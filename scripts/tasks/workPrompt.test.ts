@@ -41,7 +41,11 @@ describe('work-prompt carries the lessons a prior run paid for', () => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       const result = tasks('work-prompt', 'a-member');
       expect(result.stdout).toContain('File what you notice outside your grant; do not merely mention it.');
-      expect(result.stdout).toContain('`tasks add --kind finding`');
+      // The whole command, because the brief that told a worker `tasks add
+      // --kind finding` was telling it to run something this repository makes
+      // refuse — and the test asserting that fragment pinned the regression
+      // rather than catching it.
+      expect(result.stdout).toContain('--kind finding --fault tooling|contract|nobody --deliverable');
       expect(result.stdout).toContain('Never cite an id you have not seen in your own store');
     }));
 });

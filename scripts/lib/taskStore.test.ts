@@ -1,10 +1,11 @@
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { closeSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { makeRealGitRepo } from './realGitRepo';
-import { backfillSeq, checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, matchesSearchTerm, nearMatches, nextSeq, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
+import { tsxCli } from './tsxCli';
+import { backfillSeq, checkStore, claimSummary, CLOSING_STATES, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, matchesSearchTerm, misfiledSystem, nearMatches, nextSeq, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -24,6 +25,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     grant: null,
     fault: null,
     decider: null,
+    breaches: [],
     produces: [],
     deliverable: null,
     evidence: null,
@@ -142,6 +144,7 @@ describe('loadStore / saveStore', () => {
           grant: null,
           fault: null,
           decider: null,
+          breaches: [],
           produces: [],
           deliverable: null,
           evidence: null,
@@ -238,7 +241,7 @@ describe('loadStore / saveStore', () => {
 
       saveStore(loadStore(file), file);
       const line = readFileSync(file, 'utf8').trim();
-      const canonicalKeys = ['id', 'seq', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'departure', 'clause', 'discharges', 'requires', 'files', 'writes', 'grant', 'fault', 'decider', 'produces', 'deliverable', 'evidence', 'source', 'reason', 'trigger', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
+      const canonicalKeys = ['id', 'seq', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'departure', 'clause', 'discharges', 'requires', 'files', 'writes', 'grant', 'fault', 'decider', 'breaches', 'produces', 'deliverable', 'evidence', 'source', 'reason', 'trigger', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
       const keys = Object.keys(JSON.parse(line));
       expect(keys.slice(0, canonicalKeys.length)).toEqual(canonicalKeys);
       expect(keys.slice(canonicalKeys.length)).toEqual(['aField', 'mField', 'zField']);
@@ -272,6 +275,117 @@ describe('loadStore / saveStore', () => {
       expect(readFileSync(fileA, 'utf8').split('\n')[0]).toContain('"x-record"');
     });
   });
+});
+
+describe('misfiledSystem', () => {
+  const owner = (path: string): string | null => (path.startsWith('scripts/') ? 'Task system' : path.startsWith('src/') ? 'Runtime' : null);
+
+  it('reports a record whose every path belongs to a system other than the one it claims', () => {
+    const issue = misfiledSystem(task({ id: 'a', system: 'Testing procedure', writes: ['scripts/tasks/records.ts'], files: ['scripts/lib/taskStore.ts:12'] }), owner);
+    expect(issue).toEqual({ level: 'warning', message: 'a is filed under Testing procedure, and every path it names is owned by Task system' });
+  });
+
+  it('says nothing when one of the paths does belong to the declared system, because a record may span two', () => {
+    expect(misfiledSystem(task({ id: 'a', system: 'Runtime', writes: ['scripts/tasks/records.ts', 'src/runtime/save.ts'] }), owner)).toBeNull();
+  });
+
+  it('says nothing about a record with no system, no paths, or only paths nothing owns', () => {
+    expect(misfiledSystem(task({ id: 'a', writes: ['scripts/tasks/records.ts'] }), owner)).toBeNull();
+    expect(misfiledSystem(task({ id: 'b', system: 'Runtime' }), owner)).toBeNull();
+    expect(misfiledSystem(task({ id: 'c', system: 'Runtime', files: ['docs/audits/x.md#H1'] }), owner)).toBeNull();
+  });
+
+  it('says nothing about a closed record, whose system field can no longer hide it from anything', () => {
+    expect(misfiledSystem(task({ id: 'a', state: 'done', system: 'Testing procedure', writes: ['scripts/tasks/records.ts'] }), owner)).toBeNull();
+  });
+});
+
+describe('a store that moved under the writer', () => {
+  it('refuses rather than overwriting, and the write it would have deleted survives', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      saveStore([task({ id: 'a' })], file);
+      const mine = loadStore(file);
+      mine.push(task({ id: 'mine' }));
+
+      const theirs = [...loadStore(file), task({ id: 'theirs' })];
+      writeFileSync(file, `${theirs.map((t) => JSON.stringify({ ...t, extra: undefined })).join('\n')}\n`, 'utf8');
+
+      expect(() => saveStore(mine, file)).toThrow(StoreError);
+      expect(loadStore(file).map((t) => t.id)).toEqual(['a', 'theirs']);
+    });
+  });
+
+  it('writes a path this process never read, so a first write is not a conflict', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'fresh.jsonl');
+      writeFileSync(file, `${JSON.stringify({ id: 'planted', title: 'planted', kind: 'task', state: 'open', requires: [], files: [] })}\n`, 'utf8');
+      expect(() => saveStore([task({ id: 'a' })], file)).not.toThrow();
+      expect(loadStore(file).map((t) => t.id)).toEqual(['a']);
+    });
+  });
+
+  // Staging and renaming bought the torn read, and it cost this: Windows
+  // refuses to replace a file another process holds open, where writeFileSync
+  // did not. Which of the two answers below a platform gives is not the
+  // property — that a raw errno never reaches the caller, and that no staging
+  // file survives either answer, is.
+  it('answers a reader holding the store open with a refusal or a write, and never with a raw filesystem error', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      saveStore([task({ id: 'a' })], file);
+      const held = openSync(file, 'r');
+      let outcome: 'wrote' | unknown;
+      try {
+        saveStore([task({ id: 'b' })], file);
+        outcome = 'wrote';
+      } catch (error) {
+        outcome = error;
+      } finally {
+        closeSync(held);
+      }
+      expect(outcome === 'wrote' || outcome instanceof StoreError).toBe(true);
+      if (process.platform === 'win32') expect(outcome).toBeInstanceOf(StoreError);
+      expect(readdirSync(dir)).toEqual(['tasks.jsonl']);
+    });
+  });
+
+  it('leaves no staging file behind', () => {
+    withTmpDir((dir) => {
+      saveStore([task({ id: 'a' })], path.join(dir, 'tasks.jsonl'));
+      expect(readdirSync(dir)).toEqual(['tasks.jsonl']);
+    });
+  });
+});
+
+// The measured failure: eight concurrent `tasks add` against one store
+// printed eight `added` lines, raised zero errors and left three records on
+// disk. The property that forbids it is not "no two writers" — an
+// orchestrator dispatches writers together — but that a command claiming to
+// have added a record is a command whose record is on disk. Real processes,
+// because the hazard is between processes and nothing inside one can stage it.
+describe('writers dispatched together', () => {
+  it('never reports a record added that the store does not then hold', async () => {
+    const repoRoot = path.join(import.meta.dirname, '../..');
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-taskstore-race-'));
+    const store = path.join(dir, 'tasks.jsonl');
+    try {
+      const results = await Promise.all(
+        ['alpha', 'beta', 'gamma'].map(
+          (id) =>
+            new Promise<{ id: string; status: number }>((settle) => {
+              const child = spawn(process.execPath, [tsxCli, path.join(repoRoot, 'scripts/tasks.ts'), 'add', id, '--id', id, '--store', store], { cwd: repoRoot, stdio: 'ignore' });
+              child.on('exit', (code) => settle({ id, status: code ?? 1 }));
+            }),
+        ),
+      );
+      const claimed = results.filter((result) => result.status === 0).map((result) => result.id);
+      expect(claimed.length).toBeGreaterThan(0);
+      expect(loadStore(store).map((t) => t.id).sort()).toEqual([...claimed].sort());
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
 });
 
 // c6: a record written by a checkout that does not know `seq` exists yet is
@@ -401,6 +515,25 @@ describe('parallel branches, merged for real', () => {
     return out;
   }
 
+  // Every write below stands for one command on one branch, and a command
+  // reads the store before it writes it. That read is also what tells
+  // saveStore which file its write is replacing, and `git checkout` between
+  // two of these replaces that file — so writing twice with no read in
+  // between is a lost update here for the same reason it is one in a session.
+  // The delete-insert shapes below genuinely drop a record, which `saveStore`
+  // now refuses unless the caller says so. Declaring whatever went is what a
+  // command does; here it is derived, because the shapes differ per case and
+  // the subject under test is the merge, not the declaration.
+  const asOneCommand = (tasks: Task[]): void => {
+    const before = loadStore(storePath());
+    const staying = new Set(tasks.map((task) => task.id));
+    saveStore(
+      tasks,
+      storePath(),
+      before.map((task) => task.id).filter((id) => !staying.has(id)),
+    );
+  };
+
   it('two branches, one editing a record and adding a non-adjacent one, the other doing the same to a different record, merge with zero conflicts', () => {
     // Ten records, so the two touched regions (the first record and the
     // last, edited and added-next-to on opposite branches) sit far enough
@@ -408,7 +541,7 @@ describe('parallel branches, merged for real', () => {
     // 590-record real store's ordinary shape, not the 2-line case where
     // every line is within context of every other.
     const base = Array.from({ length: 10 }, (_, i) => task({ id: `r-${String(i).padStart(2, '0')}`, seq: i + 1 }));
-    saveStore(scrambled(base), storePath());
+    asOneCommand(scrambled(base));
     commit('base: r-00 .. r-09');
     git('branch', '-M', 'main');
 
@@ -416,7 +549,7 @@ describe('parallel branches, merged for real', () => {
     const onA = [...base];
     onA[0] = { ...onA[0], title: 'edited by A' };
     onA.splice(5, 0, task({ id: 'r-04-mid', seq: 11 }));
-    saveStore(scrambled(onA), storePath());
+    asOneCommand(scrambled(onA));
     commit('A edits r-00 and adds r-04-mid');
 
     git('checkout', '-q', 'main');
@@ -424,7 +557,7 @@ describe('parallel branches, merged for real', () => {
     const onB = [...base];
     onB[onB.length - 1] = { ...onB[onB.length - 1], title: 'edited by B' };
     onB.push(task({ id: 'zzz-b', seq: 11 }));
-    saveStore(scrambled(onB), storePath());
+    asOneCommand(scrambled(onB));
     commit('B edits r-09 and adds zzz-b');
 
     const merge = git('merge', '--no-edit', 'branch-a');
@@ -460,7 +593,7 @@ describe('parallel branches, merged for real', () => {
     // untouched record between them.
     function mergeStatus(shape: 'insert-insert' | 'edit-insert' | 'delete-insert', gap: number): number | null {
       const base = buildBase();
-      saveStore(scrambled(base), storePath());
+      asOneCommand(scrambled(base));
       commit(`base: ${N} records`);
       git('branch', '-M', 'main');
 
@@ -472,13 +605,13 @@ describe('parallel branches, merged for real', () => {
           : shape === 'edit-insert'
             ? base.map((t) => (t.id === changed.id ? { ...t, title: 'edited by A' } : t))
             : [...base, task({ id: `${changed.id}-a-ins`, seq: 101 })];
-      saveStore(scrambled(onA), storePath());
+      asOneCommand(scrambled(onA));
       commit(`A changes ${changed.id} (${shape})`);
 
       git('checkout', '-q', 'main');
       git('checkout', '-q', '-b', 'branch-b');
       const insertAfter = base[CHANGE_INDEX + gap];
-      saveStore(scrambled([...base, task({ id: `${insertAfter.id}-ins`, seq: 102 })]), storePath());
+      asOneCommand(scrambled([...base, task({ id: `${insertAfter.id}-ins`, seq: 102 })]));
       commit(`B inserts beside ${insertAfter.id} (gap ${gap})`);
 
       return git('merge', '--no-edit', 'branch-a').status;
@@ -506,18 +639,18 @@ describe('parallel branches, merged for real', () => {
     // showing the conflict and its shape rather than trying to remove it.
     it('insert-insert at gap 0 conflicts on exactly one hunk carrying both new records, resolved by keeping both', () => {
       const base = buildBase();
-      saveStore(scrambled(base), storePath());
+      asOneCommand(scrambled(base));
       commit(`base: ${N} records`);
       git('branch', '-M', 'main');
 
       const changed = base[CHANGE_INDEX];
       git('checkout', '-q', '-b', 'branch-a');
-      saveStore(scrambled([...base, task({ id: `${changed.id}-a-ins`, seq: 101 })]), storePath());
+      asOneCommand(scrambled([...base, task({ id: `${changed.id}-a-ins`, seq: 101 })]));
       commit(`A inserts beside ${changed.id}`);
 
       git('checkout', '-q', 'main');
       git('checkout', '-q', '-b', 'branch-b');
-      saveStore(scrambled([...base, task({ id: `${changed.id}-b-ins`, seq: 102 })]), storePath());
+      asOneCommand(scrambled([...base, task({ id: `${changed.id}-b-ins`, seq: 102 })]));
       commit(`B inserts beside ${changed.id}`);
 
       const merge = git('merge', '--no-edit', 'branch-a');
@@ -949,12 +1082,12 @@ describe('checkStore', () => {
 
   it('flags a duplicate id', () => {
     const issues = checkStore([task({ id: 'a' }), task({ id: 'a' })], systems, () => true);
-    expect(issues).toContainEqual({ level: 'error', message: 'duplicate id: a' });
+    expect(issues).toContainEqual({ level: 'dangling', message: 'duplicate id: a' });
   });
 
   it('flags an unresolved requires reference', () => {
     const issues = checkStore([task({ id: 'a', requires: ['ghost'] })], systems, () => true);
-    expect(issues).toContainEqual({ level: 'error', message: 'a requires unresolved id: ghost' });
+    expect(issues).toContainEqual({ level: 'dangling', message: 'a requires unresolved id: ghost' });
   });
 
   it('detects a dependency cycle exactly once', () => {
@@ -994,12 +1127,21 @@ describe('checkStore', () => {
 
   it('flags a system not in systems.json', () => {
     const issues = checkStore([task({ id: 'a', system: 'Ghost system' })], systems, () => true);
-    expect(issues).toContainEqual({ level: 'error', message: 'a has a system not in systems.json: Ghost system' });
+    expect(issues).toContainEqual({ level: 'dangling', message: 'a has a system not in systems.json: Ghost system' });
   });
 
   it('flags a spec with no file', () => {
     const issues = checkStore([task({ id: 'a', spec: 'ghost-spec' })], systems, () => false);
-    expect(issues).toContainEqual({ level: 'error', message: 'a references a spec with no file: ghost-spec' });
+    expect(issues).toContainEqual({ level: 'dangling', message: 'a references a spec with no file: ghost-spec' });
+  });
+
+  // A closed record's slug is which contract it answered, not a pointer to a
+  // file that has to outlive it — which is what let 34 historical spec files
+  // strand 336 closed records rather than being deleted.
+  it('says nothing about a closed record whose spec file is gone, whichever way it closed', () => {
+    for (const state of CLOSING_STATES) {
+      expect(checkStore([task({ id: 'a', state, spec: 'ghost-spec', ...(state === 'declined' ? { reason: 'closed by ruling' } : {}) })], systems, () => false)).toEqual([]);
+    }
   });
 
   it('warns, but does not error, on a file that no longer exists', () => {
@@ -1016,5 +1158,91 @@ describe('checkStore', () => {
 
     const missing = checkStore([task({ id: 'b', files: ['docs/audits/no-such-doc.md#H1'] })], systems, () => true);
     expect(missing).toEqual([{ level: 'warning', message: 'b lists a file that no longer exists: docs/audits/no-such-doc.md#H1' }]);
+  });
+});
+
+// c2. `saveStore` rewrites the whole file from the array it was handed, so a
+// record missing from that array leaves the store. Closing that set is the
+// durable part: an op added later cannot re-open the hole by being
+// write-path-only, because the refusal is at the write and not in a review.
+describe('a record cannot leave the store undeclared', () => {
+  const two = (): Task[] => [task({ id: 'stays' }), task({ id: 'goes' })];
+
+  it('refuses a save that would drop a record nothing declared, and writes nothing', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      saveStore(two(), file);
+      const before = readFileSync(file, 'utf8');
+
+      loadStore(file);
+      expect(() => saveStore([task({ id: 'stays' })], file)).toThrow(/would drop 1 record\(s\) nothing declared: goes/);
+      expect(readFileSync(file, 'utf8')).toBe(before);
+    });
+  });
+
+  it('accepts the same save once the drop is declared', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      saveStore(two(), file);
+
+      loadStore(file);
+      saveStore([task({ id: 'stays' })], file, ['goes']);
+      expect(loadStore(file).map((entry) => entry.id)).toEqual(['stays']);
+    });
+  });
+
+  it('names every undeclared drop, not the first, so one declaration cannot smuggle another out', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      saveStore([task({ id: 'stays' }), task({ id: 'goes' }), task({ id: 'also-goes' })], file);
+
+      loadStore(file);
+      expect(() => saveStore([task({ id: 'stays' })], file, ['goes'])).toThrow(/nothing declared: also-goes/);
+    });
+  });
+
+  it('says nothing about a store this process never read, because silence there is not evidence of a drop', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      writeFileSync(file, `${JSON.stringify(task({ id: 'written-by-somebody-else' }))}\n`, 'utf8');
+      // No `loadStore`: nothing here has seen the previous contents, so
+      // nothing here can claim a record left.
+      saveStore([task({ id: 'fresh' })], file);
+      expect(loadStore(file).map((entry) => entry.id)).toEqual(['fresh']);
+    });
+  });
+
+  // The half `saveStore` cannot enforce by itself. Declaring a drop satisfies
+  // the guard above; writing the `remove` event that names it is the caller's
+  // job, and exactly one caller does it — `saveStoreAndWarn`, which derives the
+  // declaration and the events from one `Removal` list so the two cannot
+  // disagree. So the closure of the set is "there is one caller", and that is a
+  // fact about the call graph rather than about any line, which is why it is
+  // asserted here: `saveStore(tasks, path, ['x'])` from a second call site
+  // drops a record, appends nothing, and breaks no other test in the tree.
+  it('has exactly one non-test caller, which is what pairs a declared drop with the event naming it', () => {
+    const sources = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) return sources(full);
+        return /\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name) ? [full] : [];
+      });
+
+    const outside = sources('scripts')
+      .filter((file) => path.resolve(file) !== path.resolve('scripts', 'lib', 'taskStore.ts'))
+      .map((file) => ({ at: file.split(path.sep).join('/'), text: readFileSync(file, 'utf8') }));
+
+    // Which files may name it at all. An alias would let a new file call it
+    // under another name, so the import is checked and not only the call.
+    const importers = outside.filter(({ text }) => /\bsaveStore\b/.test(text)).map(({ at }) => at);
+    expect(importers).toEqual(['scripts/tasks/context.ts']);
+    const context = outside.find(({ at }) => at === 'scripts/tasks/context.ts')!.text;
+    expect(context, 'saveStore is imported unaliased, so counting its calls by name is exhaustive').toMatch(/import \{[^}]*\bsaveStore,/);
+
+    // And how many times. Asserting the *file list* left a second call inside
+    // `context.ts` itself invisible — pass 2 measured that mutation surviving
+    // all 2056 tests — because the file was already in the allowed list. The
+    // count is the property; the location is not.
+    expect(context.match(/\bsaveStore\s*\(/g)).toHaveLength(1);
   });
 });

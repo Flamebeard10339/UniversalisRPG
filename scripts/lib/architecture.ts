@@ -209,7 +209,7 @@ export interface RegionView {
   // inside it is ordinary coupling; what crosses a boundary is the
   // architectural fact.
   importsOut: Array<{ path: string; system: string }>;
-  importedBy: Array<{ path: string; system: string }>;
+  importedBy: Array<{ path: string; system: string; crossesBoundary: boolean }>;
 }
 
 export function regionView(manifest: Manifest, tree: SourceTree, modules: Module[], path: string): RegionView {
@@ -241,7 +241,11 @@ export function regionView(manifest: Manifest, tree: SourceTree, modules: Module
     importsOut: [...importsOut].map(([to, system]) => ({ path: to, system })),
     importedBy: modules
       .filter((candidate) => !inRegion.has(candidate.path) && candidate.system !== null)
-      .filter((candidate) => candidate.imports.some((to) => inRegion.has(to) && byPath.get(to)?.system !== candidate.system))
-      .map((candidate) => ({ path: candidate.path, system: candidate.system as string })),
+      .filter((candidate) => candidate.imports.some((to) => inRegion.has(to)))
+      .map((candidate) => ({
+        path: candidate.path,
+        system: candidate.system as string,
+        crossesBoundary: candidate.imports.some((to) => inRegion.has(to) && byPath.get(to)?.system !== candidate.system),
+      })),
   };
 }

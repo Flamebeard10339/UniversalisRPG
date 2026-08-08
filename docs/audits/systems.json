@@ -2,27 +2,75 @@
   "unowned": {
     "note": "Deliberately chargeable to no system: prose, audit records, and the repo-wide manifests that change for every system's reasons and none of their own. Everything else must be owned, and audit-status fails when a tracked file is neither.",
     "paths": [
-      "docs",
+      "*.md",
       ".claude/launch.json",
       ".gitignore",
-      "package.json",
+      ".planning",
+      "docs",
       "package-lock.json",
-      "tsconfig.json",
-      "*.md",
-      ".planning"
+      "package.json",
+      "tsconfig.json"
     ]
   },
   "systems": [
     {
       "name": "DSL load path",
       "paths": [
-        "src/grammar",
-        "src/content",
-        "content"
+        "content/tutorial-island.dsl",
+        "src/content/dialogue.ts",
+        "src/content/dropTable.test.ts",
+        "src/content/dropTable.ts",
+        "src/content/entity.ts",
+        "src/content/entityType.test.ts",
+        "src/content/entityType.ts",
+        "src/content/flag.ts",
+        "src/content/flags.test.ts",
+        "src/content/info.ts",
+        "src/content/item.ts",
+        "src/content/location.ts",
+        "src/content/merge.test.ts",
+        "src/content/merge.ts",
+        "src/content/module.ts",
+        "src/content/namespace.ts",
+        "src/content/parse.test.ts",
+        "src/content/recipe.ts",
+        "src/content/referenceSites.ts",
+        "src/content/references.test.ts",
+        "src/content/references.ts",
+        "src/content/registry.ts",
+        "src/content/removal.ts",
+        "src/content/resolve.test.ts",
+        "src/content/resolve.ts",
+        "src/content/resource.ts",
+        "src/content/saveSection.ts",
+        "src/content/skill.ts",
+        "src/content/stat.ts",
+        "src/content/test.test.ts",
+        "src/content/test.ts",
+        "src/content/tuningVariables.ts",
+        "src/content/typed.ts",
+        "src/content/universe.test.ts",
+        "src/content/universe.ts",
+        "src/content/variable.ts",
+        "src/grammar/action.ts",
+        "src/grammar/actionResult.ts",
+        "src/grammar/condition.ts",
+        "src/grammar/dependency.ts",
+        "src/grammar/list.ts",
+        "src/grammar/parser.ts",
+        "src/grammar/range.test.ts",
+        "src/grammar/range.ts",
+        "src/grammar/section.ts",
+        "src/grammar/structure.ts",
+        "src/grammar/tagClause.ts",
+        "src/grammar/values.ts"
+      ],
+      "covers": [
+        "src/content"
       ],
       "lastAudit": "f8c8c8d",
       "lastAuditDoc": "docs/audits/dsl-load-path-2026-07-30-pass2.md",
-      "note": "Pass 2 (2026-07-30) audited the half no previous pass had: content/, the shipped DSL. Its one in-window commit changed two lines of a # save fixture, and that fixture is H1 — integration.test.ts runs every shipped # test from a bare createGameState(), so the whole tutorial route plays with the health pool never initialised, on empty: can never fire (setPoolLevel needs current > 0), and miki-route-end pins health at 0. The same test against a live session fails 21000 vs 0, so /test and CI disagree about it; this is also the root cause of Runtime M1, which measured the symptom. M1: the route skips node skills, so 4 of 8 dialogue nodes and both equipment items are unreached and the stat-bonus system has no shipped coverage. M2 is a fourth reproduction of pass 1's open H1, on dependencies: — block form silently drops the version constraint. Pass 1 (dsl-load-path-2026-07-30.md) is the loader audit and every one of its findings is still open; read it for the loader, this one for the content. Earlier history is in dsl-modules-2026-07-29-reconciled.md. The contribution system's files under src/content are owned by both, which is double coverage rather than a gap.",
+      "note": "Pass 2 (2026-07-30) audited the half no previous pass had: content/, the shipped DSL. Its one in-window commit changed two lines of a # save fixture, and that fixture is H1 — integration.test.ts runs every shipped # test from a bare createGameState(), so the whole tutorial route plays with the health pool never initialised, on empty: can never fire (setPoolLevel needs current > 0), and miki-route-end pins health at 0. The same test against a live session fails 21000 vs 0, so /test and CI disagree about it; this is also the root cause of Runtime M1, which measured the symptom. M1: the route skips node skills, so 4 of 8 dialogue nodes and both equipment items are unreached and the stat-bonus system has no shipped coverage. M2 is a fourth reproduction of pass 1's open H1, on dependencies: — block form silently drops the version constraint. Pass 1 (dsl-load-path-2026-07-30.md) is the loader audit and every one of its findings is still open; read it for the loader, this one for the content. Earlier history is in dsl-modules-2026-07-29-reconciled.md. The contribution system's files under src/content are owned by it and read by this one, which is what `covers` now says outright rather than leaving to a directory grant that also conferred ownership.",
       "concepts": [
         {
           "name": "the parser",
@@ -34,8 +82,8 @@
         {
           "name": "the section field engine",
           "paths": [
-            "src/grammar/section.ts",
-            "src/grammar/action.ts"
+            "src/grammar/action.ts",
+            "src/grammar/section.ts"
           ],
           "note": "Named by dsl-load-path-2026-07-28-m2, which verified action.ts holds a second, laxer copy of it — hence the second path."
         },
@@ -49,8 +97,8 @@
         {
           "name": "reference validation",
           "paths": [
-            "src/content/references.ts",
-            "src/content/referenceSites.ts"
+            "src/content/referenceSites.ts",
+            "src/content/references.ts"
           ],
           "note": "Named 'reference validation' by dsl-load-path-2026-07-28-h2 and game-engine-2026-07-27-pass2-m1, both of which measured how much of the class it covers."
         },
@@ -75,7 +123,39 @@
     {
       "name": "Runtime",
       "paths": [
-        "src/runtime"
+        "src/runtime/actions.ts",
+        "src/runtime/cadence.test.ts",
+        "src/runtime/conditions.ts",
+        "src/runtime/contest.test.ts",
+        "src/runtime/dialogue-runtime.ts",
+        "src/runtime/dropTable.test.ts",
+        "src/runtime/effects.ts",
+        "src/runtime/encounter.test.ts",
+        "src/runtime/encounter.ts",
+        "src/runtime/enemy-pool.test.ts",
+        "src/runtime/equipment.test.ts",
+        "src/runtime/equipment.ts",
+        "src/runtime/forwardProgress.ts",
+        "src/runtime/integration.test.ts",
+        "src/runtime/location.test.ts",
+        "src/runtime/recipe.test.ts",
+        "src/runtime/resolve.test.ts",
+        "src/runtime/resource.test.ts",
+        "src/runtime/rng.test.ts",
+        "src/runtime/rng.ts",
+        "src/runtime/runtime.test.ts",
+        "src/runtime/runtime.ts",
+        "src/runtime/save.test.ts",
+        "src/runtime/save.ts",
+        "src/runtime/session.test.ts",
+        "src/runtime/session.ts",
+        "src/runtime/stat.test.ts",
+        "src/runtime/state.ts",
+        "src/runtime/stats.ts",
+        "src/runtime/stopping.test.ts",
+        "src/runtime/time.test.ts",
+        "src/runtime/tuning.ts",
+        "src/runtime/units.ts"
       ],
       "lastAudit": "d7c6493",
       "lastAuditDoc": "docs/audits/runtime-2026-07-30.md",
@@ -114,26 +194,26 @@
     {
       "name": "Contribution system",
       "paths": [
-        "src/content/contribution.ts",
-        "src/content/contribution.test.ts",
-        "src/content/issueForm.test.ts",
-        "src/content/localChanges.ts",
-        "src/content/localChanges.test.ts",
-        "src/content/modportal.ts",
-        "src/content/modportal.test.ts",
-        "src/content/registryDiff.ts",
-        "src/content/roundTrip.ts",
-        "src/content/roundTrip.test.ts",
-        "src/content/serialize.ts",
-        "src/content/serialize.test.ts",
-        "scripts/modportal.ts",
-        "scripts/modportal.test.ts",
-        "scripts/publish-local-changes.ts",
-        "scripts/publish-local-changes.test.ts",
-        "scripts/squash-local-changes.ts",
-        "scripts/squash-local-changes.test.ts",
+        ".github/ISSUE_TEMPLATE/content-contribution.yml",
         "scripts/lib/modportalCache.ts",
-        ".github/ISSUE_TEMPLATE/content-contribution.yml"
+        "scripts/modportal.test.ts",
+        "scripts/modportal.ts",
+        "scripts/publish-local-changes.test.ts",
+        "scripts/publish-local-changes.ts",
+        "scripts/squash-local-changes.test.ts",
+        "scripts/squash-local-changes.ts",
+        "src/content/contribution.test.ts",
+        "src/content/contribution.ts",
+        "src/content/issueForm.test.ts",
+        "src/content/localChanges.test.ts",
+        "src/content/localChanges.ts",
+        "src/content/modportal.test.ts",
+        "src/content/modportal.ts",
+        "src/content/registryDiff.ts",
+        "src/content/roundTrip.test.ts",
+        "src/content/roundTrip.ts",
+        "src/content/serialize.test.ts",
+        "src/content/serialize.ts"
       ],
       "lastAudit": "f8c8c8d",
       "lastAuditDoc": "docs/audits/contribution-system-2026-07-30.md",
@@ -142,18 +222,18 @@
         {
           "name": "local changes",
           "paths": [
-            "src/content/localChanges.ts",
             "scripts/publish-local-changes.ts",
-            "scripts/squash-local-changes.ts"
+            "scripts/squash-local-changes.ts",
+            "src/content/localChanges.ts"
           ],
           "note": "Named 'Local Changes' eleven times across docs/audits/contribution-system-*.md."
         },
         {
           "name": "mod portal",
           "paths": [
-            "src/content/modportal.ts",
+            "scripts/lib/modportalCache.ts",
             "scripts/modportal.ts",
-            "scripts/lib/modportalCache.ts"
+            "src/content/modportal.ts"
           ],
           "note": "Named 'mod portal' in docs/audits/contribution-system-2026-07-30.md, whose H1 and M1 are both about it."
         },
@@ -183,157 +263,110 @@
     {
       "name": "User interface",
       "paths": [
-        "src/ui",
-        "src/main.tsx",
-        "src/index.css",
-        "src/vite-env.d.ts",
         "index.html",
-        "public",
         "postcss.config.js",
+        "public/changelog.txt",
+        "public/favicon.svg",
+        "src/index.css",
+        "src/main.tsx",
+        "src/vite-env.d.ts",
         "tailwind.config.js"
       ],
       "lastAudit": "f8c8c8d",
       "lastAuditDoc": "docs/audits/user-interface-2026-07-30.md",
-      "note": "src/ui still does not exist, so coverage stays structurally limited until the GUI rebuild. The 2026-07-30 pass verified 060dd3e closed UI-H1 (the attic exclude), UI-M1 (270 to 70 lines of CSS, 16.57 to 6.98 kB), UI-M2 (public/content/) and UI-M3 (twelve unimported dependencies, reactflow included), and that 73a73f3's partition closed the 2026-07-28 orphan list — public/, postcss.config.js, tailwind.config.js and src/vite-env.d.ts are members now, which is why this system had a window at all. M1 is the one file of that sweep left standing: public/changelog.txt has no reader by the same grep that condemned public/content/, ships to itch.io and into the APK, and advertises the deleted legacy GUI's features under version 0.1.0. Its lows are the inherited remainder — 14 unused colour properties and seven data-theme/data-font-size rules nothing sets, a Tailwind glob sweeping three layers below this one, and a theme-color hand-copied from the stylesheet."
+      "note": "src/ui still does not exist, so coverage stays structurally limited until the GUI rebuild. The 2026-07-30 pass verified 060dd3e closed UI-H1 (the attic exclude), UI-M1 (270 to 70 lines of CSS, 16.57 to 6.98 kB), UI-M2 (public/content/) and UI-M3 (twelve unimported dependencies, reactflow included), and that 73a73f3's partition closed the 2026-07-28 orphan list — public/, postcss.config.js, tailwind.config.js and src/vite-env.d.ts are members now, which is why this system had a window at all. M1 is the one file of that sweep left standing: public/changelog.txt has no reader by the same grep that condemned public/content/, ships to itch.io and into the APK, and advertises the deleted legacy GUI's features under version 0.1.0. Its lows are the inherited remainder — 14 unused colour properties and seven data-theme/data-font-size rules nothing sets, a Tailwind glob sweeping three layers below this one, and a theme-color hand-copied from the stylesheet.",
+      "concepts": []
     },
     {
       "name": "Task system",
       "paths": [
-        "scripts/tasks.ts",
-        "scripts/tasks.test.ts",
-        "scripts/tasks",
-        "scripts/lib/taskStore.ts",
-        "scripts/lib/taskStore.test.ts",
-        "scripts/lib/eventLog.ts",
-        "scripts/lib/eventLog.test.ts",
-        "scripts/lib/specDoc.ts",
-        "scripts/lib/specDoc.test.ts",
-        "scripts/lib/planCheck.ts",
-        "scripts/lib/planCheck.test.ts",
-        "scripts/lib/producers.ts",
-        "scripts/lib/producers.test.ts",
-        "scripts/lib/auditImport.ts",
-        "scripts/lib/auditImport.test.ts",
-        "scripts/lib/commitContract.ts",
-        "scripts/lib/commitContract.test.ts",
-        "scripts/lib/architecture.ts",
         "scripts/lib/architecture.test.ts",
-        "scripts/lib/roadmap.ts",
-        "scripts/lib/roadmap.test.ts",
-        "scripts/lib/orderIndependence.test.ts",
+        "scripts/lib/architecture.ts",
+        "scripts/lib/auditImport.test.ts",
+        "scripts/lib/auditImport.ts",
+        "scripts/lib/bytes.test.ts",
         "scripts/lib/bytes.ts",
-        "scripts/lib/bytes.test.ts"
+        "scripts/lib/commitContract.test.ts",
+        "scripts/lib/commitContract.ts",
+        "scripts/lib/eventLog.test.ts",
+        "scripts/lib/eventLog.ts",
+        "scripts/lib/git.test.ts",
+        "scripts/lib/git.ts",
+        "scripts/lib/orderIndependence.test.ts",
+        "scripts/lib/planCheck.test.ts",
+        "scripts/lib/planCheck.ts",
+        "scripts/lib/producers.test.ts",
+        "scripts/lib/producers.ts",
+        "scripts/lib/realGitRepo.ts",
+        "scripts/lib/roadmap.test.ts",
+        "scripts/lib/roadmap.ts",
+        "scripts/lib/specDoc.test.ts",
+        "scripts/lib/specDoc.ts",
+        "scripts/lib/systems.test.ts",
+        "scripts/lib/systems.ts",
+        "scripts/lib/taskStore.test.ts",
+        "scripts/lib/taskStore.ts",
+        "scripts/tasks.test.ts",
+        "scripts/tasks.ts",
+        "scripts/tasks/architectureCmds.test.ts",
+        "scripts/tasks/architectureCmds.ts",
+        "scripts/tasks/audit.test.ts",
+        "scripts/tasks/audit.ts",
+        "scripts/tasks/auditPrompt.test.ts",
+        "scripts/tasks/auditPrompt.ts",
+        "scripts/tasks/briefLessons.test.ts",
+        "scripts/tasks/briefLessons.ts",
+        "scripts/tasks/cli.ts",
+        "scripts/tasks/cliFixtures.test.ts",
+        "scripts/tasks/cliFixtures.ts",
+        "scripts/tasks/commands.ts",
+        "scripts/tasks/context.ts",
+        "scripts/tasks/doctor.test.ts",
+        "scripts/tasks/doctor.ts",
+        "scripts/tasks/friction.test.ts",
+        "scripts/tasks/friction.ts",
+        "scripts/tasks/handoff.test.ts",
+        "scripts/tasks/handoff.ts",
+        "scripts/tasks/mergeReady.test.ts",
+        "scripts/tasks/mergeReady.ts",
+        "scripts/tasks/orchestratePrompt.test.ts",
+        "scripts/tasks/orchestratePrompt.ts",
+        "scripts/tasks/planPrompt.test.ts",
+        "scripts/tasks/planPrompt.ts",
+        "scripts/tasks/prompt.ts",
+        "scripts/tasks/realGitFixture.ts",
+        "scripts/tasks/records.test.ts",
+        "scripts/tasks/records.ts",
+        "scripts/tasks/render.test.ts",
+        "scripts/tasks/render.ts",
+        "scripts/tasks/resolveIds.ts",
+        "scripts/tasks/roadmapCmd.test.ts",
+        "scripts/tasks/roadmapCmd.ts",
+        "scripts/tasks/specCmds.test.ts",
+        "scripts/tasks/specCmds.ts",
+        "scripts/tasks/triage.test.ts",
+        "scripts/tasks/triage.ts",
+        "scripts/tasks/workPrompt.test.ts",
+        "scripts/tasks/workPrompt.ts"
       ],
-      "lastAudit": "6895198",
+      "lastAudit": "7508489ac3e345b32dbf51fe796bfabdf2e09e57",
       "lastAuditDoc": "docs/audits/task-system-2026-08-08.md",
-      "note": "Carved out of Testing procedure on 2026-08-03 by task-system-refactor: the workflow tool is a system, not a testing utility. Branch-level audit history for this code lives in the task-system-* and testing-procedure-2026-08-0x docs under docs/audits/. First whole-system sweep 2026-08-08 at 6895198, nine auditors over disjoint regions: 35 findings, 16 high. It corrected both premises it was commissioned on. tasks plan is not structurally blind -- all three Phase 3 grants were commitment, so the softening never engaged and the check reported no overlap because the record was false (one task declared 4 files and wrote 20). And the data needed to model \"these two files must agree\" already exists: architecture.ts walks every import edge and regionView.importedBy then filters callers to cross-system ones, so context.ts prints none of its fifteen importers. The reported symptom -- agents reading stale or incomplete information -- is a torn read: saveStore is writeFileSync over the whole file, so 1825 of 1826 reads during two concurrent writes answered short, and eight concurrent adds produced eight successes and three records. Section 7 orders the work; the first five changes are a few lines each and retire eleven of the sixteen highs.",
+      "note": "Frozen as of the 2026-08-08 sweep: no further work on the tracker until the MVP is complete. What remains is filed and ordered in docs/tasks.jsonl, and docs/audits/task-system-2026-08-08.md is the diagnosis it was frozen against.",
       "concepts": [
         {
-          "name": "the event log",
-          "paths": [
-            "scripts/lib/eventLog.ts"
-          ],
-          "note": "Named 'the event log' three times across docs/audits/testing-procedure-*.md."
-        },
-        {
-          "name": "the commit contract",
-          "paths": [
-            "scripts/lib/commitContract.ts"
-          ],
-          "note": "Named 'the commit contract' three times across docs/audits/testing-procedure-*.md."
-        },
-        {
-          "name": "the task record",
+          "name": "atomic store write",
           "paths": [
             "scripts/lib/taskStore.ts"
           ],
-          "note": "coord-fields produced 'writes grant' and 'produces claim', both fields of the record this file defines."
+          "note": "produced by store-writes-atomically: saveStore stages and renames, and refuses a write over a store that moved since this process read it"
         },
         {
-          "name": "spec documents",
-          "paths": [
-            "scripts/lib/specDoc.ts"
-          ],
-          "note": "The clause and audit-pass machinery; testing-procedure-2026-07-30-pass2-m3 is about its writers."
-        },
-        {
-          "name": "plan report",
-          "paths": [
-            "scripts/lib/planCheck.ts"
-          ],
-          "note": "Produced by coord-plan, closed; the claim is recorded on that task."
-        },
-        {
-          "name": "derived architecture view",
-          "paths": [
-            "scripts/lib/architecture.ts"
-          ],
-          "note": "Produced by arch-derived-view, closed; the claim is recorded on that task."
-        },
-        {
-          "name": "whole-store produces query",
-          "paths": [
-            "scripts/lib/producers.ts"
-          ],
-          "note": "Produced by arch-query-commands; the claim is recorded on that task."
-        },
-        {
-          "name": "roadmap view",
-          "paths": [
-            "scripts/lib/roadmap.ts"
-          ],
-          "note": "produced by roadmap-view; the deferred-backlog frontier tasks next cannot answer"
-        },
-        {
-          "name": "prior art by path",
-          "paths": [
-            "scripts/lib/producers.ts"
-          ],
-          "note": "produced by prior-art-by-path; the path-keyed index, distinct from the name-keyed produces query sharing this file"
-        },
-        {
-          "name": "ruling query",
-          "paths": [
-            "scripts/lib/producers.ts",
-            "scripts/tasks/architectureCmds.ts"
-          ],
-          "note": "produced by survey-cannot-see-rulings: reads a closed record's reason and event-log decisions for the queried path or its basename, distinct from the writes/files claim query"
-        },
-        {
-          "name": "generated planner brief",
-          "paths": [
-            "scripts/tasks/planPrompt.ts"
-          ],
-          "note": "produced by plan-prompt-brief: symmetric with the generated worker brief and auditor brief, tasks plan-prompt runs step 1's survey (tasks where) over named paths instead of listing commands"
-        },
-        {
-          "name": "decline trigger",
+          "name": "blocking question",
           "paths": [
             "scripts/lib/taskStore.ts",
             "scripts/tasks/records.ts"
           ],
-          "note": "produced by decline-trigger-is-write-only: Task.trigger plus tasks list --triggered, a queue for a decline's revisit condition"
-        },
-        {
-          "name": "proof target resolution",
-          "paths": [
-            "scripts/tasks/auditPrompt.ts"
-          ],
-          "note": "produced by targets-resolve-across-files"
-        },
-        {
-          "name": "generated auditor brief",
-          "paths": [
-            "scripts/tasks/auditPrompt.ts"
-          ],
-          "note": "produced by brief-arrives-with-answers"
-        },
-        {
-          "name": "mergeable task store",
-          "paths": [
-            "scripts/lib/taskStore.ts"
-          ],
-          "note": "produced by the-task-store-survives-parallel-branches: id-sorted saveStore plus a seq field carrying creation order, so parallel branches merge per-record instead of colliding on tail-append"
+          "note": "produced by a-record-carries-its-fault-and-a-question-blocks-only-what-d"
         },
         {
           "name": "clause deferral",
@@ -345,28 +378,65 @@
           "note": "produced by a-clause-can-be-deferred-and-a-spec-can-carry-its-goal: its wording is the pass-file skeleton (auditPrompt.ts) and its behaviour is the interactive walk (audit.ts)"
         },
         {
-          "name": "non-interactive triage",
+          "name": "decider routing",
           "paths": [
-            "scripts/tasks/triage.ts",
-            "scripts/tasks/records.ts",
-            "scripts/tasks/commands.ts"
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/handoff.ts",
+            "scripts/tasks/workPrompt.ts"
           ],
-          "note": "produced by every-triage-action-has-a-non-interactive-form: tasks defer/redirect/ask, and the TRIAGE_ACTIONS table cmdTriage dispatches from"
+          "note": "produced by a-question-s-decider-changes-what-the-tooling-does-with-it: awaitsADecider, and the three routes that read it — work-prompt briefs an answer instead of an implementation, the member queue does not dispatch one, and start refuses to claim one"
         },
         {
-          "name": "spec ownership inference",
+          "name": "decline trigger",
           "paths": [
-            "scripts/tasks/mergeReady.ts"
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/records.ts"
           ],
-          "note": "produced by a-branch-knows-which-spec-it-owes"
+          "note": "produced by decline-trigger-is-write-only: Task.trigger plus tasks list --triggered, a queue for a decline's revisit condition"
         },
         {
-          "name": "orchestrator brief",
+          "name": "derived architecture view",
           "paths": [
-            "scripts/tasks/orchestratePrompt.ts",
-            "scripts/tasks/briefLessons.ts"
+            "scripts/lib/architecture.ts"
           ],
-          "note": "produced by briefs-carry-the-lessons"
+          "note": "Produced by arch-derived-view, closed; the claim is recorded on that task."
+        },
+        {
+          "name": "file-level system ownership",
+          "paths": [
+            "scripts/lib/systems.ts",
+            "scripts/lib/systems.test.ts"
+          ],
+          "note": "produced by every-system-owns-its-files-by-name: System.paths is exact files and checkManifest refuses a directory there, System.covers holds the directories that widen an audit window and confer nothing, and orphanedFiles reads ownership only"
+        },
+        {
+          "name": "friction recurrence",
+          "paths": [
+            "scripts/lib/eventLog.ts",
+            "scripts/tasks/records.ts"
+          ],
+          "note": "produced by a-recurrence-is-appended-and-filing-shows-what-already-claim: the recur op and tasks recur, an occurrence appended against a filed friction with its own note; the count is read back off the occurrences and nothing is stored"
+        },
+        {
+          "name": "generated auditor brief",
+          "paths": [
+            "scripts/tasks/auditPrompt.ts"
+          ],
+          "note": "produced by brief-arrives-with-answers"
+        },
+        {
+          "name": "generated planner brief",
+          "paths": [
+            "scripts/tasks/planPrompt.ts"
+          ],
+          "note": "produced by plan-prompt-brief: symmetric with the generated worker brief and auditor brief, tasks plan-prompt runs step 1's survey (tasks where) over named paths instead of listing commands"
+        },
+        {
+          "name": "git facts as data",
+          "paths": [
+            "scripts/lib/git.ts"
+          ],
+          "note": "produced by the-git-seam-is-the-only-way-the-task-system-reads-git"
         },
         {
           "name": "lesson handle",
@@ -376,50 +446,121 @@
           "note": "produced by a-lesson-has-a-handle-that-survives-rewording-it"
         },
         {
+          "name": "mergeable task store",
+          "paths": [
+            "scripts/lib/taskStore.ts"
+          ],
+          "note": "produced by the-task-store-survives-parallel-branches: id-sorted saveStore plus a seq field carrying creation order, so parallel branches merge per-record instead of colliding on tail-append"
+        },
+        {
+          "name": "non-interactive triage",
+          "paths": [
+            "scripts/tasks/commands.ts",
+            "scripts/tasks/records.ts",
+            "scripts/tasks/triage.ts"
+          ],
+          "note": "produced by every-triage-action-has-a-non-interactive-form: tasks defer/redirect/ask, and the TRIAGE_ACTIONS table cmdTriage dispatches from"
+        },
+        {
+          "name": "orchestrator brief",
+          "paths": [
+            "scripts/tasks/briefLessons.ts",
+            "scripts/tasks/orchestratePrompt.ts"
+          ],
+          "note": "produced by briefs-carry-the-lessons"
+        },
+        {
+          "name": "plan report",
+          "paths": [
+            "scripts/lib/planCheck.ts"
+          ],
+          "note": "Produced by coord-plan, closed; the claim is recorded on that task."
+        },
+        {
+          "name": "prior art by path",
+          "paths": [
+            "scripts/lib/producers.ts"
+          ],
+          "note": "produced by prior-art-by-path; the path-keyed index, distinct from the name-keyed produces query sharing this file"
+        },
+        {
+          "name": "process friction channel",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/friction.ts"
+          ],
+          "note": "produced by one-query-over-the-channel-and-the-second-place-retired: tasks friction over the store's fault and breaches fields and the log's recur and checked events, plus tasks checked; .planning/agent-feedback/tool-friction.md is retired and no generated brief names a second place"
+        },
+        {
+          "name": "proof target resolution",
+          "paths": [
+            "scripts/tasks/auditPrompt.ts"
+          ],
+          "note": "produced by targets-resolve-across-files"
+        },
+        {
           "name": "record fault",
           "paths": [
             "scripts/lib/taskStore.ts",
-            "scripts/tasks/records.ts",
-            "scripts/tasks/audit.ts"
+            "scripts/tasks/audit.ts",
+            "scripts/tasks/records.ts"
           ],
           "note": "produced by a-record-carries-its-fault-and-a-question-blocks-only-what-d"
         },
         {
-          "name": "blocking question",
+          "name": "roadmap view",
           "paths": [
+            "scripts/lib/roadmap.ts"
+          ],
+          "note": "produced by roadmap-view; the deferred-backlog frontier tasks next cannot answer"
+        },
+        {
+          "name": "ruling query",
+          "paths": [
+            "scripts/lib/producers.ts",
+            "scripts/tasks/architectureCmds.ts"
+          ],
+          "note": "produced by survey-cannot-see-rulings: reads a closed record's reason and event-log decisions for the queried path or its basename, distinct from the writes/files claim query"
+        },
+        {
+          "name": "spec documents",
+          "paths": [
+            "scripts/lib/specDoc.ts"
+          ],
+          "note": "The clause and audit-pass machinery; testing-procedure-2026-07-30-pass2-m3 is about its writers."
+        },
+        {
+          "name": "spec ownership inference",
+          "paths": [
+            "scripts/tasks/mergeReady.ts"
+          ],
+          "note": "produced by a-branch-knows-which-spec-it-owes"
+        },
+        {
+          "name": "store removal record",
+          "paths": [
+            "scripts/lib/eventLog.ts",
             "scripts/lib/taskStore.ts",
+            "scripts/tasks/context.ts",
+            "scripts/tasks/doctor.ts",
             "scripts/tasks/records.ts"
           ],
-          "note": "produced by a-record-carries-its-fault-and-a-question-blocks-only-what-d"
-        }
-      ]
-    },
-    {
-      "name": "Testing procedure",
-      "paths": [
-        "scripts/play-cli.ts",
-        "scripts/play-cli.test.ts",
-        "scripts/probe.ts",
-        "scripts/probe.test.ts",
-        "scripts/mutate.ts",
-        "scripts/mutate.test.ts",
-        "scripts/migrate-saves.ts",
-        "scripts/migrate-saves.test.ts",
-        "scripts/inspect.ts",
-        "scripts/inspect.test.ts",
-        "scripts/audit-status.ts",
-        "scripts/layer-check.ts",
-        "scripts/session-timing.ts",
-        "scripts/session-timing.test.ts",
-        "scripts/lib",
-        ".claude/hooks",
-        ".claude/settings.json",
-        ".github/workflows/test.yml"
-      ],
-      "lastAudit": "4631baa",
-      "lastAuditDoc": "docs/audits/testing-procedure-2026-07-30.md",
-      "note": "The 2026-07-30 pass verified the 2026-07-28 closures and found H1: /test runs a # test against the LIVE session state, so it rewinds the player and makes /create-valid-test emit a test that fails on its own first replay — reproduced end to end. Its mediums are one theme, gates claiming more than they check: an unresolvable lastAudit aborts the whole ledger before any verdict, the doc gate or the partition check, and 7676c09's hook reads that crash as silence (M1); layer-check never reads any file directly under src/, in either direction (M2); /create-test is the one authoring command that bypasses the /dsl machinery that would validate and persist it (M3). Owns .claude/hooks (2026-07-28 M5). Its scripts coverage names the files it implements, except that scripts/lib is declared whole and so double-charges the contribution system's modportalCache.ts — L4, open. Eleven of this window's sixteen commits reached it only through scripts/play-cli.ts, which is a downstream consumer of every layer beneath it; the coverage is still earned, since nobody else audits that file and H1 and M3 are both in it. runTest and # test parsing live under src/ and are covered by the DSL load path and Runtime as well. Since then this system gained scripts/probe.ts and scripts/mutate.ts, audited three times at branch level (not a system sweep, so lastAudit is unmoved): testing-procedure-2026-08-03-probe-tooling.md, -pass2.md and -pass3.md. Each pass found HIGHs in the code the previous pass's fixes had just written, and the recurring shape was a decision placed where no test could reach it — inside main(), or behind a test that asserted on a callback's output rather than its argument. Nine pass-3 mediums and lows are open and unreviewed; the branch merged with only its HIGHs closed, by decision.",
-      "concepts": [
+          "note": "produced by a-record-cannot-leave-the-store-unrecorded: the remove op and tasks remove, saveStore refusing an undeclared drop, and reconcile over the log against the store with the coverage it does not have"
+        },
+        {
+          "name": "the commit contract",
+          "paths": [
+            "scripts/lib/commitContract.ts"
+          ],
+          "note": "Named 'the commit contract' three times across docs/audits/testing-procedure-*.md."
+        },
+        {
+          "name": "the event log",
+          "paths": [
+            "scripts/lib/eventLog.ts"
+          ],
+          "note": "Named 'the event log' three times across docs/audits/testing-procedure-*.md."
+        },
         {
           "name": "the systems manifest",
           "paths": [
@@ -428,10 +569,62 @@
           "note": "testing-procedure-2026-07-30-pass2-m6 is about this concept having had two readers and two type declarations; arch-ownership-seam produced its ownership rule and concept schema here."
         },
         {
+          "name": "the task record",
+          "paths": [
+            "scripts/lib/taskStore.ts"
+          ],
+          "note": "coord-fields produced 'writes grant' and 'produces claim', both fields of the record this file defines."
+        },
+        {
+          "name": "whole-store produces query",
+          "paths": [
+            "scripts/lib/producers.ts"
+          ],
+          "note": "Produced by arch-query-commands; the claim is recorded on that task."
+        }
+      ]
+    },
+    {
+      "name": "Testing procedure",
+      "paths": [
+        ".claude/hooks/block-main-git-writes.sh",
+        ".claude/hooks/commit-msg",
+        ".claude/hooks/lib/git-write-dirs.js",
+        ".claude/hooks/lib/hook-field.js",
+        ".claude/settings.json",
+        ".github/workflows/test.yml",
+        "scripts/audit-status.ts",
+        "scripts/inspect.test.ts",
+        "scripts/inspect.ts",
+        "scripts/layer-check.ts",
+        "scripts/lib/layers.test.ts",
+        "scripts/lib/layers.ts",
+        "scripts/lib/sessionTiming.test.ts",
+        "scripts/lib/sessionTiming.ts",
+        "scripts/lib/sourceFiles.ts",
+        "scripts/lib/stripComments.test.ts",
+        "scripts/lib/stripComments.ts",
+        "scripts/lib/tsxCli.ts",
+        "scripts/migrate-saves.test.ts",
+        "scripts/migrate-saves.ts",
+        "scripts/mutate.test.ts",
+        "scripts/mutate.ts",
+        "scripts/play-cli.test.ts",
+        "scripts/play-cli.ts",
+        "scripts/probe.test.ts",
+        "scripts/probe.ts",
+        "scripts/session-timing.test.ts",
+        "scripts/session-timing.ts"
+      ],
+      "lastAudit": "4631baa",
+      "lastAuditDoc": "docs/audits/testing-procedure-2026-07-30.md",
+      "note": "The 2026-07-30 pass verified the 2026-07-28 closures and found H1: /test runs a # test against the LIVE session state, so it rewinds the player and makes /create-valid-test emit a test that fails on its own first replay — reproduced end to end. Its mediums are one theme, gates claiming more than they check: an unresolvable lastAudit aborts the whole ledger before any verdict, the doc gate or the partition check, and 7676c09's hook reads that crash as silence (M1); layer-check never reads any file directly under src/, in either direction (M2); /create-test is the one authoring command that bypasses the /dsl machinery that would validate and persist it (M3). Owns .claude/hooks (2026-07-28 M5). Its scripts coverage names every file it implements, one by one: the scripts/lib directory grant that used to double-charge the contribution system's modportalCache.ts is gone, which is L4 closed. Eleven of this window's sixteen commits reached it only through scripts/play-cli.ts, which is a downstream consumer of every layer beneath it; the coverage is still earned, since nobody else audits that file and H1 and M3 are both in it. runTest and # test parsing live under src/ and are covered by the DSL load path and Runtime as well. Since then this system gained scripts/probe.ts and scripts/mutate.ts, audited three times at branch level (not a system sweep, so lastAudit is unmoved): testing-procedure-2026-08-03-probe-tooling.md, -pass2.md and -pass3.md. Each pass found HIGHs in the code the previous pass's fixes had just written, and the recurring shape was a decision placed where no test could reach it — inside main(), or behind a test that asserted on a callback's output rather than its argument. Nine pass-3 mediums and lows are open and unreviewed; the branch merged with only its HIGHs closed, by decision.",
+      "concepts": [
+        {
           "name": "the layer rule",
           "paths": [
-            "scripts/lib/layers.ts",
-            "scripts/layer-check.ts"
+            "scripts/layer-check.ts",
+            "scripts/lib/layers.ts"
           ],
           "note": "testing-procedure-2026-07-30-m2 is about what layer-check does and does not read."
         },
@@ -455,29 +648,75 @@
             "scripts/migrate-saves.ts"
           ],
           "note": "produced by save-fixture-migration; the one-shot shape rewrite of every # save fixture at a SAVE_VERSION bump, retired by save-migration-system's ladder"
-        },
-        {
-          "name": "git facts as data",
-          "paths": [
-            "scripts/lib/git.ts"
-          ],
-          "note": "produced by the-git-seam-is-the-only-way-the-task-system-reads-git"
         }
       ]
     },
     {
       "name": "Build & deployment",
       "paths": [
-        ".github/workflows/publish.yml",
-        "android",
-        "capacitor.config.ts",
-        "vite.config.ts",
         ".gitattributes",
-        "run-web.cmd"
+        ".github/workflows/publish.yml",
+        "android/.gitignore",
+        "android/app/.gitignore",
+        "android/app/build.gradle",
+        "android/app/capacitor.build.gradle",
+        "android/app/proguard-rules.pro",
+        "android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java",
+        "android/app/src/main/AndroidManifest.xml",
+        "android/app/src/main/java/org/universalis/rpg/MainActivity.java",
+        "android/app/src/main/res/drawable-land-hdpi/splash.png",
+        "android/app/src/main/res/drawable-land-mdpi/splash.png",
+        "android/app/src/main/res/drawable-land-xhdpi/splash.png",
+        "android/app/src/main/res/drawable-land-xxhdpi/splash.png",
+        "android/app/src/main/res/drawable-land-xxxhdpi/splash.png",
+        "android/app/src/main/res/drawable-port-hdpi/splash.png",
+        "android/app/src/main/res/drawable-port-mdpi/splash.png",
+        "android/app/src/main/res/drawable-port-xhdpi/splash.png",
+        "android/app/src/main/res/drawable-port-xxhdpi/splash.png",
+        "android/app/src/main/res/drawable-port-xxxhdpi/splash.png",
+        "android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml",
+        "android/app/src/main/res/drawable/ic_launcher_background.xml",
+        "android/app/src/main/res/drawable/splash.png",
+        "android/app/src/main/res/layout/activity_main.xml",
+        "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+        "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+        "android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+        "android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png",
+        "android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png",
+        "android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+        "android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
+        "android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png",
+        "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+        "android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png",
+        "android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png",
+        "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+        "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png",
+        "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png",
+        "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+        "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+        "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png",
+        "android/app/src/main/res/values/ic_launcher_background.xml",
+        "android/app/src/main/res/values/strings.xml",
+        "android/app/src/main/res/values/styles.xml",
+        "android/app/src/main/res/xml/file_paths.xml",
+        "android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java",
+        "android/build.gradle",
+        "android/capacitor.settings.gradle",
+        "android/gradle.properties",
+        "android/gradle/wrapper/gradle-wrapper.jar",
+        "android/gradle/wrapper/gradle-wrapper.properties",
+        "android/gradlew",
+        "android/gradlew.bat",
+        "android/settings.gradle",
+        "android/variables.gradle",
+        "capacitor.config.ts",
+        "run-web.cmd",
+        "vite.config.ts"
       ],
       "lastAudit": "f8c8c8d",
       "lastAuditDoc": "docs/audits/build-deployment-2026-07-30.md",
-      "note": "The 2026-07-30 pass verified BD-H1 (base is './' and the built HTML proves it), BD-M2/M3 (every action pinned by commit, least-privilege permissions), BD-L1 (versionCode/versionName derived from package.json) and BD-L3/L4 closed, and found H1: capacitor.config.ts reads NODE_ENV, npm run build sets it inside the Vite process only, and cap sync is the next process in the chain — so the signed release APK is built in dev configuration, pointing its WebView at http://10.0.2.2:5173 with cleartext on. Reproduced under the exact environment publish.yml provides. BD-H2 stays open and wants the same release-readiness gate. Mediums: the two publish jobs have no needs: between them so a tag can half-publish, and neither runs the test suite, because test.yml fires on branches and pull_request and a tag push matches neither; and pinning stops at the actions, not at what Gradle resolves in the job holding SIGNING_KEY. L1 records that .gitattributes and test.yml justify each other with a claim the same commit made false — with eol=lf in the index both runners check out identical bytes, and the real CRLF guard is integration.test.ts. M1 of 2026-07-28 stays fixed: package.json and tsconfig.json are not members, which is why this window is two commits rather than twelve."
+      "note": "The 2026-07-30 pass verified BD-H1 (base is './' and the built HTML proves it), BD-M2/M3 (every action pinned by commit, least-privilege permissions), BD-L1 (versionCode/versionName derived from package.json) and BD-L3/L4 closed, and found H1: capacitor.config.ts reads NODE_ENV, npm run build sets it inside the Vite process only, and cap sync is the next process in the chain — so the signed release APK is built in dev configuration, pointing its WebView at http://10.0.2.2:5173 with cleartext on. Reproduced under the exact environment publish.yml provides. BD-H2 stays open and wants the same release-readiness gate. Mediums: the two publish jobs have no needs: between them so a tag can half-publish, and neither runs the test suite, because test.yml fires on branches and pull_request and a tag push matches neither; and pinning stops at the actions, not at what Gradle resolves in the job holding SIGNING_KEY. L1 records that .gitattributes and test.yml justify each other with a claim the same commit made false — with eol=lf in the index both runners check out identical bytes, and the real CRLF guard is integration.test.ts. M1 of 2026-07-28 stays fixed: package.json and tsconfig.json are not members, which is why this window is two commits rather than twelve.",
+      "concepts": []
     }
   ]
 }

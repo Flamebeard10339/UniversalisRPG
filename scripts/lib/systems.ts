@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 
 // A concept is one thing a system knows how to do, named so that "does
 // anything already do this" is a query instead of a guess. It refines its
@@ -16,7 +16,15 @@ export interface Concept {
 
 export interface System {
   name: string;
+  // Exact files, one per line the system owns. A directory here is refused by
+  // `checkManifest`, because a file cannot be allowed to join a system by
+  // being created next to one: an undeclared file is then owned by nobody,
+  // and `audit-status` already exits non-zero on exactly that.
   paths: string[];
+  // Directories whose files this system reads too. Contributes to the audit
+  // window and to nothing else, and never confers ownership — the deliberate
+  // double coverage the directory grants used to supply, kept when they went.
+  covers: string[];
   lastAudit: string | null;
   lastAuditDoc: string | null;
   note: string | null;
@@ -124,7 +132,8 @@ export function parseManifest(text: string, label: string): Manifest {
       const where = `${label}: ${name}`;
       return {
         name,
-        paths: asStringArray(system, 'paths', where),
+        paths: asStringArray(system, 'paths', where).map(canonicalPath),
+        covers: (system.covers === undefined ? [] : asStringArray(system, 'covers', where)).map(canonicalPath),
         lastAudit: asNullableString(system, 'lastAudit', where),
         lastAuditDoc: asNullableString(system, 'lastAuditDoc', where),
         note: asNullableString(system, 'note', where),
@@ -190,7 +199,26 @@ export function owningSystem(manifest: Manifest, file: string): string | null {
 // Kept apart from ownership so that making membership single-valued does not
 // silently shrink anybody's window.
 export function coveringSystems(manifest: Manifest, file: string): string[] {
-  return manifest.systems.filter((system) => system.paths.some((path) => covers(path, file))).map((system) => system.name);
+  return manifest.systems.filter((system) => auditWindow(system).some((path) => covers(path, file))).map((system) => system.name);
+}
+
+// What a system is audited over, as against what it owns. The two were one
+// field, and a directory grant therefore did both jobs at once: `scripts/lib`
+// gave Testing procedure a second read of eleven files and ownership of them
+// as a side effect. Separating them is what lets ownership be exact without
+// shrinking anybody's window.
+// Membership only means something if it is a partition: a file owned by no
+// system can never trigger an audit. Ownership only — a system's `covers`
+// widens what it reads and claims nothing, so a file reachable only through
+// somebody's `covers` is still an orphan, and `audit-status` exiting non-zero
+// on that is what forces it to be declared by name.
+export function orphanedFiles(manifest: Manifest, tracked: string[]): string[] {
+  const declared = [...manifest.systems.flatMap((system) => system.paths), ...manifest.unowned.paths];
+  return tracked.filter((file) => !declared.some((path) => covers(path, file)));
+}
+
+export function auditWindow(system: System): string[] {
+  return [...system.paths, ...system.covers];
 }
 
 // Every concept of this system that claims the file. Not single-valued on
@@ -270,8 +298,25 @@ export interface ManifestIssue {
 // Meaning, not shape — everything here is something a reader can answer
 // around, so all of it reports and none of it throws. `audit-status` keeps
 // its one failing condition and does not gain a second from this list.
-export function checkManifest(manifest: Manifest, exists: (path: string) => boolean = existsSync): ManifestIssue[] {
+const isDirectoryOnDisk = (path: string): boolean => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
+
+export function checkManifest(manifest: Manifest, exists: (path: string) => boolean = existsSync, isDirectory: (path: string) => boolean = isDirectoryOnDisk): ManifestIssue[] {
   const issues: ManifestIssue[] = [];
+
+  // Ownership is by name. A directory in `paths` lets a file join a system by
+  // being created next to one, which is how orderIndependence.test.ts fell
+  // through `scripts/lib` into the wrong system — and a grant nobody
+  // enumerated is also a decline nobody made on every file beneath it. What
+  // the directory grants were also doing is a second read, and that is what
+  // `covers` is for: it widens the window and confers nothing.
+  for (const system of manifest.systems) {
+    for (const path of system.paths) {
+      if (isDirectory(path)) issues.push({ level: 'error', message: `${system.name} claims the directory ${path} — ownership is by name, so list its files. \`covers\` is where a directory belongs when the point is a second audit read rather than ownership` });
+    }
+    for (const path of system.covers) {
+      if (!exists(path)) issues.push({ level: 'warning', message: `${system.name} covers ${path}, which does not exist` });
+    }
+  }
 
   const seenSystems = new Set<string>();
   for (const system of manifest.systems) {

@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { harvestFiles, parseAuditDoc, systemForDoc } from '../lib/auditImport';
+import { hasVisibleContent } from '../lib/eventLog';
 import { appendAuditPass, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, verdictsForPass, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from '../lib/specDoc';
 import { createTask, loadStore, nextSeq, resolveFault, type Fault, type Severity, type Task } from '../lib/taskStore';
+import { reportPriorArt } from './architectureCmds';
 import { resolveDiffRange } from './auditPrompt';
 import type { Flags } from './cli';
 import { recordEvents, refuseUnknownSpec, resolveConfig, saveStoreAndWarn, slugify, specFile, subjectOf, today, uniqueId } from './context';
@@ -76,6 +78,7 @@ export function cmdImport(args: Flags, usage: string): void {
   const skippedNote = skipped > 0 ? ` (${skipped} already present, skipped)` : '';
   const systemNote = system === null && findings.length > 0 ? ' — no system mapping for this doc name, system left null' : '';
   console.log(`imported ${imported} finding(s) from ${docPath}${skippedNote}${systemNote}`);
+  for (const task of created) reportPriorArt(config, tasks, task);
 }
 
 interface AuditFinding {
@@ -127,25 +130,11 @@ function clauseScoped(raw: string): { clause: number; value: string } | null {
   return Number.isFinite(clause) ? { clause, value: raw.slice(eq + 1).trim() } : null;
 }
 
-// A reason must contain at least one character that occupies space when
-// rendered and does not command the renderer. Whitespace (`\s`) occupies
-// nothing; `Default_Ignorable_Code_Point` — the Unicode property that
-// defines "occupies no space when rendered", covering ZERO WIDTH SPACE and
-// its Cf kin plus the Mn/Lo outliers a general category alone misses
-// (variation selectors including VS16, COMBINING GRAPHEME JOINER, the
-// Hangul filler jamo, Khmer inherent vowel signs, Mongolian free variation
-// selectors) — renders nothing; category Cc (NUL, BEL, ESC, DEL and their
-// kin — control characters) commands the renderer rather than rendering, up
-// to and including painting colour codes or ringing a bell when the file is
-// later read. Everything else is a legitimate reason, however ugly: a
-// single punctuation mark, a long run of one character, a lone combining
-// mark, an unpaired surrogate (replaced by U+FFFD on write, visible by the
-// time it lands). This line is drawn and stays drawn — no further
-// exclusions.
-const VISIBLE_CHARACTER = /[^\s\p{Default_Ignorable_Code_Point}\p{Cc}]/u;
-export function hasVisibleContent(text: string | null): boolean {
-  return text !== null && VISIBLE_CHARACTER.test(text);
-}
+// One predicate, in the layer below, because notes entering the event log need
+// the same answer and a second copy of a Unicode rule is a second thing to
+// drift. Re-exported rather than moved out of this module's surface: the clause
+// evidence guard is this file's, and its callers name it here.
+export { hasVisibleContent };
 
 // Repeated --proof/--evidence/--finding flags need a dedicated scanner: the
 // generic parseArgs collapses a repeated flag to its last value, and a
@@ -414,6 +403,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     recordEvents(config, 'audit', created.map((task) => subjectOf(task, `recorded unreviewed by ${slug} against pass ${against}: ${truncateLine(task.title, 60)}`)));
     console.log(`${created.length} finding(s) recorded, unreviewed, against pass ${against} — no pass appended, so recorded clause verdicts stand`);
     console.log(`Next: \`npm run tasks -- triage --spec ${slug}\` walks them, with a separate actor. You file findings; you never promote them`);
+    for (const task of created) reportPriorArt(config, tasks, task);
     return;
   }
 
@@ -536,13 +526,13 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     else undeliveredCreated++;
   }
 
-  let findingsCreated = 0;
+  const filed: Task[] = [];
   for (const finding of findings) {
     const task = buildFindingTask(finding, slug, passNumber, taken, tasks);
     tasks.push(task);
     taken.add(task.id);
     created.push({ task, note: `recorded unreviewed by ${slug} pass ${passNumber}: ${truncateLine(finding.title, 60)}` });
-    findingsCreated++;
+    filed.push(task);
   }
 
   saveStoreAndWarn(tasks, config);
@@ -560,14 +550,23 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
   if (undeliveredCreated > 0) console.log(`${undeliveredCreated} undelivered task(s) created for unmet clauses`);
   if (deferredCreated > 0) console.log(`${deferredCreated} clause(s) deferred — tracked as undelivered work with no spec, no longer outstanding against ${slug}`);
   if (ungraded.length > 0) console.log(`${ungraded.length} clause(s) recorded unknown — nobody graded them: ${ungraded.join(', ')}. No undelivered task was created, because an ungraded clause is not a broken promise`);
-  if (findingsCreated > 0) console.log(`${findingsCreated} finding(s) recorded, unreviewed`);
+  if (filed.length > 0) console.log(`${filed.length} finding(s) recorded, unreviewed`);
   console.log(nextAfterPass(undeliveredCreated > 0 || ungraded.length > 0, slug));
+  // After the verdict, because the verdict is what the auditor came for; the
+  // prior art is what the next person triaging these findings needs, and an
+  // auditor filing six at once is the reader least able to remember which of
+  // them the store already holds. Findings only — an undelivered clause record
+  // names the clause's own files and has no duplicate to find.
+  for (const task of filed) reportPriorArt(config, tasks, task);
 }
 
 // The last step of the auditor's brief, said by the command that completes
 // the step before it. Of the two passes carrying the friction log as prose
 // somewhere in the brief, one wrote nothing; the pass that had it as a
-// numbered step wrote it.
+// numbered step wrote it. It now names the channel rather than a markdown
+// file: what the tooling generates may not direct a report outside the store,
+// because a report outside the store does not aggregate and the friction that
+// recurs is exactly the friction that stays invisible.
 export function nextAfterPass(outstanding: boolean, slug: string): string {
-  return `Next: log what this audit cost you in .planning/agent-feedback/tool-friction.md, dated, then commit${outstanding ? `. This pass leaves a clause outstanding — \`npm run tasks -- next --spec ${slug}\` is what picks it up` : ''}`;
+  return `Next: file what this audit cost you — \`npm run tasks -- add "<title>" --kind finding --fault tooling|contract|nobody --deliverable "..."\`, one record per friction, adding \`--breaches <lesson-handle>\` where it was an instruction that did not land, and \`npm run tasks -- recur <id> --note "..."\` where the channel already holds it. Then commit${outstanding ? `. This pass leaves a clause outstanding — \`npm run tasks -- next --spec ${slug}\` is what picks it up` : ''}`;
 }

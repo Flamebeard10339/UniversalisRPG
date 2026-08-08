@@ -2,9 +2,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { deriveModules, regionView, repoSourceTree, systemView, type Module, type ModuleSurface, type RegionView, type SourceTree, type SystemEdge, type SystemView } from '../lib/architecture';
 import { loadEvents } from '../lib/eventLog';
 import { checkPlan } from '../lib/planCheck';
-import { findProducers, priorArt, producerIndex, rulingsOn, type PriorArt, type Producer, type Rulings } from '../lib/producers';
+import { declaredPath, findProducers, priorArt, producerIndex, rulingsOn, type PriorArt, type Producer, type Rulings } from '../lib/producers';
 import { canonicalPath, checkManifest, isUnowned, loadManifest, ManifestError, overlappingConcepts, parseManifest, type Manifest } from '../lib/systems';
-import type { Task } from '../lib/taskStore';
+import { reportsCost, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { CLOSING_STATES, readStore, recordEvents, resolveActiveSpec, resolveConfig, splitList, systemNames, type Config } from './context';
 import { printRow, reportUnknownIds, wrapUnder } from './render';
@@ -212,7 +212,7 @@ export function printPriorArt(art: PriorArt, { collapseClosed = false } = {}): v
     if (task.produces.length > 0) console.log(`            produces ${task.produces.join(', ')}`);
   }
   const closed = art.claims.length - shown.length;
-  if (closed > 0) console.log(`  ${closed} closed claim(s) not listed — each is a decision already made rather than a collision.`);
+  if (closed > 0) console.log(`  ${closed} closed claim(s) not listed — each is a decision already made rather than a collision. \`tasks where <file>\` names every claim on one path.`);
   console.log('\nA claim in any state is prior art: a closed one is a decision already made, and an open one is a collision.');
 }
 
@@ -239,22 +239,76 @@ export function printRulings(rulings: Rulings): void {
   console.log('\nA ruling is a decision already made about this path, not a claim on it — read it before proposing the same remedy again.');
 }
 
-// The same query `tasks where` answers when asked, fired by the act of
-// declaring a write grant. A check that has to be remembered is skipped
-// exactly when a session is deep in something else: this one was run once in
-// a whole planning session, and that once is the one duplication it caught.
+// Every path a record names, whichever field carried it. A grant is a
+// forecast about a region and a `files` entry is where something was
+// observed, but a reader asking "has anyone been here before" is asking about
+// the path, and a finding — the kind that reaches this with no grant at all —
+// names its region only in `files`, with the line number still on it.
+export const claimedPaths = (task: Task): string[] => [...new Set([...task.writes, ...task.files].map(declaredPath))].filter((path) => path !== '');
+
+// The same query `tasks where` answers when asked, fired by the act of naming
+// a path on a record. A check that has to be remembered is skipped exactly
+// when a session is deep in something else: this one was run once in a whole
+// planning session, and that once is the one duplication it caught.
 // The record's own claim is excluded from both sections — a task always
-// claims what it just granted, and reporting that would bury the answer
+// claims what it just named, and reporting that would bury the answer
 // under itself.
-export function reportPriorArtOnWrites(config: Config, tasks: Task[], task: Task): void {
-  if (task.writes.length === 0) return;
+// Returns how many records were reported claiming the same paths, which is
+// what a caller offering to attach to one of them needs and cannot get by
+// running the query a second time.
+export function reportPriorArtOnPaths(config: Config, tasks: Task[], task: Task): number {
+  const paths = claimedPaths(task);
+  if (paths.length === 0) return 0;
   const manifest = manifestOrEmpty(config, 'answering from recorded claims only — registered concepts could not be read');
   const others = tasks.filter((candidate) => candidate.id !== task.id);
+  reportDispatchDefects(manifest, tasks, task);
   console.log('');
-  printPriorArt(priorArt(manifest, others, task.writes));
+  const art = priorArt(manifest, others, paths);
+  printPriorArt(art);
   console.log('');
-  printRulings(rulingsOn(others, loadEvents(config.eventsPath).events, task.writes));
+  printRulings(rulingsOn(others, loadEvents(config.eventsPath).events, paths));
+  return art.claims.length;
 }
+
+// The prompt that makes an occurrence reachable, and the shape of it is the
+// clause: the record is already filed by the time this prints, so filing new
+// costs nothing and attaching costs two further commands. A duplicate is
+// visible and cheap to triage; a wrong merge makes a distinct defect vanish
+// and the derived count lie, so the cheap path must never be the merge.
+function offerRecurrence(task: Task, claims: number): void {
+  if (claims === 0 || !reportsCost(task.kind)) return;
+  console.log(`\nif one of those is this same friction rather than a new one, \`tasks recur <its id> --note "what it cost this time"\` records this as an occurrence of it, and \`tasks decline ${task.id} --reason "duplicate of <its id>"\` retires what you just filed. Nothing is merged for you.`);
+}
+
+// What every route that files a record owes it, as one call. The query and the
+// offer were paired by hand at `add` and `edit` and absent from `audit` and
+// `import`, which is the pair a caller can forget — and forgetting it is how
+// 227 of 603 reporting records were filed blind to what already claimed their
+// paths, through the route the generated auditor brief prescribes.
+export function reportPriorArt(config: Config, tasks: Task[], task: Task): void {
+  offerRecurrence(task, reportPriorArtOnPaths(config, tasks, task));
+}
+
+// `tasks plan` grades a dispatch set once, before anyone works it, when every
+// grant in it is a planner's forecast; the accurate grant is the one a worker
+// writes mid-run, and it arrives here. Defects only, and silence otherwise —
+// this fires on every `--writes` write, and a check that prints a paragraph
+// each time is one that gets skipped. It reports and never refuses, for
+// `cmdPlan`'s reason.
+function reportDispatchDefects(manifest: Manifest, tasks: Task[], task: Task): void {
+  if (task.spec === null) return;
+  const plan = tasks.filter((candidate) => candidate.spec === task.spec && (candidate.state === 'open' || candidate.state === 'in-progress'));
+  if (!plan.some((member) => member.id === task.id)) return;
+
+  const defects = checkPlan(plan, tasks, producerIndex(manifest, tasks)).findings.filter((finding) => finding.level === 'defect');
+  if (defects.length === 0) return;
+
+  console.log(`\ngraded against spec ${task.spec}: its ${plan.length} open and in-progress member(s)`);
+  for (const finding of defects) console.log(`  [defect] ${finding.message}`);
+  console.log('only defects are shown here — `tasks plan` grades the same set in full.');
+}
+
+const namesADirectory = (view: RegionView): boolean => view.files.some((file) => file !== view.path);
 
 // The body of `tasks where`, factored out so `plan-prompt` can run the same
 // survey over paths named on its own command line — the deliverable it
@@ -278,13 +332,15 @@ export function printWhere(config: Config, target: string, arch = architecture(c
     for (const entry of view.importsOut) console.log(`    ${entry.path} (${entry.system})`);
   }
   if (view.importedBy.length > 0) {
-    console.log('  imported from outside its system by:');
-    for (const entry of view.importedBy) console.log(`    ${entry.path} (${entry.system})`);
+    console.log('  imported by:');
+    for (const entry of [...view.importedBy].sort((a, b) => Number(b.crossesBoundary) - Number(a.crossesBoundary))) {
+      console.log(`    ${entry.path} (${entry.system})${entry.crossesBoundary ? ' — across a system boundary' : ''}`);
+    }
   }
 
   const tasks = readStore(config);
   console.log('');
-  printPriorArt(priorArt(manifest, tasks, [view.path]));
+  printPriorArt(priorArt(manifest, tasks, [view.path]), { collapseClosed: namesADirectory(view) });
 
   console.log('');
   printRulings(rulingsOn(tasks, loadEvents(config.eventsPath).events, [view.path]));
@@ -366,7 +422,12 @@ export function cmdConcept(args: Flags, usage: string): void {
   system.concepts = [...(system.concepts ?? []), { name, paths, note: args.flags.note ?? null }];
 
   const candidate = parseManifest(JSON.stringify(raw), config.systemsPath);
-  const blocking = checkManifest(candidate).filter((issue) => issue.level === 'error');
+  // What this write introduced, not what the manifest already said. Blocking
+  // on every error made an unrelated standing one — a system still declaring
+  // a directory, say — refuse a registration that has nothing to do with it,
+  // and the caller cannot fix a manifest by registering nothing.
+  const standing = new Set(checkManifest(manifest).map((issue) => issue.message));
+  const blocking = checkManifest(candidate).filter((issue) => issue.level === 'error' && !standing.has(issue.message));
   if (blocking.length > 0) {
     for (const issue of blocking) console.error(`error: ${issue.message}`);
     process.exitCode = 1;

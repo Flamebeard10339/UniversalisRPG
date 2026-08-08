@@ -1,11 +1,13 @@
 import { existsSync } from 'node:fs';
 import * as git from '../lib/git';
-import { checkStore, coldClaimIssues, loadStoreTolerantly, type CheckIssue, type Task } from '../lib/taskStore';
+import { loadEvents, reconcile } from '../lib/eventLog';
+import { checkStore, coldClaimIssues, loadStoreTolerantly, misfiledSystem, type CheckIssue, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import {
   closedCommitIssues,
   CLOSING_STATES,
   dirtyStoreIssue,
+  pathOwner,
   recordEvents,
   resolveConfig,
   saveStoreAndWarn,
@@ -39,6 +41,11 @@ function repairStore(tasks: Task[]): Array<{ task: Task; message: string }> {
 // count — `merge-ready`, whose summary was swallowing five warnings about
 // closes that existed only in the working tree — reads the same list the
 // report prints rather than parsing it back out of the output.
+function misfiledSystemIssues(config: Config, tasks: Task[]): CheckIssue[] {
+  const owner = pathOwner(config);
+  return tasks.flatMap((task) => misfiledSystem(task, owner) ?? []);
+}
+
 export function doctorIssues(config: Config, tasks: Task[]): CheckIssue[] {
   const dirtyIssue = dirtyStoreIssue(config);
   // Mid-merge, HEAD is still the pre-merge commit: every record the other
@@ -49,11 +56,33 @@ export function doctorIssues(config: Config, tasks: Task[]): CheckIssue[] {
   const gitAnchored = git.mergeInProgress() ? [] : [...closedCommitIssues(tasks), ...workingTreeOnlyIssues(config, tasks)];
   return [
     ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))),
+    ...misfiledSystemIssues(config, tasks),
     ...gitAnchored,
     ...coldClaimIssues(tasks, today()),
     ...specIssues(config),
     ...(dirtyIssue ? [dirtyIssue] : []),
   ];
+}
+
+// The log against the store, printed on every run and changing no exit code.
+// The reconciliation adds no failure condition, and an absence in the store's
+// own history is why: one historical absence is the case for reporting it,
+// not for failing the build over a record this repository lost before it had
+// a verb for losing one. `--fix` cannot repair it either — a record the store
+// lost is not a record `doctor` may invent.
+//
+// The coverage line prints on a clean run too. A check that says "reconciled"
+// over the quarter of the store it can see is a false proof, and this
+// repository has filed that defect under seven different names.
+function printReconciliation(config: Config, tasks: Task[]): void {
+  const { absentExplained, absentUnexplained, storeRecords, outsideCoverage, logLinesUnread } = reconcile(loadEvents(config.eventsPath), tasks.map((task) => task.id));
+  console.log(`the log against the store: ${absentUnexplained.length} record(s) absent with nothing explaining it, ${absentExplained.length} absent and accounted for, ${outsideCoverage} of ${storeRecords} store record(s) outside what this can check at all — they carry no \`add\` event, so nothing here can say whether they ever left`);
+  console.log(
+    logLinesUnread === 0
+      ? `  and the log read whole: 0 line(s) of ${config.eventsPath} failed to parse, so the absences above are every absence the log can show`
+      : `  but ${logLinesUnread} line(s) of ${config.eventsPath} did not parse, so this comparison is reading less than the log holds and an absence may be missing from it entirely — \`tasks log\` names them`,
+  );
+  for (const id of absentUnexplained) console.log(`  [absent] ${id} — the log created it and the store does not hold it, and no removal or decline says why. \`tasks log --id ${id}\` is its whole history; \`tasks remove ${id} --reason "..."\` files the ruling`);
 }
 
 export function cmdDoctor(args: Flags): void {
@@ -88,15 +117,26 @@ export function cmdDoctor(args: Flags): void {
     console.log('none of these has exactly one correct repair; `--fix` clears a close date left on a record that is not closed, and nothing else');
   }
 
-  const errors = issues.filter((issue) => issue.level === 'error').length;
-  console.log(`${tasks.length} task(s), ${errors} error(s), ${issues.length - errors} warning(s), ${skipped.length} unparseable line(s)`);
+  printReconciliation(config, tasks);
 
-  // The only condition that exits non-zero. A store that will not parse is
-  // malformed input, not a disagreement about the work — and it is the one
-  // state a later write would destroy rather than merely disagree with.
+  const count = (level: CheckIssue['level']): number => issues.filter((issue) => issue.level === level).length;
+  const dangling = count('dangling');
+  console.log(`${tasks.length} task(s), ${dangling} dangling reference(s), ${count('error')} error(s), ${count('warning')} warning(s), ${skipped.length} unparseable line(s)`);
+
+  // The two conditions that exit non-zero, and what they have in common is
+  // that neither is a disagreement about the work. A store that will not
+  // parse is malformed input, and it is the one state a later write would
+  // destroy rather than merely disagree with. A dangling reference is the
+  // store having drifted out of step with the tree — a system name, a spec
+  // file or a record id that resolves to nothing — which is decidable, unlike
+  // every other line above.
   if (skipped.length > 0) {
     for (const message of skipped) console.error(`error: ${message}`);
-    console.error(`error: ${config.storePath} does not parse — the only condition doctor fails on`);
+    console.error(`error: ${config.storePath} does not parse`);
+    process.exitCode = 1;
+  }
+  if (dangling > 0) {
+    console.error(`error: ${dangling} record reference(s) resolve to nothing — a record must point at something real, which is the one thing about the store a machine can check`);
     process.exitCode = 1;
   }
 }

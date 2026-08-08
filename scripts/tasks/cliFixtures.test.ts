@@ -5,6 +5,45 @@ import { describe, expect, it } from 'vitest';
 import * as git from '../lib/git';
 import { defaultStoreGitFixture, enclosingGitFixture, fixture, gitFixture, unbornDefaultStoreFixture } from './cliFixtures';
 
+// c5: the two ends of one rule — a usage string declares the flags a command
+// accepts, and each of them once. Both defects answered at exit 0 with a
+// complete-looking list built from an argument the command never read.
+describe('a command accepts the flags its usage declares, once each', () => {
+  it('refuses a flag its usage only mentions in prose, and stops offering it on the refusal path', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const result = tasks('list', '--trigger', 'some condition');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('unknown flag: --trigger');
+      expect(result.stderr).toContain('not a flag of `list` — it belongs to `decline`');
+      expect(result.stdout).not.toContain('a-member');
+      const offered = result.stderr.split('\n').find((line) => line.includes('takes:'));
+      expect(offered).toBe('  `list` takes: --state, --severity, --system, --spec, --kind, --deferred, --unspecced, --triggered');
+    });
+  });
+
+  it('refuses a flag given twice rather than answering from the last value', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const result = tasks('list', '--state', 'open', '--state', 'declined');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--state given twice: "open" then "declined" — a flag takes one value');
+      expect(result.stdout).not.toContain('a-member');
+    });
+  });
+
+  // The counter-case, and the reason repetition is declared rather than
+  // banned: a pass grades every clause in one invocation, and `--args-from`
+  // is the only filing route a branch audit has.
+  it('files a pass whose --proof and --evidence repeat, because tasks audit declares them repeated', () =>
+    fixture(async ({ audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(result.stderr).not.toContain('given twice');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('recorded pass 1 for demo-spec');
+    }));
+});
+
 // c3: which git a test reads is declared by the fixture it calls, and the
 // same read answers differently under each — not implied by which fields
 // the test happens to assert on.

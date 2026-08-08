@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { appendEvents, eventsPathFor, filterEvents, loadEvents, parseEvents, type TaskEvent } from './eventLog';
+import { appendEvents, EVENT_OPS, eventsPathFor, filterEvents, loadEvents, noteProblem, parseEvents, reconcile, type TaskEvent, type ToleratedEvents } from './eventLog';
 
 function event(overrides: Partial<TaskEvent> = {}): TaskEvent {
   return {
@@ -170,5 +170,116 @@ describe('the log is not derived from present-day state', () => {
       expect(filterEvents(events, { spec: 'old-spec' })).toHaveLength(1);
       expect(filterEvents(events, { spec: 'new-spec' })).toHaveLength(1);
     });
+  });
+});
+
+// A record leaving `docs/tasks.jsonl` was, for sixteen ops, a thing the log
+// had no verb for: `saveStore` rewrites the whole file from the array it was
+// given, so any caller dropping a record removed it and nothing could say
+// that it had, or why.
+describe('c1, c3, c4: a record cannot leave the store unrecorded', () => {
+  const entry = (op: string, id: string | null, note = ''): TaskEvent => event({ op, id, note });
+  // A log that read whole. The cases that matter pass their own `skipped`.
+  const read = (events: TaskEvent[]): ToleratedEvents => ({ events, skipped: [] });
+
+  it('declares `remove` as an op, so the log can name what left', () => {
+    expect(EVENT_OPS).toContain('remove');
+  });
+
+  it('returns three disjoint sets over every id the log has seen created', () => {
+    const events = [
+      entry('add', 'still-here'),
+      entry('add', 'dropped-on-purpose'),
+      entry('remove', 'dropped-on-purpose', 'removed from the store: scratch'),
+      entry('add', 'declined-then-dropped'),
+      entry('decline', 'declined-then-dropped', 'not real work'),
+      entry('add', 'simply-gone'),
+    ];
+
+    const result = reconcile(read(events), ['still-here', 'never-in-the-log']);
+    expect(result.accounted).toEqual(['still-here']);
+    expect(result.absentExplained).toEqual([
+      { id: 'dropped-on-purpose', op: 'remove', note: 'removed from the store: scratch' },
+      { id: 'declined-then-dropped', op: 'decline', note: 'not real work' },
+    ]);
+    expect(result.absentUnexplained).toEqual(['simply-gone']);
+    // Disjoint, and exhaustive over what the log created: the first two sets
+    // are the proof the third one is the whole finding.
+    const created = new Set([...result.accounted, ...result.absentExplained.map((entry) => entry.id), ...result.absentUnexplained]);
+    expect(created.size).toBe(4);
+  });
+
+  it('reports the coverage it does not have, on a clean run as well as a dirty one', () => {
+    const clean = reconcile(read([entry('add', 'known')]), ['known', 'predates-the-log', 'also-predates']);
+    expect(clean.absentUnexplained).toEqual([]);
+    // The number that stops "reconciled" being a false proof: two of the
+    // three store records carry no `add` event, so nothing here can say
+    // whether they ever left.
+    expect(clean.storeRecords).toBe(3);
+    expect(clean.outsideCoverage).toBe(2);
+    // The same statement about the other input, and it is why `reconcile` takes
+    // the whole read: a caller holding only the events cannot make it.
+    expect(clean.logLinesUnread).toBe(0);
+  });
+
+  it('states how much of the log it could not read, which is what stops one bad line hiding an absence', () => {
+    // The reproduction: `simply-gone`'s `add` line is the one that did not
+    // parse, so the id the store is missing is an id this comparison never
+    // learns was created. The absence goes from 1 to 0 and the only thing
+    // separating that from a clean store is the count of unread lines.
+    const blind = reconcile({ events: [entry('add', 'known')], skipped: ['events.jsonl:2: malformed JSONL event record'] }, ['known']);
+    expect(blind.absentUnexplained).toEqual([]);
+    expect(blind.logLinesUnread).toBe(1);
+  });
+
+  it('reads the last explanation, so a record removed and then re-created and removed again reads as removed', () => {
+    const events = [entry('add', 'twice'), entry('remove', 'twice', 'first time'), entry('add', 'twice'), entry('remove', 'twice', 'second time')];
+    expect(reconcile(read(events), []).absentExplained).toEqual([{ id: 'twice', op: 'remove', note: 'second time' }]);
+  });
+
+  it('does not read an explanation from before the id was created again, so a re-filed record that vanishes is the finding', () => {
+    // add, remove, add — and then gone. The old rule took the last explaining
+    // event wherever it sat and reported this as accounted for under a reason
+    // that had already been superseded by the re-filing.
+    const refiled = [entry('add', 'twice'), entry('remove', 'twice', 'first time, on purpose'), entry('add', 'twice')];
+    expect(reconcile(read(refiled), []).absentExplained).toEqual([]);
+    expect(reconcile(read(refiled), []).absentUnexplained).toEqual(['twice']);
+
+    // The same shape through the other explaining op, and past events that
+    // explain nothing: a decline, a retriage, then re-filed under the same id.
+    const retriaged = [entry('add', 'x'), entry('decline', 'x', 'not real work'), entry('triage', 'x', 'retriaged'), entry('add', 'x')];
+    expect(reconcile(read(retriaged), []).absentUnexplained).toEqual(['x']);
+  });
+});
+
+// The check every verb that writes a note owes, in one place because four of
+// them applied the line half by hand and none of them applied this half.
+describe('noteProblem', () => {
+  it('accepts a note a reader can see', () => {
+    expect(noteProblem('a reason', 'a probe, never real work')).toBeNull();
+    // However ugly: one punctuation mark, one digit, one combining mark, a run
+    // of dashes. The rule is "renders as something", not "reads well".
+    for (const ugly of ['.', '0', '\u0301', '\u2014\u2014']) expect(noteProblem('a reason', ugly), JSON.stringify(ugly)).toBeNull();
+    // The near miss that must stay legal: an escape sequence carries visible
+    // characters, so it is ugly rather than empty. Guarding over-strictness
+    // matters as much as guarding the bypass.
+    expect(noteProblem('a reason', '\u001b[31m')).toBeNull();
+  });
+
+  it('refuses a note that renders as nothing, which truthiness cannot catch', () => {
+    // Every caller tests the flag for truthiness first, and every one of these
+    // is truthy. The removal reason was the reproduction: `--reason "   "`
+    // filed an explanation that explained nothing, and the reconciliation then
+    // counted the record as accounted for — an absence explained by blanks.
+    for (const blank of [' ', '   ', '\t', '\u200b', '\ufe0f', '\u0000', '\u001b']) {
+      expect(noteProblem('a reason', blank), JSON.stringify(blank)).toContain('renders as nothing');
+    }
+  });
+
+  it('refuses a multi-line note and counts the lines, naming the caller\u2019s own noun', () => {
+    // The article comes from the caller. Deriving it here produced
+    // "a occurrence", which is what a shared message costs when it guesses.
+    expect(noteProblem('an occurrence', 'first\nsecond')).toBe('an occurrence is one line \u2014 this one has 2. Say it here and leave the prose in the commit message');
+    expect(noteProblem('a check', 'a\r\nb\r\nc')).toContain('a check is one line \u2014 this one has 3');
   });
 });

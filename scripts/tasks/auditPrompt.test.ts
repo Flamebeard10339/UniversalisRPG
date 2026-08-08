@@ -814,13 +814,19 @@ describe('the brief arriving with the answers rather than the instructions', () 
     expect(toolLines(null).join('\n')).not.toContain('stale');
   });
 
-  it('makes logging tool friction a numbered step rather than a line to skip', () => {
+  it('makes filing what the audit cost a numbered step, and sends it to the channel rather than a markdown file', () => {
     enclosingGitFixture(({ tasks }) => {
       const { stdout } = tasks('audit-prompt', 'demo-spec');
       // Of the two passes that had it as prose elsewhere in the brief, one
       // wrote nothing at all; the pass that had it as a step wrote it.
-      expect(stepsBlock(stdout)).toContain('8. Log what this audit cost you');
-      expect(stepsBlock(stdout)).toContain('.planning/agent-feedback/tool-friction.md');
+      expect(stepsBlock(stdout)).toContain('8. File what this audit cost you');
+      expect(stepsBlock(stdout)).toContain('npm run tasks -- add');
+      expect(stepsBlock(stdout)).toContain('--breaches <lesson-handle>');
+      // The invariant, of which the deleted markdown file was one instance:
+      // nothing the tooling generates may direct a report outside the store.
+      // Scoped to the instructions, because the brief also echoes the branch
+      // diff and a deleted path there is a fact, not a direction.
+      expect(stepsBlock(stdout)).not.toContain('.planning/');
     });
   });
 
@@ -1017,5 +1023,35 @@ describe('audit-prompt prints instructions, not the incidents that motivated the
 describe('the four briefs stay within the lesson budget the spec sets', () => {
   it('the combined lesson count this branch added is within the documented budget', () => {
     expect(totalLessonCount()).toBeLessThanOrEqual(MAX_LESSON_COUNT);
+  });
+});
+
+// ORCHESTRATOR_LESSONS carries "give every dispatched agent a scratch
+// filename prefix", which reaches an orchestrated run and not an auditor
+// commissioned directly — which is most of them. The brief names its own.
+describe('the scratch prefix an auditor is given', () => {
+  it('names a prefix keyed to the spec and the pass, in the steps rather than beside them', () => {
+    enclosingGitFixture(({ tasks }) => {
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      expect(stepsBlock(stdout)).toContain('audit-demo-spec-pass1-<what it is>');
+      expect(stepsBlock(stdout)).toContain('Concurrent auditors share that directory');
+    });
+  });
+
+  it('moves the prefix with the pass, so pass 2 cannot overwrite pass 1', () => {
+    enclosingGitFixture(({ tasks, dir }) => {
+      const spec = path.join(dir, 'specs', 'demo-spec.md');
+      writeFileSync(spec, `${readFileSync(spec, 'utf8')}
+## Audit passes
+
+### Pass 1 — 2026-08-08
+
+- base: \`abc\`
+- head: \`def\`
+- proof 1: unknown
+- proof 2: unknown
+`, 'utf8');
+      expect(stepsBlock(tasks('audit-prompt', 'demo-spec').stdout)).toContain('audit-demo-spec-pass2-<what it is>');
+    });
   });
 });

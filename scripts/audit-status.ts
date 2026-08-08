@@ -1,17 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { trackedFiles } from './lib/sourceFiles';
-import { checkManifest, covers, loadManifest, overlappingConcepts, sharedOwnership, type Manifest, type System } from './lib/systems';
+import { auditWindow, checkManifest, loadManifest, orphanedFiles, overlappingConcepts, sharedOwnership, type System } from './lib/systems';
 import { codeOnly } from './lib/stripComments';
 
 const MANIFEST = 'docs/audits/systems.json';
-
-// Membership only means something if it is a partition. A file owned by no
-// system can never trigger an audit, and nothing used to notice one appearing.
-function orphanedFiles(manifest: Manifest, tracked: string[]): string[] {
-  const declared = [...manifest.systems.flatMap((system) => system.paths), ...manifest.unowned.paths];
-  return tracked.filter((file) => !declared.some((path) => covers(path, file)));
-}
-
 
 function git(...args: string[]): string {
   return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -88,12 +80,13 @@ for (const system of manifest.systems) {
   const changing = touches.filter((touch) => touch.code).length;
 
   const detail =
-    system.paths.length === 0
+    auditWindow(system).length === 0
       ? 'no paths declared'
       : system.lastAudit === null
         ? 'never swept'
         : `${changing} of ${touches.length} commit(s) changed code since ${system.lastAudit}`;
-  console.log(`     ${system.name.padEnd(22)} ${detail}`);
+  const window = system.covers.length > 0 ? `, plus ${system.covers.join(', ')} as a second read` : '';
+  console.log(`     ${system.name.padEnd(22)} ${detail}${window}`);
   if (system.note) console.log(`      ${system.note}`);
   if (verbose) for (const touch of touches) console.log(`      ${touch.code ? 'code ' : 'no-op'} ${touch.sha} ${touch.subject}`);
 }

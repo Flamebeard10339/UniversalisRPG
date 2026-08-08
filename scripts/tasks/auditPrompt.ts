@@ -620,6 +620,13 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('');
   console.log('Steps, in order. Each command names the next one when it finishes.');
   console.log('');
+  // The two artifacts above are already keyed to slug and pass. Anything else
+  // this auditor writes is not, and an orchestrator's instruction to prefix a
+  // dispatched agent's scratch files reaches an orchestrated run and not an
+  // auditor commissioned directly — which is most of them. So the brief names
+  // its own prefix rather than relying on who dispatched it.
+  console.log(`0. Anything you write outside the repository goes in ${os.tmpdir()} named \`audit-${slug}-pass${pass}-<what it is>\`. Concurrent auditors share that directory, and a second manifest called \`mutations.json\` overwrites somebody else's judgement rather than colliding with it.`);
+  console.log('');
   console.log(`1. Read ${path_} in full. \`## Deliverable\` is the argument the clauses promise about, \`## Decisions\` are settled and not to be reopened, \`## Audit passes\` is what earlier passes found.`);
   console.log('2. Read the diff over the range above. Do not assume the implementation approach is correct; verify each clause independently.');
   console.log('3. Grade every clause under `Proof clauses:` below.');
@@ -643,7 +650,10 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
     console.log(`     npm run tasks -- audit ${slug} --args-from ${argsPath}`);
     if (argsKept) console.log(`     ${keptNote(argsPath, 'pass file')}`);
   }
-  console.log('8. Log what this audit cost you — task tool, audit tool, harness — in .planning/agent-feedback/tool-friction.md, dated, with what you measured.');
+  console.log('8. File what this audit cost you — task tool, audit tool, harness — into the channel, with what you measured. One record per friction:');
+  console.log('     npm run tasks -- add "<what cost you>" --kind finding --fault tooling|contract|nobody --deliverable "what fixing it would mean" --evidence "what you measured"');
+  console.log('   Add `--breaches <lesson-handle>` when what failed was an instruction below that did not land, and use `npm run tasks -- recur <id> --note "what it cost this time"` when the channel already holds it — a recurrence is counted and a second record is not. `npm run tasks -- friction` is the query over all of it.');
+  console.log('   Nothing you file here gates anything, and a fault of `nobody` is never counted as a defect. There is no markdown file to append to: prose does not aggregate, and the friction that recurs is the one that stays invisible.');
   console.log('');
   console.log('Look specifically for:');
   for (const item of AUDIT_CHECKLIST) console.log(`- ${item}`);

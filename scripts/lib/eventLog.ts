@@ -1,10 +1,20 @@
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-// The verbs that write, plus the two writes that exist only to be recorded.
+// The verbs that write, plus the three writes that exist only to be recorded.
 // `decision` is its own op rather than a note by convention, because "what
 // was decided about this" has to be answerable without a text heuristic.
-export const EVENT_OPS = ['add', 'edit', 'start', 'stop', 'done', 'decline', 'triage', 'import', 'audit', 'spec-add', 'spec-remove', 'spec-defer', 'spec-done', 'doctor-fix', 'note', 'decision'] as const;
+// `recur` is its own op for the same reason and a stronger one: it is counted,
+// and a count assembled by matching prose would be a different number every
+// time the prose was reworded. `checked` is the one place an event's `id` is
+// not a task id but a lesson handle — the subject of the event is the lesson,
+// and "who looked, and when" is what an append-only log answers well.
+// `remove` is here because a record leaving the store is the one thing that
+// happened to it which no other op can be read as: every op above describes a
+// record the log can still point at, and this one is the only trace left of one
+// it cannot. Its note carries the reason, so an absence is either explained
+// here or is a finding.
+export const EVENT_OPS = ['add', 'edit', 'start', 'stop', 'done', 'decline', 'triage', 'import', 'audit', 'spec-add', 'spec-remove', 'spec-defer', 'spec-done', 'doctor-fix', 'note', 'decision', 'recur', 'checked', 'remove'] as const;
 
 export type EventOp = (typeof EVENT_OPS)[number];
 
@@ -59,6 +69,48 @@ function renderEvent(event: TaskEvent): string {
 export function appendEvents(events: TaskEvent[], eventsPath: string): void {
   if (events.length === 0) return;
   appendFileSync(eventsPath, `${events.map(renderEvent).join('\n')}\n`, 'utf8');
+}
+
+// One event is one line, and every reader of this log depends on it: `tasks
+// log` renders a row per event and a paragraph inside one is unreadable in a
+// column. Checked where a note enters rather than at render, because
+// `JSON.stringify` escapes the newline happily and hides the problem in the
+// file. Returns the line count of an offending note, so a caller can name it.
+export function multilineNote(note: string): number | null {
+  return /[\r\n]/.test(note) ? note.split(/\r\n|\r|\n/).length : null;
+}
+
+// A note must contain at least one character that occupies space when rendered
+// and does not command the renderer. Whitespace (`\s`) occupies nothing;
+// `Default_Ignorable_Code_Point` — the Unicode property that defines "occupies
+// no space when rendered", covering ZERO WIDTH SPACE and its Cf kin plus the
+// Mn/Lo outliers a general category alone misses (variation selectors including
+// VS16, COMBINING GRAPHEME JOINER, the Hangul filler jamo, Khmer inherent vowel
+// signs, Mongolian free variation selectors) — renders nothing; category Cc
+// (NUL, BEL, ESC, DEL and their kin — control characters) commands the renderer
+// rather than rendering, up to and including painting colour codes or ringing a
+// bell when the file is later read. Everything else is legitimate, however
+// ugly: a single punctuation mark, a long run of one character, a lone
+// combining mark, an unpaired surrogate (replaced by U+FFFD on write, visible
+// by the time it lands). This line is drawn and stays drawn — no further
+// exclusions.
+const VISIBLE_CHARACTER = /[^\s\p{Default_Ignorable_Code_Point}\p{Cc}]/u;
+export function hasVisibleContent(text: string | null): boolean {
+  return text !== null && VISIBLE_CHARACTER.test(text);
+}
+
+// Both things a note entering this log has to be, in one place, because four
+// verbs each applied the line check by hand and none of them applied this one:
+// `tasks remove <id> --reason "   "` filed a removal whose reason explained
+// nothing, and `reconcile` then counted the record as accounted for — an
+// absence explained by blanks. The truthiness test every caller runs on the
+// flag cannot catch it, because a space is truthy. Returns the complaint, so
+// the caller keeps naming its own noun.
+export function noteProblem(what: string, note: string): string | null {
+  const lines = multilineNote(note);
+  if (lines !== null) return `${what} is one line — this one has ${lines}. Say it here and leave the prose in the commit message`;
+  if (!hasVisibleContent(note)) return `${what} must say something a reader can see, and this one renders as nothing`;
+  return null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -120,6 +172,74 @@ export function parseEvents(text: string, label: string): ToleratedEvents {
 export function loadEvents(eventsPath: string): ToleratedEvents {
   if (!existsSync(eventsPath)) return { events: [], skipped: [] };
   return parseEvents(readFileSync(eventsPath, 'utf8'), eventsPath);
+}
+
+// What a record leaving the store looks like from the log's side. `remove` is
+// the precise answer and `decline` is the weaker one — a record declined and
+// then dropped was dropped deliberately, and reading it as unexplained would
+// bury the absences nobody can account for under the ones everybody can.
+const EXPLAINS_ABSENCE: string[] = ['remove', 'decline'];
+
+export interface ExplainedAbsence {
+  id: string;
+  op: string;
+  note: string;
+}
+
+export interface Reconciliation {
+  // Ids the log has seen created and the store still holds.
+  accounted: string[];
+  absentExplained: ExplainedAbsence[];
+  // The finding. Everything above is the proof that it is complete.
+  absentUnexplained: string[];
+  // How much of the store this could not check at all: a record predating the
+  // log carries no `add` event, so nothing here can say whether it ever left.
+  // Reported on every run, clean ones included — a check that says
+  // "reconciled" over the quarter of the store it can see is a false proof.
+  storeRecords: number;
+  outsideCoverage: number;
+  // The same statement about the other input. One malformed log line used to
+  // take an unexplained absence from 1 to 0 with nothing said and exit 0 — the
+  // check failing open on the input it exists to read. The number was already
+  // in hand and the caller destructured past it, so it is a field here: the
+  // coverage is part of the answer, not something a printer may forget.
+  logLinesUnread: number;
+}
+
+// The log and the store, compared. Three disjoint sets over the ids the log
+// has ever seen created, plus the coverage the comparison does not have — of
+// the store, and of the log. It takes the whole read rather than the events
+// out of it, because a caller holding only `events` cannot state its coverage.
+export function reconcile(read: ToleratedEvents, storeIds: string[]): Reconciliation {
+  const { events, skipped } = read;
+  const present = new Set(storeIds);
+  const created = [...new Set(filterEvents(events, { op: 'add' }).map((event) => event.id))].filter((id): id is string => id !== null);
+
+  const accounted = created.filter((id) => present.has(id));
+  const absent = created.filter((id) => !present.has(id));
+  const absentExplained: ExplainedAbsence[] = [];
+  const absentUnexplained: string[] = [];
+  for (const id of absent) {
+    const explanation = lastExplanation(events, id);
+    if (explanation === undefined) absentUnexplained.push(id);
+    else absentExplained.push({ id, op: explanation.op, note: explanation.note });
+  }
+
+  return { accounted, absentExplained, absentUnexplained, storeRecords: storeIds.length, outsideCoverage: storeIds.filter((id) => !created.includes(id)).length, logLinesUnread: skipped.length };
+}
+
+// The last explanation *after* the id's last `add`, which is not the same as
+// the last explanation. A record removed on purpose, re-filed under the same
+// id, and then lost silently reported as accounted for under the old reason —
+// so the third set was nearly the finding rather than the finding. Re-filing
+// under a used id and retriage after a decline are both ordinary here.
+function lastExplanation(events: TaskEvent[], id: string): TaskEvent | undefined {
+  const own = events.filter((event) => event.id === id);
+  for (let i = own.length - 1; i >= 0; i--) {
+    if (own[i].op === 'add') return undefined;
+    if (EXPLAINS_ABSENCE.includes(own[i].op)) return own[i];
+  }
+  return undefined;
 }
 
 export interface EventFilter {

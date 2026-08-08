@@ -3,8 +3,8 @@ import path from 'node:path';
 import { appendEvents, eventsPathFor, type EventOp, type TaskEvent } from '../lib/eventLog';
 import * as git from '../lib/git';
 import { duplicateClauseIds, parseSpecDoc } from '../lib/specDoc';
-import { loadManifest, systemNames as manifestSystemNames } from '../lib/systems';
-import { DEFAULT_STORE_PATH, loadStoreTolerantly, parseStore, saveStore, type CheckIssue, type State, type Task } from '../lib/taskStore';
+import { loadManifest, ManifestError, owningSystem, systemNames as manifestSystemNames, type Manifest } from '../lib/systems';
+import { CLOSING_STATES, DEFAULT_STORE_PATH, loadStoreTolerantly, parseStore, saveStore, type CheckIssue, type Task } from '../lib/taskStore';
 
 // `--actor` is not here: a global flag is accepted by every command, and a
 // read command that accepted it would drop it, which is exactly the silent
@@ -66,6 +66,22 @@ export function systemNames(config: Config): string[] {
   return manifestSystemNames(loadManifest(config.systemsPath));
 }
 
+// The other half of the same manifest: which system owns a given path, for
+// the callers comparing that against what a record says about itself. A
+// manifest that will not parse costs this answer and nothing else — every
+// caller is reporting, and none of them may fail a write over it.
+export function pathOwner(config: Config): (path: string) => string | null {
+  if (!existsSync(config.systemsPath)) return () => null;
+  let manifest: Manifest;
+  try {
+    manifest = loadManifest(config.systemsPath);
+  } catch (error) {
+    if (!(error instanceof ManifestError)) throw error;
+    return () => null;
+  }
+  return (path) => owningSystem(manifest, path);
+}
+
 export function specFile(config: Config, spec: string): string {
   return `${config.specsDir}/${spec}.md`;
 }
@@ -109,7 +125,7 @@ function warnIfStoreDirtyAndStale(config: Config): void {
   warnedStoreDirty = true;
 }
 
-export const CLOSING_STATES: State[] = ['done', 'declined'];
+export { CLOSING_STATES };
 
 export function workingTreeOnlyIssues(config: Config, tasks: Task[]): CheckIssue[] {
   if (!usesDefaultStore(config)) return [];
@@ -172,11 +188,30 @@ export function flushSkippedStoreLines(): void {
   skippedStoreLines.length = 0;
 }
 
+// A record leaving the store, and the reason it left. Both halves travel
+// together because a caller able to declare one without the other is exactly
+// the gap this pair exists to close: `saveStore` refuses an undeclared drop,
+// and declaring it here is what writes the event, so there is no order of
+// calls that removes a record and logs nothing.
+export interface Removal {
+  task: Task;
+  reason: string;
+}
+
 // The staleness check reads the pre-write state, so it runs before the
 // save: after it, the mtime is this write's own and the question is gone.
-export function saveStoreAndWarn(tasks: Task[], config: Config): void {
+export function saveStoreAndWarn(tasks: Task[], config: Config, removals: Removal[] = []): void {
   warnIfStoreDirtyAndStale(config);
-  saveStore(tasks, config.storePath);
+  saveStore(
+    tasks,
+    config.storePath,
+    removals.map(({ task }) => task.id),
+  );
+  recordEvents(
+    config,
+    'remove',
+    removals.map(({ task, reason }) => subjectOf(task, `removed from the store: ${reason}`)),
+  );
 }
 
 // "the spec whose branch is checked out" — a branch not named after any spec

@@ -2,9 +2,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import * as git from '../lib/git';
 import { clauseStandings, parseSpecDoc } from '../lib/specDoc';
 import { findProducers, producerIndex } from '../lib/producers';
-import { loadManifest } from '../lib/systems';
-import { filterEvents, loadEvents } from '../lib/eventLog';
+import { canonicalPath, covers, loadManifest } from '../lib/systems';
+import { filterEvents, loadEvents, noteProblem } from '../lib/eventLog';
 import {
+  awaitsADecider,
   claimSummary,
   coldClaims,
   createTask,
@@ -19,8 +20,11 @@ import {
   listQueue,
   loadStore,
   matchesSearchTerm,
+  misfiledSystem,
   nextSeq,
   parseStore,
+  REPORTING_KINDS,
+  reportsCost,
   requirementStates,
   resolveDecider,
   resolveFault,
@@ -39,6 +43,7 @@ import {
 import type { Flags } from './cli';
 import {
   CLOSING_STATES,
+  pathOwner,
   readStore,
   recordEvents,
   refuseUnknownSpec,
@@ -56,7 +61,8 @@ import {
   validateContentFields,
   type Config,
 } from './context';
-import { reportPriorArtOnWrites } from './architectureCmds';
+import { reportPriorArt } from './architectureCmds';
+import { unknownLessonIds } from './briefLessons';
 import { printRow, printTask, truncateLine, wrapUnder } from './render';
 import { resolveTaskIds } from './resolveIds';
 
@@ -67,15 +73,40 @@ export function reportUnresolvedRequires(task: Task, tasks: Task[]): void {
   console.log(`recorded ${unresolved.length} requirement(s) no record answers to: ${unresolved.join(', ')} — they hold the task until the record exists, and \`tasks doctor\` reports them until it does`);
 }
 
+// The word `commitment` says one thing — someone has read this region — and
+// the party it exists to distrust is the planner, who by definition has not.
+// Holding the record is the act that makes the claim true, so this is what
+// permits the word: all three Phase 3 records were born commitments at the
+// planning commit, `tasks plan` graded their declared regions clean, and two
+// of them then collided in five files neither had declared.
+//
+// A closed record does not qualify, though it may once have. `open` reaches
+// `done` with no `start` in between, so admitting a closed state let a
+// commitment be asserted on a region nobody ever read — and that grant is the
+// input `done --commit` measures a diff against. Correcting a closed record's
+// region needs no `--grant`: an edit that does not name one keeps the kind
+// the record already carries.
+function claimHolds(task: Task | null): boolean {
+  return task?.state === 'in-progress';
+}
+
 // A grant nobody has read the code for is a forecast, so that is what a
 // grant declared here is unless its author says otherwise: `add` and a
 // planner's `edit` both run before the region has been read, and the
 // workflow's correction point is a worker narrowing its own grant at
 // dispatch. Returning the previous kind for an edit that touches nothing
 // else keeps a worker's commitment from being demoted by a later title fix.
-function resolveGrant(flags: Record<string, string>, current: Grant | null): { grant: Grant | null } | { error: string } {
+function resolveGrant(flags: Record<string, string>, task: Task | null): { grant: Grant | null } | { error: string } {
+  const current = task?.grant ?? null;
   const given = flags.grant;
-  if (given !== undefined) return GRANTS.includes(given as Grant) ? { grant: given as Grant } : { error: `error: --grant must be one of ${GRANTS.join(', ')}` };
+  if (given !== undefined) {
+    if (!GRANTS.includes(given as Grant)) return { error: `error: --grant must be one of ${GRANTS.join(', ')}` };
+    if (given === 'commitment' && !claimHolds(task)) {
+      const start = task === null ? '`tasks add` … then `tasks start <id> --actor <you>`' : `\`tasks start ${task.id} --actor <you>\``;
+      return { error: `error: --grant commitment records that someone has read the region, and ${task === null ? 'a record being created' : `${task.id} is ${task.state}`} — ${start} takes the record, and the same edit is a commitment from there` };
+    }
+    return { grant: given as Grant };
+  }
   if (flags.writes === undefined) return { grant: current };
   return { grant: current ?? 'forecast' };
 }
@@ -91,6 +122,54 @@ function parseDischarges(given: string | undefined, current: number[]): { number
     numbers.push(parsed);
   }
   return { numbers: [...new Set(numbers)].sort((a, b) => a - b) };
+}
+
+// At the record, not at the flag: `--system` alone says nothing wrong, and
+// `--writes` alone says nothing wrong; the disagreement only exists once both
+// are on one record. Reported, never refused — a record may span systems, and
+// what fires here is the narrower case where not one path it names belongs to
+// the system it claims.
+function reportMisfiledSystem(config: Config, task: Task): void {
+  const issue = misfiledSystem(task, pathOwner(config));
+  if (issue === null) return;
+  console.log(`note: ${issue.message} — \`tasks edit ${task.id} --system "<name>"\` corrects the field if that is what is wrong; a record that genuinely spans systems needs nothing.`);
+}
+
+// The comparison `docs/workflow.md` asks a worker to make by eye, made where
+// both halves are already in hand. It reports and nothing turns on it: the
+// workflow's own line is that a diff diverging from its grant is information,
+// not a violation. What is new is that the information is now recorded —
+// this is the only measurement anyone has of how wrong a forecast is, and the
+// sample this audit took by hand was 10-50% recall.
+function reportGrantAgainstDiff(task: Task, sha: string): void {
+  if (task.writes.length === 0) return;
+  const changed = git.changedIn(sha);
+  if (changed === null) {
+    console.log(`  git could not say what ${sha.slice(0, 12)} changed, so the grant is not compared against it`);
+    return;
+  }
+  const granted = task.writes.map(canonicalPath);
+  const wrote = changed.filter((file) => !granted.some((region) => covers(region, file)));
+  const untouched = granted.filter((region) => !changed.some((file) => covers(region, file)));
+  if (wrote.length === 0 && untouched.length === 0) {
+    console.log(`  grant and diff agree: ${sha.slice(0, 12)} touched only what this record granted`);
+    return;
+  }
+  if (wrote.length > 0) console.log(`  wrote, ungranted: ${wrote.join(', ')}`);
+  if (untouched.length > 0) console.log(`  granted, untouched: ${untouched.join(', ')}`);
+  console.log(`  \`tasks edit ${task.id} --writes <what it really touched>\` corrects the record — a divergence is information, and this is the one measurement of how wrong a forecast is`);
+}
+
+// A citation naming no live lesson is reported and kept, never dropped and
+// never refused. Kept because the lesson may be one a concurrent branch is
+// adding and the record is still the honest observation; reported because a
+// handle that resolves to nothing is how a breach count silently goes to
+// zero. Not a `doctor` condition and not a gate: c9 is that no exit code
+// reads a breach.
+function reportUnknownBreaches(task: Task): void {
+  const unknown = unknownLessonIds(task.breaches);
+  if (unknown.length === 0) return;
+  console.log(`note: ${unknown.length} cited lesson handle(s) name no live lesson: ${unknown.join(', ')} — the citation is kept, and \`tasks friction\` reports it there too. A lesson's handle survives rewording its prose, so a miss here is a typo or a retirement rather than an edit`);
 }
 
 function reportGrant(task: Task): void {
@@ -185,6 +264,7 @@ export function cmdAdd(args: Flags, usage: string): void {
     requires: splitList(args.flags.requires),
     writes: splitList(args.flags.writes),
     grant: grant.grant,
+    breaches: splitList(args.flags.breaches),
     produces: splitList(args.flags.produces),
     files: splitList(args.flags.files),
     deliverable: args.flags.deliverable ?? null,
@@ -197,7 +277,133 @@ export function cmdAdd(args: Flags, usage: string): void {
   if (kind === 'finding' && args.flags.spec !== undefined) console.log(`--spec is not recorded on a finding — it starts unreviewed outside every spec, and triage or \`tasks promote\` moves it in`);
   reportUnresolvedRequires(task, tasks);
   reportGrant(task);
-  if (args.flags.writes !== undefined) reportPriorArtOnWrites(config, tasks, task);
+  reportUnknownBreaches(task);
+  reportMisfiledSystem(config, task);
+  reportPriorArt(config, tasks, task);
+}
+
+// The other half of the asymmetry `reportPriorArt` prints, and it writes
+// nothing to the store. An occurrence is an event, so two branches recording
+// one append two lines that `merge=union` keeps both of; a counter field is
+// something concurrent branches edit by construction, whose correct
+// resolution is to add the two sides, which git cannot compute. The count is
+// whatever `filterEvents` returns over these events, so it cannot disagree
+// with them, and no description is overwritten — each occurrence keeps what
+// this one cost, which is the variation nine overwrites would have lost.
+export function cmdRecur(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const given = args.positional[0];
+  const note = args.flags.note;
+  if (!given || !note) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  const problem = noteProblem('an occurrence', note);
+  if (problem !== null) {
+    console.error(`error: ${problem}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const tasks = readStore(config);
+  const resolved = resolveTaskIds([given], tasks);
+  if (resolved === null) return;
+  const task = resolved[0];
+  // An occurrence is a count of what the workflow cost, and only the kinds
+  // that carry a fault are in that channel. Attaching one to a planned task
+  // would put a number on a record no query reads it from.
+  if (!reportsCost(task.kind)) {
+    console.error(`error: ${task.id} is a ${task.kind}, and only a ${REPORTING_KINDS.join(' or ')} records what the work cost — there is nothing for an occurrence to be counted against. \`tasks add "<title>" --kind finding --fault ${FAULTS.join('|')} --deliverable "..."\` files this as its own record`);
+    process.exitCode = 1;
+    return;
+  }
+
+  recordEvents(config, 'recur', [subjectOf(task, note)]);
+  const occurrences = filterEvents(loadEvents(config.eventsPath).events, { id: task.id, op: 'recur' });
+  console.log(`recorded occurrence ${occurrences.length} of ${task.id} in ${config.eventsPath} — the record itself is untouched, and the count is read back off the occurrences`);
+  console.log(`\`tasks log --op recur --id ${task.id}\` reads what each one cost`);
+  // A friction recurring after its record closed is the sharpest thing this
+  // channel can say — the fix did not hold — so it is recorded and named
+  // rather than refused.
+  if (CLOSING_STATES.includes(task.state)) console.log(`${task.id} is ${task.state}, so this occurrence is a recurrence after the record closed — \`tasks retriage ${task.id}\` puts it back in the queue if the fix did not hold`);
+}
+
+// The recorded form of a record leaving the store, and the only route that
+// can. `--reason` is refused when absent on the same ground `decline` refuses
+// one: an absence with no stated cause is the state this exists to make
+// impossible, and the whole cost being bought down is not the missing row but
+// having to re-audit every record to tell "deliberately dropped" from
+// "silently gone".
+//
+// It also files the event for a record already gone — the retroactive case,
+// which is how a store that lost records before the verb existed is caught
+// up. Closing a record is `done` or `decline`; this is for a record that
+// should not be in the store at all.
+export function cmdRemove(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const given = args.positional[0];
+  const reason = args.flags.reason;
+  if (!given || !reason) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  const problem = noteProblem("a removal's reason", reason);
+  if (problem !== null) {
+    console.error(`error: ${problem}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const tasks = loadStore(config.storePath);
+  const task = tasks.find((candidate) => candidate.id === given);
+  if (task === undefined) {
+    // Exact only, and deliberately: a fragment resolving to the nearest id is
+    // right for a command that moves a record and wrong for one that deletes
+    // it. A removal is also the one write with something to say about an id
+    // the store does not hold, so an unknown id is answered rather than
+    // refused — if the log ever created it, this is the retroactive route.
+    const created = filterEvents(loadEvents(config.eventsPath).events, { op: 'add', id: given });
+    if (created.length === 0) {
+      console.error(`error: no record and no history answers to ${given} — nothing has left the store under that id, so there is nothing to record. \`tasks list\` and \`tasks log --id ${given}\` are the two places it would be`);
+      process.exitCode = 1;
+      return;
+    }
+    recordEvents(config, 'remove', [{ id: given, system: null, spec: null, note: `removed from the store: ${reason}` }]);
+    console.log(`${given} was already absent from the store and the log had no removal for it — recorded one against its history. \`tasks doctor\` no longer reports it as an unexplained absence`);
+    return;
+  }
+
+  // Refused because removal is not reversible and a forward reference is.
+  // `edit --requires <an id nobody has filed yet>` reaches the same dangling
+  // state deliberately and says so, and the record it names may arrive later;
+  // deleting the far end of an edge that already resolves cannot be undone and
+  // has no such reading. So the asymmetry is the point, not an oversight.
+  // The holders are named rather than repaired because dropping the edge is a
+  // decision about their work, not about this one.
+  const holders = tasks.filter((candidate) => candidate.requires.includes(task.id));
+  if (holders.length > 0) {
+    console.error(`error: ${holders.length} record(s) require ${task.id}, and removing it would leave them pointing at nothing — a dangling reference, which \`tasks doctor\` exits non-zero on: ${holders.map((candidate) => candidate.id).join(', ')}`);
+    console.error(`\`tasks edit <holder> --requires <the rest>\` drops the edge where it belongs, or \`tasks decline ${task.id} --reason "..."\` closes this record and leaves the history it holds up intact`);
+    process.exitCode = 1;
+    return;
+  }
+
+  // Reported, not refused, and the difference from the case above is that
+  // nothing breaks: a claim is one actor's, and `tasks start` already lets
+  // another take one over while saying so. Silence was the defect — the
+  // removal destroyed a live claim without mentioning it.
+  const claim = claimSummary(task, today());
+
+  saveStoreAndWarn(
+    tasks.filter((candidate) => candidate.id !== task.id),
+    config,
+    [{ task, reason }],
+  );
+  console.log(`removed ${task.id} [${task.kind}/${task.state}] from ${config.storePath} — the record is gone and the log says so, with the reason`);
+  if (claim !== null) console.log(`destroyed a live claim with it: ${claim} — \`tasks log --id ${task.id}\` is where that now lives`);
+  console.log(`\`tasks log --id ${task.id}\` is now the whole of what remains of it`);
 }
 
 // A question belongs to the spec whose work it holds up. Records from two
@@ -301,7 +507,7 @@ export function cmdEdit(args: Flags, usage: string): void {
     return;
   }
 
-  const grant = resolveGrant(args.flags, task.grant);
+  const grant = resolveGrant(args.flags, task);
   if ('error' in grant) {
     console.error(grant.error);
     process.exitCode = 1;
@@ -374,6 +580,10 @@ export function cmdEdit(args: Flags, usage: string): void {
     task.grant = grant.grant;
     changes.push('grant');
   }
+  if (args.flags.breaches !== undefined) {
+    task.breaches = splitList(args.flags.breaches);
+    changes.push('breaches');
+  }
   if (args.flags.produces !== undefined) {
     task.produces = splitList(args.flags.produces);
     changes.push('produces');
@@ -397,7 +607,9 @@ export function cmdEdit(args: Flags, usage: string): void {
   console.log(`edited ${task.id}: ${changes.join(', ')}`);
   reportUnresolvedRequires(task, tasks);
   if (changes.includes('grant')) reportGrant(task);
-  if (args.flags.writes !== undefined) reportPriorArtOnWrites(config, tasks, task);
+  if (changes.includes('breaches')) reportUnknownBreaches(task);
+  if (changes.some((change) => change === 'system' || change === 'writes' || change === 'files')) reportMisfiledSystem(config, task);
+  if (changes.includes('writes') || changes.includes('files')) reportPriorArt(config, tasks, task);
 }
 
 function storeStateAt(config: Config, commit: string, id: string): State | null {
@@ -721,6 +933,15 @@ export function cmdStart(args: Flags, usage: string): void {
   const resolved = resolveTaskIds([id], tasks);
   if (resolved === null) return;
   const task = resolved[0];
+  // Claiming is how work is taken, and a question addressed away from the
+  // worker is not work: it is answered, which needs no claim and leaves no
+  // grant. Refused rather than warned, because the silent claim is exactly
+  // how an escalation turned back into an implementation.
+  if (awaitsADecider(task)) {
+    console.error(`error: ${task.id} is a question for the ${task.decider ?? 'unaddressed'} to decide, not work to claim. \`tasks decision "<the answer>" --id ${task.id}\` records the answer and \`tasks done ${task.id}\` releases what waits on it; \`tasks work-prompt ${task.id}\` prints the whole route`);
+    process.exitCode = 1;
+    return;
+  }
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const waiting = waitingOn(task, byId);
   const displaced = claimSummary(task, today());
@@ -885,6 +1106,7 @@ export function cmdDone(args: Flags, usage: string): void {
     if (task.kind === 'undelivered') console.log(`clause standing at close: ${clauseStanding(task, (spec) => specSource(config, spec))}`);
     if (alreadyDone) console.log(`the recorded close date stands: ${task.closed ?? 'undated'}`);
     if (waiting.length > 0) console.log(`closed with ${waiting.length} requirement(s) still open: ${waiting.join(', ')}`);
+    if (task.closedCommit !== null) reportGrantAgainstDiff(task, task.closedCommit);
     reportReleasedHolds(task, tasks);
     printDecisionPrompt(task);
   }

@@ -1,6 +1,6 @@
 import type { TaskEvent } from './eventLog';
 import { allConcepts, canonicalPath, pathsOverlap, type Concept, type Manifest } from './systems';
-import { seqRank, type State, type Task } from './taskStore';
+import { oldestFirst, type State, type Task } from './taskStore';
 
 // "Does anything already do this?" — the question a worker is supposed to ask
 // before building, and the one the store could not answer. `produces` has
@@ -129,8 +129,10 @@ export interface PriorArt {
 
 // `src/runtime/save.ts:88` and `docs/workflow.md#H1` are a path with a
 // location on the end: the suffix says where inside the file something was
-// seen, and is not part of what was claimed.
-const declaredPath = (entry: string): string => canonicalPath(entry.split(/[:#]/)[0]);
+// seen, and is not part of what was claimed. Exported because a caller
+// querying *with* a record's own entries has to strip it by the same rule —
+// two rules would answer the same question two ways.
+export const declaredPath = (entry: string): string => canonicalPath(entry.split(/[:#]/)[0]);
 
 // Live work first, because an open claim on a path is a collision and a
 // closed one is a precedent to read. Within a group, seq — oldest first.
@@ -153,7 +155,7 @@ export function priorArt(manifest: Manifest, tasks: Task[], paths: string[]): Pr
   const claims = tasks
     .map((task) => ({ task, on: pathMatches(task, queries) }))
     .filter((entry) => entry.on.length > 0)
-    .sort((a, b) => STATE_RANK[a.task.state] - STATE_RANK[b.task.state] || seqRank(a.task.seq) - seqRank(b.task.seq));
+    .sort((a, b) => STATE_RANK[a.task.state] - STATE_RANK[b.task.state] || oldestFirst(a.task, b.task));
 
   const concepts = allConcepts(manifest)
     .map(({ system, concept }) => ({ system: system.name, concept, on: queries.filter((query) => concept.paths.some((path) => pathsOverlap(path, query))) }))

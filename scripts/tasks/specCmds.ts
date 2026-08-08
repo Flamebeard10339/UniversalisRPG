@@ -262,10 +262,6 @@ export function cmdSpecRemove(args: Flags, usage: string): void {
     process.exitCode = 1;
     return;
   }
-  if (!existsSync(specFile(config, slug))) {
-    refuseUnknownSpec(config, slug);
-    return;
-  }
   const tasks = loadStore(config.storePath);
   const byId = new Map(tasks.map((task) => [task.id, task]));
   const missing = ids.filter((id) => !byId.has(id));
@@ -274,6 +270,19 @@ export function cmdSpecRemove(args: Flags, usage: string): void {
     return;
   }
   const notMembers = ids.filter((id) => byId.get(id)!.spec !== slug);
+  // The one place a missing spec file is not a refusal — but only when the
+  // store still says the slug is real. Detaching a member from a spec whose
+  // file is already gone is exactly what this command is for, and asking for
+  // the file back asks for the thing being removed from; a slug no named
+  // record belongs to and no file backs is a typo, and departing those
+  // records from the specs they really are in is not what was asked.
+  if (!existsSync(specFile(config, slug))) {
+    if (notMembers.length === ids.length) {
+      refuseUnknownSpec(config, slug);
+      return;
+    }
+    console.log(`no ${specFile(config, slug)}, and the store still has members naming it — detaching them is what this is for, so the removal goes ahead`);
+  }
   const undelivered = ids.filter((id) => byId.get(id)!.kind === 'undelivered');
   const from = new Map(ids.map((id) => [id, byId.get(id)!.spec]));
   // No verdict is implied by a manual removal — it is neither a scope

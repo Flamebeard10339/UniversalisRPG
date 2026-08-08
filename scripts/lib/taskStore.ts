@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 export type Kind = 'task' | 'finding' | 'undelivered' | 'question';
 export type State = 'unreviewed' | 'open' | 'in-progress' | 'done' | 'declined';
@@ -69,6 +70,11 @@ export interface Task {
   // Who should decide it, for a `question`: the role whose decision would
   // hold. Null on every other kind.
   decider: Decider | null;
+  // The lessons this record is an instance of breaching, by the handle that
+  // survives rewording the lesson's own prose. Empty on almost everything:
+  // most records breach nothing, and a citation is worth having only because
+  // it turns "how many defects" into "which instruction is not landing".
+  breaches: string[];
   produces: string[];
   deliverable: string | null;
   evidence: string | null;
@@ -103,6 +109,12 @@ export const DECIDERS: Decider[] = ['worker', 'planner', 'author'];
 export const DEPARTURES: Departure[] = ['deferred', 'unmet', 'retriage'];
 const SEVERITIES: Severity[] = ['high', 'medium', 'low'];
 
+// The states that mean the record is answered. What separates them from the
+// rest is that nothing about the work is still to be decided, which is why
+// several checks below stop at them rather than asking a finished record to
+// agree with a tree that has moved on since.
+export const CLOSING_STATES: State[] = ['done', 'declined'];
+
 // The kinds that report what working the process cost. A `task` is planned
 // work and an `undelivered` record is a clause verdict the spec document
 // already carries; neither is a report of a cost.
@@ -110,6 +122,14 @@ export const REPORTING_KINDS: Kind[] = ['finding', 'question'];
 
 export function reportsCost(kind: Kind): boolean {
   return REPORTING_KINDS.includes(kind);
+}
+
+// A question addressed to the planner or the author is a decision waiting on
+// somebody, not work waiting on a worker, and every route that hands out work
+// has to be able to tell the two apart. A question addressed to the worker is
+// the case where the agent reading it is the decider, so there it is work.
+export function awaitsADecider(task: Task): boolean {
+  return task.kind === 'question' && task.decider !== null && task.decider !== 'worker';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -183,6 +203,7 @@ const KNOWN_KEYS: ReadonlyArray<keyof KnownFields> = Object.keys({
   grant: true,
   fault: true,
   decider: true,
+  breaches: true,
   produces: true,
   deliverable: true,
   evidence: true,
@@ -263,6 +284,7 @@ function normalizeTask(value: unknown, where: string): Task {
     grant: grant as Grant | null,
     fault: fault as Fault | null,
     decider: decider as Decider | null,
+    breaches: optionalStringArray(value, 'breaches', where),
     produces: optionalStringArray(value, 'produces', where),
     deliverable: nullableString(value, 'deliverable', where),
     evidence: nullableString(value, 'evidence', where),
@@ -301,6 +323,7 @@ function renderTask(task: Task): string {
     grant: task.grant,
     fault: task.fault,
     decider: task.decider,
+    breaches: task.breaches,
     produces: task.produces,
     deliverable: task.deliverable,
     evidence: task.evidence,
@@ -361,6 +384,7 @@ export function createTask(record: NewRecord, draft: Draft = {}): Task {
     grant: null,
     fault: record.fault ?? null,
     decider: record.decider ?? null,
+    breaches: [],
     produces: [],
     deliverable: null,
     evidence: null,
@@ -460,14 +484,40 @@ export function parseStoreTolerantly(text: string, label: string): ToleratedStor
   return { tasks, skipped };
 }
 
+// The bytes this process last saw at each store path. Every write verb is
+// load, mutate, save, and the mutation is a closure over the array that was
+// loaded — so the read and the write are the two ends of one transaction and
+// the file is the only place a second process can appear between them. Both
+// ends are in this module and nowhere else, which is what lets the comparison
+// below need nothing from any caller.
+const lastSeen = new Map<string, string>();
+
+function readAndRemember(path: string): string {
+  const text = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  lastSeen.set(resolve(path), text);
+  return text;
+}
+
 export function loadStore(path: string = DEFAULT_STORE_PATH): Task[] {
-  if (!existsSync(path)) return [];
-  return parseStore(readFileSync(path, 'utf8'), path);
+  return parseStore(readAndRemember(path), path);
 }
 
 export function loadStoreTolerantly(path: string = DEFAULT_STORE_PATH): ToleratedStore {
-  if (!existsSync(path)) return { tasks: [], skipped: [] };
-  return parseStoreTolerantly(readFileSync(path, 'utf8'), path);
+  return parseStoreTolerantly(readAndRemember(path), path);
+}
+
+// Which ids are about to leave and were not declared. Answered from the bytes
+// this process read, so it costs no second read and cannot disagree with the
+// concurrent-write check above, which is comparing the same string. A store
+// this process never read is one it cannot know the previous contents of, and
+// silence there is not evidence of a drop.
+function undeclaredDrops(seen: string | undefined, path: string, saving: Task[], removing: string[]): string[] {
+  if (seen === undefined) return [];
+  const staying = new Set(saving.map((task) => task.id));
+  const declared = new Set(removing);
+  return parseStoreTolerantly(seen, path)
+    .tasks.map((task) => task.id)
+    .filter((id) => !staying.has(id) && !declared.has(id));
 }
 
 // One task per line, in id order — the file on disk is a function of the
@@ -478,10 +528,120 @@ export function loadStoreTolerantly(path: string = DEFAULT_STORE_PATH): Tolerate
 // each inserting a new, id-adjacent line, which lands at the same position
 // on both sides and conflicts once, in the shape a human resolves by keeping
 // both.
-export function saveStore(tasks: Task[], path: string = DEFAULT_STORE_PATH): void {
+// How long a writer waits for another writer's turn, and how old a lock has
+// to be before it is read as abandoned rather than held. A write is a compare
+// and a rename, so the hold is milliseconds; anything past the first number
+// is a queue, and anything past the second is a process that died holding it.
+const LOCK_WAIT_MS = 5_000;
+const LOCK_ABANDONED_MS = 30_000;
+
+const pause = (ms: number): void => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+};
+
+// Exclusive creation is the only operation a filesystem offers that two
+// processes cannot both win. Comparing the file against what this command
+// read is not enough on its own: both writers pass the comparison, then both
+// rename, and the second silently replaces the first — which is the measured
+// failure with one extra step, not a fix for it. So the comparison and the
+// rename happen together, under this.
+function withLock<T>(path: string, run: () => T): T {
+  const lock = `${path}.lock`;
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  for (;;) {
+    try {
+      writeFileSync(lock, `${process.pid}`, { flag: 'wx' });
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      const age = Date.now() - (statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? Date.now());
+      if (age > LOCK_ABANDONED_MS) rmSync(lock, { force: true });
+      else if (Date.now() > deadline) throw new StoreError(`${lock} is held by another write and did not clear within ${LOCK_WAIT_MS}ms. Nothing was written; re-run the command.`);
+      else pause(20);
+    }
+  }
+  try {
+    return run();
+  } finally {
+    rmSync(lock, { force: true });
+  }
+}
+
+// How long a writer waits for a reader to let go of the destination. Windows
+// refuses to replace a file another process holds open, and a reader holds the
+// store for exactly as long as its own read takes — so the wait only has to
+// outlast that. It cannot reorder two writes: the lock above has already
+// excluded every other writer, and what is being waited on is a read.
+const REPLACE_WAIT_MS = 500;
+
+// Refused as a StoreError when the wait runs out, never as the raw errno.
+// `writeFileSync` into a file held open for reading succeeds, so staging and
+// renaming introduced this failure; letting it escape as an `EPERM` naming a
+// staging file that has already been removed would make a correct workflow
+// fail for a reason its operator cannot act on.
+function replace(staging: string, path: string): void {
+  const deadline = Date.now() + REPLACE_WAIT_MS;
+  for (;;) {
+    try {
+      renameSync(staging, path);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY') throw error;
+      if (Date.now() > deadline) throw new StoreError(`${path} is held open by another process and could not be replaced within ${REPLACE_WAIT_MS}ms. Nothing was written; re-run the command.`);
+      pause(10);
+    }
+  }
+}
+
+//
+// Staged and renamed rather than written in place, because `writeFileSync`
+// truncates and then streams: a reader inside that window sees a prefix, and
+// a prefix ending on a newline is a store that is short, self-consistent and
+// silent. Renaming replaces the file in one step, so a reader sees the whole
+// of one version or the whole of the other.
+//
+// And refused, never merged, when the file has moved under this process. What
+// is in `tasks` is what was on disk when this command read it, plus whatever
+// it changed; a record another process added in between is in neither, and
+// writing would delete it with no error anywhere. Refusing costs the caller a
+// re-run, which is what `docs/workflow.md` already asks agents to arrange by
+// hand.
+// The ids a caller has said out loud it is dropping. Passing them is what
+// separates a removal from a record silently going missing, and the default
+// is the honest one: a caller that says nothing may drop nothing.
+export function saveStore(tasks: Task[], path: string = DEFAULT_STORE_PATH, removing: string[] = []): void {
   const sorted = [...tasks].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const body = sorted.map((task) => renderTask(task)).join('\n');
-  writeFileSync(path, body.length > 0 ? `${body}\n` : '', 'utf8');
+  const text = body.length > 0 ? `${body}\n` : '';
+
+  withLock(path, () => {
+    const seen = lastSeen.get(resolve(path));
+    if (seen !== undefined && (existsSync(path) ? readFileSync(path, 'utf8') : '') !== seen) {
+      throw new StoreError(`${path} changed on disk after this command read it — another write landed in between, and saving now would delete it. Nothing was written; re-run the command.`);
+    }
+    // This function rewrites the whole file from the array it was handed, so
+    // a record missing from that array leaves the store — which for sixteen
+    // ops was a thing the log had no verb for and no caller had to declare.
+    // Declaring it is now the only way to do it, so a caller that forgets
+    // gets a refusal here rather than a gap somebody finds by re-auditing
+    // every record. Closing the set is the durable part: an op added later
+    // cannot re-open the hole by being write-path-only.
+    const undeclared = undeclaredDrops(seen, path, sorted, removing);
+    if (undeclared.length > 0) {
+      throw new StoreError(`saving ${path} would drop ${undeclared.length} record(s) nothing declared: ${undeclared.join(', ')}. A record leaving the store is an operation with a reason — \`tasks remove <id> --reason "..."\` is it. Nothing was written.`);
+    }
+
+    const staging = `${path}.${process.pid}.tmp`;
+    try {
+      writeFileSync(staging, text, 'utf8');
+      replace(staging, path);
+    } catch (error) {
+      rmSync(staging, { force: true });
+      throw error;
+    }
+  });
+  lastSeen.set(resolve(path), text);
 }
 
 // The next position a newly created record takes. Both sides of a parallel
@@ -517,6 +677,13 @@ export const severityRank = (severity: Severity | null): number => (severity ===
 // newest thing in the store the moment it merges in, whatever position it
 // happened to land at in its own branch's file.
 export const seqRank = (seq: number | null): number => (seq === null ? Number.POSITIVE_INFINITY : seq);
+
+// `seq` alone does not order a queue, because `nextSeq` is max+1 over what
+// one branch can see and two branches cannot see each other: 39 values are
+// shared by 104 of the store's 792 records. Where it ties, id decides —
+// arbitrary, but the same arbitrary answer from every checkout and whatever
+// order the store was read in, which is the only property a queue needs here.
+export const oldestFirst = (a: Task, b: Task): number => seqRank(a.seq) - seqRank(b.seq) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 export type RequirementStatus = 'waiting' | 'done' | 'declined' | 'missing';
 
@@ -575,7 +742,7 @@ export function fixNowQueue(tasks: Task[], spec: string | null, filter: QueueFil
     .filter((task) => !isBlocked(task, byId))
     .filter((task) => filter.system === undefined || task.system === filter.system)
     .filter((task) => filter.severity === undefined || task.severity === filter.severity)
-    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || seqRank(a.seq) - seqRank(b.seq));
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || oldestFirst(a, b));
 }
 
 // The queue fixNowQueue cannot answer for: an in-progress record is held,
@@ -605,7 +772,7 @@ export function unreviewedFiledBy(tasks: Task[], spec: string): Task[] {
 export function unreviewedQueue(tasks: Task[]): Task[] {
   return tasks
     .filter((task) => task.state === 'unreviewed')
-    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || seqRank(a.seq) - seqRank(b.seq));
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || oldestFirst(a, b));
 }
 
 export interface ListFilter {
@@ -692,7 +859,7 @@ export function listQueue(tasks: Task[], filter: ListFilter = {}): Task[] {
     .filter((task) => filter.kind === undefined || task.kind === filter.kind)
     .filter((task) => filter.text === undefined || matchesSearchTerm(SEARCHABLE(task), filter.text))
     .filter((task) => !filter.triggered || (task.state === 'declined' && task.trigger !== null))
-    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || seqRank(a.seq) - seqRank(b.seq));
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || oldestFirst(a, b));
 }
 
 // An id that resolves to nothing is a guess that missed, and the guess is
@@ -717,13 +884,22 @@ export function nearMatches(query: string, tasks: Task[], limit = 5): Task[] {
       return { task, score };
     })
     .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score || seqRank(a.task.seq) - seqRank(b.task.seq))
+    .sort((a, b) => b.score - a.score || oldestFirst(a.task, b.task))
     .slice(0, limit)
     .map((entry) => entry.task);
 }
 
+// Three levels, because two collapsed a distinction `doctor` needs. A
+// `dangling` issue is a record pointing at something that does not exist — a
+// system name, a spec file, another record's id — which is the store having
+// drifted out of step with the tree, and is checkable. An `error` is a record
+// disagreeing with itself, and a `warning` is a disagreement about the work;
+// neither is decidable by a machine, and neither fails anything. It is a
+// level rather than a flag on a level so tsc makes every check choose.
+export type IssueLevel = 'dangling' | 'error' | 'warning';
+
 export interface CheckIssue {
-  level: 'error' | 'warning';
+  level: IssueLevel;
   message: string;
 }
 
@@ -779,6 +955,29 @@ export function coldClaimIssues(tasks: Task[], today: string): CheckIssue[] {
     }));
 }
 
+// A doc backlink is `path#H1` and a code reference is `path:88`; the path is
+// what either names.
+export const pathOf = (reference: string): string => reference.split(/[:#]/)[0];
+
+// `system` and the system that owns the paths the record names are two
+// statements about where the work sits, and nothing has ever compared them.
+// Reported and never refused, because a record may legitimately span systems
+// — so this fires only when the record names paths and not one of them
+// belongs to the system it claims, which is the shape all eight live
+// misfilings have. `owner` is passed in because resolving a path needs the
+// manifest and everything else here is pure over the record set.
+//
+// A closed record is not asked. What the field costs is visibility to
+// `--system` queries, and nothing queries for work that is finished; asking
+// anyway turns one answer into 137 and buries the eight that can still be
+// acted on.
+export function misfiledSystem(task: Task, owner: (path: string) => string | null): CheckIssue | null {
+  if (task.system === null || CLOSING_STATES.includes(task.state)) return null;
+  const owners = new Set([...task.writes, ...task.files].map((reference) => owner(pathOf(reference))).filter((name): name is string => name !== null));
+  if (owners.size === 0 || owners.has(task.system)) return null;
+  return { level: 'warning', message: `${task.id} is filed under ${task.system}, and every path it names is owned by ${[...owners].sort().join(', ')}` };
+}
+
 // `specExists` has no default on purpose: the spec directory is the
 // caller's configuration, and a default here would hard-code a path that
 // `specFile` owns.
@@ -786,14 +985,14 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
   const issues: CheckIssue[] = [];
   const seen = new Set<string>();
   for (const task of tasks) {
-    if (seen.has(task.id)) issues.push({ level: 'error', message: `duplicate id: ${task.id}` });
+    if (seen.has(task.id)) issues.push({ level: 'dangling', message: `duplicate id: ${task.id}` });
     seen.add(task.id);
   }
 
   const byId = new Map(tasks.map((task) => [task.id, task]));
   for (const task of tasks) {
     for (const dep of task.requires) {
-      if (!byId.has(dep)) issues.push({ level: 'error', message: `${task.id} requires unresolved id: ${dep}` });
+      if (!byId.has(dep)) issues.push({ level: 'dangling', message: `${task.id} requires unresolved id: ${dep}` });
     }
     if (task.state === 'declined' && !task.reason) issues.push({ level: 'error', message: `${task.id} is declined but has no reason` });
     if (task.state !== 'declined' && task.reason) issues.push({ level: 'warning', message: `${task.id} is ${task.state} and carries a decline reason, which reads as a decline that was reopened: ${task.reason}` });
@@ -804,17 +1003,18 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
     if (task.kind === 'undelivered' && task.clause === null) issues.push({ level: 'error', message: `${task.id} is undelivered but names no proof clause` });
     if (task.kind !== 'undelivered' && task.clause !== null) issues.push({ level: 'error', message: `${task.id} names a proof clause but is not undelivered` });
     if (task.discharges.length > 0 && task.spec === null) issues.push({ level: 'error', message: `${task.id} claims to discharge clause(s) ${task.discharges.join(', ')} and names no spec, so there is no document those numbers refer to` });
-    if (task.system !== null && !systems.includes(task.system)) issues.push({ level: 'error', message: `${task.id} has a system not in systems.json: ${task.system}` });
-    if (task.spec !== null && !specExists(task.spec)) issues.push({ level: 'error', message: `${task.id} references a spec with no file: ${task.spec}` });
+    if (task.system !== null && !systems.includes(task.system)) issues.push({ level: 'dangling', message: `${task.id} has a system not in systems.json: ${task.system}` });
+    // A closed record's slug is history: it says which contract the record
+    // answered, and nothing can be worked against it again. Requiring the file
+    // to survive forever is what makes a finished spec undeletable and
+    // `docs/specs/` a directory that can only grow.
+    if (task.spec !== null && !CLOSING_STATES.includes(task.state) && !specExists(task.spec)) issues.push({ level: 'dangling', message: `${task.id} references a spec with no file: ${task.spec}` });
     for (const file of task.files) {
-      // A doc backlink is `path#H1`, a code reference is `path:88` — strip
-      // whichever suffix is present before checking the path itself exists.
-      const path = file.split(/[:#]/)[0];
-      if (!existsSync(path)) issues.push({ level: 'warning', message: `${task.id} lists a file that no longer exists: ${file}` });
+      if (!existsSync(pathOf(file))) issues.push({ level: 'warning', message: `${task.id} lists a file that no longer exists: ${file}` });
     }
   }
 
-  for (const cycle of dependencyCycles(tasks)) issues.push({ level: 'error', message: `dependency cycle: ${cycle.join(' -> ')}` });
+  for (const cycle of dependencyCycles(tasks)) issues.push({ level: 'dangling', message: `dependency cycle: ${cycle.join(' -> ')}` });
 
   return issues;
 }

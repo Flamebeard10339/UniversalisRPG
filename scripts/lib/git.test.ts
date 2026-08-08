@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { branch, changedFiles, commitCount, commitLog, commitsTouching, diffStat, dirtyPaths, fileAt, head, install, isAncestor, lsFiles, mergeBase, mergeInProgress, parseCommitLog, resolveCommit, type GitFacts } from './git';
+import { branch, changedFiles, changedIn, commitCount, commitLog, commitsTouching, diffStat, dirtyPaths, fileAt, head, install, isAncestor, lsFiles, mergeBase, mergeInProgress, parseCommitLog, resolveCommit, type GitFacts } from './git';
 import { makeRealGitRepo } from './realGitRepo';
 
 let dir: string;
@@ -248,6 +248,16 @@ describe('git seam', () => {
     expect(commitsTouching('never-touched.txt')).toEqual([]);
   });
 
+  it('changedIn carries one commit against its parent, and answers null for a revision git cannot resolve', () => {
+    const base = commit('base');
+    const earlier = changedIn(base) ?? [];
+    writeFileSync(path.join(dir, 'only-here.txt'), 'x\n', 'utf8');
+    const sha = commit('adds only-here.txt');
+    expect(changedIn(sha)).toContain('only-here.txt');
+    for (const file of earlier) expect(changedIn(sha)).not.toContain(file);
+    expect(changedIn('no-such-rev')).toBeNull();
+  });
+
   it('install swaps the implementation every exported read answers from, and hands back the one it replaced', () => {
     const sha = commit('real');
     // A sentinel per method, so an export that reaches around the install
@@ -264,6 +274,7 @@ describe('git seam', () => {
       mergeInProgress: () => true,
       dirtyPaths: () => ['sentinel-dirty.txt'],
       changedFiles: () => ['sentinel-changed.txt'],
+      changedIn: () => ['sentinel-changedIn.txt'],
       diffStat: () => 'sentinel-diffStat',
       commitLog: () => [{ sha: 'sentinel', subject: 'sentinel-subject', files: [] }],
       commitsTouching: () => ['sentinel-touching'],
@@ -281,6 +292,7 @@ describe('git seam', () => {
       expect(mergeInProgress()).toBe(true);
       expect(dirtyPaths()).toEqual(['sentinel-dirty.txt']);
       expect(changedFiles('a..b')).toEqual(['sentinel-changed.txt']);
+      expect(changedIn('abc123')).toEqual(['sentinel-changedIn.txt']);
       expect(diffStat('a..b')).toBe('sentinel-diffStat');
       expect(commitLog('a..b')?.[0].subject).toBe('sentinel-subject');
       expect(commitsTouching('any.txt')).toEqual(['sentinel-touching']);

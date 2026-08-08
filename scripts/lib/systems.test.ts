@@ -1,3 +1,5 @@
+import { statSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   allConcepts,
@@ -14,6 +16,8 @@ import {
   parseManifest,
   pathsOverlap,
   sharedOwnership,
+  loadManifest,
+  orphanedFiles,
   systemNames,
   type Concept,
   type Manifest,
@@ -21,7 +25,7 @@ import {
 } from './systems';
 
 function system(name: string, paths: string[], concepts: Concept[] = []): System {
-  return { name, paths, lastAudit: null, lastAuditDoc: null, note: null, concepts };
+  return { name, paths, covers: [], lastAudit: null, lastAuditDoc: null, note: null, concepts };
 }
 
 function concept(name: string, paths: string[], note: string | null = 'seeded from a produces claim'): Concept {
@@ -266,11 +270,16 @@ describe('parseManifest', () => {
 
 describe('checkManifest', () => {
   const always = (): boolean => true;
-  const messages = (m: Manifest, exists = always): string[] => checkManifest(m, exists).map((issue) => issue.message);
+  // These fixtures name regions rather than files, and several of those
+  // regions really are directories in this checkout. The path-shape check
+  // has its own describe block below; here nothing is a directory, so each
+  // test answers about the one thing it is asking.
+  const never = (): boolean => false;
+  const messages = (m: Manifest, exists = always): string[] => checkManifest(m, exists, never).map((issue) => issue.message);
 
   it('passes a manifest whose concepts sit inside their systems', () => {
     const m = manifestOf([system('Runtime', ['src/runtime'], [concept('saves', ['src/runtime/save.ts'])])]);
-    expect(checkManifest(m, always)).toEqual([]);
+    expect(checkManifest(m, always, never)).toEqual([]);
   });
 
   it('refuses a concept reaching outside its own system', () => {
@@ -290,7 +299,7 @@ describe('checkManifest', () => {
 
   it('accepts a concept over a directory its system owns', () => {
     const m = manifestOf([system('Runtime', ['src/runtime'], [concept('combat', ['src/runtime/combat'])])]);
-    expect(checkManifest(m, always)).toEqual([]);
+    expect(checkManifest(m, always, never)).toEqual([]);
   });
 
   it('reports a concept name claimed by two systems', () => {
@@ -332,7 +341,7 @@ describe('checkManifest', () => {
 
   it('never returns an issue for the concept-overlap signal, which is about code and not the manifest', () => {
     const m = manifestOf([system('Runtime', ['src/runtime'], [concept('a', ['src/runtime/f.ts']), concept('b', ['src/runtime/f.ts'])])]);
-    expect(checkManifest(m, always)).toEqual([]);
+    expect(checkManifest(m, always, never)).toEqual([]);
     expect(overlappingConcepts(m)).toHaveLength(1);
   });
 });
@@ -355,5 +364,106 @@ describe('sharedOwnership', () => {
   it('marks the case specificity did not decide', () => {
     const tie = manifestOf([system('Zeta', ['src/runtime']), system('Alpha', ['src/runtime'])]);
     expect(sharedOwnership(tie, ['src/runtime/save.ts'])).toEqual([{ file: 'src/runtime/save.ts', owner: 'Alpha', alsoCovered: ['Zeta'], tied: true }]);
+  });
+});
+
+// A file cannot join a system by being created next to one. That is the whole
+// of it: `orderIndependence.test.ts` was added to test Task-system ordering
+// and fell through Testing procedure's `scripts/lib` grant into the wrong
+// system, and a directory-wide grant also makes its decline a ruling on every
+// file beneath it that nobody made.
+describe('ownership is by name, and coverage is the field that takes a directory', () => {
+  const always = (): boolean => true;
+  const dir = (path: string) => (candidate: string): boolean => candidate === path;
+  const none = (): boolean => false;
+
+  it('refuses a directory in paths, naming the field a directory belongs in', () => {
+    const m = manifestOf([system('Runtime', ['src/runtime'])]);
+    const messages = checkManifest(m, always, dir('src/runtime')).map((issue) => issue.message);
+    expect(messages).toEqual(['Runtime claims the directory src/runtime — ownership is by name, so list its files. `covers` is where a directory belongs when the point is a second audit read rather than ownership']);
+    expect(checkManifest(m, always, dir('src/runtime'))[0].level).toBe('error');
+  });
+
+  it('accepts the same directory under covers', () => {
+    const m = manifestOf([{ ...system('DSL load path', ['src/content/registry.ts']), covers: ['src/content'] }]);
+    expect(checkManifest(m, always, dir('src/content'))).toEqual([]);
+  });
+
+  it('widens the audit window without conferring ownership', () => {
+    const m = manifestOf([
+      { ...system('DSL load path', ['src/content/registry.ts']), covers: ['src/content'] },
+      system('Contribution system', ['src/content/modportal.ts']),
+    ]);
+    // Read by both, owned by exactly one — and by the system that named it,
+    // not by the one whose directory happens to reach it.
+    expect(coveringSystems(m, 'src/content/modportal.ts').sort()).toEqual(['Contribution system', 'DSL load path']);
+    expect(owningSystem(m, 'src/content/modportal.ts')).toBe('Contribution system');
+    // And a file only `covers` reaches is owned by nobody, which is the
+    // condition `audit-status` exits non-zero on and therefore what forces
+    // the declaration.
+    expect(owningSystem(m, 'src/content/undeclared.ts')).toBeNull();
+    expect(coveringSystems(m, 'src/content/undeclared.ts')).toEqual(['DSL load path']);
+  });
+
+  it('counts a file only covers reaches as an orphan, which is what forces it to be declared by name', () => {
+    const m = manifestOf([{ ...system('DSL load path', ['src/content/registry.ts']), covers: ['src/content'] }], []);
+    expect(orphanedFiles(m, ['src/content/registry.ts', 'src/content/modportal.ts'])).toEqual(['src/content/modportal.ts']);
+  });
+
+  it('counts nothing an unowned grant reaches, which keeps its directories by ruling', () => {
+    const m = manifestOf([system('Runtime', ['src/runtime/state.ts'])], ['docs', '*.md']);
+    expect(orphanedFiles(m, ['src/runtime/state.ts', 'docs/workflow.md', 'README.md'])).toEqual([]);
+  });
+
+  it('reports a covers path that does not exist, and never refuses it', () => {
+    const m = manifestOf([{ ...system('DSL load path', ['src/content/registry.ts']), covers: ['src/gone'] }]);
+    const issues = checkManifest(m, none, none);
+    expect(issues.map((issue) => issue.level)).toEqual(['warning']);
+    expect(issues[0].message).toBe('DSL load path covers src/gone, which does not exist');
+  });
+
+  it('defaults covers to empty, so a manifest written before the field parses unchanged', () => {
+    const parsed = parseManifest(JSON.stringify({ unowned: { note: '', paths: [] }, systems: [{ name: 'Runtime', paths: ['src/runtime/state.ts'], lastAudit: null, lastAuditDoc: null, note: null }] }), 'test');
+    expect(parsed.systems[0].covers).toEqual([]);
+  });
+});
+
+// The live manifest, asserted against rather than described: the partition is
+// the one condition `audit-status` fails on, and these are the properties
+// that make it hold by name instead of by adjacency.
+const REPO_ROOT = path.join(import.meta.dirname, '../..');
+
+describe('the manifest this repository ships', () => {
+  const live = loadManifest(path.join(REPO_ROOT, 'docs', 'audits', 'systems.json'));
+
+  it('names every owned path as a file that exists, never as a directory', () => {
+    for (const system of live.systems) {
+      for (const declared of system.paths) {
+        expect(statSync(path.join(REPO_ROOT, declared), { throwIfNoEntry: false })?.isFile() ?? false, `${system.name} → ${declared}`).toBe(true);
+      }
+    }
+  });
+
+  it('sorts every path list, so two branches adding a file merge line by line rather than colliding on a tail append', () => {
+    for (const system of live.systems) expect([...system.paths], system.name).toEqual([...system.paths].sort());
+    expect([...live.unowned.paths]).toEqual([...live.unowned.paths].sort());
+  });
+
+  it('keeps the deliberate second read that the directory grants used to supply', () => {
+    const dsl = live.systems.find((system) => system.name === 'DSL load path');
+    expect(dsl?.covers).toEqual(['src/content']);
+    expect(coveringSystems(live, 'src/content/modportal.ts').sort()).toEqual(['Contribution system', 'DSL load path']);
+  });
+
+  it('leaves unowned its directory and glob grants, which is the ruling', () => {
+    expect(live.unowned.paths).toContain('docs');
+    expect(live.unowned.paths).toContain('*.md');
+  });
+
+  it('records the Task system freeze on the entry itself, where audit-status prints it', () => {
+    const taskSystem = live.systems.find((system) => system.name === 'Task system');
+    expect(taskSystem?.lastAudit).toMatch(/^[0-9a-f]{40}$/);
+    expect(taskSystem?.note).toContain('Frozen as of the 2026-08-08 sweep');
+    expect(taskSystem?.note).toContain('until the MVP is complete');
   });
 });

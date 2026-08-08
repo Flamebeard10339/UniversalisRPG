@@ -114,6 +114,19 @@ describe('tasks where', () => {
       expect(result.stdout).toContain('exports:');
     }));
 
+  // Every file in one system is a sibling of every other, so filtering
+  // callers to the cross-system ones answered "nothing imports this" for the
+  // whole of a directory — which is where the caller left behind by a
+  // narrowed function body lives.
+  it('names a same-system sibling among the callers, not only cross-system ones', () =>
+    enclosingGitFixture(({ tasks }) => {
+      const result = tasks('where', 'src/runtime/save.ts');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('imported by:');
+      expect(result.stdout).toContain('src/runtime/session.ts (Runtime)');
+      expect(result.stdout).not.toContain('src/runtime/session.ts (Runtime) — across a system boundary');
+    }));
+
   it('answers for a path no system owns rather than refusing', () =>
     enclosingGitFixture(({ tasks }) => {
       const result = tasks('where', 'docs/workflow.md');
@@ -166,6 +179,23 @@ describe('tasks where', () => {
   it('where says outright that nothing has claimed a path, rather than printing an empty section', () =>
     enclosingGitFixture(({ tasks }) => {
       expect(tasks('where', 'src/runtime/save.ts').stdout).toContain('nothing has claimed src/runtime/save.ts');
+    }));
+
+  // A directory-wide survey is what `plan-prompt` runs at step 1, and closed
+  // claims are the bulk of it. One path is the opposite reader: they asked
+  // about it precisely because a decision may already have been made.
+  it('where collapses closed claims for a directory and keeps them for one file', () =>
+    enclosingGitFixture(({ tasks }) => {
+      tasks('add', 'the save format pass', '--id', 'old-saves', '--writes', 'src/runtime/save.ts');
+      tasks('done', 'old-saves');
+
+      const directory = tasks('where', 'src/runtime');
+      expect(directory.status).toBe(0);
+      expect(directory.stdout).not.toContain('[done] old-saves');
+      expect(directory.stdout).toContain('1 closed claim(s) not listed');
+      expect(directory.stdout).toContain('`tasks where <file>` names every claim on one path');
+
+      expect(tasks('where', 'src/runtime/save.ts').stdout).toContain('[done] old-saves');
     }));
 
   it('where answers for a directory with the files under it and the whole surface they export', () =>
@@ -324,6 +354,43 @@ describe('tasks plan, against producers that already exist', () => {
     fixture(({ tasks }) => {
       tasks('add', 'only work', '--produces', 'lonely thing', '--writes', 'src/runtime/lonely.ts', '--id', 'lonely', '--spec', 'demo-spec');
       expect(tasks('plan', 'lonely').stdout).not.toContain('existing-producer');
+    }));
+});
+
+// `tasks plan` grades a forecast once, before dispatch. The accurate grant is
+// the one a worker writes mid-run, and in the collision this pins the
+// colliding record was named — inside the prior-art wall, untagged.
+describe('setting --writes grades the dispatch set the record belongs to', () => {
+  it('reports the collision the corrected grant creates, above the prior-art wall', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'the save pass', '--id', 'one', '--spec', 'demo-spec', '--writes', 'src/runtime/save.ts');
+      tasks('add', 'the load pass', '--id', 'two', '--spec', 'demo-spec', '--writes', 'src/runtime/load.ts');
+      tasks('start', 'one');
+      tasks('start', 'two');
+      tasks('edit', 'one', '--writes', 'src/runtime/save.ts', '--grant', 'commitment');
+
+      const result = tasks('edit', 'two', '--writes', 'src/runtime/save.ts', '--grant', 'commitment');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('graded against spec demo-spec: its 2 open and in-progress member(s)');
+      expect(result.stdout).toContain('[defect] one and two both write src/runtime/save.ts');
+      expect(result.stdout.indexOf('[defect]')).toBeLessThan(result.stdout.indexOf('prior art on'));
+    }));
+
+  it('says nothing when the grant collides with nothing, since this fires on every write', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'the save pass', '--id', 'one', '--spec', 'demo-spec', '--writes', 'src/runtime/save.ts');
+      const result = tasks('add', 'the load pass', '--id', 'two', '--spec', 'demo-spec', '--writes', 'src/runtime/load.ts');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('graded against spec');
+      expect(result.stdout).toContain('nothing has claimed src/runtime/load.ts');
+    }));
+
+  it('grades nothing for a record no spec holds, which has no dispatch set to collide with', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'the save pass', '--id', 'one', '--spec', 'demo-spec', '--writes', 'src/runtime/save.ts');
+      const result = tasks('add', 'a loose record', '--id', 'loose', '--writes', 'src/runtime/save.ts');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('graded against spec');
     }));
 });
 

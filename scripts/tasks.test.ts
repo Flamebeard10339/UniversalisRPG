@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { flagArities, positionalArity } from './tasks/cli';
+import { flagArities, positionalArity, type FlagArity } from './tasks/cli';
 import { allUsages, everyVerb } from './tasks/commands';
 import { enclosingGitFixture, fixture } from './tasks/cliFixtures';
 
@@ -180,6 +180,98 @@ describe('tasks CLI', () => {
     }
   });
 
+  // The declarative half of a usage string: what is left once every
+  // parenthetical is removed. Written here rather than imported, so the
+  // property is checked against the text a reader sees rather than against
+  // the scanner that produced the vocabulary.
+  function outsideParentheses(usage: string): string {
+    let depth = 0;
+    let declared = '';
+    for (const char of usage) {
+      if (char === '(') depth++;
+      else if (char === ')') depth--;
+      else if (depth === 0) declared += char;
+    }
+    return declared;
+  }
+
+  // The other half of the same sweep: a flag is accepted because the usage
+  // declares it, never because its prose mentions it. `list` accepted
+  // `--trigger` — `decline`'s flag, named only in `list`'s trailing note —
+  // discarded the value, answered the whole unfiltered list at exit 0, and
+  // then advertised the flag by name on its own refusal path.
+  it('accepts only the flags every usage string declares, never one its prose mentions', () => {
+    const registry = everyVerb();
+    expect(registry.length).toBeGreaterThan(30);
+    for (const [name, usage] of registry) {
+      const declared = outsideParentheses(usage);
+      for (const flag of flagArities(usage).keys()) {
+        expect(new RegExp(`--${flag}(?![a-z0-9-])`).test(declared), `--${flag} in \`${name}\``).toBe(true);
+      }
+    }
+    const flagsOf = (verb: string): Map<string, FlagArity> => flagArities(registry.find(([name]) => name === verb)![1]);
+    expect(flagsOf('list').has('trigger')).toBe(false);
+    expect(flagsOf('decline').has('trigger')).toBe(true);
+    expect(flagsOf('decision').has('op')).toBe(false);
+    expect(flagsOf('log').has('op')).toBe(true);
+  });
+
+  // The converse, and the half the sweep above cannot see: a declaration that
+  // fails to declare. The scanner reads the vocabulary out of the one artifact
+  // that documents it, so a usage string it reads differently from a human is
+  // a command refusing flags its own --help prints, at exit 1, for a reason no
+  // reader of the string can find. Three ways that can happen, all checked
+  // here: a `--word` written outside every parenthetical and dropped anyway,
+  // an unbalanced delimiter (one unclosed `(` deletes every later flag), and a
+  // `...` spelled where the scanner cannot read it as repetition.
+  it('declares every flag it writes: nothing outside a parenthetical is dropped, and the delimiters balance', () => {
+    const registry = everyVerb();
+    for (const [name, usage] of registry) {
+      const declared = outsideParentheses(usage);
+      const vocabulary = flagArities(usage);
+      for (const [, flag] of declared.matchAll(/--([a-z][a-z0-9-]*)/g)) {
+        expect(vocabulary.has(flag), `--${flag} is declared by \`${name}\` and is not in its vocabulary`).toBe(true);
+      }
+
+      const count = (character: string): number => [...usage].filter((char) => char === character).length;
+      expect(count('('), `unbalanced () in \`${name}\``).toBe(count(')'));
+      expect(count('['), `unbalanced [] in \`${name}\``).toBe(count(']'));
+
+      // Past the first flag, `...` means repetition, and the scanner reads it
+      // as such only when it stands on its own once the brackets around it are
+      // discounted. `"..."` is the prose placeholder and says what the value
+      // looks like, not how often the flag may be given. Any other spelling is
+      // silently a single-value flag. Before the first flag the same three
+      // characters mean an unbounded positional tail, which is
+      // `positionalArity`'s half of the string and stops where this starts.
+      // Line by line, because `spec`'s usage is a menu of its subcommands and
+      // each line carries its own positionals.
+      for (const line of declared.split('\n')) {
+        const firstFlag = line.search(/\s\[?--/);
+        if (firstFlag === -1) continue;
+        const flagged = line.slice(firstFlag + 1);
+        for (const token of flagged.split(/\s+/).filter((entry) => entry.includes('...'))) {
+          const beyondTheProsePlaceholder = token.split('"..."').join('');
+          expect(/^[.\])]+$/.test(token) || !beyondTheProsePlaceholder.includes('...'), `${token} in \`${name}\` is a ... the scanner does not read as repetition`).toBe(true);
+        }
+      }
+    }
+  });
+
+  // `audit` is the one verb whose flags genuinely repeat — a pass carries a
+  // --proof per clause and a --finding per finding, and `--args-from` is the
+  // only filing route for a branch audit. That is declared by the `...` its
+  // usage already writes, so nothing beside the usage string has to be kept
+  // in step with it; everywhere else a flag is given once, which is what
+  // makes `--state open --state declined` a refusal rather than a plausible,
+  // complete-looking answer built from the last value.
+  it('reads repetition off the ... a usage string writes, which only tasks audit does', () => {
+    const repeated = everyVerb()
+      .map(([name, usage]) => [name, [...flagArities(usage)].filter(([, arity]) => arity === 'repeated').map(([flag]) => flag)] as const)
+      .filter(([, flags]) => flags.length > 0);
+    expect(repeated).toEqual([['audit', ['proof', 'evidence', 'file', 'finding', 'severity', 'system', 'fault', 'deliverable']]]);
+  });
+
   it('leaves a command whose usage ends in ... unbounded', () => {
     fixture(({ tasks }) => {
       tasks('spec', 'new', 'demo-spec');
@@ -315,7 +407,9 @@ describe('a refusal that names the near miss', () => {
     fixture(({ tasks }) => {
       const result = tasks('add', 'a title', '--note', 'some prose');
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('--note: not a flag of `add` — it belongs to `concept`');
+      // Every owner, not the first one found: a flag two verbs take is
+      // answered with both, or the caller is sent to the wrong one.
+      expect(result.stderr).toContain('--note: not a flag of `add` — it belongs to `checked`, `recur`, `concept`');
       // The list flags, the choices and the identifiers are not the near
       // miss and are not offered as one — checked on the near-miss line
       // itself, since the usage printed below it names every flag.
@@ -329,6 +423,53 @@ describe('a refusal that names the near miss', () => {
       const result = tasks('audit-status');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('`audit-status` is an npm script of this repository, not a tasks verb — run `npm run audit-status`');
+    });
+  });
+});
+
+// [auditor/next-neighbour]. Pass 2 found `tasks remove --reason "   "` filing a
+// removal whose reason explained nothing, which the reconciliation then counted
+// as accounted for. Four verbs write a note into the event log and all four had
+// the same hole, because each applied the one-line half by hand and none
+// applied this one — a space is truthy, so the truthiness test every caller
+// runs first cannot see it. Swept rather than fixed at the reproduction.
+describe('every verb that writes a note refuses one that renders as nothing', () => {
+  const blank = '   ';
+
+  it('refuses it on each of the four, and writes neither the store nor the log', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a record', '--id', 'a-rec');
+      const before = readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8');
+      const logBefore = readFileSync(path.join(dir, 'events.jsonl'), 'utf8');
+
+      const refusals = [
+        tasks('remove', 'a-rec', '--reason', blank),
+        tasks('recur', 'a-rec', '--note', blank),
+        tasks('note', blank, '--id', 'a-rec'),
+        tasks('checked', 'worker/mutation-proof', '--note', blank),
+      ];
+      for (const refused of refusals) {
+        expect(refused.status, refused.stdout + refused.stderr).toBe(1);
+        expect(refused.stderr).toContain('renders as nothing');
+      }
+
+      // Nothing moved: a refusal that had already written the event would make
+      // the blank explanation exactly as permanent as accepting it.
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).toBe(before);
+      expect(readFileSync(path.join(dir, 'events.jsonl'), 'utf8')).toBe(logBefore);
+    });
+  });
+
+  it('still accepts an ugly note on each of the four, so the guard is not a ban on the verb', () => {
+    fixture(({ tasks }) => {
+      // A finding, because `recur` counts occurrences only against a record
+      // that reports what the work cost — an unrelated refusal that would
+      // otherwise be mistaken for this guard firing.
+      tasks('add', 'a friction', '--id', 'a-rec', '--kind', 'finding', '--fault', 'tooling', '--severity', 'low', '--deliverable', 'fix it');
+      expect(tasks('recur', 'a-rec', '--note', '.').status).toBe(0);
+      expect(tasks('note', '.', '--id', 'a-rec').status).toBe(0);
+      expect(tasks('checked', 'worker/mutation-proof', '--note', '.').status).toBe(0);
+      expect(tasks('remove', 'a-rec', '--reason', '.').status).toBe(0);
     });
   });
 });

@@ -48,11 +48,14 @@ describe('tasks orchestrate-prompt', () => {
 // itself — a loop over the array under test would still pass with the array
 // emptied.
 describe('orchestrate-prompt carries the lessons the run observed', () => {
-  it('carries the buffer-not-decision-maker rule', () =>
+  it('carries the decision-placement rule as a test with a criterion, and names where an escalation goes', () =>
     fixture(({ tasks }) => {
       const result = tasks('orchestrate-prompt');
-      expect(result.stdout).toContain('The orchestrator is a buffer, not a decision-maker.');
-      expect(result.stdout).toContain('Route a design question you could answer yourself to a planning session anyway');
+      expect(result.stdout).toContain('Place a decision where it will not be re-decided; the test is durability, not who is busy.');
+      // The prohibition it replaced said only where not to decide. A
+      // destination is what makes the alternative to deciding reachable.
+      expect(result.stdout).toContain('--decider planner|author');
+      expect(result.stdout).toContain('A decision made in the wrong place gets re-decided, and the re-decision is the cost.');
     }));
 
   it('carries the ruling-is-a-contract-too rule', () =>

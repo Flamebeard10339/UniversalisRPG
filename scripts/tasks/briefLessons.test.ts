@@ -4,13 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { allLessons, AUDITOR_LESSONS, findLesson, indexLessons, ORCHESTRATOR_LESSONS, PLANNER_LESSONS, unknownLessonIds, WORKER_LESSONS, type Lesson } from './briefLessons';
 import { enclosingGitFixture, fixture, repoRoot } from './cliFixtures';
 
-// The nineteen ids, written out here rather than read off the arrays, for the
+// The twenty ids, written out here rather than read off the arrays, for the
 // same reason workPrompt.test.ts writes out the nineteen sentences: a list
 // derived from the thing under test still passes when that thing is emptied.
 // These literals stand in for the records that cite them — a rename or a
 // deletion reddens this file the way it would orphan a record, and an
 // editor who wants a lesson gone deletes it here too and says so.
-const WORKER_IDS = ['worker/comment-rule', 'worker/mutation-proof', 'worker/record-decisions', 'worker/file-findings'];
+const WORKER_IDS = ['worker/comment-rule', 'worker/mutation-proof', 'worker/record-decisions', 'worker/aim-at-the-clause', 'worker/file-findings'];
 const AUDITOR_IDS = ['auditor/false-proof-shape', 'auditor/next-neighbour', 'auditor/rule-may-be-wrong', 'auditor/over-strictness', 'auditor/silent-guess'];
 const PLANNER_IDS = ['planner/state-the-invariant', 'planner/guard-placement', 'planner/who-else-computes', 'planner/name-delegated-decisions'];
 const ORCHESTRATOR_IDS = ['orchestrator/buffer-not-decider', 'orchestrator/ruling-is-a-contract', 'orchestrator/verify-not-grade', 'orchestrator/file-on-worker-branch', 'orchestrator/scratch-prefix', 'orchestrator/no-mid-run-tuning'];
@@ -32,9 +32,9 @@ describe('every instruction in the four briefs has an id', () => {
     expect(ORCHESTRATOR_LESSONS.map((lesson) => lesson.id)).toEqual(ORCHESTRATOR_IDS);
   });
 
-  it('resolves each of the nineteen ids to a live lesson', () => {
+  it('resolves each of the twenty ids to a live lesson', () => {
     const ids = [...WORKER_IDS, ...AUDITOR_IDS, ...PLANNER_IDS, ...ORCHESTRATOR_IDS];
-    expect(ids).toHaveLength(19);
+    expect(ids).toHaveLength(20);
     for (const id of ids) expect(findLesson(id)?.id, id).toBe(id);
   });
 });
@@ -52,7 +52,7 @@ describe('an id survives editing the lesson it names', () => {
 
   it('resolves every citation after every sentence in every lesson has been rewritten', () => {
     const index = indexLessons(reworded);
-    expect(index.size).toBe(19);
+    expect(index.size).toBe(20);
     for (const id of [...WORKER_IDS, ...AUDITOR_IDS, ...PLANNER_IDS, ...ORCHESTRATOR_IDS]) {
       expect(index.get(id)?.title, id).toMatch(/^rewritten title /);
     }
@@ -87,7 +87,7 @@ describe('a citation naming no live lesson is reported', () => {
     const retired = allLessons().filter((lesson) => lesson.id !== 'auditor/next-neighbour');
     const index = indexLessons(retired);
     expect(index.has('auditor/next-neighbour')).toBe(false);
-    expect(index.size).toBe(18);
+    expect(index.size).toBe(19);
   });
 
   it('reports a citation that only resembles a live id, rather than counting it as resolved', () => {
@@ -153,7 +153,7 @@ describe('a citation is matched exactly as given, and every one is accounted for
       const lesson = findLesson(citation);
       if (lesson !== undefined) expect(lesson.id, JSON.stringify(citation)).toBe(citation);
     }
-    expect(liveIds.filter((id) => findLesson(id) !== undefined)).toHaveLength(19);
+    expect(liveIds.filter((id) => findLesson(id) !== undefined)).toHaveLength(20);
   });
 
   it('resolves nothing for a citation differing from a live id by so much as one character', () => {
@@ -175,8 +175,8 @@ describe('two lessons cannot share one id', () => {
     expect(() => indexLessons([lesson, { ...lesson, title: 'a different instruction' }])).toThrow(/worker\/comment-rule/);
   });
 
-  it('the nineteen shipped ids are distinct', () => {
-    expect(new Set(allLessons().map((lesson) => lesson.id)).size).toBe(19);
+  it('the twenty shipped ids are distinct', () => {
+    expect(new Set(allLessons().map((lesson) => lesson.id)).size).toBe(20);
   });
 
   // Where the refusal fires decides how much it takes with it. Every `tasks`
@@ -227,4 +227,19 @@ describe('every brief shows the ids of the lessons it prints', () => {
     fixture(({ tasks }) => {
       showsItsIds(tasks('orchestrate-prompt').stdout, ORCHESTRATOR_LESSONS);
     }));
+});
+
+// A lesson is an instruction an agent runs, so a command inside one has to be
+// a command that works. `worker/file-findings` said `tasks add --kind finding`
+// for as long as it took this branch to make `--fault` and `--deliverable`
+// required, and every worker dispatched in between was told to run something
+// that exits 1. Written over every lesson rather than that one, because the
+// next lesson to name the verb will be written by someone who does not know.
+describe('a command a lesson names is a command the CLI accepts', () => {
+  it('no lesson names `--kind finding` without the flags that route requires', () => {
+    const offenders = allLessons()
+      .filter((lesson) => `${lesson.title} ${lesson.body}`.includes('--kind finding'))
+      .filter((lesson) => !(lesson.body.includes('--fault') && lesson.body.includes('--deliverable')));
+    expect(offenders.map((lesson) => lesson.id)).toEqual([]);
+  });
 });

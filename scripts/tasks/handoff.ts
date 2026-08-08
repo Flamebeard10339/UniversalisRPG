@@ -1,9 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { checkCommitMessage, isExempt } from '../lib/commitContract';
-import { EVENT_OPS, filterEvents, loadEvents, type EventOp, type TaskEvent } from '../lib/eventLog';
+import { EVENT_OPS, filterEvents, loadEvents, noteProblem, type EventOp, type TaskEvent } from '../lib/eventLog';
 import { loadManifest } from '../lib/systems';
+import { awaitsADecider } from '../lib/taskStore';
 import type { Flags } from './cli';
-import { readStore, recordEvents, resolveConfig, specFile, splitList, validateContentFields, type EventSubject } from './context';
+import { CLOSING_STATES, readStore, recordEvents, resolveConfig, specFile, splitList, validateContentFields, type EventSubject } from './context';
 
 // The two writes that touch no task state. A decision is its own op rather
 // than a note by convention, because "what was decided about this" has to be
@@ -17,11 +18,11 @@ export function recordStandaloneEvent(op: 'note' | 'decision') {
       process.exitCode = 1;
       return;
     }
-    // The one refusal, and it is malformed input: the whole log depends on
-    // one event being one line, and prose in a record is what made `next`
-    // cost thirty lines to call.
-    if (/[\r\n]/.test(note)) {
-      console.error(`error: a ${op} is one line — this one has ${note.split(/\r\n|\r|\n/).length}. Record the summary here and leave the prose in the commit message or the spec`);
+    // The one refusal, and it is malformed input: prose in a record is what
+    // made `next` cost thirty lines to call.
+    const problem = noteProblem(`a ${op}`, note);
+    if (problem !== null) {
+      console.error(`error: ${problem}`);
       process.exitCode = 1;
       return;
     }
@@ -52,6 +53,16 @@ export function recordStandaloneEvent(op: 'note' | 'decision') {
     // system name is drawn from a manifest that is authoritative right now,
     // which is why validateContentFields refuses that one.
     if (subject.spec !== null && !existsSync(specFile(config, subject.spec))) console.log(`no spec file at ${specFile(config, subject.spec)} — recorded against that slug anyway`);
+    // Recording the answer and releasing what waits on it are two acts, and
+    // the second is the one a decider forgets: the decision is in the log,
+    // the hold is in `requires`, and nothing joins them. A question left open
+    // behind a recorded answer is a stall that reads as an unanswered
+    // question, which is the shape c4 exists to refuse.
+    if (op === 'decision' && task !== undefined && awaitsADecider(task) && !CLOSING_STATES.includes(task.state)) {
+      const held = tasks.filter((candidate) => candidate.requires.includes(task.id) && !CLOSING_STATES.includes(candidate.state));
+      console.log(`${task.id} is still open, so the ${task.decider ?? 'addressee'}'s answer is recorded and nothing has moved${held.length === 0 ? '' : ` — ${held.length} record(s) still wait on it: ${held.map((candidate) => candidate.id).join(', ')}`}`);
+      console.log(`\`tasks done ${task.id}\` releases them; \`tasks decline ${task.id} --reason "..."\` does the same for a question dismissed rather than answered`);
+    }
   };
 }
 

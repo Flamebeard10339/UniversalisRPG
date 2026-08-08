@@ -7,23 +7,90 @@ export interface Flags {
   raw: string[];
 }
 
-export type FlagArity = 'value' | 'boolean';
+export type FlagArity = 'value' | 'boolean' | 'repeated';
+
+interface UsageToken {
+  text: string;
+  // Inside a parenthetical, where a `--word` is being described rather than
+  // declared. Depth is counted over characters because the tokens that open
+  // and close one carry other text: `(required`, `finding)]`.
+  prose: boolean;
+  // Bracket depth the token's own text sits at, and the depth left after it,
+  // so the extent of a `[...]` group is readable from its two ends. Brackets
+  // written inside a parenthetical are prose too and are not counted.
+  opens: number;
+  closes: number;
+}
+
+function tokenize(usage: string): UsageToken[] {
+  const tokens: UsageToken[] = [];
+  let parens = 0;
+  let brackets = 0;
+  let text = '';
+  let prose = false;
+  let opens = 0;
+  const flush = (): void => {
+    if (text !== '') tokens.push({ text, prose, opens, closes: brackets });
+    text = '';
+  };
+  for (const char of usage) {
+    if (/\s/.test(char)) {
+      flush();
+      continue;
+    }
+    const starting = text === '';
+    if (starting) prose = parens > 0;
+    if (parens === 0 && char === '[') brackets++;
+    if (parens === 0 && char === ']') brackets--;
+    if (char === '(') parens++;
+    if (char === ')') parens--;
+    text += char;
+    if (starting || /^\[+$/.test(text)) opens = brackets;
+  }
+  flush();
+  return tokens;
+}
+
+// A `...` standing on its own, once the brackets closing around it are
+// discounted — `...`, `...]`, `]]...`. The `"..."` that stands for prose and
+// the `<id>...` that makes a positional tail unbounded both carry other
+// characters, so neither is one of these.
+const isRepetitionMark = (text: string): boolean => /^[.\])]+$/.test(text) && text.includes('...');
+
+// The mark applies to the flag it follows or to the group that flag sits in,
+// so the search runs from the flag to the end of that group.
+function repeats(tokens: UsageToken[], at: number): boolean {
+  const depth = tokens[at].opens;
+  for (let i = at; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (!token.prose && isRepetitionMark(token.text)) return true;
+    if (token.closes < depth) return false;
+  }
+  return false;
+}
 
 // A command's usage string is its flag spec. Every flag it accepts is named
 // in the text it prints when asked for help, so what the parser enforces
 // and what the help documents cannot drift apart: a flag dropped from the
 // usage stops being accepted, and one never written there was never
-// reachable in the first place. A flag followed by anything that is not
-// another flag takes a value; one followed by nothing, or by a prose
-// parenthetical, takes none — a `(` opens description, not declaration,
-// which is the same stop positionalArity applies to its half.
+// reachable in the first place. A `--word` inside a parenthetical is being
+// described, not declared, and never enters the vocabulary — the same stop
+// positionalArity applies to its half of the string. A flag followed by
+// anything that is not another flag takes a value; one followed by nothing,
+// or by a prose parenthetical, takes none; one whose own group is marked
+// `...` may be given again, which is how `audit` files a pass.
 export function flagArities(usage: string): Map<string, FlagArity> {
-  const tokens = usage.split(/\s+/);
+  const tokens = tokenize(usage);
   const arities = new Map<string, FlagArity>();
   for (let i = 0; i < tokens.length; i++) {
-    const name = /^\[?--([a-z][a-z0-9-]*)\]?$/.exec(tokens[i])?.[1];
+    if (tokens[i].prose) continue;
+    const name = /^\[?--([a-z][a-z0-9-]*)\]?$/.exec(tokens[i].text)?.[1];
     if (name === undefined || arities.has(name)) continue;
-    const next = tokens[i + 1] ?? '';
+    if (repeats(tokens, i)) {
+      arities.set(name, 'repeated');
+      continue;
+    }
+    const next = tokens[i + 1]?.text ?? '';
     arities.set(name, next === '' || next.startsWith('--') || next.startsWith('[--') || next.startsWith(']') || next.startsWith('(') ? 'boolean' : 'value');
   }
   return arities;
@@ -79,6 +146,7 @@ export function parseArgs(args: string[], arities: Map<string, FlagArity>, maxPo
       continue;
     }
     if (arity === 'boolean') {
+      if (flags[key] !== undefined) errors.push(`${arg} given twice — a flag is given once`);
       flags[key] = 'true';
       continue;
     }
@@ -87,6 +155,7 @@ export function parseArgs(args: string[], arities: Map<string, FlagArity>, maxPo
       errors.push(`${arg} needs a value`);
       continue;
     }
+    if (arity === 'value' && flags[key] !== undefined) errors.push(`${arg} given twice: ${JSON.stringify(flags[key])} then ${JSON.stringify(value)} — a flag takes one value`);
     flags[key] = value;
     i++;
   }

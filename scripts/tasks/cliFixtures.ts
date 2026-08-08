@@ -173,6 +173,7 @@ const noRepositoryGit: GitFacts = {
   mergeInProgress: () => false,
   dirtyPaths: () => null,
   changedFiles: () => null,
+  changedIn: () => null,
   diffStat: () => null,
   commitLog: () => null,
   commitsTouching: () => null,
@@ -263,6 +264,7 @@ class DataGit {
         if (commits === null) return null;
         return [...new Set(commits.flatMap((commit) => commit.files))].sort();
       },
+      changedIn: (rev) => this.commits.find((commit) => commit.sha === rev || commit.sha.startsWith(rev))?.files.slice().sort() ?? null,
       diffStat: (range) => {
         const commits = this.inRange(range);
         if (commits === null) return null;
@@ -375,16 +377,25 @@ function fixtureWith(gitFacts: GitFacts | null, run: (context: FixtureContext) =
     );
     const storePath = path.join(dir, 'tasks.jsonl');
     const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
+    // A flag given twice is an error, not a last-value win, so a caller
+    // naming one of these globals is overriding it and the fixture's own
+    // copy has to stand down.
+    const yielding = (to: string[]): string[] => {
+      const overridden = new Set(to.filter((token) => token.startsWith('--')));
+      return globals.filter((token, at) => !overridden.has(token) && !overridden.has(globals[at - 1] ?? ''));
+    };
+
     // A bare `--` ends flag parsing, so the fixture's own flags must land
     // before it, never after.
     const withGlobals = (args: string[]): string[] => {
       const term = args.indexOf('--');
-      return term === -1 ? [...args, ...globals] : [...args.slice(0, term), ...globals, ...args.slice(term)];
+      const mine = yielding(args);
+      return term === -1 ? [...args, ...mine] : [...args.slice(0, term), ...mine, ...args.slice(term)];
     };
 
     const result = run({
       dir,
-      args: (extra = []) => [...globals, ...extra],
+      args: (extra = []) => [...yielding(extra), ...extra],
       tasks: (...args: string[]) => runInProcess(withGlobals(args)),
       audit: (...args: string[]) => runInProcessAsync(withGlobals(['audit', ...args])),
       auditWith: (input: string, ...args: string[]) => runInProcessAsync(withGlobals(['audit', ...args]), input),

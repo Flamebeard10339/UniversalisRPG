@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
@@ -247,7 +247,7 @@ describe('tasks CLI', () => {
       // a task exactly as hard as a live requirement, and `next` is where
       // the difference has to be visible or nobody will look for it.
       expect(next).toContain('editable waits on ghost (missing)');
-      expect(tasks('doctor').stdout).toContain('[error] editable requires unresolved id: ghost');
+      expect(tasks('doctor').stdout).toContain('[dangling] editable requires unresolved id: ghost');
     });
   });
 
@@ -878,6 +878,26 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('done --commit reports the grant against what that commit actually changed', () => {
+    gitFixture(({ commit, tasks }) => {
+      tasks('add', 'granted work', '--id', 'granted', '--writes', 'src/runtime/save.ts,src/runtime/never.ts');
+      commit('record the task');
+      const sha = commit('the work', ['src/runtime/save.ts', 'src/ui/panel.ts']);
+      const result = tasks('done', 'granted', '--commit', sha);
+      expect(result.stdout).toContain('wrote, ungranted: src/ui/panel.ts');
+      expect(result.stdout).toContain('granted, untouched: src/runtime/never.ts');
+    });
+  });
+
+  it('done --commit says so when the grant and the diff agree, which is the measurement either way', () => {
+    gitFixture(({ commit, tasks }) => {
+      tasks('add', 'granted work', '--id', 'granted', '--writes', 'src/runtime/');
+      commit('record the task');
+      const sha = commit('the work', ['src/runtime/save.ts']);
+      expect(tasks('done', 'granted', '--commit', sha).stdout).toContain('grant and diff agree');
+    });
+  });
+
   // closedCommit answers "what commit closed this", but `done` cannot know
   // that at the time it runs (H6). `show` fills the gap after the fact by
   // walking git history over the store for the commit that flipped this
@@ -1187,7 +1207,9 @@ describe('a record that declares its grant kind', () => {
 
   it('keeps a commitment through an edit that changes something else', () =>
     fixture(({ tasks }) => {
-      tasks('add', 'read work', '--id', 'read', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
+      tasks('add', 'read work', '--id', 'read', '--writes', 'src/runtime/combat.ts');
+      tasks('start', 'read');
+      tasks('edit', 'read', '--grant', 'commitment');
       tasks('edit', 'read', '--title', 'read work, retitled');
       expect(tasks('show', 'read').stdout).toContain('writes (commitment):');
     }));
@@ -1199,6 +1221,44 @@ describe('a record that declares its grant kind', () => {
       expect(tasks('edit', 'silent', '--severity', 'low').stdout).toBe('edited silent: severity\n');
     }));
 
+  it('refuses a commitment on a record nobody has taken, at add and at edit alike', () =>
+    fixture(({ tasks }) => {
+      const added = tasks('add', 'planned work', '--id', 'planned', '--writes', 'src/runtime/', '--grant', 'commitment');
+      expect(added.status).toBe(1);
+      expect(added.stderr).toContain('records that someone has read the region');
+
+      tasks('add', 'planned work', '--id', 'planned', '--writes', 'src/runtime/');
+      const edited = tasks('edit', 'planned', '--grant', 'commitment');
+      expect(edited.status).toBe(1);
+      expect(edited.stderr).toContain('tasks start planned');
+      expect(tasks('show', 'planned').stdout).toContain('writes (forecast):');
+    }));
+
+  // `open` reaches `done` with no `start` in between, so a state test that
+  // admitted a closed record admitted one nobody ever held.
+  it('refuses a commitment on a record that reached done without ever being started', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'never held', '--id', 'never-held', '--writes', 'src/runtime/');
+      tasks('done', 'never-held');
+      const edited = tasks('edit', 'never-held', '--grant', 'commitment');
+      expect(edited.status).toBe(1);
+      expect(edited.stderr).toContain('records that someone has read the region');
+      expect(tasks('show', 'never-held').stdout).toContain('writes (forecast):');
+    }));
+
+  // Correcting the region a closed record really touched is the workflow's
+  // own instruction, and it must not need the word this branch just refused.
+  it('lets a closed record correct its writes, keeping the grant kind it already carried', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'held work', '--id', 'held', '--writes', 'src/runtime/');
+      tasks('start', 'held');
+      tasks('edit', 'held', '--grant', 'commitment');
+      tasks('done', 'held');
+      const corrected = tasks('edit', 'held', '--writes', 'src/runtime/save.ts,src/ui/panel.ts');
+      expect(corrected.status).toBe(0);
+      expect(tasks('show', 'held').stdout).toContain('writes (commitment): src/runtime/save.ts, src/ui/panel.ts');
+    }));
+
   it('refuses a grant kind it does not know, rather than recording it', () =>
     fixture(({ tasks }) => {
       const result = tasks('add', 'bad grant', '--id', 'bad', '--writes', 'src/runtime/', '--grant', 'maybe');
@@ -1208,8 +1268,11 @@ describe('a record that declares its grant kind', () => {
 
   it('grades an overlap between two commitments as a defect and the same overlap under a forecast as a note', () =>
     fixture(({ tasks }) => {
-      tasks('add', 'left', '--id', 'left', '--spec', 'demo-spec', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
-      tasks('add', 'right', '--id', 'right', '--spec', 'demo-spec', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
+      for (const id of ['left', 'right']) {
+        tasks('add', id, '--id', id, '--spec', 'demo-spec', '--writes', 'src/runtime/combat.ts');
+        tasks('start', id);
+        tasks('edit', id, '--grant', 'commitment');
+      }
       const committed = tasks('plan', 'left', 'right').stdout;
       expect(committed).toContain('2 of those a commitment');
       expect(committed).toContain('[defect] left and right both write');
@@ -1346,7 +1409,7 @@ describe('a read that resolves a spec only where it uses one', () => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       tasks('add', 'elsewhere', '--id', 'elsewhere');
       appendEvent(dir, { branch: 'claude/generated-2f9a11', spec: 'demo-spec', id: 'a-member' });
-      const result = runInProcess(['next', ...args(), '--branch', 'claude/generated-2f9a11']);
+      const result = runInProcess(['next', ...args(['--branch', 'claude/generated-2f9a11'])]);
       // The store still has one open spec — demo-spec, via a-member — so the
       // candidate is named, but as a refusal, not as an inference the event
       // log drove: the note says "not given", never "inferred from the event
@@ -1363,7 +1426,7 @@ describe('a read that resolves a spec only where it uses one', () => {
     fixture(({ tasks, dir, args }) => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       appendEvent(dir, { branch: 'main', spec: 'demo-spec', id: 'a-member' });
-      const result = runInProcess(['next', ...args(), '--branch', 'main']);
+      const result = runInProcess(['next', ...args(['--branch', 'main'])]);
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('no active spec for this branch');
     });
@@ -1389,10 +1452,10 @@ describe('a read that resolves a spec only where it uses one', () => {
     fixture(({ tasks, dir, args }) => {
       tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
       appendEvent(dir, { branch: 'claude/generated-2f9a11', spec: 'demo-spec' });
-      const result = runInProcess(['promote', 'a-finding', ...args(), '--branch', 'claude/generated-2f9a11']);
+      const result = runInProcess(['promote', 'a-finding', ...args(['--branch', 'claude/generated-2f9a11'])]);
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('no active spec to promote into — pass --spec');
-      const shown = runInProcess(['show', 'a-finding', ...args(), '--branch', 'claude/generated-2f9a11']);
+      const shown = runInProcess(['show', 'a-finding', ...args(['--branch', 'claude/generated-2f9a11'])]);
       expect(shown.stdout).not.toContain('spec: demo-spec');
       expect(shown.stdout).toContain('[finding/unreviewed');
     });
@@ -1548,6 +1611,134 @@ describe('a move never strands a question', () => {
         const promoted = tasks('promote', 'needs-context');
         expect(promoted.status).toBe(0);
       });
+    });
+  });
+});
+
+// c1 and c2 through the one caller that drops a record. The store's removal
+// path had a hole rather than a route: any caller dropping a task from the
+// array removed it on the next save, with nothing able to say that it had.
+describe('tasks remove', () => {
+  const events = (dir: string): Array<{ op: string; id: string | null; note: string }> =>
+    (existsSync(path.join(dir, 'events.jsonl')) ? readFileSync(path.join(dir, 'events.jsonl'), 'utf8') : '')
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
+      .map((line) => JSON.parse(line) as { op: string; id: string | null; note: string })
+      .map(({ op, id, note }) => ({ op, id, note }));
+
+  it('drops the record and files one remove event carrying the reason', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a scratch probe', '--id', 'a-probe');
+      tasks('add', 'real work', '--id', 'real-work');
+
+      const removed = tasks('remove', 'a-probe', '--reason', 'a probe, never real work', '--actor', 'worker-a');
+      expect(removed.status).toBe(0);
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).not.toContain('a-probe');
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).toContain('real-work');
+      expect(events(dir).filter((entry) => entry.op === 'remove')).toEqual([{ op: 'remove', id: 'a-probe', note: 'removed from the store: a probe, never real work' }]);
+    });
+  });
+
+  it('refuses with no reason, on the same ground decline does, and writes nothing', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a scratch probe', '--id', 'a-probe');
+
+      const refused = tasks('remove', 'a-probe');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('usage: tasks remove <id> --reason');
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).toContain('a-probe');
+      expect(events(dir).some((entry) => entry.op === 'remove')).toBe(false);
+    });
+  });
+
+  // The collision between two halves of one branch: c1 and c2 gave the store a
+  // verb for leaving it, and c9 made a reference resolving to nothing the one
+  // condition `doctor` exits non-zero on. Removing a required record exited 0
+  // and reddened the next merge gate.
+  it('refuses to remove a record something requires, and names every holder', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a scratch probe', '--id', 'a-probe');
+      tasks('add', 'real work', '--id', 'real-work', '--requires', 'a-probe');
+      tasks('add', 'more real work', '--id', 'also-real', '--requires', 'a-probe');
+
+      const refused = tasks('remove', 'a-probe', '--reason', 'a probe, never real work');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('2 record(s) require a-probe');
+      expect(refused.stderr).toContain('real-work');
+      expect(refused.stderr).toContain('also-real');
+      // Names the condition, and does not count doctor's conditions. This line
+      // was written by the c5 repair and said "the one store condition doctor
+      // exits non-zero on" — reintroducing, in new user-facing output, the
+      // census that repair existed to delete.
+      expect(refused.stderr).toContain('a dangling reference, which `tasks doctor` exits non-zero on');
+      expect(refused.stderr).not.toMatch(/the (one|only) (store )?condition/);
+      expect(refused.stderr).toContain('tasks edit <holder> --requires');
+      // Writes nothing: the record stays and no removal is filed.
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).toContain('a-probe');
+      expect(events(dir).some((entry) => entry.op === 'remove')).toBe(false);
+      // And the state it refused to create is the state doctor fails on, so
+      // the refusal is what keeps the gate green.
+      expect(tasks('doctor').status).toBe(0);
+    });
+  });
+
+  it('removes a record nothing requires once the edge is dropped where it belongs', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a scratch probe', '--id', 'a-probe');
+      tasks('add', 'real work', '--id', 'real-work', '--requires', 'a-probe');
+
+      expect(tasks('remove', 'a-probe', '--reason', 'a probe').status).toBe(1);
+      tasks('edit', 'real-work', '--requires', '');
+      expect(tasks('remove', 'a-probe', '--reason', 'a probe, never real work').status).toBe(0);
+    });
+  });
+
+  // Reported and not refused, and the difference from the case above is that
+  // nothing breaks. `tasks start` already lets one actor take another's claim
+  // while saying so; the defect here was silence, not permission.
+  it('says it destroyed a live claim rather than deleting it quietly', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'work somebody took', '--id', 'held');
+      tasks('start', 'held', '--actor', 'worker-a');
+
+      const removed = tasks('remove', 'held', '--reason', 'not wanted after all', '--actor', 'worker-b');
+      expect(removed.status).toBe(0);
+      expect(removed.stdout).toContain('destroyed a live claim with it');
+      expect(removed.stdout).toContain('worker-a');
+    });
+  });
+
+  it('takes an exact id only, because a fragment resolving to the nearest record is wrong for a delete', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a scratch probe', '--id', 'a-probe');
+
+      const refused = tasks('remove', 'probe', '--reason', 'close enough');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('no record and no history answers to probe');
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).toContain('a-probe');
+    });
+  });
+
+  it('files a removal for a record that already went, which is how a store that lost one is caught up', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a record that will vanish', '--id', 'vanished');
+      // The absence this branch exists for: the row is gone and the log's
+      // `add` is the only trace, which is exactly the four ids found live.
+      writeFileSync(path.join(dir, 'tasks.jsonl'), '', 'utf8');
+
+      const filed = tasks('remove', 'vanished', '--reason', 'superseded by another record; ruled 2026-08-08', '--actor', 'worker-a');
+      expect(filed.status).toBe(0);
+      expect(filed.stdout).toContain('was already absent from the store and the log had no removal for it');
+      expect(events(dir).filter((entry) => entry.op === 'remove')).toEqual([{ op: 'remove', id: 'vanished', note: 'removed from the store: superseded by another record; ruled 2026-08-08' }]);
+    });
+  });
+
+  it('refuses an id neither the store nor the log has ever held, so a typo files nothing', () => {
+    fixture(({ tasks, dir }) => {
+      const refused = tasks('remove', 'never-existed', '--reason', 'gone');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('no record and no history answers to never-existed');
+      expect(events(dir).some((entry) => entry.op === 'remove')).toBe(false);
     });
   });
 });

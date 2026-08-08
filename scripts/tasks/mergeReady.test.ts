@@ -6,7 +6,7 @@ import * as git from '../lib/git';
 import { parseStoreTolerantly, type Task } from '../lib/taskStore';
 import { allUsages } from './commands';
 import type { Config } from './context';
-import { installDataGit } from './cliFixtures';
+import { fixture, installDataGit } from './cliFixtures';
 import { realGitRepo } from './realGitFixture';
 import {
   branchStanding,
@@ -42,6 +42,7 @@ const task = (overrides: Partial<Task> = {}): Task => ({
   grant: null,
   fault: null,
   decider: null,
+  breaches: [],
   produces: [],
   deliverable: null,
   evidence: null,
@@ -852,5 +853,54 @@ describe('the commands the legs name', () => {
     const named = [...new Set(nexts.flatMap((line) => [...line.matchAll(/npm run tasks -- ([a-z-]+)( [a-z-]+)?/g)].map((match) => match[1])))];
     expect(named.length).toBeGreaterThan(0);
     for (const verb of named) expect(verbs).toContain(verb);
+  });
+});
+
+// c9. The channel reports and refuses to become a threshold. Written as a
+// test rather than as intent because every previous measurement added to
+// this repository grew a gate within two branches, and the `if` statement
+// that would do it here is one line away and would look like tidying.
+describe('the gate reads no fault, no breach and no count', () => {
+  it('runs no leg over the channel, and none of its legs is the friction query', () => {
+    expect(LEGS.map((leg) => leg.command)).not.toContain('npm run tasks -- friction');
+    for (const leg of LEGS) expect(leg.command).not.toMatch(/friction|fault|breach|recur|checked/);
+  });
+
+  // Behaviour, and only behaviour. This described a source scan over the files
+  // the gate reaches, and pass 4 walked around it in one keystroke:
+  // `const { kind, fault } = task` never writes `.fault`, so the scan stayed
+  // green while `doctor` — a leg of this gate *and* a CI step — exited 1 on the
+  // live store, where 543 records carry no fault. A scan can only ban the
+  // spellings somebody thought of, and CLAUDE.md already ruled on that shape:
+  // a gate that cannot prove what it claims costs more than it prevents. So the
+  // question is asked of the gate instead, over a store carrying every input a
+  // threshold could be built on.
+  it('exits zero over a store carrying every input a threshold could read', () => {
+    fixture(({ tasks, dir }) => {
+      for (const [fault, lesson] of [['tooling', 'worker/mutation-proof'], ['contract', 'worker/mutation-proof'], ['nobody', 'auditor/next-neighbour']]) {
+        const id = `breach-${fault}`;
+        tasks('add', `a breach of ${lesson}`, '--id', id, '--kind', 'finding', '--fault', fault, '--severity', 'high', '--deliverable', 'fix it', '--breaches', lesson);
+        // Several occurrences on one record, so a count that any threshold
+        // would plausibly compare against is actually present.
+        for (const n of [1, 2, 3, 4, 5]) tasks('recur', id, '--note', `it cost something again (${n})`);
+      }
+      // A finding carrying no fault, which is the absence the whole axis turns
+      // on — and which no route can create any more, so it goes in as bytes.
+      // Adding a plain *task* instead is how this fixture used to be written,
+      // and a task needs no fault, so it exercised nothing.
+      const store = path.join(dir, 'tasks.jsonl');
+      const legacy = { id: 'from-before-the-channel', seq: 99, title: 'filed before fault existed', kind: 'finding', state: 'unreviewed', severity: 'high', system: null, spec: null, departure: null, clause: null, discharges: [], requires: [], files: [], writes: [], grant: null, fault: null, decider: null, breaches: ['worker/mutation-proof', 'no-such-lesson'], produces: [], deliverable: 'fix it', evidence: 'x', source: null, reason: null, trigger: null, closed: null, closedCommit: null, claimed: null, claimedBy: null };
+      writeFileSync(store, `${readFileSync(store, 'utf8')}${JSON.stringify(legacy)}\n`, 'utf8');
+      tasks('add', 'ordinary work', '--id', 'ordinary');
+      tasks('checked', 'auditor/silent-guess', '--note', 'looked and found it clean');
+
+      // The two legs that read the store at all, plus the query itself. None of
+      // them may take an opinion from any of the above — and the plan is handed
+      // the breach-carrying records, not only the ordinary one, so a gate on the
+      // channel inside `cmdPlan` has something to fire on.
+      expect(tasks('doctor').status).toBe(0);
+      expect(tasks('plan', 'ordinary', 'breach-tooling', 'breach-contract', 'breach-nobody', 'from-before-the-channel').status).toBe(0);
+      expect(tasks('friction').status).toBe(0);
+    });
   });
 });

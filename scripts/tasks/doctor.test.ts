@@ -3,26 +3,63 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defaultStoreGitFixture, fixture, installDataGit, runInProcess, spawnTasks, unbornDefaultStoreFixture } from './cliFixtures';
+import { defaultStoreGitFixture, fixture, installDataGit, runInProcess, spawnTasks, unbornDefaultStoreFixture, type Run } from './cliFixtures';
 import { realDefaultStoreGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
-  it('doctor reports an inconsistent store and still exits zero, because no disagreement may fail a build', () => {
+  it('doctor reports a record disagreeing with itself and still exits zero, because no disagreement about the work may fail a build', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'fine', '--system', 'Runtime');
       const clean = tasks('doctor');
       expect(clean.status).toBe(0);
       expect(clean.stdout).toContain('0 error(s)');
 
-      writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'open', severity: null, system: 'Nonexistent', spec: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null })}\n`, 'utf8');
+      writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'declined', severity: null, system: null, spec: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null })}\n`, 'utf8');
       const inconsistent = tasks('doctor');
       expect(inconsistent.status).toBe(0);
       expect(inconsistent.stdout).toContain('reported, not enforced');
-      expect(inconsistent.stdout).toContain('[error] a has a system not in systems.json: Nonexistent');
+      expect(inconsistent.stdout).toContain('[error] a is declined but has no reason');
     });
   });
 
-  it('doctor exits non-zero on exactly one condition: a store that will not parse', () => {
+  it('doctor exits non-zero on a reference that resolves to nothing, which is the one thing about the store a machine can check', () => {
+    fixture(({ tasks, dir }) => {
+      writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'open', severity: null, system: 'Nonexistent', spec: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null })}\n`, 'utf8');
+      const result = tasks('doctor');
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain('[dangling] a has a system not in systems.json: Nonexistent');
+      expect(result.stdout).toContain('1 dangling reference(s)');
+      expect(result.stderr).toContain('resolve to nothing');
+    });
+  });
+
+  it('a closed record keeps its spec slug after the spec file is deleted, so a finished spec can retire', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      tasks('done', 'a-member');
+      rmSync(path.join(dir, 'specs', 'demo-spec.md'));
+
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('references a spec with no file');
+      expect(tasks('show', 'a-member').stdout).toContain('spec: demo-spec');
+    });
+  });
+
+  it('a live record naming a spec with no file is a dangling reference, and `spec remove` detaches it without the file', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      rmSync(path.join(dir, 'specs', 'demo-spec.md'));
+      expect(tasks('doctor').status).toBe(1);
+
+      const removed = tasks('spec', 'remove', 'demo-spec', 'a-member');
+      expect(removed.status).toBe(0);
+      expect(removed.stdout).toContain('detaching them is what this is for');
+      expect(tasks('doctor').status).toBe(0);
+    });
+  });
+
+  it('doctor exits non-zero on a store that will not parse, which a later write would delete rather than disagree with', () => {
     fixture(({ tasks, dir }) => {
       const store = path.join(dir, 'tasks.jsonl');
       tasks('add', 'fine');
@@ -31,7 +68,7 @@ describe('tasks CLI', () => {
       const result = tasks('doctor');
       expect(result.status).toBe(1);
       expect(result.stdout).toContain('1 unparseable line(s)');
-      expect(result.stderr).toContain('the only condition doctor fails on');
+      expect(result.stderr).toContain('does not parse');
     });
   });
 
@@ -50,13 +87,15 @@ describe('tasks CLI', () => {
       expect(readFileSync(store, 'utf8')).toContain('2026-08-01');
 
       const fixed = tasks('doctor', '--fix');
-      expect(fixed.status).toBe(0);
+      // Non-zero for the unresolved requirement it repaired nothing about,
+      // never for the close date it did.
+      expect(fixed.status).toBe(1);
       expect(fixed.stdout).toContain('repaired 1:');
       expect(fixed.stdout).toContain('reopened is open: cleared its close date (2026-08-01)');
       expect(readFileSync(store, 'utf8')).not.toContain('2026-08-01');
       // The unresolved requirement is reported by both runs and repaired by
       // neither: dropping the edge and creating the task are both defensible.
-      expect(fixed.stdout).toContain('[error] reopened requires unresolved id: ghost');
+      expect(fixed.stdout).toContain('[dangling] reopened requires unresolved id: ghost');
     });
   });
 
@@ -218,7 +257,9 @@ describe('tasks CLI', () => {
       spawnSync('git', ['merge', 'side'], { cwd: dir, encoding: 'utf8' });
 
       const result = tasks('doctor');
-      expect(result.status).toBe(0);
+      // Non-zero for the unresolved requirement below, which is the point of
+      // the assertion after it: the store-only checks ran.
+      expect(result.status).toBe(1);
       expect(result.stdout).toContain('a merge is in progress (MERGE_HEAD exists)');
       expect(result.stdout).not.toContain('only in the working tree');
       // The store-only checks are the ones worth reading mid-merge, and the
@@ -336,6 +377,101 @@ describe('tasks CLI', () => {
       const result = tasks('doctor');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('[error] demo-spec tags more than one proof clause [c1]');
+    });
+  });
+});
+
+// c4 and c5. Ruled by the author 2026-08-06, refusing this clause's original
+// form: one historical absence is the case for reporting it, not for failing
+// the build on the store's own history. Written as a refusal rather than
+// deleted, because a deleted clause leaves the gate available to the next
+// branch that finds the argument locally reasonable — and this exact gate was
+// proposed twice in one day from two independent directions.
+describe('the log against the store, reported and never enforced', () => {
+  const vanish = (tasks: (...args: string[]) => Run, dir: string, id: string): void => {
+    tasks('add', 'a record that will vanish', '--id', id);
+    const store = path.join(dir, 'tasks.jsonl');
+    writeFileSync(
+      store,
+      readFileSync(store, 'utf8')
+        .split('\n')
+        .filter((line) => !line.includes(`"id":${JSON.stringify(id)}`))
+        .join('\n'),
+      'utf8',
+    );
+  };
+
+  it('names an unexplained absence, counts it, and still exits zero', () => {
+    fixture(({ tasks, dir }) => {
+      vanish(tasks, dir, 'vanished');
+
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('1 record(s) absent with nothing explaining it');
+      expect(result.stdout).toContain('[absent] vanished');
+      expect(result.stdout).toContain('tasks remove vanished --reason');
+    });
+  });
+
+  it('stops naming it once a removal accounts for it', () => {
+    fixture(({ tasks, dir }) => {
+      vanish(tasks, dir, 'vanished');
+      tasks('remove', 'vanished', '--reason', 'scratch, never real work');
+
+      const result = tasks('doctor');
+      expect(result.stdout).toContain('0 record(s) absent with nothing explaining it, 1 absent and accounted for');
+      expect(result.stdout).not.toContain('[absent] vanished');
+    });
+  });
+
+  it('prints its coverage on a clean run rather than the word reconciled', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'ordinary work', '--id', 'ordinary');
+      const store = path.join(dir, 'tasks.jsonl');
+      // A record predating the log: in the store, with no `add` event, so
+      // nothing here can say whether it ever left.
+      writeFileSync(store, `${readFileSync(store, 'utf8')}${JSON.stringify({ id: 'from-before', seq: 9, title: 'older than the log', kind: 'task', state: 'open', severity: null, system: null, spec: null, clause: null, discharges: [], requires: [], files: [], writes: [], grant: null, produces: [], deliverable: null, evidence: null, source: null, reason: null, trigger: null, closed: null, closedCommit: null, claimed: null, claimedBy: null })}\n`, 'utf8');
+
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('0 record(s) absent with nothing explaining it');
+      expect(result.stdout).toContain('1 of 2 store record(s) outside what this can check at all');
+      // And the same statement about the other input, on the clean run too.
+      // The store half of this was printed and the log half was not, so a
+      // reader could tell how much of the store went unchecked and not how
+      // much of the log went unread — which is the input the check is a reader of.
+      expect(result.stdout).toContain('the log read whole: 0 line(s)');
+      expect(result.stdout).not.toContain('reconciled');
+    });
+  });
+
+  it('says the comparison is reading less than the log holds when a line did not parse', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a record that will vanish', '--id', 'vanished');
+      const log = path.join(dir, 'events.jsonl');
+      // The reproduction: the vanished record's own `add` line is the one that
+      // will not parse, so the comparison never learns the id was created. The
+      // absence goes from 1 to 0 and exit stays 0 — the check failing open on
+      // the input it exists to read, with the number to say so already in hand.
+      writeFileSync(log, readFileSync(log, 'utf8').replace(/^\{/, 'not json at all {'), 'utf8');
+      writeFileSync(path.join(dir, 'tasks.jsonl'), '', 'utf8');
+
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('0 record(s) absent with nothing explaining it');
+      expect(result.stdout).toContain('1 line(s)');
+      expect(result.stdout).toContain('reading less than the log holds');
+    });
+  });
+
+  it('leaves --fix alone, because a record the store lost is not one doctor may invent', () => {
+    fixture(({ tasks, dir }) => {
+      vanish(tasks, dir, 'vanished');
+
+      const fixed = tasks('doctor', '--fix');
+      expect(fixed.status).toBe(0);
+      expect(fixed.stdout).toContain('[absent] vanished');
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).not.toContain('vanished');
     });
   });
 });
