@@ -633,6 +633,51 @@ describe('branchStanding, against repository facts', () => {
     expect(standing?.clausesOwed).toBe(1);
   });
 
+  // c11, pinning a mutation pass 1's own audit found surviving at
+  // whole-suite scope: scoping `ownClauseIds` to `ownMembers` — this spec's
+  // own changed records — has to happen before the clause ids are read, not
+  // be skipped in favour of reading every declared spec's changed records
+  // together. Two specs in one diff, sharing a clause *number* that is also
+  // a real clause in spec-a's own document, is the shape that survived: a
+  // foreign id that happened not to exist in spec-a's text would have stood
+  // out as the "stale clause id" case above proves it does; one that does
+  // exist reads as spec-a legitimately owing it, and only the ownership
+  // filter — not the clause's existence in the document — tells them apart.
+  it('does not credit spec-a\'s owed clauses with a clause number spec-b\'s own member discharged (c11)', () => {
+    writeSystems();
+    write('specs/spec-a.md', specV1.replace(/a-spec/g, 'spec-a'));
+    write('specs/spec-b.md', specV1.replace(/a-spec/g, 'spec-b'));
+    write(
+      'tasks.jsonl',
+      [
+        JSON.stringify({ id: 'member-a', title: 'A', kind: 'task', state: 'open', spec: 'spec-a', discharges: [1], requires: [], files: [] }),
+        JSON.stringify({ id: 'member-b', title: 'B', kind: 'task', state: 'open', spec: 'spec-b', discharges: [2], requires: [], files: [] }),
+      ].join('\n') + '\n',
+    );
+    commit('base');
+    repo.fork();
+
+    write(
+      'tasks.jsonl',
+      [
+        JSON.stringify({ id: 'member-a', title: 'A', kind: 'task', state: 'done', spec: 'spec-a', discharges: [1], requires: [], files: [] }),
+        // c2 is spec-b's own member's discharge, and also a real clause id
+        // in spec-a's own document (specV1 carries [c1] and [c2] on every
+        // spec it is copied onto) — the overlap that makes a filter on
+        // clause existence alone indistinguishable from a filter on
+        // ownership, unless ownership is what is actually checked.
+        JSON.stringify({ id: 'member-b', title: 'B', kind: 'task', state: 'done', spec: 'spec-b', discharges: [2], requires: [], files: [] }),
+      ].join('\n') + '\n',
+    );
+    commit('this branch closes both members, declaring one spec each');
+
+    const standing = standingFor(config(), 'spec-a');
+    // Only member-a's own discharge (c1) is spec-a's to own — c2 is
+    // spec-b's member's, not spec-a's, however identically it is numbered.
+    expect(standing?.clausesOwed).toBe(1);
+    expect(standing?.outstandingClauses).not.toContain('c2');
+  });
+
   // c10: two declared specs are graded independently.
   it('declares both specs when the diff changes a member of each', () => {
     writeSystems();

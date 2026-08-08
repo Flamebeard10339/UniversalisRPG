@@ -1,11 +1,12 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseManifest, refusalsFor } from '../mutate';
 import { parseSpecDoc } from '../lib/specDoc';
 import { describeResolution, indexSuiteTitles, manifestNotes, mutationManifest, resolveTarget, slugStanding, slugStandingLines, toolLines, UNAIMED_FILE, UNRETARGETED, unresolvedTarget, type SlugStanding, type TargetResolution } from './auditPrompt';
 import { MAX_LESSON_COUNT, totalLessonCount } from './briefLessons';
-import { enclosingGitFixture, fixture, gitFixture, relevantFilesBlock, repoRoot, stepsBlock } from './cliFixtures';
+import { enclosingGitFixture, fixture, gitFixture, installDataGit, isolateTmp, relevantFilesBlock, repoRoot, runInProcessAt, stepsBlock, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
   it('audit-prompt prints a ready-to-use auditor prompt for a spec', async () => {
@@ -521,13 +522,16 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // would have re-enabled it with nothing failing.
   it('decides the range belongs to this slug from the standing itself, not from how it is worded', () => {
     const of = (over: Partial<SlugStanding>): boolean =>
-      slugStanding({ slug: 'demo-spec', branch: 'demo-spec', branchSpec: 'demo-spec', base: 'abc1234', lastPassHead: null, lastPassMerged: false, ...over }).rangeIsThisSlugs;
+      slugStanding({ slug: 'demo-spec', branch: 'demo-spec', declaredSpecs: ['demo-spec'], base: 'abc1234', lastPassHead: null, lastPassMerged: false, ...over }).rangeIsThisSlugs;
 
     expect(of({})).toBe(true);
-    expect(of({ branchSpec: 'another-spec' })).toBe(false);
+    expect(of({ declaredSpecs: ['another-spec'] })).toBe(false);
     // Nothing relates the slug to the branch — the standing pass 2 found
     // shipping a manifest, because its line carries no WARNING prefix.
-    expect(of({ branchSpec: null })).toBe(false);
+    expect(of({ declaredSpecs: [] })).toBe(false);
+    // Nor could this checkout tell — the diff could not be read and no
+    // branch-name route fired either, which must not read as ownership.
+    expect(of({ declaredSpecs: null })).toBe(false);
     expect(of({ lastPassHead: 'def5678', lastPassMerged: true })).toBe(false);
   });
 
@@ -788,13 +792,15 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // contradicts the warning printed above it.
   it('says only what the standing says when nothing relates the slug to the branch', () => {
     const unrelated = (over: Partial<SlugStanding>): boolean =>
-      slugStanding({ slug: 'demo-spec', branch: 'demo-spec', branchSpec: 'demo-spec', base: 'abc1234', lastPassHead: null, lastPassMerged: false, ...over }).rangeIsUnrelated;
+      slugStanding({ slug: 'demo-spec', branch: 'demo-spec', declaredSpecs: ['demo-spec'], base: 'abc1234', lastPassHead: null, lastPassMerged: false, ...over }).rangeIsUnrelated;
 
-    expect(unrelated({ branchSpec: 'another-spec' })).toBe(true);
+    expect(unrelated({ declaredSpecs: ['another-spec'] })).toBe(true);
     expect(unrelated({ lastPassHead: 'def5678', lastPassMerged: true })).toBe(true);
-    // Nothing relates the two: refused, but not on the grounds that the diff
-    // belongs to somebody else.
-    expect(unrelated({ branchSpec: null })).toBe(false);
+    // Nothing relates the two — a diff nobody can place, whether because
+    // nothing was declared or because nothing could be read — is not the
+    // same claim as a diff known to belong to a named other spec.
+    expect(unrelated({ declaredSpecs: [] })).toBe(false);
+    expect(unrelated({ declaredSpecs: null })).toBe(false);
     expect(unrelated({})).toBe(false);
   });
 
@@ -852,7 +858,7 @@ describe('the slug audit-prompt is given and the branch it is run on', () => {
   });
 
   it('says a spec whose passes predate the branch point has none of its work in the diff', () => {
-    const merged = slugStandingLines({ slug: 'merged-spec', branch: 'tasks-roadmap', branchSpec: 'tasks-roadmap', base: 'dcc8574001b06b5c89516f8a9afcefa8ce64163b', lastPassHead: 'c38657c001b06b5c89516f8a9afcefa8ce64163b', lastPassMerged: true });
+    const merged = slugStandingLines({ slug: 'merged-spec', branch: 'tasks-roadmap', declaredSpecs: ['tasks-roadmap'], base: 'dcc8574001b06b5c89516f8a9afcefa8ce64163b', lastPassHead: 'c38657c001b06b5c89516f8a9afcefa8ce64163b', lastPassMerged: true });
     expect(merged.join('\n')).toContain('merged before this branch began');
     expect(merged.join('\n')).toContain('none of the work its clauses describe is in the diff');
   });
@@ -860,12 +866,92 @@ describe('the slug audit-prompt is given and the branch it is run on', () => {
   // Silence here would be the original defect wearing a passing test: the
   // brief would still range an unrelated slug against HEAD and say nothing.
   it('says plainly when nothing relates the slug to the branch at all', () => {
-    const lines = slugStandingLines({ slug: 'some-spec', branch: 'claude/cold-worktree', branchSpec: null, base: 'abc1234', lastPassHead: null, lastPassMerged: false });
+    const lines = slugStandingLines({ slug: 'some-spec', branch: 'claude/cold-worktree', declaredSpecs: [], base: 'abc1234', lastPassHead: null, lastPassMerged: false });
     expect(lines.join('\n')).toContain('Nothing relates some-spec to claude/cold-worktree');
   });
 
+  // The deadlock member 4 found: on a checkout whose store diff cannot be
+  // read at all and whose branch name matches no spec file, silence about
+  // "could not tell" reads exactly like the confident "nothing relates"
+  // case above, and a reader cannot act on either the same way — one says
+  // there is an answer and it is no, the other says there is no answer yet.
+  it('says it could not tell, distinctly from nothing relating, when the declared set could not be read', () => {
+    const lines = slugStandingLines({ slug: 'some-spec', branch: 'claude/cold-worktree', declaredSpecs: null, base: 'abc1234', lastPassHead: null, lastPassMerged: false });
+    expect(lines.join('\n')).toContain('Could not tell whether some-spec relates to claude/cold-worktree');
+    expect(lines.join('\n')).not.toContain('Nothing relates');
+  });
+
   it('stays silent when the branch owns the slug and its passes are on this branch', () => {
-    expect(slugStandingLines({ slug: 'demo-spec', branch: 'demo-spec', branchSpec: 'demo-spec', base: 'abc1234', lastPassHead: 'def5678', lastPassMerged: false })).toEqual([]);
+    expect(slugStandingLines({ slug: 'demo-spec', branch: 'demo-spec', declaredSpecs: ['demo-spec'], base: 'abc1234', lastPassHead: 'def5678', lastPassMerged: false })).toEqual([]);
+  });
+});
+
+// The deadlock member 4 found and reproduced independently: on a branch
+// whose name matches no spec file — every `claude/*` branch, which is most
+// of them — the branch-name route above answers null, and before this fix
+// that was the only signal `cmdAuditPrompt` read. It declared the diff
+// foreign on a checkout `merge-ready` graded as this branch's own, and
+// blocked on a pass only the refusing tool could file. `gitFixture` pins
+// `main` to its own first commit and gives the branch the same name as the
+// slug, so it cannot exercise this — proving the fix needs a repository
+// where the branch's own store diff, not its name, is the only thing that
+// can answer.
+function declaredSpecFixture(run: (ctx: { dir: string; commit: (message: string) => void; tasks: (...args: string[]) => Run }) => void): void {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-audit-prompt-declared-'));
+  const restoreTmp = isolateTmp(dir);
+  mkdirSync(path.join(dir, 'specs'), { recursive: true });
+  writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+  writeFileSync(path.join(dir, 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
+  writeFileSync(path.join(dir, 'tasks.jsonl'), '', 'utf8');
+  // Snapshotted into the first commit by `installDataGit`, then pinned as
+  // `main` — an empty, but readable, store at the merge base, which is what
+  // lets a later change to it read as this branch's own declaration rather
+  // than as an unreadable diff.
+  const repo = installDataGit(dir, 'claude/cold-worktree');
+  repo.fork();
+  const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs'), '--branch', 'claude/cold-worktree'];
+  try {
+    run({
+      dir,
+      commit: (message: string) => void repo.commit(message),
+      tasks: (...args: string[]) => runInProcessAt(dir, [...args, ...globals]),
+    });
+  } finally {
+    repo.uninstall();
+    restoreTmp();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+describe('audit-prompt reads the same declared set merge-ready does, on a branch name that answers nothing', () => {
+  it('owns a slug through its own store diff alone', () => {
+    declaredSpecFixture(({ tasks, commit }) => {
+      tasks('add', 'The task under audit', '--spec', 'demo-spec');
+      commit('declare demo-spec');
+
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('WARNING: this branch is working');
+      expect(result.stdout).not.toContain('Nothing relates');
+      expect(result.stdout).not.toContain('Could not tell whether');
+      // Both artifacts the old deadlock refused: the manifest gate reads the
+      // same standing as the pass-file gate, so proving one proves both.
+      expect(result.stdout).not.toContain('No mutation manifest: the diff above is not');
+      expect(stepsBlock(result.stdout)).toContain('7. File the pass.');
+    });
+  });
+
+  it('warns off the branch\'s own store diff too, not only the branch-name route', () => {
+    declaredSpecFixture(({ dir, tasks, commit }) => {
+      writeFileSync(path.join(dir, 'specs', 'another-spec.md'), '# Another spec\n\n## Deliverable\n\nElsewhere.\n\nProof:\n\n- It holds.\n', 'utf8');
+      tasks('add', 'The task under audit', '--spec', 'another-spec');
+      commit('declare another-spec');
+
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('WARNING: this branch is working another-spec, not demo-spec');
+      expect(stepsBlock(result.stdout)).toContain('7. Do not file a pass.');
+    });
   });
 });
 

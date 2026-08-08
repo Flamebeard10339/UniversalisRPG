@@ -10,7 +10,8 @@ import { FAULTS, type Task } from '../lib/taskStore';
 import { architecture, ownership, printPriorArt } from './architectureCmds';
 import { AUDITOR_LESSONS, printLessons } from './briefLessons';
 import type { Flags } from './cli';
-import { readStore, type Config, knownSpecs, reportUnknownSpec, resolveActiveSpec, resolveConfig, specFile } from './context';
+import { readStore, type Config, currentSpec, knownSpecs, reportUnknownSpec, resolveConfig, specFile } from './context';
+import { declaredSpecs, storeDiff } from './mergeReady';
 import { printRow, truncateLine } from './render';
 
 // A prompt without a resolvable diff range cannot do its job — the two
@@ -413,7 +414,13 @@ export function auditArgsSkeleton(slug: string, clauses: ProofClause[], pass: nu
 export interface SlugStanding {
   slug: string;
   branch: string;
-  branchSpec: string | null;
+  // Every spec this branch is known to relate to — the union of the
+  // branch-name route (a spec file matching the branch's own name) and the
+  // branch's own store diff, the same set `merge-ready` grades. Null only
+  // when both are silent: no spec file matches the branch name, and the
+  // diff could not be read at all, which must not be read as "declares
+  // nothing" any more than merge-ready reads it that way.
+  declaredSpecs: string[] | null;
   base: string;
   lastPassHead: string | null;
   lastPassMerged: boolean;
@@ -438,22 +445,33 @@ export interface SlugVerdict {
 
 export function slugStanding(standing: SlugStanding): SlugVerdict {
   const lines = slugStandingLines(standing);
-  const branchOwnsSlug = standing.branchSpec === standing.slug;
+  const branchOwnsSlug = standing.declaredSpecs !== null && standing.declaredSpecs.includes(standing.slug);
+  // A branch this checkout knows declares *something* — a non-empty set —
+  // is the only case that can positively contradict the slug, whether by
+  // naming a different spec or by a pass recorded before this branch began.
+  // An empty or unreadable set has nothing to contradict it with, so it
+  // stays "nobody can place this diff" rather than becoming "known to be
+  // somebody else's".
+  const positivelyKnown = standing.declaredSpecs !== null && standing.declaredSpecs.length > 0;
   return {
     lines,
     rangeIsThisSlugs: branchOwnsSlug && !standing.lastPassMerged,
-    rangeIsUnrelated: standing.branchSpec !== null && (!branchOwnsSlug || standing.lastPassMerged),
+    rangeIsUnrelated: positivelyKnown && (!branchOwnsSlug || standing.lastPassMerged),
   };
 }
 
 export function slugStandingLines(standing: SlugStanding): string[] {
   const lines: string[] = [];
-  if (standing.branchSpec !== null && standing.branchSpec !== standing.slug) {
+  if (standing.declaredSpecs === null) {
     lines.push(
-      `WARNING: this branch is working ${standing.branchSpec}, not ${standing.slug}. The diff range above is ${standing.branch}'s, so ${standing.slug}'s clauses below would be graded against a diff that does not contain their implementation. Audit ${standing.branchSpec}, or run this on the branch that owns ${standing.slug}.`,
+      `Could not tell whether ${standing.slug} relates to ${standing.branch}: no spec file matches the branch name, and this branch's own store diff could not be read, so its declared specs cannot be determined. The range above is still this branch's.`,
     );
-  } else if (standing.branchSpec === null) {
-    lines.push(`Nothing relates ${standing.slug} to ${standing.branch}: no spec file named for the branch. The range above is this branch's whatever ${standing.slug} promised.`);
+  } else if (!standing.declaredSpecs.includes(standing.slug)) {
+    lines.push(
+      standing.declaredSpecs.length === 0
+        ? `Nothing relates ${standing.slug} to ${standing.branch}: no spec file matches the branch name, and this branch's own store diff declares no spec. The range above is still this branch's; nothing here says it is ${standing.slug}'s.`
+        : `WARNING: this branch is working ${standing.declaredSpecs.join(', ')}, not ${standing.slug}. The diff range above is ${standing.branch}'s, so ${standing.slug}'s clauses below would be graded against a diff that does not contain their implementation. Audit ${standing.declaredSpecs.length === 1 ? standing.declaredSpecs[0] : 'one of them'}, or run this on the branch that owns ${standing.slug}.`,
+    );
   }
   if (standing.lastPassMerged && standing.lastPassHead !== null) {
     lines.push(
@@ -562,10 +580,23 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   // should not have had to open the file to find it.
   console.log(`Goal: ${doc.goal ?? `(none recorded — add a \`## Goal\` line to ${path_}; a deferral has nothing to weigh against without one)`}`);
   console.log(`Diff range: ${base}..${head}`);
+  // Two signals for "does this branch relate to this slug", unioned rather
+  // than chosen between: the branch-name match is retained because it is
+  // correct wherever it fires, and the branch's own store diff — the same
+  // set merge-ready grades — is what actually fires on a branch whose name
+  // never matches a spec file, which is most of them. Neither derives *the*
+  // spec to operate on; the slug came from the caller, and this only checks
+  // whether it belongs to what the branch has declared.
+  const diff = storeDiff(config, base, tasks);
+  const diffSpecs = diff.readable ? declaredSpecs(diff.changed) : null;
+  const branchNameSpec = currentSpec(config);
+  const knownSpecsForBranch: string[] | null =
+    diffSpecs === null && branchNameSpec === null ? null : [...new Set([...(diffSpecs ?? []), ...(branchNameSpec !== null ? [branchNameSpec] : [])])].sort();
+
   const standing = slugStanding({
     slug,
     branch: config.branch,
-    branchSpec: resolveActiveSpec(config, tasks, undefined).spec,
+    declaredSpecs: knownSpecsForBranch,
     base,
     lastPassHead: latest?.head ?? null,
     lastPassMerged: latest?.head !== undefined && latest.head !== '(unresolved)' && git.isAncestor(latest.head, base),
