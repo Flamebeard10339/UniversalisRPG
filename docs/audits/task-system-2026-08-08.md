@@ -444,6 +444,112 @@ removes a spec from what the branch is graded on. `docs/workflow.md:93-94` promi
 Code path exact; behavioural half **unconfirmed** — running `merge-ready` was forbidden during this
 concurrent sweep.
 
+## H11 — The git seam destroys the reason for every failure, and four call sites turn "git could not answer" into a positive claim
+
+`scripts/lib/git.ts` is a disciplined seam: fifteen facts, every one nullable, twenty-five tests
+pinning what "git said no" looks like — unborn HEAD, no merge base, unreachable rev, buffer
+overflow. The layer above spends that discipline. `raw()` (`scripts/lib/git.ts:38-42`) sets
+`stdio[2] = 'ignore'` and discards the exit code, so **fifteen distinguishable failures arrive as
+one indistinguishable `null`**, and four of the twenty-two call sites coalesce that `null` into a
+benign default (`?? []`, `|| '(none)'`).
+
+Consequence: `merge-ready` can print `tree ok — pass, nothing uncommitted` and "the base has not
+moved" in a directory where git cannot answer at all.
+
+The same shape repeats as bare `catch { return null }` — **15 swallowed catches across 9 files** in
+the non-test region. In every one the reason exists for exactly one stack frame and is then
+destroyed. **No subprocess in the region sets a timeout, anywhere.**
+
+This is the direct answer to *"the system fails to reliably log its own errors."* It does not fail
+to log them. It destroys them at the seam, one frame after they are known, and then answers
+confidently from the default.
+
+## H12 — Flag arity is parsed out of documentation prose, so two commands accept a flag they do not have
+
+`flagArities` (`scripts/tasks/cli.ts:27`) is a regexp over the usage *string*, and this repository's
+usage strings carry rich explanatory parentheticals. The guard against prose applies only to the
+token *after* a flag, never to the flag token itself — so any `--word` named inside a parenthetical
+enters the accepted vocabulary with an arity read off the next English word.
+
+Reproduced:
+
+```
+$ npm run tasks -- list --trigger "some condition"
+… entire unfiltered list …                                              exit 0
+$ npm run tasks -- list --nonsense foo
+error: unknown flag: --nonsense
+  `list` takes: --state, --severity, --system, --spec, --kind, --deferred, --unspecced, --triggered, --trigger
+```
+
+`--trigger` belongs to `decline`, not `list`. The value is silently discarded **and the refusal path
+advertises the flag by name.** Same for `tasks decision "…" --op note`. A sweep over all 41
+registered verbs finds exactly `list: [trigger]` and `decision: [op]`.
+
+`scripts/tasks/context.ts:9-11` and `scripts/tasks/commands.ts:203` both promise *"a flag not named
+there is an error, never a silent no-op."* A declared arity table beside each usage string — one
+line per command — makes both promises true and makes `reportUnknownFlags` exact rather than
+prose-derived.
+
+## H13 — A repeated flag silently keeps the last value
+
+`scripts/tasks/cli.ts:90` — `flags[key] = value` into a `Record<string, string>`. There is nowhere
+for a second value to go and nothing notices one arriving.
+
+```
+$ npm run tasks -- list --state open --state declined
+222 task(s) — … declined: 222
+$ npm run tasks -- list --state declined
+222 task(s) — … declined: 222
+```
+
+Identical, exit 0, no message on either stream. An agent writing `--state open --state in-progress`
+to mean a union gets a plausible, complete-looking, wrong list. Same class as H12: one rule — *every
+argument the parser accepts must reach the command body, or be an error* — closes both.
+
+## H14 — `doctor` classifies nine conditions as `error` and exits 0 on every one of them
+
+`scripts/tasks/doctor.ts:97-101` is the only non-zero path and it fires on unparseable lines alone.
+But `checkStore` (`scripts/lib/taskStore.ts:785-819`) does not classify along malformed-versus-
+semantic; it classifies `error` versus `warning`, and its `error` set is dominated by **broken
+references**: a system name not in `systems.json`, a spec with no file, a `requires` naming nothing,
+a duplicate id, a dependency cycle.
+
+Those are not disagreements about the work. They are the store having drifted out of sync with the
+tree — precisely the staleness class this audit exists over. Every one is reported and none fails
+anything. The behaviour is pinned by its own test (`scripts/tasks/doctor.test.ts:10-23`), which
+asserts `status === 0` alongside `[error] a has a system not in systems.json: Nonexistent`.
+
+A record filed under a system name that does not exist is invisible to every `--system` query —
+which is the reported visibility failure with the field left blank instead of wrong. Making the
+*reference* errors fail (and leaving the semantic warnings reporting) would make the CI leg the
+first automated check in the repository that a record still points at something real.
+
+## H15 — `tasks log` reports "no events recorded yet" over a log whose every line failed to parse
+
+`scripts/tasks/handoff.ts:85` branches on `events.length` alone. Its own comment two lines above
+argues that an empty log and a filter matching nothing are different answers — and then collapses a
+third case, *the log exists and none of it parsed*, into the second.
+
+```
+$ printf 'not json\n' > <scratch>/events.jsonl
+$ npm run tasks -- log --store <scratch>/tasks.jsonl
+no events recorded yet in …\events.jsonl
+skipped 1 unreadable event line(s) — everything above is the rest of the log: …
+exit=0
+```
+
+The store draws this three-way distinction correctly at `scripts/tasks/context.ts:161-173`. One call
+site catching up with a pattern the region already has.
+
+## H16 — `merge-ready`'s `tree` leg is red at exactly the moment the gate is meant to run
+
+`scripts/tasks/mergeReady.ts:155-160` fails on any dirty path — which is the state the documented
+merge procedure guarantees, since the gate is run before committing. The comment three lines above
+(`:149-151`) denies that the leg fails at all. Its own test asserts that it does.
+
+A leg that is red by construction trains every reader to discount the gate's output, which is the
+one output that is supposed to be read literally.
+
 ## M1 — `tasks plan`'s duplicate-capability check can fire on 0.6% of the pairs it is meant to catch
 
 `checkPlan` (`scripts/lib/planCheck.ts:164`) matches producer names at `exact` and `contains`
@@ -543,6 +649,26 @@ in one to four of `planPrompt.ts` / `orchestratePrompt.ts` / `workPrompt.ts` / `
 strings — `docs/workflow.md:48-49` and `scripts/tasks/planPrompt.ts:70` share a word-for-word
 sentence about `tasks plan`. All copies currently agree. H9 is the proof that this structure drifts
 silently, and the merge-ready leg list is hand-copied in five places.
+
+## M12 — `--writes "a b"` is accepted as one malformed path, and is then invisible to the check built to catch it
+
+`splitList` (`scripts/tasks/context.ts:258`) splits on comma only, with no validation that a
+resulting path is real or singular. Two `done` records literally carry
+`writes: ["scripts/migrate-saves.ts scripts/migrate-saves.test.ts"]` — a space where a comma was
+meant. `pathsOverlap`'s prefix-containment check (`scripts/lib/systems.ts:61`) cannot match that
+string against either real path, so a grant typed this way declares nothing `tasks plan` can grade,
+while looking populated.
+
+Same class as H2: a grant that is false while appearing complete. Validating each path against the
+tree at `--writes` time — the tree is already loaded there for `reportPriorArtOnWrites` — closes it.
+
+## M13 — Nearly half of all recorded history is anonymous
+
+1,055 of 2,247 events (**47.0%**) carry `by: null`, the silent default when `--actor` is omitted
+(`scripts/tasks/context.ts:39`). No verb requires it. `tasks log` is the artifact this repository
+leans on hardest for "why is it like this", and half of it cannot say who.
+
+Cheap to fix: default the actor from an environment variable, or refuse a write verb without one.
 
 ## L1 — `work-prompt` re-asserts the grant kind as unconditional prose after printing it correctly
 
@@ -769,3 +895,201 @@ others. Three measurements already exist and are not collected:
   correct refusals at rows 39, 48a, 51, 53, 54, 57, and no case of a planner overriding one. That
   is the tool's single best-evidenced mechanism and it is worth protecting from any redesign.
 
+
+---
+
+## 7. What to do
+
+The repository's own rule for reading a finding list applies here: *"ask what single change retires
+the most of the list, and build that seam first."* Ordered by that, not by severity.
+
+### 7.1 Five small changes, first, before anything else is planned
+
+Each is a few lines. Together they retire eleven of the sixteen HIGH findings and both failures the
+commissioning ruling named. None requires a design decision.
+
+| # | change | file | retires |
+|---|---|---|---|
+| 1 | `saveStore` writes `.tmp` then `rename`s; re-read and compare before writing | `scripts/lib/taskStore.ts:481` | **H1** (lost writes, torn reads), H8's persistence, M6, and the reason filing is serialised by hand |
+| 2 | Drop the `byPath.get(to)?.system !== candidate.system` clause; label cross-boundary callers instead of filtering to them | `scripts/lib/architecture.ts:244` | **H3** — makes `tasks where` able to show the sibling caller that produced the deadlock |
+| 3 | Compare a record's `system` against `ownerOf` over its `writes ∪ files`; warn, never refuse | `scripts/tasks/context.ts:339` and/or `scripts/lib/taskStore.ts:785` | **H4** — the Phase-6 invisibility and the eight live mis-filings |
+| 4 | Make the queue tie-break total: `seq`, then `id` | `scripts/lib/taskStore.ts:519` | **H7** — and it makes `orderIndependence.test.ts`'s property true of the live data for the first time |
+| 5 | Replace `flagArities`' prose regexp with a declared arity table beside each usage string; reject a repeated flag | `scripts/tasks/cli.ts:27`, `:90` | **H12, H13** — and makes `commands.ts:203`'s "never a silent no-op" true |
+
+Change 1 is the highest value-to-cost ratio in this audit: ten lines in one function, no caller
+changes, and it ends the failure that has been silently corrupting every parallel session.
+
+### 7.2 Give the write grant an observation point
+
+This is the seven-out-of-seven fix, and it is three changes in one branch (**H2**):
+
+- **Refuse `--grant commitment` on a record that has never been started.** The field's only job is
+  to record that someone read the region; the planner must not be able to assert it.
+- **Call `checkPlan` from inside `reportPriorArtOnWrites`**, printing defects *above* the prior-art
+  wall, so the collision check fires when the worker corrects its grant rather than when the planner
+  guesses it. Reuses `checkPlan` verbatim and adds no concept.
+- **Have `tasks done --commit <rev>` report grant-versus-diff.** It holds both. `docs/workflow.md`
+  already asks a human to do this by eye. Recording the delta also produces the first real
+  measurement of how wrong a forecast is, which is the only cheap answer to §6.8.
+
+Then collapse `tasks where <directory>` with the `collapseClosed` that already exists and has one
+caller (**M4**). 711 lines carrying 104 rulings is not a survey a planner reads, and workflow step 1
+runs exactly that query.
+
+### 7.3 Let `doctor` fail on a broken reference
+
+`checkStore` already classifies nine conditions as `error` and `doctor` exits 0 on all of them
+(**H14**). The reference errors — a system name not in `systems.json`, a spec with no file, an
+unresolved `requires`, a duplicate id, a dependency cycle — are not semantic disagreements about the
+work. They are the store having drifted out of sync with the tree, which is this audit's subject.
+
+Fail on those; keep reporting the rest. That makes the CI leg the first automated check in this
+repository that a record still points at something real. Land it together with M8, because a spec
+must be able to retire before "a spec with no file" is an error anyone can clear.
+
+### 7.4 Resume phases 4–6 — the paused plan is well aimed
+
+The paused plan already answers four of the seven v3 requirements, and its designs are right. Two
+deserve saying out loud:
+
+- `a-recurrence-is-appended-and-filing-shows-what-already-claim` independently reached the same
+  conclusion this audit's store reproduction reaches from the other side: *"Nothing is incremented
+  anywhere: a counter is a field concurrent branches edit by construction."* Append the occurrence,
+  derive the count.
+- `one-query-over-the-channel-and-the-second-place-retired` deletes `tool-friction.md` and stops
+  `audit.ts` step 8 sending auditors to write prose into a markdown file. That is the "single way to
+  log an issue" requirement, already specced.
+
+Two corrections to make before dispatching them:
+
+- **Re-file `every-system-owns-its-files-by-name` as `Task system` / `high`.** It is the phase-6
+  branch that stamps the freeze, it is invisible to the query anyone surveying this work runs, and
+  the previous orchestrator recorded that fact in a note attached to the record without changing the
+  record. Fix the fields, not the narration.
+- **Rule on the three-way `briefLessons.ts` collision** before any lesson work is dispatched:
+  `a-lesson-is-folded-from-its-own-log`, `a-lesson-has-a-handle-that-survives-rewording-it` (built,
+  unmerged on `claude/lesson-handle`) and `a-lesson-can-be-retired-and-the-retirement-is-recorded`
+  all intend to write that one file. That is the exact shape that produced the Phase 3 collision.
+
+### 7.5 Do not rebuild the store yet
+
+The event-sourced store is the right destination and the reasoning behind it is sound (§6.1). It is
+not the right next move, for one measured reason and one design reason.
+
+**Measured:** the failure losing data today is `writeFileSync`, not JSONL. The id-sorted file merges
+well, `taskStore.test.ts` pins the boundary precisely, and the residual conflicts *loudly*. Change 1
+in §7.1 closes the loss without touching the format.
+
+**Design:** per-field last-writer-wins makes the merge rule silent. Today two branches editing one
+record produce a conflict a human adjudicates. Under `merge=union` with a `t` clause they produce a
+resolution nobody sees. **If v3 is built it needs a contested-field report as a first-class output,
+or it re-creates by design the exact class of defect this audit is about.** Two further constraints
+to carry: the fold must read the log and nothing else, or the two authorities return; and 212 of 792
+records carry no event at all, so the fold needs a genesis snapshot.
+
+### 7.6 The thing to stop doing
+
+Capabilities are being built ahead of their use, and the evidence is not anecdotal:
+
+- `decider` is populated on **0 of 792** records. `tasks question` has been used zero times since it
+  was built — the single `question` record predates the field.
+- `claimed`/`claimedBy` shipped in a commit whose own body ends *"Nothing writes these fields yet."*
+  (They are wired now; this one came good.)
+- **86 of 104 distinct `produces` claims (83%)** were never registered as a concept.
+- The Task system holds **22 of the repository's 43** registered concepts.
+- 32% of every record ever filed is about the tracker, and `docs/tasks.jsonl` and
+  `docs/events.jsonl` are the two most-committed files in the repository, ahead of every game source
+  file.
+
+The v3 note asks for a counter so a capability needing 5+ rounds can be rethought rather than
+patched again. That counter is worth building — but its answer already exists (§3), and it says four
+capabilities are past the threshold. The lesson this repository's own history teaches most clearly
+is that **the move that works here is deletion**: every retirement in the log followed it, and the
+one capability that finally held is the one that was deleted rather than fixed a seventh time.
+
+---
+
+## 8. On the freeze
+
+Phase 6 stamps a freeze on this system. This audit's answer: the freeze is right, and §7.1–§7.3
+should land inside it rather than after it.
+
+The case is not that the system is bad. §2 is honest — the generated briefs, the event log and the
+audit loop are load-bearing and have no cheaper substitute, and the refusal invitation is the
+best-evidenced mechanism in the repository: the delegation log records real, correct refusals at
+rows 39, 48a, 51, 53, 54 and 57, and no case of a planner overriding one. The test suite is fine
+(1,050 tests, 24.8 s wall, zero tests above 4,000 ms, green under eight concurrent agents), the
+in-process fixture fix already landed, and the store's referential integrity came back clean on
+every check in §9 — including zero evidence of anyone routing around the tool.
+
+The case for the freeze is arithmetic. The tool is 19,728 lines against a 15,473-line game that is
+not yet playable. It has absorbed 21 of the last 25 merges. Its four most-reworked capabilities have
+taken six, five, five and four rounds — the fourth (`tasks plan`) still unresolved, and last handled
+by *avoiding* parallelism rather than fixing the check.
+
+What §7.1–§7.3 buy is that the frozen system is one that **cannot silently lose a record, cannot
+silently answer short, cannot silently accept a flag it does not have, and cannot silently hide a
+record from the query meant to find it.** Those four failures are what made this system expensive to
+operate. None of them needs a redesign. Freeze after them, not before.
+
+---
+
+## 9. What the store data says — including the good news
+
+Counted directly over 792 records and 2,247 events, with throwaway scripts rather than through the
+CLI whose filters are themselves under audit.
+
+**Clean. Every one of these was checked and came back zero:**
+
+| checked | result |
+|---|---|
+| duplicate ids | 0 |
+| `requires` naming a record that does not exist | 0 |
+| records naming a spec with no file / spec files no record names | 0 / 0 |
+| `discharges` numbers with no matching `- [cN]` in the named spec | 0 |
+| `closedCommit` values unreachable in this repo | 0 (159/159 resolve) |
+| open or unreviewed records older than two weeks | 0 |
+| **agents hand-editing task content into the store, bypassing the tool** | **0** |
+
+That last one is the author's direct question and the answer is unambiguous. Cross-verified two
+independent ways — per-record event coverage, and a per-commit check that every commit touching
+`docs/tasks.jsonl` also touched `docs/events.jsonl` — **412 of 413 commits pair correctly**, the one
+exception being a reviewed schema migration. Four records were hand-*deleted* from the file, which
+is what happens when no `tasks remove` verb exists; no content was ever hand-inserted.
+
+So the friction is not that agents route around the tool. They do not.
+
+**Volume, in context.** Task-system records are 32% of everything ever filed, and task-system code
+churn is ~34% of commit volume over the weeks it has existed — proportional to its usage share
+rather than runaway. But `docs/tasks.jsonl` and `docs/events.jsonl` are the **#1 and #2
+most-committed files in the entire repository**, ahead of every game source file, and
+`scripts/tasks.ts` is twice as hot as any other code file.
+
+**Duplicates, measured.** 18 records — 8.1% of all declines — were filed and then caught as
+duplicates at triage. The open queue is clean because triage is doing the work that prevention is
+not. That is the size of the pile the v3 dedupe rule would prevent, and it is smaller than the
+narrative suggests.
+
+## 10. One finding this audit retracted, and why it matters
+
+The store-data auditor filed one HIGH: *"`departure` has been null in 811 of 811 historical
+occurrences despite 88 recorded set-calls"* — presented with a reproduction, a `git log --all -p`
+command, and a cross-check of 86 specific ids. It concluded the store's read-modify-write race was
+silently swallowing that field on every write, and offered it as a likely contributor to the
+seven-of-seven grant corrections.
+
+It is wrong, and checking it took one command. `departure` landed on 2026-08-07 in `504af12`. Of the
+259 `spec-defer` / `spec-remove` / `triage` events in all of history, exactly **one** occurred after
+that commit — and it was a `promote`, which adds a record to a spec rather than departing it from
+one. `departFromSpec` has had essentially zero opportunities to fire since the field existed.
+811 of 811 null is exactly the expected value.
+
+This is recorded because it is the same failure the commissioning ruling had already caught itself
+making: *"The orchestrator reported 13 earlier from a grep that counted wrapped output lines rather
+than records, and that wrong number is what the pause was argued from."* Both are a real
+measurement over the wrong denominator, delivered with more confidence than the evidence carried.
+Two occurrences in one week, from two different agents, on the same repository.
+
+The lesson is not "audit harder". It is that **a count is not evidence until its denominator is
+stated**, and that the cheapest defence is the one that worked here: before filing a
+never-happened claim, ask when the thing could first have happened.

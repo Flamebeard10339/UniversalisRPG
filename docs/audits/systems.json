@@ -224,9 +224,9 @@
         "scripts/lib/bytes.ts",
         "scripts/lib/bytes.test.ts"
       ],
-      "lastAudit": null,
-      "lastAuditDoc": null,
-      "note": "Carved out of Testing procedure on 2026-08-03 by task-system-refactor: the workflow tool is a system, not a testing utility. Branch-level audit history for this code lives in the task-system-* and testing-procedure-2026-08-0x docs under docs/audits/. Never swept as its own system yet.",
+      "lastAudit": "6895198",
+      "lastAuditDoc": "docs/audits/task-system-2026-08-08.md",
+      "note": "Carved out of Testing procedure on 2026-08-03 by task-system-refactor: the workflow tool is a system, not a testing utility. Branch-level audit history for this code lives in the task-system-* and testing-procedure-2026-08-0x docs under docs/audits/. First whole-system sweep 2026-08-08 at 6895198, nine auditors over disjoint regions: 35 findings, 16 high. It corrected both premises it was commissioned on. tasks plan is not structurally blind -- all three Phase 3 grants were commitment, so the softening never engaged and the check reported no overlap because the record was false (one task declared 4 files and wrote 20). And the data needed to model \"these two files must agree\" already exists: architecture.ts walks every import edge and regionView.importedBy then filters callers to cross-system ones, so context.ts prints none of its fifteen importers. The reported symptom -- agents reading stale or incomplete information -- is a torn read: saveStore is writeFileSync over the whole file, so 1825 of 1826 reads during two concurrent writes answered short, and eight concurrent adds produced eight successes and three records. Section 7 orders the work; the first five changes are a few lines each and retire eleven of the sixteen highs.",
       "concepts": [
         {
           "name": "the event log",
