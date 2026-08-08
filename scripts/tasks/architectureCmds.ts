@@ -212,7 +212,7 @@ export function printPriorArt(art: PriorArt, { collapseClosed = false } = {}): v
     if (task.produces.length > 0) console.log(`            produces ${task.produces.join(', ')}`);
   }
   const closed = art.claims.length - shown.length;
-  if (closed > 0) console.log(`  ${closed} closed claim(s) not listed — each is a decision already made rather than a collision.`);
+  if (closed > 0) console.log(`  ${closed} closed claim(s) not listed — each is a decision already made rather than a collision. \`tasks where <file>\` names every claim on one path.`);
   console.log('\nA claim in any state is prior art: a closed one is a decision already made, and an open one is a collision.');
 }
 
@@ -250,11 +250,33 @@ export function reportPriorArtOnWrites(config: Config, tasks: Task[], task: Task
   if (task.writes.length === 0) return;
   const manifest = manifestOrEmpty(config, 'answering from recorded claims only — registered concepts could not be read');
   const others = tasks.filter((candidate) => candidate.id !== task.id);
+  reportDispatchDefects(manifest, tasks, task);
   console.log('');
   printPriorArt(priorArt(manifest, others, task.writes));
   console.log('');
   printRulings(rulingsOn(others, loadEvents(config.eventsPath).events, task.writes));
 }
+
+// `tasks plan` grades a dispatch set once, before anyone works it, when every
+// grant in it is a planner's forecast; the accurate grant is the one a worker
+// writes mid-run, and it arrives here. Defects only, and silence otherwise —
+// this fires on every `--writes` write, and a check that prints a paragraph
+// each time is one that gets skipped. It reports and never refuses, for
+// `cmdPlan`'s reason.
+function reportDispatchDefects(manifest: Manifest, tasks: Task[], task: Task): void {
+  if (task.spec === null) return;
+  const plan = tasks.filter((candidate) => candidate.spec === task.spec && (candidate.state === 'open' || candidate.state === 'in-progress'));
+  if (!plan.some((member) => member.id === task.id)) return;
+
+  const defects = checkPlan(plan, tasks, producerIndex(manifest, tasks)).findings.filter((finding) => finding.level === 'defect');
+  if (defects.length === 0) return;
+
+  console.log(`\ngraded against spec ${task.spec}: its ${plan.length} open and in-progress member(s)`);
+  for (const finding of defects) console.log(`  [defect] ${finding.message}`);
+  console.log('only defects are shown here — `tasks plan` grades the same set in full.');
+}
+
+const namesADirectory = (view: RegionView): boolean => view.files.some((file) => file !== view.path);
 
 // The body of `tasks where`, factored out so `plan-prompt` can run the same
 // survey over paths named on its own command line — the deliverable it
@@ -278,13 +300,15 @@ export function printWhere(config: Config, target: string, arch = architecture(c
     for (const entry of view.importsOut) console.log(`    ${entry.path} (${entry.system})`);
   }
   if (view.importedBy.length > 0) {
-    console.log('  imported from outside its system by:');
-    for (const entry of view.importedBy) console.log(`    ${entry.path} (${entry.system})`);
+    console.log('  imported by:');
+    for (const entry of [...view.importedBy].sort((a, b) => Number(b.crossesBoundary) - Number(a.crossesBoundary))) {
+      console.log(`    ${entry.path} (${entry.system})${entry.crossesBoundary ? ' — across a system boundary' : ''}`);
+    }
   }
 
   const tasks = readStore(config);
   console.log('');
-  printPriorArt(priorArt(manifest, tasks, [view.path]));
+  printPriorArt(priorArt(manifest, tasks, [view.path]), { collapseClosed: namesADirectory(view) });
 
   console.log('');
   printRulings(rulingsOn(tasks, loadEvents(config.eventsPath).events, [view.path]));

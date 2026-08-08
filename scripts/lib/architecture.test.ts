@@ -238,7 +238,23 @@ describe('regionView', () => {
   it('reports only the imports that leave the owning system', () => {
     const view = regionView(overlapping, source, modules, 'src/content/modportal.ts');
     expect(view.importsOut).toEqual([{ path: 'src/grammar/parser.ts', system: 'Grammar' }]);
-    expect(view.importedBy).toEqual([{ path: 'src/content/registry.ts', system: 'DSL load path' }]);
+  });
+
+  // The blindness that let `auditPrompt.ts` keep calling a narrowed
+  // `resolveActiveSpec`: every file in one system is a sibling, so filtering
+  // callers to the cross-system ones deleted every caller a directory can
+  // hold. Both kinds are named; which of them crosses is a label.
+  it('names a same-system sibling caller as well as a cross-system one, labelling which crosses', () => {
+    const callers = tree({
+      'src/grammar/parser.ts': 'export const parse = 1;',
+      'src/grammar/lexer.ts': "import { parse } from './parser';",
+      'src/content/registry.ts': "import { parse } from '../grammar/parser';",
+    });
+    const view = regionView(overlapping, callers, deriveModules(overlapping, callers), 'src/grammar/parser.ts');
+    expect(view.importedBy).toEqual([
+      { path: 'src/content/registry.ts', system: 'DSL load path', crossesBoundary: true },
+      { path: 'src/grammar/lexer.ts', system: 'Grammar', crossesBoundary: false },
+    ]);
   });
 
   it('leaves a same-system import out of importsOut, since inside a system it is ordinary coupling', () => {
