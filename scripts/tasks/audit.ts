@@ -189,7 +189,7 @@ export function parseAuditArgs(args: string[]): AuditArgs {
       if (scoped !== null) evidence.set(scoped.clause, scoped.value);
       else if (current === null) errors.push(`--evidence ${value ?? ''} names no clause — before any --finding, evidence is clause-scoped and takes the same N="..." shape as --proof`);
       else if (current.evidence !== null) errors.push(`finding "${current.title}" already has evidence`);
-      else current.evidence = value ?? '';
+      else current.evidence = (value ?? '').trim();
     } else if (key === 'finding') {
       current = { title: value ?? '', severity: null, system: null, files: [], deliverable: null, evidence: null, fault: null };
       findings.push(current);
@@ -204,7 +204,7 @@ export function parseAuditArgs(args: string[]): AuditArgs {
     } else if (key === 'system') {
       current.system = value ?? null;
     } else if (key === 'deliverable') {
-      current.deliverable = value ?? null;
+      current.deliverable = value?.trim() ?? null;
     } else if (key === 'fault') {
       current.fault = value ?? null;
     } else if (key === 'file') {
@@ -225,6 +225,14 @@ export function parseAuditArgs(args: string[]): AuditArgs {
 // evidence a next pass can re-run and then rationed how much of it there was
 // room for; only the transport moves, and the parser below is the same one.
 //
+// A bare spec slug is the one value a reader plausibly writes on a line of
+// its own before any flag: it is the positional argument `tasks audit` takes
+// on the command line, not inside this file, and a reader who has just
+// finished writing a whole pass reaches for it out of habit. Matched against
+// the same shape `slugify` produces, so the check names the actual form a
+// slug takes rather than a guess at one.
+const LOOKS_LIKE_SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
 // A line opening with `--` is a flag and everything after the first space is
 // its value; any other line continues the value above it, which is what lets
 // a clause's evidence be a paragraph. Blank lines and `#` at column zero are
@@ -241,7 +249,8 @@ export function parseAuditFile(text: string, label: string): { argv: string[]; e
       return;
     }
     if (argv.length === 0) {
-      errors.push(`${label}:${index + 1}: a value line before any flag — every line here either opens a flag with -- or continues the one above it`);
+      const remedy = LOOKS_LIKE_SLUG.test(line) ? ` — if "${line}" is the spec slug, it belongs on the command line: npm run tasks -- audit ${line} --args-from ${label}` : '';
+      errors.push(`${label}:${index + 1}: a value line before any flag — every line here either opens a flag with -- or continues the one above it${remedy}`);
       return;
     }
     argv[argv.length - 1] = `${argv[argv.length - 1]}\n${line}`;
