@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 export type Kind = 'task' | 'finding' | 'undelivered' | 'question';
 export type State = 'unreviewed' | 'open' | 'in-progress' | 'done' | 'declined';
@@ -460,14 +461,26 @@ export function parseStoreTolerantly(text: string, label: string): ToleratedStor
   return { tasks, skipped };
 }
 
+// The bytes this process last saw at each store path. Every write verb is
+// load, mutate, save, and the mutation is a closure over the array that was
+// loaded — so the read and the write are the two ends of one transaction and
+// the file is the only place a second process can appear between them. Both
+// ends are in this module and nowhere else, which is what lets the comparison
+// below need nothing from any caller.
+const lastSeen = new Map<string, string>();
+
+function readAndRemember(path: string): string {
+  const text = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  lastSeen.set(resolve(path), text);
+  return text;
+}
+
 export function loadStore(path: string = DEFAULT_STORE_PATH): Task[] {
-  if (!existsSync(path)) return [];
-  return parseStore(readFileSync(path, 'utf8'), path);
+  return parseStore(readAndRemember(path), path);
 }
 
 export function loadStoreTolerantly(path: string = DEFAULT_STORE_PATH): ToleratedStore {
-  if (!existsSync(path)) return { tasks: [], skipped: [] };
-  return parseStoreTolerantly(readFileSync(path, 'utf8'), path);
+  return parseStoreTolerantly(readAndRemember(path), path);
 }
 
 // One task per line, in id order — the file on disk is a function of the
@@ -478,10 +491,79 @@ export function loadStoreTolerantly(path: string = DEFAULT_STORE_PATH): Tolerate
 // each inserting a new, id-adjacent line, which lands at the same position
 // on both sides and conflicts once, in the shape a human resolves by keeping
 // both.
+// How long a writer waits for another writer's turn, and how old a lock has
+// to be before it is read as abandoned rather than held. A write is a compare
+// and a rename, so the hold is milliseconds; anything past the first number
+// is a queue, and anything past the second is a process that died holding it.
+const LOCK_WAIT_MS = 5_000;
+const LOCK_ABANDONED_MS = 30_000;
+
+const pause = (ms: number): void => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+};
+
+// Exclusive creation is the only operation a filesystem offers that two
+// processes cannot both win. Comparing the file against what this command
+// read is not enough on its own: both writers pass the comparison, then both
+// rename, and the second silently replaces the first — which is the measured
+// failure with one extra step, not a fix for it. So the comparison and the
+// rename happen together, under this.
+function withLock<T>(path: string, run: () => T): T {
+  const lock = `${path}.lock`;
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  for (;;) {
+    try {
+      writeFileSync(lock, `${process.pid}`, { flag: 'wx' });
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      const age = Date.now() - (statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? Date.now());
+      if (age > LOCK_ABANDONED_MS) rmSync(lock, { force: true });
+      else if (Date.now() > deadline) throw new StoreError(`${lock} is held by another write and did not clear within ${LOCK_WAIT_MS}ms. Nothing was written; re-run the command.`);
+      else pause(20);
+    }
+  }
+  try {
+    return run();
+  } finally {
+    rmSync(lock, { force: true });
+  }
+}
+
+//
+// Staged and renamed rather than written in place, because `writeFileSync`
+// truncates and then streams: a reader inside that window sees a prefix, and
+// a prefix ending on a newline is a store that is short, self-consistent and
+// silent. Renaming replaces the file in one step, so a reader sees the whole
+// of one version or the whole of the other.
+//
+// And refused, never merged, when the file has moved under this process. What
+// is in `tasks` is what was on disk when this command read it, plus whatever
+// it changed; a record another process added in between is in neither, and
+// writing would delete it with no error anywhere. Refusing costs the caller a
+// re-run, which is what `docs/workflow.md` already asks agents to arrange by
+// hand.
 export function saveStore(tasks: Task[], path: string = DEFAULT_STORE_PATH): void {
   const sorted = [...tasks].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const body = sorted.map((task) => renderTask(task)).join('\n');
-  writeFileSync(path, body.length > 0 ? `${body}\n` : '', 'utf8');
+  const text = body.length > 0 ? `${body}\n` : '';
+
+  withLock(path, () => {
+    const seen = lastSeen.get(resolve(path));
+    if (seen !== undefined && (existsSync(path) ? readFileSync(path, 'utf8') : '') !== seen) {
+      throw new StoreError(`${path} changed on disk after this command read it — another write landed in between, and saving now would delete it. Nothing was written; re-run the command.`);
+    }
+
+    const staging = `${path}.${process.pid}.tmp`;
+    try {
+      writeFileSync(staging, text, 'utf8');
+      renameSync(staging, path);
+    } catch (error) {
+      rmSync(staging, { force: true });
+      throw error;
+    }
+  });
+  lastSeen.set(resolve(path), text);
 }
 
 // The next position a newly created record takes. Both sides of a parallel

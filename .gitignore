@@ -19,3 +19,8 @@ vite.*.log
 
 # Emitted by tsc --build for the tsconfig.node project.
 tsconfig.node.tsbuildinfo
+
+# saveStore stages its write beside the store and takes a lock there. Both are
+# removed on the way out; these two lines are for the write that was killed.
+*.jsonl.lock
+*.jsonl.*.tmp

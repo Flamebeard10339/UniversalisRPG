@@ -1,9 +1,10 @@
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { makeRealGitRepo } from './realGitRepo';
+import { tsxCli } from './tsxCli';
 import { backfillSeq, checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, matchesSearchTerm, nearMatches, nextSeq, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
@@ -274,6 +275,69 @@ describe('loadStore / saveStore', () => {
   });
 });
 
+describe('a store that moved under the writer', () => {
+  it('refuses rather than overwriting, and the write it would have deleted survives', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      saveStore([task({ id: 'a' })], file);
+      const mine = loadStore(file);
+      mine.push(task({ id: 'mine' }));
+
+      const theirs = [...loadStore(file), task({ id: 'theirs' })];
+      writeFileSync(file, `${theirs.map((t) => JSON.stringify({ ...t, extra: undefined })).join('\n')}\n`, 'utf8');
+
+      expect(() => saveStore(mine, file)).toThrow(StoreError);
+      expect(loadStore(file).map((t) => t.id)).toEqual(['a', 'theirs']);
+    });
+  });
+
+  it('writes a path this process never read, so a first write is not a conflict', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'fresh.jsonl');
+      writeFileSync(file, `${JSON.stringify({ id: 'planted', title: 'planted', kind: 'task', state: 'open', requires: [], files: [] })}\n`, 'utf8');
+      expect(() => saveStore([task({ id: 'a' })], file)).not.toThrow();
+      expect(loadStore(file).map((t) => t.id)).toEqual(['a']);
+    });
+  });
+
+  it('leaves no staging file behind', () => {
+    withTmpDir((dir) => {
+      saveStore([task({ id: 'a' })], path.join(dir, 'tasks.jsonl'));
+      expect(readdirSync(dir)).toEqual(['tasks.jsonl']);
+    });
+  });
+});
+
+// The measured failure: eight concurrent `tasks add` against one store
+// printed eight `added` lines, raised zero errors and left three records on
+// disk. The property that forbids it is not "no two writers" — an
+// orchestrator dispatches writers together — but that a command claiming to
+// have added a record is a command whose record is on disk. Real processes,
+// because the hazard is between processes and nothing inside one can stage it.
+describe('writers dispatched together', () => {
+  it('never reports a record added that the store does not then hold', async () => {
+    const repoRoot = path.join(import.meta.dirname, '../..');
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-taskstore-race-'));
+    const store = path.join(dir, 'tasks.jsonl');
+    try {
+      const results = await Promise.all(
+        ['alpha', 'beta', 'gamma'].map(
+          (id) =>
+            new Promise<{ id: string; status: number }>((settle) => {
+              const child = spawn(process.execPath, [tsxCli, path.join(repoRoot, 'scripts/tasks.ts'), 'add', id, '--id', id, '--store', store], { cwd: repoRoot, stdio: 'ignore' });
+              child.on('exit', (code) => settle({ id, status: code ?? 1 }));
+            }),
+        ),
+      );
+      const claimed = results.filter((result) => result.status === 0).map((result) => result.id);
+      expect(claimed.length).toBeGreaterThan(0);
+      expect(loadStore(store).map((t) => t.id).sort()).toEqual([...claimed].sort());
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
+});
+
 // c6: a record written by a checkout that does not know `seq` exists yet is
 // not malformed, and it is not stuck at the front of every queue either.
 describe('a record with no seq', () => {
@@ -401,6 +465,16 @@ describe('parallel branches, merged for real', () => {
     return out;
   }
 
+  // Every write below stands for one command on one branch, and a command
+  // reads the store before it writes it. That read is also what tells
+  // saveStore which file its write is replacing, and `git checkout` between
+  // two of these replaces that file — so writing twice with no read in
+  // between is a lost update here for the same reason it is one in a session.
+  const asOneCommand = (tasks: Task[]): void => {
+    loadStore(storePath());
+    saveStore(tasks, storePath());
+  };
+
   it('two branches, one editing a record and adding a non-adjacent one, the other doing the same to a different record, merge with zero conflicts', () => {
     // Ten records, so the two touched regions (the first record and the
     // last, edited and added-next-to on opposite branches) sit far enough
@@ -408,7 +482,7 @@ describe('parallel branches, merged for real', () => {
     // 590-record real store's ordinary shape, not the 2-line case where
     // every line is within context of every other.
     const base = Array.from({ length: 10 }, (_, i) => task({ id: `r-${String(i).padStart(2, '0')}`, seq: i + 1 }));
-    saveStore(scrambled(base), storePath());
+    asOneCommand(scrambled(base));
     commit('base: r-00 .. r-09');
     git('branch', '-M', 'main');
 
@@ -416,7 +490,7 @@ describe('parallel branches, merged for real', () => {
     const onA = [...base];
     onA[0] = { ...onA[0], title: 'edited by A' };
     onA.splice(5, 0, task({ id: 'r-04-mid', seq: 11 }));
-    saveStore(scrambled(onA), storePath());
+    asOneCommand(scrambled(onA));
     commit('A edits r-00 and adds r-04-mid');
 
     git('checkout', '-q', 'main');
@@ -424,7 +498,7 @@ describe('parallel branches, merged for real', () => {
     const onB = [...base];
     onB[onB.length - 1] = { ...onB[onB.length - 1], title: 'edited by B' };
     onB.push(task({ id: 'zzz-b', seq: 11 }));
-    saveStore(scrambled(onB), storePath());
+    asOneCommand(scrambled(onB));
     commit('B edits r-09 and adds zzz-b');
 
     const merge = git('merge', '--no-edit', 'branch-a');
@@ -460,7 +534,7 @@ describe('parallel branches, merged for real', () => {
     // untouched record between them.
     function mergeStatus(shape: 'insert-insert' | 'edit-insert' | 'delete-insert', gap: number): number | null {
       const base = buildBase();
-      saveStore(scrambled(base), storePath());
+      asOneCommand(scrambled(base));
       commit(`base: ${N} records`);
       git('branch', '-M', 'main');
 
@@ -472,13 +546,13 @@ describe('parallel branches, merged for real', () => {
           : shape === 'edit-insert'
             ? base.map((t) => (t.id === changed.id ? { ...t, title: 'edited by A' } : t))
             : [...base, task({ id: `${changed.id}-a-ins`, seq: 101 })];
-      saveStore(scrambled(onA), storePath());
+      asOneCommand(scrambled(onA));
       commit(`A changes ${changed.id} (${shape})`);
 
       git('checkout', '-q', 'main');
       git('checkout', '-q', '-b', 'branch-b');
       const insertAfter = base[CHANGE_INDEX + gap];
-      saveStore(scrambled([...base, task({ id: `${insertAfter.id}-ins`, seq: 102 })]), storePath());
+      asOneCommand(scrambled([...base, task({ id: `${insertAfter.id}-ins`, seq: 102 })]));
       commit(`B inserts beside ${insertAfter.id} (gap ${gap})`);
 
       return git('merge', '--no-edit', 'branch-a').status;
@@ -506,18 +580,18 @@ describe('parallel branches, merged for real', () => {
     // showing the conflict and its shape rather than trying to remove it.
     it('insert-insert at gap 0 conflicts on exactly one hunk carrying both new records, resolved by keeping both', () => {
       const base = buildBase();
-      saveStore(scrambled(base), storePath());
+      asOneCommand(scrambled(base));
       commit(`base: ${N} records`);
       git('branch', '-M', 'main');
 
       const changed = base[CHANGE_INDEX];
       git('checkout', '-q', '-b', 'branch-a');
-      saveStore(scrambled([...base, task({ id: `${changed.id}-a-ins`, seq: 101 })]), storePath());
+      asOneCommand(scrambled([...base, task({ id: `${changed.id}-a-ins`, seq: 101 })]));
       commit(`A inserts beside ${changed.id}`);
 
       git('checkout', '-q', 'main');
       git('checkout', '-q', '-b', 'branch-b');
-      saveStore(scrambled([...base, task({ id: `${changed.id}-b-ins`, seq: 102 })]), storePath());
+      asOneCommand(scrambled([...base, task({ id: `${changed.id}-b-ins`, seq: 102 })]));
       commit(`B inserts beside ${changed.id}`);
 
       const merge = git('merge', '--no-edit', 'branch-a');
