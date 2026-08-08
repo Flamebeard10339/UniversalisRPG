@@ -536,6 +536,33 @@ function withLock<T>(path: string, run: () => T): T {
   }
 }
 
+// How long a writer waits for a reader to let go of the destination. Windows
+// refuses to replace a file another process holds open, and a reader holds the
+// store for exactly as long as its own read takes — so the wait only has to
+// outlast that. It cannot reorder two writes: the lock above has already
+// excluded every other writer, and what is being waited on is a read.
+const REPLACE_WAIT_MS = 500;
+
+// Refused as a StoreError when the wait runs out, never as the raw errno.
+// `writeFileSync` into a file held open for reading succeeds, so staging and
+// renaming introduced this failure; letting it escape as an `EPERM` naming a
+// staging file that has already been removed would make a correct workflow
+// fail for a reason its operator cannot act on.
+function replace(staging: string, path: string): void {
+  const deadline = Date.now() + REPLACE_WAIT_MS;
+  for (;;) {
+    try {
+      renameSync(staging, path);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY') throw error;
+      if (Date.now() > deadline) throw new StoreError(`${path} is held open by another process and could not be replaced within ${REPLACE_WAIT_MS}ms. Nothing was written; re-run the command.`);
+      pause(10);
+    }
+  }
+}
+
 //
 // Staged and renamed rather than written in place, because `writeFileSync`
 // truncates and then streams: a reader inside that window sees a prefix, and
@@ -563,7 +590,7 @@ export function saveStore(tasks: Task[], path: string = DEFAULT_STORE_PATH): voi
     const staging = `${path}.${process.pid}.tmp`;
     try {
       writeFileSync(staging, text, 'utf8');
-      renameSync(staging, path);
+      replace(staging, path);
     } catch (error) {
       rmSync(staging, { force: true });
       throw error;

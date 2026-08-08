@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -320,6 +320,31 @@ describe('a store that moved under the writer', () => {
       writeFileSync(file, `${JSON.stringify({ id: 'planted', title: 'planted', kind: 'task', state: 'open', requires: [], files: [] })}\n`, 'utf8');
       expect(() => saveStore([task({ id: 'a' })], file)).not.toThrow();
       expect(loadStore(file).map((t) => t.id)).toEqual(['a']);
+    });
+  });
+
+  // Staging and renaming bought the torn read, and it cost this: Windows
+  // refuses to replace a file another process holds open, where writeFileSync
+  // did not. Which of the two answers below a platform gives is not the
+  // property — that a raw errno never reaches the caller, and that no staging
+  // file survives either answer, is.
+  it('answers a reader holding the store open with a refusal or a write, and never with a raw filesystem error', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      saveStore([task({ id: 'a' })], file);
+      const held = openSync(file, 'r');
+      let outcome: 'wrote' | unknown;
+      try {
+        saveStore([task({ id: 'b' })], file);
+        outcome = 'wrote';
+      } catch (error) {
+        outcome = error;
+      } finally {
+        closeSync(held);
+      }
+      expect(outcome === 'wrote' || outcome instanceof StoreError).toBe(true);
+      if (process.platform === 'win32') expect(outcome).toBeInstanceOf(StoreError);
+      expect(readdirSync(dir)).toEqual(['tasks.jsonl']);
     });
   });
 
