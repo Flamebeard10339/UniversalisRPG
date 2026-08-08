@@ -230,3 +230,179 @@ The tested copy states the lesson. The hand-copied one in the repository's own g
 is nearly a tautology — "assembled" and "written" are the same moment — and says nothing. One
 sentence, two homes, no link, and the copy that governs every agent is the one that drifted.
 
+---
+
+## 6. The v3 requirements, assessed against measurement
+
+The author's notes in `.planning/.scratch.md` list seven requirements for the next iteration. Each
+is answered here against what this sweep measured, not against the design's own merits.
+
+### 6.1 "Concurrent agents without corrupting the store" — **confirmed, and worse than stated**
+
+Reproduced directly. Three concurrent `npm run tasks -- add` against one store:
+
+```
+records before: 792
+records after:  793   (expected 795)
+probes that survived in the STORE:  race-probe-gamma
+probes recorded in the EVENT LOG:   3
+```
+
+All three commands printed `added …` and exited 0. **Two records were lost with no error**, and the
+store and the event log now disagree permanently with nothing able to detect it.
+
+`saveStore` (`scripts/lib/taskStore.ts:481-485`) is a bare `writeFileSync` of the whole file — no
+lock, no temp-file-and-rename, no compare-and-swap, not even a re-read before write. A reader can
+also observe a truncated file mid-write. `docs/workflow.md` states the hazard in prose — *"Filing is
+the one step that cannot be concurrent"* — and nothing enforces it. Nine agents ran in this worktree
+during this audit; the only reason nothing was lost is that they were told not to write.
+
+**The author's instinct is right and the measurement supports it in an unexpected way: the event log
+survived all three writes.** `appendFileSync` with three concurrent appenders kept every record; the
+whole-file rewrite kept one. That is the strongest argument for the v3 direction, and it is
+empirical rather than theoretical.
+
+But **the redesign is not the first move**, for three reasons:
+
+1. **The cheap fix closes the loss today.** An advisory lock (or write-temp-then-rename with a
+   re-read-and-retry on mtime change) around `saveStore` is tens of lines and ends silent data loss
+   in every scenario above. It should land regardless of what happens to the store's shape.
+2. **The cross-branch half is already largely solved and was measured.**
+   `the-task-store-survives-parallel-branches` sorted the store by id; verified here — 792 records,
+   zero out-of-order positions, every record carrying `seq`. Two branches editing different records
+   already merge clean. The residual is *adjacent-line* changes, which is a much smaller problem
+   than "three unmergeable rewrites."
+3. **`merge=union` on an editable store has already been tried and rejected here, with a written
+   reason** (`.gitattributes`): it silently produced a duplicate record under one id, clean exit,
+   green CI — *"worse than the conflict it was configured to avoid."*
+
+Point 3 is where the per-field `t` clause earns its keep: under an append-only log with last-write-
+wins per field, a duplicate append is not a duplicate record, it is two events resolved by
+timestamp. So the design does answer the objection that killed union merge. **And it dissolves a
+manual-sync relation rather than adding one** — if the store is a projection of the log, the two
+cannot disagree by construction, which retires the whole of the open spec
+`a-record-cannot-leave-the-store-unrecorded` (whose deliverable is a reconciliation between them).
+
+The cost is the "grep still works" clause. A projection that is committed is a derived artifact in
+the tree, which is only safe if the tool rewrites it on every write and never asks a human to.
+That is achievable — `saveStore` already rewrites the whole file every time — but it must be the
+rule, not a convention.
+
+**Recommendation.** Lock the write now. Take the event-log store as a deliberate later branch, and
+take it whole: append-only, `merge=union`, per-field last-write-wins on `t`, and a projection the
+tool regenerates on every command that writes. Do not take it as a patch to the current store.
+
+### 6.2 "A single way to log an issue, with dedupe before filing" — **confirmed; already specced**
+
+There are **ten channels** for "something we learned":
+
+| channel | size | machine-readable | dedupes |
+|---|---|---|---|
+| `docs/tasks.jsonl` | 792 records / 1.41 MB | yes | no |
+| `docs/events.jsonl` | 2,247 events / 907 KB | yes | no |
+| `.planning/agent-feedback/tool-friction.md` | 1,660 lines, 47 session entries | no | no |
+| `.planning/agent-feedback/audit-tooling-friction.md` | 26 lines — a scaffold with zero entries | no | — |
+| `docs/audits/*.md` | 10,492 lines over 35 files | no | no |
+| `docs/audits/systems.json` `note` fields | 12,605 chars of embedded audit prose | half | no |
+| `docs/specs/*.md` `## Decisions` | 58 of 60 spec files | no | no |
+| `docs/dsl-rewrite/delegation-experiments.md` | 437 lines | no | no |
+| `postmortem.md` + `backlog-process-review.md` | 357 lines | no | no |
+| commit bodies | ~every commit | no | no |
+
+Nothing dedupes anywhere. `tasks import`'s key is `${basename}-${code}` — it detects re-importing
+*one document twice* and cannot see across two documents describing one defect. The three
+independent pass-2 audits of `task-system-refactor` each filed the same task-id-resolution gap;
+`-a-m3`, `-b-m3` and `-c-m3` are all still open today.
+
+The open HIGH `one-query-over-the-channel-and-the-second-place-retired` already specifies exactly
+this — one query over the channel, `tool-friction.md` deleted, `audit.ts` step 8 stops telling
+auditors to write prose into a markdown file. It is phase 4 of the paused push. **It is the right
+design and it should be resumed.**
+
+### 6.3 "Durable, automatic process lessons" — **confirmed gap, partly specced**
+
+Every lesson in `briefLessons.ts` is hand-authored into one of four `const` arrays. There is no
+`tasks lesson add`, no route from a finding to a lesson, and no recurrence counter anywhere.
+One of nineteen lessons already names a command whose flags have drifted (`worker/file-findings`
+teaches `tasks add --kind finding`, which the command now refuses without `--fault`).
+
+`docs/specs/a-lesson-is-folded-from-its-own-log.md` designs the fix — an append-only
+`docs/lessons.jsonl` under `merge=union`, folded by a pure function into the arrays — and is
+unstarted. Note its own Open Questions flag a three-way collision: two *other* specs
+(`a-lesson-has-a-handle-that-survives-rewording-it`, built and unmerged on `claude/lesson-handle`,
+and `a-lesson-can-be-retired-and-the-retirement-is-recorded`) also intend to write
+`briefLessons.ts`. That needs a ruling before any of the three is dispatched.
+
+**The half nothing addresses is the one the author named directly**: *"Me forgetting to tell them
+about `npm run tasks -- *-prompt ...` can't be the failure mode."* Today lessons arrive only if the
+dispatcher remembers to say "run `work-prompt <id>` and do what it says". There is no fallback for
+an agent told "just fix X". That is a `CLAUDE.md` line, not a code change, and §7 proposes it.
+
+### 6.4 "No infinitely appended markdown; dissolve finished specs" — **confirmed, and currently impossible**
+
+34 of 59 spec files (58%) are fully historical. They cannot be deleted: `checkStore` requires every
+closed record's non-null `spec` to name an existing file forever, because `departFromSpec` only
+clears `spec` on departure and never on an ordinary close. Deleting the 34 today would strand
+**336 closed records** as 336 `doctor` errors, 55 of which carry `--discharges` and would produce a
+second error wave. And `spec remove` — the one command that could detach a record — refuses once
+the file is gone, so it needs the file it is trying to remove. This is already filed as
+`stranded-spec-members-have-no-repair`.
+
+**A spec cannot currently retire.** That is why `docs/specs/` only grows, and it is a five-line fix
+in the wrong direction from where anyone has been looking: let a closed record keep its spec *slug*
+as history without requiring the file to exist.
+
+### 6.5 & 6.6 "Claim the spec" and "multiple specs per branch" — **one fixed, one not**
+
+Multiple specs per branch is genuinely fixed. `BranchStanding.specs` is a real collection; the
+heuristics (`specToGrade`, `authoredAsPlan`, `specAddsClauseId`, `decideSpec`) are deleted.
+
+"Claim spec" is **not** built. There is no `claim` verb. What replaced inference is `--spec`, a
+branch-name match against a real file, and a CI-only derivation from the branch's own store diff.
+That derivation is better evidence than the old guess — a changed task record *is* the branch's diff
+— but it is still derived, and one caller still exits 0 with no usable answer on an ambiguous spec
+(`cmdPlan`, `architectureCmds.ts:57-60`), deliberately, because making it refuse would redden CI on
+every PR. The resulting clause sits open and high-severity on an already-merged spec.
+
+The author's instinct ("most inference-based systems should just be simplified") is the one the
+repository's own history most strongly supports: this capability took **six rounds**, and the only
+round that held was the one that deleted rather than fixed.
+
+### 6.7 "A counter that fires when a capability needs 5+ rounds" — **the highest-value item**
+
+This is the requirement that would have prevented the other six, and §3 shows it can be computed
+from data that already exists: the event log, the store's `produces`/`concepts`, and 47 sessions of
+`tool-friction.md`. What is missing is not the data but a **handle** — a stable identity a
+recurrence can be appended to.
+
+The design is already written and correct. `a-recurrence-is-appended-and-filing-shows-what-already-claim`
+(open, HIGH, phase 4) reasons it out in its own deliverable: *"Nothing is incremented anywhere: a
+counter is a field concurrent branches edit by construction … the derivation of the count belongs to
+the query."* That is exactly right, and it is the same conclusion the store-race reproduction in
+§6.1 reaches from the other direction.
+
+Two things this audit adds to it:
+
+- **The counter should also count *capabilities*, not only frictions.** The Task system holds 22 of
+  the repository's 43 registered concepts. Concept count per system, tracked over time, is the
+  cheapest available proxy for "this system is growing faster than it is being used", and
+  `audit-status` already computes it.
+- **83% of `produces` claims never become concepts** (86 of 104 distinct names). Any recurrence
+  query keyed on capability name will read a vocabulary that is mostly unregistered forecasts.
+  Key it on **path**, not name — `producers.ts:91-95` already says so in its own comment, and
+  `checkPlan` does not do it.
+
+### 6.8 "No way to know whether any of this is easy for the agents"
+
+This is the one requirement with no design behind it, and it is answerable more cheaply than the
+others. Three measurements already exist and are not collected:
+
+- **Grant drift.** `tasks done --commit <rev>` has both the grant and the diff in hand. Recording
+  the delta per task gives a real distribution of how wrong a forecast is (this audit's sample:
+  10–50% recall). That is §7's first recommendation and it doubles as the answer here.
+- **Direct-edit rate.** How often an agent bypasses the CLI and edits `docs/tasks.jsonl` by hand is
+  measurable from commits that change the store without a matching `docs/events.jsonl` change.
+- **Refusals.** The refusal invitation demonstrably works — the delegation log records real,
+  correct refusals at rows 39, 48a, 51, 53, 54, 57, and no case of a planner overriding one. That
+  is the tool's single best-evidenced mechanism and it is worth protecting from any redesign.
+
