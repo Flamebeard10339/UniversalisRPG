@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { appendEvents, EVENT_OPS, eventsPathFor, filterEvents, loadEvents, parseEvents, reconcile, type TaskEvent } from './eventLog';
+import { appendEvents, EVENT_OPS, eventsPathFor, filterEvents, loadEvents, parseEvents, reconcile, type TaskEvent, type ToleratedEvents } from './eventLog';
 
 function event(overrides: Partial<TaskEvent> = {}): TaskEvent {
   return {
@@ -179,6 +179,8 @@ describe('the log is not derived from present-day state', () => {
 // that it had, or why.
 describe('c1, c3, c4: a record cannot leave the store unrecorded', () => {
   const entry = (op: string, id: string | null, note = ''): TaskEvent => event({ op, id, note });
+  // A log that read whole. The cases that matter pass their own `skipped`.
+  const read = (events: TaskEvent[]): ToleratedEvents => ({ events, skipped: [] });
 
   it('declares `remove` as an op, so the log can name what left', () => {
     expect(EVENT_OPS).toContain('remove');
@@ -194,7 +196,7 @@ describe('c1, c3, c4: a record cannot leave the store unrecorded', () => {
       entry('add', 'simply-gone'),
     ];
 
-    const result = reconcile(events, ['still-here', 'never-in-the-log']);
+    const result = reconcile(read(events), ['still-here', 'never-in-the-log']);
     expect(result.accounted).toEqual(['still-here']);
     expect(result.absentExplained).toEqual([
       { id: 'dropped-on-purpose', op: 'remove', note: 'removed from the store: scratch' },
@@ -208,17 +210,44 @@ describe('c1, c3, c4: a record cannot leave the store unrecorded', () => {
   });
 
   it('reports the coverage it does not have, on a clean run as well as a dirty one', () => {
-    const clean = reconcile([entry('add', 'known')], ['known', 'predates-the-log', 'also-predates']);
+    const clean = reconcile(read([entry('add', 'known')]), ['known', 'predates-the-log', 'also-predates']);
     expect(clean.absentUnexplained).toEqual([]);
     // The number that stops "reconciled" being a false proof: two of the
     // three store records carry no `add` event, so nothing here can say
     // whether they ever left.
     expect(clean.storeRecords).toBe(3);
     expect(clean.outsideCoverage).toBe(2);
+    // The same statement about the other input, and it is why `reconcile` takes
+    // the whole read: a caller holding only the events cannot make it.
+    expect(clean.logLinesUnread).toBe(0);
+  });
+
+  it('states how much of the log it could not read, which is what stops one bad line hiding an absence', () => {
+    // The reproduction: `simply-gone`'s `add` line is the one that did not
+    // parse, so the id the store is missing is an id this comparison never
+    // learns was created. The absence goes from 1 to 0 and the only thing
+    // separating that from a clean store is the count of unread lines.
+    const blind = reconcile({ events: [entry('add', 'known')], skipped: ['events.jsonl:2: malformed JSONL event record'] }, ['known']);
+    expect(blind.absentUnexplained).toEqual([]);
+    expect(blind.logLinesUnread).toBe(1);
   });
 
   it('reads the last explanation, so a record removed and then re-created and removed again reads as removed', () => {
     const events = [entry('add', 'twice'), entry('remove', 'twice', 'first time'), entry('add', 'twice'), entry('remove', 'twice', 'second time')];
-    expect(reconcile(events, []).absentExplained).toEqual([{ id: 'twice', op: 'remove', note: 'second time' }]);
+    expect(reconcile(read(events), []).absentExplained).toEqual([{ id: 'twice', op: 'remove', note: 'second time' }]);
+  });
+
+  it('does not read an explanation from before the id was created again, so a re-filed record that vanishes is the finding', () => {
+    // add, remove, add — and then gone. The old rule took the last explaining
+    // event wherever it sat and reported this as accounted for under a reason
+    // that had already been superseded by the re-filing.
+    const refiled = [entry('add', 'twice'), entry('remove', 'twice', 'first time, on purpose'), entry('add', 'twice')];
+    expect(reconcile(read(refiled), []).absentExplained).toEqual([]);
+    expect(reconcile(read(refiled), []).absentUnexplained).toEqual(['twice']);
+
+    // The same shape through the other explaining op, and past events that
+    // explain nothing: a decline, a retriage, then re-filed under the same id.
+    const retriaged = [entry('add', 'x'), entry('decline', 'x', 'not real work'), entry('triage', 'x', 'retriaged'), entry('add', 'x')];
+    expect(reconcile(read(retriaged), []).absentUnexplained).toEqual(['x']);
   });
 });

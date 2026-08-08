@@ -436,7 +436,31 @@ describe('the log against the store, reported and never enforced', () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('0 record(s) absent with nothing explaining it');
       expect(result.stdout).toContain('1 of 2 store record(s) outside what this can check at all');
+      // And the same statement about the other input, on the clean run too.
+      // The store half of this was printed and the log half was not, so a
+      // reader could tell how much of the store went unchecked and not how
+      // much of the log went unread — which is the input the check is a reader of.
+      expect(result.stdout).toContain('the log read whole: 0 line(s)');
       expect(result.stdout).not.toContain('reconciled');
+    });
+  });
+
+  it('says the comparison is reading less than the log holds when a line did not parse', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a record that will vanish', '--id', 'vanished');
+      const log = path.join(dir, 'events.jsonl');
+      // The reproduction: the vanished record's own `add` line is the one that
+      // will not parse, so the comparison never learns the id was created. The
+      // absence goes from 1 to 0 and exit stays 0 — the check failing open on
+      // the input it exists to read, with the number to say so already in hand.
+      writeFileSync(log, readFileSync(log, 'utf8').replace(/^\{/, 'not json at all {'), 'utf8');
+      writeFileSync(path.join(dir, 'tasks.jsonl'), '', 'utf8');
+
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('0 record(s) absent with nothing explaining it');
+      expect(result.stdout).toContain('1 line(s)');
+      expect(result.stdout).toContain('reading less than the log holds');
     });
   });
 

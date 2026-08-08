@@ -1651,6 +1651,58 @@ describe('tasks remove', () => {
     });
   });
 
+  // The collision between two halves of one branch: c1 and c2 gave the store a
+  // verb for leaving it, and c9 made a reference resolving to nothing the one
+  // condition `doctor` exits non-zero on. Removing a required record exited 0
+  // and reddened the next merge gate.
+  it('refuses to remove a record something requires, and names every holder', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a scratch probe', '--id', 'a-probe');
+      tasks('add', 'real work', '--id', 'real-work', '--requires', 'a-probe');
+      tasks('add', 'more real work', '--id', 'also-real', '--requires', 'a-probe');
+
+      const refused = tasks('remove', 'a-probe', '--reason', 'a probe, never real work');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('2 record(s) require a-probe');
+      expect(refused.stderr).toContain('real-work');
+      expect(refused.stderr).toContain('also-real');
+      expect(refused.stderr).toContain('exits non-zero on');
+      expect(refused.stderr).toContain('tasks edit <holder> --requires');
+      // Writes nothing: the record stays and no removal is filed.
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).toContain('a-probe');
+      expect(events(dir).some((entry) => entry.op === 'remove')).toBe(false);
+      // And the state it refused to create is the state doctor fails on, so
+      // the refusal is what keeps the gate green.
+      expect(tasks('doctor').status).toBe(0);
+    });
+  });
+
+  it('removes a record nothing requires once the edge is dropped where it belongs', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a scratch probe', '--id', 'a-probe');
+      tasks('add', 'real work', '--id', 'real-work', '--requires', 'a-probe');
+
+      expect(tasks('remove', 'a-probe', '--reason', 'a probe').status).toBe(1);
+      tasks('edit', 'real-work', '--requires', '');
+      expect(tasks('remove', 'a-probe', '--reason', 'a probe, never real work').status).toBe(0);
+    });
+  });
+
+  // Reported and not refused, and the difference from the case above is that
+  // nothing breaks. `tasks start` already lets one actor take another's claim
+  // while saying so; the defect here was silence, not permission.
+  it('says it destroyed a live claim rather than deleting it quietly', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'work somebody took', '--id', 'held');
+      tasks('start', 'held', '--actor', 'worker-a');
+
+      const removed = tasks('remove', 'held', '--reason', 'not wanted after all', '--actor', 'worker-b');
+      expect(removed.status).toBe(0);
+      expect(removed.stdout).toContain('destroyed a live claim with it');
+      expect(removed.stdout).toContain('worker-a');
+    });
+  });
+
   it('takes an exact id only, because a fragment resolving to the nearest record is wrong for a delete', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'a scratch probe', '--id', 'a-probe');

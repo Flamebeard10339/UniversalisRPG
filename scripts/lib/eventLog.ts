@@ -163,11 +163,20 @@ export interface Reconciliation {
   // "reconciled" over the quarter of the store it can see is a false proof.
   storeRecords: number;
   outsideCoverage: number;
+  // The same statement about the other input. One malformed log line used to
+  // take an unexplained absence from 1 to 0 with nothing said and exit 0 — the
+  // check failing open on the input it exists to read. The number was already
+  // in hand and the caller destructured past it, so it is a field here: the
+  // coverage is part of the answer, not something a printer may forget.
+  logLinesUnread: number;
 }
 
 // The log and the store, compared. Three disjoint sets over the ids the log
-// has ever seen created, plus the coverage the comparison does not have.
-export function reconcile(events: TaskEvent[], storeIds: string[]): Reconciliation {
+// has ever seen created, plus the coverage the comparison does not have — of
+// the store, and of the log. It takes the whole read rather than the events
+// out of it, because a caller holding only `events` cannot state its coverage.
+export function reconcile(read: ToleratedEvents, storeIds: string[]): Reconciliation {
+  const { events, skipped } = read;
   const present = new Set(storeIds);
   const created = [...new Set(filterEvents(events, { op: 'add' }).map((event) => event.id))].filter((id): id is string => id !== null);
 
@@ -176,12 +185,26 @@ export function reconcile(events: TaskEvent[], storeIds: string[]): Reconciliati
   const absentExplained: ExplainedAbsence[] = [];
   const absentUnexplained: string[] = [];
   for (const id of absent) {
-    const explanation = events.filter((event) => event.id === id && EXPLAINS_ABSENCE.includes(event.op)).pop();
+    const explanation = lastExplanation(events, id);
     if (explanation === undefined) absentUnexplained.push(id);
     else absentExplained.push({ id, op: explanation.op, note: explanation.note });
   }
 
-  return { accounted, absentExplained, absentUnexplained, storeRecords: storeIds.length, outsideCoverage: storeIds.filter((id) => !created.includes(id)).length };
+  return { accounted, absentExplained, absentUnexplained, storeRecords: storeIds.length, outsideCoverage: storeIds.filter((id) => !created.includes(id)).length, logLinesUnread: skipped.length };
+}
+
+// The last explanation *after* the id's last `add`, which is not the same as
+// the last explanation. A record removed on purpose, re-filed under the same
+// id, and then lost silently reported as accounted for under the old reason —
+// so the third set was nearly the finding rather than the finding. Re-filing
+// under a used id and retriage after a decline are both ordinary here.
+function lastExplanation(events: TaskEvent[], id: string): TaskEvent | undefined {
+  const own = events.filter((event) => event.id === id);
+  for (let i = own.length - 1; i >= 0; i--) {
+    if (own[i].op === 'add') return undefined;
+    if (EXPLAINS_ABSENCE.includes(own[i].op)) return own[i];
+  }
+  return undefined;
 }
 
 export interface EventFilter {

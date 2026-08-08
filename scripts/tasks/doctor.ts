@@ -75,8 +75,13 @@ export function doctorIssues(config: Config, tasks: Task[]): CheckIssue[] {
 // over the quarter of the store it can see is a false proof, and this
 // repository has filed that defect under seven different names.
 function printReconciliation(config: Config, tasks: Task[]): void {
-  const { absentExplained, absentUnexplained, storeRecords, outsideCoverage } = reconcile(loadEvents(config.eventsPath).events, tasks.map((task) => task.id));
+  const { absentExplained, absentUnexplained, storeRecords, outsideCoverage, logLinesUnread } = reconcile(loadEvents(config.eventsPath), tasks.map((task) => task.id));
   console.log(`the log against the store: ${absentUnexplained.length} record(s) absent with nothing explaining it, ${absentExplained.length} absent and accounted for, ${outsideCoverage} of ${storeRecords} store record(s) outside what this can check at all — they carry no \`add\` event, so nothing here can say whether they ever left`);
+  console.log(
+    logLinesUnread === 0
+      ? `  and the log read whole: 0 line(s) of ${config.eventsPath} failed to parse, so the absences above are every absence the log can show`
+      : `  but ${logLinesUnread} line(s) of ${config.eventsPath} did not parse, so this comparison is reading less than the log holds and an absence may be missing from it entirely — \`tasks log\` names them`,
+  );
   for (const id of absentUnexplained) console.log(`  [absent] ${id} — the log created it and the store does not hold it, and no removal or decline says why. \`tasks log --id ${id}\` is its whole history; \`tasks remove ${id} --reason "..."\` files the ruling`);
 }
 

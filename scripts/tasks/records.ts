@@ -375,12 +375,35 @@ export function cmdRemove(args: Flags, usage: string): void {
     return;
   }
 
+  // Refused, because this is the one write that can manufacture the state
+  // `doctor` exits non-zero on. c1 and c2 gave the store a way out and c9, on
+  // the same branch, made a reference resolving to nothing a failure
+  // condition — so `remove` on a record something requires exited 0 saying
+  // "the record is gone and the log says so", and the next `merge-ready` was
+  // red for a reason the caller had already been told was a success. The
+  // holders are named because dropping the edge for them is a decision about
+  // their work, not about this one.
+  const holders = tasks.filter((candidate) => candidate.requires.includes(task.id));
+  if (holders.length > 0) {
+    console.error(`error: ${holders.length} record(s) require ${task.id}, and removing it would leave them pointing at nothing — which is the one store condition \`tasks doctor\` exits non-zero on: ${holders.map((candidate) => candidate.id).join(', ')}`);
+    console.error(`\`tasks edit <holder> --requires <the rest>\` drops the edge where it belongs, or \`tasks decline ${task.id} --reason "..."\` closes this record and leaves the history it holds up intact`);
+    process.exitCode = 1;
+    return;
+  }
+
+  // Reported, not refused, and the difference from the case above is that
+  // nothing breaks: a claim is one actor's, and `tasks start` already lets
+  // another take one over while saying so. Silence was the defect — the
+  // removal destroyed a live claim without mentioning it.
+  const claim = claimSummary(task, today());
+
   saveStoreAndWarn(
     tasks.filter((candidate) => candidate.id !== task.id),
     config,
     [{ task, reason }],
   );
   console.log(`removed ${task.id} [${task.kind}/${task.state}] from ${config.storePath} — the record is gone and the log says so, with the reason`);
+  if (claim !== null) console.log(`destroyed a live claim with it: ${claim} — \`tasks log --id ${task.id}\` is where that now lives`);
   console.log(`\`tasks log --id ${task.id}\` is now the whole of what remains of it`);
 }
 
