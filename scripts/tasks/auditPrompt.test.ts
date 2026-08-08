@@ -1025,3 +1025,33 @@ describe('the four briefs stay within the lesson budget the spec sets', () => {
     expect(totalLessonCount()).toBeLessThanOrEqual(MAX_LESSON_COUNT);
   });
 });
+
+// ORCHESTRATOR_LESSONS carries "give every dispatched agent a scratch
+// filename prefix", which reaches an orchestrated run and not an auditor
+// commissioned directly — which is most of them. The brief names its own.
+describe('the scratch prefix an auditor is given', () => {
+  it('names a prefix keyed to the spec and the pass, in the steps rather than beside them', () => {
+    enclosingGitFixture(({ tasks }) => {
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      expect(stepsBlock(stdout)).toContain('audit-demo-spec-pass1-<what it is>');
+      expect(stepsBlock(stdout)).toContain('Concurrent auditors share that directory');
+    });
+  });
+
+  it('moves the prefix with the pass, so pass 2 cannot overwrite pass 1', () => {
+    enclosingGitFixture(({ tasks, dir }) => {
+      const spec = path.join(dir, 'specs', 'demo-spec.md');
+      writeFileSync(spec, `${readFileSync(spec, 'utf8')}
+## Audit passes
+
+### Pass 1 — 2026-08-08
+
+- base: \`abc\`
+- head: \`def\`
+- proof 1: unknown
+- proof 2: unknown
+`, 'utf8');
+      expect(stepsBlock(tasks('audit-prompt', 'demo-spec').stdout)).toContain('audit-demo-spec-pass2-<what it is>');
+    });
+  });
+});

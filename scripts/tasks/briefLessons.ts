@@ -39,6 +39,11 @@ export const WORKER_LESSONS: readonly Lesson[] = [
     body: '`tasks note --spec` or a line in the commit body.',
   },
   {
+    id: 'worker/aim-at-the-clause',
+    title: "Aim a fix at the clause, not at the finding's words.",
+    body: 'A finding names one reproduction and the reproduction is always narrower than the property the clause promises, so a fix that satisfies the sentence and not the property is the failure mode this workflow is measurably worst at: 30% of fixes did not hold against 0.5% of certifications reversed, and every failure was aimed at a finding literally.',
+  },
+  {
     id: 'worker/file-findings',
     title: 'File what you notice outside your grant; do not merely mention it.',
     body: "`tasks add --kind finding`. Reporting it in a final message is how it gets lost. Never cite an id you have not seen in your own store — describe it in prose instead.",
@@ -99,8 +104,8 @@ export const PLANNER_LESSONS: readonly Lesson[] = [
 export const ORCHESTRATOR_LESSONS: readonly Lesson[] = [
   {
     id: 'orchestrator/buffer-not-decider',
-    title: 'The orchestrator is a buffer, not a decision-maker.',
-    body: "It absorbs everything that is not a genuine design decision and batches what is left into one review. Route a design question you could answer yourself to a planning session anyway — not to move it off the author's desk, but to move it where the survey and the rulings already are.",
+    title: 'Place a decision where it will not be re-decided; the test is durability, not who is busy.',
+    body: "A mechanical decision belongs to the agent that just read the code, because routing it upward makes it both worse and slower. A decision about what the work is belongs to the planner-and-author pairing, because that pairing holds the survey and the rulings — route one there even when you could answer it, and route it with `tasks question \"<it>\" --blocks <ids> --decider planner|author --fault ...`, which halts exactly what depends on it and reaches the addressee instead of coming back to a worker as an implementation brief. A decision made in the wrong place gets re-decided, and the re-decision is the cost.",
   },
   {
     id: 'orchestrator/ruling-is-a-contract',

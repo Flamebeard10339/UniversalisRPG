@@ -620,6 +620,13 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('');
   console.log('Steps, in order. Each command names the next one when it finishes.');
   console.log('');
+  // The two artifacts above are already keyed to slug and pass. Anything else
+  // this auditor writes is not, and an orchestrator's instruction to prefix a
+  // dispatched agent's scratch files reaches an orchestrated run and not an
+  // auditor commissioned directly — which is most of them. So the brief names
+  // its own prefix rather than relying on who dispatched it.
+  console.log(`0. Anything you write outside the repository goes in ${os.tmpdir()} named \`audit-${slug}-pass${pass}-<what it is>\`. Concurrent auditors share that directory, and a second manifest called \`mutations.json\` overwrites somebody else's judgement rather than colliding with it.`);
+  console.log('');
   console.log(`1. Read ${path_} in full. \`## Deliverable\` is the argument the clauses promise about, \`## Decisions\` are settled and not to be reopened, \`## Audit passes\` is what earlier passes found.`);
   console.log('2. Read the diff over the range above. Do not assume the implementation approach is correct; verify each clause independently.');
   console.log('3. Grade every clause under `Proof clauses:` below.');
