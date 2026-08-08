@@ -104,10 +104,24 @@ Proof:
   reproduction no longer fires. A record left open whose reproduction cannot be made to fire is this
   clause unmet, however few they turn out to be.
 
+- [c7] A generated command line carries every value its generator already holds. Deleting the guess
+  moves the cost onto whoever must now name a spec, and the tooling prints most of the commands this
+  project runs — so a brief that prints `npm run tasks -- next` while holding the spec in a local
+  variable has manufactured exactly the refusal c2 introduces. The property is over generated
+  commands, not over the four known sites: a printed invocation that omits an available argument is
+  this clause unmet wherever it is. `mergeReady.ts:132` is the case that shows it is an oversight
+  rather than a design — one branch of that ternary interpolates `${standing.spec}` and the other,
+  in the same expression, prints a bare verb.
+  proof: every `npm run tasks --` string printed by `scripts/tasks/*.ts` that names a verb needing a
+  spec includes one. Enumerate them and record the list; the known four are `mergeReady.ts:132`,
+  `mergeReady.ts:146`, `audit.ts:416` and `audit.ts:572`, and finding more is the expected outcome of
+  looking rather than a sign the clause was wrong.
+  proof: vitest scripts/tasks/mergeReady.test.ts
+
 ## Goal
 
-Stop the tooling from telling a branch which spec it owes, and stop it from forgetting a verdict an
-earlier pass recorded.
+Stop the tooling from telling a branch which spec it owes, stop it from forgetting a verdict an
+earlier pass recorded, and do not hand the reader a command that cannot run.
 
 ## Decisions
 
@@ -149,6 +163,21 @@ earlier pass recorded.
   it wants a different default (the store's open members, say, offered as a list rather than chosen),
   report it rather than deciding it.
 
-- Whether any caller is left with no way to supply a spec at all. A survey is running separately and
-  its result will be attached to this spec before the second member is dispatched; treat a
-  "genuinely stranded" caller as a stop and report it rather than inventing a default for it.
+- ~~Whether any caller is left with no way to supply a spec at all.~~ **Answered before dispatch, by
+  survey.** No genuinely stranded caller exists: of the seven `resolveActiveSpec` call sites, `plan`,
+  `next`, `promote` and `triage` all already accept `--spec`; `audit-prompt` takes its spec as a
+  positional and uses this read only for an informational WARNING that degrades to null; and
+  `merge-ready` is the sanctioned derivation. CI runs only `spec show "$SPEC_BRANCH" --branch ...`
+  (slug passed positionally, so the inference path is never reached) and `plan --branch ...` (a read
+  that exits 0 by design). No `package.json` script, git hook, or `scripts/*` subprocess invokes an
+  affected verb. What the survey found instead is c7.
+
+- `tasks spec show` is the one verb that consults the inference and has **no** `--spec` flag —
+  `commands.ts:39`'s usage string carries none, and `flagArities` derives accepted flags from that
+  string, so passing `--spec` is refused as unknown before `cmdSpecShow` runs. Its slug-less path is
+  documented as interactive-only and no non-interactive caller reaches it. Adding the flag is the
+  obvious tidy; decide whether that is in scope or a record, and say which.
+
+- `lastSpecWrittenFromBranch` (`context.ts:222`) has exactly one caller — route 3. It becomes dead
+  code on deletion. `specsWrittenFromBranch` keeps a second, surviving caller in `mergeReady.ts:315`,
+  which reaches it directly rather than through `resolveActiveSpec`, so it stays.
