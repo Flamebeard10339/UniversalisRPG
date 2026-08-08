@@ -95,15 +95,24 @@ export function cmdDoctor(args: Flags): void {
     console.log('none of these has exactly one correct repair; `--fix` clears a close date left on a record that is not closed, and nothing else');
   }
 
-  const errors = issues.filter((issue) => issue.level === 'error').length;
-  console.log(`${tasks.length} task(s), ${errors} error(s), ${issues.length - errors} warning(s), ${skipped.length} unparseable line(s)`);
+  const count = (level: CheckIssue['level']): number => issues.filter((issue) => issue.level === level).length;
+  const dangling = count('dangling');
+  console.log(`${tasks.length} task(s), ${dangling} dangling reference(s), ${count('error')} error(s), ${count('warning')} warning(s), ${skipped.length} unparseable line(s)`);
 
-  // The only condition that exits non-zero. A store that will not parse is
-  // malformed input, not a disagreement about the work — and it is the one
-  // state a later write would destroy rather than merely disagree with.
+  // The two conditions that exit non-zero, and what they have in common is
+  // that neither is a disagreement about the work. A store that will not
+  // parse is malformed input, and it is the one state a later write would
+  // destroy rather than merely disagree with. A dangling reference is the
+  // store having drifted out of step with the tree — a system name, a spec
+  // file or a record id that resolves to nothing — which is decidable, unlike
+  // every other line above.
   if (skipped.length > 0) {
     for (const message of skipped) console.error(`error: ${message}`);
-    console.error(`error: ${config.storePath} does not parse — the only condition doctor fails on`);
+    console.error(`error: ${config.storePath} does not parse`);
+    process.exitCode = 1;
+  }
+  if (dangling > 0) {
+    console.error(`error: ${dangling} record reference(s) resolve to nothing — a record must point at something real, which is the one thing about the store a machine can check`);
     process.exitCode = 1;
   }
 }

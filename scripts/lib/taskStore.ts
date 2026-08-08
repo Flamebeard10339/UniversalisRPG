@@ -817,8 +817,17 @@ export function nearMatches(query: string, tasks: Task[], limit = 5): Task[] {
     .map((entry) => entry.task);
 }
 
+// Three levels, because two collapsed a distinction `doctor` needs. A
+// `dangling` issue is a record pointing at something that does not exist — a
+// system name, a spec file, another record's id — which is the store having
+// drifted out of step with the tree, and is checkable. An `error` is a record
+// disagreeing with itself, and a `warning` is a disagreement about the work;
+// neither is decidable by a machine, and neither fails anything. It is a
+// level rather than a flag on a level so tsc makes every check choose.
+export type IssueLevel = 'dangling' | 'error' | 'warning';
+
 export interface CheckIssue {
-  level: 'error' | 'warning';
+  level: IssueLevel;
   message: string;
 }
 
@@ -904,14 +913,14 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
   const issues: CheckIssue[] = [];
   const seen = new Set<string>();
   for (const task of tasks) {
-    if (seen.has(task.id)) issues.push({ level: 'error', message: `duplicate id: ${task.id}` });
+    if (seen.has(task.id)) issues.push({ level: 'dangling', message: `duplicate id: ${task.id}` });
     seen.add(task.id);
   }
 
   const byId = new Map(tasks.map((task) => [task.id, task]));
   for (const task of tasks) {
     for (const dep of task.requires) {
-      if (!byId.has(dep)) issues.push({ level: 'error', message: `${task.id} requires unresolved id: ${dep}` });
+      if (!byId.has(dep)) issues.push({ level: 'dangling', message: `${task.id} requires unresolved id: ${dep}` });
     }
     if (task.state === 'declined' && !task.reason) issues.push({ level: 'error', message: `${task.id} is declined but has no reason` });
     if (task.state !== 'declined' && task.reason) issues.push({ level: 'warning', message: `${task.id} is ${task.state} and carries a decline reason, which reads as a decline that was reopened: ${task.reason}` });
@@ -922,14 +931,18 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
     if (task.kind === 'undelivered' && task.clause === null) issues.push({ level: 'error', message: `${task.id} is undelivered but names no proof clause` });
     if (task.kind !== 'undelivered' && task.clause !== null) issues.push({ level: 'error', message: `${task.id} names a proof clause but is not undelivered` });
     if (task.discharges.length > 0 && task.spec === null) issues.push({ level: 'error', message: `${task.id} claims to discharge clause(s) ${task.discharges.join(', ')} and names no spec, so there is no document those numbers refer to` });
-    if (task.system !== null && !systems.includes(task.system)) issues.push({ level: 'error', message: `${task.id} has a system not in systems.json: ${task.system}` });
-    if (task.spec !== null && !specExists(task.spec)) issues.push({ level: 'error', message: `${task.id} references a spec with no file: ${task.spec}` });
+    if (task.system !== null && !systems.includes(task.system)) issues.push({ level: 'dangling', message: `${task.id} has a system not in systems.json: ${task.system}` });
+    // A closed record's slug is history: it says which contract the record
+    // answered, and nothing can be worked against it again. Requiring the file
+    // to survive forever is what makes a finished spec undeletable and
+    // `docs/specs/` a directory that can only grow.
+    if (task.spec !== null && !CLOSING_STATES.includes(task.state) && !specExists(task.spec)) issues.push({ level: 'dangling', message: `${task.id} references a spec with no file: ${task.spec}` });
     for (const file of task.files) {
       if (!existsSync(pathOf(file))) issues.push({ level: 'warning', message: `${task.id} lists a file that no longer exists: ${file}` });
     }
   }
 
-  for (const cycle of dependencyCycles(tasks)) issues.push({ level: 'error', message: `dependency cycle: ${cycle.join(' -> ')}` });
+  for (const cycle of dependencyCycles(tasks)) issues.push({ level: 'dangling', message: `dependency cycle: ${cycle.join(' -> ')}` });
 
   return issues;
 }

@@ -7,22 +7,59 @@ import { defaultStoreGitFixture, fixture, installDataGit, runInProcess, spawnTas
 import { realDefaultStoreGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
-  it('doctor reports an inconsistent store and still exits zero, because no disagreement may fail a build', () => {
+  it('doctor reports a record disagreeing with itself and still exits zero, because no disagreement about the work may fail a build', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'fine', '--system', 'Runtime');
       const clean = tasks('doctor');
       expect(clean.status).toBe(0);
       expect(clean.stdout).toContain('0 error(s)');
 
-      writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'open', severity: null, system: 'Nonexistent', spec: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null })}\n`, 'utf8');
+      writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'declined', severity: null, system: null, spec: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null })}\n`, 'utf8');
       const inconsistent = tasks('doctor');
       expect(inconsistent.status).toBe(0);
       expect(inconsistent.stdout).toContain('reported, not enforced');
-      expect(inconsistent.stdout).toContain('[error] a has a system not in systems.json: Nonexistent');
+      expect(inconsistent.stdout).toContain('[error] a is declined but has no reason');
     });
   });
 
-  it('doctor exits non-zero on exactly one condition: a store that will not parse', () => {
+  it('doctor exits non-zero on a reference that resolves to nothing, which is the one thing about the store a machine can check', () => {
+    fixture(({ tasks, dir }) => {
+      writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'open', severity: null, system: 'Nonexistent', spec: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null })}\n`, 'utf8');
+      const result = tasks('doctor');
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain('[dangling] a has a system not in systems.json: Nonexistent');
+      expect(result.stdout).toContain('1 dangling reference(s)');
+      expect(result.stderr).toContain('resolve to nothing');
+    });
+  });
+
+  it('a closed record keeps its spec slug after the spec file is deleted, so a finished spec can retire', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      tasks('done', 'a-member');
+      rmSync(path.join(dir, 'specs', 'demo-spec.md'));
+
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('references a spec with no file');
+      expect(tasks('show', 'a-member').stdout).toContain('spec: demo-spec');
+    });
+  });
+
+  it('a live record naming a spec with no file is a dangling reference, and `spec remove` detaches it without the file', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      rmSync(path.join(dir, 'specs', 'demo-spec.md'));
+      expect(tasks('doctor').status).toBe(1);
+
+      const removed = tasks('spec', 'remove', 'demo-spec', 'a-member');
+      expect(removed.status).toBe(0);
+      expect(removed.stdout).toContain('detaching them is what this is for');
+      expect(tasks('doctor').status).toBe(0);
+    });
+  });
+
+  it('doctor exits non-zero on a store that will not parse, which a later write would delete rather than disagree with', () => {
     fixture(({ tasks, dir }) => {
       const store = path.join(dir, 'tasks.jsonl');
       tasks('add', 'fine');
@@ -31,7 +68,7 @@ describe('tasks CLI', () => {
       const result = tasks('doctor');
       expect(result.status).toBe(1);
       expect(result.stdout).toContain('1 unparseable line(s)');
-      expect(result.stderr).toContain('the only condition doctor fails on');
+      expect(result.stderr).toContain('does not parse');
     });
   });
 
@@ -50,13 +87,15 @@ describe('tasks CLI', () => {
       expect(readFileSync(store, 'utf8')).toContain('2026-08-01');
 
       const fixed = tasks('doctor', '--fix');
-      expect(fixed.status).toBe(0);
+      // Non-zero for the unresolved requirement it repaired nothing about,
+      // never for the close date it did.
+      expect(fixed.status).toBe(1);
       expect(fixed.stdout).toContain('repaired 1:');
       expect(fixed.stdout).toContain('reopened is open: cleared its close date (2026-08-01)');
       expect(readFileSync(store, 'utf8')).not.toContain('2026-08-01');
       // The unresolved requirement is reported by both runs and repaired by
       // neither: dropping the edge and creating the task are both defensible.
-      expect(fixed.stdout).toContain('[error] reopened requires unresolved id: ghost');
+      expect(fixed.stdout).toContain('[dangling] reopened requires unresolved id: ghost');
     });
   });
 
@@ -218,7 +257,9 @@ describe('tasks CLI', () => {
       spawnSync('git', ['merge', 'side'], { cwd: dir, encoding: 'utf8' });
 
       const result = tasks('doctor');
-      expect(result.status).toBe(0);
+      // Non-zero for the unresolved requirement below, which is the point of
+      // the assertion after it: the store-only checks ran.
+      expect(result.status).toBe(1);
       expect(result.stdout).toContain('a merge is in progress (MERGE_HEAD exists)');
       expect(result.stdout).not.toContain('only in the working tree');
       // The store-only checks are the ones worth reading mid-merge, and the

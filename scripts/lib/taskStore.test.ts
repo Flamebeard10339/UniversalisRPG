@@ -1046,12 +1046,12 @@ describe('checkStore', () => {
 
   it('flags a duplicate id', () => {
     const issues = checkStore([task({ id: 'a' }), task({ id: 'a' })], systems, () => true);
-    expect(issues).toContainEqual({ level: 'error', message: 'duplicate id: a' });
+    expect(issues).toContainEqual({ level: 'dangling', message: 'duplicate id: a' });
   });
 
   it('flags an unresolved requires reference', () => {
     const issues = checkStore([task({ id: 'a', requires: ['ghost'] })], systems, () => true);
-    expect(issues).toContainEqual({ level: 'error', message: 'a requires unresolved id: ghost' });
+    expect(issues).toContainEqual({ level: 'dangling', message: 'a requires unresolved id: ghost' });
   });
 
   it('detects a dependency cycle exactly once', () => {
@@ -1091,12 +1091,12 @@ describe('checkStore', () => {
 
   it('flags a system not in systems.json', () => {
     const issues = checkStore([task({ id: 'a', system: 'Ghost system' })], systems, () => true);
-    expect(issues).toContainEqual({ level: 'error', message: 'a has a system not in systems.json: Ghost system' });
+    expect(issues).toContainEqual({ level: 'dangling', message: 'a has a system not in systems.json: Ghost system' });
   });
 
   it('flags a spec with no file', () => {
     const issues = checkStore([task({ id: 'a', spec: 'ghost-spec' })], systems, () => false);
-    expect(issues).toContainEqual({ level: 'error', message: 'a references a spec with no file: ghost-spec' });
+    expect(issues).toContainEqual({ level: 'dangling', message: 'a references a spec with no file: ghost-spec' });
   });
 
   it('warns, but does not error, on a file that no longer exists', () => {

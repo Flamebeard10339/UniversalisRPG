@@ -247,7 +247,7 @@ describe('tasks CLI', () => {
       // a task exactly as hard as a live requirement, and `next` is where
       // the difference has to be visible or nobody will look for it.
       expect(next).toContain('editable waits on ghost (missing)');
-      expect(tasks('doctor').stdout).toContain('[error] editable requires unresolved id: ghost');
+      expect(tasks('doctor').stdout).toContain('[dangling] editable requires unresolved id: ghost');
     });
   });
 
