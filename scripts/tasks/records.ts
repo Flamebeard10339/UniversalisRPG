@@ -9,6 +9,7 @@ import {
   coldClaims,
   createTask,
   DECIDERS,
+  departFromSpec,
   dependencyCycles,
   FAULTS,
   fixNowQueue,
@@ -518,6 +519,7 @@ function runList(args: Flags, text: string | undefined): void {
     system: flags.system,
     spec: flags.spec,
     deferred: flags.deferred === 'true',
+    unspecced: flags.unspecced === 'true',
     kind,
     text,
     triggered,
@@ -1000,7 +1002,7 @@ export function cmdDefer(args: Flags, usage: string): void {
   const defers: Array<{ task: Task; note: string }> = [];
   for (const task of resolved) {
     const notes = transition(task, 'open');
-    task.spec = null;
+    departFromSpec(task, 'retriage');
     defers.push({ task, note: ['deferred: opened outside every spec', ...notes].join('; ') });
     console.log(`deferred ${task.id}`);
     for (const note of notes) console.log(note);
@@ -1025,10 +1027,10 @@ export function cmdRetriage(args: Flags, usage: string): void {
   const tasks = loadStore(config.storePath);
   const resolved = resolveTaskIds(args.positional, tasks);
   if (resolved === null) return;
-  const deferred = new Set(listQueue(tasks, { deferred: true }).map((task) => task.id));
+  const departed = new Set(listQueue(tasks, { unspecced: true }).map((task) => task.id));
   for (const task of resolved) {
-    if (!deferred.has(task.id)) {
-      console.error(`error: ${task.id} is ${task.state}${task.spec ? `, spec ${task.spec}` : ''} — retriage only routes a deferred record (open, no spec) back to the unreviewed queue. Nothing was retriaged`);
+    if (!departed.has(task.id)) {
+      console.error(`error: ${task.id} is ${task.state}${task.spec ? `, spec ${task.spec}` : ''} — retriage only routes a record that left every spec (open, no spec) back to the unreviewed queue. Nothing was retriaged`);
       process.exitCode = 1;
       return;
     }

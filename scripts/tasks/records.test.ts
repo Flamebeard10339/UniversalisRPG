@@ -27,7 +27,9 @@ describe('tasks CLI', () => {
       tasks('add', 'checkSave crashes', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--spec', 'demo-spec', '--deliverable', 'loadSave refuses the malformed body instead of throwing');
       const shown = tasks('show', 'checksave-crashes');
       expect(shown.stdout).toContain('[finding/unreviewed/high]');
-      expect(shown.stdout).toContain('spec: (deferred)');
+      // Never a member, not a departure — a distinct render from one that
+      // left a spec, which is the property this branch exists to establish.
+      expect(shown.stdout).toContain('spec: (no spec)');
     });
   });
 
@@ -757,13 +759,34 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('list --deferred shows only open tasks with no spec, unreachable by any other verb', () => {
+  // A plain `tasks add` with no `--spec` never joined one, so it is not a
+  // departure and `--deferred` does not answer for it; `spec done
+  // --defer-open` sweeps a straggler out `unmet`, a checked-and-failed
+  // record `--deferred` must not report as the scope decision it is not.
+  // Both stay reachable by the plain queue, which neither flag hides them
+  // from.
+  it('list --deferred answers only the scope decision, not a record that never had a spec or one swept out unmet', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'deferred task', '--id', 'deferred-task');
-      tasks('add', 'fix now task', '--id', 'fix-now-task', '--spec', 'demo-spec');
+      tasks('add', 'never specced', '--id', 'never-specced');
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      tasks('spec', 'done', 'demo-spec', '--defer-open');
       const result = tasks('list', '--deferred');
-      expect(result.stdout).toContain('deferred-task');
-      expect(result.stdout).not.toContain('fix-now-task');
+      expect(result.stdout).not.toContain('never-specced');
+      expect(result.stdout).not.toContain('a-member');
+      const plain = tasks('list').stdout;
+      expect(plain).toContain('never-specced');
+      expect(plain).toContain('a-member');
+    });
+  });
+
+  it('list --unspecced keeps every open task naming no spec, unlike the narrower --deferred', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'never specced', '--id', 'never-specced');
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      tasks('spec', 'done', 'demo-spec', '--defer-open');
+      const result = tasks('list', '--unspecced');
+      expect(result.stdout).toContain('never-specced');
+      expect(result.stdout).toContain('a-member');
     });
   });
 
@@ -1380,7 +1403,7 @@ describe('a move never strands a question', () => {
       const result = tasks('defer', 'needs-context');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('warning: this record has a live, unanswered question');
-      expect(tasks('show', 'needs-context').stdout).toContain('spec: (deferred)');
+      expect(tasks('show', 'needs-context').stdout).toContain('spec: (retriage)');
     });
   });
 
@@ -1441,7 +1464,7 @@ describe('a move never strands a question', () => {
       fixture(({ tasks }) => {
         tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--fault', 'tooling', '--severity', 'medium', '--deliverable', 'fix it');
         tasks('defer', 'defer-me');
-        expect(tasks('show', 'defer-me').stdout).toContain('spec: (deferred)');
+        expect(tasks('show', 'defer-me').stdout).toContain('spec: (retriage)');
         const result = tasks('retriage', 'defer-me');
         expect(result.status).toBe(0);
         expect(tasks('show', 'defer-me').stdout).toContain('[finding/unreviewed');
@@ -1454,7 +1477,7 @@ describe('a move never strands a question', () => {
         tasks('add', 'still open', '--id', 'still-open', '--spec', 'demo-spec');
         const result = tasks('retriage', 'still-open');
         expect(result.status).toBe(1);
-        expect(result.stderr).toContain('retriage only routes a deferred record');
+        expect(result.stderr).toContain('retriage only routes a record that left every spec');
         expect(result.stderr).toContain('is open, spec demo-spec');
       });
     });
@@ -1474,7 +1497,7 @@ describe('a move never strands a question', () => {
         tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
         tasks('ask', 'needs-context', '--question', 'which universe?');
         tasks('defer', 'needs-context');
-        expect(tasks('show', 'needs-context').stdout).toContain('spec: (deferred)');
+        expect(tasks('show', 'needs-context').stdout).toContain('spec: (retriage)');
         const result = tasks('retriage', 'needs-context');
         expect(result.status).toBe(0);
         expect(tasks('show', 'needs-context').stdout).toContain('[finding/unreviewed');

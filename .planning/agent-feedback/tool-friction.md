@@ -1503,3 +1503,29 @@ script normally would) cost one wasted round trip. Total audit cost: one merge-r
 a real-but-unrelated flake (two spawn-heavy tests timing out under full-suite contention, already
 filed as `npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s`) and cleared on re-run with no
 code changes — confirms that finding is about suite contention, not about this branch.
+
+
+## 2026-08-08 — auditing dropped-and-failed-clauses-differ, pass 1
+
+Reading `audit.ts:490-527` side by side with `git show <base>:scripts/tasks/audit.ts` was enough
+to see c4's duplicate-guard bug by eye (the guard keys on `task.id === baseId`, unconditional on
+`task.state`, and runs before the branch that would set the deferred shape), but I did not trust a
+read-only verdict for a HIGH-adjacent finding on a clause I was about to grade unmet, so I wrote two
+disposable `*.test.ts` files reusing `cliFixtures.ts`'s `fixture`/`audit` helpers — one driving
+`cmdAudit` through an unmet-then-deferred pass pair on the same clause, one driving `cmdSpecRemove`
+against an id that was never a member of the named spec but already carried a different departure —
+ran each with `npx vitest run <file> --reporter=verbose --no-file-parallelism` to see the
+`console.log` dumps (default reporter swallows stdout; `--reporter=verbose` does not, and matters
+more than any other flag here), and deleted both immediately after reading the output. Neither
+repro needed more than 15 lines. This is the shape `npm run inspect` is supposedly for
+("evaluates against the repo's own module resolution and leaves no file behind"), but `inspect`
+takes a bare expression, not an async fixture callback with CLI subprocess-style assertions on
+stdout across two sequential calls — reproducing this class of "does route A's write survive route
+B's read" bug needs the fixture harness itself, so a scratch test file wired to `cliFixtures` was
+the right tool despite the instinct to reach for `inspect` first. The two mutation-manifest runs
+(`npm run mutate`) that followed, by contrast, were exactly on-rails: three clauses, three
+one-line reversions, three clean KILLED verdicts, no back-and-forth. Total pass: a little over
+two hours wall clock, most of it in the two hand-built repros and reading every non-membership
+`spec === null` call site by hand for c1 (17 sites, one file at a time — a `tasks where`-style verb
+that classified a call site as "membership test" vs "reason-mapping" automatically would have cut
+that part to a couple of minutes).

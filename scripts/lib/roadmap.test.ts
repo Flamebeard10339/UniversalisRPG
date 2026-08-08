@@ -11,6 +11,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     severity: null,
     system: null,
     spec: null,
+    departure: null,
     clause: null,
     discharges: [],
     requires: [],
@@ -78,10 +79,13 @@ describe('roadmapView', () => {
     expect(view.counts.ready).toBe(1);
   });
 
-  it('leaves the deferred filter meaning what its other callers mean by it', () => {
-    const tasks = [task({ id: 'specced', spec: 'a-branch' }), task({ id: 'unspecced' })];
-    expect(listQueue(tasks, { deferred: true }).map((entry) => entry.id)).toEqual(['unspecced']);
-    expect(ids(roadmapView(tasks, noSpecFiles).topics)).toEqual(['unspecced']);
+  it('backs its topics with the unspecced filter, not the narrower deferred one — a record with no spec belongs here whatever the reason', () => {
+    const tasks = [task({ id: 'specced', spec: 'a-branch' }), task({ id: 'never-specced' }), task({ id: 'swept-out-unmet', departure: 'unmet' })];
+    expect(listQueue(tasks, { unspecced: true }).map((entry) => entry.id).sort()).toEqual(['never-specced', 'swept-out-unmet']);
+    expect(ids(roadmapView(tasks, noSpecFiles).topics).sort()).toEqual(['never-specced', 'swept-out-unmet']);
+    // `--deferred` answers a narrower question the roadmap does not ask: only
+    // a scope decision, never a clause the branch checked and failed.
+    expect(listQueue(tasks, { deferred: true })).toEqual([]);
   });
 
   it('sorts live work into named states rather than calling undecided work ready', () => {

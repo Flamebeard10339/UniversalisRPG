@@ -9,6 +9,12 @@ export type Grant = 'forecast' | 'commitment';
 // count of defects must not include it.
 export type Fault = 'tooling' | 'contract' | 'nobody';
 export type Decider = 'worker' | 'planner' | 'author';
+// Why a record's `spec` is null, for the one case that is not simply "never
+// a member": `deferred` is a scope decision made against a graded clause,
+// goal still served; `unmet` is a clause `spec done --defer-open` swept out
+// still failing; `retriage` is a manual pull — triage's `defer`, `spec
+// remove` — that makes no claim about pass or fail at all.
+export type Departure = 'deferred' | 'unmet' | 'retriage';
 
 export interface Source {
   spec: string;
@@ -30,6 +36,10 @@ export interface Task {
   severity: Severity | null;
   system: string | null;
   spec: string | null;
+  // Null while `spec` is non-null. Set together with `spec` by whichever
+  // route takes a record out of one — never inferred by a reader from `spec`
+  // being null, which is also the state of a record that never joined one.
+  departure: Departure | null;
   // The clause this record *is*: an `undelivered` member is a spec's own
   // outstanding promise on one clause, and nothing else carries it.
   clause: number | null;
@@ -90,6 +100,7 @@ export const STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'de
 export const GRANTS: Grant[] = ['forecast', 'commitment'];
 export const FAULTS: Fault[] = ['tooling', 'contract', 'nobody'];
 export const DECIDERS: Decider[] = ['worker', 'planner', 'author'];
+export const DEPARTURES: Departure[] = ['deferred', 'unmet', 'retriage'];
 const SEVERITIES: Severity[] = ['high', 'medium', 'low'];
 
 // The kinds that report what working the process cost. A `task` is planned
@@ -163,6 +174,7 @@ const KNOWN_KEYS: ReadonlyArray<keyof KnownFields> = Object.keys({
   severity: true,
   system: true,
   spec: true,
+  departure: true,
   clause: true,
   discharges: true,
   requires: true,
@@ -227,6 +239,12 @@ function normalizeTask(value: unknown, where: string): Task {
   const decider = value.decider ?? null;
   if (decider !== null && (typeof decider !== 'string' || !DECIDERS.includes(decider as Decider))) throw new StoreError(`${where}: task ${JSON.stringify(id)} has invalid decider: ${String(decider)}`);
 
+  // Absent is every record written before this field existed, or one that
+  // has never left a spec — both read the same as "not recorded", which is
+  // what null already means for a field the store learns to carry mid-flight.
+  const departure = value.departure ?? null;
+  if (departure !== null && (typeof departure !== 'string' || !DEPARTURES.includes(departure as Departure))) throw new StoreError(`${where}: task ${JSON.stringify(id)} has invalid departure: ${String(departure)}`);
+
   return {
     id,
     seq,
@@ -236,6 +254,7 @@ function normalizeTask(value: unknown, where: string): Task {
     severity: severity as Severity | null,
     system: nullableString(value, 'system', where),
     spec: nullableString(value, 'spec', where),
+    departure: departure as Departure | null,
     clause,
     discharges: optionalNumberArray(value, 'discharges', where),
     requires: stringArray(value, 'requires', where),
@@ -273,6 +292,7 @@ function renderTask(task: Task): string {
     severity: task.severity,
     system: task.system,
     spec: task.spec,
+    departure: task.departure,
     clause: task.clause,
     discharges: task.discharges,
     requires: task.requires,
@@ -332,6 +352,7 @@ export function createTask(record: NewRecord, draft: Draft = {}): Task {
     severity: null,
     system: null,
     spec: null,
+    departure: null,
     clause: null,
     discharges: [],
     requires: [],
@@ -353,6 +374,14 @@ export function createTask(record: NewRecord, draft: Draft = {}): Task {
     extra: null,
     ...draft,
   };
+}
+
+// The one route that takes an existing record out of a spec. `spec` and
+// `departure` change together because a caller able to set one without the
+// other is exactly the confusion this pair of fields exists to rule out.
+export function departFromSpec(task: Task, reason: Departure): void {
+  task.spec = null;
+  task.departure = reason;
 }
 
 export type Resolved<T> = { value: T } | { error: string };
@@ -585,6 +614,10 @@ export interface ListFilter {
   system?: string;
   spec?: string;
   deferred?: boolean;
+  // Every open task naming no spec, whatever the reason — the roadmap's own
+  // backlog question, and a different one from `deferred`'s scope-decision
+  // reading: a record `--defer-open` swept out unmet is unspecced too.
+  unspecced?: boolean;
   kind?: Kind;
   text?: string;
   // A declined record carrying a trigger: the store's shape for "revisit
@@ -650,7 +683,12 @@ export function listQueue(tasks: Task[], filter: ListFilter = {}): Task[] {
     .filter((task) => filter.severity === undefined || task.severity === filter.severity)
     .filter((task) => filter.system === undefined || task.system === filter.system)
     .filter((task) => filter.spec === undefined || task.spec === filter.spec)
-    .filter((task) => !filter.deferred || (task.state === 'open' && task.spec === null))
+    // `deferred` here means the scope decision, read from `departure` rather
+    // than inferred from `spec` being null — a record `--defer-open` swept
+    // out still failing carries `departure: 'unmet'` and is reachable by a
+    // plain `tasks list`, but is not what this flag answers.
+    .filter((task) => !filter.deferred || (task.state === 'open' && task.departure === 'deferred'))
+    .filter((task) => !filter.unspecced || (task.state === 'open' && task.spec === null))
     .filter((task) => filter.kind === undefined || task.kind === filter.kind)
     .filter((task) => filter.text === undefined || matchesSearchTerm(SEARCHABLE(task), filter.text))
     .filter((task) => !filter.triggered || (task.state === 'declined' && task.trigger !== null))

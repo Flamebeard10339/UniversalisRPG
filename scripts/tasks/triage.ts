@@ -1,5 +1,5 @@
 import type { Task } from '../lib/taskStore';
-import { loadStore, unreviewedQueue } from '../lib/taskStore';
+import { departFromSpec, loadStore, unreviewedQueue } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { recordEvents, resolveActiveSpec, resolveConfig, saveStoreAndWarn, subjectOf, today, type Config } from './context';
 import { pass2Promotion, printDecisionPrompt, transition, writeAskedQuestion } from './records';
@@ -48,7 +48,7 @@ async function runPromote({ task, spec }: TriageContext): Promise<TriageResult> 
 
 async function runDefer({ task }: TriageContext): Promise<TriageResult> {
   const notes = transition(task, 'open');
-  task.spec = null;
+  departFromSpec(task, 'retriage');
   for (const note of notes) console.log(note);
   return { decision: ['deferred: opened outside every spec', ...notes].join('; ') };
 }

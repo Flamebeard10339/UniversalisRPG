@@ -46,6 +46,14 @@ function proseLines(label: string, text: string): string[] {
   return [...wrapUnder(first, `${label}: `), ...rest.flatMap((line) => wrapUnder(line, hanging))].map((line) => line.trimEnd());
 }
 
+// `spec: null` alone does not say why — `departure` does, for the one case
+// that is not simply "never joined a spec". A reader wanting a reason reads
+// that field; nothing here guesses one from the absence.
+function specLine(task: Task): string {
+  if (task.spec !== null) return `spec: ${task.spec}`;
+  return `spec: ${task.departure === null ? '(no spec)' : `(${task.departure})`}`;
+}
+
 // The one rendering of a task, at the three verbosities anything asking for
 // one has ever needed: a `row` for a queue or a member list, a `brief`
 // record whose prose is summarized, and the `full` record. Every command
@@ -72,7 +80,7 @@ export function renderTask(task: Task, byId: Map<string, Task>, detail: Detail, 
   const prose = detail === 'full' ? (text: string): string => text : summarize;
   const lines = [`${task.id}  [${taskTag(task)}]${blocked}${decider}`, task.title];
   if (task.system) lines.push(`system: ${task.system}`);
-  lines.push(`spec: ${task.spec ?? '(deferred)'}`);
+  lines.push(specLine(task));
   if (task.fault) lines.push(`fault: ${task.fault}`);
   if (task.discharges.length > 0) lines.push(`discharges: ${task.discharges.map((clause) => `c${clause}`).join(', ')}`);
   if (task.requires.length > 0) lines.push(requiresLine(task, byId));

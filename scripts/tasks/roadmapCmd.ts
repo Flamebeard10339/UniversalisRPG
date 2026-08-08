@@ -158,7 +158,7 @@ function topicLines(view: RoadmapView): string[] {
     `UNSPECCED — ${view.topics.length} topic(s) no spec has decided; each wants a planner`,
     '',
     ...shown.flatMap((entry) => [...entryRow(entry), ...tree(ENTRY_INDENT, [blockerText(entry.waitsOn), ...waiterNotes(entry.unblocks)])]),
-    ...truncationNote(view.topics.length, shown.length, '`tasks list --deferred --kind task`'),
+    ...truncationNote(view.topics.length, shown.length, '`tasks list --unspecced --kind task`'),
   ];
 }
 
@@ -170,7 +170,7 @@ function blockedLines(view: RoadmapView): string[] {
     `BLOCKED — ${view.blocked.length} unspecced task(s)${inSpec > 0 ? `; the other ${inSpec} sit in a spec above` : ''}`,
     '',
     ...shown.flatMap((entry) => wrapUnder(blockerText(entry.waitsOn), `  ${column(entry.task.id, BLOCKED_ID_COLUMN)}`, ' '.repeat(2 + BLOCKED_ID_COLUMN))),
-    ...truncationNote(view.blocked.length, shown.length, '`tasks list --deferred --kind task`'),
+    ...truncationNote(view.blocked.length, shown.length, '`tasks list --unspecced --kind task`'),
   ];
 }
 

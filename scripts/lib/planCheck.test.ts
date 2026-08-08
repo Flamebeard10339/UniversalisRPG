@@ -12,6 +12,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     severity: null,
     system: null,
     spec: null,
+    departure: null,
     clause: null,
     discharges: [],
     requires: [],

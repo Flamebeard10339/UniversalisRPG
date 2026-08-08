@@ -15,6 +15,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     severity: null,
     system: null,
     spec: null,
+    departure: null,
     clause: null,
     discharges: [],
     requires: [],
@@ -132,6 +133,7 @@ describe('loadStore / saveStore', () => {
           severity: null,
           system: null,
           spec: null,
+          departure: null,
           clause: null,
           discharges: [],
           requires: [],
@@ -236,7 +238,7 @@ describe('loadStore / saveStore', () => {
 
       saveStore(loadStore(file), file);
       const line = readFileSync(file, 'utf8').trim();
-      const canonicalKeys = ['id', 'seq', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'discharges', 'requires', 'files', 'writes', 'grant', 'fault', 'decider', 'produces', 'deliverable', 'evidence', 'source', 'reason', 'trigger', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
+      const canonicalKeys = ['id', 'seq', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'departure', 'clause', 'discharges', 'requires', 'files', 'writes', 'grant', 'fault', 'decider', 'produces', 'deliverable', 'evidence', 'source', 'reason', 'trigger', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
       const keys = Object.keys(JSON.parse(line));
       expect(keys.slice(0, canonicalKeys.length)).toEqual(canonicalKeys);
       expect(keys.slice(canonicalKeys.length)).toEqual(['aField', 'mField', 'zField']);
@@ -899,13 +901,30 @@ describe('listQueue', () => {
     expect(listQueue(tasks, { kind: 'finding' }).map((t) => t.id)).toEqual(['b']);
   });
 
-  it('--deferred keeps only state:open tasks with no spec', () => {
+  it('--deferred keeps only state:open tasks departed as a scope decision, not one merely never joined or swept out unmet', () => {
     const tasks = [
-      task({ id: 'deferred', state: 'open', spec: null }),
+      task({ id: 'deferred', state: 'open', spec: null, departure: 'deferred' }),
+      task({ id: 'fix-now', state: 'open', spec: 's' }),
+      task({ id: 'unreviewed', state: 'unreviewed', spec: null, departure: 'deferred' }),
+      task({ id: 'never-in-a-spec', state: 'open', spec: null, departure: null }),
+      task({ id: 'swept-out-unmet', state: 'open', spec: null, departure: 'unmet' }),
+      task({ id: 'retriaged', state: 'open', spec: null, departure: 'retriage' }),
+    ];
+    expect(listQueue(tasks, { deferred: true }).map((t) => t.id)).toEqual(['deferred']);
+    // Not lost: still findable by the plain queue, same as before.
+    expect(listQueue(tasks).map((t) => t.id)).toContain('swept-out-unmet');
+  });
+
+  it('--unspecced keeps every open task naming no spec, whatever the departure reason — the roadmap backlog question', () => {
+    const tasks = [
+      task({ id: 'deferred', state: 'open', spec: null, departure: 'deferred' }),
+      task({ id: 'swept-out-unmet', state: 'open', spec: null, departure: 'unmet' }),
+      task({ id: 'retriaged', state: 'open', spec: null, departure: 'retriage' }),
+      task({ id: 'never-in-a-spec', state: 'open', spec: null, departure: null }),
       task({ id: 'fix-now', state: 'open', spec: 's' }),
       task({ id: 'unreviewed', state: 'unreviewed', spec: null }),
     ];
-    expect(listQueue(tasks, { deferred: true }).map((t) => t.id)).toEqual(['deferred']);
+    expect(listQueue(tasks, { unspecced: true }).map((t) => t.id).sort()).toEqual(['deferred', 'never-in-a-spec', 'retriaged', 'swept-out-unmet']);
   });
 
   // A trigger's whole point is a declined record, which the not-closed
