@@ -30,7 +30,7 @@ describe('checkCommitMessage', () => {
 
 const manifest: Manifest = {
   unowned: { note: '', paths: ['docs', '*.md'] },
-  systems: [{ name: 'Runtime', paths: ['src/runtime'], lastAudit: null, lastAuditDoc: null, note: null, concepts: [] }],
+  systems: [{ name: 'Runtime', paths: ['src/runtime'], covers: [], lastAudit: null, lastAuditDoc: null, note: null, concepts: [] }],
 };
 
 describe('isExempt', () => {

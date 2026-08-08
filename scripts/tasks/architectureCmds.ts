@@ -403,7 +403,12 @@ export function cmdConcept(args: Flags, usage: string): void {
   system.concepts = [...(system.concepts ?? []), { name, paths, note: args.flags.note ?? null }];
 
   const candidate = parseManifest(JSON.stringify(raw), config.systemsPath);
-  const blocking = checkManifest(candidate).filter((issue) => issue.level === 'error');
+  // What this write introduced, not what the manifest already said. Blocking
+  // on every error made an unrelated standing one — a system still declaring
+  // a directory, say — refuse a registration that has nothing to do with it,
+  // and the caller cannot fix a manifest by registering nothing.
+  const standing = new Set(checkManifest(manifest).map((issue) => issue.message));
+  const blocking = checkManifest(candidate).filter((issue) => issue.level === 'error' && !standing.has(issue.message));
   if (blocking.length > 0) {
     for (const issue of blocking) console.error(`error: ${issue.message}`);
     process.exitCode = 1;

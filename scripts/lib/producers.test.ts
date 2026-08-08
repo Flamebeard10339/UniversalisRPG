@@ -41,8 +41,8 @@ function task(id: string, produces: string[], state: Task['state'] = 'done', pat
 const manifest: Manifest = {
   unowned: { note: '', paths: [] },
   systems: [
-    { name: 'Runtime', paths: ['src/runtime'], lastAudit: null, lastAuditDoc: null, note: null, concepts: [{ name: 'buff engine', paths: ['src/runtime/buffs.ts'], note: 'from a produces claim' }] },
-    { name: 'Grammar', paths: ['src/grammar'], lastAudit: null, lastAuditDoc: null, note: null, concepts: [] },
+    { name: 'Runtime', paths: ['src/runtime'], covers: [], lastAudit: null, lastAuditDoc: null, note: null, concepts: [{ name: 'buff engine', paths: ['src/runtime/buffs.ts'], note: 'from a produces claim' }] },
+    { name: 'Grammar', paths: ['src/grammar'], covers: [], lastAudit: null, lastAuditDoc: null, note: null, concepts: [] },
   ],
 };
 

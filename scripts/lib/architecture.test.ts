@@ -4,7 +4,7 @@ import { deriveModules, exportedNames, regionView, repoSourceTree, resolveImport
 import type { Concept, Manifest, System } from './systems';
 
 function system(name: string, paths: string[], concepts: Concept[] = []): System {
-  return { name, paths, lastAudit: null, lastAuditDoc: null, note: null, concepts };
+  return { name, paths, covers: [], lastAudit: null, lastAuditDoc: null, note: null, concepts };
 }
 
 function tree(files: Record<string, string>): SourceTree {
