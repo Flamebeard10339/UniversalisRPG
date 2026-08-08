@@ -1,6 +1,6 @@
 import type { TaskEvent } from './eventLog';
 import { allConcepts, canonicalPath, pathsOverlap, type Concept, type Manifest } from './systems';
-import { seqRank, type State, type Task } from './taskStore';
+import { oldestFirst, type State, type Task } from './taskStore';
 
 // "Does anything already do this?" — the question a worker is supposed to ask
 // before building, and the one the store could not answer. `produces` has
@@ -153,7 +153,7 @@ export function priorArt(manifest: Manifest, tasks: Task[], paths: string[]): Pr
   const claims = tasks
     .map((task) => ({ task, on: pathMatches(task, queries) }))
     .filter((entry) => entry.on.length > 0)
-    .sort((a, b) => STATE_RANK[a.task.state] - STATE_RANK[b.task.state] || seqRank(a.task.seq) - seqRank(b.task.seq));
+    .sort((a, b) => STATE_RANK[a.task.state] - STATE_RANK[b.task.state] || oldestFirst(a.task, b.task));
 
   const concepts = allConcepts(manifest)
     .map(({ system, concept }) => ({ system: system.name, concept, on: queries.filter((query) => concept.paths.some((path) => pathsOverlap(path, query))) }))

@@ -600,6 +600,13 @@ export const severityRank = (severity: Severity | null): number => (severity ===
 // happened to land at in its own branch's file.
 export const seqRank = (seq: number | null): number => (seq === null ? Number.POSITIVE_INFINITY : seq);
 
+// `seq` alone does not order a queue, because `nextSeq` is max+1 over what
+// one branch can see and two branches cannot see each other: 39 values are
+// shared by 104 of the store's 792 records. Where it ties, id decides —
+// arbitrary, but the same arbitrary answer from every checkout and whatever
+// order the store was read in, which is the only property a queue needs here.
+export const oldestFirst = (a: Task, b: Task): number => seqRank(a.seq) - seqRank(b.seq) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
 export type RequirementStatus = 'waiting' | 'done' | 'declined' | 'missing';
 
 export interface RequirementState {
@@ -657,7 +664,7 @@ export function fixNowQueue(tasks: Task[], spec: string | null, filter: QueueFil
     .filter((task) => !isBlocked(task, byId))
     .filter((task) => filter.system === undefined || task.system === filter.system)
     .filter((task) => filter.severity === undefined || task.severity === filter.severity)
-    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || seqRank(a.seq) - seqRank(b.seq));
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || oldestFirst(a, b));
 }
 
 // The queue fixNowQueue cannot answer for: an in-progress record is held,
@@ -687,7 +694,7 @@ export function unreviewedFiledBy(tasks: Task[], spec: string): Task[] {
 export function unreviewedQueue(tasks: Task[]): Task[] {
   return tasks
     .filter((task) => task.state === 'unreviewed')
-    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || seqRank(a.seq) - seqRank(b.seq));
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || oldestFirst(a, b));
 }
 
 export interface ListFilter {
@@ -774,7 +781,7 @@ export function listQueue(tasks: Task[], filter: ListFilter = {}): Task[] {
     .filter((task) => filter.kind === undefined || task.kind === filter.kind)
     .filter((task) => filter.text === undefined || matchesSearchTerm(SEARCHABLE(task), filter.text))
     .filter((task) => !filter.triggered || (task.state === 'declined' && task.trigger !== null))
-    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || seqRank(a.seq) - seqRank(b.seq));
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || oldestFirst(a, b));
 }
 
 // An id that resolves to nothing is a guess that missed, and the guess is
@@ -799,7 +806,7 @@ export function nearMatches(query: string, tasks: Task[], limit = 5): Task[] {
       return { task, score };
     })
     .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score || seqRank(a.task.seq) - seqRank(b.task.seq))
+    .sort((a, b) => b.score - a.score || oldestFirst(a.task, b.task))
     .slice(0, limit)
     .map((entry) => entry.task);
 }

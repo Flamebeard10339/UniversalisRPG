@@ -6,9 +6,9 @@ import { fixNowQueue, listQueue, nearMatches, unreviewedQueue, type Task } from 
 
 // The property the-task-store-survives-parallel-branches exists to
 // establish, checked directly rather than by naming the sites that used to
-// violate it: once every task carries a distinct `seq`, no function in this
-// directory that orders a Task[] may answer differently depending on what
-// order the caller happened to build (or load) that array in. A function
+// violate it: no function in this directory that orders a Task[] may answer
+// differently depending on what order the caller happened to build (or load)
+// that array in — whatever `seq` the records carry, sharing one included. A function
 // that reads meaning out of array position — by any mechanism, an `.index`
 // tie-break, a position-keyed Map, or something not yet invented — fails
 // the moment its input is reversed, regardless of the shape the violation
@@ -60,13 +60,15 @@ const ids = (entries: Array<{ id: string }>): string[] => entries.map((entry) =>
 const noSpecFiles: ReadSpec = () => null;
 const emptyManifest: Manifest = { unowned: { note: '', paths: [] }, systems: [] };
 
-describe('order independence: every Task[] ordering function in scripts/lib, given seq', () => {
-  // Five tasks, distinct seq, everything else that could otherwise break a
-  // tie (severity, score, fan-out, state) held equal — so a function correct
-  // by this property is one where reversing the array cannot change the
-  // answer, and a function reading position instead of seq answers
-  // differently as soon as it does.
-  const base = Array.from({ length: 5 }, (_, i) => task({ id: `t-${i}`, seq: i + 1, severity: 'high' }));
+describe('order independence: every Task[] ordering function in scripts/lib', () => {
+  // Five tasks with everything that could otherwise break a tie (severity,
+  // score, fan-out, state) held equal, and the first three sharing one `seq`
+  // — the live store's shape, where 104 of 792 records share a value with
+  // another. A fixture giving every record a distinct `seq` states this
+  // property over data the store does not contain: `seq` is max+1 over what
+  // one branch can see, so two branches produce the same number by
+  // construction and no amount of care at the point of writing one avoids it.
+  const base = Array.from({ length: 5 }, (_, i) => task({ id: `t-${i}`, seq: i < 3 ? 1 : i + 1, severity: 'high' }));
 
   it('fixNowQueue', () => {
     const open = base.map((t) => ({ ...t, state: 'open' as const, spec: 's' }));
@@ -84,7 +86,7 @@ describe('order independence: every Task[] ordering function in scripts/lib, giv
   });
 
   it('nearMatches', () => {
-    const named = base.map((t) => ({ ...t, id: `shared-${t.seq}` }));
+    const named = base.map((t, i) => ({ ...t, id: `shared-${i}` }));
     expect(ids(nearMatches('shared', [...named].reverse()))).toEqual(ids(nearMatches('shared', named)));
   });
 
