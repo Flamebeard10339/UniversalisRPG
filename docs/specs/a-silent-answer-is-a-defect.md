@@ -84,6 +84,13 @@ only changes the sweep already reproduced and costed.
   comparison catches a concurrent `add` and misses a concurrent `edit`, which is the same class of
   defect one field over. The store module owns both the read and the write, so the whole
   read-modify-write window is inside it and the snapshot needs no caller to thread it through.
+- **The compare needs a lock, which the sweep's costing does not include.** Measured after
+  implementing exactly what §7.1's change 1 prescribes: five concurrent `tasks add`, three exiting 0
+  claiming success, one record lost. Comparing and then renaming is check-then-act — both writers
+  pass the comparison, then both rename, and the second silently replaces the first. The comparison
+  and the rename now happen together under an exclusive-create lock beside the store, held for the
+  microseconds they take and broken if a process died holding it. This is the one place the branch
+  is larger than the audit costed it, and the reason is a measurement rather than a preference.
 - **No declared flag table.** §7.1's change 5 prescribes "a declared arity table beside each usage
   string". That is refused, and the refusal is the audit's own §4.3 rule: a table beside 45 usage
   strings is a second artifact required to be manually kept in sync with the first, and the sweep's
