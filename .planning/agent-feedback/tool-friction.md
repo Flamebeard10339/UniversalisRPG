@@ -1507,3 +1507,27 @@ survived any of it. The one real gotcha: `suiteFilesFor`'s default `search` runs
 `npx vitest list --json` subprocess on first call and caches it module-globally, so the first
 corpus-wide `resolveTarget` call over 258 targets took noticeably longer than the rest; harmless once
 noticed, but worth knowing before assuming a slow `inspect` call is stuck.
+
+## `brief-builds-the-manifest` pass 2, 2026-08-08
+
+Same 354(now 358)-entry generated manifest, same shape as pass 1's own finding — which is already
+filed (`the-generated-mutation-manifest-expands-one-file-only-target`, unreviewed) and correctly not
+re-filed here. Went straight to a hand-built six-entry manifest at a scratch path (one per clause,
+aimed by reading the diff rather than guessing), which is exactly pass 1's own workaround; this time
+it cost about five minutes rather than ten, since pass 1's own evidence already named the five lines
+to aim at (`auditPrompt.ts:115`, `:162`, `:184`, `audit.ts:194`/`:347` for c4's two halves, `:252`).
+All six KILLED at their own named-test scope on the first `npm run mutate` run, zero escalation,
+about a minute of run time — the fastest a pass in this log has confirmed five clauses plus a c4
+re-check.
+
+The one thing worth naming: re-running pass 1's exact `npm run inspect` corpus-count one-liner
+against the current head reproduced its numbers exactly (258 total, 237 resolved, 21 omitted) with
+no edits needed to the expression — the ability to paste a prior pass's own reproduction command
+verbatim and get the same answer is the thing c1's evidence text claims for the *next* auditor, and
+it held for real rather than only in the prose. Nothing else cost a round this pass: c4's fix
+(commit c581de4) closes the gap pass 1 found precisely — title is now trimmed at the same assignment
+site the other two fields already were, and guarded the same way — and no next-neighbour instance
+of the pattern (an assembled field checked by truthiness rather than by a fixed set, left untrimmed)
+turned up in `system`/`fault`/`severity`, since `fault` and `severity` are both checked against an
+enum (`FAULTS.includes`, `['high','medium','low'].includes`) rather than by truthiness, so a
+whitespace value there is rejected on the merits rather than by accident.
