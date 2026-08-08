@@ -3,7 +3,7 @@ import * as git from '../lib/git';
 import { clauseStandings, parseSpecDoc } from '../lib/specDoc';
 import { findProducers, producerIndex } from '../lib/producers';
 import { canonicalPath, covers, loadManifest } from '../lib/systems';
-import { filterEvents, loadEvents, multilineNote } from '../lib/eventLog';
+import { filterEvents, loadEvents, noteProblem } from '../lib/eventLog';
 import {
   awaitsADecider,
   claimSummary,
@@ -299,9 +299,9 @@ export function cmdRecur(args: Flags, usage: string): void {
     process.exitCode = 1;
     return;
   }
-  const lines = multilineNote(note);
-  if (lines !== null) {
-    console.error(`error: an occurrence is one line — this one has ${lines}. Record what it cost here and leave the prose in the commit message`);
+  const problem = noteProblem('an occurrence', note);
+  if (problem !== null) {
+    console.error(`error: ${problem}`);
     process.exitCode = 1;
     return;
   }
@@ -349,9 +349,9 @@ export function cmdRemove(args: Flags, usage: string): void {
     process.exitCode = 1;
     return;
   }
-  const lines = multilineNote(reason);
-  if (lines !== null) {
-    console.error(`error: a removal's reason is one line — this one has ${lines}. Say why here and leave the prose in the commit message`);
+  const problem = noteProblem("a removal's reason", reason);
+  if (problem !== null) {
+    console.error(`error: ${problem}`);
     process.exitCode = 1;
     return;
   }
@@ -375,17 +375,16 @@ export function cmdRemove(args: Flags, usage: string): void {
     return;
   }
 
-  // Refused, because this is the one write that can manufacture the state
-  // `doctor` exits non-zero on. c1 and c2 gave the store a way out and c9, on
-  // the same branch, made a reference resolving to nothing a failure
-  // condition — so `remove` on a record something requires exited 0 saying
-  // "the record is gone and the log says so", and the next `merge-ready` was
-  // red for a reason the caller had already been told was a success. The
-  // holders are named because dropping the edge for them is a decision about
-  // their work, not about this one.
+  // Refused because removal is not reversible and a forward reference is.
+  // `edit --requires <an id nobody has filed yet>` reaches the same dangling
+  // state deliberately and says so, and the record it names may arrive later;
+  // deleting the far end of an edge that already resolves cannot be undone and
+  // has no such reading. So the asymmetry is the point, not an oversight.
+  // The holders are named rather than repaired because dropping the edge is a
+  // decision about their work, not about this one.
   const holders = tasks.filter((candidate) => candidate.requires.includes(task.id));
   if (holders.length > 0) {
-    console.error(`error: ${holders.length} record(s) require ${task.id}, and removing it would leave them pointing at nothing — which is the one store condition \`tasks doctor\` exits non-zero on: ${holders.map((candidate) => candidate.id).join(', ')}`);
+    console.error(`error: ${holders.length} record(s) require ${task.id}, and removing it would leave them pointing at nothing — a dangling reference, which \`tasks doctor\` exits non-zero on: ${holders.map((candidate) => candidate.id).join(', ')}`);
     console.error(`\`tasks edit <holder> --requires <the rest>\` drops the edge where it belongs, or \`tasks decline ${task.id} --reason "..."\` closes this record and leaves the history it holds up intact`);
     process.exitCode = 1;
     return;

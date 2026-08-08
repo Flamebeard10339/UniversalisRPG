@@ -1666,7 +1666,12 @@ describe('tasks remove', () => {
       expect(refused.stderr).toContain('2 record(s) require a-probe');
       expect(refused.stderr).toContain('real-work');
       expect(refused.stderr).toContain('also-real');
-      expect(refused.stderr).toContain('exits non-zero on');
+      // Names the condition, and does not count doctor's conditions. This line
+      // was written by the c5 repair and said "the one store condition doctor
+      // exits non-zero on" — reintroducing, in new user-facing output, the
+      // census that repair existed to delete.
+      expect(refused.stderr).toContain('a dangling reference, which `tasks doctor` exits non-zero on');
+      expect(refused.stderr).not.toMatch(/the (one|only) (store )?condition/);
       expect(refused.stderr).toContain('tasks edit <holder> --requires');
       // Writes nothing: the record stays and no removal is filed.
       expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).toContain('a-probe');

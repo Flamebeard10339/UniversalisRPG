@@ -426,3 +426,50 @@ describe('a refusal that names the near miss', () => {
     });
   });
 });
+
+// [auditor/next-neighbour]. Pass 2 found `tasks remove --reason "   "` filing a
+// removal whose reason explained nothing, which the reconciliation then counted
+// as accounted for. Four verbs write a note into the event log and all four had
+// the same hole, because each applied the one-line half by hand and none
+// applied this one — a space is truthy, so the truthiness test every caller
+// runs first cannot see it. Swept rather than fixed at the reproduction.
+describe('every verb that writes a note refuses one that renders as nothing', () => {
+  const blank = '   ';
+
+  it('refuses it on each of the four, and writes neither the store nor the log', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a record', '--id', 'a-rec');
+      const before = readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8');
+      const logBefore = readFileSync(path.join(dir, 'events.jsonl'), 'utf8');
+
+      const refusals = [
+        tasks('remove', 'a-rec', '--reason', blank),
+        tasks('recur', 'a-rec', '--note', blank),
+        tasks('note', blank, '--id', 'a-rec'),
+        tasks('checked', 'worker/mutation-proof', '--note', blank),
+      ];
+      for (const refused of refusals) {
+        expect(refused.status, refused.stdout + refused.stderr).toBe(1);
+        expect(refused.stderr).toContain('renders as nothing');
+      }
+
+      // Nothing moved: a refusal that had already written the event would make
+      // the blank explanation exactly as permanent as accepting it.
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).toBe(before);
+      expect(readFileSync(path.join(dir, 'events.jsonl'), 'utf8')).toBe(logBefore);
+    });
+  });
+
+  it('still accepts an ugly note on each of the four, so the guard is not a ban on the verb', () => {
+    fixture(({ tasks }) => {
+      // A finding, because `recur` counts occurrences only against a record
+      // that reports what the work cost — an unrelated refusal that would
+      // otherwise be mistaken for this guard firing.
+      tasks('add', 'a friction', '--id', 'a-rec', '--kind', 'finding', '--fault', 'tooling', '--severity', 'low', '--deliverable', 'fix it');
+      expect(tasks('recur', 'a-rec', '--note', '.').status).toBe(0);
+      expect(tasks('note', '.', '--id', 'a-rec').status).toBe(0);
+      expect(tasks('checked', 'worker/mutation-proof', '--note', '.').status).toBe(0);
+      expect(tasks('remove', 'a-rec', '--reason', '.').status).toBe(0);
+    });
+  });
+});

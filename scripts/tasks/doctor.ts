@@ -65,8 +65,8 @@ export function doctorIssues(config: Config, tasks: Task[]): CheckIssue[] {
 }
 
 // The log against the store, printed on every run and changing no exit code.
-// `doctor` keeps exactly one failure condition, and an absence in the store's
-// own history is not it: one historical absence is the case for reporting it,
+// The reconciliation adds no failure condition, and an absence in the store's
+// own history is why: one historical absence is the case for reporting it,
 // not for failing the build over a record this repository lost before it had
 // a verb for losing one. `--fix` cannot repair it either — a record the store
 // lost is not a record `doctor` may invent.

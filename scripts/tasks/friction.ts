@@ -1,4 +1,4 @@
-import { filterEvents, loadEvents, multilineNote, type TaskEvent } from '../lib/eventLog';
+import { filterEvents, loadEvents, noteProblem, type TaskEvent } from '../lib/eventLog';
 import { CLOSING_STATES, FAULTS, reportsCost, type Fault, type Task } from '../lib/taskStore';
 import { allLessons, findLesson, unknownLessonIds } from './briefLessons';
 import type { Flags } from './cli';
@@ -176,9 +176,9 @@ export function cmdChecked(args: Flags, usage: string): void {
     process.exitCode = 1;
     return;
   }
-  const lines = multilineNote(note);
-  if (lines !== null) {
-    console.error(`error: a check is one line — this one has ${lines}. Record what you looked at here and leave the prose in the commit message`);
+  const problem = noteProblem('a check', note);
+  if (problem !== null) {
+    console.error(`error: ${problem}`);
     process.exitCode = 1;
     return;
   }

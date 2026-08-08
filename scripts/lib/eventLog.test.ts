@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { appendEvents, EVENT_OPS, eventsPathFor, filterEvents, loadEvents, parseEvents, reconcile, type TaskEvent, type ToleratedEvents } from './eventLog';
+import { appendEvents, EVENT_OPS, eventsPathFor, filterEvents, loadEvents, noteProblem, parseEvents, reconcile, type TaskEvent, type ToleratedEvents } from './eventLog';
 
 function event(overrides: Partial<TaskEvent> = {}): TaskEvent {
   return {
@@ -249,5 +249,37 @@ describe('c1, c3, c4: a record cannot leave the store unrecorded', () => {
     // explain nothing: a decline, a retriage, then re-filed under the same id.
     const retriaged = [entry('add', 'x'), entry('decline', 'x', 'not real work'), entry('triage', 'x', 'retriaged'), entry('add', 'x')];
     expect(reconcile(read(retriaged), []).absentUnexplained).toEqual(['x']);
+  });
+});
+
+// The check every verb that writes a note owes, in one place because four of
+// them applied the line half by hand and none of them applied this half.
+describe('noteProblem', () => {
+  it('accepts a note a reader can see', () => {
+    expect(noteProblem('a reason', 'a probe, never real work')).toBeNull();
+    // However ugly: one punctuation mark, one digit, one combining mark, a run
+    // of dashes. The rule is "renders as something", not "reads well".
+    for (const ugly of ['.', '0', '\u0301', '\u2014\u2014']) expect(noteProblem('a reason', ugly), JSON.stringify(ugly)).toBeNull();
+    // The near miss that must stay legal: an escape sequence carries visible
+    // characters, so it is ugly rather than empty. Guarding over-strictness
+    // matters as much as guarding the bypass.
+    expect(noteProblem('a reason', '\u001b[31m')).toBeNull();
+  });
+
+  it('refuses a note that renders as nothing, which truthiness cannot catch', () => {
+    // Every caller tests the flag for truthiness first, and every one of these
+    // is truthy. The removal reason was the reproduction: `--reason "   "`
+    // filed an explanation that explained nothing, and the reconciliation then
+    // counted the record as accounted for — an absence explained by blanks.
+    for (const blank of [' ', '   ', '\t', '\u200b', '\ufe0f', '\u0000', '\u001b']) {
+      expect(noteProblem('a reason', blank), JSON.stringify(blank)).toContain('renders as nothing');
+    }
+  });
+
+  it('refuses a multi-line note and counts the lines, naming the caller\u2019s own noun', () => {
+    // The article comes from the caller. Deriving it here produced
+    // "a occurrence", which is what a shared message costs when it guesses.
+    expect(noteProblem('an occurrence', 'first\nsecond')).toBe('an occurrence is one line \u2014 this one has 2. Say it here and leave the prose in the commit message');
+    expect(noteProblem('a check', 'a\r\nb\r\nc')).toContain('a check is one line \u2014 this one has 3');
   });
 });

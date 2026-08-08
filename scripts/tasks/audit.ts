@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { harvestFiles, parseAuditDoc, systemForDoc } from '../lib/auditImport';
+import { hasVisibleContent } from '../lib/eventLog';
 import { appendAuditPass, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, verdictsForPass, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from '../lib/specDoc';
 import { createTask, loadStore, nextSeq, resolveFault, type Fault, type Severity, type Task } from '../lib/taskStore';
 import { reportPriorArt } from './architectureCmds';
@@ -129,25 +130,11 @@ function clauseScoped(raw: string): { clause: number; value: string } | null {
   return Number.isFinite(clause) ? { clause, value: raw.slice(eq + 1).trim() } : null;
 }
 
-// A reason must contain at least one character that occupies space when
-// rendered and does not command the renderer. Whitespace (`\s`) occupies
-// nothing; `Default_Ignorable_Code_Point` — the Unicode property that
-// defines "occupies no space when rendered", covering ZERO WIDTH SPACE and
-// its Cf kin plus the Mn/Lo outliers a general category alone misses
-// (variation selectors including VS16, COMBINING GRAPHEME JOINER, the
-// Hangul filler jamo, Khmer inherent vowel signs, Mongolian free variation
-// selectors) — renders nothing; category Cc (NUL, BEL, ESC, DEL and their
-// kin — control characters) commands the renderer rather than rendering, up
-// to and including painting colour codes or ringing a bell when the file is
-// later read. Everything else is a legitimate reason, however ugly: a
-// single punctuation mark, a long run of one character, a lone combining
-// mark, an unpaired surrogate (replaced by U+FFFD on write, visible by the
-// time it lands). This line is drawn and stays drawn — no further
-// exclusions.
-const VISIBLE_CHARACTER = /[^\s\p{Default_Ignorable_Code_Point}\p{Cc}]/u;
-export function hasVisibleContent(text: string | null): boolean {
-  return text !== null && VISIBLE_CHARACTER.test(text);
-}
+// One predicate, in the layer below, because notes entering the event log need
+// the same answer and a second copy of a Unicode rule is a second thing to
+// drift. Re-exported rather than moved out of this module's surface: the clause
+// evidence guard is this file's, and its callers name it here.
+export { hasVisibleContent };
 
 // Repeated --proof/--evidence/--finding flags need a dedicated scanner: the
 // generic parseArgs collapses a repeated flag to its last value, and a

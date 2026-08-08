@@ -9,9 +9,11 @@ import path from 'node:path';
 // time the prose was reworded. `checked` is the one place an event's `id` is
 // not a task id but a lesson handle — the subject of the event is the lesson,
 // and "who looked, and when" is what an append-only log answers well.
-// `remove` is the one verb the store's removal path had none of: saveStore
-// rewrites the whole file from the array it was given, so any caller dropping
-// a record removed it with nothing able to say that it had, or why.
+// `remove` is here because a record leaving the store is the one thing that
+// happened to it which no other op can be read as: every op above describes a
+// record the log can still point at, and this one is the only trace left of one
+// it cannot. Its note carries the reason, so an absence is either explained
+// here or is a finding.
 export const EVENT_OPS = ['add', 'edit', 'start', 'stop', 'done', 'decline', 'triage', 'import', 'audit', 'spec-add', 'spec-remove', 'spec-defer', 'spec-done', 'doctor-fix', 'note', 'decision', 'recur', 'checked', 'remove'] as const;
 
 export type EventOp = (typeof EVENT_OPS)[number];
@@ -76,6 +78,39 @@ export function appendEvents(events: TaskEvent[], eventsPath: string): void {
 // file. Returns the line count of an offending note, so a caller can name it.
 export function multilineNote(note: string): number | null {
   return /[\r\n]/.test(note) ? note.split(/\r\n|\r|\n/).length : null;
+}
+
+// A note must contain at least one character that occupies space when rendered
+// and does not command the renderer. Whitespace (`\s`) occupies nothing;
+// `Default_Ignorable_Code_Point` — the Unicode property that defines "occupies
+// no space when rendered", covering ZERO WIDTH SPACE and its Cf kin plus the
+// Mn/Lo outliers a general category alone misses (variation selectors including
+// VS16, COMBINING GRAPHEME JOINER, the Hangul filler jamo, Khmer inherent vowel
+// signs, Mongolian free variation selectors) — renders nothing; category Cc
+// (NUL, BEL, ESC, DEL and their kin — control characters) commands the renderer
+// rather than rendering, up to and including painting colour codes or ringing a
+// bell when the file is later read. Everything else is legitimate, however
+// ugly: a single punctuation mark, a long run of one character, a lone
+// combining mark, an unpaired surrogate (replaced by U+FFFD on write, visible
+// by the time it lands). This line is drawn and stays drawn — no further
+// exclusions.
+const VISIBLE_CHARACTER = /[^\s\p{Default_Ignorable_Code_Point}\p{Cc}]/u;
+export function hasVisibleContent(text: string | null): boolean {
+  return text !== null && VISIBLE_CHARACTER.test(text);
+}
+
+// Both things a note entering this log has to be, in one place, because four
+// verbs each applied the line check by hand and none of them applied this one:
+// `tasks remove <id> --reason "   "` filed a removal whose reason explained
+// nothing, and `reconcile` then counted the record as accounted for — an
+// absence explained by blanks. The truthiness test every caller runs on the
+// flag cannot catch it, because a space is truthy. Returns the complaint, so
+// the caller keeps naming its own noun.
+export function noteProblem(what: string, note: string): string | null {
+  const lines = multilineNote(note);
+  if (lines !== null) return `${what} is one line — this one has ${lines}. Say it here and leave the prose in the commit message`;
+  if (!hasVisibleContent(note)) return `${what} must say something a reader can see, and this one renders as nothing`;
+  return null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

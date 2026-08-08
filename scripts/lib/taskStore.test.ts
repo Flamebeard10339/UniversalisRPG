@@ -1228,10 +1228,21 @@ describe('a record cannot leave the store undeclared', () => {
         return /\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name) ? [full] : [];
       });
 
-    const callers = sources('scripts')
+    const outside = sources('scripts')
       .filter((file) => path.resolve(file) !== path.resolve('scripts', 'lib', 'taskStore.ts'))
-      .filter((file) => /\bsaveStore\s*\(/.test(readFileSync(file, 'utf8')))
-      .map((file) => file.split(path.sep).join('/'));
-    expect(callers).toEqual(['scripts/tasks/context.ts']);
+      .map((file) => ({ at: file.split(path.sep).join('/'), text: readFileSync(file, 'utf8') }));
+
+    // Which files may name it at all. An alias would let a new file call it
+    // under another name, so the import is checked and not only the call.
+    const importers = outside.filter(({ text }) => /\bsaveStore\b/.test(text)).map(({ at }) => at);
+    expect(importers).toEqual(['scripts/tasks/context.ts']);
+    const context = outside.find(({ at }) => at === 'scripts/tasks/context.ts')!.text;
+    expect(context, 'saveStore is imported unaliased, so counting its calls by name is exhaustive').toMatch(/import \{[^}]*\bsaveStore,/);
+
+    // And how many times. Asserting the *file list* left a second call inside
+    // `context.ts` itself invisible — pass 2 measured that mutation surviving
+    // all 2056 tests — because the file was already in the allowed list. The
+    // count is the property; the location is not.
+    expect(context.match(/\bsaveStore\s*\(/g)).toHaveLength(1);
   });
 });
