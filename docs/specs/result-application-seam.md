@@ -1,5 +1,12 @@
 # result-application-seam
 
+## Goal
+
+Three queued branches each need `applyResults` to change in a different way. This branch exists so
+that none of them has to rewrite it: after it lands, a consumer names the actor a result applies to
+and watches results being applied, and the change each of the three makes to shared code is an entry
+in a list rather than a rewrite of the function every other one is also rewriting.
+
 ## Deliverable
 
 `applyResults` is the chokepoint three queued branches each need to change in a different way, which
@@ -46,15 +53,24 @@ Proof:
   list every production segment carries, and it is exported so a caller building its own segment can
   spread it.
 - **Joining that list is a one-line append to `effects.ts`, and that is the sanctioned extension
-  path.** A subscriber manifest is static by construction: the segments the game runs are built
-  inside the engine, so nothing downstream can reach them without a shared file naming it. This is
-  what the branch actually bought — three branches append one line each and write their own module,
-  instead of three rewrites of `applyResults` landing on top of each other. It is *not* what c5
-  measures. `tasks plan`'s cohesion check is path-level and cannot tell those two apart, so c5 is
-  satisfiable only by moving the manifest to a second file, which would relocate the report rather
-  than remove it. Recorded here rather than repaired: the clause names the wrong measurement, and
-  `first-class-modals`, `skill-levels-xp-events` and `combat-events` will each need `effects.ts` in
-  their grant when their workers correct them.
+  path.** All three downstream branches will make that append, and their write grants say so. The
+  alternative pass 2 raised — a push-based `registerResultObserver(observer)` each module calls from
+  its own file — was rejected, not missed. It does not remove the shared edit, it relocates it: a
+  module whose only job is to register itself runs nothing until something imports it, so a bare
+  side-effect import has to be added to the barrel instead of a line to the list, and the repo has
+  no such import outside `main.tsx`'s stylesheet. It buys that relocation at the price of an
+  observer set assembled by whichever modules happened to be imported and in what order, with no
+  per-test reset — which is the shape CLAUDE.md rules against when it says to enforce where a value
+  is assembled rather than where it is written. A declared list is worth more than a hidden one.
+- **c5 is not delivered, and the clause is not being rewritten to say otherwise.** The branch's real
+  reduction — three one-line appends instead of three rewrites of `applyResults` — is invisible to
+  what c5 measures: `tasks plan`'s cohesion check counts grants by path and cannot weigh how large a
+  change to that path is (`planCheck.ts` `cohesionFinding`), so it fires on three appends exactly as
+  it would on three rewrites. c5 reads met today only because two downstream grants were stale;
+  those grants are corrected as part of this branch, which makes the report fire and the clause
+  honestly unmet. Satisfying its sentence would mean moving the manifest to a second file so that
+  the named path goes quiet — the report relocated, the concentration untouched. It stands as an
+  accepted, tracked limitation instead, with the trigger for revisiting recorded on its record.
 
 ## Open questions
 
