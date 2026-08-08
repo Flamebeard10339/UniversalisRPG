@@ -5,6 +5,7 @@ import { findProducers, producerIndex } from '../lib/producers';
 import { canonicalPath, covers, loadManifest } from '../lib/systems';
 import { filterEvents, loadEvents, multilineNote } from '../lib/eventLog';
 import {
+  awaitsADecider,
   claimSummary,
   coldClaims,
   createTask,
@@ -845,6 +846,15 @@ export function cmdStart(args: Flags, usage: string): void {
   const resolved = resolveTaskIds([id], tasks);
   if (resolved === null) return;
   const task = resolved[0];
+  // Claiming is how work is taken, and a question addressed away from the
+  // worker is not work: it is answered, which needs no claim and leaves no
+  // grant. Refused rather than warned, because the silent claim is exactly
+  // how an escalation turned back into an implementation.
+  if (awaitsADecider(task)) {
+    console.error(`error: ${task.id} is a question for the ${task.decider ?? 'unaddressed'} to decide, not work to claim. \`tasks decision "<the answer>" --id ${task.id}\` records the answer and \`tasks done ${task.id}\` releases what waits on it; \`tasks work-prompt ${task.id}\` prints the whole route`);
+    process.exitCode = 1;
+    return;
+  }
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const waiting = waitingOn(task, byId);
   const displaced = claimSummary(task, today());

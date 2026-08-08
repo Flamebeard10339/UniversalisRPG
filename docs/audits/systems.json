@@ -406,6 +406,15 @@
             "scripts/tasks/records.ts"
           ],
           "note": "produced by a-recurrence-is-appended-and-filing-shows-what-already-claim: the recur op and tasks recur, an occurrence appended against a filed friction with its own note; the count is read back off the occurrences and nothing is stored"
+        },
+        {
+          "name": "decider routing",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/workPrompt.ts",
+            "scripts/tasks/handoff.ts"
+          ],
+          "note": "produced by a-question-s-decider-changes-what-the-tooling-does-with-it: awaitsADecider, and the three routes that read it — work-prompt briefs an answer instead of an implementation, the member queue does not dispatch one, and start refuses to claim one"
         }
       ]
     },

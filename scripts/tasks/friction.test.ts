@@ -310,6 +310,124 @@ describe('c4: a blocking question is filed, addressed, and holds only what depen
   });
 });
 
+// The half of c4 the record-shape slice could not reach: `decider` was
+// stored, displayed and read by nothing, so every route that hands out work
+// handed out a question addressed to the author as work to implement.
+describe('c4: a question addressed away from the worker is never handed back as work', () => {
+  const askAuthor = (tasks: (...args: string[]) => Run, decider = 'author'): void => {
+    tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec', '--severity', 'high');
+    tasks('question', 'Which way?', '--blocks', 'held-work', '--decider', decider, '--fault', 'nobody');
+  };
+
+  it('briefs it as a decision to make, not as a record to implement', () => {
+    fixture(({ tasks }) => {
+      askAuthor(tasks);
+
+      const brief = tasks('work-prompt', 'which-way');
+      expect(brief.status).toBe(0);
+      expect(brief.stdout).toContain('which-way is a question for the author to decide. It is not work');
+      expect(brief.stdout).not.toContain('You are implementing');
+      // The three obligations an implementation brief prints, and none of
+      // them is a thing an answer involves.
+      expect(brief.stdout).not.toContain('--grant commitment');
+      expect(brief.stdout).not.toContain('Write grant');
+      expect(brief.stdout).not.toContain('commit after each logical chunk');
+    });
+  });
+
+  it('names what waits on it and the two commands that release them', () => {
+    fixture(({ tasks }) => {
+      askAuthor(tasks);
+
+      const brief = tasks('work-prompt', 'which-way');
+      expect(brief.stdout).toContain('1 record(s) wait on it and move the moment it closes: held-work');
+      expect(brief.stdout).toContain('tasks -- decision "<the answer>" --id which-way');
+      expect(brief.stdout).toContain('tasks -- done which-way');
+      expect(brief.stdout).toContain('If you are not, stop here and say so');
+    });
+  });
+
+  it('still briefs a worker-addressed question as work, because there the reader is the decider', () => {
+    fixture(({ tasks }) => {
+      askAuthor(tasks, 'worker');
+
+      const brief = tasks('work-prompt', 'which-way');
+      expect(brief.stdout).toContain('You are implementing which-way');
+    });
+  });
+
+  it('does not take the head of the work queue, so the work behind it is still dispatched', () => {
+    fixture(({ tasks }) => {
+      askAuthor(tasks);
+      // A question filed high outranks every other member in `fixNowQueue`,
+      // so without the filter the spec route briefs it and the real work
+      // waits behind a record nobody dispatched is going to implement.
+      tasks('question', 'And which way here?', '--blocks', 'held-work', '--decider', 'author', '--fault', 'nobody', '--severity', 'high');
+      tasks('add', 'work nothing holds up', '--id', 'free-work', '--spec', 'demo-spec', '--severity', 'medium');
+
+      const brief = tasks('work-prompt', 'demo-spec');
+      expect(brief.stdout).toContain('resolved the spec demo-spec -> free-work');
+      expect(brief.stdout).toContain('You are implementing free-work');
+      expect(brief.stdout).not.toContain('You are implementing and-which-way-here');
+    });
+  });
+
+  it('is named to the dispatcher rather than hidden, so it can still be routed', () => {
+    fixture(({ tasks }) => {
+      askAuthor(tasks);
+      // held-work is blocked by the question, so the question is the only
+      // open unblocked member: filtering it leaves the spec with nothing to
+      // brief, and saying only that would strand it.
+      const brief = tasks('work-prompt', 'demo-spec');
+      expect(brief.stdout).toContain('demo-spec also holds 1 question(s) that are not work');
+      expect(brief.stdout).toContain('which-way — for the author: Which way?');
+      expect(brief.stdout).toContain('demo-spec is a spec, and it has no open, unblocked member to brief');
+      expect(brief.stdout).not.toContain('You are implementing which-way');
+    });
+  });
+
+  it('reads the kind as well as the addressee, so a stray decider on a finding does not make it unclaimable', () => {
+    fixture(({ tasks, dir }) => {
+      // The store validates a decider's value and not the kind that carries
+      // it, so a hand-edit or a merge can leave one on a finding. That record
+      // is still work, and `start` must still take it.
+      const store = path.join(dir, 'tasks.jsonl');
+      writeFileSync(store, `${JSON.stringify({ id: 'stray', seq: 1, title: 'a finding carrying a decider', kind: 'finding', fault: 'tooling', decider: 'author', state: 'open', severity: 'low', system: null, spec: null, clause: null, discharges: [], requires: [], files: [], writes: [], grant: null, produces: [], deliverable: 'fix it', evidence: 'x', source: null, reason: null, trigger: null, closed: null, closedCommit: null, claimed: null, claimedBy: null })}\n`, 'utf8');
+
+      expect(tasks('start', 'stray', '--actor', 'worker-a').status).toBe(0);
+      expect(storedField(dir, 'stray', 'state')).toBe('in-progress');
+    });
+  });
+
+  it('refuses to be claimed as work, so the silent start is gone', () => {
+    fixture(({ tasks, dir }) => {
+      askAuthor(tasks);
+
+      const refused = tasks('start', 'which-way', '--actor', 'worker-a');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('which-way is a question for the author to decide, not work to claim');
+      expect(storedField(dir, 'which-way', 'state')).toBe('open');
+      expect(storedField(dir, 'which-way', 'claimedBy')).toBe(null);
+    });
+  });
+
+  it('tells a decider who recorded the answer that the hold is still on', () => {
+    fixture(({ tasks }) => {
+      askAuthor(tasks);
+
+      const recorded = tasks('decision', 'go left', '--id', 'which-way');
+      expect(recorded.status).toBe(0);
+      expect(recorded.stdout).toContain('which-way is still open, so the author\'s answer is recorded and nothing has moved — 1 record(s) still wait on it: held-work');
+      expect(recorded.stdout).toContain('`tasks done which-way` releases them');
+
+      // And says nothing once the question is closed, which is the state
+      // where the advice would be wrong.
+      tasks('done', 'which-way');
+      expect(tasks('decision', 'and here is why', '--id', 'which-way').stdout).not.toContain('still open');
+    });
+  });
+});
+
 describe('the channel refuses the two shapes a second answer would take', () => {
   it('add no longer creates a question at all, so there is one route and it always wires the hold', () => {
     fixture(({ tasks, dir }) => {

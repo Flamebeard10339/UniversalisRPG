@@ -119,6 +119,14 @@ export function reportsCost(kind: Kind): boolean {
   return REPORTING_KINDS.includes(kind);
 }
 
+// A question addressed to the planner or the author is a decision waiting on
+// somebody, not work waiting on a worker, and every route that hands out work
+// has to be able to tell the two apart. A question addressed to the worker is
+// the case where the agent reading it is the decider, so there it is work.
+export function awaitsADecider(task: Task): boolean {
+  return task.kind === 'question' && task.decider !== null && task.decider !== 'worker';
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

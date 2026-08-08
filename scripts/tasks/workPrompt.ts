@@ -4,10 +4,10 @@ import { isReadableGrant } from '../lib/planCheck';
 import { clauseStandings, parseSpecDoc, type SpecDoc } from '../lib/specDoc';
 import { trackedFiles } from '../lib/sourceFiles';
 import { covers, normalizePath } from '../lib/systems';
-import { clausesOf, fixNowQueue, type Task } from '../lib/taskStore';
-import { printLessons, WORKER_LESSONS } from './briefLessons';
+import { awaitsADecider, clausesOf, fixNowQueue, type Task } from '../lib/taskStore';
+import { ORCHESTRATOR_LESSONS, PLANNER_LESSONS, printLessons, WORKER_LESSONS } from './briefLessons';
 import type { Flags } from './cli';
-import { readStore, resolveConfig, specFile, type Config } from './context';
+import { CLOSING_STATES, readStore, resolveConfig, specFile, type Config } from './context';
 import { explainEmptyQueue } from './records';
 import { clauseStandingLines, renderTask } from './render';
 import { resolveTaskIds } from './resolveIds';
@@ -118,6 +118,31 @@ function printObligations(task: Task): void {
   console.log(`Then work: commit after each logical chunk, and close with \`npm run tasks -- done ${task.id} --commit HEAD\`.`);
 }
 
+// What a decider is handed instead of an implementation brief: the question,
+// what it is costing while it waits, and the two commands that end it. No
+// write grant, no clause to discharge and nothing to commit — answering is
+// not implementing, and a brief that asked for those is what made the
+// escalation route a loop back to a worker.
+function printAnswerBrief(config: Config, task: Task, tasks: Task[]): void {
+  console.log(`${task.id} is a question for the ${task.decider ?? 'unaddressed'} to decide. It is not work, and this is not an implementation brief.`);
+  printSpecProvenance(config, task);
+  console.log('');
+  for (const line of renderTask(task, new Map(tasks.map((candidate) => [candidate.id, candidate])), 'full')) console.log(line);
+  console.log('');
+
+  const held = tasks.filter((candidate) => candidate.requires.includes(task.id) && !CLOSING_STATES.includes(candidate.state));
+  console.log(held.length === 0 ? 'Nothing waits on it, so answering it unblocks nothing — it is a decision worth recording rather than one anything is stalled behind.' : `${held.length} record(s) wait on it and move the moment it closes: ${held.map((candidate) => candidate.id).join(', ')}`);
+  console.log('');
+
+  console.log(`If you are the ${task.decider ?? 'addressee'}, answer it:`);
+  console.log(`1. Record the answer where the next reader finds it: npm run tasks -- decision "<the answer>" --id ${task.id}`);
+  console.log(`2. Release what waits on it: npm run tasks -- done ${task.id} (answered) or npm run tasks -- decline ${task.id} --reason "..." (dismissed as not worth answering).`);
+  console.log('');
+  console.log(`If you are not, stop here and say so. Do not answer it and do not implement around it — a decision made by whoever happened to be dispatched is the one this record exists to refuse, and it will be re-decided. \`npm run tasks -- work-prompt ${task.spec ?? '<spec>'}\` briefs whatever else is dispatchable.`);
+  console.log('');
+  printLessons('What repeated rounds have already paid to learn about where a decision belongs:', task.decider === 'planner' ? PLANNER_LESSONS : ORCHESTRATOR_LESSONS);
+}
+
 // The root-record convention eleven specs carry: a task whose id is the spec
 // slug and which declares no write grant, holding the whole picture and every
 // member of the spec as a requirement. It is a container, not work, and a
@@ -134,8 +159,21 @@ function isRootRecord(task: Task): boolean {
 // The queue `tasks next --spec <slug>` reads, asked here rather than answered
 // again: a second opinion on which member comes next is a second thing to
 // keep in sync.
+// The second route into the same defect, and the one nobody types on
+// purpose: a dispatcher naming the spec gets whichever member is unblocked,
+// and a question addressed to the author is an open, unblocked member. It
+// leaves the work queue and is named separately, because a dispatcher that
+// never hears the question exists cannot route it either.
 function memberQueue(tasks: Task[], spec: string): Task[] {
-  return fixNowQueue(tasks, spec).filter((task) => !isRootRecord(task));
+  return fixNowQueue(tasks, spec).filter((task) => !isRootRecord(task) && !awaitsADecider(task));
+}
+
+function reportQuestionsAwaitingADecider(tasks: Task[], spec: string): void {
+  const waiting = fixNowQueue(tasks, spec).filter(awaitsADecider);
+  if (waiting.length === 0) return;
+  console.log(`${spec} also holds ${waiting.length} question(s) that are not work and were not briefed as any:`);
+  for (const question of waiting) console.log(`  ${question.id} — for the ${question.decider ?? 'unaddressed'}: ${question.title}`);
+  console.log('  Each is briefed by name — `npm run tasks -- work-prompt <its id>` — and answered by whoever it is addressed to.');
 }
 
 // A dispatcher holds the name of the work — the spec slug, which on a
@@ -163,6 +201,7 @@ function resolveWorkTarget(config: Config, tasks: Task[], name: string): Task | 
   const spec = exact?.spec ?? fuzzy?.spec ?? (existsSync(specFile(config, name)) ? name : null);
   if (spec === null) return undefined;
   const root = exact ?? fuzzy;
+  reportQuestionsAwaitingADecider(tasks, spec);
 
   const [next, ...rest] = memberQueue(tasks, spec);
   const behind = rest.length > 0 ? ` (${rest.length} more behind it: ${rest.map((task) => task.id).join(', ')})` : '';
@@ -205,6 +244,10 @@ export function cmdWorkPrompt(args: Flags, usage: string): void {
   const tasks = readStore(config);
   const task = resolveWorkTarget(config, tasks, name);
   if (task === undefined) return;
+  if (awaitsADecider(task)) {
+    printAnswerBrief(config, task, tasks);
+    return;
+  }
 
   console.log(`You are implementing ${task.id} on branch ${config.branch}.`);
   printSpecProvenance(config, task);
