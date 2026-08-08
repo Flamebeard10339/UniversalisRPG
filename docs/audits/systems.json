@@ -129,6 +129,7 @@
         "src/runtime/contest.test.ts",
         "src/runtime/dialogue-runtime.ts",
         "src/runtime/dropTable.test.ts",
+        "src/runtime/effects.test.ts",
         "src/runtime/effects.ts",
         "src/runtime/encounter.test.ts",
         "src/runtime/encounter.ts",
