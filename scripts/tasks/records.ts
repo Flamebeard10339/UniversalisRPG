@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import * as git from '../lib/git';
-import { parseSpecDoc } from '../lib/specDoc';
+import { clauseStandings, parseSpecDoc } from '../lib/specDoc';
 import { findProducers, producerIndex } from '../lib/producers';
 import { loadManifest } from '../lib/systems';
 import { filterEvents, loadEvents } from '../lib/eventLog';
@@ -779,6 +779,10 @@ function specSource(config: Config, spec: string): SpecSource {
   return { path, text: existsSync(path) ? readFileSync(path, 'utf8') : null };
 }
 
+// Composed over every recorded pass, not read off the last one: the same
+// defect `a-clause-met-by-an-earlier-pass-reverts-to-outstanding-when-`
+// fixed in `clauseStandings` itself, in a differently-named, hand-rolled
+// function that never called it.
 export function clauseStanding(task: Task, load: (spec: string) => SpecSource): string {
   if (!task.spec) return 'it names no spec, so no audit pass can speak to it';
   if (task.clause === null) return 'it names no proof clause';
@@ -786,11 +790,10 @@ export function clauseStanding(task: Task, load: (spec: string) => SpecSource): 
   if (text === null) return `its spec file is missing: ${path_}`;
   const doc = parseSpecDoc(text);
   if (!doc.proofClauses.some((candidate) => candidate.id === task.clause)) return `proof clause ${task.clause} is no longer in ${path_}`;
-  const latest = doc.auditPasses[doc.auditPasses.length - 1];
-  if (!latest) return `${task.spec} has no recorded audit pass`;
-  const status = latest.verdicts.find((candidate) => candidate.clause === task.clause)?.status ?? 'unknown';
+  if (doc.auditPasses.length === 0) return `${task.spec} has no recorded audit pass`;
+  const status = clauseStandings(doc.proofClauses, doc.auditPasses).find((verdict) => verdict.clause === task.clause)?.status ?? 'unknown';
   const nobodyLooked = status === 'unknown' ? ' — nobody graded it, which is not the same as unmet' : '';
-  return `proof clause ${task.clause} is ${status} in the latest audit pass (pass ${latest.pass})${nobodyLooked}`;
+  return `proof clause ${task.clause} is ${status} in the standing composed over ${doc.auditPasses.length} pass(es)${nobodyLooked}`;
 }
 
 // A claim that closes without being registered is a capability the next

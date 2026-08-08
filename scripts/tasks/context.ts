@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { appendEvents, eventsPathFor, loadEvents, type EventOp, type TaskEvent } from '../lib/eventLog';
+import { appendEvents, eventsPathFor, type EventOp, type TaskEvent } from '../lib/eventLog';
 import * as git from '../lib/git';
 import { duplicateClauseIds, parseSpecDoc } from '../lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from '../lib/systems';
@@ -191,30 +191,6 @@ export interface ActiveSpec {
   // here is an inference, and c8 permits an inferred default argument only
   // on the condition that the output says so and says what from.
   note: string | null;
-}
-
-// Which spec this branch has been working, read off the log rather than
-// declared: every store write records the branch it was made from, so the
-// answer is derivable and no second place has to be kept in sync. Most
-// recent first, deduplicated, and only those with a spec file in this
-// checkout.
-//
-// No caller resolves a spec through this alone anymore — an event carries
-// whatever spec the write it annotated happened to be tagged with, not
-// evidence that this branch's own diff touches that spec, and trusting it
-// unconditionally produced every incident `a-branch-is-told-which-spec-it-
-// owes` was commissioned over. `merge-ready` is the one surviving direct
-// caller (`mergeReady.ts`'s `branchStanding`), and only because it hands
-// every candidate this returns to `decideSpec`, which requires diff evidence
-// before grading one — a proposal, not an answer.
-export function specsWrittenFromBranch(config: Config): string[] {
-  const written = loadEvents(config.eventsPath).events.filter((event) => event.branch === config.branch && event.spec !== null);
-  const specs: string[] = [];
-  for (let i = written.length - 1; i >= 0; i--) {
-    const spec = written[i].spec as string;
-    if (!specs.includes(spec) && existsSync(specFile(config, spec))) specs.push(spec);
-  }
-  return specs;
 }
 
 // The candidates a caller can see once neither `--spec` nor the branch name

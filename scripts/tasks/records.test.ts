@@ -1320,7 +1320,7 @@ describe('what already worked, after the record verbs changed around it', () => 
   it('still prints the clause standing a done closed against', () =>
     fixture(async ({ tasks, audit }) => {
       await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=the seam is still open', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-      expect(tasks('done', 'demo-spec-clause-1').stdout).toContain('clause standing at close: proof clause 1 is unmet in the latest audit pass (pass 1)');
+      expect(tasks('done', 'demo-spec-clause-1').stdout).toContain('clause standing at close: proof clause 1 is unmet in the standing composed over 1 pass(es)');
     }));
 
   it('still names a pass-2 promotion as extending what the spec owes', () =>

@@ -307,19 +307,53 @@ describe('tasks CLI', () => {
       await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('done', 'demo-spec-clause-1');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('clause standing at close: proof clause 1 is unmet in the latest audit pass (pass 1)');
+      expect(result.stdout).toContain('clause standing at close: proof clause 1 is unmet in the standing composed over 1 pass(es)');
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('closed: ');
     });
   });
 
-  it('done on an undelivered task reports a clause the latest pass never graded as unknown, not as unmet', async () => {
-    await fixture(async ({ tasks, audit }) => {
-      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  // Composed over every pass rather than read off the last one: a first pass
+  // that graded clause 1 unmet and a second that never mentions it again
+  // must not read as "nobody graded it" — silence is not a retraction, and
+  // the standing still says unmet. That is a distinct scenario from this
+  // one, where no pass has ever graded clause 1 at all. The record is
+  // written by hand, the way the no-pass-at-all case below does, because an
+  // `audit` call only ever creates an undelivered record for a clause it
+  // grades unmet — there is no route to one nobody has ever graded.
+  it('done on an undelivered task reports a clause no pass has ever graded as unknown, not as unmet', async () => {
+    await fixture(async ({ tasks, dir, audit }) => {
+      const storePath = path.join(dir, 'tasks.jsonl');
+      writeFileSync(
+        storePath,
+        `${JSON.stringify({ id: 'demo-spec-clause-1', title: 'Unmet deliverable clause 1', kind: 'undelivered', state: 'open', severity: 'high', system: null, spec: 'demo-spec', clause: 1, requires: [], files: [], deliverable: 'The first clause holds.', evidence: null, source: { spec: 'demo-spec', pass: 1 }, reason: null, closed: null })}\n`,
+        'utf8',
+      );
+      await audit('demo-spec', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '2=met', '--evidence', '2=clause 2 checked, again');
+      const result = tasks('done', 'demo-spec-clause-1');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('clause standing at close: proof clause 1 is unknown in the standing composed over 2 pass(es) — nobody graded it');
+      expect(result.stdout).not.toContain('is unmet');
+    });
+  });
+
+  // c4, at this print line specifically: a clause an earlier pass met and a
+  // later pass never mentions again still reads as met, not as unknown —
+  // the defect `records.ts`'s hand-rolled clauseStanding had until this
+  // branch folded it into `specDoc.ts`'s composed clauseStandings.
+  it('done on an undelivered task reports a clause an earlier pass met and a later pass never regraded as met, not as unknown', async () => {
+    await fixture(async ({ tasks, dir, audit }) => {
+      const storePath = path.join(dir, 'tasks.jsonl');
+      writeFileSync(
+        storePath,
+        `${JSON.stringify({ id: 'demo-spec-clause-1', title: 'Unmet deliverable clause 1', kind: 'undelivered', state: 'open', severity: 'high', system: null, spec: 'demo-spec', clause: 1, requires: [], files: [], deliverable: 'The first clause holds.', evidence: null, source: { spec: 'demo-spec', pass: 1 }, reason: null, closed: null })}\n`,
+        'utf8',
+      );
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=unmet', '--evidence', '2=not yet');
       await audit('demo-spec', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('done', 'demo-spec-clause-1');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('clause standing at close: proof clause 1 is unknown in the latest audit pass (pass 2) — nobody graded it');
-      expect(result.stdout).not.toContain('is unmet in the latest audit pass (pass 2)');
+      expect(result.stdout).toContain('clause standing at close: proof clause 1 is met in the standing composed over 2 pass(es)');
     });
   });
 
