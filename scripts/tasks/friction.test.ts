@@ -330,3 +330,160 @@ describe('the channel refuses the two shapes a second answer would take', () => 
     });
   });
 });
+
+const events = (dir: string): Array<{ op: string; id: string | null; note: string }> =>
+  readFileSync(path.join(dir, 'events.jsonl'), 'utf8')
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as { op: string; id: string | null; note: string })
+    .map(({ op, id, note }) => ({ op, id, note }));
+
+const fileAFriction = (tasks: (...args: string[]) => Run, id: string, where = 'scripts/tasks/audit.ts:88'): Run =>
+  tasks('add', `the manifest never generates (${id})`, '--id', id, '--kind', 'finding', '--fault', 'tooling', '--severity', 'medium', '--deliverable', 'generate it', '--files', where);
+
+describe('c10: a recurrence is a new observation, never an edit', () => {
+  it('appends an occurrence naming the record, and leaves the record byte-identical', () => {
+    fixture(({ tasks, dir }) => {
+      fileAFriction(tasks, 'manifest-friction');
+      const before = storedLine(dir, 'manifest-friction');
+
+      const first = tasks('recur', 'manifest-friction', '--note', 'ten minutes, pass 2 of demo-spec');
+      expect(first.status).toBe(0);
+      expect(first.stdout).toContain('recorded occurrence 1 of manifest-friction');
+
+      // The load-bearing assertion: if anything were incremented or
+      // overwritten, this line would differ.
+      expect(storedLine(dir, 'manifest-friction')).toBe(before);
+      expect(events(dir).filter((event) => event.op === 'recur')).toEqual([{ op: 'recur', id: 'manifest-friction', note: 'ten minutes, pass 2 of demo-spec' }]);
+    });
+  });
+
+  it('keeps what each occurrence cost, so N observations are not one description overwritten N times', () => {
+    fixture(({ tasks, dir }) => {
+      fileAFriction(tasks, 'manifest-friction');
+      tasks('recur', 'manifest-friction', '--note', 'pass 2, ten minutes');
+      const second = tasks('recur', 'manifest-friction', '--note', 'pass 3, twenty minutes and a round trip');
+
+      expect(second.stdout).toContain('recorded occurrence 2 of manifest-friction');
+      expect(events(dir).filter((event) => event.op === 'recur').map((event) => event.note)).toEqual(['pass 2, ten minutes', 'pass 3, twenty minutes and a round trip']);
+    });
+  });
+
+  it('derives the count from the occurrences, so a log two branches both appended to answers with both', () => {
+    fixture(({ tasks, dir }) => {
+      fileAFriction(tasks, 'manifest-friction');
+      tasks('recur', 'manifest-friction', '--note', 'ours');
+      // What `merge=union` leaves behind: the other branch's line, appended.
+      // A counter field would have needed a resolution git cannot compute.
+      const log = path.join(dir, 'events.jsonl');
+      const theirs = JSON.stringify({ t: '2026-08-08T00:00:00.000Z', by: 'worker-b', branch: 'other', head: null, op: 'recur', id: 'manifest-friction', system: null, spec: null, note: 'theirs' });
+      writeFileSync(log, `${readFileSync(log, 'utf8')}${theirs}\n`, 'utf8');
+
+      expect(tasks('recur', 'manifest-friction', '--note', 'ours again').stdout).toContain('recorded occurrence 3 of manifest-friction');
+    });
+  });
+
+  it('is readable back through the op it was filed under, which is the route the append itself names', () => {
+    fixture(({ tasks }) => {
+      fileAFriction(tasks, 'manifest-friction');
+      tasks('recur', 'manifest-friction', '--note', 'pass 2, ten minutes');
+      tasks('recur', 'manifest-friction', '--note', 'pass 3, twenty minutes');
+      tasks('note', 'unrelated prose', '--id', 'manifest-friction');
+
+      const read = tasks('log', '--op', 'recur', '--id', 'manifest-friction');
+      expect(read.status).toBe(0);
+      expect(read.stdout).toContain('pass 2, ten minutes');
+      expect(read.stdout).toContain('pass 3, twenty minutes');
+      expect(read.stdout).not.toContain('unrelated prose');
+    });
+  });
+
+  it('requires a note, because an occurrence with nothing to say is the increment this clause refuses', () => {
+    fixture(({ tasks, dir }) => {
+      fileAFriction(tasks, 'manifest-friction');
+
+      const refused = tasks('recur', 'manifest-friction');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('usage: tasks recur <id> --note');
+      expect(events(dir).some((event) => event.op === 'recur')).toBe(false);
+    });
+  });
+
+  it('refuses a kind that reports no cost, so no count attaches where no query reads one', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'ordinary work', '--id', 'ordinary');
+
+      const refused = tasks('recur', 'ordinary', '--note', 'it cost something');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('ordinary is a task, and only a finding or question records what the work cost');
+      expect(events(dir).some((event) => event.op === 'recur')).toBe(false);
+    });
+  });
+
+  it('records a recurrence after the record closed, and says that is what it is', () => {
+    fixture(({ tasks }) => {
+      fileAFriction(tasks, 'manifest-friction');
+      tasks('promote', 'manifest-friction', '--spec', 'demo-spec');
+      tasks('done', 'manifest-friction');
+
+      const recurred = tasks('recur', 'manifest-friction', '--note', 'still happening a week later');
+      expect(recurred.status).toBe(0);
+      expect(recurred.stdout).toContain('is done, so this occurrence is a recurrence after the record closed');
+    });
+  });
+});
+
+describe('c11: filing shows what already claims the path, and never refuses', () => {
+  it('shows the sibling claim on a finding that names its region in files and grants nothing', () => {
+    fixture(({ tasks, dir }) => {
+      fileAFriction(tasks, 'first-sighting');
+
+      const second = fileAFriction(tasks, 'second-sighting');
+      // Never refuses: the record is filed, and the prompt comes after it.
+      expect(second.status).toBe(0);
+      expect(storedLine(dir, 'second-sighting')).toContain('"id":"second-sighting"');
+      expect(second.stdout).toContain('prior art on scripts/tasks/audit.ts');
+      expect(second.stdout).toContain('first-sighting');
+    });
+  });
+
+  it('matches by path and never by title, so two authors wording it differently still meet', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'the mutation manifest will not generate', '--id', 'worded-one-way', '--kind', 'finding', '--fault', 'tooling', '--severity', 'medium', '--deliverable', 'fix it', '--files', 'scripts/tasks/audit.ts:88');
+
+      const second = tasks('add', 'proof: vitest names a file with no test', '--id', 'worded-another-way', '--kind', 'finding', '--fault', 'tooling', '--severity', 'medium', '--deliverable', 'fix it', '--files', 'scripts/tasks/audit.ts:412');
+      expect(second.stdout).toContain('worded-one-way');
+    });
+  });
+
+  it('offers the occurrence as the deliberate path and filing as the cheap one', () => {
+    fixture(({ tasks }) => {
+      fileAFriction(tasks, 'first-sighting');
+
+      const second = fileAFriction(tasks, 'second-sighting');
+      expect(second.stdout).toContain('tasks recur <its id>');
+      expect(second.stdout).toContain('tasks decline second-sighting');
+      // Nothing was merged: both records are in the store, open, and the
+      // second one's occurrence count is still zero.
+      expect(second.stdout).toContain('Nothing is merged for you');
+    });
+  });
+
+  it('says nothing about attaching when no record claims the path', () => {
+    fixture(({ tasks }) => {
+      const first = fileAFriction(tasks, 'first-sighting');
+      expect(first.stdout).toContain('nothing has claimed scripts/tasks/audit.ts');
+      expect(first.stdout).not.toContain('tasks recur');
+    });
+  });
+
+  it('does not offer an occurrence on a plain task, which is not in the channel', () => {
+    fixture(({ tasks }) => {
+      fileAFriction(tasks, 'first-sighting');
+
+      const planned = tasks('add', 'rewrite the generator', '--id', 'planned-work', '--writes', 'scripts/tasks/audit.ts');
+      expect(planned.stdout).toContain('first-sighting');
+      expect(planned.stdout).not.toContain('tasks recur');
+    });
+  });
+});

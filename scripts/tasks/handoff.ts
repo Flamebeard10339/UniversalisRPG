@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { checkCommitMessage, isExempt } from '../lib/commitContract';
-import { EVENT_OPS, filterEvents, loadEvents, type EventOp, type TaskEvent } from '../lib/eventLog';
+import { EVENT_OPS, filterEvents, loadEvents, multilineNote, type EventOp, type TaskEvent } from '../lib/eventLog';
 import { loadManifest } from '../lib/systems';
 import type { Flags } from './cli';
 import { readStore, recordEvents, resolveConfig, specFile, splitList, validateContentFields, type EventSubject } from './context';
@@ -17,11 +17,11 @@ export function recordStandaloneEvent(op: 'note' | 'decision') {
       process.exitCode = 1;
       return;
     }
-    // The one refusal, and it is malformed input: the whole log depends on
-    // one event being one line, and prose in a record is what made `next`
-    // cost thirty lines to call.
-    if (/[\r\n]/.test(note)) {
-      console.error(`error: a ${op} is one line — this one has ${note.split(/\r\n|\r|\n/).length}. Record the summary here and leave the prose in the commit message or the spec`);
+    // The one refusal, and it is malformed input: prose in a record is what
+    // made `next` cost thirty lines to call.
+    const lines = multilineNote(note);
+    if (lines !== null) {
+      console.error(`error: a ${op} is one line — this one has ${lines}. Record the summary here and leave the prose in the commit message or the spec`);
       process.exitCode = 1;
       return;
     }

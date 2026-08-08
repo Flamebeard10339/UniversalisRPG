@@ -3,7 +3,7 @@ import * as git from '../lib/git';
 import { clauseStandings, parseSpecDoc } from '../lib/specDoc';
 import { findProducers, producerIndex } from '../lib/producers';
 import { canonicalPath, covers, loadManifest } from '../lib/systems';
-import { filterEvents, loadEvents } from '../lib/eventLog';
+import { filterEvents, loadEvents, multilineNote } from '../lib/eventLog';
 import {
   claimSummary,
   coldClaims,
@@ -22,6 +22,8 @@ import {
   misfiledSystem,
   nextSeq,
   parseStore,
+  REPORTING_KINDS,
+  reportsCost,
   requirementStates,
   resolveDecider,
   resolveFault,
@@ -58,7 +60,7 @@ import {
   validateContentFields,
   type Config,
 } from './context';
-import { reportPriorArtOnWrites } from './architectureCmds';
+import { reportPriorArtOnPaths } from './architectureCmds';
 import { printRow, printTask, truncateLine, wrapUnder } from './render';
 import { resolveTaskIds } from './resolveIds';
 
@@ -261,7 +263,64 @@ export function cmdAdd(args: Flags, usage: string): void {
   reportUnresolvedRequires(task, tasks);
   reportGrant(task);
   reportMisfiledSystem(config, task);
-  if (args.flags.writes !== undefined) reportPriorArtOnWrites(config, tasks, task);
+  offerRecurrence(task, reportPriorArtOnPaths(config, tasks, task));
+}
+
+// The prompt that makes an occurrence reachable, and the shape of it is the
+// clause: the record is already filed by the time this prints, so filing new
+// costs nothing and attaching costs two further commands. A duplicate is
+// visible and cheap to triage; a wrong merge makes a distinct defect vanish
+// and the derived count lie, so the cheap path must never be the merge.
+function offerRecurrence(task: Task, claims: number): void {
+  if (claims === 0 || !reportsCost(task.kind)) return;
+  console.log(`\nif one of those is this same friction rather than a new one, \`tasks recur <its id> --note "what it cost this time"\` records this as an occurrence of it, and \`tasks decline ${task.id} --reason "duplicate of <its id>"\` retires what you just filed. Nothing is merged for you.`);
+}
+
+// The other half of the asymmetry `offerRecurrence` prints, and it writes
+// nothing to the store. An occurrence is an event, so two branches recording
+// one append two lines that `merge=union` keeps both of; a counter field is
+// something concurrent branches edit by construction, whose correct
+// resolution is to add the two sides, which git cannot compute. The count is
+// whatever `filterEvents` returns over these events, so it cannot disagree
+// with them, and no description is overwritten — each occurrence keeps what
+// this one cost, which is the variation nine overwrites would have lost.
+export function cmdRecur(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const given = args.positional[0];
+  const note = args.flags.note;
+  if (!given || !note) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  const lines = multilineNote(note);
+  if (lines !== null) {
+    console.error(`error: an occurrence is one line — this one has ${lines}. Record what it cost here and leave the prose in the commit message`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const tasks = readStore(config);
+  const resolved = resolveTaskIds([given], tasks);
+  if (resolved === null) return;
+  const task = resolved[0];
+  // An occurrence is a count of what the workflow cost, and only the kinds
+  // that carry a fault are in that channel. Attaching one to a planned task
+  // would put a number on a record no query reads it from.
+  if (!reportsCost(task.kind)) {
+    console.error(`error: ${task.id} is a ${task.kind}, and only a ${REPORTING_KINDS.join(' or ')} records what the work cost — there is nothing for an occurrence to be counted against. \`tasks add "<title>" --kind finding --fault ${FAULTS.join('|')} --deliverable "..."\` files this as its own record`);
+    process.exitCode = 1;
+    return;
+  }
+
+  recordEvents(config, 'recur', [subjectOf(task, note)]);
+  const occurrences = filterEvents(loadEvents(config.eventsPath).events, { id: task.id, op: 'recur' });
+  console.log(`recorded occurrence ${occurrences.length} of ${task.id} in ${config.eventsPath} — the record itself is untouched, and the count is read back off the occurrences`);
+  console.log(`\`tasks log --op recur --id ${task.id}\` reads what each one cost`);
+  // A friction recurring after its record closed is the sharpest thing this
+  // channel can say — the fix did not hold — so it is recorded and named
+  // rather than refused.
+  if (CLOSING_STATES.includes(task.state)) console.log(`${task.id} is ${task.state}, so this occurrence is a recurrence after the record closed — \`tasks retriage ${task.id}\` puts it back in the queue if the fix did not hold`);
 }
 
 // A question belongs to the spec whose work it holds up. Records from two
@@ -462,7 +521,7 @@ export function cmdEdit(args: Flags, usage: string): void {
   reportUnresolvedRequires(task, tasks);
   if (changes.includes('grant')) reportGrant(task);
   if (changes.some((change) => change === 'system' || change === 'writes' || change === 'files')) reportMisfiledSystem(config, task);
-  if (args.flags.writes !== undefined) reportPriorArtOnWrites(config, tasks, task);
+  if (changes.includes('writes') || changes.includes('files')) offerRecurrence(task, reportPriorArtOnPaths(config, tasks, task));
 }
 
 function storeStateAt(config: Config, commit: string, id: string): State | null {

@@ -407,7 +407,9 @@ describe('a refusal that names the near miss', () => {
     fixture(({ tasks }) => {
       const result = tasks('add', 'a title', '--note', 'some prose');
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('--note: not a flag of `add` — it belongs to `concept`');
+      // Every owner, not the first one found: a flag two verbs take is
+      // answered with both, or the caller is sent to the wrong one.
+      expect(result.stderr).toContain('--note: not a flag of `add` — it belongs to `recur`, `concept`');
       // The list flags, the choices and the identifiers are not the near
       // miss and are not offered as one — checked on the near-miss line
       // itself, since the usage printed below it names every flag.

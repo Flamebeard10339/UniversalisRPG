@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { deriveModules, regionView, repoSourceTree, systemView, type Module, type ModuleSurface, type RegionView, type SourceTree, type SystemEdge, type SystemView } from '../lib/architecture';
 import { loadEvents } from '../lib/eventLog';
 import { checkPlan } from '../lib/planCheck';
-import { findProducers, priorArt, producerIndex, rulingsOn, type PriorArt, type Producer, type Rulings } from '../lib/producers';
+import { declaredPath, findProducers, priorArt, producerIndex, rulingsOn, type PriorArt, type Producer, type Rulings } from '../lib/producers';
 import { canonicalPath, checkManifest, isUnowned, loadManifest, ManifestError, overlappingConcepts, parseManifest, type Manifest } from '../lib/systems';
 import type { Task } from '../lib/taskStore';
 import type { Flags } from './cli';
@@ -239,22 +239,35 @@ export function printRulings(rulings: Rulings): void {
   console.log('\nA ruling is a decision already made about this path, not a claim on it — read it before proposing the same remedy again.');
 }
 
-// The same query `tasks where` answers when asked, fired by the act of
-// declaring a write grant. A check that has to be remembered is skipped
-// exactly when a session is deep in something else: this one was run once in
-// a whole planning session, and that once is the one duplication it caught.
+// Every path a record names, whichever field carried it. A grant is a
+// forecast about a region and a `files` entry is where something was
+// observed, but a reader asking "has anyone been here before" is asking about
+// the path, and a finding — the kind that reaches this with no grant at all —
+// names its region only in `files`, with the line number still on it.
+export const claimedPaths = (task: Task): string[] => [...new Set([...task.writes, ...task.files].map(declaredPath))].filter((path) => path !== '');
+
+// The same query `tasks where` answers when asked, fired by the act of naming
+// a path on a record. A check that has to be remembered is skipped exactly
+// when a session is deep in something else: this one was run once in a whole
+// planning session, and that once is the one duplication it caught.
 // The record's own claim is excluded from both sections — a task always
-// claims what it just granted, and reporting that would bury the answer
+// claims what it just named, and reporting that would bury the answer
 // under itself.
-export function reportPriorArtOnWrites(config: Config, tasks: Task[], task: Task): void {
-  if (task.writes.length === 0) return;
+// Returns how many records were reported claiming the same paths, which is
+// what a caller offering to attach to one of them needs and cannot get by
+// running the query a second time.
+export function reportPriorArtOnPaths(config: Config, tasks: Task[], task: Task): number {
+  const paths = claimedPaths(task);
+  if (paths.length === 0) return 0;
   const manifest = manifestOrEmpty(config, 'answering from recorded claims only — registered concepts could not be read');
   const others = tasks.filter((candidate) => candidate.id !== task.id);
   reportDispatchDefects(manifest, tasks, task);
   console.log('');
-  printPriorArt(priorArt(manifest, others, task.writes));
+  const art = priorArt(manifest, others, paths);
+  printPriorArt(art);
   console.log('');
-  printRulings(rulingsOn(others, loadEvents(config.eventsPath).events, task.writes));
+  printRulings(rulingsOn(others, loadEvents(config.eventsPath).events, paths));
+  return art.claims.length;
 }
 
 // `tasks plan` grades a dispatch set once, before anyone works it, when every

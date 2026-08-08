@@ -1,10 +1,13 @@
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-// The verbs that write, plus the two writes that exist only to be recorded.
+// The verbs that write, plus the three writes that exist only to be recorded.
 // `decision` is its own op rather than a note by convention, because "what
 // was decided about this" has to be answerable without a text heuristic.
-export const EVENT_OPS = ['add', 'edit', 'start', 'stop', 'done', 'decline', 'triage', 'import', 'audit', 'spec-add', 'spec-remove', 'spec-defer', 'spec-done', 'doctor-fix', 'note', 'decision'] as const;
+// `recur` is its own op for the same reason and a stronger one: it is counted,
+// and a count assembled by matching prose would be a different number every
+// time the prose was reworded.
+export const EVENT_OPS = ['add', 'edit', 'start', 'stop', 'done', 'decline', 'triage', 'import', 'audit', 'spec-add', 'spec-remove', 'spec-defer', 'spec-done', 'doctor-fix', 'note', 'decision', 'recur'] as const;
 
 export type EventOp = (typeof EVENT_OPS)[number];
 
@@ -59,6 +62,15 @@ function renderEvent(event: TaskEvent): string {
 export function appendEvents(events: TaskEvent[], eventsPath: string): void {
   if (events.length === 0) return;
   appendFileSync(eventsPath, `${events.map(renderEvent).join('\n')}\n`, 'utf8');
+}
+
+// One event is one line, and every reader of this log depends on it: `tasks
+// log` renders a row per event and a paragraph inside one is unreadable in a
+// column. Checked where a note enters rather than at render, because
+// `JSON.stringify` escapes the newline happily and hides the problem in the
+// file. Returns the line count of an offending note, so a caller can name it.
+export function multilineNote(note: string): number | null {
+  return /[\r\n]/.test(note) ? note.split(/\r\n|\r|\n/).length : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

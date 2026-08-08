@@ -129,8 +129,10 @@ export interface PriorArt {
 
 // `src/runtime/save.ts:88` and `docs/workflow.md#H1` are a path with a
 // location on the end: the suffix says where inside the file something was
-// seen, and is not part of what was claimed.
-const declaredPath = (entry: string): string => canonicalPath(entry.split(/[:#]/)[0]);
+// seen, and is not part of what was claimed. Exported because a caller
+// querying *with* a record's own entries has to strip it by the same rule —
+// two rules would answer the same question two ways.
+export const declaredPath = (entry: string): string => canonicalPath(entry.split(/[:#]/)[0]);
 
 // Live work first, because an open claim on a path is a collision and a
 // closed one is a precedent to read. Within a group, seq — oldest first.
