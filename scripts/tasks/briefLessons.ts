@@ -46,7 +46,7 @@ export const WORKER_LESSONS: readonly Lesson[] = [
   {
     id: 'worker/file-findings',
     title: 'File what you notice outside your grant; do not merely mention it.',
-    body: "`tasks add --kind finding`. Reporting it in a final message is how it gets lost. Never cite an id you have not seen in your own store — describe it in prose instead.",
+    body: "`tasks add \"<title>\" --kind finding --fault tooling|contract|nobody --deliverable \"what fixing it would mean\"` — the fault and the deliverable are required and the command refuses without them. Reporting it in a final message is how it gets lost. Never cite an id you have not seen in your own store — describe it in prose instead.",
   },
 ];
 

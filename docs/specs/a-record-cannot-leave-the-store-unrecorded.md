@@ -75,8 +75,8 @@ Proof:
   are therefore outside what it can check — on every run, including a clean one. A run that finds
   no discrepancy prints the 495 it never examined rather than the word "reconciled".
   proof: vitest scripts/lib/eventLog.test.ts
-- [c5] **`doctor` keeps exactly one failure condition.** An unexplained absence is named, counted and
-  printed on every run that finds one, and changes no exit code. Ruled by the author 2026-08-06,
+- [c5] **The reconciliation adds no failure condition to `doctor`.** An unexplained absence is named,
+  counted and printed on every run that finds one, and changes no exit code. Ruled by the author 2026-08-06,
   refusing this clause's original form: one historical absence is the case for reporting it, not for
   failing the build on the store's own history. `doctor-fix` cannot repair it either — a record the
   store lost is not a record `doctor` may invent, so the action is to file the ruling, not to write
@@ -98,6 +98,16 @@ from the log instead of by re-auditing the store.
 
 ## Decisions
 
+- **c5's headline was a census and is now the refusal it always was.** It read "`doctor` keeps
+  exactly one failure condition", which was true at the merge base and false by the time pass 1
+  graded it: `f2b0383`, on this same branch, gave `doctor` a second condition under c9 of
+  `a-silent-answer-is-a-defect` — a reference that resolves to nothing. Pass 1 graded c5 **unmet**
+  and refused to grade it met-with-a-note, because a met verdict would have entered a sentence in
+  the store as verified that anyone could disprove in one command. The substance never changed and
+  is untouched below: the reconciliation reports and does not gate. What changed is that the clause
+  now says that, so it cannot be falsified by a second condition arriving from a direction it was
+  never about. `CLAUDE.md` stated the same one-condition contract and was corrected in the same
+  commit — the count belonged in exactly two places and was wrong in both.
 - **Adopted from a planning session in another context, verified before adoption rather than taken
   on report.** Every factual claim above was re-derived independently against the tree: the four
   orphaned ids are exactly those four, `proof-targets-resolve` returns nothing from `git log --all

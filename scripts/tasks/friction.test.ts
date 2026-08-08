@@ -811,8 +811,14 @@ describe('c1, c5, c7, c8, c10, c12: one query over the channel', () => {
 // the extent: nothing the tooling generates may direct a report outside the
 // store.
 describe('c1: there is one place, and no generated brief names another', () => {
+  // The directory, not a filename. Asserting `tool-friction.md` is gone left
+  // its sibling `audit-tooling-friction.md` tracked in the same directory,
+  // saying the same thing about the same subject, under a title that claimed
+  // to have caught it — so "there is one place" was false while the guard was
+  // green. Nothing may live here: a second prose channel is exactly what the
+  // clause retires, whatever it is called.
   it('has no tracked file left under the retired feedback directory', () => {
-    expect(existsSync(path.join(process.cwd(), '.planning', 'agent-feedback', 'tool-friction.md'))).toBe(false);
+    expect(existsSync(path.join(process.cwd(), '.planning', 'agent-feedback'))).toBe(false);
   });
 
   it('sends every generated brief to the channel', () => {

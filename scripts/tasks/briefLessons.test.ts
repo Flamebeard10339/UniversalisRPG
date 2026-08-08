@@ -228,3 +228,18 @@ describe('every brief shows the ids of the lessons it prints', () => {
       showsItsIds(tasks('orchestrate-prompt').stdout, ORCHESTRATOR_LESSONS);
     }));
 });
+
+// A lesson is an instruction an agent runs, so a command inside one has to be
+// a command that works. `worker/file-findings` said `tasks add --kind finding`
+// for as long as it took this branch to make `--fault` and `--deliverable`
+// required, and every worker dispatched in between was told to run something
+// that exits 1. Written over every lesson rather than that one, because the
+// next lesson to name the verb will be written by someone who does not know.
+describe('a command a lesson names is a command the CLI accepts', () => {
+  it('no lesson names `--kind finding` without the flags that route requires', () => {
+    const offenders = allLessons()
+      .filter((lesson) => `${lesson.title} ${lesson.body}`.includes('--kind finding'))
+      .filter((lesson) => !(lesson.body.includes('--fault') && lesson.body.includes('--deliverable')));
+    expect(offenders.map((lesson) => lesson.id)).toEqual([]);
+  });
+});
