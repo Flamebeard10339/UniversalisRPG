@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { makeRealGitRepo } from './realGitRepo';
 import { tsxCli } from './tsxCli';
-import { backfillSeq, checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, matchesSearchTerm, misfiledSystem, nearMatches, nextSeq, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
+import { backfillSeq, checkStore, claimSummary, CLOSING_STATES, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, matchesSearchTerm, misfiledSystem, nearMatches, nextSeq, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -1122,6 +1122,15 @@ describe('checkStore', () => {
   it('flags a spec with no file', () => {
     const issues = checkStore([task({ id: 'a', spec: 'ghost-spec' })], systems, () => false);
     expect(issues).toContainEqual({ level: 'dangling', message: 'a references a spec with no file: ghost-spec' });
+  });
+
+  // A closed record's slug is which contract it answered, not a pointer to a
+  // file that has to outlive it — which is what let 34 historical spec files
+  // strand 336 closed records rather than being deleted.
+  it('says nothing about a closed record whose spec file is gone, whichever way it closed', () => {
+    for (const state of CLOSING_STATES) {
+      expect(checkStore([task({ id: 'a', state, spec: 'ghost-spec', ...(state === 'declined' ? { reason: 'closed by ruling' } : {}) })], systems, () => false)).toEqual([]);
+    }
   });
 
   it('warns, but does not error, on a file that no longer exists', () => {

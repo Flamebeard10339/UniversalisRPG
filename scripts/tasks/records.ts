@@ -71,12 +71,19 @@ export function reportUnresolvedRequires(task: Task, tasks: Task[]): void {
 
 // The word `commitment` says one thing — someone has read this region — and
 // the party it exists to distrust is the planner, who by definition has not.
-// Taking the record is the act that makes the claim true, so this is what
+// Holding the record is the act that makes the claim true, so this is what
 // permits the word: all three Phase 3 records were born commitments at the
 // planning commit, `tasks plan` graded their declared regions clean, and two
 // of them then collided in five files neither had declared.
+//
+// A closed record does not qualify, though it may once have. `open` reaches
+// `done` with no `start` in between, so admitting a closed state let a
+// commitment be asserted on a region nobody ever read — and that grant is the
+// input `done --commit` measures a diff against. Correcting a closed record's
+// region needs no `--grant`: an edit that does not name one keeps the kind
+// the record already carries.
 function claimHolds(task: Task | null): boolean {
-  return task !== null && (task.state === 'in-progress' || CLOSING_STATES.includes(task.state));
+  return task?.state === 'in-progress';
 }
 
 // A grant nobody has read the code for is a forecast, so that is what a

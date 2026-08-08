@@ -216,6 +216,48 @@ describe('tasks CLI', () => {
     expect(flagsOf('log').has('op')).toBe(true);
   });
 
+  // The converse, and the half the sweep above cannot see: a declaration that
+  // fails to declare. The scanner reads the vocabulary out of the one artifact
+  // that documents it, so a usage string it reads differently from a human is
+  // a command refusing flags its own --help prints, at exit 1, for a reason no
+  // reader of the string can find. Three ways that can happen, all checked
+  // here: a `--word` written outside every parenthetical and dropped anyway,
+  // an unbalanced delimiter (one unclosed `(` deletes every later flag), and a
+  // `...` spelled where the scanner cannot read it as repetition.
+  it('declares every flag it writes: nothing outside a parenthetical is dropped, and the delimiters balance', () => {
+    const registry = everyVerb();
+    for (const [name, usage] of registry) {
+      const declared = outsideParentheses(usage);
+      const vocabulary = flagArities(usage);
+      for (const [, flag] of declared.matchAll(/--([a-z][a-z0-9-]*)/g)) {
+        expect(vocabulary.has(flag), `--${flag} is declared by \`${name}\` and is not in its vocabulary`).toBe(true);
+      }
+
+      const count = (character: string): number => [...usage].filter((char) => char === character).length;
+      expect(count('('), `unbalanced () in \`${name}\``).toBe(count(')'));
+      expect(count('['), `unbalanced [] in \`${name}\``).toBe(count(']'));
+
+      // Past the first flag, `...` means repetition, and the scanner reads it
+      // as such only when it stands on its own once the brackets around it are
+      // discounted. `"..."` is the prose placeholder and says what the value
+      // looks like, not how often the flag may be given. Any other spelling is
+      // silently a single-value flag. Before the first flag the same three
+      // characters mean an unbounded positional tail, which is
+      // `positionalArity`'s half of the string and stops where this starts.
+      // Line by line, because `spec`'s usage is a menu of its subcommands and
+      // each line carries its own positionals.
+      for (const line of declared.split('\n')) {
+        const firstFlag = line.search(/\s\[?--/);
+        if (firstFlag === -1) continue;
+        const flagged = line.slice(firstFlag + 1);
+        for (const token of flagged.split(/\s+/).filter((entry) => entry.includes('...'))) {
+          const beyondTheProsePlaceholder = token.split('"..."').join('');
+          expect(/^[.\])]+$/.test(token) || !beyondTheProsePlaceholder.includes('...'), `${token} in \`${name}\` is a ... the scanner does not read as repetition`).toBe(true);
+        }
+      }
+    }
+  });
+
   // `audit` is the one verb whose flags genuinely repeat — a pass carries a
   // --proof per clause and a --finding per finding, and `--args-from` is the
   // only filing route for a branch audit. That is declared by the `...` its

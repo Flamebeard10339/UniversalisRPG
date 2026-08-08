@@ -1234,6 +1234,31 @@ describe('a record that declares its grant kind', () => {
       expect(tasks('show', 'planned').stdout).toContain('writes (forecast):');
     }));
 
+  // `open` reaches `done` with no `start` in between, so a state test that
+  // admitted a closed record admitted one nobody ever held.
+  it('refuses a commitment on a record that reached done without ever being started', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'never held', '--id', 'never-held', '--writes', 'src/runtime/');
+      tasks('done', 'never-held');
+      const edited = tasks('edit', 'never-held', '--grant', 'commitment');
+      expect(edited.status).toBe(1);
+      expect(edited.stderr).toContain('records that someone has read the region');
+      expect(tasks('show', 'never-held').stdout).toContain('writes (forecast):');
+    }));
+
+  // Correcting the region a closed record really touched is the workflow's
+  // own instruction, and it must not need the word this branch just refused.
+  it('lets a closed record correct its writes, keeping the grant kind it already carried', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'held work', '--id', 'held', '--writes', 'src/runtime/');
+      tasks('start', 'held');
+      tasks('edit', 'held', '--grant', 'commitment');
+      tasks('done', 'held');
+      const corrected = tasks('edit', 'held', '--writes', 'src/runtime/save.ts,src/ui/panel.ts');
+      expect(corrected.status).toBe(0);
+      expect(tasks('show', 'held').stdout).toContain('writes (commitment): src/runtime/save.ts, src/ui/panel.ts');
+    }));
+
   it('refuses a grant kind it does not know, rather than recording it', () =>
     fixture(({ tasks }) => {
       const result = tasks('add', 'bad grant', '--id', 'bad', '--writes', 'src/runtime/', '--grant', 'maybe');
