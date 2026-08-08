@@ -1211,4 +1211,27 @@ describe('a record cannot leave the store undeclared', () => {
       expect(loadStore(file).map((entry) => entry.id)).toEqual(['fresh']);
     });
   });
+
+  // The half `saveStore` cannot enforce by itself. Declaring a drop satisfies
+  // the guard above; writing the `remove` event that names it is the caller's
+  // job, and exactly one caller does it — `saveStoreAndWarn`, which derives the
+  // declaration and the events from one `Removal` list so the two cannot
+  // disagree. So the closure of the set is "there is one caller", and that is a
+  // fact about the call graph rather than about any line, which is why it is
+  // asserted here: `saveStore(tasks, path, ['x'])` from a second call site
+  // drops a record, appends nothing, and breaks no other test in the tree.
+  it('has exactly one non-test caller, which is what pairs a declared drop with the event naming it', () => {
+    const sources = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) return sources(full);
+        return /\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name) ? [full] : [];
+      });
+
+    const callers = sources('scripts')
+      .filter((file) => path.resolve(file) !== path.resolve('scripts', 'lib', 'taskStore.ts'))
+      .filter((file) => /\bsaveStore\s*\(/.test(readFileSync(file, 'utf8')))
+      .map((file) => file.split(path.sep).join('/'));
+    expect(callers).toEqual(['scripts/tasks/context.ts']);
+  });
 });

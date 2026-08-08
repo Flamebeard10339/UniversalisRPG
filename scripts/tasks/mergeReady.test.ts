@@ -6,7 +6,7 @@ import * as git from '../lib/git';
 import { parseStoreTolerantly, type Task } from '../lib/taskStore';
 import { allUsages } from './commands';
 import type { Config } from './context';
-import { installDataGit } from './cliFixtures';
+import { fixture, installDataGit } from './cliFixtures';
 import { realGitRepo } from './realGitFixture';
 import {
   branchStanding,
@@ -866,10 +866,37 @@ describe('the gate reads no fault, no breach and no count', () => {
     for (const leg of LEGS) expect(leg.command).not.toMatch(/friction|fault|breach|recur|checked/);
   });
 
-  it('names neither field anywhere in the gate, so no value of either can reach a leg', () => {
-    const source = readFileSync(path.join(__dirname, 'mergeReady.ts'), 'utf8');
-    // The reads that would make a count matter, rather than the words: the
-    // gate's own prose is allowed to say "recurrence" about something else.
-    for (const read of ['.fault', '.breaches', "'recur'", "'checked'", 'friction']) expect(source).not.toContain(read);
+  // Every file the gate reaches, not the one it is declared in. `doctor` is a
+  // leg of this gate *and* a CI step, and `checkPlan` runs as `tasks plan` on
+  // the same CI leg — so widening doctor's exit condition to read a fault made
+  // a merge-ready leg and a check gate on the channel, and this scan over
+  // `mergeReady.ts` alone could not see it. It survived all 2,040 tests.
+  it('names neither field in any file the gate reaches, so no value of either can reach a leg', () => {
+    const reached = [path.join(__dirname, 'mergeReady.ts'), path.join(__dirname, 'doctor.ts'), path.join(__dirname, '..', 'lib', 'planCheck.ts')];
+    for (const file of reached) {
+      const source = readFileSync(file, 'utf8');
+      // The reads that would make a count matter, rather than the words: the
+      // gate's own prose is allowed to say "recurrence" about something else.
+      for (const read of ['.fault', '.breaches', "'recur'", "'checked'", 'friction']) expect(source, `${file} reads ${read}`).not.toContain(read);
+    }
+  });
+
+  // The property, not the spelling. A scan can only ban the shapes somebody
+  // thought of; this asks the gate the question directly.
+  it('exits zero over a store whose findings carry no fault and whose breaches keep recurring', () => {
+    fixture(({ tasks }) => {
+      for (const n of [1, 2, 3, 4]) {
+        tasks('add', `a breach of the same lesson (${n})`, '--id', `breach-${n}`, '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it', '--breaches', 'worker/mutation-proof');
+        tasks('recur', `breach-${n}`, '--note', `it cost something again (${n})`);
+      }
+      // And the absence the axis turns on, which no route can create any more,
+      // so it is written straight into the store the way a legacy record sits.
+      tasks('add', 'ordinary work', '--id', 'ordinary');
+
+      // The two legs that read the store at all. Neither may take an opinion
+      // from any of the above.
+      expect(tasks('doctor').status).toBe(0);
+      expect(tasks('plan', 'ordinary').status).toBe(0);
+    });
   });
 });

@@ -791,9 +791,74 @@ describe('c1, c5, c7, c8, c10, c12: one query over the channel', () => {
       // invert them, and ordering by count is comparing it to something.
       expect(stdout.indexOf('worker/comment-rule')).toBeLessThan(stdout.indexOf('worker/mutation-proof'));
       expect(stdout).toContain('Nothing here gates. No number above is compared to anything');
-      // The refusal, checked at the source rather than in the output: an
-      // `if` over a count is one line away and would look like tidying.
-      expect(readFileSync(path.join(__dirname, 'friction.ts'), 'utf8')).not.toMatch(/\.length\s*[<>]|count\s*[<>]|>=\s*\d/);
+    });
+  });
+
+  // The rule, stated, because the previous guard banned one spelling in one
+  // file and two walk-arounds survived all 2,040 tests: the same elevation
+  // written `=== 3` instead of `> 2`, and the same elevation written in
+  // records.ts instead of friction.ts.
+  //
+  // A channel count may be compared to zero and to nothing else. Zero is an
+  // emptiness guard for phrasing — `over === 0` guards a division, and
+  // `orphaned.length === 0` chooses whether to print a heading — and neither
+  // decides anything about a lesson or a record. Any other literal is a
+  // threshold whatever operator reaches it, which is why the shape is banned
+  // rather than the inequality.
+  it('compares no channel count to anything but zero, in any file that reads the channel', () => {
+    const THRESHOLD = /(?:breach|occurrence|recurrence|cited|fault|count)\w*(?:\.length|\.size)?\s*(?:[<>]=?|={2,3}|!==)\s*(?!0\b)\d+/i;
+    // The rule bounded in both directions before it is applied to anything, so
+    // a green run means it looked rather than that it cannot fire. Guarding
+    // over-strictness matters as much here: a rule that also banned `=== 0`
+    // would forbid the emptiness guards the query legitimately needs, and the
+    // repair for that is deleting the rule.
+    for (const banned of ['if (cited.length > 2)', 'if (occurrenceCount.size === 3)', 'if (occurrences.length >= 3)', 'if (breaches.length !== 1)']) {
+      expect(THRESHOLD.test(banned), banned).toBe(true);
+    }
+    for (const legal of ['if (orphaned.length === 0) return;', 'const rate = (count: number, over: number) => (over === 0 ?', 'if (claims === 0) return;', 'return pass >= 2 ?']) {
+      expect(THRESHOLD.test(legal), legal).toBe(false);
+    }
+    for (const file of ['friction.ts', 'records.ts']) {
+      const source = readFileSync(path.join(__dirname, file), 'utf8');
+      const offenders = source
+        .split('\n')
+        .map((line, index) => ({ line: line.trim(), at: `${file}:${index + 1}` }))
+        .filter(({ line }) => THRESHOLD.test(line));
+      expect(offenders.map((offender) => `${offender.at} ${offender.line}`)).toEqual([]);
+    }
+  });
+
+  // And the property the scan is a proxy for, asked of the command directly:
+  // a lesson breached four times over and recurring reads the same way as one
+  // breached once. An elevation has to say something to be an elevation.
+  it('says nothing more about a lesson breached four times than about one breached once', () => {
+    fixture(({ tasks }) => {
+      for (const n of [1, 2, 3, 4]) {
+        tasks('add', `a breach of the recurring lesson (${n})`, '--id', `recurring-${n}`, '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it', '--breaches', 'worker/mutation-proof');
+        tasks('recur', `recurring-${n}`, '--note', `again (${n})`);
+      }
+      tasks('add', 'a single breach', '--id', 'single-one', '--kind', 'finding', '--fault', 'tooling', '--severity', 'low', '--deliverable', 'fix it', '--breaches', 'worker/aim-at-the-clause');
+
+      const { stdout, status } = tasks('friction');
+      expect(status).toBe(0);
+      const lineFor = (lesson: string): string => stdout.split('\n').find((line) => line.trimStart().startsWith(lesson))!;
+      // The shape after the lesson's own id, with the numbers standing in for
+      // themselves: `N record(s), N further occurrence(s) —`. Nothing is
+      // appended to the heavier one, which is what an elevation would be.
+      const shape = (lesson: string): string =>
+        lineFor(lesson)
+          .trimStart()
+          .slice(lesson.length)
+          .trimStart()
+          .split('—')[0]
+          .replace(/\d+/g, 'N');
+      expect(lineFor('worker/mutation-proof')).toContain('4 record(s), 4 further occurrence(s) —');
+      expect(lineFor('worker/aim-at-the-clause')).toContain('1 record(s), 0 further occurrence(s) —');
+      expect(shape('worker/mutation-proof')).toBe(shape('worker/aim-at-the-clause'));
+      // And the order is still the briefs' own, with the four-breach lesson
+      // ahead of the one-breach lesson only because WORKER_LESSONS says so.
+      expect(stdout.indexOf('worker/comment-rule')).toBeLessThan(stdout.indexOf('worker/mutation-proof'));
+      expect(stdout.indexOf('worker/mutation-proof')).toBeLessThan(stdout.indexOf('worker/aim-at-the-clause'));
     });
   });
 
