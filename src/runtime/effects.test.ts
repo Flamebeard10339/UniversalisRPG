@@ -10,8 +10,23 @@ const MODULE = `
 # stat max-health
 base: 20
 
+# flag lit
+
 # resource health
 max: max-health
+
+# droptable spoils
+drain: 5 health
+
+// One of each wrapper kind, every one of them certain to fire, so what varies
+// between them is only which actor their body is applied to.
+# droptable every-wrapper
+1 in 1: drain: 5 health
+1000 vs 0: drain: 5 health
+if lit: drain: 5 health
+one of:
+  1x: drain: 5 health
+roll: spoils
 `;
 
 function watched(): { seen: ResultApplication[]; observer: ResultObserver } {
@@ -54,6 +69,28 @@ describe('applyResults: the actor a result applies to', () => {
 
     expect(state.activeAction.actors!.brute.resources.health).toBe(toMilliUnits(15));
     expect(state.resources.health).toBe(toMilliUnits(20));
+  });
+
+  it('carries the actor into the body of every wrapper kind', () => {
+    const { registry, state } = fresh();
+    state.flags.lit = true;
+    const segment = newSegment(state, registry, []);
+
+    applyResults(segment, registry.dropTables.get('every-wrapper')!.results, 'brute');
+
+    expect(getDelta(segment.deltas, 'brute', 'health')).toBe(toMilliUnits(-25));
+    expect(getDelta(segment.deltas, PLAYER, 'health')).toBe(0);
+  });
+
+  it('carries the actor into each repetition of a batch that samples per application', () => {
+    const { registry, state } = fresh();
+    state.flags.lit = true;
+    const segment = newSegment(state, registry, []);
+
+    applyResults(segment, registry.dropTables.get('every-wrapper')!.results, 'brute', 3);
+
+    expect(getDelta(segment.deltas, 'brute', 'health')).toBe(toMilliUnits(-75));
+    expect(getDelta(segment.deltas, PLAYER, 'health')).toBe(0);
   });
 });
 
