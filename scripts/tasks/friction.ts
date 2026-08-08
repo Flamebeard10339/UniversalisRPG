@@ -17,6 +17,13 @@ import { readStore, recordEvents, resolveConfig } from './context';
 // pretend to know what they cannot.
 const DEFECT_FAULTS: Fault[] = ['tooling', 'contract'];
 
+// One predicate for "counts as a defect", so every section that presents a
+// defect measure excludes the same records. Three sections did the filtering
+// independently and two of them forgot, which is what let `nobody` be printed
+// as counted in nothing and then counted twice below it. Undefined is a
+// recurrence whose record is not in this store: unclassifiable, so not counted.
+const isDefect = (task: Task | undefined): boolean => task !== undefined && task.fault !== null && DEFECT_FAULTS.includes(task.fault);
+
 // Absence of a fault is its own answer and not a fourth value: a record
 // written before the field existed says nothing about who was at fault, and
 // folding it into `nobody` would empty the meaning the whole axis depends on.
@@ -40,11 +47,14 @@ interface Denominator {
 // Drawn from events the log already carries, never from a new tally: a
 // denominator that is itself hand-kept is a second thing to drift. A
 // `work-prompt` is a read and leaves no event, so `start` is the honest proxy
-// for a dispatch.
+// for a dispatch. `tasks audit` emits one `audit` event for the pass and one
+// more per finding the pass files, so the pass count is the subject-less ones:
+// counting them all put the numerator inside its own denominator, and made
+// filing a defect increment both sides of its own rate.
 function denominators(events: TaskEvent[]): Denominator[] {
   return [
     { label: 'dispatches (start events)', count: filterEvents(events, { op: 'start' }).length },
-    { label: 'audit passes (audit events)', count: filterEvents(events, { op: 'audit' }).length },
+    { label: 'audit passes (audit events carrying no record)', count: filterEvents(events, { op: 'audit' }).filter((event) => event.id === null).length },
     { label: 'specs closed (spec-done events)', count: filterEvents(events, { op: 'spec-done' }).length },
   ];
 }
@@ -61,7 +71,7 @@ function printByFault(reporting: Task[]): void {
 }
 
 function printRates(reporting: Task[], events: TaskEvent[]): void {
-  const defects = reporting.filter((task) => task.fault !== null && DEFECT_FAULTS.includes(task.fault));
+  const defects = reporting.filter(isDefect);
   const excluded = reporting.length - defects.length;
   console.log(`\n${defects.length} of those are a defect measure — fault ${DEFECT_FAULTS.join(' or ')} only, with the other ${excluded} reported above and excluded here:`);
   for (const { label, count } of denominators(events)) console.log(`  ${defects.length} against ${count} ${label} — ${rate(defects.length, count)}`);
@@ -85,12 +95,20 @@ function occurrencesByRecord(events: TaskEvent[]): Occurrence[] {
 }
 
 function printOccurrences(occurrences: Occurrence[], reporting: Task[]): void {
-  const total = occurrences.reduce((sum, entry) => sum + entry.events.length, 0);
-  console.log(`\n${total} recurrence(s) recorded against ${occurrences.length} record(s); the other ${reporting.length - occurrences.length} carry none. Every number here is counted off the occurrences themselves — nothing is stored, so nothing can disagree with them:`);
   const byId = new Map(reporting.map((task) => [task.id, task]));
+  const sum = (held: Occurrence[]): number => held.reduce((running, entry) => running + entry.events.length, 0);
+  const counted = occurrences.filter((entry) => isDefect(byId.get(entry.id)));
+  const excluded = occurrences.filter((entry) => !isDefect(byId.get(entry.id)));
+  const carryNone = reporting.filter(isDefect).length - counted.length;
+  console.log(
+    `\n${sum(counted)} recurrence(s) recorded against ${counted.length} record(s) of defect fault; the other ${carryNone} carry none. ` +
+      `${sum(excluded)} further recurrence(s) against ${excluded.length} record(s) are reported below and excluded from that count. ` +
+      `Every number here is counted off the occurrences themselves — nothing is stored, so nothing can disagree with them:`,
+  );
   for (const { id, events } of occurrences) {
     const task = byId.get(id);
-    console.log(`  ${id} — ${events.length} occurrence(s)${task === undefined ? ', and no record in the store answers to that id' : ` (${task.state})`}`);
+    const standing = task === undefined ? ', and no record in the store answers to that id' : ` (${task.state}${isDefect(task) ? '' : `, ${bucketOf(task)} — not counted above`})`;
+    console.log(`  ${id} — ${events.length} occurrence(s)${standing}`);
     for (const event of events) console.log(`      ${event.t.slice(0, 10)}  ${event.by ?? '(unnamed)'}  ${event.note}`);
   }
 }
@@ -106,14 +124,19 @@ function lastCheck(events: TaskEvent[], lessonId: string): TaskEvent | undefined
 function printByLesson(reporting: Task[], events: TaskEvent[], occurrences: Occurrence[]): void {
   const occurrenceCount = new Map(occurrences.map((entry) => [entry.id, entry.events.length]));
   const lessons = allLessons();
-  console.log(`\nby lesson breached, over ${lessons.length} live lesson(s). The order is the briefs' own and never the count's — ranking by the number would be comparing it to something, and the number is a reading aid for a planner rather than a rule:`);
+  console.log(
+    `\nby lesson breached, over ${lessons.length} live lesson(s), counting the defect faults only — this is the defect reading in actionable form, so it excludes what \`printRates\` excludes and names the excluded records anyway. ` +
+      `The order is the briefs' own and never the count's — ranking by the number would be comparing it to something, and the number is a reading aid for a planner rather than a rule:`,
+  );
   const width = Math.max(...lessons.map((lesson) => lesson.id.length));
   for (const lesson of lessons) {
     const cited = reporting.filter((task) => task.breaches.includes(lesson.id));
-    const recurrences = cited.reduce((sum, task) => sum + (occurrenceCount.get(task.id) ?? 0), 0);
+    const counted = cited.filter(isDefect);
+    const recurrences = counted.reduce((sum, task) => sum + (occurrenceCount.get(task.id) ?? 0), 0);
     const check = lastCheck(events, lesson.id);
     const looked = check === undefined ? 'nobody has looked' : `checked clean ${check.t.slice(0, 10)} by ${check.by ?? '(unnamed)'}: ${check.note}`;
-    console.log(`  ${lesson.id.padEnd(width)}  ${String(cited.length).padStart(3)} record(s), ${recurrences} further occurrence(s) — ${cited.length === 0 ? looked : `${cited.map((task) => task.id).join(', ')}${check === undefined ? '' : `; ${looked}`}`}`);
+    const named = cited.map((task) => (isDefect(task) ? task.id : `${task.id} (${bucketOf(task)}, not counted)`)).join(', ');
+    console.log(`  ${lesson.id.padEnd(width)}  ${String(counted.length).padStart(3)} record(s), ${recurrences} further occurrence(s) — ${cited.length === 0 ? looked : `${named}${check === undefined ? '' : `; ${looked}`}`}`);
   }
 
   const orphaned = reporting.flatMap((task) => unknownLessonIds(task.breaches).map((id) => ({ task, id })));

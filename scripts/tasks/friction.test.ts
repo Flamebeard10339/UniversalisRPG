@@ -637,6 +637,29 @@ describe('c1, c5, c7, c8, c10, c12: one query over the channel', () => {
     });
   });
 
+  it('counts nothing below the line that says it is counted in nothing below', () => {
+    fixture(({ tasks }) => {
+      fillTheChannel(tasks);
+      // The bucket note promises `nobody` is counted in nothing below it, and
+      // the per-lesson breach count and the recurrence total are below it. Both
+      // used to count it, which is the exclusion being stated and not performed.
+      tasks('edit', 'nobody-one', '--breaches', 'worker/mutation-proof');
+      tasks('recur', 'nobody-one', '--note', 'it cost twenty minutes again');
+      tasks('recur', 'tooling-one', '--note', 'and this one is a defect');
+
+      const { stdout } = tasks('friction');
+      expect(stdout).toContain('1 recurrence(s) recorded against 1 record(s) of defect fault');
+      expect(stdout).toContain('1 further recurrence(s) against 1 record(s) are reported below and excluded from that count');
+      // Reported, not silently dropped: the excluded occurrence still prints,
+      // named with the bucket that excluded it.
+      expect(stdout).toContain('nobody-one — 1 occurrence(s) (unreviewed, nobody — not counted above)');
+      // Two records cite the lesson and one of them is `nobody`, so the count
+      // is one and both are still named.
+      expect(stdout).toMatch(/worker\/mutation-proof\s+1 record\(s\), 1 further occurrence\(s\) — .*nobody-one \(nobody, not counted\)/);
+      expect(stdout).toMatch(/worker\/mutation-proof\s+1 record\(s\), 1 further occurrence\(s\) — .*tooling-one/);
+    });
+  });
+
   it('presents every count beside the denominator it is a rate over, drawn from the log', () => {
     fixture(({ tasks }) => {
       fillTheChannel(tasks);
@@ -644,8 +667,24 @@ describe('c1, c5, c7, c8, c10, c12: one query over the channel', () => {
 
       const { stdout } = tasks('friction');
       expect(stdout).toContain('2 against 1 dispatches (start events)');
-      expect(stdout).toContain('2 against 0 audit passes (audit events) — no denominator yet');
+      expect(stdout).toContain('2 against 0 audit passes (audit events carrying no record) — no denominator yet');
       expect(stdout).toContain('2 against 0 specs closed (spec-done events)');
+    });
+  });
+
+  it('counts a pass once in the audit denominator, however many findings that pass filed', () => {
+    fixture(({ tasks, dir }) => {
+      fillTheChannel(tasks);
+      // What `tasks audit` writes: one subject-less event for the pass, then
+      // one carrying a record for each finding it filed. Counting them all put
+      // the numerator inside its own denominator — filing a defect-fault
+      // finding incremented both sides of its own rate — and the number, not
+      // merely its presence, is what says so.
+      const log = path.join(dir, 'events.jsonl');
+      const audit = (id: string | null): string => JSON.stringify({ t: '2026-08-08T00:00:00.000Z', by: 'auditor', branch: 'b', head: null, op: 'audit', id, system: null, spec: 'a-spec', note: 'graded' });
+      writeFileSync(log, `${readFileSync(log, 'utf8')}${audit(null)}\n${audit('tooling-one')}\n${audit('contract-one')}\n`, 'utf8');
+
+      expect(tasks('friction').stdout).toContain('2 against 1 audit passes (audit events carrying no record) — 200 per 100');
     });
   });
 
