@@ -232,6 +232,369 @@ sentence, two homes, no link, and the copy that governs every agent is the one t
 
 ---
 
+## 5. Findings
+
+Filed under the `## H1` / `## M2` / `## L3` convention `tasks import` reads. Ordered so that the
+first four retire the most of the rest. Every finding below was reproduced unless it says
+`unconfirmed`.
+
+Findings that only **confirm an already-open record** are listed in §5.9 and are deliberately not
+re-filed — the store already carries them, and the duplicate pile is itself one of this audit's
+findings.
+
+## H1 — The store is rewritten whole with no lock, so a concurrent write loses records and a concurrent read answers short
+
+`saveStore` (`scripts/lib/taskStore.ts:481`) is `writeFileSync` over the entire 1.4 MB file. Every
+write verb is `loadStore` → mutate → `saveStore`: no lock, no compare-and-swap, no staging file, no
+re-read.
+
+**Lost writes.** Eight concurrent `tasks add` against a copy of the live store: eight `added …`
+lines, zero errors, eight `add` events in `docs/events.jsonl`, **three records on disk**, and
+`doctor` reports 0 errors. Independently reproduced at three writers: three successes, one record.
+Staggering shows the window — 0 s offset loses records, 0.2 s offset does not — so the hazard is
+precisely "writers dispatched together", which is what an orchestrator does.
+
+**Torn reads — and this is the mechanism behind the reported symptom.** `writeFileSync` truncates
+and then streams; a reader inside that window sees a *prefix*. When the prefix ends on a newline
+every line in it is valid, so `parseStoreTolerantly` — which `readStore` uses for every read
+command — has nothing to report. Measured with two writers and one reader loop:
+`reads 1826, reads answering short 1825, short reads with no skip message at all 803,
+fewest records seen 0`. Write window p50 2.89 ms / max 9.95 ms against a 3.40 ms read.
+
+That is a store that is short, self-consistent, silent, and exit-0 — which is exactly
+*"agents are constantly reading the store and discovering stale or incomplete information."*
+The symptom is not stale records. It is a truncated file.
+
+`docs/workflow.md:135-140` states the write hazard in prose and tells humans to serialise filing by
+hand. It understates it in two ways: it does not mention reads at all, and **nothing detects the
+loss afterwards** — `doctor` never opens the event log, so the one witness that kept all eight
+records is never asked. Reconciling the two live files directly finds 4 ids the log knows and the
+store does not.
+
+**Fix, in order of cost.** Ten lines in one function: write to `.tmp` and `rename` (atomic, ends the
+torn read), and re-read-and-compare before writing (ends the lost write). No caller changes. This
+retires H8's persistence, M6, the manual serialisation rule, and the reason §6.1 exists.
+
+## H2 — A write grant is a promise with no observation point, and it is graded at the one moment nobody could have kept it
+
+Three separate defects, one mechanism. See §4.1 for the full reproduction.
+
+1. `resolveGrant` (`scripts/tasks/records.ts:78`) honours `--grant commitment` unconditionally and
+   cannot tell `add` from `edit`, so a planner can record a commitment on a region nobody has read.
+   All three Phase 3 records were born `commitment` at planning commit `8c12842`.
+2. `checkPlan` runs once, before dispatch, when the grant's measured accuracy is 10–50%. The
+   corrected grant arrives during the run and nothing re-grades it. `tasks edit --writes` already
+   calls `reportPriorArtOnWrites`, which *did* name the collider — as line 59 of 233 lines of
+   untagged prior art.
+3. `task.grant` is read at five non-test sites and `writes` is compared to a real diff at none.
+   Neither `tasks start`, nor `tasks done --commit`, nor `merge-ready` ever asks whether the branch
+   wrote what it promised.
+
+**Fix.** Refuse `--grant commitment` on a record that has never been started. Call `checkPlan` from
+inside `reportPriorArtOnWrites` and print defects *above* the prior-art wall, so the check fires at
+the moment the record becomes true. And have `tasks done --commit <rev>` report grant-versus-diff:
+it has both in hand, the workflow already asks a human to do it by eye, and recording the delta is
+also the only cheap answer to §6.8.
+
+## H3 — `tasks where` discards same-system callers, so the one query that could show a sibling caller is blind exactly where siblings live
+
+`regionView.importedBy` (`scripts/lib/architecture.ts:244`) filters callers down to cross-system
+ones. Fifteen files in the tree import `scripts/tasks/context.ts`; `tasks where
+scripts/tasks/context.ts` prints none of them — including `scripts/tasks/auditPrompt.ts:568`, the
+exact call site left behind when `a8fd3e6` narrowed `resolveActiveSpec`'s body, which produced the
+`merge-ready` / `audit-prompt` deadlock.
+
+`tsc` cannot catch this class and neither could a deleted-export detector: the signature at
+`scripts/tasks/context.ts:219` is unchanged. Only the body narrowed. The break is behavioural with
+no type surface, which is why the branch's own by-hand survey of all seven callers enumerated
+`auditPrompt.ts` and classified it "informational WARNING/no-op, never a write, never a pass
+filer" — a classification that was wrong, in the direction of harmless, and that nothing checks.
+
+**Fix.** Delete the `byPath.get(to)?.system !== candidate.system` clause and label cross-boundary
+callers instead of filtering to them. One clause.
+
+## H4 — A record's `system` is never checked against the system that owns its own paths
+
+`--system` is validated only against the list of names in `docs/audits/systems.json`
+(`scripts/tasks/context.ts:339-347`). `ownerOf` (`scripts/lib/systems.ts:172-181`) is a pure
+function over the already-loaded manifest that resolves a path to its owning system, and is already
+used for the reverse direction by `tasks where` — and never for this.
+
+Reproduced: `tasks add … --system "Testing procedure" --writes scripts/lib/taskStore.ts` succeeds
+with **zero warning**, while printing 33 lines of prior art on that file, nearly all of it filed
+under "Task system".
+
+Surveyed over the live store: of 146 open records carrying both a system and at least one path,
+**8 are clean, unambiguous mis-filings** — every path resolving to one system, and not the declared
+one. Four of the eight are task-system tooling records filed as "Testing procedure", which is the
+same failure as the flagship case:
+
+`every-system-owns-its-files-by-name` — the record whose deliverable is *"stamp the freeze SHA onto
+the Task system entry"* — is filed `Testing procedure` / `medium`, and is confirmed absent from
+`tasks list --system "Task system" --severity high`. It is also `kind: task`, so `roadmap`'s
+"FINDINGS — could redden an audit" section would never show it either.
+
+The previous orchestrator diagnosed this exactly, in a `note` event attached to that very record,
+and the record's fields were never corrected. **A correct diagnosis recorded next to the defect it
+describes is not a fix.** That is the clearest single argument in this audit for enforcing rather
+than narrating.
+
+**Fix.** One warning-level comparison — `task.system` against
+`ownerOf` over `writes ∪ files` — added either to `reportPriorArtOnWrites` (stops new ones at
+authorship) or to `checkStore` (catches the eight already filed). Both is better. A warning, never
+a refusal: some records legitimately span systems.
+
+## H5 — `clauseStandings` is reconciled against the store at two of nine call sites
+
+`clauseStandings` (`scripts/lib/specDoc.ts:286`) takes the *document's current* clause list and
+returns verdicts only for ids still in it. Two callers — `scripts/tasks/mergeReady.ts:337-342` and
+`scripts/tasks/records.ts:794` — separately rebuild the clause-id set from the store's own
+`discharges`/`clause` fields and fall back to `unknown`. The other seven, including the
+human-facing `tasks spec show`, do not.
+
+Reproduced twice in a scratch fixture:
+
+- **Deletion.** Removing a graded clause's bullet from the markdown makes `tasks spec show` print
+  `clause standing (composed over 1 pass(es)): no clause outstanding` two lines above a member list
+  still showing that clause's task as `[undelivered/open/high]`. `doctor` reports 0 errors.
+- **Rewording.** Rewriting a clause's text while keeping its `[c1]` tag silently reattaches the old
+  verdict to the new text, while the undelivered record keeps the original snapshot. Two live,
+  disagreeing statements of what clause 1 is.
+
+**Fix.** Make `clauseStandings` take the store's clause ids as a required input, the way
+`mergeReady.specStanding` already had to invent for itself. Closes all seven sites in one change.
+
+## H6 — `--args-from` classifies a line by its prefix rather than by parser position, so an audit files silently corrupted evidence
+
+`parseAuditFile` (`scripts/tasks/audit.ts:240-259`) drops every blank and `#`-prefixed line
+unconditionally (`:245`) and treats every `--`-prefixed line as a new flag unconditionally (`:246`),
+whether or not a value is currently open. `AUDIT_USAGE` documents the rule as "any unprefixed line
+continuing the value above it" and mentions neither carve-out.
+
+Reproduced twice, both exiting 0 with a success message:
+
+- A `#4521 for background…` line mid-evidence is **silently deleted** from the filed record.
+- A `--file 3=src/example.ts:10 and confirm the crash` line mid-evidence truncates the evidence and
+  lands its tail in `files[]` as a bogus reference with an embedded newline.
+
+This is the silent sibling of the already-open `task-system-refactor-pass2-b-l1` (an `--evidence`
+beginning `<digits>=` is captured as clause evidence). That one refuses loudly; these two file
+successfully with corrupted data. `--args-from` is the **one filing route for a branch audit**, so
+this is the mechanism by which an audit's findings get quietly lost.
+
+**Fix.** Track parser position: only classify a line as a flag-opener at top level. One change
+retires all three manifestations.
+
+## H7 — 104 of 792 records share a `seq`, and `seq` is the sole tie-break in every queue
+
+Measured on the shipped store: 792 records, 727 distinct `seq`, **39 colliding values across 104
+records**. `nextSeq` (`scripts/lib/taskStore.ts:491`) is max+1 over what one branch can see, so two
+branches produce the same number.
+
+`seqRank` is the only tie-break in all four queues. Reversing the input array diverges `listQueue`
+at index 17 of 171 and `unreviewedQueue` — the queue `tasks triage` walks — at index 9 of 27.
+
+`scripts/lib/orderIndependence.test.ts` exists to forbid exactly this and passes, because its
+fixture gives every record a distinct `seq` — a precondition its own header states at line 9 and
+the live data violates 104 times. The comment at `scripts/lib/taskStore.ts:493` calling collisions
+"harmless, because `seq` orders a queue and does not identify a record" is false: ordering a queue
+is the entire job it has, and `:519`'s "oldest first" is actually id-alphabetical for those 104.
+
+**Fix.** Either make the tie-break total (`seq`, then id) — two lines, and it makes the existing
+test's property true of the live data — or take `seq`'s job back to the event log's own append
+order under §6.1.
+
+## H8 — A duplicate id answers two different ways inside one command
+
+`resolveIds.ts:21` uses `Array.find` (first match); `scripts/lib/taskStore.ts:572` builds
+`new Map(pairs)` (last match). Reproduced with one id present twice: `tasks show zz-dup-dep` prints
+`[task/done]` while `tasks show zz-waiter` prints `requires: zz-dup-dep (waiting)` — two answers,
+one store read. `tasks edit` reaches only the first copy and `saveStore` writes both back forever.
+`doctor` reports `[error] duplicate id` and **exits 0**.
+
+`.gitattributes:14-16` justifies excluding the store from `merge=union` on the stated grounds that
+"every read answers from the first copy forever". Every `byId` read answers from the last. The
+reasoning that shaped a merge strategy is wrong about the behaviour it was reasoning about.
+
+There are zero duplicate ids in the store today; this is a latent hazard, not a live one.
+
+## H9 — `CLAUDE.md`'s own wisdom line has drifted from the tested source it was copied from
+
+`CLAUDE.md:26` — *"Enforce where a value is assembled, not where it is **written**"*.
+`scripts/tasks/briefLessons.ts:85`, printed into every planner brief and pinned verbatim by
+`scripts/tasks/planPrompt.test.ts:106` — *"Enforce where a value is assembled, not where it is
+**read**."*
+
+"Assembled" and "written" are the same moment, so the governing document's copy states nothing. The
+tested copy states the lesson. See §4.3 for the nine other relations of this shape and §4.4 for why
+this one is the exhibit.
+
+## H10 — `merge-ready` discards the lines it could not parse, changing what the branch is graded on
+
+`scripts/tasks/mergeReady.ts:279` — `return parseStoreTolerantly(text, …).tasks;` — is the only
+tolerant-parse call site in the tree that throws away `skipped`. `context.ts` buffers it; `doctor.ts`
+sets an exit code on it.
+
+A skipped line on the **base** side makes `baseById.get(id)` undefined, so the record reads as
+added-by-this-branch and its spec enters `declaredSpecs`. A skipped line on the **current** side
+removes a spec from what the branch is graded on. `docs/workflow.md:93-94` promises the gate
+*"fails loudly rather than reading that as 'declares nothing' — the gate never guesses"*;
+`readable: false` covers only a wholly unreadable file, not a per-line skip.
+
+Code path exact; behavioural half **unconfirmed** — running `merge-ready` was forbidden during this
+concurrent sweep.
+
+## M1 — `tasks plan`'s duplicate-capability check can fire on 0.6% of the pairs it is meant to catch
+
+`checkPlan` (`scripts/lib/planCheck.ts:164`) matches producer names at `exact` and `contains`
+strength and skips `word`. Over the live store: 129 distinct producer names, `exact: 0`,
+`contains: 1`, `word: 159`. So the check fires on 1 of 160 related pairs. `"write grant"` versus the
+registered `"writes grant"` grades `word` and is skipped.
+
+Compounding it: **86 of 104 distinct `produces` claims (83%) were never registered as a concept**,
+so the vocabulary the query reads is mostly unpromoted forecasts. `scripts/lib/producers.ts:91-95`
+already prescribes the fix in its own comment — path is the primary index, name secondary — and
+`checkPlan` uses only the name.
+
+## M2 — An unknown enum *value* deletes a record from every read, while an unknown *field* is preserved
+
+Forward compatibility is asymmetric (`scripts/lib/taskStore.ts:215`): `extra` preserves an unknown
+field, but an unknown value in `state`/`kind`/`severity`/`grant`/`fault`/`decider`/`departure`
+throws, and the tolerant reader drops the whole record. Reproduced: `tasks show
+aaa-newer-branch-state` answers **"no such task"** with a did-you-mean list and exit 0, disclosing
+the real cause eight lines below the wrong answer.
+
+This is the cross-branch case: a branch that adds a vocabulary value makes its records invisible to
+every older checkout rather than merely unrecognised. The write half is correct (`add` exits 1,
+`doctor` exits 1).
+
+## M3 — `tasks next` accepts flag values that `tasks list` refuses, and then blames the wrong thing
+
+`scripts/tasks/records.ts:616` casts `args.flags.severity as Severity | undefined` with no
+validation. `tasks next --severity HIGH` answers "no open, unblocked tasks in spec X" and exits 0;
+`tasks list --severity HIGH` refuses. The same gap on `--system` makes `tasks list --system "Task
+System"` (wrong case) print 0 records and then blame **branch scoping** — a confidently wrong
+diagnosis of a typo, and the same visibility class as H4.
+
+## M4 — The collision is printed, untagged, as line 59 of 233
+
+`reportPriorArtOnWrites` (`scripts/tasks/architectureCmds.ts:208`) fires automatically on every
+`--writes` edit and did name the Phase 3 collider — buried in an undifferentiated wall.
+`tasks where scripts/tasks/` is **711 lines carrying 104 rulings**, and that directory-level query
+is what `plan-prompt` runs at workflow step 1. The step designed to prevent re-litigation is
+guaranteed to be skimmed. `collapseClosed` already exists for this and has exactly one caller;
+`printWhere` is not it.
+
+## M5 — `Testing procedure` declares `scripts/lib` whole, which manufactures 22 of the 34 shared-file lines
+
+`audit-status`'s shared-file report is 34 lines. Twelve are the deliberate, documented `src/content`
+double coverage. **Twenty-two come from one entry**: `Testing procedure` declaring the directory
+`scripts/lib` among seventeen otherwise file-level paths, while `Task system` declares specific
+files inside it. `systems.json`'s own note already confesses this as an open L4.
+
+This is also the likely mechanism behind H4's four "Testing procedure" mis-filings: a human picking
+`--system` by eye sees `scripts/lib` under Testing procedure and picks wrong. Fixing one line takes
+the report from wallpaper to signal.
+
+## M6 — `tasks audit` derives its pass number from a read and then rewrites the spec file
+
+`scripts/tasks/audit.ts:487` computes `passNumber = doc.auditPasses.length + 1` from a read, then
+`writeFileSync`s the spec file — H1's defect one file over. Clause standings compose over recorded
+passes, so a lost pass silently reverts verdicts. `cmdAudit` also makes three sequential
+non-atomic writes (store, spec file, event log). **Unconfirmed** — reproducing it needs two real
+audit filings, which this sweep was not permitted to make.
+
+## M7 — The skipped-line footer is not on every exit path, and counts reads rather than lines
+
+`scripts/tasks/commands.ts:279` uses `.finally` on the async branch and has no `try/finally` on the
+sync one, so a synchronous throw skips the disclosure entirely (structural absence exact,
+reachability unconfirmed). The buffer also accumulates per `readStore` *call*, so `spec show`,
+which reads twice, reports one bad line as "skipped 2 unparseable store line(s)". Every read over a
+partial store exits 0 with the disclosure printed *after* the answer.
+
+## M8 — A spec cannot retire, so `docs/specs/` can only grow
+
+34 of 59 spec files (58%) are fully historical. `checkStore` (`scripts/lib/taskStore.ts:808`)
+requires every closed record's non-null `spec` to name a live file forever, because `departFromSpec`
+clears `spec` only on departure and never on ordinary close. Deleting the 34 would strand **336
+closed records** as 336 `doctor` errors, 55 of which also carry `--discharges`. `spec remove` — the
+one command that could detach them — refuses once the file is gone.
+
+Extends the already-open `stranded-spec-members-have-no-repair` with the count and the reason.
+
+## M9 — `AGENTS.md` describes a directory that no longer exists
+
+`AGENTS.md:18-19` says content is parsed by `src/game/contentDsl/`. `src/game` does not exist.
+`CLAUDE.md:38` correctly names `src/grammar` + `src/content`. Two agent-facing files, one subsystem,
+nothing moving them together.
+
+## M10 — `docs/workflow.md`'s fuzzy-id list is incomplete in the direction that matters
+
+`docs/workflow.md:13-15` names `show/edit/start/stop/done/decline/promote` as the verbs accepting a
+prefix or substring and says "everywhere else … an id is exact." `resolveTaskIds` is also called
+from `cmdDefer`, `cmdRetriage`, `cmdRedirect`, `cmdAsk` and `cmdQuestion`'s `--blocks`. The
+`spec add`/`remove` half of the claim is correct. No functional risk — ambiguity still refuses —
+but the doc that claims to be kept current is not.
+
+## M11 — The same protocol sentences are hand-authored in `docs/workflow.md` and in the brief templates
+
+Roughly 450–500 words of behavioural assertion exist as independent prose in `docs/workflow.md` and
+in one to four of `planPrompt.ts` / `orchestratePrompt.ts` / `workPrompt.ts` / `commands.ts`'s usage
+strings — `docs/workflow.md:48-49` and `scripts/tasks/planPrompt.ts:70` share a word-for-word
+sentence about `tasks plan`. All copies currently agree. H9 is the proof that this structure drifts
+silently, and the merge-ready leg list is hand-copied in five places.
+
+## L1 — `work-prompt` re-asserts the grant kind as unconditional prose after printing it correctly
+
+`printGrant` (`scripts/tasks/workPrompt.ts:54`) renders the actual grant; `printObligations`
+(`:112`) then tells every worker its grant is a forecast, thirty lines later, regardless.
+
+## L2 — The concept-overlap report prints case-folded keys as if they were paths
+
+`scripts/lib/systems.ts:255-260` — `audit-status` reports `scripts/lib/specdoc.ts` and
+`scripts/tasks/auditprompt.ts`, which name nothing on a case-sensitive filesystem.
+
+## L3 — A never-swept system has no change volume to report
+
+`scripts/audit-status.ts:65` derives "commits changed since last sweep" from `lastAudit`, so the one
+system with `lastAudit: null` — the Task system, until this document — is the one the report says
+nothing about.
+
+## L4 — Nine verbs and the interactive triage walk each hand-roll the same wrapper
+
+Nine of `records.ts`'s sixteen `cmdX` functions (`scripts/tasks/records.ts:712-1123`) repeat
+resolve-ids → precheck → mutate → save → record-events → print, and `scripts/tasks/triage.ts:36-96`
+carries a second independent copy of five of them. The domain logic underneath is genuinely shared
+(`transition`, `writeAskedQuestion`, `pass2Promotion`); only the plumbing is duplicated. One
+`applyRecordChange` parameterised by precheck/mutate closures would collapse ~280 lines to ~90 plus
+a ~40-line helper, and would let the interactive forms call the same path as the batch verbs.
+
+## L5 — No command answers "what is open about this file"
+
+`tasks where <path>` prints prior art across every state with no `--state` filter; `tasks list`
+filters by state/severity/system/spec/kind with no path filter. Nothing joins them — which
+compounds H4, since `list --system <owner>` is unreliable when the `system` field itself may be
+wrong.
+
+## L6 — `check-commit-msg` is absent from the CLI's own root usage line
+
+`scripts/tasks/commands.ts:20`'s hand-maintained `USAGE` constant omits a real, working verb. Every
+other summary in that file is derived from the `COMMANDS` table; this one is not.
+
+### 5.9 Confirmed, already filed — not re-filed
+
+| existing record | what this sweep adds |
+|---|---|
+| `the-generated-mutation-manifest-expands-one-file-only-target` (unreviewed/high) | Quantified: `a-branch-is-told-which-spec-it-owes.md` generates **684** entries, `a-move-never-strands-a-question.md` 507, against 28 for a spec using quoted per-test targets. **0% usable** — every entry ships an unaimed sentinel. Hand-built replacements in 5+ consecutive passes at 10–30 min each. |
+| `stranded-spec-members-have-no-repair` (open/medium) | Now quantified as M8: 34 files, 336 stranded records. Severity is understated. |
+| `the-worker-and-auditor-lessons-still-say-tasks-add-kind-find` (unreviewed/medium) | Confirmed: 1 of 19 lessons names a drifted command. The other 18 are clean. |
+| `triage-writes-state-directly-in-three-places-bypassing-trans` (open/low) | **Already fixed** by `2ed2f96`; the record is stale and should be closed. Its `files` field still names `scripts/tasks.ts`, now a 12-line shim. |
+| `max-lesson-count-is-a-quota-of-the-shape-claude-md-retired-o` (unreviewed/medium) | **Refuted.** It is enforced (`auditPrompt.test.ts:1017-1021`) and it measures a flat count, not the gameable ratio the comment budget measured. Recommend declining. |
+| `a-branch-is-told-which-spec-it-owes-pass1-tasks-plan-does-no` (unreviewed/high) | Confirmed live and correctly disclosed; the STOP note explaining that fixing it would redden CI is right. This is a clause amendment, not a defect fix. |
+| `a-record-cannot-leave-the-store-unrecorded` (open/high) | Its reconciliation is the right mechanism, but it scopes itself to removal-by-drop and **excludes concurrency**. H1's four log-known/store-missing ids are in its blind spot. |
+
+---
+
 ## 6. The v3 requirements, assessed against measurement
 
 The author's notes in `.planning/.scratch.md` list seven requirements for the next iteration. Each
