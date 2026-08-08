@@ -342,3 +342,214 @@ discharged and mutation-proven, and file the routing gap high rather than readin
 - proof 7: unknown
 - proof 8: unknown
 - proof 9: unknown
+
+### Pass 3 — 2026-08-08
+
+- base: `9f5f4ddaaa307b18abc3c3214acc6fcea758ef65`
+- head: `a6d7d92bf9a540f97bc81122ced5510f96a8b4e4`
+- proof 1: unmet — Three of the clause's four sentences hold; its first and plainest one does not. Holding:
+`.planning/agent-feedback/tool-friction.md` is gone (`git show 9f5f4dd:.planning/agent-feedback/tool-friction.md
+| wc -l` is 1660, `ls .planning/agent-feedback/` at HEAD does not list it). `npm run tasks -- friction`
+is one query and answers over the whole channel — live on the real store it reports 603 reporting
+records across four buckets, 0 recurrences, and 20 lessons. And the generated-brief invariant is real
+rather than asserted: mutation `c1-a-generated-brief-names-a-second-place` reinserted
+`.planning/agent-feedback/tool-friction.md` into `auditPrompt.ts`'s step 8 (the exact line the spec's
+Deliverable says used to carry it) and was KILLED by `scripts/tasks/auditPrompt.test.ts > ... makes
+filing what the audit cost a numbered step, and sends it to the channel rather than a markdown file`,
+re-run at its own file with the mutation still applied and failing there too. Note for the next pass:
+the guard the branch wrote for this at `friction.test.ts:738` loops over work-prompt, plan-prompt and
+orchestrate-prompt only — audit-prompt, the brief that historically named the file, is caught by a
+different test in a different file, so the coverage is real but not where the clause's own test claims it.
+What fails is "There is one place": `.planning/agent-feedback/audit-tooling-friction.md` is still
+tracked (`git ls-files .planning/` lists it, 26 lines), still sits in the directory this branch retired,
+and is still a prose channel for exactly what the store now holds — its own header says entries record
+"what was reached for instead", "what it cost", and accumulate so a reader can "see which gaps keep
+recurring across independent passes", which is verbatim the aggregation argument the spec's Deliverable
+makes for replacing prose with records. Nothing directs an agent there, so the harm is a rotting
+parallel copy rather than an active second route; but the clause says the markdown file is "one instance
+and not the extent", which widens the promise past the named file rather than capping it at it, and the
+branch's own guard is titled `has no tracked file left under the retired feedback directory` while
+asserting only about `tool-friction.md`. Re-run: `git ls-files .planning/agent-feedback/`. One line
+either way closes this — delete the file, or record it as history in its own header the way the spec
+records tool-friction.md.
+- proof 2: unknown
+- proof 3: unknown
+- proof 4: unknown
+- proof 5: unmet — The rate section is right and mutation-proven; the exclusion the query prints is broader
+than the exclusion it performs, and the gap lands on the axis this clause exists to protect. Proven
+right: `printRates` (friction.ts:63-68) counts only `DEFECT_FAULTS = ['tooling','contract']`, and both
+attacks on it die — `c5-nobody-counted-as-a-defect` (DEFECT_FAULTS widened to include 'nobody') and
+`c5-absence-folded-into-nobody` (`bucketOf`'s `?? 'unclassified'` changed to `?? 'nobody'`, the one
+substitution the clause names as the small convenience that would empty the axis) are each KILLED by
+`friction.test.ts > c1, c5, c7, c8, c10, c12: one query over the channel > reports nobody and
+unclassified, and counts neither as a defect`, both re-run at that file with the mutation still applied.
+What fails: `BUCKET_NOTE` (friction.ts:28-33) prints "Reported, and counted in nothing below" for
+`nobody` and "Counted in nothing below" for `unclassified`, and both are then counted below. Reproduced
+live on an isolated store — `npm run tasks -- add "nobody could have known this lesson applied" --id
+nobody-breach --kind finding --fault nobody --severity low --deliverable "record it" --breaches
+worker/mutation-proof --store <scratch>` then `tasks recur nobody-breach --note "..."` then `tasks
+friction --store <scratch>` prints, in one run: `nobody 1 record(s) ... Reported, and counted in nothing
+below`, then `1 recurrence(s) recorded against 1 record(s)`, then `worker/mutation-proof  1 record(s),
+1 further occurrence(s) — nobody-breach`. The nobody-fault record and its occurrence are counted twice
+below the line that says they are counted in nothing. `printByLesson` (friction.ts:112-113) filters on
+`task.breaches.includes(lesson.id)` over every reporting record with no fault filter at all, and
+`printOccurrences` (friction.ts:88) totals occurrences the same way, so an `unclassified` record carrying
+occurrences reaches the same two counts by the same code path. This is not a mislabelled line only: the
+spec's own Deliverable says the breach axis "turns 'how many defects' into 'which lesson is not landing',
+which is the actionable form", so the per-lesson section is the defect reading restated, and c5's
+sentence is that `nobody` is excluded from every count presented as a defect measure. Graded unmet
+rather than deferred because the harm the spec states for getting this wrong — "counting it creates
+pressure to write specs that pretend to know what they cannot" — is the reason the axis exists, and the
+fix is small: filter both sections the way `printRates` already does, or narrow the printed promise to
+name the one section it is true of.
+- proof 6: unknown
+- proof 7: met — Live and re-runnable on an isolated store, then attacked from both directions. Before any
+check, `npm run tasks -- friction --store <scratch>` prints all 20 live lessons as `0 record(s), 0
+further occurrence(s) — nobody has looked`; after `npm run tasks -- checked auditor/next-neighbour --note
+"hunted the neighbour on every clause this pass" --actor auditor-pass3 --store <scratch>`, that
+one line reads `checked clean 2026-08-08 by auditor-pass3: hunted the neighbour on every clause this
+pass` and the other 19 still read `nobody has looked`. The same holds on the real store today: all 20
+read `nobody has looked`, so the marker is not vacuously satisfied by pre-existing data. The
+distinction is recorded by whoever looked rather than inferred — it is a `checked` event carrying `by`
+and `note`, not a derived absence (`recordEvents(config, 'checked', ...)` at friction.ts:169), and
+`cmdChecked` refuses a handle no live lesson answers to (`no live lesson has the handle ...`), so a
+check cannot mark a lesson that does not exist. Two mutations, both KILLED by `friction.test.ts > ... >
+distinguishes a lesson checked and found clean from one nobody looked at`, each re-run at its own file
+with the mutation still applied: `c7-a-recorded-check-reads-as-nobody-looked` (`lastCheck` returns
+`undefined`, collapsing checked-clean back into the absence) and `c7-a-check-marks-every-lesson-clean`
+(dropping `id: lessonId` from the `checked` filter, so one check anywhere marks all twenty). The second
+matters more than the first: it is the failure that would look like the feature working. Two boundaries
+checked and not graded against the clause: `--actor` is optional, so a check can be recorded anonymously
+and prints `(unnamed)` (already filed as task-system-2026-08-08-m13, "nearly half of all recorded
+history is anonymous"), and `lastCheck` takes the last-appended rather than the latest-dated event,
+which two branches merging by union could reorder. Neither is what the clause turns on.
+- proof 8: unmet — Every count does arrive beside a denominator, and no denominator is a hand-kept tally —
+but one of the three denominators is not the quantity it is labelled as, and the count is inside it, so
+the rate it presents cannot mean what it says. Measured on the real store: `npm run tasks -- friction`
+prints `57 against 299 audit passes (audit events) — 19 per 100`. There are not 299 audit passes.
+`grep -c '"op":"audit"' docs/events.jsonl` is 299; `grep '"op":"audit"' docs/events.jsonl | grep -c
+'"id":null'` is 72, and `grep '"op":"audit"' docs/events.jsonl | grep -vc '"id":null'` is 227. `tasks
+audit` emits one `audit` event for the pass (`audit.ts:553-556`, `id: null`) plus one per finding the
+pass filed, and the findings-only route emits one per finding with no pass event at all
+(`audit.ts:414`). So the denominator is 4x the quantity it names, and — worse — the 227 finding events
+are the same findings the numerator counts, so filing a defect-fault finding increments both sides of
+its own rate. Reproduced from empty: one `tasks audit demo-spec --proof ... --finding ...` on an
+isolated store produced `2 audit passes (audit events)` and the query printed `2 against 2 audit passes
+— 100 per 100` after one pass. Nothing in the suite pins this: mutation
+`c8-audit-denominator-counts-only-real-passes`, which *corrects* the denominator to
+`.filter((event) => event.id === null)`, SURVIVED at every scope up to the whole suite (0 failed of
+2040) — the right answer and the wrong one are indistinguishable to the tests. The other two
+denominators are sound and pinned: `c8-a-bare-count-with-no-denominator` (the rate loop replaced by a
+bare count) and `c8-dispatch-denominator-drawn-from-the-wrong-op` (`start` swapped for `add`) are each
+KILLED by `friction.test.ts > ... > presents every count beside the denominator it is a rate over,
+drawn from the log`, re-run at that file with the mutation applied. The fix is the filter the surviving
+mutation already spells, plus a test that asserts the number rather than only its presence; the clause
+is a promise about what a denominator *is*, and a denominator containing its own numerator is the one
+shape a rate must not have.
+- proof 9: met — Graded by exhaustive search rather than by mutation, because a refusal is not proven by
+breaking a line, and treated as a live risk rather than a formality. What I searched, all re-runnable:
+(1) every non-test read of `fault` in `scripts/` (`grep -rn "fault" --include=*.ts scripts/ | grep -v
+'\.test\.ts'`) — 40-odd hits, every one of them schema (`taskStore.ts:69,204,257-258,285,324,359-361,
+385`), assembly (`records.ts:185-189,252,427-470,515-581`, `audit.ts:33-56,208-213,324,354-360`),
+display (`render.ts:84`) or a usage string. Nothing branches on a fault's *value* to decide an outcome.
+(2) every non-test read of `breaches` — schema, assembly, `render.ts:91`, `friction.ts:112,119` and
+`records.ts:170` `reportUnknownBreaches`, which prints and returns and is explicitly not a doctor
+condition. (3) every non-test read of the `recur` and `checked` ops — `EVENT_OPS`, `friction.ts:102,80`
+and `records.ts:332-334`; nothing else in the repo reads either. (4) every leg of the gate:
+`LEGS` (mergeReady.ts:20-26) is tsc, npm test, layer-check, audit-status, doctor — none of them the
+friction query — plus the bytes, tree, base, spec and clauses legs, and `grep -n "\.fault\|\.breaches\|
+'recur'\|'checked'\|friction" scripts/tasks/mergeReady.ts` is empty. (5) every CI step in
+`.github/workflows/test.yml`: tsc, npm test, layer-check, audit-status, doctor, `spec show`, `plan` —
+none names the channel, and `doctor`'s two exit conditions are an unparseable store line and a dangling
+reference (doctor.ts:129-136), neither of which reads a fault or a breach. (6) `checkPlan`, which CI
+runs through `tasks plan` — no fault, no breach, no occurrence read. The live gate agrees: `npm run
+tasks -- merge-ready` reports `doctor ok pass — 15 warning(s) reported above, which do not fail this
+leg`. Boundary stated rather than left as an exclusion list, because the clause read literally
+contradicts c2 and c4: `tasks add --fault the weather` exits 1 and `tasks start` refuses a question
+addressed to the author, so an exit code does read those fields as *input validation*. The operative
+property, which is what I graded, is that no *value* of a fault, no breach count and no occurrence
+count determines a pass/fail verdict, an ordering, a filter or an exit code anywhere. That holds today.
+What does not hold is the guard: `mergeReady.test.ts`'s new c9 describe is a `not.toContain` text scan
+over `mergeReady.ts` alone, and the gate reaches `doctorIssues` and `checkPlan` in other files.
+Mutation `c9-an-exit-code-reads-a-fault` — doctor's exit condition widened to
+`dangling > 0 || tasks.some((task) => task.kind === 'finding' && task.fault === null)`, which makes a
+merge-ready leg *and* a CI check exit on a fault — SURVIVED at every scope up to the whole suite
+(0 failed of 2040). Filed as a finding; the clause is met on the code, and unguarded against the
+regression it was written to prevent.
+- proof 10: met — Both slices land, and each is pinned by a mutation aimed at the thing the clause refuses
+rather than at the code that happens to be there. The append: `cmdRecur` (records.ts:303-339) writes
+one `recur` event through `recordEvents` and touches the store on no path — no `saveStoreAndWarn` call
+exists in the function. Attacked directly: `c10-recur-overwrites-the-description` inserts
+`task.evidence = note; saveStoreAndWarn(tasks, config);` before the append, turning the observation
+into the edit the clause is written against, and is KILLED by `friction.test.ts > c10: a recurrence is
+a new observation, never an edit > appends an occurrence naming the record, and leaves the record
+byte-identical`, re-run at its own file with the mutation still applied. That assertion is
+byte-identity of the stored line, which cannot pass while anything about the recurrence reaches the
+record. The derivation: `occurrencesByRecord` (friction.ts:78-85) folds the `recur` events and stores
+nothing; `c10-count-not-derived-from-the-occurrences` (`byId.set(event.id, [event])`, so each occurrence
+replaces the last) is KILLED by `... > derives the recurrence count from the occurrences and prints
+what each one cost`. The merge argument the clause rests on is itself tested rather than asserted —
+`friction.test.ts:490` appends another branch's `recur` line to the log by hand and asserts the next
+occurrence is numbered 3, which is the resolution a counter field would have needed git to compute.
+Live: on an isolated store, `tasks recur nobody-breach --note "it cost twenty minutes again"` printed
+`recorded occurrence 1 ... the record itself is untouched`, and `tasks friction` then printed
+`1 recurrence(s) recorded against 1 record(s) ... nothing is stored, so nothing can disagree with them`
+with the note's own text under it. Each occurrence keeps its own note (`--note` is required, and
+`friction.test.ts:479` asserts two different notes both survive), which is the loss the clause names.
+- proof 11: unmet — Everything the clause describes is true of `tasks add` and `tasks edit`, and none of it is
+true of the route by which most of the channel actually arrives. Wired correctly at two sites, and both
+proven: `records.ts:282` (`cmdAdd`) and `records.ts:600` (`cmdEdit`) call
+`offerRecurrence(task, reportPriorArtOnPaths(config, tasks, task))`. It never refuses — the record is
+saved at records.ts:274 before the prompt prints. It matches by path, not title
+(`claimedPaths` = `writes` + `files`, architectureCmds.ts:247). Mutations
+`c11-filing-shows-nothing-that-claims-the-path` (the call deleted from `cmdAdd`) and
+`c11-the-occurrence-is-offered-outside-the-channel` (the `reportsCost` guard dropped, offering the merge
+on a plain task) are each KILLED by their named test in `friction.test.ts > c11: filing shows what
+already claims the path, and never refuses`, re-run at that file with the mutation applied.
+What fails: `grep -n "priorArt\|reportPriorArt" scripts/tasks/audit.ts` is empty. Neither
+`tasks audit --finding ... --file <path>` nor `tasks import` shows anything that already claims the
+path, and those are the routes an auditor files through — the generated brief's own step 8 and the
+`--args-from` transport. Reproduced live end to end on an isolated store: `tasks add "first sighting of
+the manifest friction" ... --files scripts/tasks/audit.ts:88` printed the full `prior art on
+scripts/tasks/audit.ts` block; then `tasks audit demo-spec --proof 1=met --evidence 1=checked --proof
+2=met --evidence 2=checked --finding "second sighting of the manifest friction" --severity medium --fault
+tooling --deliverable "generate it" --evidence "ten minutes again" --file
+scripts/tasks/audit.ts:88` printed `1 finding(s) recorded, unreviewed` and nothing else — no prior art,
+no `tasks recur <its id>`, no `Nothing is merged for you`. Both records are in the store with
+`"files":["scripts/tasks/audit.ts:88"]` and the second author was never shown the first. Scale on the
+real store: of 603 reporting-kind records, 227 carry both a `source` (filed by an audit pass) and a
+non-empty `files` list — `grep '"kind":"\(finding\|question\)"' docs/tasks.jsonl | grep '"source":{' |
+grep -vc '"files":\[\]'` — so more than a third of the channel was filed blind to what already claimed
+its path, through the one route the tooling tells auditors to use. This is the shape
+[auditor/next-neighbour] names: the clause promises a property of filing, the fix covered the command
+the finding happened to mention, and the neighbour is where the volume is. The remedy is the same two
+lines already working in `cmdAdd`, called from `audit.ts` after its `saveStoreAndWarn` at 413 and 548.
+- proof 12: met — Graded as a refusal, by exhaustive search, and checked as the live risk this repository's
+own history says it is rather than as a formality. The property holds: nothing anywhere elevates a
+lesson, a fault or an occurrence count. Searched (re-runnable): every non-test read of `breaches` and of
+the `recur`/`checked` ops in `scripts/` resolves to schema, assembly, display or `friction.ts` itself;
+every threshold-shaped comparison in the nine files of this clause's live surface
+(`grep -rn "length\s*[<>]=\?\s*[0-9]\|count\s*[<>]=\?\|>=\s*[0-9]" ...`) is an emptiness guard for
+phrasing, or `planCheck.ts:203`'s `granted.length < 3` sample-size guard and `records.ts:1053`'s
+`pass >= 2` promotion rule, both pre-existing and neither over a channel count. Ordering is not by
+count anywhere: `printByFault` walks `BUCKETS`, `printByLesson` walks `allLessons()` in the briefs'
+order, `occurrencesByRecord` returns log order. No exit code, filter, queue position or gate verdict is
+decided by a fault, a breach count or an occurrence count. Boundary stated rather than a longer
+exclusion list, per [auditor/rule-may-be-wrong]: the clause's literal sentence is false and cannot be
+made true — `friction.ts:52` compares `over === 0` to guard a division, `friction.ts:120` returns on
+`orphaned.length === 0`, `records.ts:291` returns on `claims === 0`. The operative property, which is
+what I graded, is that no count determines what the tooling *does with* a lesson or a record: no
+elevation, no ranking, no threshold, no exit code. That property holds, and I recommend the clause be
+restated in those terms rather than kept as a sentence its own implementation contradicts three times.
+The guard, by contrast, does not hold, and two mutations say so precisely. The only mechanised part of
+this refusal is `friction.test.ts:716`, a `not.toMatch(/\.length\s*[<>]|count\s*[<>]|>=\s*\d/)` over
+`friction.ts`'s source text. `c12-a-threshold-appears-in-the-query` (`if (cited.length > 2) console.log
+('^ this lesson is not landing — schedule it')`) is KILLED by it, so the guard is not decorative. But
+`c12-a-threshold-written-without-an-inequality` (the same elevation as `occurrenceCount.size === 3`)
+SURVIVED at every scope up to the whole suite, because the regex bans inequalities and not comparisons;
+and `c12-a-threshold-outside-the-one-file-the-guard-reads` (`if (occurrences.length >= 3) console.log
+('... it is now scheduled work')` in `cmdRecur`, on the recurrence count itself) SURVIVED for the
+simpler reason that the guard reads one file while the clause says "anywhere in any code path". Both
+filed. A refusal whose guard can be walked around by changing `>` to `===`, in a repository whose own
+clause text says this gate was proposed four times in one day, is worth more than the shape it has.
+- proof 13: unknown
