@@ -1038,15 +1038,22 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('next resolves the sole spec with open members when the branch matches no spec file, and says it was inferred', () => {
+  // Route 4 used to resolve this silently — the branch's only candidate,
+  // handed back with no chance to say no. A single candidate is still a
+  // guess: `next` now refuses and names it, the same shape a contested store
+  // always got.
+  it('next refuses, naming the sole candidate, when the branch matches no spec file and the store has exactly one', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
       const storePath = path.join(dir, 'tasks.jsonl');
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
       const result = spawnSync(process.execPath, [tsxCli, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.stdout).toContain('spec inferred from the store: demo-spec');
-      expect(result.stdout).toContain('open task');
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain('spec not given: no');
+      expect(result.stdout).toContain('1 spec has open members — demo-spec');
+      expect(result.stdout).toContain('Pass --spec to use it');
+      expect(result.stdout).not.toContain('open task');
     });
   });
 
@@ -1057,19 +1064,23 @@ describe('tasks CLI', () => {
   // spec, so every answer it can give there is a guess about a branch the
   // caller is not on. Asserted on a store where a spec DOES have open
   // members, because that is the only state in which the bug is reachable.
-  it('does not infer a spec from the store on the default branch', () => {
+  it('does not name a candidate, or refuse, on the default branch — main is never working a spec', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
       const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs')];
-      const on = (branch: string): { stdout: string } => spawnSync(process.execPath, [tsxCli, script, 'next', ...globals, '--branch', branch], { cwd: repoRoot, encoding: 'utf8' });
+      const on = (branch: string): { status: number | null; stdout: string } => spawnSync(process.execPath, [tsxCli, script, 'next', ...globals, '--branch', branch], { cwd: repoRoot, encoding: 'utf8' });
 
       const onMain = on('main');
-      expect(onMain.stdout).not.toContain('spec inferred from the store');
+      expect(onMain.status).toBe(0);
+      expect(onMain.stdout).not.toContain('spec not given');
       expect(onMain.stdout).not.toContain('open task');
 
-      // The same store, one branch name different: still inferred, so what
-      // changed is the rule for main and not the inference itself.
-      expect(on('orphaned-branch').stdout).toContain('spec inferred from the store: demo-spec');
+      // The same store, one branch name different: still refused and named,
+      // so what changed is the rule for main and not the candidate search.
+      const onOrphan = on('orphaned-branch');
+      expect(onOrphan.status).toBe(1);
+      expect(onOrphan.stdout).toContain('spec not given: no');
+      expect(onOrphan.stdout).toContain('demo-spec');
     });
   });
 
@@ -1091,6 +1102,7 @@ describe('tasks CLI', () => {
       const storePath = path.join(dir, 'tasks.jsonl');
       const systemsPath = path.join(dir, 'systems.json');
       const result = spawnSync(process.execPath, [tsxCli, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      expect(result.status).toBe(1);
       expect(result.stdout).toContain('no active spec for this branch');
       expect(result.stdout).toContain('spec contested:');
       expect(result.stdout).toContain('demo-spec, other-spec');
@@ -1321,18 +1333,29 @@ describe('what already worked, after the record verbs changed around it', () => 
 });
 
 describe('a read that resolves a spec only where it uses one', () => {
-  // `claude/<topic>-<hash>` looks for a nested spec path that cannot exist,
-  // and the open-members route contests whenever more than one spec is live.
-  // The log already records the branch of every store write, so which spec a
-  // branch is working is derivable rather than declared.
-  it('infers the spec this branch last wrote to, which the branch name cannot answer for a worktree', () => {
+  // `claude/<topic>-<hash>` looks for a nested spec path that cannot exist.
+  // The event log used to be consulted here — the most recent spec written
+  // from this branch — and that route produced every recorded incident
+  // `a-branch-is-told-which-spec-it-owes` fixed: an unrelated note event can
+  // tag a spec this branch never worked, and there is no way to unbind it,
+  // the log being append-only. A store write is different — it is what the
+  // open-members candidate list is built from below — so a stray event no
+  // longer moves the answer at all, whatever it names.
+  it('does not resolve from the event log — a stray event naming a spec this branch never worked does not surface it', () => {
     fixture(({ tasks, dir, args }) => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       tasks('add', 'elsewhere', '--id', 'elsewhere');
       appendEvent(dir, { branch: 'claude/generated-2f9a11', spec: 'demo-spec', id: 'a-member' });
       const result = runInProcess(['next', ...args(), '--branch', 'claude/generated-2f9a11']);
-      expect(result.stdout).toContain('spec inferred from the event log: demo-spec');
-      expect(result.stdout).toContain('the most recent spec written from claude/generated-2f9a11');
+      // The store still has one open spec — demo-spec, via a-member — so the
+      // candidate is named, but as a refusal, not as an inference the event
+      // log drove: the note says "not given", never "inferred from the event
+      // log", and nothing is answered without --spec.
+      expect(result.status).toBe(1);
+      expect(result.stdout).not.toContain('inferred from the event log');
+      expect(result.stdout).toContain('spec not given: no');
+      expect(result.stdout).toContain('1 spec has open members — demo-spec');
+      expect(result.stdout).not.toContain('a-member');
     });
   });
 
@@ -1340,7 +1363,9 @@ describe('a read that resolves a spec only where it uses one', () => {
     fixture(({ tasks, dir, args }) => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       appendEvent(dir, { branch: 'main', spec: 'demo-spec', id: 'a-member' });
-      expect(runInProcess(['next', ...args(), '--branch', 'main']).stdout).toContain('no active spec for this branch');
+      const result = runInProcess(['next', ...args(), '--branch', 'main']);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no active spec for this branch');
     });
   });
 
@@ -1351,6 +1376,25 @@ describe('a read that resolves a spec only where it uses one', () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('spec inferred from the branch name: demo-spec');
       expect(result.stdout).toContain('a-member');
+    });
+  });
+
+  // The recorded incident: `tasks promote` filed an unrelated finding into
+  // demo-spec because a bare `note` event, written for something else
+  // entirely twenty minutes earlier, was the most recent spec-tagged write
+  // from this branch. Nothing here names demo-spec as a candidate — no open
+  // member of it exists on this branch — so the fix is a plain refusal, not
+  // a different guess.
+  it('promote does not inherit a spec from an unrelated event, the tasks-promote incident this branch fixes', () => {
+    fixture(({ tasks, dir, args }) => {
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      appendEvent(dir, { branch: 'claude/generated-2f9a11', spec: 'demo-spec' });
+      const result = runInProcess(['promote', 'a-finding', ...args(), '--branch', 'claude/generated-2f9a11']);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no active spec to promote into — pass --spec');
+      const shown = runInProcess(['show', 'a-finding', ...args(), '--branch', 'claude/generated-2f9a11']);
+      expect(shown.stdout).not.toContain('spec: demo-spec');
+      expect(shown.stdout).toContain('[finding/unreviewed');
     });
   });
 });

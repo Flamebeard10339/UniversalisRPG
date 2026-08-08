@@ -603,9 +603,14 @@ export function cmdNext(args: Flags): void {
   if (activeSpec.note) console.log(activeSpec.note);
   const spec = activeSpec.spec;
   // A resolved spec of null means "no active spec", not "match deferred
-  // tasks" — those two must not collapse into the same query.
+  // tasks" — those two must not collapse into the same query. A note means
+  // resolution was actually attempted and failed (the default branch, where
+  // nothing is ever active, carries none) — refuse rather than answer with
+  // nothing, so the empty queue this used to print silently is not read as
+  // "no work" when it is really "no spec was named".
   if (spec === null) {
     console.log('no active spec for this branch, and no --spec given');
+    if (activeSpec.note !== null) process.exitCode = 1;
     return;
   }
   const filter = { system: args.flags.system, severity: args.flags.severity as Severity | undefined };

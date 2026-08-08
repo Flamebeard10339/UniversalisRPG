@@ -129,7 +129,7 @@ function standingLegs(standing: BranchStanding): LegResult[] {
     detail: specOk
       ? `pass — every member of ${standing.spec} is closed`
       : [standing.openMembers.length > 0 ? `${standing.openMembers.length} open member(s): ${standing.openMembers.join(', ')}` : null, standing.unreviewedFindings > 0 ? `${standing.unreviewedFindings} unreviewed finding(s)` : null].filter(Boolean).join('; '),
-    next: specOk ? `npm run tasks -- spec done ${standing.spec}` : standing.openMembers.length > 0 ? 'npm run tasks -- next' : 'npm run tasks -- triage',
+    next: specOk ? `npm run tasks -- spec done ${standing.spec}` : standing.openMembers.length > 0 ? `npm run tasks -- next --spec ${standing.spec}` : `npm run tasks -- triage --spec ${standing.spec}`,
   });
 
   const clausesOk = standing.auditPasses > 0 && standing.outstandingClauses.length === 0;
@@ -143,7 +143,7 @@ function standingLegs(standing: BranchStanding): LegResult[] {
         : clausesOk
           ? `pass — the latest of ${standing.auditPasses} pass(es) leaves no clause outstanding${deferredNote}`
           : `${standing.outstandingClauses.length} outstanding after pass ${standing.auditPasses}: ${standing.outstandingClauses.join(', ')}${deferredNote}`,
-    next: clausesOk ? undefined : standing.auditPasses === 0 ? `commission an auditor: npm run tasks -- audit-prompt ${standing.spec}` : 'npm run tasks -- next',
+    next: clausesOk ? undefined : standing.auditPasses === 0 ? `commission an auditor: npm run tasks -- audit-prompt ${standing.spec}` : `npm run tasks -- next --spec ${standing.spec}`,
   });
 
   return legs;
@@ -243,15 +243,20 @@ export interface SpecCandidate {
   authoredAsPlan: boolean;
 }
 
-// `resolveActiveSpec` answers "what am I working on" — a resume aid whose log
-// route takes the most recently written spec. Planning happens last, so a
-// branch that implemented one spec and then authored a plan for a later
-// branch resolves to the plan, and a plan owes nothing. A gate asks a
-// different question, and must not read "this plan owes nothing" as "this
-// branch owes nothing": a spec the branch owes outranks one it merely wrote,
-// however recently. Candidates arrive most recent first, so an ordinary
-// branch — one spec, not a plan — is unaffected, and a branch whose every
-// candidate is a plan still passes as the planning branch it is.
+// `resolveActiveSpec` answers "what am I working on" for a human who can be
+// asked; it no longer proposes anything from the event log, because that
+// route produced every incident `a-branch-is-told-which-spec-it-owes` fixed.
+// This gate is the one caller with nobody to ask — CI runs it on a fresh
+// checkout — so `branchStanding` proposes the log's most recent write
+// itself, the same candidate the deleted route used to hand back, and
+// `decideSpec` below never grades it without diff evidence. Planning happens
+// last, so a branch that implemented one spec and then authored a plan for a
+// later branch would otherwise resolve to the plan, and a plan owes nothing —
+// a gate asks a different question, and must not read "this plan owes
+// nothing" as "this branch owes nothing": a spec the branch owes outranks one
+// it merely wrote, however recently. Candidates arrive most recent first, so
+// an ordinary branch — one spec, not a plan — is unaffected, and a branch
+// whose every candidate is a plan still passes as the planning branch it is.
 export function specToGrade(candidates: SpecCandidate[]): SpecCandidate | null {
   return candidates.find((candidate) => !candidate.authoredAsPlan) ?? candidates[0] ?? null;
 }
@@ -306,13 +311,23 @@ export function branchStanding(config: Config, baseBranch: string): BranchStandi
   const tasks = readStore(config);
   const events = loadEvents(config.eventsPath).events;
   const active = resolveActiveSpec(config, tasks, undefined);
+  const written = specsWrittenFromBranch(config);
+  // The proposal this gate is alone in being allowed to make: `active.spec`
+  // covers `--spec` (never passed here) and the branch-name route, both
+  // already checked against a real spec file. Past that, fall back to the
+  // event log directly — the derivation `resolveActiveSpec` used to make on
+  // every caller's behalf, moved to the one caller still entitled to it.
+  // `decideSpec` is what makes this safe: the candidate is graded only if the
+  // branch's own diff, or a start/stop/done event, shows work against it.
+  const activeSpec = active.spec ?? written[0] ?? null;
+  const activeNote = active.spec !== null ? active.note : written[0] !== undefined ? `spec inferred from the event log: ${written[0]} — the most recent spec written from ${config.branch}` : null;
   const membersOf = (spec: string): Task[] => tasks.filter((task) => task.spec === spec);
   const changed = changedFiles(base);
 
   const decision = decideSpec({
-    activeSpec: active.spec,
-    activeNote: active.note,
-    written: specsWrittenFromBranch(config),
+    activeSpec,
+    activeNote,
+    written,
     isPlan: (spec) => authoredAsPlan(membersOf(spec), specAddsClauseId(config, baseBranch, baseHead, spec)),
     // A declared `writes` grant is a forecast, and the diff is only the
     // stronger of two kinds of evidence: a `start`/`stop`/`done` event

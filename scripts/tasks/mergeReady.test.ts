@@ -182,14 +182,17 @@ describe('runMergeReady, on this branch\'s standing', () => {
     expect(lines).toContain('2 uncommitted path(s): docs/tasks.jsonl, src/a.ts');
   });
 
-  it('fails on an unclosed spec, sending an open member to `tasks next` and an unreviewed finding to `tasks triage`', async () => {
+  // c7: the printed command carries the spec it already knows — `next` and
+  // `triage` both refuse without one now, so a suggestion that omitted it
+  // would send a reader straight into that refusal.
+  it('fails on an unclosed spec, sending an open member to `tasks next --spec` and an unreviewed finding to `tasks triage --spec`', async () => {
     const open = await graded({ openMembers: ['a-slice'] });
     expect(open.ok).toBe(false);
-    expect(open.body).toContain('spec           npm run tasks -- next');
+    expect(open.body).toContain('spec           npm run tasks -- next --spec a-spec');
 
     const untriaged = await graded({ unreviewedFindings: 2 });
     expect(untriaged.ok).toBe(false);
-    expect(untriaged.body).toContain('spec           npm run tasks -- triage');
+    expect(untriaged.body).toContain('spec           npm run tasks -- triage --spec a-spec');
   });
 
   it('fails on an outstanding clause, and separates one nobody graded from one left unmet', async () => {
@@ -200,6 +203,9 @@ describe('runMergeReady, on this branch\'s standing', () => {
     const outstanding = await graded({ outstandingClauses: ['c2', 'c7'] });
     expect(outstanding.ok).toBe(false);
     expect(outstanding.body).toContain('2 outstanding after pass 1: c2, c7');
+    // c7 (this spec's): the clauses leg's own next-step carries the spec it
+    // already knows, the same fix as the spec leg above.
+    expect(outstanding.body).toContain('clauses        npm run tasks -- next --spec a-spec');
   });
 
   // c7: a branch that deferred its way to green says so in the same line
@@ -730,6 +736,10 @@ describe('branchStanding, against repository facts', () => {
     commit('base');
     repo.fork();
 
+    // A candidate has to reach `branchStanding` before it can be graded — the
+    // branch name does not match here, so, as with the two cases above, an
+    // event is what proposes `a-spec` at all.
+    writeEvent('start', 'started member-1');
     write('specs/a-spec.md', 'garbled — no recognizable spec structure left.');
     commit('spec corrupted on this branch');
 

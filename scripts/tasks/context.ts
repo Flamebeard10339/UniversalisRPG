@@ -193,22 +193,20 @@ export interface ActiveSpec {
   note: string | null;
 }
 
-// The resume half of the branch-name lookup: when the branch matches no
-// spec file — as happened on this branch for five commits while the spec
-// lived at a name the branch had since moved past — and exactly one spec
-// file has open members in the store, treat that as the active spec rather
-// than stranding a cold session with no queue and no signal anything is
-// wrong.
 // Which spec this branch has been working, read off the log rather than
 // declared: every store write records the branch it was made from, so the
-// answer is derivable and no second place has to be kept in sync. It is what
-// the branch-name route cannot answer for a generated worktree branch —
-// `claude/<topic>-<hash>` looks for a nested spec path that cannot exist —
-// nor for a branch whose name has dropped a word its spec still carries.
-// Most recent first, deduplicated, and only those with a spec file in this
-// checkout. A resume aid wants the head of this list; a gate deciding what a
-// branch owes has to see the rest of it, because the most recent write is the
-// last thing the branch did rather than the thing it is answerable for.
+// answer is derivable and no second place has to be kept in sync. Most
+// recent first, deduplicated, and only those with a spec file in this
+// checkout.
+//
+// No caller resolves a spec through this alone anymore — an event carries
+// whatever spec the write it annotated happened to be tagged with, not
+// evidence that this branch's own diff touches that spec, and trusting it
+// unconditionally produced every incident `a-branch-is-told-which-spec-it-
+// owes` was commissioned over. `merge-ready` is the one surviving direct
+// caller (`mergeReady.ts`'s `branchStanding`), and only because it hands
+// every candidate this returns to `decideSpec`, which requires diff evidence
+// before grading one — a proposal, not an answer.
 export function specsWrittenFromBranch(config: Config): string[] {
   const written = loadEvents(config.eventsPath).events.filter((event) => event.branch === config.branch && event.spec !== null);
   const specs: string[] = [];
@@ -219,8 +217,27 @@ export function specsWrittenFromBranch(config: Config): string[] {
   return specs;
 }
 
-export function lastSpecWrittenFromBranch(config: Config): string | null {
-  return specsWrittenFromBranch(config)[0] ?? null;
+// The candidates a caller can see once neither `--spec` nor the branch name
+// answers: every spec with an open or in-progress member, for a branch that
+// might be about to work one of them. Named whether there are zero, one or
+// many — the shape route 5 always used for "many" is what every caller gets
+// now, because a confident wrong answer is what this function used to give
+// and a reader must learn the same thing whether one spec is live or none.
+function openSpecCandidates(config: Config, tasks: Task[]): string[] {
+  const candidates = new Set<string>();
+  for (const task of tasks) {
+    if ((task.state !== 'open' && task.state !== 'in-progress') || task.spec === null) continue;
+    if (existsSync(specFile(config, task.spec))) candidates.add(task.spec);
+  }
+  return [...candidates].sort();
+}
+
+function unresolvedSpecNote(config: Config, tasks: Task[]): string {
+  const branchFile = specFile(config, config.branch);
+  const candidates = openSpecCandidates(config, tasks);
+  if (candidates.length === 0) return `no active spec: no ${branchFile}, and no spec has open members. Pass --spec to name one`;
+  if (candidates.length === 1) return `spec not given: no ${branchFile}, and 1 spec has open members — ${candidates[0]}. Pass --spec to use it`;
+  return `spec contested: no ${branchFile}, and ${candidates.length} specs have open members — ${candidates.join(', ')}. Pass --spec to pick one`;
 }
 
 export function resolveActiveSpec(config: Config, tasks: Task[], explicit: string | undefined): ActiveSpec {
@@ -228,38 +245,20 @@ export function resolveActiveSpec(config: Config, tasks: Task[], explicit: strin
   const strict = currentSpec(config);
   if (strict !== null) return { spec: strict, note: `spec inferred from the branch name: ${strict} — ${specFile(config, strict)} exists` };
 
-  // The routes below are resume aids for a working branch whose name has
-  // drifted from its spec file. The default branch is never working a spec,
-  // so anything it inferred would be a guess about a branch the caller is
-  // not on — and the guess lands on whichever spec is slowest to retire,
-  // which is exactly the one whose clauses describe deleted machinery.
-  // `--spec` still works here, because that is asked for rather than guessed.
+  // The default branch is never working a spec, so anything guessed here
+  // would be a guess about a branch the caller is not on — and the guess
+  // lands on whichever spec is slowest to retire, which is exactly the one
+  // whose clauses describe deleted machinery. `--spec` still works here,
+  // because that is asked for rather than guessed.
   if (config.branch === DEFAULT_BRANCH) return { spec: null, note: null };
 
-  // Ahead of the open-members route, which contests whenever more than one
-  // spec is live — nine of them today, so it answers nothing on the branch
-  // most likely to be asking. A branch that wrote to ten specs answers with
-  // the one it touched last; a cold worktree that has written nothing falls
-  // through to the store route unchanged.
-  const logged = lastSpecWrittenFromBranch(config);
-  if (logged !== null) return { spec: logged, note: `spec inferred from the event log: ${logged} — the most recent spec written from ${config.branch}` };
-
-  const candidates = new Set<string>();
-  for (const task of tasks) {
-    if ((task.state !== 'open' && task.state !== 'in-progress') || task.spec === null) continue;
-    if (existsSync(specFile(config, task.spec))) candidates.add(task.spec);
-  }
-  if (candidates.size === 1) {
-    const [spec] = candidates;
-    return { spec, note: `spec inferred from the store: ${spec} — no ${specFile(config, config.branch)}, and ${spec} is the only spec with open members` };
-  }
-  // Two candidates is exactly as ambiguous as none, but it is not as empty:
-  // naming both is what lets a caller pick one with --spec instead of
-  // rediscovering the contest.
-  if (candidates.size > 1) {
-    return { spec: null, note: `spec contested: no ${specFile(config, config.branch)}, and ${candidates.size} specs have open members — ${[...candidates].sort().join(', ')}. Pass --spec to pick one` };
-  }
-  return { spec: null, note: null };
+  // Every route past this point used to guess — the event log's most recent
+  // write, then the store's lone open-member spec — and each guess is the
+  // shape of a recorded incident: a stray `note` event inheriting a spec tag,
+  // and a legitimate audit charged to an archived record. Naming the
+  // candidates and refusing to pick among them is the whole remedy; nothing
+  // here determines an answer on its own.
+  return { spec: null, note: unresolvedSpecNote(config, tasks) };
 }
 
 export function slugify(title: string): string {
