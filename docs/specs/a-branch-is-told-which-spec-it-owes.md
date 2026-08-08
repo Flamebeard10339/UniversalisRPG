@@ -80,8 +80,11 @@ Proof:
   like a standing, which is what makes this the type's problem rather than each caller's.
   proof: on `the-workflow-records-what-cost-it-in-one-place`, whose two recorded passes grade
   disjoint clause sets, c6 reads met and c2/c3/c4 read met from one query. Record the standing before
-  and after, and the count of call sites that still compute a latest pass themselves — which must be
-  zero.
+  and after. Then enumerate every site that reads a single pass and say what it does with it: reading
+  the last pass to report *which pass was last* is not a standing and is permitted, and
+  `roadmap.ts:129` and `auditPrompt.ts:550` are that. A site that derives a clause's status from one
+  pass is this clause unmet wherever it lives, including under a different name —
+  `records.ts:789`'s `clauseStanding` is exactly that and is in scope for this branch.
   proof: vitest scripts/lib/specDoc.test.ts
 
 - [c5] A clause whose undelivered record was declined reports as settled, not outstanding, and
