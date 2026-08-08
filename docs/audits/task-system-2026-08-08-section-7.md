@@ -109,16 +109,45 @@ so.
   answer: two records start blocked, in the order they should.
 - **§7.5 and §7.6 are prohibitions and were obeyed.** The store was not rebuilt; no capability was
   added ahead of its use. Every new function here has a caller in the same commit.
-- **This branch has no audit pass.** `merge-ready` says so on its clauses leg, correctly. An
-  auditor is a separate actor by design: `npm run tasks -- audit-prompt a-silent-answer-is-a-defect`.
 - **`merge-ready` reports this branch as declaring a second spec** it never worked, because the
   §7.4 ruling is a `requires` edit on that spec's member. That is filed as
   `ordering-a-member-declares-its-spec` — the branch reproduced it on itself while obeying the
-  sweep.
+  sweep — and it is the one leg still red. Every other leg passes, this spec included.
+
+## 5a. Pass 1, and what it changed after the fact
+
+A commissioned auditor graded the branch over `ccbf328..1978988` in its own worktree and filed
+through `--args-from`, the store being the orchestrator's to hold. **Ten clauses met, thirteen
+mutations aimed by hand and thirteen killed**, each re-measured at its own file with the mutant
+still applied. It discarded the generated 669-entry manifest and rebuilt it — the fifth consecutive
+pass to do so, against an already-open finding.
+
+Its regression answer was not clean, and four things changed after the pass because of it:
+
+- **The staged rename fails on Windows while any process holds the store open**, which
+  `writeFileSync` never did, and the `EPERM` escaped `reportReadErrors` as a stack trace naming a
+  staging file that had been removed. Reproduced independently at 200 of 200 writes failing with one
+  read handle held. `saveStore` now waits the reader out inside the lock it already holds — which
+  cannot reorder writes, because what is being waited on is a read — and an exhausted wait is a
+  `StoreError` with the usual re-run wording. Re-measured: a transient reader costs 0 of 200.
+- **c6 was false as written.** `open` reaches `done` with no `start` in between, so a closed record
+  still accepted `--grant commitment` on a region nobody read. `claimHolds` is `in-progress` only.
+- **c10's declared proof could not fail on what c10 is about**; the checkStore case now exists in the
+  file the clause names, so the proof line is true and the clause text is untouched.
+- **c5's Decision rested on a one-directional sweep.** The converse now holds too, and the sweep was
+  confirmed non-vacuous by breaking a usage string three separate ways.
+
+**Everything after the first of those postdates pass 1**, whose c1 evidence describes `1978988`. A
+decision on the spec records it; a pass 2 would re-grade c1 against the code as it now stands.
+
+Two findings are deferred rather than fixed, live and unspecced: the record-versus-owner comparison
+misses the two routes in `audit.ts` that also assemble a record, and a stale lock costs five seconds
+and blames a holder that does not exist (`LOCK_WAIT_MS` 5 s is shorter than `LOCK_ABANDONED_MS`
+30 s, so the abandonment break only ever fires for a writer arriving after the window).
 
 ## 6. The sweep's findings, after this branch
 
-Closed against the work above: **H1, H2, H3, H4, H7, H12, H13, H14, M4, M8**, plus the older
+Closed against the work above: **H1, H2, H3, H4, H7, H12, H13, H14, M4, M8**, and pass 1's own EPERM regression, plus the older
 `stranded-spec-members-have-no-repair` that M8 extended.
 
 Still open and unchanged, with what a later reader should know:
@@ -146,6 +175,6 @@ was registered by this branch), 83% of `produces` claims are still unregistered,
 still has 34 fully historical files. What changed is that those 34 **can now be deleted** without
 stranding their closed members; nobody has deleted them.
 
-The suite is 1,972 tests at ~25 s wall, with one new real-subprocess test — three concurrent
+The suite is 1,977 tests at ~25 s wall, with one new real-subprocess test — three concurrent
 `tasks add` — that costs about half a second and is the only thing proving the c1 seam between
 processes rather than inside one.
