@@ -212,7 +212,7 @@ describe('tasks CLI', () => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- [c2] The second clause holds.', '- [c2] The second clause holds.\n- A clause added after the pass.'), 'utf8');
       const shown = tasks('spec', 'show', 'demo-spec');
-      expect(shown.stdout).toContain('clause standing (latest pass 1): outstanding: c3 (unknown)');
+      expect(shown.stdout).toContain('clause standing (composed over 1 pass(es)): outstanding: c3 (unknown)');
     });
   });
 

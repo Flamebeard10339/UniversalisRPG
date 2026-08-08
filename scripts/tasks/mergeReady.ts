@@ -64,13 +64,19 @@ export interface BranchStanding {
   specAuthoredHere: boolean;
   openMembers: string[];
   unreviewedFindings: number;
-  // Clause ids the spec's latest pass leaves outstanding, and whether a pass
+  // Clause ids the spec's standing leaves outstanding, and whether a pass
   // has been recorded at all — ungraded is not the same as unmet.
   outstandingClauses: string[];
-  // Clause ids the latest pass recorded deferred — off `outstandingClauses`
+  // Clause ids the standing reads deferred — off `outstandingClauses`
   // because they stop blocking the clauses leg, and named here so a branch
   // that deferred its way to green says so in the same line that says green.
   deferredClauses: string[];
+  // Clause ids that are unmet but settled: every undelivered record they
+  // have is closed and at least one was declined rather than done. Off
+  // `outstandingClauses` for the same reason `deferredClauses` is — a
+  // declined clause has no action left that would ever turn it met, and a
+  // leg that stays red forever is not a gate.
+  declinedClauses: string[];
   auditPasses: number;
   // How many issues `doctor` reported. Carried into the summary without
   // changing what fails: the count reached the summary line, the leg's
@@ -134,6 +140,7 @@ function standingLegs(standing: BranchStanding): LegResult[] {
 
   const clausesOk = standing.auditPasses > 0 && standing.outstandingClauses.length === 0;
   const deferredNote = standing.deferredClauses.length > 0 ? `; deferred: ${standing.deferredClauses.join(', ')}` : '';
+  const declinedNote = standing.declinedClauses.length > 0 ? `; declined: ${standing.declinedClauses.join(', ')}` : '';
   legs.push({
     name: 'clauses',
     ok: clausesOk,
@@ -141,8 +148,8 @@ function standingLegs(standing: BranchStanding): LegResult[] {
       standing.auditPasses === 0
         ? `${standing.spec} has no recorded audit pass`
         : clausesOk
-          ? `pass — the latest of ${standing.auditPasses} pass(es) leaves no clause outstanding${deferredNote}`
-          : `${standing.outstandingClauses.length} outstanding after pass ${standing.auditPasses}: ${standing.outstandingClauses.join(', ')}${deferredNote}`,
+          ? `pass — ${standing.auditPasses} pass(es) recorded, no clause outstanding${deferredNote}${declinedNote}`
+          : `${standing.outstandingClauses.length} outstanding across ${standing.auditPasses} pass(es): ${standing.outstandingClauses.join(', ')}${deferredNote}${declinedNote}`,
     next: clausesOk ? undefined : standing.auditPasses === 0 ? `commission an auditor: npm run tasks -- audit-prompt ${standing.spec}` : `npm run tasks -- next --spec ${standing.spec}`,
   });
 
@@ -342,8 +349,20 @@ export function branchStanding(config: Config, baseBranch: string): BranchStandi
   const spec = decision.spec;
 
   const doc = spec === null ? null : readSpecDoc(config, spec);
-  const latest = doc?.auditPasses[doc.auditPasses.length - 1];
   const members = spec === null ? [] : membersOf(spec);
+  const standings = doc === null ? [] : clauseStandings(doc.proofClauses, doc.auditPasses);
+
+  // Declining an undelivered task abandons its clause rather than
+  // discharging it, in the tool's own words — but a verdict no future audit
+  // pass will ever revisit must not leave this leg red with no action left
+  // to clear it. Settled only when every undelivered record this clause has
+  // is closed and at least one of them was a decline: a live open or
+  // in-progress record for the same clause is a recurrence and still owed.
+  const settledByDecline = (clause: number): boolean => {
+    const records = spec === null ? [] : tasks.filter((task) => task.kind === 'undelivered' && task.spec === spec && task.clause === clause);
+    return records.length > 0 && records.every((task) => task.state !== 'open' && task.state !== 'in-progress') && records.some((task) => task.state === 'declined');
+  };
+  const outstanding = standings.filter((standing) => standing.status !== 'met' && standing.status !== 'deferred');
 
   return {
     branch: config.branch,
@@ -355,8 +374,9 @@ export function branchStanding(config: Config, baseBranch: string): BranchStandi
     ...decision,
     openMembers: members.filter((task) => task.state !== 'done' && task.state !== 'declined').map((task) => task.id),
     unreviewedFindings: spec === null ? 0 : unreviewedFiledBy(tasks, spec).length,
-    outstandingClauses: doc === null ? [] : clauseStandings(doc.proofClauses, latest?.verdicts).filter((standing) => standing.status !== 'met' && standing.status !== 'deferred').map((standing) => `c${standing.clause}`),
-    deferredClauses: doc === null ? [] : clauseStandings(doc.proofClauses, latest?.verdicts).filter((standing) => standing.status === 'deferred').map((standing) => `c${standing.clause}`),
+    outstandingClauses: outstanding.filter((standing) => !settledByDecline(standing.clause)).map((standing) => `c${standing.clause}`),
+    deferredClauses: standings.filter((standing) => standing.status === 'deferred').map((standing) => `c${standing.clause}`),
+    declinedClauses: outstanding.filter((standing) => settledByDecline(standing.clause)).map((standing) => `c${standing.clause}`),
     auditPasses: doc?.auditPasses.length ?? 0,
     doctorWarnings: doctorIssues(config, tasks).length,
   };

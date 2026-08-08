@@ -31,8 +31,7 @@ export function cmdOrchestratePrompt(args: Flags, _usage: string): void {
         continue;
       }
       const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
-      const latest = doc.auditPasses[doc.auditPasses.length - 1];
-      console.log(`- ${slug}: ${doc.proofClauses.length} clause(s), ${outstandingSummary(clauseStandings(doc.proofClauses, latest?.verdicts))}`);
+      console.log(`- ${slug}: ${doc.proofClauses.length} clause(s), ${outstandingSummary(clauseStandings(doc.proofClauses, doc.auditPasses))}`);
     }
   }
   console.log('');

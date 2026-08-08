@@ -44,6 +44,7 @@ const ready = (overrides: Partial<BranchStanding> = {}): BranchStanding => ({
   unreviewedFindings: 0,
   outstandingClauses: [],
   deferredClauses: [],
+  declinedClauses: [],
   auditPasses: 1,
   doctorWarnings: 0,
   ...overrides,
@@ -202,7 +203,7 @@ describe('runMergeReady, on this branch\'s standing', () => {
 
     const outstanding = await graded({ outstandingClauses: ['c2', 'c7'] });
     expect(outstanding.ok).toBe(false);
-    expect(outstanding.body).toContain('2 outstanding after pass 1: c2, c7');
+    expect(outstanding.body).toContain('2 outstanding across 1 pass(es): c2, c7');
     // c7 (this spec's): the clauses leg's own next-step carries the spec it
     // already knows, the same fix as the spec leg above.
     expect(outstanding.body).toContain('clauses        npm run tasks -- next --spec a-spec');
@@ -213,13 +214,25 @@ describe('runMergeReady, on this branch\'s standing', () => {
   it('passes the clauses leg on a deferred clause, and names it in the same line that says pass', async () => {
     const deferred = await graded({ deferredClauses: ['c3'] });
     expect(deferred.ok).toBe(true);
-    expect(deferred.body).toContain('clauses        ok  pass — the latest of 1 pass(es) leaves no clause outstanding; deferred: c3');
+    expect(deferred.body).toContain('clauses        ok  pass — 1 pass(es) recorded, no clause outstanding; deferred: c3');
   });
 
   it('names a deferred clause beside a real outstanding one, on a failing run', async () => {
     const both = await graded({ outstandingClauses: ['c2'], deferredClauses: ['c3'] });
     expect(both.ok).toBe(false);
-    expect(both.body).toContain('1 outstanding after pass 1: c2; deferred: c3');
+    expect(both.body).toContain('1 outstanding across 1 pass(es): c2; deferred: c3');
+  });
+
+  it('passes the clauses leg on a declined clause, and names it distinctly from a real outstanding one', async () => {
+    const declined = await graded({ declinedClauses: ['c5'] });
+    expect(declined.ok).toBe(true);
+    expect(declined.body).toContain('clauses        ok  pass — 1 pass(es) recorded, no clause outstanding; declined: c5');
+  });
+
+  it('names a declined clause beside a real outstanding one, on a failing run', async () => {
+    const both = await graded({ outstandingClauses: ['c2'], declinedClauses: ['c5'] });
+    expect(both.ok).toBe(false);
+    expect(both.body).toContain('1 outstanding across 1 pass(es): c2; declined: c5');
   });
 
   it('carries doctor\'s warning count into the summary without changing what fails', async () => {
@@ -475,6 +488,15 @@ describe('diffTouchesRegion', () => {
 });
 
 const specV1 = ['# a-spec', '', '## Deliverable', '', 'Promise.', '', 'Proof:', '', '- [c1] first.', '- [c2] second.', ''].join('\n');
+
+// specV1 with one recorded pass grading c1 unmet — the standing c5's
+// declined-clause tests settle or leave outstanding.
+const specV1AuditedUnmet = [
+  '# a-spec', '', '## Deliverable', '', 'Promise.', '', 'Proof:', '', '- [c1] first.', '- [c2] second.', '',
+  '## Audit passes', '',
+  '### Pass 1 — 2026-01-01', '',
+  '- base: `aaa`', '- head: `bbb`', '- proof 1: unmet — broken', '- proof 2: met — fine', '',
+].join('\n');
 
 // The two functions that turn repository facts into the decisions above.
 // `branchStanding` itself is not called here for the same reason `decideSpec`
@@ -746,6 +768,81 @@ describe('branchStanding, against repository facts', () => {
     const standing = branchStanding(config(), 'main');
     expect(standing.spec).toBe('a-spec');
     expect(standing.specAuthoredHere).toBe(false);
+  });
+
+  // c4, end to end: two audit passes over disjoint clause sets, exactly the
+  // shape the merge that motivated this spec produced — c1 met by pass 1
+  // and never regraded, c2 met only by pass 2. A standing read off the
+  // latest pass alone would call c1 outstanding.
+  const specWithTwoPasses = [
+    '# a-spec', '', '## Deliverable', '', 'Promise.', '', 'Proof:', '', '- [c1] first.', '- [c2] second.', '',
+    '## Audit passes', '',
+    '### Pass 1 — 2026-01-01', '',
+    '- base: `aaa`', '- head: `bbb`', '- proof 1: met — checked once', '- proof 2: unknown', '',
+    '### Pass 2 — 2026-01-02', '',
+    '- base: `ccc`', '- head: `ddd`', '- proof 1: unknown', '- proof 2: met — checked separately', '',
+  ].join('\n');
+
+  it('leaves a clause an earlier pass met off outstandingClauses, even though the latest pass never regraded it (c4)', () => {
+    writeSystems();
+    write('specs/a-spec.md', specWithTwoPasses);
+    writeStore({ id: 'member-1', title: 'Member', kind: 'task', state: 'done', spec: 'a-spec', writes: ['impl.ts'] });
+    commit('base');
+    repo.fork();
+
+    writeEvent('start', 'started member-1');
+    commit('start recorded');
+
+    const standing = branchStanding(config(), 'main');
+    expect(standing.spec).toBe('a-spec');
+    expect(standing.outstandingClauses).toEqual([]);
+  });
+
+  // c5: an undelivered task whose only record was declined is abandoned,
+  // not discharged, and must not leave the clauses leg red with no action
+  // left to clear it.
+  it('drops a clause whose only undelivered record was declined off outstandingClauses, and names it declined (c5)', () => {
+    writeSystems();
+    write('specs/a-spec.md', specV1AuditedUnmet);
+    write(
+      'tasks.jsonl',
+      [
+        JSON.stringify({ id: 'member-1', seq: 1, title: 'Member', kind: 'task', state: 'done', spec: 'a-spec', requires: [], files: [], writes: ['impl.ts'] }),
+        JSON.stringify({ id: 'a-spec-clause-1', seq: 2, title: 'Unmet deliverable clause 1', kind: 'undelivered', state: 'declined', spec: 'a-spec', clause: 1, requires: [], files: [], writes: [] }),
+      ].join('\n') + '\n',
+    );
+    commit('base');
+    repo.fork();
+
+    writeEvent('start', 'started member-1');
+    commit('start recorded');
+
+    const standing = branchStanding(config(), 'main');
+    expect(standing.spec).toBe('a-spec');
+    expect(standing.outstandingClauses).toEqual([]);
+    expect(standing.declinedClauses).toEqual(['c1']);
+  });
+
+  it('keeps a clause outstanding when its unmet recurred after an earlier record for it was declined (c5)', () => {
+    writeSystems();
+    write('specs/a-spec.md', specV1AuditedUnmet);
+    write(
+      'tasks.jsonl',
+      [
+        JSON.stringify({ id: 'member-1', seq: 1, title: 'Member', kind: 'task', state: 'done', spec: 'a-spec', requires: [], files: [], writes: ['impl.ts'] }),
+        JSON.stringify({ id: 'a-spec-clause-1', seq: 2, title: 'Unmet deliverable clause 1', kind: 'undelivered', state: 'declined', spec: 'a-spec', clause: 1, requires: [], files: [], writes: [] }),
+        JSON.stringify({ id: 'a-spec-clause-1-pass-2', seq: 3, title: 'Unmet deliverable clause 1, again', kind: 'undelivered', state: 'open', spec: 'a-spec', clause: 1, requires: [], files: [], writes: [] }),
+      ].join('\n') + '\n',
+    );
+    commit('base');
+    repo.fork();
+
+    writeEvent('start', 'started member-1');
+    commit('start recorded');
+
+    const standing = branchStanding(config(), 'main');
+    expect(standing.outstandingClauses).toEqual(['c1']);
+    expect(standing.declinedClauses).toEqual([]);
   });
 });
 

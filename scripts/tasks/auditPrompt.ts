@@ -651,12 +651,12 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
     console.log(`To check the standing above against a slug this branch does not own, run audit-prompt on one of: ${otherSpecs.slice(0, 2).join(', ')} (\`ls ${config.specsDir}\` for the rest).`);
     console.log('');
   }
-  const standings = clauseStandings(doc.proofClauses, latest?.verdicts);
+  const standings = clauseStandings(doc.proofClauses, doc.auditPasses);
   console.log('Proof clauses:');
   for (const clause of doc.proofClauses) {
     console.log(`- [c${clause.id}] ${clause.text}`);
     const standing = standings.find((verdict) => verdict.clause === clause.id)!;
-    console.log(`  latest verdict: ${standing.status}${standing.status === 'unknown' ? ' — nobody has graded this clause' : standing.evidence ? ` — ${standing.evidence}` : ''}`);
+    console.log(`  standing: ${standing.status}${standing.status === 'unknown' ? ' — nobody has graded this clause' : standing.evidence ? ` — ${standing.evidence}` : ''}`);
     const targets = clause.proofTargets ?? [];
     if (targets.length === 0) {
       console.log('  no proof target — requires human verification: inspect the behavior directly.');

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, renderAuditPass, stampClauseIds } from './specDoc';
+import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, renderAuditPass, stampClauseIds, verdictsForPass, type AuditPass } from './specDoc';
 
 const DOC = `# Demo spec
 
@@ -329,11 +329,11 @@ describe('appendAuditPass / renderAuditPass round trip', () => {
   });
 });
 
-describe('clauseStandings / outstandingSummary', () => {
+describe('verdictsForPass', () => {
   const clauses = parseSpecDoc(DOC).proofClauses;
 
   it('grades every clause the pass never mentioned as unknown, not as absent', () => {
-    const standings = clauseStandings(clauses, [{ clause: 1, status: 'met', evidence: 'measured' }]);
+    const standings = verdictsForPass(clauses, [{ clause: 1, status: 'met', evidence: 'measured' }]);
     expect(standings).toEqual([
       { clause: 1, status: 'met', evidence: 'measured' },
       { clause: 2, status: 'unknown', evidence: null },
@@ -341,10 +341,61 @@ describe('clauseStandings / outstandingSummary', () => {
     ]);
   });
 
-  it('grades every clause unknown when no pass has been recorded at all', () => {
-    expect(clauseStandings(clauses, undefined).map((verdict) => verdict.status)).toEqual(['unknown', 'unknown', 'unknown']);
+  it('grades every clause unknown when nothing was graded at all', () => {
+    expect(verdictsForPass(clauses, undefined).map((verdict) => verdict.status)).toEqual(['unknown', 'unknown', 'unknown']);
+  });
+});
+
+// c4: the standing composes every recorded pass, so a clause an earlier pass
+// met does not revert to outstanding just because a later pass never looked
+// at it — the exact shape of the merge that produced this clause.
+describe('clauseStandings, composed over every pass', () => {
+  const clauses = parseSpecDoc(DOC).proofClauses;
+  const pass = (partial: Partial<AuditPass> & Pick<AuditPass, 'pass' | 'verdicts'>): AuditPass => ({ date: '2026-01-01', base: 'base', head: 'head', ...partial });
+
+  it('reads a single pass exactly as verdictsForPass would', () => {
+    const passes = [pass({ pass: 1, verdicts: [{ clause: 1, status: 'met', evidence: 'measured' }] })];
+    expect(clauseStandings(clauses, passes)).toEqual(verdictsForPass(clauses, passes[0].verdicts));
   });
 
+  it('grades every clause unknown when no pass has been recorded at all', () => {
+    expect(clauseStandings(clauses, []).map((verdict) => verdict.status)).toEqual(['unknown', 'unknown', 'unknown']);
+  });
+
+  // The repository's own reproduction: two passes over disjoint clause sets,
+  // each backfilling the clauses it did not look at as `unknown` (what
+  // `verdictsForPass` does to every pass before it is persisted) — c6 met by
+  // pass 1, c2-c4 met by pass 2, pass 2 explicitly unknown on c6. Naming
+  // three of this doc's clauses c2, c4 and c6 to match the real incident.
+  it('leaves an earlier met verdict standing when a later pass explicitly grades the clause unknown, not silence', () => {
+    const met = (clause: number, evidence: string): AuditPass['verdicts'][number] => ({ clause, status: 'met', evidence });
+    const unknown = (clause: number): AuditPass['verdicts'][number] => ({ clause, status: 'unknown', evidence: null });
+    const passes = [
+      pass({ pass: 1, verdicts: [met(1, 'first pass'), unknown(2), unknown(3)] }),
+      pass({ pass: 2, verdicts: [unknown(1), met(2, 'second pass'), met(3, 'second pass')] }),
+    ];
+    expect(clauseStandings(clauses, passes)).toEqual([
+      { clause: 1, status: 'met', evidence: 'first pass' },
+      { clause: 2, status: 'met', evidence: 'second pass' },
+      { clause: 3, status: 'met', evidence: 'second pass' },
+    ]);
+  });
+
+  it('lets a later pass that does grade a clause overwrite an earlier verdict, unmet included', () => {
+    const passes = [
+      pass({ pass: 1, verdicts: [{ clause: 1, status: 'met', evidence: 'looked fine at the time' }] }),
+      pass({ pass: 2, verdicts: [{ clause: 1, status: 'unmet', evidence: 'regressed' }] }),
+    ];
+    expect(clauseStandings(clauses, passes)[0]).toEqual({ clause: 1, status: 'unmet', evidence: 'regressed' });
+  });
+
+  it('leaves a clause unknown when no pass ever grades it with a real verdict', () => {
+    const passes = [pass({ pass: 1, verdicts: [{ clause: 1, status: 'unknown', evidence: 'not reached' }] })];
+    expect(clauseStandings(clauses, passes).find((standing) => standing.clause === 1)).toEqual({ clause: 1, status: 'unknown', evidence: null });
+  });
+});
+
+describe('outstandingSummary', () => {
   it('names each outstanding clause with its own status rather than counting them', () => {
     const summary = outstandingSummary([
       { clause: 1, status: 'met', evidence: 'measured' },

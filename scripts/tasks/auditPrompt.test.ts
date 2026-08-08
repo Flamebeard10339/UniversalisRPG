@@ -81,14 +81,14 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit-prompt shows each clause its latest verdict, spelling out that unknown means nobody looked', async () => {
+  it('audit-prompt shows each clause its standing, spelling out that unknown means nobody looked', async () => {
     await enclosingGitFixture(async ({ tasks, audit }) => {
       await audit('demo-spec', '--proof', '1=met', '--evidence', '1=measured directly');
 
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('latest verdict: met — measured directly');
-      expect(result.stdout).toContain('latest verdict: unknown — nobody has graded this clause');
+      expect(result.stdout).toContain('standing: met — measured directly');
+      expect(result.stdout).toContain('standing: unknown — nobody has graded this clause');
       expect(result.stdout).toContain('Latest audit pass: pass 1');
       expect(result.stdout).toContain('outstanding: c2 (unknown)');
       expect(stepsBlock(result.stdout)).toContain('unknown  — nobody looked. Recording unmet instead hides that nothing was verified.');

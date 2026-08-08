@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { harvestFiles, parseAuditDoc, systemForDoc } from '../lib/auditImport';
-import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from '../lib/specDoc';
+import { appendAuditPass, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, verdictsForPass, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from '../lib/specDoc';
 import { createTask, loadStore, nextSeq, resolveFault, type Fault, type Severity, type Task } from '../lib/taskStore';
 import { resolveDiffRange } from './auditPrompt';
 import type { Flags } from './cli';
@@ -465,7 +465,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const verdicts = clauseStandings(doc.proofClauses, graded);
+  const verdicts = verdictsForPass(doc.proofClauses, graded);
   const ungraded = verdicts.filter((verdict) => verdict.status === 'unknown').map((verdict) => `c${verdict.clause}`);
 
   // `deferred` needs the same hold `met` does, for the opposite reason: `met`

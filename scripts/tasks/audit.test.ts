@@ -62,9 +62,8 @@ describe('tasks CLI', () => {
   });
 
   // The verdict-wiping trap, closed: filing findings used to append a pass
-  // that graded nothing, and the standing reads from the latest pass only —
-  // so recorded verdicts were reset to unknown by the act of filing, twice,
-  // on the branch that recorded the friction.
+  // that graded nothing, resetting every recorded verdict to unknown by the
+  // act of filing — twice, on the branch that recorded the friction.
   it('audit with findings and no proofs files the findings without appending a pass, so verdicts stand', async () => {
     await fixture(async ({ dir, tasks, audit }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
@@ -78,7 +77,7 @@ describe('tasks CLI', () => {
       expect(readFileSync(specPath, 'utf8')).not.toContain('### Pass 2');
 
       const standing = tasks('spec', 'show', 'demo-spec');
-      expect(standing.stdout).toContain('clause standing (latest pass 1): no clause outstanding');
+      expect(standing.stdout).toContain('clause standing (composed over 1 pass(es)): no clause outstanding');
 
       const filed = tasks('list', '--state', 'unreviewed');
       expect(filed.stdout).toContain('a late finding');
@@ -87,7 +86,7 @@ describe('tasks CLI', () => {
 
   // The two remaining doors into the verdict-wiping trap, closed: a typo'd
   // clause number and an abandoned interactive walk each used to record a
-  // full all-unknown pass, and the standing reads from the latest pass only.
+  // full all-unknown pass, resetting every recorded verdict to unknown.
   it('audit refuses a --proof naming no clause, so a typo cannot record an all-unknown pass', async () => {
     await fixture(async ({ dir, tasks, audit }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
@@ -104,7 +103,7 @@ describe('tasks CLI', () => {
       expect(nan.stderr).toContain('(not a number)');
 
       expect(readFileSync(specPath, 'utf8')).toBe(before);
-      expect(tasks('spec', 'show', 'demo-spec').stdout).toContain('clause standing (latest pass 1): no clause outstanding');
+      expect(tasks('spec', 'show', 'demo-spec').stdout).toContain('clause standing (composed over 1 pass(es)): no clause outstanding');
     });
   });
 
@@ -118,7 +117,7 @@ describe('tasks CLI', () => {
       expect(abandoned.status).toBe(1);
       expect(abandoned.stderr).toContain('graded no clause');
       expect(readFileSync(specPath, 'utf8')).toBe(before);
-      expect(tasks('spec', 'show', 'demo-spec').stdout).toContain('clause standing (latest pass 1): no clause outstanding');
+      expect(tasks('spec', 'show', 'demo-spec').stdout).toContain('clause standing (composed over 1 pass(es)): no clause outstanding');
     });
   });
 
@@ -1041,7 +1040,7 @@ describe('a deferred clause', () => {
       expect(specText).toContain('- proof 1: deferred — the goal is still served without it');
 
       const standing = tasks('spec', 'show', 'demo-spec');
-      expect(standing.stdout).toContain('clause standing (latest pass 1): no clause outstanding');
+      expect(standing.stdout).toContain('clause standing (composed over 1 pass(es)): no clause outstanding');
       expect(standing.stdout).toContain('[deferred]');
 
       const undelivered = tasks('show', 'demo-spec-clause-1');

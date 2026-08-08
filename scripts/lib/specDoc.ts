@@ -263,10 +263,35 @@ export function appendAuditPass(rawText: string, pass: AuditPass): string {
   return [...before, ...(needsBlank ? [''] : []), rendered, '', ...after].join('\n').trimEnd() + '\n';
 }
 
-// A clause the pass never graded is `unknown` — the pass says nothing about
-// it, and the reader is owed that as a stated fact rather than an omission.
-export function clauseStandings(clauses: ProofClause[], graded: AuditVerdict[] = []): AuditVerdict[] {
+// A clause a pass never graded is `unknown` in that pass's own verdicts —
+// the pass says nothing about it, and the record is owed that as a stated
+// fact rather than an omission. Used to fill the array a pass persists, not
+// to answer what a clause's standing is: a pass three years old backfilled
+// this way still says `unknown` about a clause a later pass met, and reading
+// that backfill as the standing is the defect `clauseStandings` below exists
+// to not repeat.
+export function verdictsForPass(clauses: ProofClause[], graded: AuditVerdict[] = []): AuditVerdict[] {
   return clauses.map((clause) => graded.find((verdict) => verdict.clause === clause.id) ?? { clause: clause.id, status: 'unknown', evidence: null });
+}
+
+// The standing, composed over every recorded pass rather than read off the
+// last one: a clause holds the most recent verdict that actually graded it,
+// and a pass that says `unknown` about a clause — whether by leaving it out
+// or by writing `unknown` explicitly, which `verdictsForPass` makes every
+// persisted pass do for every clause it has — never overwrites a real one.
+// This is the one place that walk happens; a caller hands it every pass and
+// takes the result, rather than reaching for `auditPasses[len-1]` and
+// computing a "latest" of its own that a second audit pass on a second
+// branch silently invalidates at merge time.
+export function clauseStandings(clauses: ProofClause[], passes: AuditPass[]): AuditVerdict[] {
+  return clauses.map((clause) => {
+    let standing: AuditVerdict = { clause: clause.id, status: 'unknown', evidence: null };
+    for (const pass of passes) {
+      const verdict = pass.verdicts.find((entry) => entry.clause === clause.id);
+      if (verdict !== undefined && verdict.status !== 'unknown') standing = verdict;
+    }
+    return standing;
+  });
 }
 
 // Completeness as names, never as a ratio or a bit: which clause is

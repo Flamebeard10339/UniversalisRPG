@@ -98,7 +98,7 @@ function printClauses(task: Task, doc: SpecDoc | null): void {
     console.log(`- ${clauses.map((id) => `c${id}`).join(', ')} — the spec document is not in this checkout, so their standings cannot be read here`);
     return;
   }
-  const standings = clauseStandings(doc.proofClauses, doc.auditPasses[doc.auditPasses.length - 1]?.verdicts);
+  const standings = clauseStandings(doc.proofClauses, doc.auditPasses);
   for (const id of clauses) {
     const standing = standings.find((verdict) => verdict.clause === id);
     if (standing === undefined) console.log(`- c${id} — ${task.spec} has no clause with this id`);
