@@ -866,37 +866,41 @@ describe('the gate reads no fault, no breach and no count', () => {
     for (const leg of LEGS) expect(leg.command).not.toMatch(/friction|fault|breach|recur|checked/);
   });
 
-  // Every file the gate reaches, not the one it is declared in. `doctor` is a
-  // leg of this gate *and* a CI step, and `checkPlan` runs as `tasks plan` on
-  // the same CI leg — so widening doctor's exit condition to read a fault made
-  // a merge-ready leg and a check gate on the channel, and this scan over
-  // `mergeReady.ts` alone could not see it. It survived all 2,040 tests.
-  it('names neither field in any file the gate reaches, so no value of either can reach a leg', () => {
-    const reached = [path.join(__dirname, 'mergeReady.ts'), path.join(__dirname, 'doctor.ts'), path.join(__dirname, '..', 'lib', 'planCheck.ts')];
-    for (const file of reached) {
-      const source = readFileSync(file, 'utf8');
-      // The reads that would make a count matter, rather than the words: the
-      // gate's own prose is allowed to say "recurrence" about something else.
-      for (const read of ['.fault', '.breaches', "'recur'", "'checked'", 'friction']) expect(source, `${file} reads ${read}`).not.toContain(read);
-    }
-  });
-
-  // The property, not the spelling. A scan can only ban the shapes somebody
-  // thought of; this asks the gate the question directly.
-  it('exits zero over a store whose findings carry no fault and whose breaches keep recurring', () => {
-    fixture(({ tasks }) => {
-      for (const n of [1, 2, 3, 4]) {
-        tasks('add', `a breach of the same lesson (${n})`, '--id', `breach-${n}`, '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it', '--breaches', 'worker/mutation-proof');
-        tasks('recur', `breach-${n}`, '--note', `it cost something again (${n})`);
+  // Behaviour, and only behaviour. This described a source scan over the files
+  // the gate reaches, and pass 4 walked around it in one keystroke:
+  // `const { kind, fault } = task` never writes `.fault`, so the scan stayed
+  // green while `doctor` — a leg of this gate *and* a CI step — exited 1 on the
+  // live store, where 543 records carry no fault. A scan can only ban the
+  // spellings somebody thought of, and CLAUDE.md already ruled on that shape:
+  // a gate that cannot prove what it claims costs more than it prevents. So the
+  // question is asked of the gate instead, over a store carrying every input a
+  // threshold could be built on.
+  it('exits zero over a store carrying every input a threshold could read', () => {
+    fixture(({ tasks, dir }) => {
+      for (const [fault, lesson] of [['tooling', 'worker/mutation-proof'], ['contract', 'worker/mutation-proof'], ['nobody', 'auditor/next-neighbour']]) {
+        const id = `breach-${fault}`;
+        tasks('add', `a breach of ${lesson}`, '--id', id, '--kind', 'finding', '--fault', fault, '--severity', 'high', '--deliverable', 'fix it', '--breaches', lesson);
+        // Several occurrences on one record, so a count that any threshold
+        // would plausibly compare against is actually present.
+        for (const n of [1, 2, 3, 4, 5]) tasks('recur', id, '--note', `it cost something again (${n})`);
       }
-      // And the absence the axis turns on, which no route can create any more,
-      // so it is written straight into the store the way a legacy record sits.
+      // A finding carrying no fault, which is the absence the whole axis turns
+      // on — and which no route can create any more, so it goes in as bytes.
+      // Adding a plain *task* instead is how this fixture used to be written,
+      // and a task needs no fault, so it exercised nothing.
+      const store = path.join(dir, 'tasks.jsonl');
+      const legacy = { id: 'from-before-the-channel', seq: 99, title: 'filed before fault existed', kind: 'finding', state: 'unreviewed', severity: 'high', system: null, spec: null, departure: null, clause: null, discharges: [], requires: [], files: [], writes: [], grant: null, fault: null, decider: null, breaches: ['worker/mutation-proof', 'no-such-lesson'], produces: [], deliverable: 'fix it', evidence: 'x', source: null, reason: null, trigger: null, closed: null, closedCommit: null, claimed: null, claimedBy: null };
+      writeFileSync(store, `${readFileSync(store, 'utf8')}${JSON.stringify(legacy)}\n`, 'utf8');
       tasks('add', 'ordinary work', '--id', 'ordinary');
+      tasks('checked', 'auditor/silent-guess', '--note', 'looked and found it clean');
 
-      // The two legs that read the store at all. Neither may take an opinion
-      // from any of the above.
+      // The two legs that read the store at all, plus the query itself. None of
+      // them may take an opinion from any of the above — and the plan is handed
+      // the breach-carrying records, not only the ordinary one, so a gate on the
+      // channel inside `cmdPlan` has something to fire on.
       expect(tasks('doctor').status).toBe(0);
-      expect(tasks('plan', 'ordinary').status).toBe(0);
+      expect(tasks('plan', 'ordinary', 'breach-tooling', 'breach-contract', 'breach-nobody', 'from-before-the-channel').status).toBe(0);
+      expect(tasks('friction').status).toBe(0);
     });
   });
 });

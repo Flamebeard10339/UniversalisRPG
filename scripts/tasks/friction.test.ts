@@ -1,6 +1,8 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { allLessons } from './briefLessons';
 import { fixture, type Run } from './cliFixtures';
 
 // A refused write leaves no store at all, which is the same answer as an
@@ -794,39 +796,16 @@ describe('c1, c5, c7, c8, c10, c12: one query over the channel', () => {
     });
   });
 
-  // The rule, stated, because the previous guard banned one spelling in one
-  // file and two walk-arounds survived all 2,040 tests: the same elevation
-  // written `=== 3` instead of `> 2`, and the same elevation written in
-  // records.ts instead of friction.ts.
-  //
-  // A channel count may be compared to zero and to nothing else. Zero is an
-  // emptiness guard for phrasing — `over === 0` guards a division, and
-  // `orphaned.length === 0` chooses whether to print a heading — and neither
-  // decides anything about a lesson or a record. Any other literal is a
-  // threshold whatever operator reaches it, which is why the shape is banned
-  // rather than the inequality.
-  it('compares no channel count to anything but zero, in any file that reads the channel', () => {
-    const THRESHOLD = /(?:breach|occurrence|recurrence|cited|fault|count)\w*(?:\.length|\.size)?\s*(?:[<>]=?|={2,3}|!==)\s*(?!0\b)\d+/i;
-    // The rule bounded in both directions before it is applied to anything, so
-    // a green run means it looked rather than that it cannot fire. Guarding
-    // over-strictness matters as much here: a rule that also banned `=== 0`
-    // would forbid the emptiness guards the query legitimately needs, and the
-    // repair for that is deleting the rule.
-    for (const banned of ['if (cited.length > 2)', 'if (occurrenceCount.size === 3)', 'if (occurrences.length >= 3)', 'if (breaches.length !== 1)']) {
-      expect(THRESHOLD.test(banned), banned).toBe(true);
-    }
-    for (const legal of ['if (orphaned.length === 0) return;', 'const rate = (count: number, over: number) => (over === 0 ?', 'if (claims === 0) return;', 'return pass >= 2 ?']) {
-      expect(THRESHOLD.test(legal), legal).toBe(false);
-    }
-    for (const file of ['friction.ts', 'records.ts']) {
-      const source = readFileSync(path.join(__dirname, file), 'utf8');
-      const offenders = source
-        .split('\n')
-        .map((line, index) => ({ line: line.trim(), at: `${file}:${index + 1}` }))
-        .filter(({ line }) => THRESHOLD.test(line));
-      expect(offenders.map((offender) => `${offender.at} ${offender.line}`)).toEqual([]);
-    }
-  });
+  // No source scan. This was a stated rule over the files that read the
+  // channel — a channel count may be compared to zero and to nothing else —
+  // and pass 4 found it wrong in both directions at once. It missed a threshold
+  // against a named constant, one count compared to another count, one reached
+  // through `.filter(...).length`, and one in `workPrompt.ts`, a file it did
+  // not read and the very place c12's own first sentence points; and it *banned*
+  // `FAULTS.length === 3`, the invariant c5's prose states. Two passes and six
+  // walk-arounds say the same thing, and CLAUDE.md already ruled on the shape:
+  // a gate that cannot prove what it claims costs more than it prevents. The
+  // refusal is carried by what the command does, below, and by nothing else.
 
   // And the property the scan is a proxy for, asked of the command directly:
   // a lesson breached four times over and recurring reads the same way as one
@@ -837,6 +816,10 @@ describe('c1, c5, c7, c8, c10, c12: one query over the channel', () => {
         tasks('add', `a breach of the recurring lesson (${n})`, '--id', `recurring-${n}`, '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it', '--breaches', 'worker/mutation-proof');
         tasks('recur', `recurring-${n}`, '--note', `again (${n})`);
       }
+      // More occurrences than records, so a threshold comparing the two counts
+      // to each other has a state to fire on. Four and four made that mutation
+      // a no-op, which reads as the guard holding when nothing was tested.
+      for (const n of [5, 6]) tasks('recur', 'recurring-1', '--note', `again (${n})`);
       tasks('add', 'a single breach', '--id', 'single-one', '--kind', 'finding', '--fault', 'tooling', '--severity', 'low', '--deliverable', 'fix it', '--breaches', 'worker/aim-at-the-clause');
 
       const { stdout, status } = tasks('friction');
@@ -852,13 +835,29 @@ describe('c1, c5, c7, c8, c10, c12: one query over the channel', () => {
           .trimStart()
           .split('—')[0]
           .replace(/\d+/g, 'N');
-      expect(lineFor('worker/mutation-proof')).toContain('4 record(s), 4 further occurrence(s) —');
+      expect(lineFor('worker/mutation-proof')).toContain('4 record(s), 6 further occurrence(s) —');
       expect(lineFor('worker/aim-at-the-clause')).toContain('1 record(s), 0 further occurrence(s) —');
       expect(shape('worker/mutation-proof')).toBe(shape('worker/aim-at-the-clause'));
-      // And the order is still the briefs' own, with the four-breach lesson
-      // ahead of the one-breach lesson only because WORKER_LESSONS says so.
-      expect(stdout.indexOf('worker/comment-rule')).toBeLessThan(stdout.indexOf('worker/mutation-proof'));
-      expect(stdout.indexOf('worker/mutation-proof')).toBeLessThan(stdout.indexOf('worker/aim-at-the-clause'));
+
+      // The section is exactly one line per live lesson and nothing else, at any
+      // indent. This is what makes the test carry the refusal by itself now that
+      // the source scan is gone: every elevation the scan missed — a threshold
+      // against a named constant, one count compared to another count, one
+      // reached through `.filter(...).length` — has to print something to be an
+      // elevation. Filtering the section down to two-space rows was the first
+      // version of this and let all three of those through, because each printed
+      // its elevation as a six-space continuation.
+      const all = stdout.split('\n');
+      const from = all.findIndex((line) => line.includes('by lesson breached'));
+      const to = all.findIndex((line, index) => index > from && line.startsWith('Nothing here gates'));
+      expect(from, 'the per-lesson section is present').toBeGreaterThan(-1);
+      expect(to, 'and its end is findable, so the slice is the whole section').toBeGreaterThan(from);
+      const rows = all.slice(from + 1, to).filter((line) => line.trim().length > 0);
+      expect(rows).toHaveLength(allLessons().length);
+
+      // And the order is the briefs' own, over every lesson rather than one
+      // pair of them: ranking by the count is acting on it.
+      expect(rows.map((row) => row.trim().split(/\s+/)[0])).toEqual(allLessons().map((lesson) => lesson.id));
     });
   });
 
@@ -876,14 +875,24 @@ describe('c1, c5, c7, c8, c10, c12: one query over the channel', () => {
 // the extent: nothing the tooling generates may direct a report outside the
 // store.
 describe('c1: there is one place, and no generated brief names another', () => {
-  // The directory, not a filename. Asserting `tool-friction.md` is gone left
-  // its sibling `audit-tooling-friction.md` tracked in the same directory,
-  // saying the same thing about the same subject, under a title that claimed
-  // to have caught it — so "there is one place" was false while the guard was
-  // green. Nothing may live here: a second prose channel is exactly what the
-  // clause retires, whatever it is called.
-  it('has no tracked file left under the retired feedback directory', () => {
-    expect(existsSync(path.join(process.cwd(), '.planning', 'agent-feedback'))).toBe(false);
+  // Git, not the filesystem, and the clause rather than the directory. Two
+  // repairs got this wrong in different directions: naming `tool-friction.md`
+  // left its sibling `audit-tooling-friction.md` tracked beside it, and then
+  // asserting the *directory does not exist* reddened on untracked scratch
+  // while a prose channel at any other path stayed invisible. What c1 forbids
+  // is a second tracked place for what the store now holds — so that is what is
+  // asked, of the index, which is the only thing a merge carries. The primary
+  // checkout still has this directory on disk with an untracked copy in it, and
+  // that must not fail anybody's suite.
+  it('tracks no prose channel for what the store now holds', () => {
+    const tracked = spawnSync('git', ['ls-files', '.planning'], { encoding: 'utf8' });
+    expect(tracked.status, tracked.stderr).toBe(0);
+    const files = tracked.stdout.split('\n').filter((line) => line.trim().length > 0);
+    // Non-vacuous: `.planning` does hold tracked documents, so an empty answer
+    // would mean the query broke rather than that the channel is gone.
+    expect(files.length).toBeGreaterThan(0);
+    expect(files.filter((file) => file.startsWith('.planning/agent-feedback/'))).toEqual([]);
+    expect(files.filter((file) => /friction/i.test(file))).toEqual([]);
   });
 
   it('sends every generated brief to the channel', () => {

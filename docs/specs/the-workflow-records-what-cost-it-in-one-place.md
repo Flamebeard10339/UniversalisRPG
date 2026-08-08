@@ -98,8 +98,15 @@ Proof:
   "how well is the system working", and a denominator that is itself hand-kept is a second thing to
   drift.
   proof: npm run tasks -- friction
-- [c9] Nothing gates on any of it. No leg of `merge-ready`, no CI check and no command's exit code
-  reads a fault, a breach or a count. The channel is a report and refuses to become a threshold.
+- [c9] **Nothing the channel holds can change a verdict.** No leg of `merge-ready`, no CI check and
+  no command's exit code answers differently because of a record's fault, a breach citation, or how
+  many occurrences something has. A store full of recurring breaches, and one carrying a finding with
+  no fault at all, still passes every gate. Stated as behaviour after two passes graded it against
+  its own source text and six respellings walked around the guard that text produced: "no code path
+  reads a fault" is not true and cannot be made true — input validation exits non-zero on
+  `--fault the weather`, which is c2 working — and a clause asserting a fact about source invites a
+  guard over source, which is the mechanism that failed. What must hold is that no *value* in the
+  channel decides anything, and that is answerable by asking the gates.
   proof: vitest scripts/tasks/mergeReady.test.ts
 - [c10] **A recurrence is a new observation, never an edit.** Recording that a friction happened
   again appends an occurrence that carries its own note and names the record it recurs on; nothing
@@ -124,14 +131,19 @@ Proof:
   proof: vitest scripts/tasks/friction.test.ts
 
 - [c12] **A lesson that keeps costing something surfaces as work for a planner, and nothing in the
-  tooling ever elevates it.** No count is compared to anything, anywhere in any code path. The
-  breach records are the flag: they dedupe by c11 and accumulate by c10, so one lesson holds one
-  record with N occurrences, and a planner reading N decides. The number is a reading aid for a
-  human and never a rule — a stated threshold has been the wrong instrument four times in this
-  repository inside one day, and a raw breach count is confounded by attention besides, which is why
-  c8's denominator is per-lesson and c7's marker is where it comes from. Written as a refusal
-  because the reasonable-sounding alternative is one `if` statement away and would look like
-  tidying.
+  tooling ever elevates it.** The breach records are the flag: they dedupe by c11 and accumulate by
+  c10, so one lesson holds one record with N occurrences, and a planner reading N decides. The number
+  is a reading aid for a human and never a rule — a stated threshold has been the wrong instrument
+  four times in this repository inside one day, and a raw breach count is confounded by attention
+  besides, which is why c8's denominator is per-lesson and c7's marker is where it comes from.
+  **Elevating means acting on the number**, and the query is what a reader sees, so this is what it
+  must not do: rank by it, gate on it, or say anything about a lesson that it does not say about every
+  other one. A lesson breached many times over prints the same line as one breached once, in the
+  briefs' order, one line per live lesson and no more. Stated that way after "no count is compared to
+  anything, anywhere in any code path" was graded met twice against a source scan it produced, and
+  pass 4 found six respellings that walked around the scan and one legitimate invariant it banned —
+  `FAULTS.length === 3`, which c5's own prose states. The sentence was also false in its own file
+  three times over, because comparing a count to zero is how a printer chooses a heading.
   proof: vitest scripts/tasks/friction.test.ts
 - [c13] **A lesson can be retired, and the retirement is recorded.** Removing an instruction is an
   operation that says what left and why, not a deletion from an array — the same shape, one table
@@ -147,6 +159,24 @@ re-deriving it.
 
 ## Decisions
 
+- **c9 and c12 are stated as behaviour, and both source scans that guarded them are deleted.**
+  Ruled 2026-08-08 after pass 4, which is the second pass to recommend it. Both clauses were written
+  as absolute claims about source text — "no code path reads a fault", "no count is compared to
+  anything, anywhere in any code path" — and a clause that asserts a fact about source gets guarded
+  by a scan over source. That guard failed twice. Pass 3 found three respellings that survived the
+  whole suite; pass 4, asked for a fourth, found four more plus one around c9 that exits `doctor`
+  non-zero on the live store with every test green, and showed the c12 rule *banning*
+  `FAULTS.length === 3` — the invariant c5's own prose states. Both sentences were also false in
+  their own implementations: `--fault the weather` exits 1, which is c2 working, and comparing a
+  count to zero is how a printer chooses a heading. `CLAUDE.md` already rules on this shape — a gate
+  that generates strip commits and cannot prove what it claims costs more than it prevents — so the
+  repair is not a better regex. What both clauses actually forbid is a *value* in the channel
+  changing what the tooling does, and that is answerable by asking the gates and the query. The
+  behavioural tests were widened to carry it alone: a store holding every input a threshold could
+  read still exits zero through `doctor`, `plan` and `friction`, and the per-lesson section is one
+  line per live lesson in the briefs' order, so an elevation has to print something and cannot.
+  The absolute wording was kept for two passes on the argument that it deters the gate. It did not:
+  seven walk-arounds were live under it.
 - **The channel is the store, not the event log, and the event log's `note` field is not touched.**
   The 2026-08-06T13:37:57Z ruling measured 1322 events and settled that `note` stays prose: 72% of
   notes render a sentence from facts the event already has, structuring them buys nothing because

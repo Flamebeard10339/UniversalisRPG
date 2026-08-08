@@ -542,6 +542,7 @@
             "scripts/lib/eventLog.ts",
             "scripts/lib/taskStore.ts",
             "scripts/tasks/context.ts",
+            "scripts/tasks/doctor.ts",
             "scripts/tasks/records.ts"
           ],
           "note": "produced by a-record-cannot-leave-the-store-unrecorded: the remove op and tasks remove, saveStore refusing an undeclared drop, and reconcile over the log against the store with the coverage it does not have"
