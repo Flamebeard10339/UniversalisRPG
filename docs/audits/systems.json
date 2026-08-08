@@ -391,6 +391,13 @@
             "scripts/tasks/records.ts"
           ],
           "note": "produced by a-record-carries-its-fault-and-a-question-blocks-only-what-d"
+        },
+        {
+          "name": "atomic store write",
+          "paths": [
+            "scripts/lib/taskStore.ts"
+          ],
+          "note": "produced by store-writes-atomically: saveStore stages and renames, and refuses a write over a store that moved since this process read it"
         }
       ]
     },
