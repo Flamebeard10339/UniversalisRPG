@@ -3,6 +3,7 @@ import path from 'node:path';
 import { harvestFiles, parseAuditDoc, systemForDoc } from '../lib/auditImport';
 import { appendAuditPass, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, verdictsForPass, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from '../lib/specDoc';
 import { createTask, loadStore, nextSeq, resolveFault, type Fault, type Severity, type Task } from '../lib/taskStore';
+import { reportPriorArt } from './architectureCmds';
 import { resolveDiffRange } from './auditPrompt';
 import type { Flags } from './cli';
 import { recordEvents, refuseUnknownSpec, resolveConfig, saveStoreAndWarn, slugify, specFile, subjectOf, today, uniqueId } from './context';
@@ -76,6 +77,7 @@ export function cmdImport(args: Flags, usage: string): void {
   const skippedNote = skipped > 0 ? ` (${skipped} already present, skipped)` : '';
   const systemNote = system === null && findings.length > 0 ? ' — no system mapping for this doc name, system left null' : '';
   console.log(`imported ${imported} finding(s) from ${docPath}${skippedNote}${systemNote}`);
+  for (const task of created) reportPriorArt(config, tasks, task);
 }
 
 interface AuditFinding {
@@ -414,6 +416,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     recordEvents(config, 'audit', created.map((task) => subjectOf(task, `recorded unreviewed by ${slug} against pass ${against}: ${truncateLine(task.title, 60)}`)));
     console.log(`${created.length} finding(s) recorded, unreviewed, against pass ${against} — no pass appended, so recorded clause verdicts stand`);
     console.log(`Next: \`npm run tasks -- triage --spec ${slug}\` walks them, with a separate actor. You file findings; you never promote them`);
+    for (const task of created) reportPriorArt(config, tasks, task);
     return;
   }
 
@@ -536,13 +539,13 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     else undeliveredCreated++;
   }
 
-  let findingsCreated = 0;
+  const filed: Task[] = [];
   for (const finding of findings) {
     const task = buildFindingTask(finding, slug, passNumber, taken, tasks);
     tasks.push(task);
     taken.add(task.id);
     created.push({ task, note: `recorded unreviewed by ${slug} pass ${passNumber}: ${truncateLine(finding.title, 60)}` });
-    findingsCreated++;
+    filed.push(task);
   }
 
   saveStoreAndWarn(tasks, config);
@@ -560,8 +563,14 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
   if (undeliveredCreated > 0) console.log(`${undeliveredCreated} undelivered task(s) created for unmet clauses`);
   if (deferredCreated > 0) console.log(`${deferredCreated} clause(s) deferred — tracked as undelivered work with no spec, no longer outstanding against ${slug}`);
   if (ungraded.length > 0) console.log(`${ungraded.length} clause(s) recorded unknown — nobody graded them: ${ungraded.join(', ')}. No undelivered task was created, because an ungraded clause is not a broken promise`);
-  if (findingsCreated > 0) console.log(`${findingsCreated} finding(s) recorded, unreviewed`);
+  if (filed.length > 0) console.log(`${filed.length} finding(s) recorded, unreviewed`);
   console.log(nextAfterPass(undeliveredCreated > 0 || ungraded.length > 0, slug));
+  // After the verdict, because the verdict is what the auditor came for; the
+  // prior art is what the next person triaging these findings needs, and an
+  // auditor filing six at once is the reader least able to remember which of
+  // them the store already holds. Findings only — an undelivered clause record
+  // names the clause's own files and has no duplicate to find.
+  for (const task of filed) reportPriorArt(config, tasks, task);
 }
 
 // The last step of the auditor's brief, said by the command that completes

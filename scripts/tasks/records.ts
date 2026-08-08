@@ -61,7 +61,7 @@ import {
   validateContentFields,
   type Config,
 } from './context';
-import { reportPriorArtOnPaths } from './architectureCmds';
+import { reportPriorArt } from './architectureCmds';
 import { unknownLessonIds } from './briefLessons';
 import { printRow, printTask, truncateLine, wrapUnder } from './render';
 import { resolveTaskIds } from './resolveIds';
@@ -279,20 +279,10 @@ export function cmdAdd(args: Flags, usage: string): void {
   reportGrant(task);
   reportUnknownBreaches(task);
   reportMisfiledSystem(config, task);
-  offerRecurrence(task, reportPriorArtOnPaths(config, tasks, task));
+  reportPriorArt(config, tasks, task);
 }
 
-// The prompt that makes an occurrence reachable, and the shape of it is the
-// clause: the record is already filed by the time this prints, so filing new
-// costs nothing and attaching costs two further commands. A duplicate is
-// visible and cheap to triage; a wrong merge makes a distinct defect vanish
-// and the derived count lie, so the cheap path must never be the merge.
-function offerRecurrence(task: Task, claims: number): void {
-  if (claims === 0 || !reportsCost(task.kind)) return;
-  console.log(`\nif one of those is this same friction rather than a new one, \`tasks recur <its id> --note "what it cost this time"\` records this as an occurrence of it, and \`tasks decline ${task.id} --reason "duplicate of <its id>"\` retires what you just filed. Nothing is merged for you.`);
-}
-
-// The other half of the asymmetry `offerRecurrence` prints, and it writes
+// The other half of the asymmetry `reportPriorArt` prints, and it writes
 // nothing to the store. An occurrence is an event, so two branches recording
 // one append two lines that `merge=union` keeps both of; a counter field is
 // something concurrent branches edit by construction, whose correct
@@ -597,7 +587,7 @@ export function cmdEdit(args: Flags, usage: string): void {
   if (changes.includes('grant')) reportGrant(task);
   if (changes.includes('breaches')) reportUnknownBreaches(task);
   if (changes.some((change) => change === 'system' || change === 'writes' || change === 'files')) reportMisfiledSystem(config, task);
-  if (changes.includes('writes') || changes.includes('files')) offerRecurrence(task, reportPriorArtOnPaths(config, tasks, task));
+  if (changes.includes('writes') || changes.includes('files')) reportPriorArt(config, tasks, task);
 }
 
 function storeStateAt(config: Config, commit: string, id: string): State | null {

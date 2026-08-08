@@ -604,6 +604,47 @@ describe('c11: filing shows what already claims the path, and never refuses', ()
       expect(planned.stdout).not.toContain('tasks recur');
     });
   });
+
+  // The clause is a property of filing, not of one command. `add` and `edit`
+  // had it and `audit` and `import` did not, which is the route the generated
+  // auditor brief prescribes — 227 of 603 reporting records in the live store
+  // were filed through it with a path nobody was shown the prior art for.
+  it('shows the prior art to an auditor filing through a recorded pass', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      fileAFriction(tasks, 'first-sighting');
+
+      const pass = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=checked', '--proof', '2=met', '--evidence', '2=checked', '--finding', 'the manifest never generates, seen again', '--severity', 'medium', '--fault', 'tooling', '--deliverable', 'generate it', '--evidence', 'ten minutes again', '--file', 'scripts/tasks/audit.ts:88');
+      expect(pass.status).toBe(0);
+      expect(pass.stdout).toContain('1 finding(s) recorded, unreviewed');
+      expect(pass.stdout).toContain('prior art on scripts/tasks/audit.ts');
+      expect(pass.stdout).toContain('first-sighting');
+      expect(pass.stdout).toContain('tasks recur <its id>');
+    });
+  });
+
+  it('shows the prior art to a findings-only filing, which appends no pass at all', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      fileAFriction(tasks, 'first-sighting');
+
+      const late = await audit('demo-spec', '--finding', 'the manifest never generates, seen a third time', '--severity', 'medium', '--fault', 'tooling', '--deliverable', 'generate it', '--evidence', 'ten minutes again', '--file', 'scripts/tasks/audit.ts:88');
+      expect(late.stdout).toContain('no pass appended');
+      expect(late.stdout).toContain('first-sighting');
+      expect(late.stdout).toContain('tasks recur <its id>');
+    });
+  });
+
+  it('shows the prior art on an imported legacy document', () => {
+    fixture(({ tasks, dir }) => {
+      fileAFriction(tasks, 'first-sighting', 'src/runtime/save.ts:88');
+      const docPath = path.join(dir, 'runtime-2026-08-01.md');
+      writeFileSync(docPath, ['## H1 — the same region again', 'src/runtime/save.ts:88 is where it lives.'].join('\n'), 'utf8');
+
+      const imported = tasks('import', docPath, '--fault', 'contract');
+      expect(imported.stdout).toContain('imported 1 finding(s)');
+      expect(imported.stdout).toContain('first-sighting');
+      expect(imported.stdout).toContain('tasks recur <its id>');
+    });
+  });
 });
 
 describe('c1, c5, c7, c8, c10, c12: one query over the channel', () => {

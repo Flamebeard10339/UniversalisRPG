@@ -4,7 +4,7 @@ import { loadEvents } from '../lib/eventLog';
 import { checkPlan } from '../lib/planCheck';
 import { declaredPath, findProducers, priorArt, producerIndex, rulingsOn, type PriorArt, type Producer, type Rulings } from '../lib/producers';
 import { canonicalPath, checkManifest, isUnowned, loadManifest, ManifestError, overlappingConcepts, parseManifest, type Manifest } from '../lib/systems';
-import type { Task } from '../lib/taskStore';
+import { reportsCost, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { CLOSING_STATES, readStore, recordEvents, resolveActiveSpec, resolveConfig, splitList, systemNames, type Config } from './context';
 import { printRow, reportUnknownIds, wrapUnder } from './render';
@@ -268,6 +268,25 @@ export function reportPriorArtOnPaths(config: Config, tasks: Task[], task: Task)
   console.log('');
   printRulings(rulingsOn(others, loadEvents(config.eventsPath).events, paths));
   return art.claims.length;
+}
+
+// The prompt that makes an occurrence reachable, and the shape of it is the
+// clause: the record is already filed by the time this prints, so filing new
+// costs nothing and attaching costs two further commands. A duplicate is
+// visible and cheap to triage; a wrong merge makes a distinct defect vanish
+// and the derived count lie, so the cheap path must never be the merge.
+function offerRecurrence(task: Task, claims: number): void {
+  if (claims === 0 || !reportsCost(task.kind)) return;
+  console.log(`\nif one of those is this same friction rather than a new one, \`tasks recur <its id> --note "what it cost this time"\` records this as an occurrence of it, and \`tasks decline ${task.id} --reason "duplicate of <its id>"\` retires what you just filed. Nothing is merged for you.`);
+}
+
+// What every route that files a record owes it, as one call. The query and the
+// offer were paired by hand at `add` and `edit` and absent from `audit` and
+// `import`, which is the pair a caller can forget — and forgetting it is how
+// 227 of 603 reporting records were filed blind to what already claimed their
+// paths, through the route the generated auditor brief prescribes.
+export function reportPriorArt(config: Config, tasks: Task[], task: Task): void {
+  offerRecurrence(task, reportPriorArtOnPaths(config, tasks, task));
 }
 
 // `tasks plan` grades a dispatch set once, before anyone works it, when every
