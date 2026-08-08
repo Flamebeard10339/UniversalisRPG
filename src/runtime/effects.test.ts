@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { applyResults, getDelta, newSegment, ResultApplication, ResultObserver, settlePools } from './effects';
+import { applyResults, getDelta, newSegment, RESULT_OBSERVERS, ResultApplication, ResultObserver, settlePools } from './effects';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { createGameState, GameState, initResources, PLAYER } from './runtime';
 import { loadModule, Registry } from '../content/registry';
@@ -153,5 +153,16 @@ describe('applyResults: watching what was applied', () => {
 
     expect(state.log).toEqual(['modal:character-creation']);
     expect(state.pendingModal).toBe('character-creation');
+  });
+
+  it('lets a caller subscribe alongside the default list rather than in place of it', () => {
+    const { registry, state } = fresh();
+    const { seen, observer } = watched();
+    const segment = newSegment(state, registry, [...RESULT_OBSERVERS, observer]);
+
+    applyResults(segment, [{ kind: 'open-modal', modal: 'character-creation' }], PLAYER);
+
+    expect(state.log).toEqual(['modal:character-creation']);
+    expect(seen.map((application) => application.result.kind)).toEqual(['open-modal']);
   });
 });

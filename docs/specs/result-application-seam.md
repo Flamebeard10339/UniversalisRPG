@@ -39,12 +39,29 @@ Proof:
 - **Everything downstream is strictly sequential.** This branch, then `first-class-modals`, then
   `skill-levels-xp-events`, then `combat-events`. They are not independent work that happens to
   collide; each needs the shape the previous one settles.
+- **The observation point is a synchronous observer list carried on the segment**, settling the open
+  question below. Not a return value and not an accumulated list read afterwards: a consumer's own
+  log line has to interleave with the result that caused it, and skill level-ups and combat hooks
+  both narrate next to the result that fired them. `RESULT_OBSERVERS` in `effects.ts` is the default
+  list every production segment carries, and it is exported so a caller building its own segment can
+  spread it.
+- **Joining that list is a one-line append to `effects.ts`, and that is the sanctioned extension
+  path.** A subscriber manifest is static by construction: the segments the game runs are built
+  inside the engine, so nothing downstream can reach them without a shared file naming it. This is
+  what the branch actually bought — three branches append one line each and write their own module,
+  instead of three rewrites of `applyResults` landing on top of each other. It is *not* what c5
+  measures. `tasks plan`'s cohesion check is path-level and cannot tell those two apart, so c5 is
+  satisfiable only by moving the manifest to a second file, which would relocate the report rather
+  than remove it. Recorded here rather than repaired: the clause names the wrong measurement, and
+  `first-class-modals`, `skill-levels-xp-events` and `combat-events` will each need `effects.ts` in
+  their grant when their workers correct them.
 
 ## Open questions
 
 - Whether the observation point is a return value, a callback, or an accumulated list on the segment
   is left to the first slice. The clause is that exactly one such place exists, not what it is —
   choosing it needs the region read, and the worker who reads it corrects this grant anyway.
+  *Answered in Decisions above.*
 
 ## Audit passes
 

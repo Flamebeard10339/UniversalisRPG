@@ -43,8 +43,9 @@ const narrateModal: ResultObserver = ({ state }, { result, lead }) => {
 
 // Every result a segment applies is offered to each of these, in application
 // order: a consumer of applied results joins this list rather than growing the
-// switch that applies them.
-const RESULT_OBSERVERS: readonly ResultObserver[] = [narrateModal];
+// switch that applies them. Exported so a caller building its own segment can
+// spread it and keep what the game already does.
+export const RESULT_OBSERVERS: readonly ResultObserver[] = [narrateModal];
 
 export function newSegment(state: GameState, registry: Registry, observers: readonly ResultObserver[] = RESULT_OBSERVERS): Segment {
   return { state, registry, deltas: new Map(), stopped: false, observers };
