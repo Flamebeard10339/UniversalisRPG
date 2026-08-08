@@ -1432,3 +1432,51 @@ lists which verbs take it. Separately, `--store` has to follow the subcommand, n
 No install ran from this session, and `node_modules` was intact throughout. Recording the
 non-recurrence because the previous entry's cost was 40 minutes and a single observation is not a
 rate.
+
+## 2026-08-08, auditing `audit-splits-at-its-seam` (pass 1)
+
+### No mutation manifest again, and this spec's four clauses could not have produced one even in
+### principle — the shape gap is wider than "no target resolved"
+
+Step 4 printed the same "no manifest was written" line the 2026-08-07 friction-record pass already
+filed (`audit-prompt-generates-no-mutation-manifest-for-any-spec-who`, open), so this is not a new
+finding. Worth adding one data point to the open one, though: this spec's four proof lines are a
+`grep`, a `grep`+`grep`, an `npm run audit-status` read, and — for c2 — `vitest <file1> <file2>` with
+no quoted test name at all. `resolveTarget`'s regex is `/^vitest\s+(\S+)\s+"(.*)"\s*$/`, which
+requires exactly one file and one quoted title; a two-file, no-title proof line like c2's cannot
+match that shape no matter how the suite is organised, which is a narrower defect than "the target
+named a test the checkout doesn't have" — there was never a target here the tool's own format could
+parse. All four of these clauses are structural (file placement, import direction, a concept
+registry) rather than pure logic, so the brief's own carve-out for a UI/smoke target — inspected, not
+mutation-tested — is the right read, and I inspected by re-running each proof command directly. Cost
+was the fifteen minutes the open finding already prices in, not fresh.
+
+### Verifying "no test was lost or renamed by the move" (c2) has no tool, and hand-rolling one found
+### a real gotcha the naive version would have gotten wrong
+
+Nothing in the repo answers "does file A's test names match files B+C's, after a split" — I wrote a
+throwaway node script comparing `it(...)`/`test(...)` title regex-matches between the base
+`audit.test.ts` and the two post-split files. First pass: 123 titles on both sides, sorted lists
+identical — looked done. But `npx vitest run` on the same two files reported 119 tests, not 123, and
+the four-title gap turned out to be string-literal fixtures inside the file's own tests (`'a
+parameterised title'`, `'a test that exists'`, `'a title the fixture owns'`, one escaped-apostrophe
+fixture) that `testTitles()`'s own test suite feeds it as sample input — matched by any naive
+`it(...)` regex but never registered as a real test by vitest. Had to grep the base file to confirm
+those four strings pre-existed there too before trusting the 119/119 match. This is generalizable:
+`resolveTarget`'s own `testTitles()` in `auditPrompt.ts` already has this exact problem solved
+(titles-only, comment- and string-literal-safe) for a single target string; a `tasks where`-style
+verb that ran `testTitles()` against two files and diffed the sorted name lists would have answered
+c2 in one command instead of a hand-written script, and would not have needed the fixture-string
+correction by hand. Roughly 20 minutes, most of it chasing the 123-vs-119 discrepancy down to its
+cause rather than writing the script itself.
+
+### Self-inflicted: `git checkout <base-sha> -- .` while inspecting base state staged the whole
+### working tree
+
+Reaching for a quick way to diff base-vs-current `audit-status` output, I ran
+`git checkout 8baf875... -- .` intending to compare in place, which instead checked out every file at
+that SHA into the worktree and staged it — the CLAUDE.md-mandated `git status` before a destructive
+op would have caught this before it happened, and did catch it immediately after (`git checkout HEAD
+-- .` restored a clean tree with nothing lost, since nothing had been committed). No tool defect;
+recording it because `git show <sha>:<path>` piped into a script, which is what I used everywhere
+else in this pass, is the safe form of the same question and I should have reached for it first.
