@@ -188,6 +188,13 @@
             "src/runtime/forwardProgress.ts"
           ],
           "note": "produced by resolve-forward-progress-guard: what a segment boundary is, that it is never before the current instant, and how many consecutive non-advancing segments resolve() tolerates before it reports a stall"
+        },
+        {
+          "name": "result application",
+          "paths": [
+            "src/runtime/effects.ts"
+          ],
+          "note": "produced by result-application-seam: applyResults takes the actor a result applies to, and every applied result is offered to the observers the segment carries"
         }
       ]
     },
