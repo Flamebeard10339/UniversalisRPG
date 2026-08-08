@@ -453,7 +453,7 @@ export function slugStandingLines(standing: SlugStanding): string[] {
       `WARNING: this branch is working ${standing.branchSpec}, not ${standing.slug}. The diff range above is ${standing.branch}'s, so ${standing.slug}'s clauses below would be graded against a diff that does not contain their implementation. Audit ${standing.branchSpec}, or run this on the branch that owns ${standing.slug}.`,
     );
   } else if (standing.branchSpec === null) {
-    lines.push(`Nothing relates ${standing.slug} to ${standing.branch}: no spec file named for the branch, and no store or event-log record of this branch working a spec. The range above is this branch's whatever ${standing.slug} promised.`);
+    lines.push(`Nothing relates ${standing.slug} to ${standing.branch}: no spec file named for the branch. The range above is this branch's whatever ${standing.slug} promised.`);
   }
   if (standing.lastPassMerged && standing.lastPassHead !== null) {
     lines.push(

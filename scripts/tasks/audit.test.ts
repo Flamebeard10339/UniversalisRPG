@@ -830,7 +830,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
       // A clause left outstanding is a different next move, and `tasks next`
       // is what picks it up.
       expect(met.stdout).not.toContain('tasks -- next');
-      expect(nextAfterPass(true)).toContain('npm run tasks -- next');
+      expect(nextAfterPass(true, 'demo-spec')).toContain('npm run tasks -- next --spec demo-spec');
     });
   });
 });
