@@ -225,3 +225,196 @@ earlier pass recorded, and do not hand the reader a command that cannot run.
 - `lastSpecWrittenFromBranch` (`context.ts:222`) has exactly one caller — route 3. It becomes dead
   code on deletion. `specsWrittenFromBranch` keeps a second, surviving caller in `mergeReady.ts:315`,
   which reaches it directly rather than through `resolveActiveSpec`, so it stays.
+
+## Audit passes
+
+### Pass 1 — 2026-08-08
+
+- base: `8e91a6e7408b82e46420b430ab46616f0773e4b0`
+- head: `ef1bcf668e39581dd7ef51ce65090ca04aca16e4`
+- proof 1: met — `grep -rn "lastSpecWrittenFromBranch\|specsWrittenFromBranch" scripts/ --include=*.ts`
+returns nothing at all — both functions are deleted outright, not merely their caller.
+context.ts:219-238's `resolveActiveSpec` now has exactly two routes: `--spec` (explicit) and
+the branch-name file match (`currentSpec`); every other path returns `{ spec: null, note:
+unresolvedSpecNote(...) }`, which never reads `docs/events.jsonl` or does a majority/latest
+scan over the store. The five real callers (architectureCmds.ts:55 `plan`, records.ts:602
+`next`, records.ts:944 `promote`, specCmds.ts:105 `spec show`, triage.ts:114 `triage`) all
+pass through this same function; `mergeReady.ts` and `auditPrompt.ts` no longer call
+`resolveActiveSpec` at all (grep confirms zero hits in either file) and instead read
+`declaredSpecs(storeDiff(...).changed)`, which is exactly the diff-gated candidate c1
+requires — `auditPrompt.ts`'s use is a check against a caller-given slug, not a source of an
+operating spec (see c3). Mutation-tested: reverting the final `resolveActiveSpec` fallthrough
+to guess `tasks.find((t) => t.spec !== null)?.spec` instead of refusing was KILLED by
+scripts/tasks/records.test.ts "next does not infer when two specs both have open members —
+as ambiguous as none" (1 failed of 119, re-run confirmed at file scope). Manifest:
+C:\Users\yonat\AppData\Local\Temp\claude\C--Users-yonat-Projects-UniversalisRPG--claude-worktrees-task-system-final-push-5ed55b\816c65d0-7c79-4a9d-8cd0-653b667d9b34\scratchpad\bsio2-manifest.json,
+entry "c1/c2 resolveActiveSpec falls back to a guess instead of refusing".
+- proof 2: unmet — Ran all five real `resolveActiveSpec` callers on a branch matching no spec file:
+`next` (records.ts:602) and `promote` (records.ts:944) and `spec show` (specCmds.ts:105) all
+correctly exit non-zero and print the candidate note — verified live (`spec show` on an
+orphaned branch: exit 1, "usage: tasks spec show..."; and by
+scripts/tasks/records.test.ts:1045 "next refuses, naming the sole candidate..." and :1096
+"next does not infer when two specs both have open members"). But `plan`
+(architectureCmds.ts:55-60, `cmdPlan`) does not: called with no positional ids and no --spec
+on a branch with 24 open-member candidate specs, it prints the correct contested note
+("spec contested: ... Pass --spec to pick one") and then "no active spec for this branch,
+and no ids or --spec given — `tasks plan <id>...` grades a set directly" but returns with
+exit code 0 (verified live: `npx tsx scripts/tasks.ts plan --branch orphaned-test-branch
+[...]` -> EXIT=0). This is the same shape `next` had before records.ts was patched with
+`if (activeSpec.note !== null) process.exitCode = 1;` (records.ts:608) — `plan` never
+received the equivalent line. No test in architectureCmds.test.ts asserts `plan`'s exit code
+in the unresolved-spec case (only the positive "grades the active spec when given no ids"
+path at :22 is covered). Mutation-tested the inverse direction to confirm the existing
+`next` guard is real: removing records.ts:608's `process.exitCode = 1` line was KILLED by
+"next refuses, naming the sole candidate..." (1 failed of 119). `triage` (triage.ts:114) also
+does not refuse at the command level, but its use of `spec` is narrower — `unreviewedQueue`
+is not filtered by it, and only the interactive `promote` sub-action inside triage needs a
+spec, which it already refuses per-item ("no active spec to promote into — pass --spec,
+skipping", triage.ts:38) — so triage's non-refusal reads as an intentional design difference
+(browsing predates any spec choice) rather than the same gap as `plan`'s. `plan` is the one
+verb where c2's proof target ("for every verb that consults resolveActiveSpec ... exits
+non-zero") is checked and fails.
+- proof 3: met — `grep -rn "resolveActiveSpec" scripts/ --include=*.ts | grep -v test` names five
+call sites (architectureCmds.ts:55, records.ts:602, records.ts:944, specCmds.ts:105,
+triage.ts:114) — none in mergeReady.ts. `mergeReady.ts`'s `branchStanding` computes
+`declaredSpecs(diff.changed)` (mergeReady.ts:387) straight from `storeDiff` against the
+merge base, with no `--spec` argument and no human in the loop — this is the CI-only
+derivation c3 sanctions. `auditPrompt.ts` (cmdAuditPrompt, :580-596) also reads
+`storeDiff`/`declaredSpecs`, but only to build `knownSpecsForBranch`, which feeds
+`slugStanding`'s WARNING check against the slug the caller already gave positionally
+(`slug = args.positional[0]` upstream) — it never substitutes `knownSpecsForBranch` for the
+operating slug, so it is a check on a given answer, not a second deriving caller. This
+reading is the one the store's own closed finding
+`a-clause-can-be-deferred-and-a-spec-can-carry-its-goal-pass5` records under "reason": its
+proposed remedy (route auditPrompt's check through decideSpec) was superseded by deleting
+the guess outright, and the record's closure text explicitly distinguishes "told and merely
+checks" from "infers instead of being told." vitest scripts/tasks/mergeReady.test.ts (414 of
+414 pass, includes the full `branchStanding`/`storeDiff` suite at lines 336-840).
+- proof 4: met — `scripts/lib/specDoc.ts:286` `clauseStandings(clauses, passes)` walks every pass in
+order and only overwrites `standing` when `verdict !== undefined && verdict.status !==
+'unknown'` — an unmentioned or explicitly-unknown verdict in a later pass never erases an
+earlier real one. All eight call sites now pass the full `doc.auditPasses` array rather than
+`doc.auditPasses[len-1]?.verdicts`: roadmap.ts:133, auditPrompt.ts:685, mergeReady.ts:336,
+orchestratePrompt.ts:34, planPrompt.ts:42, records.ts:794 (`clauseStanding`, renamed from a
+hand-rolled duplicate that read only the latest pass), specCmds.ts:128/148,
+workPrompt.ts:101 — confirmed by reading each diff hunk. The two legitimate "which pass was
+last" reads (roadmap.ts:129 `latest?.pass ?? null` and auditPrompt.ts's pass-number stamping
+in audit.ts:403) report metadata, not a standing, and are unchanged. Mutation-tested:
+weakening specDoc.ts:286's guard from `verdict.status !== 'unknown'` to always-overwrite was
+KILLED by 3 of 93 tests across scripts/lib/specDoc.test.ts ("leaves an earlier met verdict
+standing when a later pass explicitly grades the clause unknown, not silence" and "leaves a
+clause unknown when no pass ever grades it with a real verdict") and
+scripts/tasks/mergeReady.test.ts ("leaves a clause an earlier pass met off
+outstandingClauses, even though the latest pass never regraded it (c4)"), re-run confirmed at
+file scope. Manifest entry "c4 clauseStandings lets an unknown verdict overwrite an earlier
+real one" in the bsio2 manifest path above.
+- proof 5: met — mergeReady.ts:350-353 `settledByDecline` reads every `undelivered` record for a
+clause and reports settled only when all are closed and at least one is `declined`; a live
+open/in-progress recurrence keeps it outstanding. `specStanding` (mergeReady.ts:361-363)
+routes settled clauses to `declinedClauses` and off `outstandingClauses`, and `specLegs`
+(mergeReady.ts:126-143) reports the clauses leg green with a `declined:` note rather than
+red when `outstandingClauses` is empty. Covered by
+scripts/tasks/mergeReady.test.ts:262-268 "passes the clauses leg on a declined clause, and
+names it distinctly from a real outstanding one" and "names a declined clause beside a real
+outstanding one, on a failing run", and the recurrence case at :766 "keeps a clause
+outstanding when its unmet recurred after an earlier record for it was declined (c5)".
+Mutation-tested: forcing `settledByDecline`'s `.some((task) => task.state === 'declined')`
+to always return `false` (so no clause could ever be settled by decline) was KILLED by
+"passes the clauses leg on a declined clause..." (1 failed of 48, re-run confirmed at file
+scope). Manifest entry "c5 settledByDecline never recognizes a decline as settling a clause".
+- proof 6: unmet — The two records the spec names as illustration are both closed correctly:
+`a-clause-can-be-deferred-and-a-spec-can-carry-its-goal-pass5` (finding/declined) and
+`a-note-against-an-archived-record-makes-the-branch-owe-that-` (task/declined) both carry a
+`reason` naming this branch's own members (`gate-believes-the-branch`) and a re-run
+reproduction confirming the defect no longer fires. But a search for other records
+describing the deleted event-log routes (`npx tsx scripts/tasks.ts list --state
+open,unreviewed,in-progress` filtered for event-log/resolveActiveSpec/route language) found
+one more: `audit-prompt-still-asks-resolveactivespec-whether-the-branch`
+(finding/unreviewed/high), filed by this branch's own pass-1 auditor at commit b8f96d3. Its
+own evidence text says the deadlock exists "Before this branch, the deleted routes 3 and 4
+gave audit-prompt a wrong-half-the-time shot at self-recognition; nothing replaced it" — the
+exact deleted-route dependency c6 is about. The fix landed in commit eff89ff (`auditPrompt.ts`
+no longer imports `resolveActiveSpec` at all — confirmed by grep and by reading the diff;
+it now validates the given slug against `declaredSpecs`/`storeDiff` instead) and is described
+as closing this exact reproduction in the member task
+`the-brief-validates-the-slug-it-was-given-against-the-declar` ("filed as
+audit-prompt-still-asks-resolveactivespec-whether-the-branch", closedCommit eff89ff). I
+re-ran the reproduction by inspection: `grep -n resolveActiveSpec scripts/tasks/auditPrompt.ts`
+returns nothing, so the deadlock cannot fire. The finding record itself was never triaged —
+it remains `unreviewed` rather than closed with a reason naming this branch, which is what
+this clause requires and what the workflow's own rule for a branch's first-pass findings
+("promoted without a walk") should have produced automatically.
+- proof 7: met — `grep -n "npm run tasks --" scripts/tasks/*.ts | grep -v test` enumerated
+every generated command string. The four named sites all carry the spec now: mergeReady.ts:123
+(`spec done ${standing.spec}` / `next --spec ${standing.spec}` / `triage --spec
+${standing.spec}`, all three ternary branches, where before one branch printed a bare verb),
+mergeReady.ts:142 (`audit-prompt ${standing.spec}` / `next --spec ${standing.spec}`),
+audit.ts:416 (`triage --spec ${slug}`, was `triage` bare) and audit.ts:572
+(`next --spec ${slug}`, was `next` bare, via `nextAfterPass(outstanding, slug)`'s new second
+parameter). No other site in the enumeration prints a verb needing a spec without
+interpolating one available in its own scope; the remaining `npm run tasks --` strings
+either take no spec (`doctor`, `merge-ready`, `where <path>`) or are generic usage text shown
+with no spec in scope (`work-prompt <id-or-spec>`, `audit-prompt <spec>` as placeholders in
+orchestratePrompt.ts/planPrompt.ts, correctly left as `<placeholder>` since no concrete slug
+exists at that point). Live-confirmed via `npm run tasks -- merge-ready`, which printed
+`commission an auditor: npm run tasks -- audit-prompt a-branch-is-told-which-spec-it-owes`
+with the spec interpolated. Mutation-tested: dropping the spec from mergeReady.ts:123's first
+ternary branch (`spec done` bare, the exact historical defect the spec's own text names) was
+KILLED by "ends a green run on the two commands that finish the branch" (1 failed of 48,
+re-run confirmed at file scope). Manifest entry "c7 mergeReady's spec-done next command
+drops the spec".
+- proof 8: met — `grep -rn "specToGrade\|authoredAsPlan\|specAddsClauseId" scripts/ --include=*.ts`
+returns exactly one hit, a comment in mergeReady.test.ts:401 describing what the new fixture
+"drives instead of" — no functional caller remains. `BranchStanding.specs` is typed
+`SpecStanding[]` (mergeReady.ts:96), a collection assembled by
+`declaredSpecs(diff.changed).map((spec) => specStanding(...))` (mergeReady.ts:387) — every
+spec the diff names gets its own `SpecStanding`, none chosen over another. Exercised by
+scripts/tasks/mergeReady.test.ts:682 "declares both specs when the diff changes a member of
+each" and :316 "grades every declared spec on its own, and cannot go green on the strength of
+only one" (mutation-tested under c10 below, since that is the same code path). Live-confirmed:
+`npm run tasks -- merge-ready` on this checkout reported exactly one `spec
+a-branch-is-told-which-spec-it-owes` leg pair, matching the one spec this branch's own diff
+declares.
+- proof 9: met — `storeDiff` (mergeReady.ts:306-310) reads `baseStoreTasks` (git-committed store
+at the merge base) and diffs it against the live store via `changedRecords`
+(field-for-field, key-order independent via `sortedJson`); `declaredSpecs` (mergeReady.ts:318)
+maps the changed records' `.spec` field. No call in mergeReady.ts reads `docs/events.jsonl`
+(`grep -n "loadEvents\|eventsPath" scripts/tasks/mergeReady.ts` returns nothing). Unreadable
+diffs (no merge base, or the store unreadable at the base) are reported via `{readable:
+false, changed: []}` and read distinctly from "declares nothing" at both `storeDiff` and
+`standingLegs` (mergeReady.ts:173-176, the `spec` leg fails loudly rather than passing
+vacuously). Covered end-to-end against real git by scripts/tasks/mergeReady.test.ts:403-495
+("names every spec a changed record points at", "is unreadable when there is no merge base",
+"is unreadable when the store did not exist at the merge base") and :495-810
+("branchStanding, against repository facts"), including :590 "does not declare a spec this
+branch only wrote the markdown for" (a spec authored but never assigned to a task record
+correctly stays undeclared). Mutation-tested: truncating `declaredSpecs`'s result to always
+empty (`.slice(0, 0)`) was KILLED by "names every spec a changed record points at" (1 failed
+of 48, re-run confirmed at file scope). Manifest entry "c9 declaredSpecs also reads from
+something besides the store diff".
+- proof 10: met — `standingLegs` (mergeReady.ts:183) loops `for (const spec of standing.specs)
+legs.push(...specLegs(spec))` — every declared spec gets its own `spec <slug>`/`clauses
+<slug>` leg pair, and `runMergeReady` fails the whole run if any leg is red
+(mergeReady.ts:233-234 `results.filter((r) => !r.ok)`), so a branch cannot go green by one
+declared spec's strength while another is still open. Covered by
+scripts/tasks/mergeReady.test.ts:316 "grades every declared spec on its own, and cannot go
+green on the strength of only one" (asserts two `spec <slug>` legs, one ok one not, and the
+overall run fails). Mutation-tested: narrowing the loop to `standing.specs.slice(0, 1)` (grade
+only the first declared spec) was KILLED by that same test (1 failed of 48, re-run confirmed
+at file scope). Manifest entry "c10 branchStanding grades only the first declared spec".
+- proof 11: met — `specStanding` (mergeReady.ts:327-337) computes `ownMembers = changed.filter((t)
+=> t.spec === spec)` first, then `ownClauseIds` from `ownMembers.flatMap(clausesOf)` only —
+never from the whole `changed` set across every declared spec, so a branch holding members of
+two specs cannot leak one spec's discharged clause numbers into the other's owed count. This
+is the exact regression the spec's own text flags as unproven by pass 1's own mutation run
+(member task `the-brief-validates-the-slug-it-was-given-against-the-declar`'s evidence: a
+hand-built mutation on this scoping SURVIVED at whole-suite scope because no test declared two
+specs in one diff with overlapping clause ids). That gap is now closed: scripts/tasks/mergeReady.test.ts:646
+"does not credit spec-a's owed clauses with a clause number spec-b's own member discharged
+(c11)" declares exactly that fixture (two specs, each a member closed by this branch's own
+diff, sharing clause id 1). Mutation-tested directly at that line: widening
+`ownClauseIds`'s source from `ownMembers.flatMap(clausesOf)` to `changed.flatMap(clausesOf)`
+(the whole diff, across every spec) was KILLED by that named test (1 failed of 48, re-run
+confirmed at file scope) — the regression the earlier pass could not pin is now caught.
+Manifest entry "c11 ownClauseIds leaks clauses from the whole diff, not just this spec's own
+members".

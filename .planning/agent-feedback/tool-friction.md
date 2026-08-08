@@ -1629,3 +1629,32 @@ clause the diff promises reads met in isolation. Cost: the four clause-graded gr
 contradiction took a second, deliberate re-read of the brief's own opening paragraph against the
 `merge-ready` output sitting one screen below it — nothing in either tool's own output states the
 disagreement, it only becomes visible by holding both side by side.
+
+## `a-branch-is-told-which-spec-it-owes`, pass 1 filed, 2026-08-08
+
+The deadlock the dry-run above found is fixed on this HEAD (`eff89ff`, member
+`the-brief-validates-the-slug-it-was-given-against-the-declar`) — `auditPrompt.ts` no longer imports
+`resolveActiveSpec` at all, so the brief ran clean start to finish and this pass could file for real.
+
+The manifest `audit-prompt` generated (`mutations-...-pass1.json`) was the confirmed instance of the
+already-known finding `the-generated-mutation-manifest-expands-one-file-only-target`: 684 entries, one
+per test in every file a clause's `proof:` line names whole (c1 alone expanded to 119 entries because
+its proof is "vitest scripts/tasks/records.test.ts scripts/tasks/mergeReady.test.ts
+scripts/tasks/triage.test.ts" with no narrower target), every `file`/`find` still the unaimed sentinel.
+Hand-building a focused eight-entry manifest instead — one mutation per clause with a live pure-logic
+target, aimed at the exact line the diff shows implements it — cost maybe ten minutes of reading
+against the ~30+ minutes the generated one would have cost to aim entry-by-entry across 684 rows, and
+all eight killed clean on the first run (re-run confirmed at file scope, none unstable). This is the
+second pass in a row that hits this exact finding at exactly this cost; it is still open and still
+worth the fix — narrowing the manifest generator to one entry per *distinct test the clause's proof
+line actually names*, rather than exploding a whole-file target, would have made this a five-minute
+step instead of a decision to route around the generated artifact entirely.
+
+The regression-question step (5) paid for itself again, differently this time: nothing in
+`resolveActiveSpec`'s own five call sites looked suspicious in isolation — each was read, and `next`,
+`promote`, `spec show` all visibly refuse. What surfaced the gap was running `plan` itself, live,
+against a copy of the real store on an orphaned branch name, the same way the spec's own regression
+tests do for the other four verbs — architectureCmds.test.ts has no equivalent test, so nothing in the
+suite would have shown this without running the command by hand. Cost: the mutation manifest read and
+build was the slow part; noticing `plan`'s missing refusal was a five-minute live-run check across the
+five call sites once the pattern from `next`'s `records.ts:608` guard was in hand, not a search.
