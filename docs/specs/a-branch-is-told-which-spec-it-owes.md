@@ -118,6 +118,47 @@ Proof:
   looking rather than a sign the clause was wrong.
   proof: vitest scripts/tasks/mergeReady.test.ts
 
+- [c8] A branch's active specs are a set, and every reader of that answer takes the set. The type is
+  the clause: nothing downstream may receive one spec where the branch has two. `BranchStanding`'s
+  singular spec becomes a collection, and the heuristics whose only job was choosing among
+  candidates -- `specToGrade`, `authoredAsPlan` and `specAddsClauseId` -- are deleted rather than
+  adapted. A caller that still wants "the" spec is what this clause forbids.
+  proof: `grep -rn "specToGrade\|authoredAsPlan\|specAddsClauseId" scripts/ --include=*.ts` returns
+  nothing, and no exported type carries a singular spec for the branch's own standing. Name what
+  replaced it.
+  proof: vitest scripts/tasks/mergeReady.test.ts
+
+- [c9] The set is read from the records this branch's own store diff changed, and from nothing else.
+  `tasks spec add` and `tasks start` already write `Task.spec`, so the declaration is a side effect of
+  work the workflow already does rather than a step someone must remember. No reader of the branch's
+  spec set consults `docs/events.jsonl`. **That loses no evidence**: every op `WORK_OPS` names --
+  `start`, `stop`, `done` -- writes the record itself, so a record in the store diff is exactly the
+  signal `branchWorkedOnMembers` was reading out of the log. A checkout that cannot produce a diff
+  says so rather than falling back to a guess.
+  proof: on a branch whose store diff names two specs, the set has both. On one whose diff names
+  none, the set is empty and every leg says so. Record both, and what the gate prints when the diff
+  cannot be read at all.
+  proof: vitest scripts/tasks/mergeReady.test.ts
+
+- [c10] `merge-ready` fails while any declared spec is still active, and names which. Active means the
+  spec still owes something this branch declared, not that its document exists. Each declared spec is
+  graded on its own, so a branch working two cannot go green on the strength of the one it finished.
+  The invariant: **the gate's answer is about every spec the branch declared, and never about one
+  chosen from among them.**
+  proof: vitest scripts/tasks/mergeReady.test.ts
+
+- [c11] A branch is graded on the clauses its own members discharge, not on every clause in the specs
+  they belong to. `Task.discharges` already records that per record. Today the `spec` and `clauses`
+  legs go red on any branch holding one member of a multi-member spec, and the orchestrator brief
+  tells the reader to expect it and ignore it -- a gate whose red state is documented as meaningless
+  is not a gate, and it fired on two of Phase 3's three branches. A clause no member of this branch
+  discharges is not this branch's to answer.
+  proof: on a branch holding one member of a multi-member spec, the clauses leg is green when that
+  member's discharged clauses are met and red when they are not, whatever the spec's other clauses
+  say. Record both directions, and record that no instruction to ignore a red leg survives in
+  `docs/workflow.md` or the generated briefs.
+  proof: vitest scripts/tasks/mergeReady.test.ts
+
 ## Goal
 
 Stop the tooling from telling a branch which spec it owes, stop it from forgetting a verdict an
