@@ -51,8 +51,8 @@ describe('tasks CLI', () => {
   it('spec add joins named tasks to a spec regardless of their state', async () => {
     await fixture(async ({ tasks, audit }) => {
       tasks('add', 'a task', '--id', 'a-task');
-      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
-      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'pass one finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen in pass one');
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'low', '--deliverable', 'fix it');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'pass one finding', '--severity', 'low', '--fault', 'contract', '--deliverable', 'fix it', '--evidence', 'seen in pass one');
       const added = tasks('spec', 'add', 'demo-spec', 'a-task', 'a-finding', 'demo-spec-pass1-pass-one-finding');
       expect(added.status).toBe(0);
       expect(tasks('show', 'a-task').stdout).toContain('spec: demo-spec');
@@ -73,7 +73,7 @@ describe('tasks CLI', () => {
     await fixture(async ({ tasks, audit }) => {
       tasks('add', 'a task', '--id', 'a-task');
       await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--fault', 'contract', '--deliverable', 'fix it', '--evidence', 'seen late');
       const result = tasks('spec', 'add', 'demo-spec', 'a-task', 'demo-spec-pass2-late-finding');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('came from a pass 2 or later audit, which extends what demo-spec owes');
@@ -151,12 +151,13 @@ describe('tasks CLI', () => {
   // work to implement.
   it('renders the same kind, state and severity tag in every view a task appears in', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'a question for a human', '--id', 'a-question', '--kind', 'question', '--spec', 'demo-spec', '--severity', 'high');
-      const views = [['list'], ['search', 'question'], ['next'], ['show', 'a-question'], ['spec', 'show', 'demo-spec']];
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec');
+      tasks('question', 'a question for a human', '--blocks', 'held-work', '--decider', 'author', '--fault', 'contract', '--severity', 'high');
+      const views = [['list'], ['search', 'question'], ['next'], ['show', 'a-question-for-a-human'], ['spec', 'show', 'demo-spec']];
       for (const view of views) {
         const result = tasks(...view);
         expect(result.status, view.join(' ')).toBe(0);
-        expect(result.stdout, view.join(' ')).toContain('a-question  [question/open/high]');
+        expect(result.stdout, view.join(' ')).toContain('a-question-for-a-human  [question/open/high]');
       }
     });
   });
@@ -186,7 +187,7 @@ describe('tasks CLI', () => {
 
   it('shows a triaged finding through the same printer, id included, so it can be copied to `tasks show`', async () => {
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'a finding to triage', '--id', 'triage-me', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it', '--evidence', 'it is broken');
+      tasks('add', 'a finding to triage', '--id', 'triage-me', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it', '--evidence', 'it is broken');
       // `q` on the first prompt: the pane is displayed, nothing is decided.
       const result = await triage('q\n');
       expect(result.status).toBe(0);

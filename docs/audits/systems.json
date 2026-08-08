@@ -373,6 +373,23 @@
             "scripts/tasks/briefLessons.ts"
           ],
           "note": "produced by a-lesson-has-a-handle-that-survives-rewording-it"
+        },
+        {
+          "name": "record fault",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/records.ts",
+            "scripts/tasks/audit.ts"
+          ],
+          "note": "produced by a-record-carries-its-fault-and-a-question-blocks-only-what-d"
+        },
+        {
+          "name": "blocking question",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/records.ts"
+          ],
+          "note": "produced by a-record-carries-its-fault-and-a-question-blocks-only-what-d"
         }
       ]
     },

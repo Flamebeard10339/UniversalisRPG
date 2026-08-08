@@ -24,7 +24,7 @@ describe('tasks CLI', () => {
 
   it('a finding starts unreviewed and outside any spec, even with --spec passed', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'checkSave crashes', '--kind', 'finding', '--severity', 'high', '--spec', 'demo-spec', '--deliverable', 'loadSave refuses the malformed body instead of throwing');
+      tasks('add', 'checkSave crashes', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--spec', 'demo-spec', '--deliverable', 'loadSave refuses the malformed body instead of throwing');
       const shown = tasks('show', 'checksave-crashes');
       expect(shown.stdout).toContain('[finding/unreviewed/high]');
       expect(shown.stdout).toContain('spec: (deferred)');
@@ -41,37 +41,49 @@ describe('tasks CLI', () => {
 
   it('refuses --kind finding without --deliverable, and the store is left unchanged', () => {
     fixture(({ tasks }) => {
-      const result = tasks('add', 'a bug with no proposed fix', '--kind', 'finding', '--severity', 'high');
+      const result = tasks('add', 'a bug with no proposed fix', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('--deliverable is required for --kind finding');
       expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
     });
   });
 
-  it('a question is a kind, reachable through the same add, list and show as every other record', () => {
+  it('a question is a kind, reachable through the same list and show as every other record', () => {
     fixture(({ tasks }) => {
-      const added = tasks('add', 'Does spec amend survive?', '--id', 'spec-amend-survives', '--kind', 'question', '--spec', 'demo-spec', '--system', 'Runtime', '--evidence', 'it writes a dated copy of the deliverable that nothing reads');
-      expect(added.status).toBe(0);
-      expect(added.stdout).toContain('added spec-amend-survives [question/open]');
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec');
+      const asked = tasks('question', 'Does spec amend survive?', '--blocks', 'held-work', '--decider', 'author', '--fault', 'nobody', '--system', 'Runtime', '--evidence', 'it writes a dated copy of the deliverable that nothing reads');
+      expect(asked.status).toBe(0);
+      expect(asked.stdout).toContain('asked does-spec-amend-survive [question/open]');
 
-      const shown = tasks('show', 'spec-amend-survives');
+      const shown = tasks('show', 'does-spec-amend-survive');
       expect(shown.stdout).toContain('[question/open]');
       expect(shown.stdout).toContain('spec: demo-spec');
+      expect(shown.stdout).toContain('fault: nobody');
       expect(shown.stdout).toContain('evidence: it writes a dated copy of the deliverable that nothing reads');
 
       const listed = tasks('list', '--kind', 'question');
-      expect(listed.stdout).toContain('spec-amend-survives');
+      expect(listed.stdout).toContain('does-spec-amend-survive');
       expect(listed.stdout).toContain('1 task(s)');
-      expect(tasks('list', '--kind', 'task').stdout).not.toContain('spec-amend-survives');
+      expect(tasks('list', '--kind', 'task').stdout).not.toContain('does-spec-amend-survive');
     });
   });
 
   it('a question closes on the answer the same way every other record does', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'Does spec amend survive?', '--id', 'spec-amend-survives', '--kind', 'question');
-      const declined = tasks('decline', 'spec-amend-survives', '--reason', 'no: git log -p on the spec file already gives the archive');
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec');
+      tasks('question', 'Does spec amend survive?', '--blocks', 'held-work', '--decider', 'author', '--fault', 'nobody');
+      const declined = tasks('decline', 'does-spec-amend-survive', '--reason', 'no: git log -p on the spec file already gives the archive');
       expect(declined.status).toBe(0);
-      expect(tasks('show', 'spec-amend-survives').stdout).toContain('reason: no: git log -p on the spec file already gives the archive');
+      expect(tasks('show', 'does-spec-amend-survive').stdout).toContain('reason: no: git log -p on the spec file already gives the archive');
+    });
+  });
+
+  it('add refuses --kind question and names the verb that files one', () => {
+    fixture(({ tasks }) => {
+      const refused = tasks('add', 'a question', '--kind', 'question');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('a question is created by `tasks question');
+      expect(tasks('list', '--kind', 'question').stdout).toContain('0 task(s)');
     });
   });
 
@@ -612,7 +624,7 @@ describe('tasks CLI', () => {
   it('list defaults to not-closed (unreviewed + open + in-progress), highest severity first, with a state summary', () => {
     fixture(({ tasks }) => {
       tasks('add', 'low task', '--id', 'low-task', '--severity', 'low');
-      tasks('add', 'high finding', '--id', 'high-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'high finding', '--id', 'high-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
       tasks('add', 'claimed task', '--id', 'claimed-task', '--severity', 'medium');
       tasks('start', 'claimed-task');
       tasks('add', 'closed task', '--id', 'closed-task');
@@ -729,7 +741,7 @@ describe('tasks CLI', () => {
   it('list filters by severity, system, spec and kind', () => {
     fixture(({ tasks }) => {
       tasks('add', 'runtime high', '--id', 'runtime-high', '--severity', 'high', '--system', 'Runtime', '--spec', 'demo-spec');
-      tasks('add', 'ui low', '--id', 'ui-low', '--severity', 'low', '--system', 'UI', '--kind', 'finding', '--deliverable', 'fix it');
+      tasks('add', 'ui low', '--id', 'ui-low', '--severity', 'low', '--system', 'UI', '--kind', 'finding', '--fault', 'tooling', '--deliverable', 'fix it');
 
       expect(tasks('list', '--severity', 'high').stdout).toContain('runtime-high');
       expect(tasks('list', '--severity', 'high').stdout).not.toContain('ui-low');
@@ -886,7 +898,7 @@ describe('tasks CLI', () => {
 
   it('decline requires a reason, and closes a record from any state it was in', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
+      tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--fault', 'tooling', '--deliverable', 'fix it');
       const missingReason = tasks('decline', 'stale');
       expect(missingReason.status).toBe(1);
 
@@ -948,8 +960,8 @@ describe('tasks CLI', () => {
 
   it('promote moves several findings into the spec in one call, and refuses a closed record', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'first finding', '--id', 'first-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
-      tasks('add', 'second finding', '--id', 'second-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'first finding', '--id', 'first-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'second finding', '--id', 'second-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
       const result = tasks('promote', 'first-finding', 'second-finding');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('promoted first-finding into demo-spec');
@@ -965,7 +977,7 @@ describe('tasks CLI', () => {
       // A mixed batch is all-or-nothing, and nothing is announced that was
       // not written: the valid record stays where it was and no success
       // line precedes the refusal.
-      tasks('add', 'third finding', '--id', 'third-finding', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
+      tasks('add', 'third finding', '--id', 'third-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'low', '--deliverable', 'fix it');
       const mixed = tasks('promote', 'third-finding', 'first-finding');
       expect(mixed.status).toBe(1);
       expect(mixed.stdout).not.toContain('promoted third-finding');
@@ -1261,7 +1273,7 @@ describe('a close that says back what it knows', () => {
 
   it('names it from triage too, which is the third place a disposition is decided', () =>
     fixture(async ({ tasks, triage }) => {
-      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it', '--evidence', 'seen');
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it', '--evidence', 'seen');
       expect((await triage('1\n')).stdout).toContain('tasks decision "<one line>" --id a-finding');
     }));
 });
@@ -1279,7 +1291,7 @@ describe('what already worked, after the record verbs changed around it', () => 
   it('still names a pass-2 promotion as extending what the spec owes', () =>
     fixture(async ({ tasks, audit }) => {
       await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--fault', 'contract', '--deliverable', 'fix it', '--evidence', 'seen late');
       const result = tasks('promote', 'demo-spec-pass2-late-finding');
       expect(result.stdout).toContain('promoting a pass 2 finding, which extends what demo-spec owes: demo-spec-pass2-late-finding');
     }));

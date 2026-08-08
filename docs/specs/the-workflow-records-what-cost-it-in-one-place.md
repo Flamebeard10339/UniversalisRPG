@@ -271,3 +271,74 @@ met on an absent subject would be an assertion that cannot be false while the fe
 which is the shape this repository's own auditor lesson refuses. Noted for the pass that grades it
 for real: `merge-ready` gained no leg here, and the module-load refusal filed below is not a
 threshold over a fault, a breach or a count — the worker's recorded argument on that point is right.
+
+### Pass 2 — 2026-08-07
+
+- base: `405eb154b5b8e0c643acd129b0f9e062f38cb88e`
+- head: `e9218fddf52d20923eb9c010271f2a11b58ed05e`
+- proof 1: unknown
+- proof 2: met — Every route that constructs a Task now goes through createTask (scripts/lib/taskStore.ts:325);
+grep -rn "createTask" over scripts/ returns exactly five call sites (audit.ts:61 import, audit.ts:948
+buildFindingTask, audit.ts:1131 undelivered, records.ts:180 add, records.ts:259 question) and no
+": Task = {" literal survives outside test fixtures. Its NewRecord union makes fault a compile-time
+requirement of the finding and question arms, and Draft omits fault and decider, so a route cannot
+assemble a reporting record without one and cannot override it through the draft either. Seven
+mutations aimed at the four write routes and their shared resolver were all KILLED by
+scripts/tasks/friction.test.ts, each by the named test that owns it: taskStore.ts
+"if (!reportsCost(kind)) return { value: null };" to "if (true) ..." kills "add refuses a finding with
+no fault"; REPORTING_KINDS to ['finding'] kills "question refuses with no fault"; "!FAULTS.includes(given
+as Fault)" to "false" kills "add records each of the three faults"; "if (!reportsCost(kind)) return
+{ error:" to "if (false) ..." kills "add refuses a fault on a plain task"; createTask's
+"fault: record.fault ?? null," to "fault: null," kills four tests at once; audit.ts
+"finding.fault ?? undefined" to "finding.fault ?? 'tooling'" kills "an audit pass refuses a finding with
+no fault"; audit.ts cmdImport's "resolveFault('finding', args.flags.fault)" defaulted to 'tooling' kills
+"import refuses a legacy document with no fault". Scope call, recorded on purpose: the clause says "a
+record" without qualifying the kind, and the implementation restricts fault to finding and question. I
+grade the clause loose rather than the implementation wrong, because c5 requires "nobody" to mean "the
+knowledge did not exist"; stamping the store's 148 tasks and 34 undelivered records with a fault would
+make "nobody" the modal value and empty it, so reading c2 as all four kinds puts it in direct conflict
+with c5. The clause's own purpose sentence names the query as the beneficiary, and only finding and
+question feed it. What the route guard does not reach is filed separately: 470 of the 471 reporting-kind
+records in the store carry fault null today.
+- proof 3: met — No field was added that stores a hold: the diff on scripts/lib/taskStore.ts adds fault and
+decider and nothing block-shaped, cmdQuestion writes the question's id into each blocked record's
+"requires" and nothing else, and release is cmdDone/cmdDecline moving the question to a closing state
+with requirementStates already reading both. I re-derived the byte-identity proof rather than accepting
+it, by aiming the attack the clause invites - can the assertion pass while something else stores the
+release. It cannot, on three independent mutations, all KILLED against
+scripts/tasks/friction.test.ts "a released record is byte-identical to the held one": (1) make the
+release stored, by inserting into reportReleasedHolds (scripts/tasks/records.ts:790) the line
+"for (const candidate of held) candidate.requires = candidate.requires.filter((requirement) =>
+requirement !== task.id);" before its "if (held.length === 0) return;" - the held record's stored line
+then differs after close and the assertion reddens, which is the load-bearing claim; (2) move the hold
+off requires onto the question, by replacing "for (const task of held) task.requires.push(id);" with
+"question.extra = { blocks: held.map((task) => task.id) };" - the BLOCKED assertion in the same test
+reddens; (3) stop deriving, by replacing isBlocked's "return waitingOn(task, byId).length > 0;" with
+"return false;" - same test reddens. The third test in the describe block independently asserts the
+stored record carries no key matching /block|halt|held|waiting/ and that requires equals the question's
+id, so the byte assertion is not carrying the clause alone.
+- proof 4: met — Every operative promise the clause enumerates is reachable and proven. Filed against the
+records it works: "tasks question <title> --blocks id1,id2" (scripts/tasks/records.ts:214). Addressed: the
+decider flag is refused when absent and when outside worker|planner|author; mutating resolveDecider's
+"if (kind !== 'question') return { value: null };" to "if (true) ..." is KILLED by "refuses a question
+with no decider". Named where dispatch reads: the id lands in each blocked record's requires, so
+isBlocked, next, plan and roadmap all see it with no new mechanism; mutating sharedSpec's
+"return specs.size === 1 ? [...specs][0] : null;" to "return null;" is KILLED by "files a question
+against the record it is working", and dropping render.ts's decider segment is KILLED by "halts exactly
+what depends on it while the rest of the spec proceeds". Halts exactly what depends on it: reproduced
+outside the suite against a scratch store - two high members of one spec, a question blocking one, and
+"tasks next" returns the free one while the held one shows BLOCKED; after the free one closes, next
+returns the question itself. Releases on both closes: "tasks done" and "tasks decline" each print
+"released 1 record(s)" and the held record leaves BLOCKED, and the closed-record guard
+("if (CLOSING_STATES.includes(task.state))" to "if (false)") is KILLED by "holds several records at once,
+and refuses to hold a closed one". Recorded against the clause's own sharper sentence, that the addressee
+is the point rather than a label on it: today it is a label. Nothing but render.ts:62 reads
+Task.decider, and "tasks work-prompt <question-id>" prints a full worker implementation brief ("You are
+implementing <id>", correct your write grant, register what it produces, commit after each logical
+chunk) for a question addressed to the author. I grade the clause met because each promise it states is
+discharged and mutation-proven, and file the routing gap high rather than reading it into the verdict.
+- proof 5: unknown
+- proof 6: unknown
+- proof 7: unknown
+- proof 8: unknown
+- proof 9: unknown

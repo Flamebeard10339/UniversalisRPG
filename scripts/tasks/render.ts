@@ -56,18 +56,24 @@ export function renderTask(task: Task, byId: Map<string, Task>, detail: Detail, 
   const blocked = isBlocked(task, byId) ? '  BLOCKED' : '';
   const claim = claimSummary(task, today());
 
+  // Only a question carries one, and a question read off a queue is useless
+  // without it: the row is where an orchestrator decides whether this is
+  // theirs to answer.
+  const decider = task.decider ? `  for the ${task.decider}` : '';
+
   if (detail === 'row') {
     const indent = style.indent ?? '';
     const note = style.note ? `  ${style.note}` : '';
-    const rows = [`${indent}${task.id}  [${taskTag(task)}]${blocked}  ${task.system ?? '(no system)'}  ${task.title}${note}${claim ? `  ${claim}` : ''}`];
+    const rows = [`${indent}${task.id}  [${taskTag(task)}]${blocked}${decider}  ${task.system ?? '(no system)'}  ${task.title}${note}${claim ? `  ${claim}` : ''}`];
     if (style.withFiles && task.files.length > 0) rows.push(`${' '.repeat(indent.length)}    ${task.files.join('   ')}`);
     return rows;
   }
 
   const prose = detail === 'full' ? (text: string): string => text : summarize;
-  const lines = [`${task.id}  [${taskTag(task)}]${blocked}`, task.title];
+  const lines = [`${task.id}  [${taskTag(task)}]${blocked}${decider}`, task.title];
   if (task.system) lines.push(`system: ${task.system}`);
   lines.push(`spec: ${task.spec ?? '(deferred)'}`);
+  if (task.fault) lines.push(`fault: ${task.fault}`);
   if (task.discharges.length > 0) lines.push(`discharges: ${task.discharges.map((clause) => `c${clause}`).join(', ')}`);
   if (task.requires.length > 0) lines.push(requiresLine(task, byId));
   if (task.files.length > 0) lines.push(`files: ${task.files.join(', ')}`);

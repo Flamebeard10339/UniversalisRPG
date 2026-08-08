@@ -7,7 +7,7 @@ import { harvestFiles, parseAuditDoc, systemForDoc } from '../lib/auditImport';
 import * as git from '../lib/git';
 import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from '../lib/specDoc';
 import { priorArt } from '../lib/producers';
-import { loadStore, nextSeq, type Severity, type Task } from '../lib/taskStore';
+import { createTask, FAULTS, loadStore, nextSeq, resolveFault, type Fault, type Severity, type Task } from '../lib/taskStore';
 import { architecture, ownership, printPriorArt } from './architectureCmds';
 import { AUDITOR_LESSONS, printLessons } from './briefLessons';
 import type { Flags } from './cli';
@@ -33,6 +33,16 @@ export function cmdImport(args: Flags, usage: string): void {
     return;
   }
 
+  // A legacy document carries no fault of its own, and inventing one per
+  // finding would be a guess; the caller who chose to import it classifies
+  // the batch, and `tasks edit --fault` reclassifies any of them afterwards.
+  const fault = resolveFault('finding', args.flags.fault);
+  if ('error' in fault) {
+    console.error(fault.error);
+    process.exitCode = 1;
+    return;
+  }
+
   const basename = path.basename(docPath).replace(/\.md$/, '');
   const system = systemForDoc(basename);
   const findings = parseAuditDoc(readFileSync(docPath, 'utf8'));
@@ -48,33 +58,15 @@ export function cmdImport(args: Flags, usage: string): void {
       skipped++;
       continue;
     }
-    const task: Task = {
-      id,
-      seq: nextSeq(tasks),
-      title: finding.title,
-      kind: 'finding',
-      state: 'unreviewed',
-      severity: finding.severity,
-      system,
-      spec: null,
-      clause: null,
-      requires: [],
-      writes: [],
-      discharges: [],
-      grant: null,
-      produces: [],
-      files: [`${docPath}#${finding.code}`, ...harvestFiles(finding.body, existsSync)],
-      deliverable: null,
-      evidence: finding.body,
-      source: null,
-      reason: null,
-      trigger: null,
-      closed: null,
-      closedCommit: null,
-      claimed: null,
-      claimedBy: null,
-      extra: null,
-    };
+    const task = createTask(
+      { id, seq: nextSeq(tasks), title: finding.title, state: 'unreviewed', kind: 'finding', fault: fault.value },
+      {
+        severity: finding.severity,
+        system,
+        files: [`${docPath}#${finding.code}`, ...harvestFiles(finding.body, existsSync)],
+        evidence: finding.body,
+      },
+    );
     tasks.push(task);
     taken.add(id);
     created.push(task);
@@ -398,10 +390,13 @@ export function auditArgsSkeleton(slug: string, clauses: ProofClause[], pass: nu
     lines.push('');
   }
   lines.push('# One block per finding, uncommented. A finding needs both halves: what is broken');
-  lines.push('# (--evidence) and what fixing it would mean (--deliverable).');
+  lines.push('# (--evidence) and what fixing it would mean (--deliverable), and it names what is');
+  lines.push('# at fault: the tooling, the contract that briefed the work, or nobody — nobody being');
+  lines.push('# a real answer, for a question no one could have answered when the work was briefed.');
   lines.push('# --finding ');
   lines.push('# --severity high|medium|low');
   lines.push('# --system ');
+  lines.push(`# --fault ${FAULTS.join('|')}`);
   lines.push('# --file ');
   lines.push('# --deliverable ');
   lines.push('# --evidence ');
@@ -693,7 +688,18 @@ interface AuditFinding {
   files: string[];
   deliverable: string | null;
   evidence: string | null;
+  fault: string | null;
 }
+
+// A finding that named everything a record needs. The narrowing is the point:
+// `buildFindingTask` takes one of these, so a finding that skipped a required
+// field cannot reach the assembly at all.
+type FiledFinding = Omit<AuditFinding, 'severity' | 'deliverable' | 'evidence' | 'fault'> & {
+  severity: Severity;
+  deliverable: string;
+  evidence: string;
+  fault: Fault;
+};
 
 interface AuditArgs {
   slug: string | null;
@@ -788,7 +794,7 @@ export function parseAuditArgs(args: string[]): AuditArgs {
       else if (current.evidence !== null) errors.push(`finding "${current.title}" already has evidence`);
       else current.evidence = value ?? '';
     } else if (key === 'finding') {
-      current = { title: value ?? '', severity: null, system: null, files: [], deliverable: null, evidence: null };
+      current = { title: value ?? '', severity: null, system: null, files: [], deliverable: null, evidence: null, fault: null };
       findings.push(current);
     } else if (key === 'file' && current === null) {
       const scoped = clauseScoped(value ?? '');
@@ -802,10 +808,12 @@ export function parseAuditArgs(args: string[]): AuditArgs {
       current.system = value ?? null;
     } else if (key === 'deliverable') {
       current.deliverable = value ?? null;
+    } else if (key === 'fault') {
+      current.fault = value ?? null;
     } else if (key === 'file') {
       current.files.push(value ?? '');
     } else {
-      errors.push(`unknown flag --${key} after --finding ${JSON.stringify(current.title)} — a finding takes --severity, --system, --deliverable, --evidence and --file`);
+      errors.push(`unknown flag --${key} after --finding ${JSON.stringify(current.title)} — a finding takes --severity, --system, --fault, --deliverable, --evidence and --file`);
     }
   }
   return { slug, configFlags, baseBranch, proofs, evidence, errors, clauseFiles, findings };
@@ -863,7 +871,7 @@ function readAuditFile(raw: string[]): { argv: string[]; rest: string[]; errors:
 }
 
 export const AUDIT_USAGE =
-  `usage: tasks audit <spec> [--args-from <file>] [--base-branch main] [--actor <name>] [--proof N=met|unmet|unknown|deferred ...] [--evidence N="..." ... (required for every met or deferred clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (a file of the same flags, one per line, with any unprefixed line continuing the value above it — which is how a pass carrying evidence specific enough to re-run gets past the command-line length limit. With no --proof flags and no findings, walks the clauses interactively; findings with no --proof flags are filed without recording a pass, so late findings never reset verdicts; a clause left ungraded is recorded unknown, never unmet; deferred converts a clause into a tracked undelivered record rather than dropping it, and is refused with no reason)`;
+  `usage: tasks audit <spec> [--args-from <file>] [--base-branch main] [--actor <name>] [--proof N=met|unmet|unknown|deferred ...] [--evidence N="..." ... (required for every met or deferred clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --fault tooling|contract|nobody --deliverable "..." --evidence "..." [--file path:line ...]]...  (a file of the same flags, one per line, with any unprefixed line continuing the value above it — which is how a pass carrying evidence specific enough to re-run gets past the command-line length limit. With no --proof flags and no findings, walks the clauses interactively; findings with no --proof flags are filed without recording a pass, so late findings never reset verdicts; a clause left ungraded is recorded unknown, never unmet; deferred converts a clause into a tracked undelivered record rather than dropping it, and is refused with no reason)`;
 
 // Stops at the first clause the answerer walks away from rather than
 // looping on an exhausted stdin, and the caller grades the rest `unknown` —
@@ -904,59 +912,47 @@ async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVe
   return verdicts;
 }
 
-function buildFindingTask(finding: AuditFinding, slug: string, pass: number, taken: Set<string>, tasks: Task[]): Task {
+function buildFindingTask(finding: FiledFinding, slug: string, pass: number, taken: Set<string>, tasks: Task[]): Task {
   const id = uniqueId(slugify(`${slug}-pass${pass}-${finding.title}`), taken);
-  return {
-    id,
-    seq: nextSeq(tasks),
-    title: finding.title,
-    kind: 'finding',
-    state: 'unreviewed',
-    severity: finding.severity,
-    system: finding.system,
-    spec: null,
-    clause: null,
-    requires: [],
-    writes: [],
-    discharges: [],
-    grant: null,
-    produces: [],
-    files: finding.files,
-    deliverable: finding.deliverable,
-    evidence: finding.evidence,
-    source: { spec: slug, pass },
-    reason: null,
-    trigger: null,
-    closed: null,
-    closedCommit: null,
-    claimed: null,
-    claimedBy: null,
-    extra: null,
-  };
+  return createTask(
+    { id, seq: nextSeq(tasks), title: finding.title, state: 'unreviewed', kind: 'finding', fault: finding.fault },
+    {
+      severity: finding.severity,
+      system: finding.system,
+      files: finding.files,
+      deliverable: finding.deliverable,
+      evidence: finding.evidence,
+      source: { spec: slug, pass },
+    },
+  );
 }
 
-function refuseInvalidFindings(findings: AuditFinding[]): boolean {
+// Null is a refusal already reported, so the caller returns rather than
+// re-deciding. Every field a record needs is checked here and nowhere else,
+// which is what lets `buildFindingTask` take a narrowed finding.
+function filedFindings(findings: AuditFinding[]): FiledFinding[] | null {
+  const filed: FiledFinding[] = [];
   for (const finding of findings) {
-    if (!finding.severity || !['high', 'medium', 'low'].includes(finding.severity)) {
-      console.error(`error: finding "${finding.title}" needs --severity high|medium|low`);
+    const refuse = (message: string): null => {
+      console.error(`error: finding ${JSON.stringify(finding.title)} ${message}`);
       process.exitCode = 1;
-      return true;
-    }
-    if (!finding.deliverable) {
-      console.error(`error: finding "${finding.title}" needs --deliverable "..." — a finding must say what fixing it would mean`);
-      process.exitCode = 1;
-      return true;
-    }
+      return null;
+    };
+    if (!finding.severity || !['high', 'medium', 'low'].includes(finding.severity)) return refuse('needs --severity high|medium|low');
+    if (!finding.deliverable) return refuse('needs --deliverable "..." — a finding must say what fixing it would mean');
     // Triage shows both halves and decides on both: a finding with no
     // evidence reaches the human as a proposed fix to a problem they have
     // to take on faith, which is the one thing triage cannot do.
-    if (!finding.evidence) {
-      console.error(`error: finding "${finding.title}" needs --evidence "..." — a finding must say what is broken, not only what fixing it would mean`);
+    if (!finding.evidence) return refuse('needs --evidence "..." — a finding must say what is broken, not only what fixing it would mean');
+    const fault = resolveFault('finding', finding.fault ?? undefined);
+    if ('error' in fault) {
+      console.error(`${fault.error} (finding ${JSON.stringify(finding.title)})`);
       process.exitCode = 1;
-      return true;
+      return null;
     }
+    filed.push({ ...finding, severity: finding.severity, deliverable: finding.deliverable, evidence: finding.evidence, fault: fault.value });
   }
-  return false;
+  return filed;
 }
 
 // The only way a finding enters the store.
@@ -994,13 +990,14 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
   // so an all-unknown pass created as a side effect of filing findings
   // erased real verdicts, twice, on the branch that recorded the friction.
   if (parsed.proofs.size === 0 && parsed.findings.length > 0) {
-    if (refuseInvalidFindings(parsed.findings)) return;
+    const late = filedFindings(parsed.findings);
+    if (late === null) return;
     const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
     const against = doc.auditPasses.length === 0 ? 1 : doc.auditPasses[doc.auditPasses.length - 1].pass;
     const tasks = loadStore(config.storePath);
     const taken = new Set(tasks.map((task) => task.id));
     const created: Task[] = [];
-    for (const finding of parsed.findings) {
+    for (const finding of late) {
       const task = buildFindingTask(finding, slug, against, taken, tasks);
       tasks.push(task);
       taken.add(task.id);
@@ -1077,7 +1074,8 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     return;
   }
 
-  if (refuseInvalidFindings(parsed.findings)) return;
+  const findings = filedFindings(parsed.findings);
+  if (findings === null) return;
 
   const passNumber = doc.auditPasses.length + 1;
   // A range this checkout cannot compute is recorded as unresolved rather
@@ -1099,39 +1097,30 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     if (tasks.some((task) => task.id === baseId && task.state === 'open')) continue;
     const id = taken.has(baseId) ? `${baseId}-pass-${passNumber}` : baseId;
     const clauseText = doc.proofClauses.find((clause) => clause.id === verdict.clause)?.text ?? '';
-    const undelivered: Task = {
-      id,
-      seq: nextSeq(tasks),
-      title: `${deferred ? 'Deferred' : 'Unmet'} deliverable clause ${verdict.clause}: ${clauseText}`,
-      kind: 'undelivered',
-      state: 'open',
-      severity: 'high',
-      system: null,
-      // A deferred clause converts rather than staying owed: `spec: null` is
-      // the store's existing shape for "tracked, not a member of any spec" —
-      // render already prints it as `(deferred)` — so the record leaves
-      // merge-ready's spec leg the same way it left the clauses leg, without
-      // a second field to say so. `source.spec` still names the spec it fell
-      // out of, which is where an owner search over that spec finds it.
-      spec: deferred ? null : slug,
-      clause: verdict.clause,
-      requires: [],
-      writes: [],
-      discharges: [],
-      grant: null,
-      produces: [],
-      files: parsed.clauseFiles.get(verdict.clause) ?? [],
-      deliverable: clauseText,
-      evidence: verdict.evidence,
-      source: { spec: slug, pass: passNumber },
-      reason: null,
-      trigger: null,
-      closed: null,
-      closedCommit: null,
-      claimed: null,
-      claimedBy: null,
-      extra: null,
-    };
+    const undelivered = createTask(
+      {
+        id,
+        seq: nextSeq(tasks),
+        title: `${deferred ? 'Deferred' : 'Unmet'} deliverable clause ${verdict.clause}: ${clauseText}`,
+        state: 'open',
+        kind: 'undelivered',
+      },
+      {
+        severity: 'high',
+        // A deferred clause converts rather than staying owed: `spec: null` is
+        // the store's existing shape for "tracked, not a member of any spec" —
+        // render already prints it as `(deferred)` — so the record leaves
+        // merge-ready's spec leg the same way it left the clauses leg, without
+        // a second field to say so. `source.spec` still names the spec it fell
+        // out of, which is where an owner search over that spec finds it.
+        spec: deferred ? null : slug,
+        clause: verdict.clause,
+        files: parsed.clauseFiles.get(verdict.clause) ?? [],
+        deliverable: clauseText,
+        evidence: verdict.evidence,
+        source: { spec: slug, pass: passNumber },
+      },
+    );
     tasks.push(undelivered);
     taken.add(id);
     created.push({ task: undelivered, note: `created by ${slug} pass ${passNumber} for ${deferred ? 'deferred' : 'unmet'} clause ${verdict.clause}` });
@@ -1140,7 +1129,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
   }
 
   let findingsCreated = 0;
-  for (const finding of parsed.findings) {
+  for (const finding of findings) {
     const task = buildFindingTask(finding, slug, passNumber, taken, tasks);
     tasks.push(task);
     taken.add(task.id);

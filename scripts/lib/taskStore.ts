@@ -4,6 +4,11 @@ export type Kind = 'task' | 'finding' | 'undelivered' | 'question';
 export type State = 'unreviewed' | 'open' | 'in-progress' | 'done' | 'declined';
 export type Severity = 'high' | 'medium' | 'low';
 export type Grant = 'forecast' | 'commitment';
+// `nobody` is a positive claim and not an absence: the knowledge did not
+// exist when the work was briefed, which is why it is reportable and why a
+// count of defects must not include it.
+export type Fault = 'tooling' | 'contract' | 'nobody';
+export type Decider = 'worker' | 'planner' | 'author';
 
 export interface Source {
   spec: string;
@@ -46,6 +51,14 @@ export interface Task {
   // says `commitment`. Null is a record that has not said. planCheck weighs
   // the three differently, which is the whole reason the field exists.
   grant: Grant | null;
+  // Which question this record feeds — fix the tooling, or brief the work
+  // differently. Null on the kinds that report no cost, and on every record
+  // written before the field existed; `nobody` is not that, and the two must
+  // not be read as one.
+  fault: Fault | null;
+  // Who should decide it, for a `question`: the role whose decision would
+  // hold. Null on every other kind.
+  decider: Decider | null;
   produces: string[];
   deliverable: string | null;
   evidence: string | null;
@@ -75,7 +88,18 @@ export const DEFAULT_STORE_PATH = 'docs/tasks.jsonl';
 export const KINDS: Kind[] = ['task', 'finding', 'undelivered', 'question'];
 export const STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
 export const GRANTS: Grant[] = ['forecast', 'commitment'];
+export const FAULTS: Fault[] = ['tooling', 'contract', 'nobody'];
+export const DECIDERS: Decider[] = ['worker', 'planner', 'author'];
 const SEVERITIES: Severity[] = ['high', 'medium', 'low'];
+
+// The kinds that report what working the process cost. A `task` is planned
+// work and an `undelivered` record is a clause verdict the spec document
+// already carries; neither is a report of a cost.
+export const REPORTING_KINDS: Kind[] = ['finding', 'question'];
+
+export function reportsCost(kind: Kind): boolean {
+  return REPORTING_KINDS.includes(kind);
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -145,6 +169,8 @@ const KNOWN_KEYS: ReadonlyArray<keyof KnownFields> = Object.keys({
   files: true,
   writes: true,
   grant: true,
+  fault: true,
+  decider: true,
   produces: true,
   deliverable: true,
   evidence: true,
@@ -193,6 +219,14 @@ function normalizeTask(value: unknown, where: string): Task {
   const grant = value.grant ?? null;
   if (grant !== null && (typeof grant !== 'string' || !GRANTS.includes(grant as Grant))) throw new StoreError(`${where}: task ${JSON.stringify(id)} has invalid grant: ${String(grant)}`);
 
+  // Absent is a record written before the channel existed, which is not the
+  // same answer as `nobody` and is not defaulted to it.
+  const fault = value.fault ?? null;
+  if (fault !== null && (typeof fault !== 'string' || !FAULTS.includes(fault as Fault))) throw new StoreError(`${where}: task ${JSON.stringify(id)} has invalid fault: ${String(fault)}`);
+
+  const decider = value.decider ?? null;
+  if (decider !== null && (typeof decider !== 'string' || !DECIDERS.includes(decider as Decider))) throw new StoreError(`${where}: task ${JSON.stringify(id)} has invalid decider: ${String(decider)}`);
+
   return {
     id,
     seq,
@@ -208,6 +242,8 @@ function normalizeTask(value: unknown, where: string): Task {
     files: stringArray(value, 'files', where),
     writes: optionalStringArray(value, 'writes', where),
     grant: grant as Grant | null,
+    fault: fault as Fault | null,
+    decider: decider as Decider | null,
     produces: optionalStringArray(value, 'produces', where),
     deliverable: nullableString(value, 'deliverable', where),
     evidence: nullableString(value, 'evidence', where),
@@ -243,6 +279,8 @@ function renderTask(task: Task): string {
     files: task.files,
     writes: task.writes,
     grant: task.grant,
+    fault: task.fault,
+    decider: task.decider,
     produces: task.produces,
     deliverable: task.deliverable,
     evidence: task.evidence,
@@ -259,6 +297,92 @@ function renderTask(task: Task): string {
     for (const key of Object.keys(task.extra).sort()) merged[key] = task.extra[key];
   }
   return JSON.stringify(merged);
+}
+
+export interface RecordCore {
+  id: string;
+  seq: number;
+  title: string;
+  state: State;
+}
+type Core = RecordCore;
+
+// What a route must decide before a record exists. `finding` and `question`
+// report a cost, so tsc refuses to assemble either without a fault, and
+// refuses a question without the role whose decision would hold — the check
+// is on the shape of the call rather than on each route remembering to make
+// it, which is why a route added later cannot skip it and compile.
+export type NewRecord =
+  | (Core & { kind: 'task' | 'undelivered'; fault?: never; decider?: never })
+  | (Core & { kind: 'finding'; fault: Fault; decider?: never })
+  | (Core & { kind: 'question'; fault: Fault; decider: Decider });
+
+export type Draft = Partial<Omit<Task, keyof Core | 'kind' | 'fault' | 'decider'>>;
+
+// The one assembly point for a new record. Its literal is typed as the whole
+// Task, so a field added to Task without a default here is a compile error
+// rather than an `undefined` a route happens not to set.
+export function createTask(record: NewRecord, draft: Draft = {}): Task {
+  return {
+    id: record.id,
+    seq: record.seq,
+    title: record.title,
+    kind: record.kind,
+    state: record.state,
+    severity: null,
+    system: null,
+    spec: null,
+    clause: null,
+    discharges: [],
+    requires: [],
+    files: [],
+    writes: [],
+    grant: null,
+    fault: record.fault ?? null,
+    decider: record.decider ?? null,
+    produces: [],
+    deliverable: null,
+    evidence: null,
+    source: null,
+    reason: null,
+    trigger: null,
+    closed: null,
+    closedCommit: null,
+    claimed: null,
+    claimedBy: null,
+    extra: null,
+    ...draft,
+  };
+}
+
+export type Resolved<T> = { value: T } | { error: string };
+
+// One refusal text for every route that takes a fault from a caller, so the
+// routes that can create a record cannot disagree about what one is. A
+// reporting kind narrows the result to a `Fault`, which is what lets a caller
+// that already knows its kind hand the value straight to `createTask`.
+export function resolveFault(kind: 'finding' | 'question', given: string | undefined): Resolved<Fault>;
+export function resolveFault(kind: Kind, given: string | undefined): Resolved<Fault | null>;
+export function resolveFault(kind: Kind, given: string | undefined): Resolved<Fault | null> {
+  if (given === undefined) {
+    if (!reportsCost(kind)) return { value: null };
+    return { error: `error: a ${kind} record needs --fault ${FAULTS.join('|')} — whether the tooling, the contract that briefed the work, or nobody is at fault` };
+  }
+  if (!FAULTS.includes(given as Fault)) return { error: `error: --fault must be one of ${FAULTS.join(', ')}` };
+  if (!reportsCost(kind)) return { error: `error: a ${kind} record carries no fault — only ${REPORTING_KINDS.join(' and ')} records report what the work cost` };
+  return { value: given as Fault };
+}
+
+export function resolveDecider(kind: 'question', given: string | undefined): Resolved<Decider>;
+export function resolveDecider(kind: Kind, given: string | undefined): Resolved<Decider | null>;
+export function resolveDecider(kind: Kind, given: string | undefined): Resolved<Decider | null> {
+  if (given === undefined) {
+    if (kind !== 'question') return { value: null };
+    return { error: `error: a question record needs --decider ${DECIDERS.join('|')} — a question parked with no decider is a stall with extra steps` };
+  }
+  if (!DECIDERS.includes(given as Decider)) return { error: `error: --decider must be one of ${DECIDERS.join(', ')}` };
+  if (kind !== 'question') return { error: `error: a ${kind} record carries no decider — only a question names who should decide it` };
+  return { value: given as Decider };
 }
 
 // `label` is the `where`-prefix for error messages — a file path for

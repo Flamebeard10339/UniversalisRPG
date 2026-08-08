@@ -103,7 +103,7 @@ describe('the event log', () => {
       const auditDoc = path.join(dir, 'legacy-audit.md');
       writeFileSync(auditDoc, '# Runtime — 2026-01-01\n\n## H1 — an imported finding\n\n**Files:** `src/runtime/a.ts:1`\n\nEvidence prose.\n\n**Fix**: do the thing.\n', 'utf8');
 
-      tasks('import', auditDoc, '--actor', 'importer');
+      tasks('import', auditDoc, '--fault', 'contract', '--actor', 'importer');
       await triage('2\n');
       tasks('add', 'a decliner', '--id', 'to-decline', '--actor', 'w');
       tasks('decline', 'to-decline', '--reason', 'not worth it', '--actor', 'w');

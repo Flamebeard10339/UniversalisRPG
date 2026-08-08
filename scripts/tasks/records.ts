@@ -7,7 +7,10 @@ import { filterEvents, loadEvents } from '../lib/eventLog';
 import {
   claimSummary,
   coldClaims,
+  createTask,
+  DECIDERS,
   dependencyCycles,
+  FAULTS,
   fixNowQueue,
   GRANTS,
   isBlocked,
@@ -18,12 +21,16 @@ import {
   nextSeq,
   parseStore,
   requirementStates,
+  resolveDecider,
+  resolveFault,
   SEARCH_FIELDS,
   STATES,
   unreviewedFiledBy,
   waitingOn,
   type Grant,
   type Kind,
+  type NewRecord,
+  type RecordCore,
   type Severity,
   type State,
   type Task,
@@ -90,6 +97,18 @@ function reportGrant(task: Task): void {
   console.log(`its write grant is recorded as a forecast — \`tasks edit ${task.id} --writes <paths> --grant commitment\` is what a worker that has read the region says, and \`tasks plan\` grades an overlap between commitments as a defect and one resting on a forecast as a note`);
 }
 
+// The two kinds a human files by hand are assembled apart, because a finding
+// cannot exist without a fault and a task cannot carry one — the branch is
+// the pairing, and `createTask` refuses either half on its own.
+function addedRecord(core: RecordCore, kind: 'task' | 'finding', given: string | undefined): NewRecord | { error: string } {
+  if (kind === 'finding') {
+    const fault = resolveFault(kind, given);
+    return 'error' in fault ? fault : { ...core, kind, fault: fault.value };
+  }
+  const fault = resolveFault(kind, given);
+  return 'error' in fault ? fault : { ...core, kind };
+}
+
 export function cmdAdd(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const title = args.positional[0];
@@ -100,8 +119,12 @@ export function cmdAdd(args: Flags, usage: string): void {
   }
 
   const kind = (args.flags.kind as Kind | undefined) ?? 'task';
-  if (kind !== 'task' && kind !== 'finding' && kind !== 'question') {
-    console.error(`error: --kind must be task, finding or question (undelivered tasks are only created by \`audit\`)`);
+  if (kind !== 'task' && kind !== 'finding') {
+    console.error(
+      kind === 'question'
+        ? `error: a question is created by \`tasks question "<title>" --blocks <id>... --decider ${DECIDERS.join('|')} --fault ${FAULTS.join('|')}\`, which is what names the records it holds up`
+        : 'error: --kind must be task or finding (undelivered records are only created by `audit`)',
+    );
     process.exitCode = 1;
     return;
   }
@@ -110,7 +133,6 @@ export function cmdAdd(args: Flags, usage: string): void {
     process.exitCode = 1;
     return;
   }
-
   const tasks = loadStore(config.storePath);
   const validationError = validateContentFields(config, args.flags);
   if (validationError) {
@@ -147,16 +169,17 @@ export function cmdAdd(args: Flags, usage: string): void {
   const state: State = kind === 'finding' ? 'unreviewed' : 'open';
   const spec = kind === 'finding' ? null : (args.flags.spec ?? null);
 
-  const task: Task = {
-    id,
-    seq: nextSeq(tasks),
-    title,
-    kind,
-    state,
+  const shape = addedRecord({ id, seq: nextSeq(tasks), title, state }, kind, args.flags.fault);
+  if ('error' in shape) {
+    console.error(shape.error);
+    process.exitCode = 1;
+    return;
+  }
+
+  const task = createTask(shape, {
     severity: (args.flags.severity as Severity | undefined) ?? null,
     system: args.flags.system ?? null,
     spec,
-    clause: null,
     discharges: clauses.numbers,
     requires: splitList(args.flags.requires),
     writes: splitList(args.flags.writes),
@@ -165,15 +188,7 @@ export function cmdAdd(args: Flags, usage: string): void {
     files: splitList(args.flags.files),
     deliverable: args.flags.deliverable ?? null,
     evidence: args.flags.evidence ?? null,
-    source: null,
-    reason: null,
-    trigger: null,
-    closed: null,
-    closedCommit: null,
-    claimed: null,
-    claimedBy: null,
-    extra: null,
-  };
+  });
   tasks.push(task);
   saveStoreAndWarn(tasks, config);
   recordEvents(config, 'add', [subjectOf(task, `added as ${task.kind}/${task.state}: ${truncateLine(task.title, 80)}`)]);
@@ -182,6 +197,86 @@ export function cmdAdd(args: Flags, usage: string): void {
   reportUnresolvedRequires(task, tasks);
   reportGrant(task);
   if (args.flags.writes !== undefined) reportPriorArtOnWrites(config, tasks, task);
+}
+
+// A question belongs to the spec whose work it holds up. Records from two
+// specs leave it belonging to neither, which `spec: null` already says.
+function sharedSpec(blocked: Task[]): string | null {
+  const specs = new Set(blocked.map((task) => task.spec));
+  return specs.size === 1 ? [...specs][0] : null;
+}
+
+// The route that is neither deciding it nor stalling: an agent that reaches a
+// decision it should not make files it against the records it holds up and
+// addresses it to the role whose decision would hold. Nothing here halts
+// anything — the question's id lands in each blocked record's `requires`,
+// which is the hold every other record already uses, so `done` and `decline`
+// release it with no second mechanism to disagree with.
+export function cmdQuestion(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const title = args.positional[0];
+  const blocks = splitList(args.flags.blocks);
+  if (!title || blocks.length === 0) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+
+  const validationError = validateContentFields(config, args.flags);
+  if (validationError) {
+    console.error(validationError);
+    process.exitCode = 1;
+    return;
+  }
+
+  const fault = resolveFault('question', args.flags.fault);
+  if ('error' in fault) {
+    console.error(fault.error);
+    process.exitCode = 1;
+    return;
+  }
+  const decider = resolveDecider('question', args.flags.decider);
+  if ('error' in decider) {
+    console.error(decider.error);
+    process.exitCode = 1;
+    return;
+  }
+
+  const tasks = loadStore(config.storePath);
+  const blocked = resolveTaskIds(blocks, tasks);
+  if (blocked === null) return;
+  for (const task of blocked) {
+    if (CLOSING_STATES.includes(task.state)) {
+      console.error(`error: ${task.id} is ${task.state} — a closed record has no work left to hold up. Nothing was asked`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  const taken = new Set(tasks.map((task) => task.id));
+  const id = uniqueId(slugify(title), taken);
+  const question = createTask(
+    { id, seq: nextSeq(tasks), title, state: 'open', kind: 'question', fault: fault.value, decider: decider.value },
+    {
+      severity: (args.flags.severity as Severity | undefined) ?? null,
+      system: args.flags.system ?? null,
+      spec: sharedSpec(blocked),
+      evidence: args.flags.evidence ?? null,
+    },
+  );
+  tasks.push(question);
+  const held = blocked.filter((task) => !task.requires.includes(id));
+  for (const task of held) task.requires.push(id);
+
+  saveStoreAndWarn(tasks, config);
+  recordEvents(config, 'add', [subjectOf(question, `asked as a question for the ${decider.value}, fault ${fault.value}, holding ${held.map((task) => task.id).join(', ')}: ${truncateLine(title, 80)}`)]);
+  recordEvents(config, 'edit', held.map((task) => subjectOf(task, `waits on question ${id}, addressed to the ${decider.value}`)));
+
+  console.log(`asked ${id} [${question.kind}/${question.state}] — for the ${decider.value} to decide, fault ${fault.value}`);
+  console.log(`${held.length} record(s) now wait on it: ${held.map((task) => task.id).join(', ')}. Nothing else moved — every other record in the queue is still dispatchable`);
+  console.log(`\`tasks done ${id}\` (answered) or \`tasks decline ${id} --reason "..."\` (dismissed) releases them`);
+  console.log(`the answer is what closing it delivers, so record it: \`tasks decision "<the answer>" --id ${id}\``);
+  if (question.spec === null && blocked.length > 1) console.log(`the records it holds up name different specs, so the question is filed outside every spec`);
 }
 
 export function cmdEdit(args: Flags, usage: string): void {
@@ -215,6 +310,22 @@ export function cmdEdit(args: Flags, usage: string): void {
   const clauses = parseDischarges(args.flags.discharges, task.discharges);
   if ('error' in clauses) {
     console.error(clauses.error);
+    process.exitCode = 1;
+    return;
+  }
+
+  // Resolved only when given: a record that predates the channel must stay
+  // editable without being made to classify itself, and the same call still
+  // refuses a fault on a kind that carries none.
+  const fault = args.flags.fault === undefined ? null : resolveFault(task.kind, args.flags.fault);
+  if (fault !== null && 'error' in fault) {
+    console.error(fault.error);
+    process.exitCode = 1;
+    return;
+  }
+  const decider = args.flags.decider === undefined ? null : resolveDecider(task.kind, args.flags.decider);
+  if (decider !== null && 'error' in decider) {
+    console.error(decider.error);
     process.exitCode = 1;
     return;
   }
@@ -265,6 +376,14 @@ export function cmdEdit(args: Flags, usage: string): void {
   if (args.flags.produces !== undefined) {
     task.produces = splitList(args.flags.produces);
     changes.push('produces');
+  }
+  if (fault !== null && 'value' in fault) {
+    task.fault = fault.value;
+    changes.push('fault');
+  }
+  if (decider !== null && 'value' in decider) {
+    task.decider = decider.value;
+    changes.push('decider');
   }
 
   if (changes.length === 0) {
@@ -655,7 +774,22 @@ function reportUnregisteredProduces(config: Config, task: Task): void {
 // the `tasks concept` nudge above is — and it names `show` because that is
 // where the next reader will now find the answer.
 export function printDecisionPrompt(task: Task): void {
+  // A question is the one record whose judgement is not incidental to the
+  // close — it is what the close delivers, so the prompt is not conditional.
+  if (task.kind === 'question') {
+    console.log(`this was a question for the ${task.decider ?? '(nobody named)'} — the answer is what closing it delivers, so record it: \`tasks decision "<the answer>" --id ${task.id}\``);
+    return;
+  }
   console.log(`if this rested on a judgement worth reading later, \`tasks decision "<one line>" --id ${task.id}\` records it where \`tasks show ${task.id}\` surfaces it`);
+}
+
+// The other half of a question's hold. Nothing was written to the records it
+// held, so nothing but this says they moved.
+function reportReleasedHolds(task: Task, tasks: Task[]): void {
+  if (task.kind !== 'question') return;
+  const held = tasks.filter((candidate) => candidate.requires.includes(task.id));
+  if (held.length === 0) return;
+  console.log(`released ${held.length} record(s) that waited on it: ${held.map((candidate) => candidate.id).join(', ')}`);
 }
 
 // The line clause 16 pins. A pass-2 finding was not part of what the spec
@@ -707,6 +841,7 @@ export function cmdDone(args: Flags, usage: string): void {
     if (task.kind === 'undelivered') console.log(`clause standing at close: ${clauseStanding(task, (spec) => specSource(config, spec))}`);
     if (alreadyDone) console.log(`the recorded close date stands: ${task.closed ?? 'undated'}`);
     if (waiting.length > 0) console.log(`closed with ${waiting.length} requirement(s) still open: ${waiting.join(', ')}`);
+    reportReleasedHolds(task, tasks);
     printDecisionPrompt(task);
   }
   saveStoreAndWarn(tasks, config);
@@ -743,6 +878,7 @@ export function cmdDecline(args: Flags, usage: string): void {
     // it: naming both here is what keeps the second one from being advice
     // nobody follows the way the step-2 survey command list was.
     if (trigger) console.log(`trigger recorded — \`tasks list --triggered\` surfaces it until this branch's work resolves it`);
+    reportReleasedHolds(task, tasks);
     printDecisionPrompt(task);
   }
   saveStoreAndWarn(tasks, config);

@@ -1,0 +1,332 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { fixture, type Run } from './cliFixtures';
+
+// A refused write leaves no store at all, which is the same answer as an
+// empty one and must not be an ENOENT in the middle of an assertion.
+function storeText(dir: string): string {
+  const file = path.join(dir, 'tasks.jsonl');
+  return existsSync(file) ? readFileSync(file, 'utf8') : '';
+}
+
+// The exact bytes the store holds for one record. c3 turns on this: if
+// blocking were stored, releasing a hold would have to change them.
+function storedLine(dir: string, id: string): string {
+  const line = storeText(dir)
+    .split('\n')
+    .find((candidate) => candidate.includes(`"id":${JSON.stringify(id)}`));
+  if (line === undefined) throw new Error(`no stored record for ${id}`);
+  return line;
+}
+
+const storedField = (dir: string, id: string, field: string): unknown => (JSON.parse(storedLine(dir, id)) as Record<string, unknown>)[field];
+
+const findingIds = (dir: string): string[] =>
+  storeText(dir)
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as { id: string; kind: string })
+    .filter((task) => task.kind === 'finding')
+    .map((task) => task.id);
+
+const legacyAuditDoc = (dir: string): string => {
+  const docPath = path.join(dir, 'runtime-2026-01-01.md');
+  writeFileSync(docPath, '## H1 — an imported finding\n\nsrc/runtime/save.ts:88 is where it lives.\n', 'utf8');
+  return docPath;
+};
+
+// The four write routes that can create a record, named here so the clause's
+// "every route" is a list a reader can check rather than a claim. Each is
+// exercised twice below: refused with no fault, and carrying the one it was
+// given.
+describe('c2: a record carries its fault, required where it is assembled', () => {
+  it('add refuses a finding with no fault, and writes nothing', () => {
+    fixture(({ tasks, dir }) => {
+      const refused = tasks('add', 'an unclassified finding', '--id', 'unclassified', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('a finding record needs --fault tooling|contract|nobody');
+      expect(storeText(dir).trim()).toBe('');
+    });
+  });
+
+  it('add records each of the three faults, and refuses anything else', () => {
+    fixture(({ tasks, dir }) => {
+      for (const fault of ['tooling', 'contract', 'nobody']) {
+        const added = tasks('add', `a ${fault} finding`, '--id', `f-${fault}`, '--kind', 'finding', '--fault', fault, '--severity', 'low', '--deliverable', 'fix it');
+        expect(added.status, fault).toBe(0);
+        expect(storedField(dir, `f-${fault}`, 'fault')).toBe(fault);
+      }
+      const refused = tasks('add', 'a mystery finding', '--id', 'f-mystery', '--kind', 'finding', '--fault', 'the weather', '--severity', 'low', '--deliverable', 'fix it');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('--fault must be one of tooling, contract, nobody');
+    });
+  });
+
+  it('add refuses a fault on a plain task, so no route can smuggle one onto planned work', () => {
+    fixture(({ tasks }) => {
+      const refused = tasks('add', 'ordinary work', '--id', 'ordinary', '--fault', 'tooling');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('a task record carries no fault');
+    });
+  });
+
+  it('question refuses with no fault, and carries the one it was given', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec');
+
+      const refused = tasks('question', 'Which way?', '--blocks', 'held-work', '--decider', 'planner');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('a question record needs --fault tooling|contract|nobody');
+
+      expect(tasks('question', 'Which way?', '--blocks', 'held-work', '--decider', 'planner', '--fault', 'nobody').status).toBe(0);
+      expect(storedField(dir, 'which-way', 'fault')).toBe('nobody');
+    });
+  });
+
+  it('import refuses a legacy document with no fault, and stamps the one it was given onto every finding in it', () => {
+    fixture(({ tasks, dir }) => {
+      const docPath = legacyAuditDoc(dir);
+
+      const refused = tasks('import', docPath);
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('a finding record needs --fault tooling|contract|nobody');
+      expect(storeText(dir).trim()).toBe('');
+
+      expect(tasks('import', docPath, '--fault', 'contract').status).toBe(0);
+      expect(storedField(dir, 'runtime-2026-01-01-h1', 'fault')).toBe('contract');
+    });
+  });
+
+  it('an audit pass refuses a finding with no fault, recording neither the finding nor the pass', async () => {
+    await fixture(async ({ audit, dir }) => {
+      const refused = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=checked', '--proof', '2=met', '--evidence', '2=checked', '--finding', 'an unclassified bug', '--severity', 'high', '--deliverable', 'guard it', '--evidence', 'save.ts:88 dereferences first');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('a finding record needs --fault tooling|contract|nobody');
+      expect(refused.stderr).toContain('an unclassified bug');
+      expect(findingIds(dir)).toEqual([]);
+      expect(readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8')).not.toContain('## Audit passes');
+
+      const recorded = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=checked', '--proof', '2=met', '--evidence', '2=checked', '--finding', 'a classified bug', '--severity', 'high', '--fault', 'tooling', '--deliverable', 'guard it', '--evidence', 'save.ts:88 dereferences first');
+      expect(recorded.status).toBe(0);
+      expect(findingIds(dir).map((id) => storedField(dir, id, 'fault'))).toEqual(['tooling']);
+    });
+  });
+
+  it('a late finding, filed with no proofs and appending no pass, is refused the same way', async () => {
+    await fixture(async ({ audit, dir }) => {
+      const refused = await audit('demo-spec', '--finding', 'a late bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'observed live');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('a finding record needs --fault tooling|contract|nobody');
+      expect(findingIds(dir)).toEqual([]);
+    });
+  });
+
+  it('an undelivered record created for an unmet clause carries no fault, because a clause verdict is not a report', async () => {
+    await fixture(async ({ audit, dir }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--proof', '2=met', '--evidence', '2=checked');
+      expect(storedField(dir, 'demo-spec-clause-1', 'kind')).toBe('undelivered');
+      expect(storedField(dir, 'demo-spec-clause-1', 'fault')).toBeNull();
+    });
+  });
+
+  it('edit reclassifies a fault and still refuses one on a kind that carries none', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'low', '--deliverable', 'fix it');
+      expect(tasks('edit', 'a-finding', '--fault', 'nobody').status).toBe(0);
+      expect(storedField(dir, 'a-finding', 'fault')).toBe('nobody');
+
+      tasks('add', 'ordinary work', '--id', 'ordinary');
+      const refused = tasks('edit', 'ordinary', '--fault', 'tooling');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('a task record carries no fault');
+      expect(storedField(dir, 'ordinary', 'fault')).toBeNull();
+    });
+  });
+
+  it('a record written before the channel existed reads as unclassified, which is not the same answer as nobody', () => {
+    fixture(({ tasks, dir }) => {
+      const store = path.join(dir, 'tasks.jsonl');
+      writeFileSync(store, `${JSON.stringify({ id: 'legacy', seq: 1, title: 'a finding from before', kind: 'finding', state: 'unreviewed', severity: 'low', system: null, spec: null, clause: null, discharges: [], requires: [], files: [], writes: [], grant: null, produces: [], deliverable: 'fix it', evidence: 'x', source: null, reason: null, trigger: null, closed: null, closedCommit: null, claimed: null, claimedBy: null })}\n`, 'utf8');
+
+      expect(tasks('show', 'legacy').status).toBe(0);
+      expect(tasks('show', 'legacy').stdout).not.toContain('fault:');
+
+      // Through a write, so the claim is about what the line parses to and
+      // not about a key the file happens not to carry yet.
+      expect(tasks('edit', 'legacy', '--evidence', 'still unclassified').status).toBe(0);
+      expect(storedField(dir, 'legacy', 'fault')).toBeNull();
+    });
+  });
+});
+
+describe('c3: blocking is derived, never stored', () => {
+  it('a released record is byte-identical to the held one, so nothing about the hold was ever written to it', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec');
+      tasks('question', 'Which way?', '--blocks', 'held-work', '--decider', 'planner', '--fault', 'nobody');
+
+      const held = storedLine(dir, 'held-work');
+      expect(tasks('show', 'held-work').stdout).toContain('BLOCKED');
+
+      tasks('done', 'which-way');
+      expect(storedLine(dir, 'held-work')).toBe(held);
+      expect(tasks('show', 'held-work').stdout).not.toContain('BLOCKED');
+    });
+  });
+
+  it('a declined question releases the hold exactly as an answered one does', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec');
+      tasks('question', 'Which way?', '--blocks', 'held-work', '--decider', 'planner', '--fault', 'nobody');
+      const held = storedLine(dir, 'held-work');
+
+      const dismissed = tasks('decline', 'which-way', '--reason', 'the question dissolved once the region was read');
+      expect(dismissed.status).toBe(0);
+      expect(dismissed.stdout).toContain('released 1 record(s) that waited on it: held-work');
+      expect(storedLine(dir, 'held-work')).toBe(held);
+      expect(tasks('show', 'held-work').stdout).not.toContain('BLOCKED');
+    });
+  });
+
+  it('the record carries no field that stores whether it is blocked, only the requirement that derives it', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec');
+      tasks('question', 'Which way?', '--blocks', 'held-work', '--decider', 'planner', '--fault', 'nobody');
+
+      const stored = JSON.parse(storedLine(dir, 'held-work')) as Record<string, unknown>;
+      expect(Object.keys(stored).filter((key) => /block|halt|held|waiting/i.test(key))).toEqual([]);
+      expect(stored.requires).toEqual(['which-way']);
+    });
+  });
+});
+
+describe('c4: a blocking question is filed, addressed, and holds only what depends on it', () => {
+  it('files a question against the record it is working, addressed to the role whose decision would hold', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec');
+      const asked = tasks('question', 'Which way?', '--blocks', 'held-work', '--decider', 'planner', '--fault', 'contract', '--evidence', 'the spec names a threshold where the case wants an invariant');
+
+      expect(asked.status).toBe(0);
+      expect(asked.stdout).toContain('for the planner to decide, fault contract');
+      expect(asked.stdout).toContain('1 record(s) now wait on it: held-work');
+      expect(storedField(dir, 'which-way', 'decider')).toBe('planner');
+      expect(storedField(dir, 'which-way', 'kind')).toBe('question');
+      expect(storedField(dir, 'which-way', 'spec')).toBe('demo-spec');
+    });
+  });
+
+  it('refuses a question with no decider, so no route can park one with no destination', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec');
+
+      const unaddressed = tasks('question', 'Which way?', '--blocks', 'held-work', '--fault', 'contract');
+      expect(unaddressed.status).toBe(1);
+      expect(unaddressed.stderr).toContain('a question record needs --decider worker|planner|author');
+      expect(unaddressed.stderr).toContain('a stall with extra steps');
+
+      const misaddressed = tasks('question', 'Which way?', '--blocks', 'held-work', '--fault', 'contract', '--decider', 'somebody');
+      expect(misaddressed.status).toBe(1);
+      expect(misaddressed.stderr).toContain('--decider must be one of worker, planner, author');
+      expect(storedField(dir, 'held-work', 'requires')).toEqual([]);
+    });
+  });
+
+  it('halts exactly what depends on it while the rest of the spec proceeds', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec', '--severity', 'high');
+      tasks('add', 'unrelated work', '--id', 'free-work', '--spec', 'demo-spec', '--severity', 'high');
+      tasks('question', 'Which way?', '--blocks', 'held-work', '--decider', 'planner', '--fault', 'contract');
+
+      const next = tasks('next');
+      expect(next.stdout).not.toContain('held-work');
+      expect(next.stdout).toContain('free-work');
+
+      tasks('done', 'free-work');
+      const afterwards = tasks('next');
+      expect(afterwards.stdout).toContain('which-way');
+      expect(afterwards.stdout).toContain('for the planner');
+      expect(afterwards.stdout).not.toContain('held-work  [');
+    });
+  });
+
+  it('answering it releases the hold and asks for the answer where the next reader finds it', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec');
+      tasks('question', 'Which way?', '--blocks', 'held-work', '--decider', 'author', '--fault', 'nobody');
+
+      const answered = tasks('done', 'which-way');
+      expect(answered.status).toBe(0);
+      expect(answered.stdout).toContain('released 1 record(s) that waited on it: held-work');
+      expect(answered.stdout).toContain('this was a question for the author');
+      expect(answered.stdout).toContain('tasks decision "<the answer>" --id which-way');
+      expect(tasks('next').stdout).toContain('held-work');
+    });
+  });
+
+  it('holds several records at once, and refuses to hold a closed one', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'first', '--id', 'first-work', '--spec', 'demo-spec');
+      tasks('add', 'second', '--id', 'second-work', '--spec', 'demo-spec');
+      tasks('add', 'already finished', '--id', 'finished-work', '--spec', 'demo-spec');
+      tasks('done', 'finished-work');
+
+      const refused = tasks('question', 'Which way?', '--blocks', 'first-work,finished-work', '--decider', 'planner', '--fault', 'contract');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('finished-work is done');
+      expect(storedField(dir, 'first-work', 'requires')).toEqual([]);
+
+      const asked = tasks('question', 'Which way?', '--blocks', 'first-work,second-work', '--decider', 'planner', '--fault', 'contract');
+      expect(asked.status).toBe(0);
+      expect(storedField(dir, 'first-work', 'requires')).toEqual(['which-way']);
+      expect(storedField(dir, 'second-work', 'requires')).toEqual(['which-way']);
+    });
+  });
+
+  it('is filed outside every spec when the records it holds up disagree about which spec they are in', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'member-work', '--spec', 'demo-spec');
+      tasks('add', 'a deferred record', '--id', 'deferred-work');
+
+      const asked = tasks('question', 'Which way?', '--blocks', 'member-work,deferred-work', '--decider', 'author', '--fault', 'nobody');
+      expect(asked.status).toBe(0);
+      expect(asked.stdout).toContain('name different specs, so the question is filed outside every spec');
+      expect(storedField(dir, 'which-way', 'spec')).toBeNull();
+    });
+  });
+
+  it('records the ask and the hold in the event log, so a run\'s questions are countable', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'the work it holds up', '--id', 'held-work', '--spec', 'demo-spec');
+      tasks('question', 'Which way?', '--blocks', 'held-work', '--decider', 'planner', '--fault', 'contract', '--actor', 'worker-a');
+
+      const notes = readFileSync(path.join(dir, 'events.jsonl'), 'utf8')
+        .split('\n')
+        .filter((line) => line.trim().length > 0)
+        .map((line) => JSON.parse(line) as { id: string | null; note: string });
+      expect(notes.some((event) => event.id === 'which-way' && event.note.includes('asked as a question for the planner, fault contract'))).toBe(true);
+      expect(notes.some((event) => event.id === 'held-work' && event.note.includes('waits on question which-way'))).toBe(true);
+    });
+  });
+});
+
+describe('the channel refuses the two shapes a second answer would take', () => {
+  it('add no longer creates a question at all, so there is one route and it always wires the hold', () => {
+    fixture(({ tasks, dir }) => {
+      const refused: Run = tasks('add', 'Which way?', '--kind', 'question');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('tasks question');
+      expect(refused.stderr).toContain('--blocks');
+      expect(storeText(dir).trim()).toBe('');
+    });
+  });
+
+  it('refuses a decider on a finding, so the addressee cannot drift onto a record nobody decides', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'low', '--deliverable', 'fix it');
+      const refused = tasks('edit', 'a-finding', '--decider', 'planner');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('a finding record carries no decider');
+    });
+  });
+});
