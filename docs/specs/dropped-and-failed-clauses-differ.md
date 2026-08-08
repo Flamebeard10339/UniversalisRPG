@@ -139,3 +139,78 @@ from an admitted failure.
   both records are created in the same `cmdAudit` call, against the same slug and pass, and a
   finding filed alongside an unmet verdict for a clause it names in `--file` is a much narrower
   test. Report what was chosen and its false-positive behaviour.
+
+## Audit passes
+
+### Pass 1 — 2026-08-08
+
+- base: `fbf475fe1786cc51ccb1a2c7f1f3619ed5006d2a`
+- head: `7b8e3e386ef40fc4536f4a80b5235ea29db54e17`
+- proof 1: met — grep -rn "spec === null\|spec ?? '(deferred)'\|spec == null" scripts/ --include=*.ts finds
+  17 sites; render.ts's old `spec ?? '(deferred)'` is gone, replaced by specLine() which reads
+  task.departure explicitly. Every remaining site (roadmap.ts:85,195; taskStore.ts:691,806;
+  architectureCmds.ts:57; mergeReady.ts:110,329,331,342; records.ts:280,607,904; roadmapCmd.ts:61;
+  specCmds.ts:107; triage.ts:37; workPrompt.ts:27,33,164) is a membership/branching test (e.g.
+  "no active spec", "discharges no clause", "(unspecced)") — none maps the absence to a departure
+  verdict word. Mutation: reverted render.ts's specLine() to the old `spec ?? '(deferred)'` —
+  KILLED by scripts/tasks/render.test.ts ("reads \"no spec\" for a record that never joined one",
+  "reads the departure reason for each of the three ways a record can leave one"), re-measured at
+  its own file per the manifest's second pass.
+- proof 2: met — Five call sites null a record's spec: scripts/tasks/audit.ts:513-514 (a pass grading a
+  clause deferred, sets spec/departure together at record creation), scripts/tasks/specCmds.ts:345
+  (cmdSpecDone --defer-open, departFromSpec(straggler, 'unmet')), scripts/tasks/specCmds.ts:282
+  (cmdSpecRemove, departFromSpec(task, 'retriage')), scripts/tasks/triage.ts:123 (runDefer,
+  departFromSpec(task, 'retriage')), scripts/tasks/records.ts:970 (cmdDefer, departFromSpec(task,
+  'retriage')). `grep -rn "\.spec\s*=\s*null" scripts/` finds exactly one raw assignment left in
+  the whole tree: taskStore.ts:383, which is departFromSpec's own body — every other caller is
+  forced through it by the function's mandatory second parameter. TS cannot forbid a future direct
+  `task.spec = null` bypassing the helper (no store-wide check was added; enforcement is the
+  helper's required arg, not a check on write) — the branch's own closing note says this
+  explicitly rather than leaving it silent. Mutation: reverted cmdSpecDone's `--defer-open` line to
+  raw `straggler.spec = null` — KILLED by scripts/tasks/specCmds.test.ts ("spec done --defer-open
+  removes a straggler task from the spec instead of refusing"), re-measured at its own file.
+  See also the finding filed below: a sixth site (cmdSpecRemove) states a reason at assembly but
+  the reason it states can be wrong for an id that was never a member of the named spec — c2 only
+  requires a reason be supplied, which it is, so this does not fail c2's stated proof, but it is
+  the same category of loss the branch exists to prevent, filed separately.
+- proof 3: met — The three records run-an-orchestrator-over-three-parallel-tasks left behind —
+  run-an-orchestrator-over-three-parallel-tasks-clause-2, -clause-3, -clause-5 — are undelivered/
+  open records with titles starting "Unmet deliverable clause N". `npm run tasks -- list
+  --deferred` returns none of them (checked against the live store). `npm run tasks -- list
+  --unspecced` and the plain `npm run tasks -- list` both return all three, with the "Unmet"
+  verdict still legible in the title even though these predate the `departure` field (they carry
+  departure: null, a legacy gap noted below, not a regression — pre-branch every null-spec record
+  rendered "(deferred)" regardless of truth, which was strictly less accurate than today's plain
+  "(no spec)" for these). Mutation: reverted taskStore.ts's `--deferred` filter predicate from
+  `task.departure === 'deferred'` back to `task.spec === null` — KILLED by
+  scripts/lib/taskStore.test.ts ("--deferred keeps only state:open tasks departed as a scope
+  decision, not one merely never joined or swept out unmet"), re-measured at its own file.
+- proof 4: unmet — Reproduced live against a fixture demo-spec (two clauses): pass 1 graded clause 1
+  `unmet` (`--evidence 1=first pass, it fails`), creating demo-spec-clause-1 with title "Unmet
+  deliverable clause 1", spec: demo-spec, evidence: "first pass, it fails". Pass 2 then graded the
+  same clause `deferred` (`--evidence 1=goal still holds without it`). The record after pass 2 is
+  byte-identical to after pass 1 — same title, same spec: demo-spec, same stale evidence — and it
+  is absent from `tasks list --deferred`. cmdAudit's duplicate guard at
+  scripts/tasks/audit.ts:494 (`if (tasks.some((task) => task.id === baseId && task.state ===
+  'open')) continue;`) is untouched by this diff (identical to the pre-branch file, confirmed by
+  diffing against fbf475f) and still runs above the branch at :513-514 that would set spec: null,
+  departure: 'deferred' — exactly the ordering bug the clause describes. audit.ts's only change in
+  this diff is the added `departure: deferred ? 'deferred' : null,` literal on the *creation* path;
+  the reuse/skip path that governs a second grading is untouched. scripts/tasks/audit.test.ts has
+  zero lines changed in this diff (`git diff <range> -- scripts/tasks/audit.test.ts` is empty), so
+  nothing exercises this transition either before or after. This work is already tracked, not
+  duplicated by this verdict's own filing: scripts/tasks/audit.ts and .test.ts sit in the grant of
+  the already-open task a-later-pass-converts-what-an-earlier-one-filed-and-a-restat
+  (discharges: c4, c5; BLOCKED on brief-builds-the-manifest), per this spec's own Decisions
+  section splitting c1-c3 and c4-c5 into disjoint grants.
+- proof 5: unmet — scripts/tasks/audit.ts:312-353 (buildFindingTask, filedFindings) contains no logic
+  that compares a filed finding against a clause verdict graded unmet in the same pass — no
+  title/text similarity check, no shared-clause check, nothing relates the two record kinds at
+  all. scripts/tasks/audit.test.ts is unchanged in this diff (confirmed empty diff against
+  fbf475f), so the exact scenario the clause names — run-an-orchestrator-over-three-parallel-tasks
+  pass 1 producing six records for three faults — remains fully reproducible today with zero
+  guard or report. Same tracking task as c4: a-later-pass-converts-what-an-earlier-one-filed-and-a-restat
+  (discharges: c4, c5) already exists, open, BLOCKED on brief-builds-the-manifest — filing this
+  verdict unmet will create dropped-and-failed-clauses-differ-clause-5 as a second, unrelated
+  record for the same work; noting the overlap here in evidence is this pass applying c5's own
+  principle to itself, since the tool has no mechanism to relate them automatically.
