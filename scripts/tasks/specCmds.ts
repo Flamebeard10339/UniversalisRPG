@@ -117,7 +117,6 @@ export function cmdSpecShow(args: Flags, usage: string): void {
     return;
   }
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
-  const latest = doc.auditPasses[doc.auditPasses.length - 1];
   const tasks = readStore(config);
   const owners = clauseOwners(tasks, slug);
   // The clauses with their standings, not the whole ## Deliverable: a
@@ -126,7 +125,7 @@ export function cmdSpecShow(args: Flags, usage: string): void {
   if (args.flags.full === 'true') {
     console.log(doc.deliverableSection);
   } else {
-    const standings = clauseStandings(doc.proofClauses, latest?.verdicts);
+    const standings = clauseStandings(doc.proofClauses, doc.auditPasses);
     for (const standing of standings) {
       for (const line of clauseStandingLines(standing, doc.proofClauses)) console.log(line);
       // Which slice of the decomposition promised this clause. A standing
@@ -144,8 +143,9 @@ export function cmdSpecShow(args: Flags, usage: string): void {
     console.log(`  pass ${pass.pass} (${pass.date}): ${outstandingSummary(pass.verdicts)}`);
   }
   // The passes above are what each pass said; this is where the spec stands
-  // now, which differs whenever a clause was added after the last one.
-  console.log(`clause standing (${latest ? `latest pass ${latest.pass}` : 'no audit pass recorded'}): ${outstandingSummary(clauseStandings(doc.proofClauses, latest?.verdicts))}`);
+  // now — composed over all of them, not read off the last one, so a clause
+  // one pass met and a later pass never mentioned still reads met here.
+  console.log(`clause standing (${doc.auditPasses.length === 0 ? 'no audit pass recorded' : `composed over ${doc.auditPasses.length} pass(es)`}): ${outstandingSummary(clauseStandings(doc.proofClauses, doc.auditPasses))}`);
   console.log('');
 
   const byId = new Map(tasks.map((task) => [task.id, task]));

@@ -39,8 +39,7 @@ export function cmdPlanPrompt(args: Flags, usage: string): void {
   const path_ = specFile(config, slug);
   if (existsSync(path_)) {
     const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
-    const latest = doc.auditPasses[doc.auditPasses.length - 1];
-    console.log(`Spec: ${path_} already exists — ${doc.proofClauses.length} proof clause(s) recorded, ${outstandingSummary(clauseStandings(doc.proofClauses, latest?.verdicts))}.`);
+    console.log(`Spec: ${path_} already exists — ${doc.proofClauses.length} proof clause(s) recorded, ${outstandingSummary(clauseStandings(doc.proofClauses, doc.auditPasses))}.`);
   } else {
     console.log(`No spec file yet at ${path_}. Survey below first; \`tasks spec new ${slug}\` never writes anything but the scaffold, and never before this branch's own capability decisions are on the page.`);
   }

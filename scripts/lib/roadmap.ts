@@ -130,7 +130,7 @@ function specStanding(slug: string, readSpec: ReadSpec): SpecStanding | null {
   return {
     clauses: doc.proofClauses.length,
     latestPass: latest?.pass ?? null,
-    outstanding: outstandingSummary(clauseStandings(doc.proofClauses, latest?.verdicts)),
+    outstanding: outstandingSummary(clauseStandings(doc.proofClauses, doc.auditPasses)),
   };
 }
 

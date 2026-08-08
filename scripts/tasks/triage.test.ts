@@ -151,13 +151,31 @@ describe('tasks CLI', () => {
   // In-process with its own globals rather than through the context's
   // helpers, because the branch this test is about is exactly the one the
   // fixture pins.
-  it("triage promotes into the inferred spec when the branch matches no spec file", async () => {
+  //
+  // A single open-member spec used to be promoted into silently — the store
+  // route `a-branch-is-told-which-spec-it-owes` deleted. `promote` no longer
+  // guesses even a lone candidate: it names it and skips, the same refusal
+  // every caller now gets when the branch name does not answer.
+  it("triage's promote refuses to guess a spec when the branch matches no spec file, naming the candidate", async () => {
     await fixture(async ({ tasks, dir }) => {
       tasks('add', 'fix-now anchor', '--id', 'anchor', '--spec', 'demo-spec');
       tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
       const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs'), '--branch', 'orphaned-branch'];
       const result = await runInProcessAsync(['triage', ...globals], '1\n');
-      expect(result.stdout).toContain('spec inferred from the store: demo-spec');
+      expect(result.stdout).toContain('spec not given: no');
+      expect(result.stdout).toContain('1 spec has open members — demo-spec');
+      expect(result.stdout).toContain('no active spec to promote into — pass --spec, skipping');
+      const shown = runInProcess(['show', 'a-finding', ...globals]);
+      expect(shown.stdout).not.toContain('spec: demo-spec');
+      expect(shown.stdout).toContain('[finding/unreviewed');
+    });
+  });
+
+  it("triage's promote takes an explicitly given --spec on a branch the branch name cannot answer for", async () => {
+    await fixture(async ({ tasks, dir }) => {
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs'), '--branch', 'orphaned-branch'];
+      await runInProcessAsync(['triage', ...globals, '--spec', 'demo-spec'], '1\n');
       const shown = runInProcess(['show', 'a-finding', ...globals]);
       expect(shown.stdout).toContain('spec: demo-spec');
     });

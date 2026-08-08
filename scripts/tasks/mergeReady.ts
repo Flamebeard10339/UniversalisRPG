@@ -1,14 +1,12 @@
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { checkBytes, type ByteFinding } from '../lib/bytes';
-import { loadEvents, type TaskEvent } from '../lib/eventLog';
 import * as git from '../lib/git';
 import { trackedFiles } from '../lib/sourceFiles';
-import { clauseStandings, parseSpecDoc, type ProofClause, type SpecDoc } from '../lib/specDoc';
-import { pathsOverlap } from '../lib/systems';
-import { unreviewedFiledBy, type Task } from '../lib/taskStore';
+import { clauseStandings, parseSpecDoc, type SpecDoc } from '../lib/specDoc';
+import { clausesOf, parseStoreTolerantly, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
-import { DEFAULT_BRANCH, readStore, resolveActiveSpec, resolveConfig, specFile, specsWrittenFromBranch, type Config } from './context';
+import { DEFAULT_BRANCH, readStore, resolveConfig, specFile, type Config } from './context';
 import { doctorIssues } from './doctor';
 
 // The merge gate, spelled once. Every leg here is already required by CI —
@@ -43,6 +41,39 @@ export interface LegResult {
 // own the terminal while they run still get their say, replayed in order.
 export type RunCommand = (command: string) => Promise<{ status: number | null; output: string }>;
 
+// One declared spec's own standing: everything below is scoped to the
+// members *this branch's own store diff* added or changed for this spec,
+// never to every member the spec has ever had. A branch holding one member
+// of a multi-member spec is graded on that member alone — the other
+// members, and the clauses only they discharge, are not this branch's to
+// answer for.
+export interface SpecStanding {
+  spec: string;
+  openMembers: string[];
+  unreviewedFindings: number;
+  // How many clauses this branch's own members discharge. Zero is not an
+  // error — a branch can declare a spec by filing a finding against it
+  // without discharging anything — and it is what makes the clauses leg
+  // read as "nothing owed" rather than blocked on a clause some other
+  // member answers for.
+  clausesOwed: number;
+  // Clause ids the spec's standing leaves outstanding, among the ones this
+  // branch's own members discharge, and whether a pass has been recorded at
+  // all — ungraded is not the same as unmet.
+  outstandingClauses: string[];
+  // Clause ids the standing reads deferred — off `outstandingClauses`
+  // because they stop blocking the clauses leg, and named here so a branch
+  // that deferred its way to green says so in the same line that says green.
+  deferredClauses: string[];
+  // Clause ids that are unmet but settled: every undelivered record they
+  // have is closed and at least one was declined rather than done. Off
+  // `outstandingClauses` for the same reason `deferredClauses` is — a
+  // declined clause has no action left that would ever turn it met, and a
+  // leg that stays red forever is not a gate.
+  declinedClauses: string[];
+  auditPasses: number;
+}
+
 // This branch's standing, as facts rather than as commands to go and get:
 // the six manual reads across two tools that preparing a merge actually took.
 export interface BranchStanding {
@@ -54,24 +85,15 @@ export interface BranchStanding {
   // is the one that bites in practice and the one nothing failed on.
   baseMoved: boolean;
   baseBranch: string;
-  spec: string | null;
-  // How that spec was arrived at. Every route to it but an explicit one is an
-  // inference, and a gate that grades a spec without saying which it picked
-  // leaves a reader unable to see that it graded the wrong one.
-  specNote: string | null;
-  // True when the spec is a plan this branch wrote for a later branch rather
-  // than a contract this branch owes. See `authoredAsPlan`.
-  specAuthoredHere: boolean;
-  openMembers: string[];
-  unreviewedFindings: number;
-  // Clause ids the spec's latest pass leaves outstanding, and whether a pass
-  // has been recorded at all — ungraded is not the same as unmet.
-  outstandingClauses: string[];
-  // Clause ids the latest pass recorded deferred — off `outstandingClauses`
-  // because they stop blocking the clauses leg, and named here so a branch
-  // that deferred its way to green says so in the same line that says green.
-  deferredClauses: string[];
-  auditPasses: number;
+  // False when the store diff against `baseBranch` could not be read at
+  // all — no merge base, or `docs/tasks.jsonl` unreadable there. `specs` is
+  // empty in that case too, but the two must not be read alike: empty means
+  // "this branch declared nothing", unreadable means "nobody can say".
+  diffReadable: boolean;
+  // Every spec some record in this branch's own store diff names — a set,
+  // because a branch may declare more than one, and every one of them is
+  // graded rather than one chosen among them.
+  specs: SpecStanding[];
   // How many issues `doctor` reported. Carried into the summary without
   // changing what fails: the count reached the summary line, the leg's
   // verdict did not move.
@@ -84,6 +106,43 @@ export interface MergeReadyDeps {
   read: (file: string) => Uint8Array | null;
   emit: (line: string) => void;
   standing: () => BranchStanding;
+}
+
+// One declared spec's own two legs: what this branch's own members of it
+// still owe, and which of the clauses those members discharge still stand
+// outstanding. Both are named with the spec's slug, because there can be more
+// than one pair of these on one run.
+function specLegs(standing: SpecStanding): LegResult[] {
+  const specOk = standing.openMembers.length === 0 && standing.unreviewedFindings === 0;
+  const spec: LegResult = {
+    name: `spec ${standing.spec}`,
+    ok: specOk,
+    detail: specOk
+      ? `pass — every member of ${standing.spec} this branch declared is closed`
+      : [standing.openMembers.length > 0 ? `${standing.openMembers.length} open member(s): ${standing.openMembers.join(', ')}` : null, standing.unreviewedFindings > 0 ? `${standing.unreviewedFindings} unreviewed finding(s)` : null].filter(Boolean).join('; '),
+    next: specOk ? `npm run tasks -- spec done ${standing.spec}` : standing.openMembers.length > 0 ? `npm run tasks -- next --spec ${standing.spec}` : `npm run tasks -- triage --spec ${standing.spec}`,
+  };
+
+  if (standing.clausesOwed === 0) {
+    return [spec, { name: `clauses ${standing.spec}`, ok: true, detail: `pass — no member of ${standing.spec} this branch declared discharges a clause` }];
+  }
+
+  const clausesOk = standing.auditPasses > 0 && standing.outstandingClauses.length === 0;
+  const deferredNote = standing.deferredClauses.length > 0 ? `; deferred: ${standing.deferredClauses.join(', ')}` : '';
+  const declinedNote = standing.declinedClauses.length > 0 ? `; declined: ${standing.declinedClauses.join(', ')}` : '';
+  const clauses: LegResult = {
+    name: `clauses ${standing.spec}`,
+    ok: clausesOk,
+    detail:
+      standing.auditPasses === 0
+        ? `${standing.spec} has no recorded audit pass`
+        : clausesOk
+          ? `pass — ${standing.auditPasses} pass(es) recorded, no clause outstanding${deferredNote}${declinedNote}`
+          : `${standing.outstandingClauses.length} outstanding across ${standing.auditPasses} pass(es): ${standing.outstandingClauses.join(', ')}${deferredNote}${declinedNote}`,
+    next: clausesOk ? undefined : standing.auditPasses === 0 ? `commission an auditor: npm run tasks -- audit-prompt ${standing.spec}` : `npm run tasks -- next --spec ${standing.spec}`,
+  };
+
+  return [spec, clauses];
 }
 
 // The questions a merge actually turns on, answered from the standing rather
@@ -107,44 +166,21 @@ function standingLegs(standing: BranchStanding): LegResult[] {
     next: standing.baseMoved ? `git merge ${standing.baseBranch}` : undefined,
   });
 
-  if (standing.spec === null) {
-    legs.push({ name: 'spec', ok: true, detail: 'pass — this branch is working no spec, so it owes no clause' });
+  // Unreadable is never read as "declares nothing": that would be exactly
+  // the guess c9 forbids, on the one axis this gate exists to answer. It
+  // fails loudly instead, with nothing to run — there is no single command
+  // that repairs an unresolvable merge base or an unreadable store snapshot.
+  if (!standing.diffReadable) {
+    legs.push({ name: 'spec', ok: false, detail: `this branch's store diff against ${standing.baseBranch} could not be read — declared specs cannot be determined` });
     return legs;
   }
 
-  // Which spec was graded, on its own line rather than folded into a verdict:
-  // it is the one fact that makes every leg below it readable, and the only
-  // way a reader can see the gate grading a spec they did not mean.
-  if (standing.specNote !== null) legs.push({ name: 'spec source', ok: true, detail: standing.specNote });
-
-  if (standing.specAuthoredHere) {
-    legs.push({ name: 'spec', ok: true, detail: `pass — this branch wrote ${standing.spec} as a plan for a later branch and worked none of its ${standing.openMembers.length} member(s), so it owes neither them nor a clause. No other spec was graded` });
+  if (standing.specs.length === 0) {
+    legs.push({ name: 'spec', ok: true, detail: "pass — this branch's store diff declares no spec, so it owes no clause" });
     return legs;
   }
 
-  const specOk = standing.openMembers.length === 0 && standing.unreviewedFindings === 0;
-  legs.push({
-    name: 'spec',
-    ok: specOk,
-    detail: specOk
-      ? `pass — every member of ${standing.spec} is closed`
-      : [standing.openMembers.length > 0 ? `${standing.openMembers.length} open member(s): ${standing.openMembers.join(', ')}` : null, standing.unreviewedFindings > 0 ? `${standing.unreviewedFindings} unreviewed finding(s)` : null].filter(Boolean).join('; '),
-    next: specOk ? `npm run tasks -- spec done ${standing.spec}` : standing.openMembers.length > 0 ? 'npm run tasks -- next' : 'npm run tasks -- triage',
-  });
-
-  const clausesOk = standing.auditPasses > 0 && standing.outstandingClauses.length === 0;
-  const deferredNote = standing.deferredClauses.length > 0 ? `; deferred: ${standing.deferredClauses.join(', ')}` : '';
-  legs.push({
-    name: 'clauses',
-    ok: clausesOk,
-    detail:
-      standing.auditPasses === 0
-        ? `${standing.spec} has no recorded audit pass`
-        : clausesOk
-          ? `pass — the latest of ${standing.auditPasses} pass(es) leaves no clause outstanding${deferredNote}`
-          : `${standing.outstandingClauses.length} outstanding after pass ${standing.auditPasses}: ${standing.outstandingClauses.join(', ')}${deferredNote}`,
-    next: clausesOk ? undefined : standing.auditPasses === 0 ? `commission an auditor: npm run tasks -- audit-prompt ${standing.spec}` : 'npm run tasks -- next',
-  });
+  for (const spec of standing.specs) legs.push(...specLegs(spec));
 
   return legs;
 }
@@ -198,8 +234,9 @@ export async function runMergeReady(deps: MergeReadyDeps): Promise<boolean> {
   if (failed.length === 0) {
     const doctorNote = standing.doctorWarnings > 0 ? `, with ${standing.doctorWarnings} doctor warning(s) that fail nothing` : '';
     deps.emit(`merge-ready: every leg passed${doctorNote}`);
-    const closeSpec = results.find((result) => result.name === 'spec')?.next;
-    if (closeSpec) deps.emit(`  next: ${closeSpec}`);
+    // One `next` per declared spec — a branch that declared two closes both,
+    // and c10 is what forbids collapsing this to the first.
+    for (const result of results) if (result.name.startsWith('spec ') && result.next) deps.emit(`  next: ${result.next}`);
     deps.emit(`  then merge ${standing.branch} into ${standing.baseBranch} — the merge body is the one artifact whoever did the work has to write`);
     return true;
   }
@@ -211,87 +248,120 @@ export async function runMergeReady(deps: MergeReadyDeps): Promise<boolean> {
   return false;
 }
 
-// A planning branch's output is a spec for a later branch, told apart from a
-// contract by two facts nobody has to declare: this branch's head carries a
-// clause id the base branch does not, and every member is still open, so
-// nothing here was ever worked against it. A spec authored and never
-// decomposed is not a plan: nothing was promised to a later branch until the
-// work was named.
-//
-// `headAddsClauseId` is null when git could not answer at all — an
-// unresolvable base ref, no repository — and that reads as "not shown to add
-// one" rather than as "this branch wrote it". A gate whose exemption widens
-// when its evidence disappears is the wrong way round.
-export function authoredAsPlan(members: Task[], headAddsClauseId: boolean | null): boolean {
-  return headAddsClauseId === true && members.length > 0 && members.every((member) => member.state === 'open');
+// A stable, key-order-independent serialization: the store is rewritten
+// wholesale on every save, so two copies of the same task can differ in key
+// order without differing in any field, and comparing raw JSON text would
+// read that as a change nobody made.
+function sortedJson(value: unknown): string {
+  return JSON.stringify(value, (_key, val: unknown) => {
+    if (val === null || typeof val !== 'object' || Array.isArray(val)) return val;
+    const record = val as Record<string, unknown>;
+    return Object.keys(record)
+      .sort()
+      .reduce<Record<string, unknown>>((acc, key) => {
+        acc[key] = record[key];
+        return acc;
+      }, {});
+  });
 }
 
-// Clause identity is the id `stampClauseIds` writes into the text, not the
-// wording — rewording and reordering are exactly what stamping is for
-// leaving alone. Directional on purpose: authorship only ever *adds* an id,
-// so only a head id absent from base is evidence of it. Corruption of any
-// shape only ever removes ids, from one bullet to the whole file, so it can
-// never satisfy this on its own — and a respec that purely deletes a clause
-// is refused the exemption along with it, which is the safe direction.
-export function headAddsClauseId(base: ProofClause[], head: ProofClause[]): boolean {
-  const baseIds = new Set(base.map((clause) => clause.id));
-  return head.some((clause) => !baseIds.has(clause.id));
+// The store the merge base held, read through git rather than the working
+// tree — a dirty checkout must not inflate the diff with edits nobody
+// committed. Null when the merge base is unknown or the file could not be
+// read there at all: both cases mean the diff cannot be trusted, and
+// `storeDiff` reads them the same way rather than treating "could not read"
+// as "there was nothing there".
+function baseStoreTasks(config: Config, base: string | null): Task[] | null {
+  if (base === null) return null;
+  const text = git.fileAt(base, config.storePath);
+  if (text === null) return null;
+  try {
+    return parseStoreTolerantly(text, `${config.storePath}@${base}`).tasks;
+  } catch {
+    return null;
+  }
 }
 
-export interface SpecCandidate {
-  spec: string;
-  authoredAsPlan: boolean;
+// The records this branch's own diff added or changed, matched by id and
+// compared field for field: every `start`/`stop`/`done` writes the record
+// itself, so a record here is exactly the signal the deleted event-log route
+// was reading, and a plain `edit` or a filed finding is declared work the
+// event log could never see at all.
+export function changedRecords(base: Task[], current: Task[]): Task[] {
+  const baseById = new Map(base.map((task) => [task.id, task]));
+  return current.filter((task) => {
+    const before = baseById.get(task.id);
+    return before === undefined || sortedJson(before) !== sortedJson(task);
+  });
 }
 
-// `resolveActiveSpec` answers "what am I working on" — a resume aid whose log
-// route takes the most recently written spec. Planning happens last, so a
-// branch that implemented one spec and then authored a plan for a later
-// branch resolves to the plan, and a plan owes nothing. A gate asks a
-// different question, and must not read "this plan owes nothing" as "this
-// branch owes nothing": a spec the branch owes outranks one it merely wrote,
-// however recently. Candidates arrive most recent first, so an ordinary
-// branch — one spec, not a plan — is unaffected, and a branch whose every
-// candidate is a plan still passes as the planning branch it is.
-export function specToGrade(candidates: SpecCandidate[]): SpecCandidate | null {
-  return candidates.find((candidate) => !candidate.authoredAsPlan) ?? candidates[0] ?? null;
+export interface StoreDiff {
+  // False when the diff could not be computed at all — no merge base, or
+  // `docs/tasks.jsonl` unreadable there. `changed` is empty in that case
+  // too, and a caller must not read the two alike.
+  readable: boolean;
+  changed: Task[];
 }
 
-export interface SpecFacts {
-  // What `resolveActiveSpec` answered, and how it says it got there.
-  activeSpec: string | null;
-  activeNote: string | null;
-  // Every spec this branch has written store records against, most recent
-  // first.
-  written: string[];
-  isPlan: (spec: string) => boolean;
-  // False for a spec this branch shows no real evidence of working — its
-  // diff never touched the spec's write region and no `start`/`stop`/`done`
-  // event names one of its members. Recording a note against a spec is a
-  // store write, not work against it, and a candidate that fails this is
-  // dropped before it can be graded as either a plan or a debt. True when
-  // the diff could not be read at all: the exemption from being asked must
-  // not widen just because git had no answer.
-  touchedWriteRegion: (spec: string) => boolean;
+export function storeDiff(config: Config, base: string | null, current: Task[]): StoreDiff {
+  const before = baseStoreTasks(config, base);
+  if (before === null) return { readable: false, changed: [] };
+  return { readable: true, changed: changedRecords(before, current) };
 }
 
-export type SpecDecision = Pick<BranchStanding, 'spec' | 'specNote' | 'specAuthoredHere'>;
+// The set this branch declared: every spec some record in its own store
+// diff names, whatever state that record is in. A spec a branch merely wrote
+// the markdown for — no task record ever pointed at it — never enters this
+// set, which is what replaces "authored as a plan" without a special case
+// for it: nothing was declared, so nothing is graded.
+export function declaredSpecs(changed: Task[]): string[] {
+  return [...new Set(changed.map((task) => task.spec).filter((spec): spec is string => spec !== null))].sort();
+}
 
-// The whole spec decision, with the git and store reads passed in as data.
-// It lives here rather than inline in `branchStanding` because that function
-// cannot be called without a repository, and a decision nothing can call is a
-// decision nothing checks: inverting this flag's polarity once left the file
-// green and `tsc` clean.
-export function decideSpec(facts: SpecFacts): SpecDecision {
-  const ordered = facts.activeSpec === null ? [] : [facts.activeSpec, ...facts.written.filter((spec) => spec !== facts.activeSpec)];
-  const touched = ordered.filter((spec) => facts.touchedWriteRegion(spec));
-  const graded = specToGrade(touched.map((spec) => ({ spec, authoredAsPlan: facts.isPlan(spec) })));
-  if (graded === null) return { spec: null, specNote: null, specAuthoredHere: false };
-  if (graded.spec === facts.activeSpec) return { spec: graded.spec, specNote: facts.activeNote, specAuthoredHere: graded.authoredAsPlan };
-  const activeReason = facts.activeSpec !== null && !facts.touchedWriteRegion(facts.activeSpec) ? `${facts.activeSpec} was not shown to be touched by this branch's diff` : `${facts.activeSpec} is a plan this branch wrote`;
+// One declared spec's standing, scoped to this branch's own members of it —
+// the records its own diff changed that name this spec — never to every
+// member the spec has ever had. `tasks` is the live store, used only for
+// `settledByDecline`'s lookup of every undelivered record for a clause,
+// including ones this branch's diff did not itself touch: an earlier
+// decline is still what settles a clause, whichever branch recorded it.
+function specStanding(config: Config, tasks: Task[], changed: Task[], spec: string): SpecStanding {
+  const ownMembers = changed.filter((task) => task.spec === spec);
+  // Findings stay `spec: null` until triage promotes them, so "declared
+  // against this spec" for one is its audit provenance, not its own field —
+  // the same distinction `unreviewedFiledBy` draws, scoped here to this
+  // branch's own diff instead of the whole store.
+  const ownUnreviewed = changed.filter((task) => task.state === 'unreviewed' && task.source?.spec === spec);
+
+  const doc = readSpecDoc(config, spec);
+  const standings = doc === null ? [] : clauseStandings(doc.proofClauses, doc.auditPasses);
+  const ownClauseIds = new Set(ownMembers.flatMap((task) => clausesOf(task)));
+  // Every clause an own member discharges gets a verdict, even one the
+  // spec's own text no longer carries — filtering `standings` down to
+  // `ownClauseIds` would instead let a stale or corrupted clause id drop out
+  // of the standing silently, reading as nothing owed rather than unknown.
+  const ownStandings = [...ownClauseIds].map((id) => standings.find((standing) => standing.clause === id) ?? { clause: id, status: 'unknown' as const, evidence: null });
+
+  // Declining an undelivered task abandons its clause rather than
+  // discharging it, in the tool's own words — but a verdict no future audit
+  // pass will ever revisit must not leave this leg red with no action left
+  // to clear it. Settled only when every undelivered record this clause has
+  // is closed and at least one of them was a decline: a live open or
+  // in-progress record for the same clause is a recurrence and still owed.
+  const settledByDecline = (clause: number): boolean => {
+    const records = tasks.filter((task) => task.kind === 'undelivered' && task.spec === spec && task.clause === clause);
+    return records.length > 0 && records.every((task) => task.state !== 'open' && task.state !== 'in-progress') && records.some((task) => task.state === 'declined');
+  };
+  const outstanding = ownStandings.filter((standing) => standing.status !== 'met' && standing.status !== 'deferred');
+
   return {
-    spec: graded.spec,
-    specNote: `spec chosen by the gate: ${graded.spec} — ${activeReason}, and ${graded.spec} is a spec it owes`,
-    specAuthoredHere: graded.authoredAsPlan,
+    spec,
+    openMembers: ownMembers.filter((task) => task.state !== 'done' && task.state !== 'declined').map((task) => task.id),
+    unreviewedFindings: ownUnreviewed.length,
+    clausesOwed: ownClauseIds.size,
+    outstandingClauses: outstanding.filter((standing) => !settledByDecline(standing.clause)).map((standing) => `c${standing.clause}`),
+    deferredClauses: ownStandings.filter((standing) => standing.status === 'deferred').map((standing) => `c${standing.clause}`),
+    declinedClauses: outstanding.filter((standing) => settledByDecline(standing.clause)).map((standing) => `c${standing.clause}`),
+    auditPasses: doc?.auditPasses.length ?? 0,
   };
 }
 
@@ -304,31 +374,7 @@ export function branchStanding(config: Config, baseBranch: string): BranchStandi
   const base = git.mergeBase(baseBranch);
   const baseHead = git.resolveCommit(baseBranch);
   const tasks = readStore(config);
-  const events = loadEvents(config.eventsPath).events;
-  const active = resolveActiveSpec(config, tasks, undefined);
-  const membersOf = (spec: string): Task[] => tasks.filter((task) => task.spec === spec);
-  const changed = changedFiles(base);
-
-  const decision = decideSpec({
-    activeSpec: active.spec,
-    activeNote: active.note,
-    written: specsWrittenFromBranch(config),
-    isPlan: (spec) => authoredAsPlan(membersOf(spec), specAddsClauseId(config, baseBranch, baseHead, spec)),
-    // A declared `writes` grant is a forecast, and the diff is only the
-    // stronger of two kinds of evidence: a `start`/`stop`/`done` event
-    // against one of the spec's members is a record that work happened,
-    // even when it landed outside what the member declared.
-    touchedWriteRegion: (spec) => {
-      const members = membersOf(spec);
-      const region = [specFile(config, spec), ...members.flatMap((task) => task.writes)];
-      return diffTouchesRegion(changed, region) || branchWorkedOnMembers(events, config.branch, new Set(members.map((task) => task.id)));
-    },
-  });
-  const spec = decision.spec;
-
-  const doc = spec === null ? null : readSpecDoc(config, spec);
-  const latest = doc?.auditPasses[doc.auditPasses.length - 1];
-  const members = spec === null ? [] : membersOf(spec);
+  const diff = storeDiff(config, base, tasks);
 
   return {
     branch: config.branch,
@@ -337,56 +383,10 @@ export function branchStanding(config: Config, baseBranch: string): BranchStandi
     // could not answer would be a gate nobody could get green.
     baseMoved: base !== null && baseHead !== null && base !== baseHead,
     baseBranch,
-    ...decision,
-    openMembers: members.filter((task) => task.state !== 'done' && task.state !== 'declined').map((task) => task.id),
-    unreviewedFindings: spec === null ? 0 : unreviewedFiledBy(tasks, spec).length,
-    outstandingClauses: doc === null ? [] : clauseStandings(doc.proofClauses, latest?.verdicts).filter((standing) => standing.status !== 'met' && standing.status !== 'deferred').map((standing) => `c${standing.clause}`),
-    deferredClauses: doc === null ? [] : clauseStandings(doc.proofClauses, latest?.verdicts).filter((standing) => standing.status === 'deferred').map((standing) => `c${standing.clause}`),
-    auditPasses: doc?.auditPasses.length ?? 0,
+    diffReadable: diff.readable,
+    specs: diff.readable ? declaredSpecs(diff.changed).map((spec) => specStanding(config, tasks, diff.changed, spec)) : [],
     doctorWarnings: doctorIssues(config, tasks).length,
   };
-}
-
-// The paths this branch's own commits touched, relative to the merge base —
-// not `baseBranch`'s tip, which would also carry every commit landed there
-// since this branch forked. Null when there is no merge base to diff from.
-export function changedFiles(base: string | null): string[] | null {
-  if (base === null) return null;
-  return git.changedFiles(`${base}..HEAD`);
-}
-
-// True when `changed` is unknown — the exemption `touchedWriteRegion` gates
-// must not widen just because the diff could not be read — or when some
-// changed path falls inside some region.
-export function diffTouchesRegion(changed: string[] | null, region: string[]): boolean {
-  return changed === null || changed.some((file) => region.some((path) => pathsOverlap(file, path)));
-}
-
-const WORK_OPS = new Set(['start', 'stop', 'done']);
-
-// A `start`/`stop`/`done` event against a member is a record that work
-// happened, not an annotation of the spec — a bare `note` or `decision`
-// carries no such claim and must not count, however open the member still
-// reads. `id`, not `spec`: a member's own current spec pointer is what
-// `touchedWriteRegion` is asking about, not whichever spec the event was
-// filed under before any later re-pointing.
-export function branchWorkedOnMembers(events: TaskEvent[], branch: string, memberIds: Set<string>): boolean {
-  return events.some((event) => event.branch === branch && event.id !== null && memberIds.has(event.id) && WORK_OPS.has(event.op));
-}
-
-// `headAddsClauseId` needs both sides parsed: the base branch's copy of the
-// spec, read through git rather than the working tree, and this branch's.
-// Absent from base parses as no clauses, so any head clause counts as new —
-// the same fact the old file-existence test captured, folded into the
-// comparison this one runs instead. A head that fails to parse at all — the
-// file missing, unreadable, or corrupted past recognition — reads the same
-// way: no clauses read, so nothing there can be new.
-export function specAddsClauseId(config: Config, baseBranch: string, baseHead: string | null, spec: string): boolean | null {
-  if (baseHead === null) return null;
-  const baseText = git.fileAt(baseBranch, specFile(config, spec));
-  const baseClauses = baseText === null ? [] : parseSpecDoc(baseText).proofClauses;
-  const headClauses = readSpecDoc(config, spec)?.proofClauses ?? [];
-  return headAddsClauseId(baseClauses, headClauses);
 }
 
 function readSpecDoc(config: Config, spec: string): SpecDoc | null {

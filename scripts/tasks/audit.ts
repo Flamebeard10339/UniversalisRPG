@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { harvestFiles, parseAuditDoc, systemForDoc } from '../lib/auditImport';
-import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from '../lib/specDoc';
+import { appendAuditPass, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, verdictsForPass, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from '../lib/specDoc';
 import { createTask, loadStore, nextSeq, resolveFault, type Fault, type Severity, type Task } from '../lib/taskStore';
 import { resolveDiffRange } from './auditPrompt';
 import type { Flags } from './cli';
@@ -413,7 +413,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     saveStoreAndWarn(tasks, config);
     recordEvents(config, 'audit', created.map((task) => subjectOf(task, `recorded unreviewed by ${slug} against pass ${against}: ${truncateLine(task.title, 60)}`)));
     console.log(`${created.length} finding(s) recorded, unreviewed, against pass ${against} — no pass appended, so recorded clause verdicts stand`);
-    console.log('Next: `npm run tasks -- triage` walks them, with a separate actor. You file findings; you never promote them');
+    console.log(`Next: \`npm run tasks -- triage --spec ${slug}\` walks them, with a separate actor. You file findings; you never promote them`);
     return;
   }
 
@@ -465,7 +465,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const verdicts = clauseStandings(doc.proofClauses, graded);
+  const verdicts = verdictsForPass(doc.proofClauses, graded);
   const ungraded = verdicts.filter((verdict) => verdict.status === 'unknown').map((verdict) => `c${verdict.clause}`);
 
   // `deferred` needs the same hold `met` does, for the opposite reason: `met`
@@ -561,13 +561,13 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
   if (deferredCreated > 0) console.log(`${deferredCreated} clause(s) deferred — tracked as undelivered work with no spec, no longer outstanding against ${slug}`);
   if (ungraded.length > 0) console.log(`${ungraded.length} clause(s) recorded unknown — nobody graded them: ${ungraded.join(', ')}. No undelivered task was created, because an ungraded clause is not a broken promise`);
   if (findingsCreated > 0) console.log(`${findingsCreated} finding(s) recorded, unreviewed`);
-  console.log(nextAfterPass(undeliveredCreated > 0 || ungraded.length > 0));
+  console.log(nextAfterPass(undeliveredCreated > 0 || ungraded.length > 0, slug));
 }
 
 // The last step of the auditor's brief, said by the command that completes
 // the step before it. Of the two passes carrying the friction log as prose
 // somewhere in the brief, one wrote nothing; the pass that had it as a
 // numbered step wrote it.
-export function nextAfterPass(outstanding: boolean): string {
-  return `Next: log what this audit cost you in .planning/agent-feedback/tool-friction.md, dated, then commit${outstanding ? '. This pass leaves a clause outstanding — `npm run tasks -- next` is what picks it up' : ''}`;
+export function nextAfterPass(outstanding: boolean, slug: string): string {
+  return `Next: log what this audit cost you in .planning/agent-feedback/tool-friction.md, dated, then commit${outstanding ? `. This pass leaves a clause outstanding — \`npm run tasks -- next --spec ${slug}\` is what picks it up` : ''}`;
 }

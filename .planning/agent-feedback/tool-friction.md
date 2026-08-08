@@ -1581,3 +1581,80 @@ of the pattern (an assembled field checked by truthiness rather than by a fixed 
 turned up in `system`/`fault`/`severity`, since `fault` and `severity` are both checked against an
 enum (`FAULTS.includes`, `['high','medium','low'].includes`) rather than by truthiness, so a
 whitespace value there is rejected on the merits rather than by accident.
+
+## `a-branch-is-told-which-spec-it-owes`, dry-run audit on `claude/spec-declared`, 2026-08-08
+
+Commissioned with `audit-prompt a-branch-is-told-which-spec-it-owes` on a worktree checked out
+directly at the spec's own last commit (`claude/spec-declared`, HEAD `b8f96d3`, `main` still at the
+merge base). The brief's own step 7 said "Do not file a pass" because `branchSpec` read null —
+`resolveActiveSpec(config, tasks, undefined)` found no `--spec`, and the branch-name route checks
+`docs/specs/claude/spec-declared.md`, which does not exist because the branch is named for its topic,
+not for the slug it implements, exactly as the spec's own Deliverable describes for 55 of 65 branches
+in the log. Followed the brief anyway and read the diff, graded all 11 clauses (c1, c2, c4, c6, c7,
+c8, c9, c10 met with direct evidence — grep, live invocation, or a passing test named in the clause's
+own proof line; c5 met via the `settledByDecline` test at `mergeReady.test.ts:700`; c3 met by absence
+— no second caller reaches `declaredSpecs`/`storeDiff`), ran `npm test` on the seven files the eleven
+clauses' proof lines name (410 passed), and hand-built a four-entry mutation manifest at clauses with
+a live pure-logic proof target (`clauseStandings`' composition loop for c4, `declaredSpecs` for c9,
+the `specs` iteration in `specLegs` for c10, `ownClauseIds`'s scoping in `specStanding` for c11) —
+three killed clean, one (`ownClauseIds` computed from every changed record instead of just this
+spec's own members) SURVIVED at whole-suite scope: no test declares two specs in one branch diff with
+overlapping clause numbers, so a regression that let one spec's discharged clauses count toward
+another's `clausesOwed` would ship silently. That SURVIVED result is the only clause-level gap this
+pass found with direct evidence; the rest of the eleven read as delivered.
+
+The step-6 `merge-ready` run is what turned this from a routine pass into a real finding: it reported
+`spec a-branch-is-told-which-spec-it-owes: pass` and `clauses a-branch-is-told-which-spec-it-owes:
+FAIL — no recorded audit pass` on this exact checkout — i.e. `declaredSpecs`/`storeDiff` (the
+mechanism this branch built for `mergeReady.ts`, c8/c9) correctly recognises that this branch's own
+store diff against `main` declares this very spec, and blocks on it being unaudited. That directly
+contradicts the audit-prompt brief's own "Nothing relates this spec to this branch" line three
+commands earlier, on the same checkout, in the same five minutes. Read together: `mergeReady.ts`'s
+ownership check was migrated off the deleted event-log guess onto the diff-derived `declaredSpecs`
+set; `auditPrompt.ts`'s `branchSpec`/`slugStanding` ownership check (used only to decide whether an
+auditor may file a pass, gating `rangeIsThisSlugs` and therefore whether a mutation manifest and args
+skeleton get written at all) was left reading the same `resolveActiveSpec` this branch gutted down to
+`--spec`-or-literal-branch-name, with no equivalent migration. Before this branch, routes 3/4 gave
+`resolveActiveSpec` a real (if occasionally wrong) chance at recognising self-authorship on a
+`claude/*` branch; after, that chance is gone for `auditPrompt.ts` specifically, because nothing
+routed its ownership check through `declaredSpecs` the way `mergeReady.ts`'s was. Net effect: on the
+ordinary case this project actually runs — a `claude/<topic>-<hash>` worktree branch authoring and
+then auditing its own spec — `merge-ready` will (correctly) block on an unaudited clause while
+`audit-prompt` (the one tool that produces a filed pass) tells the auditor nothing relates the spec to
+the branch and refuses to write a manifest or an args skeleton. That is a live deadlock this session
+sat inside for the length of the audit, not a hypothetical one; the regression-question step (5) is
+what makes this checkable at all — clause-by-clause grading alone would have missed it, since every
+clause the diff promises reads met in isolation. Cost: the four clause-graded greps and the seven-file
+`vitest run` together took under two minutes; recognising the `merge-ready` vs. `audit-prompt`
+contradiction took a second, deliberate re-read of the brief's own opening paragraph against the
+`merge-ready` output sitting one screen below it — nothing in either tool's own output states the
+disagreement, it only becomes visible by holding both side by side.
+
+## `a-branch-is-told-which-spec-it-owes`, pass 1 filed, 2026-08-08
+
+The deadlock the dry-run above found is fixed on this HEAD (`eff89ff`, member
+`the-brief-validates-the-slug-it-was-given-against-the-declar`) — `auditPrompt.ts` no longer imports
+`resolveActiveSpec` at all, so the brief ran clean start to finish and this pass could file for real.
+
+The manifest `audit-prompt` generated (`mutations-...-pass1.json`) was the confirmed instance of the
+already-known finding `the-generated-mutation-manifest-expands-one-file-only-target`: 684 entries, one
+per test in every file a clause's `proof:` line names whole (c1 alone expanded to 119 entries because
+its proof is "vitest scripts/tasks/records.test.ts scripts/tasks/mergeReady.test.ts
+scripts/tasks/triage.test.ts" with no narrower target), every `file`/`find` still the unaimed sentinel.
+Hand-building a focused eight-entry manifest instead — one mutation per clause with a live pure-logic
+target, aimed at the exact line the diff shows implements it — cost maybe ten minutes of reading
+against the ~30+ minutes the generated one would have cost to aim entry-by-entry across 684 rows, and
+all eight killed clean on the first run (re-run confirmed at file scope, none unstable). This is the
+second pass in a row that hits this exact finding at exactly this cost; it is still open and still
+worth the fix — narrowing the manifest generator to one entry per *distinct test the clause's proof
+line actually names*, rather than exploding a whole-file target, would have made this a five-minute
+step instead of a decision to route around the generated artifact entirely.
+
+The regression-question step (5) paid for itself again, differently this time: nothing in
+`resolveActiveSpec`'s own five call sites looked suspicious in isolation — each was read, and `next`,
+`promote`, `spec show` all visibly refuse. What surfaced the gap was running `plan` itself, live,
+against a copy of the real store on an orphaned branch name, the same way the spec's own regression
+tests do for the other four verbs — architectureCmds.test.ts has no equivalent test, so nothing in the
+suite would have shown this without running the command by hand. Cost: the mutation manifest read and
+build was the slow part; noticing `plan`'s missing refusal was a five-minute live-run check across the
+five call sites once the pattern from `next`'s `records.ts:608` guard was in hand, not a search.

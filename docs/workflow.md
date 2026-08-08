@@ -81,21 +81,25 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    [4] redirect [a] ask [s] skip [q] quit`; `[a]` records a question on the finding and leaves it
    unreviewed).
 9. **Close and merge.** `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check,
-    audit-status, doctor, byte check — plus this branch's standing: is the tree clean, has the base
-    branch moved past the merge base, is every spec member closed, does the latest pass leave a
-    clause outstanding. A **planning branch** carries no spec of its own — planning is informal —
-    and owes nothing for the plans it writes: when the spec file is absent from the base branch and
-    it has **at least one member, every one of them still open**, the branch wrote that spec as a
-    plan for a later branch, and the spec leg passes saying so rather than reading open members and
-    a missing audit pass as debts. A spec authored and never decomposed has promised a later branch
-    nothing and keeps owing its clauses. The gate also names **which** spec it graded and how it got
-    there, and prefers a spec the branch owes over a plan it merely wrote — the resume-aid
-    inference takes the most recently written spec, and planning happens last.
+    audit-status, doctor, byte check — plus this branch's standing. The specs a branch owes are read
+    from nothing but its own store diff: every task record that changed between the merge base and
+    this checkout, filtered to the ones naming a spec, is what this branch **declared** — a spec
+    merely written as markdown, with no record ever pointing at it, was never declared and is never
+    graded. Every declared spec is graded **on its own** — a branch working two cannot go green on
+    the strength of the one it finished — and each is graded on **its own members only**: the ones
+    its own diff changed, and the clauses only those members discharge. A member another,
+    already-merged branch closed earlier is not this branch's to answer for, and a clause none of
+    this branch's members discharges never blocks its clauses leg. A branch declaring no spec owes
+    no clause; a checkout whose diff cannot be read at all (no merge base, an unreadable store
+    snapshot) fails loudly rather than reading that as "declares nothing" — the gate never guesses.
     One line per leg, non-zero when a leg fails, and **every failing leg names
-    the command that advances it** — an outstanding clause names `tasks next`, an unreviewed finding
-    names `tasks triage`, a moved base names the merge of it into this branch. A fully green run
-    names `tasks spec done <slug>` and then the merge, so "work until `merge-ready` is green" is an
-    instruction rather than a judgement. It stops short of merging: the merge body is the one
+    the command that advances it**, the declared spec's own slug included — an outstanding clause
+    names `tasks next --spec <slug>`, an unreviewed finding names `tasks triage --spec <slug>`, a
+    moved base names the merge of it into this branch. A fully green run
+    names `tasks spec done <slug>` for every spec it declared and then the merge, so "work until
+    `merge-ready` is green" is an instruction rather than a judgement — and there is no leg whose red
+    state is meant to be read as noise: a red spec or clauses leg is real debt, on a member this
+    branch itself worked. It stops short of merging: the merge body is the one
     artifact whoever did the work has to write.
 10. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
     `tasks decision "<one line>" --spec <slug>` as they happen; `tasks log --id <id>` /
