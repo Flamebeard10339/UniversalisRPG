@@ -88,12 +88,32 @@ const AUDIT_CHECKLIST = [
 // nothing. Measured at 40 of 49 targets on this spec's own first pass. The
 // title is a string literal in the file, so a text search answers without
 // running the suite — this is a read printed beside the target, not a gate.
+//
+// `found` and `moved` are the only states a manifest entry comes from; every
+// other state is a reason recorded rather than a test resolved, so the state
+// carries what `describeResolution` needs to say what would resolve it and
+// nothing this brief has to guess at.
 export type TargetResolution =
   | { state: 'found'; file: string; name: string }
   | { state: 'moved'; file: string; name: string; foundIn: string[] }
-  | { state: 'no-such-file'; file: string; name: string }
+  | { state: 'no-such-file'; file: string }
   | { state: 'nowhere'; file: string; name: string }
-  | { state: 'unsearchable'; file: string; name: string };
+  | { state: 'unsearchable'; file: string; name: string }
+  | { state: 'no-tests'; file: string }
+  | { state: 'unparseable'; target: string };
+
+// A target's file list is either bare and space-separated or the whole list
+// wrapped in one pair of backticks — the shape `audit-splits-at-its-seam` c2
+// itself writes two paths in, and the shape a spec written as markdown reaches
+// for on its own. A stray quote or backtick inside the remainder means the
+// quoted-name form was attempted and malformed, not a file list, so it is
+// left unparsed rather than guessed at.
+function parseFileList(remainder: string): string[] | null {
+  const wrapped = /^`([^`]*)`$/.exec(remainder.trim());
+  const body = (wrapped ? wrapped[1] : remainder).trim();
+  if (body === '' || /["`]/.test(body)) return null;
+  return body.split(/\s+/);
+}
 
 // A title the named file does not carry is not yet an absence: the suite
 // split moved tests between files without renaming one of them, so the title
@@ -105,25 +125,71 @@ export type TargetResolution =
 // A file the checkout does not have settles the target on its own: the
 // target has to be rewritten either way, and that is the more useful thing
 // to say than where the title happens to live now.
-export function resolveTarget(target: string, read: (file: string) => string | null = readIfPresent, search: (name: string) => string[] | null = suiteFilesFor): TargetResolution | null {
-  const parsed = /^vitest\s+(\S+)\s+"(.*)"\s*$/.exec(target);
-  if (parsed === null) return null;
-  const [, file, name] = parsed;
+function resolveNamedTarget(file: string, name: string, read: (file: string) => string | null, search: (name: string) => string[] | null): TargetResolution {
   const text = read(file);
-  if (text === null) return { state: 'no-such-file', file, name };
+  if (text === null) return { state: 'no-such-file', file };
   if (testTitles(text).includes(name)) return { state: 'found', file, name };
   const elsewhere = search(name);
   if (elsewhere === null) return { state: 'unsearchable', file, name };
   return elsewhere.length > 0 ? { state: 'moved', file, name, foundIn: elsewhere } : { state: 'nowhere', file, name };
 }
 
+// Naming a file means naming its tests: every title `testTitles` finds in it
+// is a resolution of its own, so a clause pointing at a whole file is proven
+// by breaking any one of them. A file with none is not a silent success —
+// nothing here can tell "nobody has written a test yet" from "the wrong file
+// was named" — so it reports the same way an absent file does.
+function resolveFileTests(file: string, read: (file: string) => string | null): TargetResolution[] {
+  const text = read(file);
+  if (text === null) return [{ state: 'no-such-file', file }];
+  const titles = testTitles(text);
+  return titles.length > 0 ? titles.map((name) => ({ state: 'found' as const, file, name })) : [{ state: 'no-tests', file }];
+}
+
+// A target that does not open with `vitest` is not this function's concern —
+// `command ...` targets are real and outside c1/c2's corpus, which is scoped
+// to lines whose value begins `vitest` — so it resolves to nothing rather
+// than to a reported failure. Every target that does open with `vitest`
+// resolves to at least one entry in the array this returns: a target this
+// brief cannot place is `unparseable` rather than dropped, which is the
+// difference between this function and the one it replaced.
+export function resolveTarget(target: string, read: (file: string) => string | null = readIfPresent, search: (name: string) => string[] | null = suiteFilesFor): TargetResolution[] {
+  const trimmed = target.trim();
+  if (!/^vitest(\s|$)/.test(trimmed)) return [];
+  const named = /^vitest\s+(\S+)\s+"(.*)"\s*$/.exec(trimmed);
+  if (named !== null) return [resolveNamedTarget(named[1], named[2], read, search)];
+  const files = parseFileList(trimmed.slice('vitest'.length));
+  if (files === null) return [{ state: 'unparseable', target }];
+  return files.flatMap((file) => resolveFileTests(file, read));
+}
+
+// The one place every failure sentence is written, so the display note beside
+// a clause's target and the manifest's omitted line say the same thing rather
+// than drifting into two descriptions of one fact. Each branch names the form
+// that would resolve, which is the property c3 holds this function to —
+// `found` carries no such sentence, and is never passed one.
+export function describeResolution(resolution: Exclude<TargetResolution, { state: 'found' }>): string {
+  switch (resolution.state) {
+    case 'moved':
+      return `moved: this test is in ${resolution.foundIn.join(', ')}, not in ${resolution.file}`;
+    case 'no-such-file':
+      return `names no file in this checkout: ${resolution.file} — write a target naming a file this checkout has`;
+    case 'nowhere':
+      return 'no test by this name exists anywhere in the suite, and `vitest -t` would skip every test and exit 0 — quote the exact title of a test that exists, or drop the quotes to name every test in the file';
+    case 'unsearchable':
+      return `${resolution.file} has no test by this name, and the suite could not be listed to say whether it moved — quote the title exactly as it is written in the file`;
+    case 'no-tests':
+      return `${resolution.file} declares no tests — name a file that has at least one \`it(...)\`, or drop it from the target`;
+    case 'unparseable':
+      return 'does not match a form this brief can resolve — write `vitest <file> "<test name>"` to name one test, or `vitest <file> [<file> ...]` (optionally wrapped in one pair of backticks) to name every test in one or more files';
+  }
+}
+
 export function unresolvedTarget(target: string, read: (file: string) => string | null = readIfPresent, search: (name: string) => string[] | null = suiteFilesFor): string | null {
-  const resolution = resolveTarget(target, read, search);
-  if (resolution === null || resolution.state === 'found') return null;
-  if (resolution.state === 'no-such-file') return `   <-- names no file in this checkout: ${resolution.file}`;
-  if (resolution.state === 'moved') return `   <-- moved: this test is in ${resolution.foundIn.join(', ')}, not in ${resolution.file}`;
-  if (resolution.state === 'unsearchable') return `   <-- ${resolution.file} has no test by this name, and the suite could not be listed to say whether it moved`;
-  return `   <-- no test by this name exists anywhere in the suite, and \`vitest -t\` would skip every test and exit 0`;
+  const notes = resolveTarget(target, read, search)
+    .filter((resolution) => resolution.state !== 'found')
+    .map((resolution) => `   <-- ${describeResolution(resolution as Exclude<TargetResolution, { state: 'found' }>)}`);
+  return notes.length > 0 ? notes.join('\n') : null;
 }
 
 // `vitest list --json` is the authoritative answer to which file a title
@@ -267,25 +333,31 @@ export const UNRETARGETED = '<<< the line in that file this clause is about >>>'
 // runs.
 export function mutationManifest(
   clauses: Array<{ id: number; targets: string[] }>,
-  resolve: (target: string) => TargetResolution | null,
+  resolve: (target: string) => TargetResolution[],
 ): { entries: MutationEntry[]; omitted: string[] } {
   const entries: MutationEntry[] = [];
   const omitted: string[] = [];
   for (const clause of clauses) {
     for (const target of clause.targets) {
-      const resolution = resolve(target);
-      if (resolution === null) continue;
-      if (resolution.state !== 'found' && resolution.state !== 'moved') {
-        omitted.push(`c${clause.id}: ${target} — ${resolution.state === 'no-such-file' ? 'names no file in this checkout' : resolution.state === 'nowhere' ? 'no test by this name exists anywhere' : 'the suite could not be listed to place it'}`);
-        continue;
+      // `resolve` returns one entry per non-`vitest` target: nothing here
+      // to omit or enter, because c1/c2's corpus is targets whose value
+      // begins `vitest` and this one's does not. A `vitest` target always
+      // returns at least one resolution — found, moved, or a named reason —
+      // so nothing reaching this loop from that prefix can vanish silently.
+      for (const resolution of resolve(target)) {
+        if (resolution.state !== 'found' && resolution.state !== 'moved') {
+          omitted.push(`c${clause.id}: ${target} — ${describeResolution(resolution)}`);
+          continue;
+        }
+        const file = resolution.state === 'moved' ? resolution.foundIn[0] : resolution.file;
+        const name = `c${clause.id} ${resolution.name}`;
+        // `parseManifest` refuses two mutations sharing a name, since their
+        // verdicts could not be told apart — so a clause naming one test twice
+        // (directly, or across two files a `vitest <a> <b>` target names)
+        // costs the run rather than repeating an entry.
+        if (entries.some((entry) => entry.name === name)) continue;
+        entries.push({ name, file: UNAIMED_FILE, find: UNRETARGETED, replace: '', tests: [file], test: resolution.name });
       }
-      const file = resolution.state === 'moved' ? resolution.foundIn[0] : resolution.file;
-      const name = `c${clause.id} ${resolution.name}`;
-      // `parseManifest` refuses two mutations sharing a name, since their
-      // verdicts could not be told apart — so a clause naming one test twice
-      // costs the run rather than repeating an entry.
-      if (entries.some((entry) => entry.name === name)) continue;
-      entries.push({ name, file: UNAIMED_FILE, find: UNRETARGETED, replace: '', tests: [file], test: resolution.name });
     }
   }
   return { entries, omitted };

@@ -1529,3 +1529,55 @@ two hours wall clock, most of it in the two hand-built repros and reading every 
 `spec === null` call site by hand for c1 (17 sites, one file at a time — a `tasks where`-style verb
 that classified a call site as "membership test" vs "reason-mapping" automatically would have cut
 that part to a couple of minutes).
+
+
+## `brief-builds-the-manifest` pass 1, 2026-08-07
+
+The generated 354-entry mutation manifest (one entry per test in the two whole-file proof targets,
+`audit.test.ts` and `auditPrompt.test.ts`) is unusable as delivered: `mutate` refuses a run with even
+one unaimed sentinel entry, and hand-aiming `file`/`find` on 354 entries is not a five-minute
+operation for any auditor. This is not a defect in this branch's clauses — a whole-file proof target
+resolving to "every test in the file" is exactly what c1 promises — but it means the auto-generated
+manifest is the wrong artifact to mutate-test against whenever a clause's own proof target names a
+file rather than a single test. What actually worked: writing a small hand-built manifest (six
+entries, one or two per clause) at a scratch path, aiming each at the specific diff line the clause
+is about, and running `npm run mutate` against that instead of the generated file. All six killed
+clean. Cost: maybe 10 minutes to notice the 354-entry file couldn't be used directly and switch to a
+hand-built one, once `npm run mutate -- --help` made clear there's no way to select a subset of an
+existing manifest by name. Worth considering: a `--only <name>` filter on `mutate`, or `audit-prompt`
+capping how many entries a whole-file proof target expands to before falling back to "pick one" —
+either would remove the need to hand-roll a replacement manifest just to run a handful of kills.
+
+`npm run inspect` earned its keep here: computing the base-vs-head resolution counts c1's proof
+target asks for (258 targets across `docs/specs/*.md`, base 108/258 resolved vs head 237/258) took
+one `readdirSync`+`parseSpecDoc`+`resolveTarget` one-liner per number, run three or four times as the
+question sharpened (total, resolved, omitted, then split by named-vs-file-only to separate 9
+pre-existing broken quoted-name targets from the 12 genuinely new omissions) — no scratch file
+survived any of it. The one real gotcha: `suiteFilesFor`'s default `search` runs a real
+`npx vitest list --json` subprocess on first call and caches it module-globally, so the first
+corpus-wide `resolveTarget` call over 258 targets took noticeably longer than the rest; harmless once
+noticed, but worth knowing before assuming a slow `inspect` call is stuck.
+
+## `brief-builds-the-manifest` pass 2, 2026-08-08
+
+Same 354(now 358)-entry generated manifest, same shape as pass 1's own finding — which is already
+filed (`the-generated-mutation-manifest-expands-one-file-only-target`, unreviewed) and correctly not
+re-filed here. Went straight to a hand-built six-entry manifest at a scratch path (one per clause,
+aimed by reading the diff rather than guessing), which is exactly pass 1's own workaround; this time
+it cost about five minutes rather than ten, since pass 1's own evidence already named the five lines
+to aim at (`auditPrompt.ts:115`, `:162`, `:184`, `audit.ts:194`/`:347` for c4's two halves, `:252`).
+All six KILLED at their own named-test scope on the first `npm run mutate` run, zero escalation,
+about a minute of run time — the fastest a pass in this log has confirmed five clauses plus a c4
+re-check.
+
+The one thing worth naming: re-running pass 1's exact `npm run inspect` corpus-count one-liner
+against the current head reproduced its numbers exactly (258 total, 237 resolved, 21 omitted) with
+no edits needed to the expression — the ability to paste a prior pass's own reproduction command
+verbatim and get the same answer is the thing c1's evidence text claims for the *next* auditor, and
+it held for real rather than only in the prose. Nothing else cost a round this pass: c4's fix
+(commit c581de4) closes the gap pass 1 found precisely — title is now trimmed at the same assignment
+site the other two fields already were, and guarded the same way — and no next-neighbour instance
+of the pattern (an assembled field checked by truthiness rather than by a fixed set, left untrimmed)
+turned up in `system`/`fault`/`severity`, since `fault` and `severity` are both checked against an
+enum (`FAULTS.includes`, `['high','medium','low'].includes`) rather than by truthiness, so a
+whitespace value there is rejected on the merits rather than by accident.

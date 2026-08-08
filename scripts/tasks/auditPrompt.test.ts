@@ -1,8 +1,9 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseManifest, refusalsFor } from '../mutate';
-import { indexSuiteTitles, manifestNotes, mutationManifest, slugStanding, slugStandingLines, toolLines, UNAIMED_FILE, UNRETARGETED, unresolvedTarget, type SlugStanding, type TargetResolution } from './auditPrompt';
+import { parseSpecDoc } from '../lib/specDoc';
+import { describeResolution, indexSuiteTitles, manifestNotes, mutationManifest, resolveTarget, slugStanding, slugStandingLines, toolLines, UNAIMED_FILE, UNRETARGETED, unresolvedTarget, type SlugStanding, type TargetResolution } from './auditPrompt';
 import { MAX_LESSON_COUNT, totalLessonCount } from './briefLessons';
 import { enclosingGitFixture, fixture, gitFixture, relevantFilesBlock, repoRoot, stepsBlock } from './cliFixtures';
 
@@ -301,7 +302,7 @@ describe('a proof target that names no test', () => {
 // twice. None of it is judgment; all of it is derivable from what the brief
 // has already read.
 describe('the brief arriving with the answers rather than the instructions', () => {
-  const resolves = (name: string, file = 'scripts/tasks/audit.test.ts'): TargetResolution => ({ state: 'found', file, name });
+  const resolves = (name: string, file = 'scripts/tasks/audit.test.ts'): TargetResolution[] => [{ state: 'found', file, name }];
 
   it('a manifest entry runs the test its clause names, in the file that test lives in', () => {
     const { entries } = mutationManifest(
@@ -309,7 +310,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
         { id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] },
         { id: 2, targets: ['vitest scripts/tasks.test.ts "a test that moved"'] },
       ],
-      (target) => (target.includes('moved') ? { state: 'moved', file: 'scripts/tasks.test.ts', name: 'a test that moved', foundIn: ['scripts/tasks/records.test.ts'] } : resolves('the first test')),
+      (target) => (target.includes('moved') ? [{ state: 'moved', file: 'scripts/tasks.test.ts', name: 'a test that moved', foundIn: ['scripts/tasks/records.test.ts'] }] : resolves('the first test')),
     );
 
     expect(() => parseManifest(JSON.stringify(entries))).not.toThrow();
@@ -355,14 +356,152 @@ describe('the brief arriving with the answers rather than the instructions', () 
   it('an unresolved target is named as omitted rather than emitted into the manifest', () => {
     const { entries, omitted } = mutationManifest(
       [{ id: 1, targets: ['vitest a.test.ts "gone"', 'vitest scripts/tasks/audit.test.ts "here"'] }],
-      (target) => (target.includes('gone') ? { state: 'nowhere', file: 'a.test.ts', name: 'gone' } : resolves('here')),
+      (target) => (target.includes('gone') ? [{ state: 'nowhere', file: 'a.test.ts', name: 'gone' }] : resolves('here')),
     );
 
     // parseManifest refuses a manifest as a whole, so one entry the brief
     // could not complete would cost the auditor every entry beside it.
     expect(entries).toHaveLength(1);
-    expect(omitted).toEqual(['c1: vitest a.test.ts "gone" — no test by this name exists anywhere']);
+    expect(omitted).toEqual([`c1: vitest a.test.ts "gone" — no test by this name exists anywhere in the suite, and \`vitest -t\` would skip every test and exit 0 — quote the exact title of a test that exists, or drop the quotes to name every test in the file`]);
     expect(() => parseManifest(JSON.stringify(entries))).not.toThrow();
+  });
+
+  // c1/c2: a target naming a file with no quoted test name resolves to every
+  // test the file declares — "naming a file means naming its tests" — and a
+  // target naming more than one file resolves to the union across all of
+  // them, whether the list is bare or wrapped in one pair of backticks.
+  it('c1: a target naming one file with no quoted test resolves to every test that file declares', () => {
+    const read = (): string => "it('first', () => {});\nit('second', () => {});\n";
+    const resolutions = resolveTarget('vitest a.test.ts', read);
+    expect(resolutions).toEqual([
+      { state: 'found', file: 'a.test.ts', name: 'first' },
+      { state: 'found', file: 'a.test.ts', name: 'second' },
+    ]);
+  });
+
+  it('c1: a target naming two files, bare or backtick-wrapped, resolves to every test across both', () => {
+    const read = (file: string): string => (file === 'a.test.ts' ? "it('from a', () => {});\n" : "it('from b', () => {});\n");
+    const bare = resolveTarget('vitest a.test.ts b.test.ts', read);
+    const backticked = resolveTarget('vitest `a.test.ts b.test.ts`', read);
+    expect(bare).toEqual([
+      { state: 'found', file: 'a.test.ts', name: 'from a' },
+      { state: 'found', file: 'b.test.ts', name: 'from b' },
+    ]);
+    expect(backticked).toEqual(bare);
+  });
+
+  // c1, at the manifest itself rather than at resolveTarget in isolation: one
+  // file-only target resolving to several tests must become several manifest
+  // entries, not the first one found — a resolver returning an array is only
+  // the whole clause if every element of it reaches the manifest.
+  it('c1: one file-only target resolving to several tests becomes a manifest entry for each', () => {
+    const { entries, omitted } = mutationManifest(
+      [{ id: 1, targets: ['vitest a.test.ts'] }],
+      () => [
+        { state: 'found', file: 'a.test.ts', name: 'first' },
+        { state: 'found', file: 'a.test.ts', name: 'second' },
+        { state: 'found', file: 'a.test.ts', name: 'third' },
+      ],
+    );
+    expect(entries.map((entry) => entry.name)).toEqual(['c1 first', 'c1 second', 'c1 third']);
+    expect(omitted).toEqual([]);
+  });
+
+  it('c1: a single file wrapped in backticks resolves the same as the bare form', () => {
+    const read = (): string => "it('a title', () => {});\n";
+    expect(resolveTarget('vitest `a.test.ts`', read)).toEqual([{ state: 'found', file: 'a.test.ts', name: 'a title' }]);
+  });
+
+  // Decisions: a file-only target naming a real file with no tests is an
+  // omission, not a silent success — both are defensible, but "resolved to
+  // nothing" is exactly the shape a reader cannot tell apart from "was never
+  // read", which is the ambiguity c2 exists to remove.
+  it('c1: a file-only target naming a real file with no tests is an omission, not a silent empty success', () => {
+    const resolutions = resolveTarget('vitest empty.test.ts', () => '// no tests in this file\n');
+    expect(resolutions).toEqual([{ state: 'no-tests', file: 'empty.test.ts' }]);
+    const { entries, omitted } = mutationManifest([{ id: 1, targets: ['vitest empty.test.ts'] }], (target) => resolveTarget(target, () => '// no tests\n'));
+    expect(entries).toHaveLength(0);
+    expect(omitted).toEqual(['c1: vitest empty.test.ts — empty.test.ts declares no tests — name a file that has at least one `it(...)`, or drop it from the target']);
+  });
+
+  it('c1: a file-only target naming a file absent from the checkout is reported as missing, the same way a named target is', () => {
+    expect(resolveTarget('vitest gone.test.ts', () => null)).toEqual([{ state: 'no-such-file', file: 'gone.test.ts' }]);
+  });
+
+  // c2: the form this clause adds — a `vitest` target this brief cannot place
+  // in either the quoted-name shape or the file-list shape — is reported by
+  // name rather than silently dropped, which is what a `null` return from the
+  // old `resolveTarget` did.
+  it('c2: a vitest target matching no recognised form is reported as unparseable rather than dropped', () => {
+    expect(resolveTarget('vitest')).toEqual([{ state: 'unparseable', target: 'vitest' }]);
+    expect(resolveTarget('vitest "just a quoted name, no file"')).toEqual([{ state: 'unparseable', target: 'vitest "just a quoted name, no file"' }]);
+  });
+
+  it('c2: a target that does not open with vitest resolves to nothing, staying outside this clause\'s corpus', () => {
+    expect(resolveTarget('command npm run layer-check')).toEqual([]);
+  });
+
+  // c3: every message this brief can print for an unresolved target names the
+  // form that would fix it, enumerated here so a later reader can check it
+  // against the code's failure states rather than re-deriving it.
+  it('c3: every reported reason names the target form that would resolve it', () => {
+    const messages = [
+      describeResolution({ state: 'no-such-file', file: 'a.test.ts' }),
+      describeResolution({ state: 'nowhere', file: 'a.test.ts', name: 'x' }),
+      describeResolution({ state: 'unsearchable', file: 'a.test.ts', name: 'x' }),
+      describeResolution({ state: 'no-tests', file: 'a.test.ts' }),
+      describeResolution({ state: 'unparseable', target: 'vitest' }),
+    ];
+    expect(messages).toEqual([
+      'names no file in this checkout: a.test.ts — write a target naming a file this checkout has',
+      'no test by this name exists anywhere in the suite, and `vitest -t` would skip every test and exit 0 — quote the exact title of a test that exists, or drop the quotes to name every test in the file',
+      'a.test.ts has no test by this name, and the suite could not be listed to say whether it moved — quote the title exactly as it is written in the file',
+      'a.test.ts declares no tests — name a file that has at least one `it(...)`, or drop it from the target',
+      'does not match a form this brief can resolve — write `vitest <file> "<test name>"` to name one test, or `vitest <file> [<file> ...]` (optionally wrapped in one pair of backticks) to name every test in one or more files',
+    ]);
+    // Each message states the writable form: a target this brief could write
+    // back to the reader, quoted with backticks, appears in every one of them.
+    for (const message of messages) expect(message).toMatch(/`.*`| write a target| quote the (exact title|title exactly)| name a file/);
+  });
+
+  // c1/c2, over this repository's own corpus: every `vitest`-prefixed proof
+  // target any spec in docs/specs/*.md actually writes resolves to something
+  // — found tests or a named omission — never to nothing. `search` is stubbed
+  // to avoid a real `npx vitest list --json` subprocess, so a quoted-name
+  // target whose title has moved is measured here as `nowhere` rather than
+  // `moved` — a pre-existing distinction this branch does not change, and one
+  // that only ever affects the quoted form. The property this test locks in
+  // is c2's — nothing empty — over the whole corpus, and c1's — a real count
+  // of resolved entries where there were none — over the file-only forms this
+  // branch adds resolution for.
+  it('c1/c2: every vitest-prefixed proof target in this repo\'s own specs resolves to at least one outcome, and the file-only forms — unresolvable before this branch — mostly resolve now', () => {
+    const specsDir = path.join(repoRoot, 'docs', 'specs');
+    const targets = readdirSync(specsDir)
+      .filter((name) => name.endsWith('.md'))
+      .flatMap((name) => parseSpecDoc(readFileSync(path.join(specsDir, name), 'utf8')).proofClauses.flatMap((clause) => clause.proofTargets ?? []))
+      .filter((target) => /^vitest(\s|$)/.test(target));
+
+    expect(targets.length).toBeGreaterThan(0);
+    const neverSearches = (): string[] => [];
+    let fileOnlyTotal = 0;
+    let fileOnlyResolved = 0;
+    for (const target of targets) {
+      const resolutions = resolveTarget(target, undefined, neverSearches);
+      // c2: never empty, whatever form the target takes.
+      expect(resolutions.length).toBeGreaterThan(0);
+      if (!target.includes('"')) {
+        fileOnlyTotal++;
+        if (resolutions.some((resolution) => resolution.state === 'found')) fileOnlyResolved++;
+      }
+    }
+    // c1: before this branch, `resolveTarget` returned null for every one of
+    // these — the form nearly every clause in this repository actually
+    // writes — so this count was 0. It is now most of them; what remains is a
+    // genuine no-such-file or unparseable target, reported rather than
+    // dropped (surveyed by hand: 10 name a file this checkout does not have,
+    // 2 name no file at all).
+    expect(fileOnlyTotal).toBeGreaterThan(0);
+    expect(fileOnlyResolved).toBeGreaterThan(fileOnlyTotal * 0.85);
   });
 
   it('says which fields of the manifest are derived and which the auditor still owes', () => {

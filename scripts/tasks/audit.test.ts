@@ -231,6 +231,56 @@ describe('tasks CLI', () => {
     });
   });
 
+  // c4: `filedFindings` tests truthiness — a finding must say what is broken
+  // and what fixing it would mean — and a whitespace-only string is truthy,
+  // so `--deliverable "   " --evidence "   "` used to pass both guards and
+  // file a finding whose two required halves were blank.
+  it('c4: audit refuses a --finding whose --deliverable or --evidence is only whitespace, recording nothing', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const graded = ['--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked'];
+      const blankDeliverable = await audit('demo-spec', ...graded, '--finding', 'blank deliverable', '--severity', 'high', '--deliverable', '   ', '--evidence', 'it is broken');
+      expect(blankDeliverable.status).toBe(1);
+      expect(blankDeliverable.stderr).toContain('needs --deliverable');
+
+      const blankEvidence = await audit('demo-spec', ...graded, '--finding', 'blank evidence', '--severity', 'high', '--deliverable', 'fix it somehow', '--evidence', '  \t  ');
+      expect(blankEvidence.status).toBe(1);
+      expect(blankEvidence.stderr).toContain('needs --evidence');
+
+      expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
+    });
+  });
+
+  // c4: trimmed at the assignment in parseAuditArgs, not at the guard —
+  // --args-from joins a continuation line onto the one above it with a
+  // newline, so a finding's evidence is routinely a paragraph and only the
+  // block's own outer whitespace is meant to come off.
+  it('c4: parseAuditArgs strips a finding\'s --deliverable and --evidence of their outer whitespace only', () => {
+    const parsed = parseAuditArgs(['demo-spec', '--finding', 'a finding', '--severity', 'low', '--deliverable', '  guard the null case  ', '--evidence', '  save.ts:88 dereferences\n\n  before the null check  ']);
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.findings[0].deliverable).toBe('guard the null case');
+    expect(parsed.findings[0].evidence).toBe('save.ts:88 dereferences\n\n  before the null check');
+  });
+
+  // c4: the clause names title alongside deliverable and evidence — `current
+  // = { title: value ?? '', ... }` skipped the trim the other two fields
+  // got, and filedFindings had no truthiness check on title at all, so
+  // `--finding "   "` filed a task titled "   " with no refusal.
+  it('c4: parseAuditArgs strips a finding\'s title of its outer whitespace', () => {
+    const parsed = parseAuditArgs(['demo-spec', '--finding', '  a finding  ', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'observed']);
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.findings[0].title).toBe('a finding');
+  });
+
+  it('c4: audit refuses a --finding whose title is only whitespace, recording nothing', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const graded = ['--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked'];
+      const result = await audit('demo-spec', ...graded, '--finding', '   ', '--severity', 'high', '--deliverable', 'fix it somehow', '--evidence', 'it is broken');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('needs a --finding title');
+      expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
+    });
+  });
+
   it('audit carries a --finding\'s --evidence onto the finding task, where triage reads it', async () => {
     await fixture(async ({ tasks, audit }) => {
       await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--fault', 'contract', '--deliverable', 'guard the null case', '--evidence', 'save.ts:88 dereferences before the null check');
@@ -1045,6 +1095,23 @@ describe('an audit pass read from a file', () => {
   it('refuses a value line that continues nothing', () => {
     const { errors } = parseAuditFile('evidence with no flag above it\n', 'pass.txt');
     expect(errors[0]).toContain('pass.txt:1: a value line before any flag');
+  });
+
+  // c5: a bare line before any flag is refused the same way regardless of
+  // what it says, but a reader who has just written a whole pass and put the
+  // spec slug on its own line — the one value that is plausibly there and
+  // not a flag — gets told where it actually belongs, not just that the line
+  // is wrong.
+  it('c5: names the command-line fix when the offending line looks like a bare spec slug', () => {
+    const { errors } = parseAuditFile('brief-builds-the-manifest\n--proof 1=met\n--evidence 1=checked\n', 'pass.txt');
+    expect(errors[0]).toContain('pass.txt:1: a value line before any flag');
+    expect(errors[0]).toContain('if "brief-builds-the-manifest" is the spec slug, it belongs on the command line');
+    expect(errors[0]).toContain('npm run tasks -- audit brief-builds-the-manifest --args-from pass.txt');
+  });
+
+  it('c5: says nothing about a slug when the offending line does not look like one', () => {
+    const { errors } = parseAuditFile('evidence with no flag above it\n', 'pass.txt');
+    expect(errors[0]).not.toContain('belongs on the command line');
   });
 
   it('records a whole pass from a file, and a flag typed beside it still wins', async () => {
