@@ -261,6 +261,26 @@ describe('tasks CLI', () => {
     expect(parsed.findings[0].evidence).toBe('save.ts:88 dereferences\n\n  before the null check');
   });
 
+  // c4: the clause names title alongside deliverable and evidence — `current
+  // = { title: value ?? '', ... }` skipped the trim the other two fields
+  // got, and filedFindings had no truthiness check on title at all, so
+  // `--finding "   "` filed a task titled "   " with no refusal.
+  it('c4: parseAuditArgs strips a finding\'s title of its outer whitespace', () => {
+    const parsed = parseAuditArgs(['demo-spec', '--finding', '  a finding  ', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'observed']);
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.findings[0].title).toBe('a finding');
+  });
+
+  it('c4: audit refuses a --finding whose title is only whitespace, recording nothing', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const graded = ['--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked'];
+      const result = await audit('demo-spec', ...graded, '--finding', '   ', '--severity', 'high', '--deliverable', 'fix it somehow', '--evidence', 'it is broken');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('needs a --finding title');
+      expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
+    });
+  });
+
   it('audit carries a --finding\'s --evidence onto the finding task, where triage reads it', async () => {
     await fixture(async ({ tasks, audit }) => {
       await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--fault', 'contract', '--deliverable', 'guard the null case', '--evidence', 'save.ts:88 dereferences before the null check');

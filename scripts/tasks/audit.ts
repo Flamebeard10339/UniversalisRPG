@@ -191,7 +191,7 @@ export function parseAuditArgs(args: string[]): AuditArgs {
       else if (current.evidence !== null) errors.push(`finding "${current.title}" already has evidence`);
       else current.evidence = (value ?? '').trim();
     } else if (key === 'finding') {
-      current = { title: value ?? '', severity: null, system: null, files: [], deliverable: null, evidence: null, fault: null };
+      current = { title: (value ?? '').trim(), severity: null, system: null, files: [], deliverable: null, evidence: null, fault: null };
       findings.push(current);
     } else if (key === 'file' && current === null) {
       const scoped = clauseScoped(value ?? '');
@@ -344,6 +344,7 @@ function filedFindings(findings: AuditFinding[]): FiledFinding[] | null {
       process.exitCode = 1;
       return null;
     };
+    if (!finding.title) return refuse('needs a --finding title, not only whitespace');
     if (!finding.severity || !['high', 'medium', 'low'].includes(finding.severity)) return refuse('needs --severity high|medium|low');
     if (!finding.deliverable) return refuse('needs --deliverable "..." — a finding must say what fixing it would mean');
     // Triage shows both halves and decides on both: a finding with no
