@@ -553,3 +553,175 @@ simpler reason that the guard reads one file while the clause says "anywhere in 
 filed. A refusal whose guard can be walked around by changing `>` to `===`, in a repository whose own
 clause text says this gate was proposed four times in one day, is worth more than the shape it has.
 - proof 13: unknown
+
+### Pass 4 — 2026-08-08
+
+- base: `9f5f4ddaaa307b18abc3c3214acc6fcea758ef65`
+- head: `2edcf7e789d7c5df5f8b965ce3ac8821e8b55148`
+- proof 1: met — Pass 3's one failure is closed and the invariant is proven rather than asserted.
+  `git ls-files .planning/` at HEAD lists ten planning documents and nothing under
+  agent-feedback; the directory itself is untracked-empty and `git ls-files | grep -iE
+  "friction|feedback"` returns only three merged spec files plus friction.ts and its test, so
+  no tracked prose channel survives. The generated-brief half is mutation-proven: mutation
+  c1-a-generated-brief-names-a-second-place reinserted the markdown path into auditPrompt.ts's
+  step 8 and was KILLED by auditPrompt.test.ts "makes filing what the audit cost a numbered
+  step, and sends it to the channel rather than a markdown file", re-run at its own file with
+  the mutation still applied and failing there too. Searched independently for a second route:
+  grep over every non-test file in scripts/tasks and scripts/lib for "append to", "write it
+  to <something>.md", "agent-feedback" and "tool-friction" returns exactly one hit, and it is
+  auditPrompt.ts:656 saying "There is no markdown file to append to". `npm run tasks --
+  friction` is one query over the whole channel and reports 619 records in four buckets.
+  Graded met on the state of the tooling, which is what the clause promises. The guard's
+  mechanism is separately defective and filed as a finding: friction.test.ts:885 asserts
+  existsSync on the filesystem rather than on git, so it reddens on untracked scratch and is
+  blind to a prose channel at any other path. That is a defect of the proof, not of the
+  property.
+- proof 2: met — Stands from pass 2, re-verified rather than assumed, because records.ts moved
+  under it for c11. `createTask` is still the single assembly point: grep for createTask over
+  scripts/ excluding tests returns its definition at taskStore.ts:368 and exactly four call
+  sites (audit.ts:56 import, audit.ts:325 buildFindingTask, audit.ts:510 undelivered,
+  records.ts:259 add, records.ts:466 question), and `grep -rn ": Task = {" scripts/ --include=
+  *.ts | grep -v "\.test\.ts"` is empty, so no route assembles a record around the resolver.
+  The c11 refactor touched only the prior-art call in cmdAdd and cmdEdit and added no write
+  route. The c2 mutation set in friction.test.ts still passes as a block.
+- proof 3: met — Stands from pass 2. Re-checked that the diff since that pass added no
+  block-shaped field: `git diff a6d7d92..HEAD -- scripts/lib/taskStore.ts` adds nothing to the
+  record schema, and cmdQuestion still expresses the hold as `task.requires.push(id)` at
+  records.ts:476 with no second answer beside it.
+- proof 4: met — Stands from pass 2. No route added since changes what reads a decider, and
+  `awaitsADecider` is still imported by workPrompt.ts:7 rather than reimplemented.
+- proof 5: met — Pass 3's gap is closed at the place it was assembled rather than at the three
+  places it was read, which is the repository's own wisdom line. `isDefect` (friction.ts:25) is
+  one predicate, and printRates (74), printOccurrences (100 and 101) and printByLesson (134)
+  all read it, so the three sections cannot disagree. Three mutations, each aimed at one
+  section's use of it, all KILLED: c5-the-per-lesson-count-drops-the-defect-filter
+  (`cited.filter(isDefect)` to `cited`) and c5-the-recurrence-total-drops-the-defect-filter
+  (`occurrences.filter(...isDefect...)` to `occurrences`) are both killed by friction.test.ts
+  "counts nothing below the line that says it is counted in nothing below", and
+  c5-absence-folded-into-nobody (bucketOf's `?? 'unclassified'` to `?? 'nobody'`, the one
+  substitution the clause names as the convenience that would empty the axis) is killed by
+  "reports nobody and unclassified, and counts neither as a defect". Each was re-run at
+  friction.test.ts with the mutation still applied and failed there too. Live on the real
+  store, `npm run tasks -- friction` now prints 5 nobody and 543 unclassified records above
+  the line, then "71 of those are a defect measure — fault tooling or contract only, with the
+  other 548 reported above and excluded here", and the excluded records are still named with
+  the bucket that excluded them, which is the reporting half the clause also requires.
+- proof 6: met — Stands from pass 1's fifteen-entry manifest over briefLessons.ts. Re-checked
+  that the lesson-table edits this branch made since (the worker/file-findings text and the
+  new per-lesson guard) did not change the handle mechanism: `id` is still an explicit field
+  and findLesson still matches it exactly.
+- proof 7: met — Stands from pass 3, and re-confirmed not vacuous: on the real store today all
+  20 live lessons still print "nobody has looked", so the marker is not satisfied by
+  pre-existing data. The two pass-3 mutations over lastCheck and the checked filter are
+  unchanged in the tree and still owned by friction.test.ts "distinguishes a lesson checked
+  and found clean from one nobody looked at".
+- proof 8: met — The denominator is no longer four times the quantity it names, and the number
+  itself is now asserted rather than only its presence. friction.ts:57 counts audit events
+  filtered to `event.id === null`. Verified independently against the log: `grep -c
+  '"op":"audit"' docs/events.jsonl` is 318, of which 74 carry `"id":null` and 244 carry a
+  record, and `npm run tasks -- friction` now prints "71 against 74 audit passes (audit events
+  carrying no record) — 96 per 100" where pass 3 measured 299. Numerator and denominator are
+  now disjoint event sets, so filing a defect-fault finding no longer increments both sides of
+  its own rate. The correcting mutation that SURVIVED all 2,040 tests at pass 3 was re-run
+  inverted as c8-RERUN-audit-denominator-counts-every-finding-event (the filter removed) and is
+  KILLED by friction.test.ts "counts a pass once in the audit denominator, however many
+  findings that pass filed", re-run at its own file with the mutation still applied and failing
+  there too. That test asserts "2 against 1 audit passes", so it is the number and not the
+  shape that holds it. The other two denominators remain sound and pinned.
+- proof 9: met — Met on the code and still unguarded against the regression it is written to
+  prevent, which is the same verdict pass 3 reached for a stronger reason. The property holds:
+  LEGS in mergeReady.ts names tsc, npm test, layer-check, audit-status and doctor and none of
+  them is the friction query; doctor's only two exit conditions are an unparseable store line
+  and a dangling reference (doctor.ts:133 and 138); and the live gate agrees, with `npm run
+  tasks -- merge-ready` reporting "doctor ok pass — 16 warning(s) reported above, which do not
+  fail this leg" and every mechanical leg green in 39 seconds. Pass 3's surviving mutation was
+  re-run verbatim as c9-RERUN-an-exit-code-reads-a-fault and is now KILLED by
+  mergeReady.test.ts "names neither field in any file the gate reaches", so the widened scan
+  over mergeReady.ts, doctor.ts and planCheck.ts is real. What the scan cannot see is the same
+  gate spelled without the token it bans. Mutation
+  c9-NEW-b-the-exit-code-reads-a-destructured-fault destructures instead
+  (`const { kind, fault } = task`) and exits doctor 1 on a fault-less finding; it SURVIVED at
+  every scope up to the whole suite, 0 failed of 2056. Applied by hand and measured rather than
+  inferred: `npm run tasks -- doctor` exits 0 on this tree and exits 1 with that one line
+  changed, on the real store, because 543 records carry no fault — so a merge-ready leg and a
+  CI check both gate on a fault with the whole suite green. The behavioural companion test
+  cannot catch it either, and for two separate reasons worth recording: its fixture writes
+  `tasks add "ordinary work" --id ordinary`, a plain task, where its own comment claims to
+  write the fault-less reporting record "the axis turns on"; and it is bounded at four
+  breaches, which mutation c9-NEW-c demonstrated by planting a breach-count gate scaled below
+  that fixture and being killed by the text scan rather than by the behavioural test. Graded
+  met because no value of a fault, a breach or an occurrence count determines a verdict, an
+  ordering, a filter or an exit code anywhere in the tree today. The clause's literal sentence
+  remains false and this branch made it falser: cmdRemove gained
+  `if (holders.length > 0) { ... process.exitCode = 1; }` between a6d7d92 and HEAD, which is a
+  command's exit code reading a count. Both the guard and the sentence are filed as findings.
+- proof 10: met — Stands from pass 3, re-verified because records.ts moved under it. `git diff
+  a6d7d92..HEAD -- scripts/tasks/records.ts` shows cmdRecur unchanged: it still writes one
+  `recur` event through recordEvents and reaches the store on no path, and the only additions
+  to that file are the reportPriorArt call swap and cmdRemove's new holder refusal, neither of
+  which touches the recurrence. The byte-identity assertion in friction.test.ts and the
+  derivation test over occurrencesByRecord are both unchanged and passing.
+- proof 11: met — The clause is now a property of filing rather than of one command, and the
+  route the volume arrives through is covered. `reportPriorArt` (architectureCmds.ts:288) is
+  one exported call pairing the query with the offer, and grep for it returns five call sites
+  covering every route that can file a record carrying a path: records.ts:282 cmdAdd,
+  records.ts:613 cmdEdit on a writes or files change, audit.ts:419 the findings-only route,
+  audit.ts:573 the recorded pass, and audit.ts:80 cmdImport. Mutation
+  c11-the-audit-route-files-a-finding-showing-no-prior-art deletes the call from the recorded
+  pass and is KILLED by friction.test.ts "shows the prior art to an auditor filing through a
+  recorded pass", re-run at its own file with the mutation still applied and failing there too.
+  Hunted the next neighbour rather than confirming the fix: the fifth route that assembles a
+  reporting-kind record is cmdQuestion (records.ts:466), and it does not call reportPriorArt.
+  Checked rather than assumed, and it is not a defect: the Draft cmdQuestion hands createTask
+  carries only severity, system, spec and evidence, `tasks question`'s usage declares no
+  --files or --writes flag, so claimedPaths on a question is always empty and
+  reportPriorArtOnPaths would return 0 before printing anything. A question that later gains a
+  path gains it through cmdEdit, which is covered. Also checked that the new call sites cannot
+  print where they should not: reportDispatchDefects early-returns on an audit-filed finding
+  because `unreviewed` is neither open nor in-progress, and offerRecurrence is still gated on
+  reportsCost, pinned by the test "does not offer an occurrence on a plain task".
+- proof 12: met — Met on the property, and the rewritten guard is wrong in both directions,
+  which is a sharper result than pass 3's. The property holds: printByFault walks BUCKETS,
+  printByLesson walks allLessons() in the briefs' order, occurrencesByRecord returns log order,
+  and no exit code, filter, queue position or gate verdict is decided by a breach or occurrence
+  count. The behavioural half of the new guard is genuinely good and I could not walk around
+  it: friction.test.ts "says nothing more about a lesson breached four times than about one
+  breached once" asserts the 4-and-4 and 1-and-0 numbers and then shape-equality of the two
+  lines, so an elevation appended to the heavier one reddens it. Both pass-3 survivors are dead
+  against the stated rule: c12-RERUN-a-threshold-written-without-an-inequality
+  (`occurrenceCount.size === 3`) and c12-RERUN-a-threshold-outside-the-one-file-the-guard-read
+  (`occurrences.length >= 3` in cmdRecur) are each KILLED by "compares no channel count to
+  anything but zero, in any file that reads the channel", each re-run at friction.test.ts with
+  the mutation still applied. The rule is nonetheless the wrong instrument, and four more
+  walk-arounds prove it, every one SURVIVED at every scope up to the whole suite, 0 failed of
+  2056. Compared to a named constant: `const NOT_LANDING = 3; if (counted.length >=
+  NOT_LANDING)` in printByLesson. Compared to another count: `if (recurrences >
+  counted.length)`, which contains no literal for the rule to find. Reached through a call
+  rather than a bare field: `if (cited.filter(isDefect).length >= 3)`, where `.filter(...)`
+  separates the identifier from `.length`. And in a file the scan does not read:
+  `if (breaches.length >= 3)` in workPrompt.ts, printed into the worker and planner brief,
+  which is where the clause's own first sentence says a lesson should surface. The rule is also
+  over-strict on a shape the spec itself asks for: probed with `npm run inspect`, the regex
+  BANS `FAULTS.length === 3`, which is exactly the invariant c5's text states ("fault stays
+  exactly tooling, contract or nobody"), because the vocabulary includes `fault`, which is a
+  category and not a count. Graded met on the operative property, per the same reasoning pass 3
+  recorded; the guard and the clause's literal sentence are filed as findings, and the
+  recommendation is to delete the regex rather than extend it, because a rule written against
+  three reproductions has now failed against six.
+- proof 13: deferred — Checked, and it fails: nothing retires a lesson. The four lesson arrays in
+  briefLessons.ts are still edited by hand, and unknownLessonIds now has a caller
+  (friction.ts:142 reports orphaned citations), so c6's reporting half arrived without the
+  retirement operation c13 asks for. The goal this brief prints holds without it, which is what
+  makes deferred available rather than unmet: what the workflow costs is countable in one place
+  today, and the lesson table is not what makes it countable.
+  The reason, which for a deferred verdict this flag is what carries: the clause's sole owner,
+  a-lesson-can-be-retired-and-the-retirement-is-recorded,
+  is declined by the author's recorded ruling of 2026-08-07, with a trigger already attached
+  ("the task-system freeze lifts, or a lesson in briefLessons.ts needs removing and its
+  citations would silently resolve to nothing"). Recording the tension rather than deciding it:
+  the ruling's own words are "c13 is abandoned rather than deferred, because deferred says a
+  later branch owes it and the freeze means no later branch is coming", and this tool has no
+  `abandoned` verdict. Deferred is the closest true grade, because I checked and it fails and
+  the goal survives; unmet would call a deliberate author ruling a broken promise, and unknown
+  would claim nobody looked. If the tracked undelivered record deferred creates contradicts
+  the ruling, the right repair is the audit vocabulary and not this verdict.
