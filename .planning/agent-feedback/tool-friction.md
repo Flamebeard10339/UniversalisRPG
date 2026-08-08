@@ -1480,3 +1480,26 @@ op would have caught this before it happened, and did catch it immediately after
 -- .` restored a clean tree with nothing lost, since nothing had been committed). No tool defect;
 recording it because `git show <sha>:<path>` piped into a script, which is what I used everywhere
 else in this pass, is the safe form of the same question and I should have reached for it first.
+
+## `a-move-never-strands-a-question` audit, pass 1, 2026-08-08
+
+Five clauses, all met, no findings — the smoothest audit-prompt run I've had. `npm run mutate` was
+where the time actually went: writing five `find`/`replace` pairs against exact source lines cost
+more thought than reading the diff did, since a lazy `find` (e.g. matching `warnLiveQuestion(task,
+to)` alone, which appears in both its definition and its one call site) would have refused for
+non-uniqueness or silently mutated the wrong occurrence. Grepping each candidate string's count in
+the target file before writing the manifest entry (`grep -c -F "<exact text>" <file>`) avoided every
+false start; worth doing routinely rather than finding out from the tool's own refusal. All 5
+mutations were KILLED and confirmed on first run — no ERROR/UNSTABLE retries needed, which is unusual
+across the passes logged above and probably reflects that this branch's own tests were written
+narrowly against the guard rather than around it.
+
+The one thing `npm run inspect` couldn't do directly: `require()` is unavailable inside the
+evaluated expression (module resolution only works through the injected `load()`), so a first attempt
+using CommonJS `require` inside the eval body threw `ReferenceError: require is not defined` and had
+to be rewritten as `await load('scripts/tasks/commands.ts')`. Not a defect — `--help`'s own example
+already shows `load()` — but a copy-paste from habit (reaching for `require` the way a throwaway node
+script normally would) cost one wasted round trip. Total audit cost: one merge-ready run that caught
+a real-but-unrelated flake (two spawn-heavy tests timing out under full-suite contention, already
+filed as `npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s`) and cleared on re-run with no
+code changes — confirms that finding is about suite contention, not about this branch.

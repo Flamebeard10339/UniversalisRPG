@@ -137,3 +137,70 @@ caught the loss incapable of falling behind the command set.
   verb is reached. Asserting behaviour is stronger and may surface more than three unswept verbs;
   if it does, report the count rather than fixing each one, since fixing an unrelated verb's
   argument handling is outside this grant.
+
+## Audit passes
+
+### Pass 1 — 2026-08-08
+
+- base: `fbf475fe1786cc51ccb1a2c7f1f3619ed5006d2a`
+- head: `7130f4a0d738de24417f5b4caf4ca5f5ec1967ba`
+- proof 1: met — `grep -rn "triage asked (" scripts/ --include=*.ts` outside test files returns exactly one
+line: records.ts:655 (the ASKED_PREFIX const). Writer: writeAskedQuestion (records.ts:657), the one
+place `task.evidence` gets the sentinel appended; both cmdAsk (records.ts:1107) and triage.ts's
+runAsk (triage.ts:91) call it, no other call site exists (grep confirms). Reader: liveQuestion
+(records.ts:665), the one place the sentinel is parsed back; its one call site is warnLiveQuestion
+(records.ts:677), whose one call site is transition() (records.ts:693) — the single place every
+state-changing verb reaches state through (grep '\.state\s*=' across scripts/tasks/records.ts and
+triage.ts finds exactly one direct assignment, transition():694; every other reference is a
+read/comparison). Mutation: replacing `paragraph.startsWith(ASKED_PREFIX)` with a predicate that
+never matches (records.ts:667) was KILLED by
+records.test.ts > a move never strands a question > promote warns, naming the question, and still
+promotes rather than refusing, confirmed on re-run at its own file. vitest scripts/tasks/records.test.ts
+passes (161 tests across the three touched files).
+- proof 2: met — promote, defer, decline, start and done each carry a dedicated test in
+records.test.ts ("a move never strands a question" describe block) asserting stdout contains
+`warning: this record has a live, unanswered question` and the question text, and that the move
+still completes (record ends up promoted/deferred/declined/in-progress/done, not refused);
+triage.test.ts adds the interactive-walk case (ask in one session, promote in a later one). A
+record with no live question moves with no warning at all (records.test.ts, same block) — the
+property is over the move, not a verb allowlist: `grep -n "transition(" scripts/tasks/records.ts
+scripts/tasks/triage.ts` shows 10 call sites (start, stop, done, decline, promote, defer, retriage
+in records.ts; promote, defer, decline in triage.ts's interactive walk), all reached through the one
+function that assembles the warning. Mutation: dropping the question text from the warning message
+(records.ts:680) was KILLED by 2 tests across records.test.ts and triage.test.ts, confirmed on
+re-run at records.test.ts. vitest scripts/tasks/records.test.ts and scripts/tasks/triage.test.ts pass.
+- proof 3: met — The guard's one source location is warnLiveQuestion (records.ts:677), called once,
+from transition() (records.ts:693) — the shared function start/stop/done/decline/promote/defer/
+retriage in records.ts and promote/defer/decline in triage.ts's interactive walk all route through
+(confirmed: only one direct `task.state =` assignment exists anywhere in scripts/tasks/records.ts or
+triage.ts, at transition():694). Mutation: replacing `const warning = warnLiveQuestion(task, to);`
+with `const warning: string[] = [];` inside transition() (removing the guard from its one home) was
+run against records.test.ts and triage.test.ts together and KILLED 7 tests: promote, defer, decline,
+start, done and the interactive-walk case in records.test.ts, plus triage.test.ts's own promote-warns
+case — more than one verb's test died from a single deletion, which is what "shared" means here.
+Verdict confirmed on re-run at [records.test.ts, triage.test.ts]. vitest scripts/tasks/records.test.ts passes.
+- proof 4: met — The predicate the route consults is listQueue(tasks, { deferred: true })
+(records.ts:1027), which reuses taskStore.ts's own `deferred` filter (state === 'open' && spec ===
+null, taskStore.ts:653) — this branch defines no second "open with a null spec" test anywhere in
+records.ts; cmdRetriage's refusal message and its `deferred` Set both come from that one imported
+query. `tasks retriage <id>...` is registered in commands.ts, files a `triage` event the same way
+promote/defer do, and records.test.ts's "retriage: the inverse of defer" block covers: routing a
+deferred record back to unreviewed, refusing a record that was never deferred (naming its actual
+state), refusing a closed record rather than reopening it, and the end-to-end case — ask, defer,
+retriage, promote — proving a late-answered question finally lands somewhere. Mutation: changing
+cmdRetriage's destination from `transition(task, 'unreviewed')` to `transition(task, 'open')`
+(records.ts:1037) was KILLED by 2 tests (the routing test and the late-answer test), confirmed on
+re-run at records.test.ts. vitest scripts/tasks/records.test.ts passes.
+- proof 5: met — scripts/tasks.test.ts's "refuses five junk arguments on every bounded command
+surface" now computes `bounded` from `everyVerb()` (commands.ts's own registry, exported at
+commands.ts:112) filtered by `positionalArity(usage) !== null` (cli.ts:37), not a hardcoded list.
+Measured directly (npm run inspect): registry size 41, bounded count 29 — matching the test's own
+recorded claim of "29 swept vs 23 hardcoded before." `tasks defer` with five junk arguments now
+exits 1 via resolveTaskIds' "no such task" (records.test.ts has a dedicated test for this, plus
+scripts/tasks.test.ts's own "tasks defer refuses five junk arguments as unresolved ids" test), where
+before this branch it exited 0 for want of an arity complaint (defer takes unbounded `<id>...`, so
+positionalArity excludes it from the bounded sweep by design — its refusal comes from id resolution,
+which is what the dedicated test isolates). Mutation: collapsing everyVerb() to return `[]`
+(commands.ts:112-114) was KILLED by 3 tests in scripts/tasks.test.ts (the bounded-surface sweep,
+the --help sweep, and one more), confirmed on re-run at scripts/tasks.test.ts. vitest
+scripts/tasks.test.ts passes (22 tests).
