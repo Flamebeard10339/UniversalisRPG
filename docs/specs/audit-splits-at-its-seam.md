@@ -43,8 +43,9 @@ Proof:
   cross-reference — `cmdAudit` calls `resolveDiffRange` — and it has to land somewhere that both
   halves may read without either depending on the other. Where it lands is the open question below;
   that it does not become a mutual import is the clause.
-  proof: `grep -n "from './auditPrompt'" scripts/tasks/audit.ts` returns nothing, and
-  `grep -n "from './audit'" scripts/tasks/auditPrompt.ts` returns nothing.
+  proof: at most one of `grep -n "from './auditPrompt'" scripts/tasks/audit.ts` and
+  `grep -n "from './audit'" scripts/tasks/auditPrompt.ts` returns a line. Both returning a line is
+  the cycle this clause forbids; one is the one-way import the open question sanctions.
 
 - [c4] `docs/audits/systems.json` describes where the code actually is. A concept's registered paths
   follow the functions that implement it, so a concept whose implementation now spans both files
@@ -52,8 +53,12 @@ Proof:
   and `proof target resolution` move; `record fault` stays; `clause deferral` is the one that
   genuinely spans both, because its wording lives in the pass-file skeleton and its behaviour lives
   in the interactive walk.
-  proof: `npm run audit-status` reports no path claimed by more concepts than before this branch,
-  and `scripts/tasks/audit.ts` is no longer the most-claimed path in the report.
+  proof: `npm run audit-status`'s two-concept report names `scripts/tasks/audit.ts` with strictly
+  fewer concepts than the four it carried at this branch's base, names `scripts/tasks/auditPrompt.ts`
+  with the rest, and adds no path that was not already in that report. Record the before and after
+  counts for both files in the pass. The comparison is against this file's own base, not against
+  whichever path happens to lead the report — `scripts/lib/taskStore.ts` carried five concepts before
+  this branch and still does, and nothing here was ever going to change that.
 
 ## Goal
 
