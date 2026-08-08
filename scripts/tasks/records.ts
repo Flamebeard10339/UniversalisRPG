@@ -9,6 +9,7 @@ import {
   coldClaims,
   createTask,
   DECIDERS,
+  departFromSpec,
   dependencyCycles,
   FAULTS,
   fixNowQueue,
@@ -518,6 +519,7 @@ function runList(args: Flags, text: string | undefined): void {
     system: flags.system,
     spec: flags.spec,
     deferred: flags.deferred === 'true',
+    unspecced: flags.unspecced === 'true',
     kind,
     text,
     triggered,
@@ -966,7 +968,7 @@ export function cmdDefer(args: Flags, usage: string): void {
   const defers: Array<{ task: Task; note: string }> = [];
   for (const task of resolved) {
     task.state = 'open';
-    task.spec = null;
+    departFromSpec(task, 'retriage');
     defers.push({ task, note: 'deferred: opened outside every spec' });
     console.log(`deferred ${task.id}`);
   }

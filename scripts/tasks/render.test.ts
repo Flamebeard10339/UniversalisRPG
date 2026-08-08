@@ -1,5 +1,60 @@
 import { describe, expect, it } from 'vitest';
-import { clauseStandingLines, MIN_WRAP_WIDTH, printEvidence, packGreedy, summarize, TERMINAL_WIDTH, truncateLine, wrapText, wrapUnder } from './render';
+import type { Task } from '../lib/taskStore';
+import { clauseStandingLines, MIN_WRAP_WIDTH, printEvidence, packGreedy, renderTask, summarize, TERMINAL_WIDTH, truncateLine, wrapText, wrapUnder } from './render';
+
+function task(overrides: Partial<Task> & { id: string }): Task {
+  return {
+    seq: null,
+    title: overrides.id,
+    kind: 'task',
+    state: 'open',
+    severity: null,
+    system: null,
+    spec: null,
+    departure: null,
+    clause: null,
+    discharges: [],
+    requires: [],
+    files: [],
+    writes: [],
+    grant: null,
+    fault: null,
+    decider: null,
+    produces: [],
+    deliverable: null,
+    evidence: null,
+    source: null,
+    reason: null,
+    trigger: null,
+    closed: null,
+    closedCommit: null,
+    claimed: null,
+    claimedBy: null,
+    extra: null,
+    ...overrides,
+  };
+}
+
+// c1: no reader may derive a departure reason from `spec` being null — every
+// distinct null-spec shape below prints its own text, read from `departure`,
+// never guessed from the absence.
+describe('renderTask spec line', () => {
+  const line = (t: Task): string | undefined => renderTask(t, new Map(), 'full').find((entry) => entry.startsWith('spec:'));
+
+  it('names the spec for a current member', () => {
+    expect(line(task({ id: 'x', spec: 'demo-spec' }))).toBe('spec: demo-spec');
+  });
+
+  it('reads "no spec" for a record that never joined one', () => {
+    expect(line(task({ id: 'x', spec: null, departure: null }))).toBe('spec: (no spec)');
+  });
+
+  it('reads the departure reason for each of the three ways a record can leave one', () => {
+    expect(line(task({ id: 'x', spec: null, departure: 'deferred' }))).toBe('spec: (deferred)');
+    expect(line(task({ id: 'x', spec: null, departure: 'unmet' }))).toBe('spec: (unmet)');
+    expect(line(task({ id: 'x', spec: null, departure: 'retriage' }))).toBe('spec: (retriage)');
+  });
+});
 
 describe('packGreedy', () => {
   it('fills each line to the width before starting the next', () => {

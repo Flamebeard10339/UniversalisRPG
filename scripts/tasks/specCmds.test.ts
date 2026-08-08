@@ -90,8 +90,8 @@ describe('tasks CLI', () => {
       const removed = tasks('spec', 'remove', 'demo-spec', 'a-task', 'b-task');
       expect(removed.status).toBe(0);
       expect(removed.stdout).toContain('removed 2 task(s) from demo-spec');
-      expect(tasks('show', 'a-task').stdout).toContain('spec: (deferred)');
-      expect(tasks('show', 'b-task').stdout).toContain('spec: (deferred)');
+      expect(tasks('show', 'a-task').stdout).toContain('spec: (retriage)');
+      expect(tasks('show', 'b-task').stdout).toContain('spec: (retriage)');
     });
   });
 
@@ -120,7 +120,7 @@ describe('tasks CLI', () => {
       const result = tasks('spec', 'remove', 'demo-spec', 'unrelated', 'a-member');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('named a different spec, or none, and now name none: unrelated');
-      expect(tasks('show', 'a-member').stdout).toContain('spec: (deferred)');
+      expect(tasks('show', 'a-member').stdout).toContain('spec: (retriage)');
     });
   });
 
@@ -131,7 +131,7 @@ describe('tasks CLI', () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("were demo-spec's outstanding promises");
       expect(result.stdout).toContain('tracked by no spec: demo-spec-clause-1');
-      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('spec: (deferred)');
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('spec: (retriage)');
     });
   });
 
@@ -282,7 +282,11 @@ describe('tasks CLI', () => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       const result = tasks('spec', 'done', 'demo-spec', '--defer-open');
       expect(result.status).toBe(0);
-      expect(tasks('show', 'a-member').stdout).toContain('spec: (deferred)');
+      // Checked and still open when the spec closed around it — `unmet`, not
+      // the `deferred` a scope decision earns, and not the query `--deferred`
+      // answers either.
+      expect(tasks('show', 'a-member').stdout).toContain('spec: (unmet)');
+      expect(tasks('list', '--deferred').stdout).not.toContain('a-member');
     });
   });
 

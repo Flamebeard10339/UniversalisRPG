@@ -244,7 +244,7 @@ export function roadmapView(tasks: Task[], readSpec: ReadSpec): RoadmapView {
   const byId = new Map(tasks.map((task) => [task.id, task]));
   const index = liveWaiterIndex(tasks);
 
-  const backlog = listQueue(tasks, { deferred: true, kind: 'task' }).map((task) => entryOf(task, byId, index));
+  const backlog = listQueue(tasks, { unspecced: true, kind: 'task' }).map((task) => entryOf(task, byId, index));
   const topics = backlog.filter((entry) => entry.state === 'unspecced').sort((a, b) => b.unblocks.length - a.unblocks.length || severityRank(a.task.severity) - severityRank(b.task.severity));
 
   const findings = listQueue(tasks, { state: 'open', kind: 'finding' });

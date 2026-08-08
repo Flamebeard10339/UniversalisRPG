@@ -14,6 +14,7 @@ function task(id: string, produces: string[], state: Task['state'] = 'done', pat
     severity: null,
     system: null,
     spec: null,
+    departure: null,
     clause: null,
     requires: [],
     files: paths.files ?? [],

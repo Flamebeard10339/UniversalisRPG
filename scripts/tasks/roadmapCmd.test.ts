@@ -13,6 +13,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     severity: null,
     system: null,
     spec: null,
+    departure: null,
     clause: null,
     discharges: [],
     requires: [],
@@ -235,7 +236,7 @@ describe('renderRoadmap', () => {
   it('states what each cap left out and the command that shows the rest', () => {
     const topics = Array.from({ length: 9 }, (_, index) => task({ id: `topic-${index}` }));
     const body = text(topics);
-    expect(body).toContain('… 3 more — `tasks list --deferred --kind task`');
+    expect(body).toContain('… 3 more — `tasks list --unspecced --kind task`');
   });
 
   it('caps how many records one spec claims to unblock rather than printing them all', () => {

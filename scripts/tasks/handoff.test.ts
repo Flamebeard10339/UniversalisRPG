@@ -178,7 +178,7 @@ describe('the event log', () => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       tasks('spec', 'remove', 'demo-spec', 'a-member');
 
-      expect(tasks('show', 'a-member').stdout).toContain('spec: (deferred)');
+      expect(tasks('show', 'a-member').stdout).toContain('spec: (retriage)');
       const events = readEvents(dir);
       expect(events[0].op).toBe('add');
       expect(events[0].spec).toBe('demo-spec');

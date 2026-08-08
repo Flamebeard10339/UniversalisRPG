@@ -16,7 +16,7 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('0 unreviewed finding(s) left');
 
       expect(tasks('show', 'promote-me').stdout).toContain('spec: demo-spec');
-      expect(tasks('show', 'defer-me').stdout).toContain('spec: (deferred)');
+      expect(tasks('show', 'defer-me').stdout).toContain('spec: (retriage)');
       const declined = tasks('show', 'decline-me').stdout;
       expect(declined).toContain('reason: stale, superseded by later work');
     });
@@ -190,7 +190,7 @@ describe('tasks CLI', () => {
       tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--fault', 'tooling', '--severity', 'medium', '--deliverable', 'fix it');
       const result = tasks('defer', 'defer-me');
       expect(result.status).toBe(0);
-      expect(tasks('show', 'defer-me').stdout).toContain('spec: (deferred)');
+      expect(tasks('show', 'defer-me').stdout).toContain('spec: (retriage)');
       expect(tasks('log', '--op', 'triage').stdout).toContain('deferred: opened outside every spec');
 
       tasks('decline', 'defer-me', '--reason', 'closed for the refusal check');

@@ -60,11 +60,11 @@ const COMMANDS: Record<string, Command> = {
   },
   show: { usage: 'usage: tasks show <id>', run: cmdShow },
   list: {
-    usage: 'usage: tasks list [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred] [--triggered]  (--triggered reaches past the not-closed default to every declined record carrying a --trigger condition)',
+    usage: 'usage: tasks list [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred] [--unspecced] [--triggered]  (--deferred is the scope decision only; --unspecced is every open task naming no spec, whatever the reason; --triggered reaches past the not-closed default to every declined record carrying a --trigger condition)',
     run: cmdList,
   },
   search: {
-    usage: 'usage: tasks search <term> [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred] [--triggered]',
+    usage: 'usage: tasks search <term> [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred] [--unspecced] [--triggered]',
     run: cmdSearch,
   },
   plan: { usage: 'usage: tasks plan [<id>...] [--spec <slug>]  (grades a dispatch set for overlap, unstated dependencies and duplicated interfaces; runs no workers and refuses nothing)', run: cmdPlan },

@@ -504,13 +504,14 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
       },
       {
         severity: 'high',
-        // A deferred clause converts rather than staying owed: `spec: null` is
-        // the store's existing shape for "tracked, not a member of any spec" —
-        // render already prints it as `(deferred)` — so the record leaves
-        // merge-ready's spec leg the same way it left the clauses leg, without
-        // a second field to say so. `source.spec` still names the spec it fell
-        // out of, which is where an owner search over that spec finds it.
+        // A deferred clause converts rather than staying owed: `spec: null`
+        // is the store's shape for "tracked, not a member of any spec", so
+        // the record leaves merge-ready's spec leg the same way it left the
+        // clauses leg. `departure` says why, since `spec: null` alone no
+        // longer does; `source.spec` still names the spec it fell out of,
+        // which is where an owner search over that spec finds it.
         spec: deferred ? null : slug,
+        departure: deferred ? 'deferred' : null,
         clause: verdict.clause,
         files: parsed.clauseFiles.get(verdict.clause) ?? [],
         deliverable: clauseText,

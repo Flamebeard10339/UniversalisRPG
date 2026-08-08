@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { clauseStandings, outstandingSummary, parseSpecDoc } from '../lib/specDoc';
-import { clausesOf, loadStore, unreviewedFiledBy, type Task } from '../lib/taskStore';
+import { clausesOf, departFromSpec, loadStore, unreviewedFiledBy, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { readStore, recordEvents, refuseUnknownSpec, reportUnknownSpec, resolveActiveSpec, resolveConfig, saveStoreAndWarn, specFile, subjectOf } from './context';
 import { clauseStandingLines, printRow, refuseUnknownIds } from './render';
@@ -219,7 +219,10 @@ export function cmdSpecDone(args: Flags, usage: string): void {
   const stragglers = members.filter((task) => task.state !== 'done' && task.state !== 'declined');
 
   if (stragglers.length > 0 && args.flags['defer-open'] === 'true') {
-    for (const straggler of stragglers) straggler.spec = null;
+    // Checked and still failing when the spec closed around it — the branch
+    // is admitting the clause, not dropping it, so this is `unmet` and never
+    // the `deferred` a scope decision earns.
+    for (const straggler of stragglers) departFromSpec(straggler, 'unmet');
     saveStoreAndWarn(tasks, config);
     // The spec named is the one the record just left, not the null it now
     // carries: `tasks log --spec <slug>` has to be the whole membership
@@ -273,7 +276,10 @@ export function cmdSpecRemove(args: Flags, usage: string): void {
   const notMembers = ids.filter((id) => byId.get(id)!.spec !== slug);
   const undelivered = ids.filter((id) => byId.get(id)!.kind === 'undelivered');
   const from = new Map(ids.map((id) => [id, byId.get(id)!.spec]));
-  for (const id of ids) byId.get(id)!.spec = null;
+  // No verdict is implied by a manual removal — it is neither a scope
+  // decision nor an admitted failure, the same `retriage` triage's own
+  // `defer` carries.
+  for (const id of ids) departFromSpec(byId.get(id)!, 'retriage');
   saveStoreAndWarn(tasks, config);
   recordEvents(
     config,

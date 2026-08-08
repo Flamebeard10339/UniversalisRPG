@@ -27,7 +27,9 @@ describe('tasks CLI', () => {
       tasks('add', 'checkSave crashes', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--spec', 'demo-spec', '--deliverable', 'loadSave refuses the malformed body instead of throwing');
       const shown = tasks('show', 'checksave-crashes');
       expect(shown.stdout).toContain('[finding/unreviewed/high]');
-      expect(shown.stdout).toContain('spec: (deferred)');
+      // Never a member, not a departure — a distinct render from one that
+      // left a spec, which is the property this branch exists to establish.
+      expect(shown.stdout).toContain('spec: (no spec)');
     });
   });
 
@@ -757,13 +759,34 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('list --deferred shows only open tasks with no spec, unreachable by any other verb', () => {
+  // A plain `tasks add` with no `--spec` never joined one, so it is not a
+  // departure and `--deferred` does not answer for it; `spec done
+  // --defer-open` sweeps a straggler out `unmet`, a checked-and-failed
+  // record `--deferred` must not report as the scope decision it is not.
+  // Both stay reachable by the plain queue, which neither flag hides them
+  // from.
+  it('list --deferred answers only the scope decision, not a record that never had a spec or one swept out unmet', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'deferred task', '--id', 'deferred-task');
-      tasks('add', 'fix now task', '--id', 'fix-now-task', '--spec', 'demo-spec');
+      tasks('add', 'never specced', '--id', 'never-specced');
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      tasks('spec', 'done', 'demo-spec', '--defer-open');
       const result = tasks('list', '--deferred');
-      expect(result.stdout).toContain('deferred-task');
-      expect(result.stdout).not.toContain('fix-now-task');
+      expect(result.stdout).not.toContain('never-specced');
+      expect(result.stdout).not.toContain('a-member');
+      const plain = tasks('list').stdout;
+      expect(plain).toContain('never-specced');
+      expect(plain).toContain('a-member');
+    });
+  });
+
+  it('list --unspecced keeps every open task naming no spec, unlike the narrower --deferred', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'never specced', '--id', 'never-specced');
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      tasks('spec', 'done', 'demo-spec', '--defer-open');
+      const result = tasks('list', '--unspecced');
+      expect(result.stdout).toContain('never-specced');
+      expect(result.stdout).toContain('a-member');
     });
   });
 
