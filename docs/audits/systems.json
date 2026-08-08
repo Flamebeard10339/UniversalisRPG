@@ -423,6 +423,14 @@
             "scripts/lib/taskStore.ts"
           ],
           "note": "produced by one-query-over-the-channel-and-the-second-place-retired: tasks friction over the store's fault and breaches fields and the log's recur and checked events, plus tasks checked; .planning/agent-feedback/tool-friction.md is retired and no generated brief names a second place"
+        },
+        {
+          "name": "store removal record",
+          "paths": [
+            "scripts/lib/eventLog.ts",
+            "scripts/lib/taskStore.ts"
+          ],
+          "note": "produced by a-record-cannot-leave-the-store-unrecorded: the remove op and tasks remove, saveStore refusing an undeclared drop, and reconcile over the log against the store with the coverage it does not have"
         }
       ]
     },

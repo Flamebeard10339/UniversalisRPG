@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { appendEvents, eventsPathFor, filterEvents, loadEvents, parseEvents, type TaskEvent } from './eventLog';
+import { appendEvents, EVENT_OPS, eventsPathFor, filterEvents, loadEvents, parseEvents, reconcile, type TaskEvent } from './eventLog';
 
 function event(overrides: Partial<TaskEvent> = {}): TaskEvent {
   return {
@@ -170,5 +170,55 @@ describe('the log is not derived from present-day state', () => {
       expect(filterEvents(events, { spec: 'old-spec' })).toHaveLength(1);
       expect(filterEvents(events, { spec: 'new-spec' })).toHaveLength(1);
     });
+  });
+});
+
+// A record leaving `docs/tasks.jsonl` was, for sixteen ops, a thing the log
+// had no verb for: `saveStore` rewrites the whole file from the array it was
+// given, so any caller dropping a record removed it and nothing could say
+// that it had, or why.
+describe('c1, c3, c4: a record cannot leave the store unrecorded', () => {
+  const entry = (op: string, id: string | null, note = ''): TaskEvent => event({ op, id, note });
+
+  it('declares `remove` as an op, so the log can name what left', () => {
+    expect(EVENT_OPS).toContain('remove');
+  });
+
+  it('returns three disjoint sets over every id the log has seen created', () => {
+    const events = [
+      entry('add', 'still-here'),
+      entry('add', 'dropped-on-purpose'),
+      entry('remove', 'dropped-on-purpose', 'removed from the store: scratch'),
+      entry('add', 'declined-then-dropped'),
+      entry('decline', 'declined-then-dropped', 'not real work'),
+      entry('add', 'simply-gone'),
+    ];
+
+    const result = reconcile(events, ['still-here', 'never-in-the-log']);
+    expect(result.accounted).toEqual(['still-here']);
+    expect(result.absentExplained).toEqual([
+      { id: 'dropped-on-purpose', op: 'remove', note: 'removed from the store: scratch' },
+      { id: 'declined-then-dropped', op: 'decline', note: 'not real work' },
+    ]);
+    expect(result.absentUnexplained).toEqual(['simply-gone']);
+    // Disjoint, and exhaustive over what the log created: the first two sets
+    // are the proof the third one is the whole finding.
+    const created = new Set([...result.accounted, ...result.absentExplained.map((entry) => entry.id), ...result.absentUnexplained]);
+    expect(created.size).toBe(4);
+  });
+
+  it('reports the coverage it does not have, on a clean run as well as a dirty one', () => {
+    const clean = reconcile([entry('add', 'known')], ['known', 'predates-the-log', 'also-predates']);
+    expect(clean.absentUnexplained).toEqual([]);
+    // The number that stops "reconciled" being a false proof: two of the
+    // three store records carry no `add` event, so nothing here can say
+    // whether they ever left.
+    expect(clean.storeRecords).toBe(3);
+    expect(clean.outsideCoverage).toBe(2);
+  });
+
+  it('reads the last explanation, so a record removed and then re-created and removed again reads as removed', () => {
+    const events = [entry('add', 'twice'), entry('remove', 'twice', 'first time'), entry('add', 'twice'), entry('remove', 'twice', 'second time')];
+    expect(reconcile(events, []).absentExplained).toEqual([{ id: 'twice', op: 'remove', note: 'second time' }]);
   });
 });

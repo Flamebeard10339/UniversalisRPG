@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defaultStoreGitFixture, fixture, installDataGit, runInProcess, spawnTasks, unbornDefaultStoreFixture } from './cliFixtures';
+import { defaultStoreGitFixture, fixture, installDataGit, runInProcess, spawnTasks, unbornDefaultStoreFixture, type Run } from './cliFixtures';
 import { realDefaultStoreGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
@@ -377,6 +377,77 @@ describe('tasks CLI', () => {
       const result = tasks('doctor');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('[error] demo-spec tags more than one proof clause [c1]');
+    });
+  });
+});
+
+// c4 and c5. Ruled by the author 2026-08-06, refusing this clause's original
+// form: one historical absence is the case for reporting it, not for failing
+// the build on the store's own history. Written as a refusal rather than
+// deleted, because a deleted clause leaves the gate available to the next
+// branch that finds the argument locally reasonable — and this exact gate was
+// proposed twice in one day from two independent directions.
+describe('the log against the store, reported and never enforced', () => {
+  const vanish = (tasks: (...args: string[]) => Run, dir: string, id: string): void => {
+    tasks('add', 'a record that will vanish', '--id', id);
+    const store = path.join(dir, 'tasks.jsonl');
+    writeFileSync(
+      store,
+      readFileSync(store, 'utf8')
+        .split('\n')
+        .filter((line) => !line.includes(`"id":${JSON.stringify(id)}`))
+        .join('\n'),
+      'utf8',
+    );
+  };
+
+  it('names an unexplained absence, counts it, and still exits zero', () => {
+    fixture(({ tasks, dir }) => {
+      vanish(tasks, dir, 'vanished');
+
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('1 record(s) absent with nothing explaining it');
+      expect(result.stdout).toContain('[absent] vanished');
+      expect(result.stdout).toContain('tasks remove vanished --reason');
+    });
+  });
+
+  it('stops naming it once a removal accounts for it', () => {
+    fixture(({ tasks, dir }) => {
+      vanish(tasks, dir, 'vanished');
+      tasks('remove', 'vanished', '--reason', 'scratch, never real work');
+
+      const result = tasks('doctor');
+      expect(result.stdout).toContain('0 record(s) absent with nothing explaining it, 1 absent and accounted for');
+      expect(result.stdout).not.toContain('[absent] vanished');
+    });
+  });
+
+  it('prints its coverage on a clean run rather than the word reconciled', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'ordinary work', '--id', 'ordinary');
+      const store = path.join(dir, 'tasks.jsonl');
+      // A record predating the log: in the store, with no `add` event, so
+      // nothing here can say whether it ever left.
+      writeFileSync(store, `${readFileSync(store, 'utf8')}${JSON.stringify({ id: 'from-before', seq: 9, title: 'older than the log', kind: 'task', state: 'open', severity: null, system: null, spec: null, clause: null, discharges: [], requires: [], files: [], writes: [], grant: null, produces: [], deliverable: null, evidence: null, source: null, reason: null, trigger: null, closed: null, closedCommit: null, claimed: null, claimedBy: null })}\n`, 'utf8');
+
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('0 record(s) absent with nothing explaining it');
+      expect(result.stdout).toContain('1 of 2 store record(s) outside what this can check at all');
+      expect(result.stdout).not.toContain('reconciled');
+    });
+  });
+
+  it('leaves --fix alone, because a record the store lost is not one doctor may invent', () => {
+    fixture(({ tasks, dir }) => {
+      vanish(tasks, dir, 'vanished');
+
+      const fixed = tasks('doctor', '--fix');
+      expect(fixed.status).toBe(0);
+      expect(fixed.stdout).toContain('[absent] vanished');
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).not.toContain('vanished');
     });
   });
 });

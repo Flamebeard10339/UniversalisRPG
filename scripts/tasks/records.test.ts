@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
@@ -1611,6 +1611,77 @@ describe('a move never strands a question', () => {
         const promoted = tasks('promote', 'needs-context');
         expect(promoted.status).toBe(0);
       });
+    });
+  });
+});
+
+// c1 and c2 through the one caller that drops a record. The store's removal
+// path had a hole rather than a route: any caller dropping a task from the
+// array removed it on the next save, with nothing able to say that it had.
+describe('tasks remove', () => {
+  const events = (dir: string): Array<{ op: string; id: string | null; note: string }> =>
+    (existsSync(path.join(dir, 'events.jsonl')) ? readFileSync(path.join(dir, 'events.jsonl'), 'utf8') : '')
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
+      .map((line) => JSON.parse(line) as { op: string; id: string | null; note: string })
+      .map(({ op, id, note }) => ({ op, id, note }));
+
+  it('drops the record and files one remove event carrying the reason', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a scratch probe', '--id', 'a-probe');
+      tasks('add', 'real work', '--id', 'real-work');
+
+      const removed = tasks('remove', 'a-probe', '--reason', 'a probe, never real work', '--actor', 'worker-a');
+      expect(removed.status).toBe(0);
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).not.toContain('a-probe');
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).toContain('real-work');
+      expect(events(dir).filter((entry) => entry.op === 'remove')).toEqual([{ op: 'remove', id: 'a-probe', note: 'removed from the store: a probe, never real work' }]);
+    });
+  });
+
+  it('refuses with no reason, on the same ground decline does, and writes nothing', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a scratch probe', '--id', 'a-probe');
+
+      const refused = tasks('remove', 'a-probe');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('usage: tasks remove <id> --reason');
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).toContain('a-probe');
+      expect(events(dir).some((entry) => entry.op === 'remove')).toBe(false);
+    });
+  });
+
+  it('takes an exact id only, because a fragment resolving to the nearest record is wrong for a delete', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a scratch probe', '--id', 'a-probe');
+
+      const refused = tasks('remove', 'probe', '--reason', 'close enough');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('no record and no history answers to probe');
+      expect(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8')).toContain('a-probe');
+    });
+  });
+
+  it('files a removal for a record that already went, which is how a store that lost one is caught up', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a record that will vanish', '--id', 'vanished');
+      // The absence this branch exists for: the row is gone and the log's
+      // `add` is the only trace, which is exactly the four ids found live.
+      writeFileSync(path.join(dir, 'tasks.jsonl'), '', 'utf8');
+
+      const filed = tasks('remove', 'vanished', '--reason', 'superseded by another record; ruled 2026-08-08', '--actor', 'worker-a');
+      expect(filed.status).toBe(0);
+      expect(filed.stdout).toContain('was already absent from the store and the log had no removal for it');
+      expect(events(dir).filter((entry) => entry.op === 'remove')).toEqual([{ op: 'remove', id: 'vanished', note: 'removed from the store: superseded by another record; ruled 2026-08-08' }]);
+    });
+  });
+
+  it('refuses an id neither the store nor the log has ever held, so a typo files nothing', () => {
+    fixture(({ tasks, dir }) => {
+      const refused = tasks('remove', 'never-existed', '--reason', 'gone');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('no record and no history answers to never-existed');
+      expect(events(dir).some((entry) => entry.op === 'remove')).toBe(false);
     });
   });
 });

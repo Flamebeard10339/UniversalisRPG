@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import * as git from '../lib/git';
+import { loadEvents, reconcile } from '../lib/eventLog';
 import { checkStore, coldClaimIssues, loadStoreTolerantly, misfiledSystem, type CheckIssue, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import {
@@ -63,6 +64,22 @@ export function doctorIssues(config: Config, tasks: Task[]): CheckIssue[] {
   ];
 }
 
+// The log against the store, printed on every run and changing no exit code.
+// `doctor` keeps exactly one failure condition, and an absence in the store's
+// own history is not it: one historical absence is the case for reporting it,
+// not for failing the build over a record this repository lost before it had
+// a verb for losing one. `--fix` cannot repair it either — a record the store
+// lost is not a record `doctor` may invent.
+//
+// The coverage line prints on a clean run too. A check that says "reconciled"
+// over the quarter of the store it can see is a false proof, and this
+// repository has filed that defect under seven different names.
+function printReconciliation(config: Config, tasks: Task[]): void {
+  const { absentExplained, absentUnexplained, storeRecords, outsideCoverage } = reconcile(loadEvents(config.eventsPath).events, tasks.map((task) => task.id));
+  console.log(`the log against the store: ${absentUnexplained.length} record(s) absent with nothing explaining it, ${absentExplained.length} absent and accounted for, ${outsideCoverage} of ${storeRecords} store record(s) outside what this can check at all — they carry no \`add\` event, so nothing here can say whether they ever left`);
+  for (const id of absentUnexplained) console.log(`  [absent] ${id} — the log created it and the store does not hold it, and no removal or decline says why. \`tasks log --id ${id}\` is its whole history; \`tasks remove ${id} --reason "..."\` files the ruling`);
+}
+
 export function cmdDoctor(args: Flags): void {
   const config = resolveConfig(args.flags);
   const { tasks, skipped } = loadStoreTolerantly(config.storePath);
@@ -94,6 +111,8 @@ export function cmdDoctor(args: Flags): void {
   } else if (issues.length > 0 && args.flags.fix !== 'true') {
     console.log('none of these has exactly one correct repair; `--fix` clears a close date left on a record that is not closed, and nothing else');
   }
+
+  printReconciliation(config, tasks);
 
   const count = (level: CheckIssue['level']): number => issues.filter((issue) => issue.level === level).length;
   const dangling = count('dangling');

@@ -11,7 +11,7 @@ import { cmdDoctor } from './doctor';
 import { cmdChecked, cmdFriction } from './friction';
 import { cmdCheckCommitMessage, cmdLog, recordStandaloneEvent } from './handoff';
 import { cmdMergeReady } from './mergeReady';
-import { cmdAdd, cmdAsk, cmdDecline, cmdDefer, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdQuestion, cmdRecur, cmdRedirect, cmdRetriage, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
+import { cmdAdd, cmdAsk, cmdDecline, cmdDefer, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdQuestion, cmdRecur, cmdRedirect, cmdRemove, cmdRetriage, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
 import { cmdOrchestratePrompt } from './orchestratePrompt';
 import { cmdRoadmap } from './roadmapCmd';
 import { cmdPlanPrompt } from './planPrompt';
@@ -19,7 +19,7 @@ import { cmdSpecAdd, cmdSpecDone, cmdSpecNew, cmdSpecRemove, cmdSpecShow } from 
 import { cmdTriage } from './triage';
 import { cmdWorkPrompt } from './workPrompt';
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|question|recur|friction|checked|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|defer|retriage|redirect|ask|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|orchestrate-prompt|merge-ready> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|question|recur|remove|friction|checked|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|defer|retriage|redirect|ask|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|orchestrate-prompt|merge-ready> ...';
 
 interface Command {
   usage: string;
@@ -55,6 +55,10 @@ const COMMANDS: Record<string, Command> = {
   question: {
     usage: `usage: tasks question "<title>" --blocks id1,id2 --decider worker|planner|author --fault tooling|contract|nobody [--severity high|medium|low] [--system "<name>"] [--evidence "..."] ${ACTOR_USAGE}  (files a decision you should not make against the records it holds up, addressed to the role whose decision would hold. Nothing is stored as blocked: the question's id lands in each named record's requires, so \`tasks done\` on it once answered — or \`tasks decline\` once dismissed — releases exactly those and nothing else)`,
     run: cmdQuestion,
+  },
+  remove: {
+    usage: `usage: tasks remove <id> --reason "..." ${ACTOR_USAGE}  (takes a record out of the store and records that it left, with the reason. The id is exact, never a fragment. Closing a record is \`done\` or \`decline\`; this is for a record that should not be in the store at all, and for filing the removal of one that already went)`,
+    run: cmdRemove,
   },
   friction: {
     usage: 'usage: tasks friction  (one query over the channel: what the workflow has cost, by fault, by lesson breached, and every count beside the denominator it is a rate over. Reports only — nothing here is compared to anything)',

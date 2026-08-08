@@ -339,6 +339,61 @@ export function cmdRecur(args: Flags, usage: string): void {
   if (CLOSING_STATES.includes(task.state)) console.log(`${task.id} is ${task.state}, so this occurrence is a recurrence after the record closed — \`tasks retriage ${task.id}\` puts it back in the queue if the fix did not hold`);
 }
 
+// The recorded form of a record leaving the store, and the only route that
+// can. `--reason` is refused when absent on the same ground `decline` refuses
+// one: an absence with no stated cause is the state this exists to make
+// impossible, and the whole cost being bought down is not the missing row but
+// having to re-audit every record to tell "deliberately dropped" from
+// "silently gone".
+//
+// It also files the event for a record already gone — the retroactive case,
+// which is how a store that lost records before the verb existed is caught
+// up. Closing a record is `done` or `decline`; this is for a record that
+// should not be in the store at all.
+export function cmdRemove(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const given = args.positional[0];
+  const reason = args.flags.reason;
+  if (!given || !reason) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  const lines = multilineNote(reason);
+  if (lines !== null) {
+    console.error(`error: a removal's reason is one line — this one has ${lines}. Say why here and leave the prose in the commit message`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const tasks = loadStore(config.storePath);
+  const task = tasks.find((candidate) => candidate.id === given);
+  if (task === undefined) {
+    // Exact only, and deliberately: a fragment resolving to the nearest id is
+    // right for a command that moves a record and wrong for one that deletes
+    // it. A removal is also the one write with something to say about an id
+    // the store does not hold, so an unknown id is answered rather than
+    // refused — if the log ever created it, this is the retroactive route.
+    const created = filterEvents(loadEvents(config.eventsPath).events, { op: 'add', id: given });
+    if (created.length === 0) {
+      console.error(`error: no record and no history answers to ${given} — nothing has left the store under that id, so there is nothing to record. \`tasks list\` and \`tasks log --id ${given}\` are the two places it would be`);
+      process.exitCode = 1;
+      return;
+    }
+    recordEvents(config, 'remove', [{ id: given, system: null, spec: null, note: `removed from the store: ${reason}` }]);
+    console.log(`${given} was already absent from the store and the log had no removal for it — recorded one against its history. \`tasks doctor\` no longer reports it as an unexplained absence`);
+    return;
+  }
+
+  saveStoreAndWarn(
+    tasks.filter((candidate) => candidate.id !== task.id),
+    config,
+    [{ task, reason }],
+  );
+  console.log(`removed ${task.id} [${task.kind}/${task.state}] from ${config.storePath} — the record is gone and the log says so, with the reason`);
+  console.log(`\`tasks log --id ${task.id}\` is now the whole of what remains of it`);
+}
+
 // A question belongs to the spec whose work it holds up. Records from two
 // specs leave it belonging to neither, which `spec: null` already says.
 function sharedSpec(blocked: Task[]): string | null {

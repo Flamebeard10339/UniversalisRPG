@@ -9,7 +9,10 @@ import path from 'node:path';
 // time the prose was reworded. `checked` is the one place an event's `id` is
 // not a task id but a lesson handle — the subject of the event is the lesson,
 // and "who looked, and when" is what an append-only log answers well.
-export const EVENT_OPS = ['add', 'edit', 'start', 'stop', 'done', 'decline', 'triage', 'import', 'audit', 'spec-add', 'spec-remove', 'spec-defer', 'spec-done', 'doctor-fix', 'note', 'decision', 'recur', 'checked'] as const;
+// `remove` is the one verb the store's removal path had none of: saveStore
+// rewrites the whole file from the array it was given, so any caller dropping
+// a record removed it with nothing able to say that it had, or why.
+export const EVENT_OPS = ['add', 'edit', 'start', 'stop', 'done', 'decline', 'triage', 'import', 'audit', 'spec-add', 'spec-remove', 'spec-defer', 'spec-done', 'doctor-fix', 'note', 'decision', 'recur', 'checked', 'remove'] as const;
 
 export type EventOp = (typeof EVENT_OPS)[number];
 
@@ -134,6 +137,51 @@ export function parseEvents(text: string, label: string): ToleratedEvents {
 export function loadEvents(eventsPath: string): ToleratedEvents {
   if (!existsSync(eventsPath)) return { events: [], skipped: [] };
   return parseEvents(readFileSync(eventsPath, 'utf8'), eventsPath);
+}
+
+// What a record leaving the store looks like from the log's side. `remove` is
+// the precise answer and `decline` is the weaker one — a record declined and
+// then dropped was dropped deliberately, and reading it as unexplained would
+// bury the absences nobody can account for under the ones everybody can.
+const EXPLAINS_ABSENCE: string[] = ['remove', 'decline'];
+
+export interface ExplainedAbsence {
+  id: string;
+  op: string;
+  note: string;
+}
+
+export interface Reconciliation {
+  // Ids the log has seen created and the store still holds.
+  accounted: string[];
+  absentExplained: ExplainedAbsence[];
+  // The finding. Everything above is the proof that it is complete.
+  absentUnexplained: string[];
+  // How much of the store this could not check at all: a record predating the
+  // log carries no `add` event, so nothing here can say whether it ever left.
+  // Reported on every run, clean ones included — a check that says
+  // "reconciled" over the quarter of the store it can see is a false proof.
+  storeRecords: number;
+  outsideCoverage: number;
+}
+
+// The log and the store, compared. Three disjoint sets over the ids the log
+// has ever seen created, plus the coverage the comparison does not have.
+export function reconcile(events: TaskEvent[], storeIds: string[]): Reconciliation {
+  const present = new Set(storeIds);
+  const created = [...new Set(filterEvents(events, { op: 'add' }).map((event) => event.id))].filter((id): id is string => id !== null);
+
+  const accounted = created.filter((id) => present.has(id));
+  const absent = created.filter((id) => !present.has(id));
+  const absentExplained: ExplainedAbsence[] = [];
+  const absentUnexplained: string[] = [];
+  for (const id of absent) {
+    const explanation = events.filter((event) => event.id === id && EXPLAINS_ABSENCE.includes(event.op)).pop();
+    if (explanation === undefined) absentUnexplained.push(id);
+    else absentExplained.push({ id, op: explanation.op, note: explanation.note });
+  }
+
+  return { accounted, absentExplained, absentUnexplained, storeRecords: storeIds.length, outsideCoverage: storeIds.filter((id) => !created.includes(id)).length };
 }
 
 export interface EventFilter {

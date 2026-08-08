@@ -520,9 +520,18 @@ describe('parallel branches, merged for real', () => {
   // saveStore which file its write is replacing, and `git checkout` between
   // two of these replaces that file — so writing twice with no read in
   // between is a lost update here for the same reason it is one in a session.
+  // The delete-insert shapes below genuinely drop a record, which `saveStore`
+  // now refuses unless the caller says so. Declaring whatever went is what a
+  // command does; here it is derived, because the shapes differ per case and
+  // the subject under test is the merge, not the declaration.
   const asOneCommand = (tasks: Task[]): void => {
-    loadStore(storePath());
-    saveStore(tasks, storePath());
+    const before = loadStore(storePath());
+    const staying = new Set(tasks.map((task) => task.id));
+    saveStore(
+      tasks,
+      storePath(),
+      before.map((task) => task.id).filter((id) => !staying.has(id)),
+    );
   };
 
   it('two branches, one editing a record and adding a non-adjacent one, the other doing the same to a different record, merge with zero conflicts', () => {
@@ -1149,5 +1158,57 @@ describe('checkStore', () => {
 
     const missing = checkStore([task({ id: 'b', files: ['docs/audits/no-such-doc.md#H1'] })], systems, () => true);
     expect(missing).toEqual([{ level: 'warning', message: 'b lists a file that no longer exists: docs/audits/no-such-doc.md#H1' }]);
+  });
+});
+
+// c2. `saveStore` rewrites the whole file from the array it was handed, so a
+// record missing from that array leaves the store. Closing that set is the
+// durable part: an op added later cannot re-open the hole by being
+// write-path-only, because the refusal is at the write and not in a review.
+describe('a record cannot leave the store undeclared', () => {
+  const two = (): Task[] => [task({ id: 'stays' }), task({ id: 'goes' })];
+
+  it('refuses a save that would drop a record nothing declared, and writes nothing', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      saveStore(two(), file);
+      const before = readFileSync(file, 'utf8');
+
+      loadStore(file);
+      expect(() => saveStore([task({ id: 'stays' })], file)).toThrow(/would drop 1 record\(s\) nothing declared: goes/);
+      expect(readFileSync(file, 'utf8')).toBe(before);
+    });
+  });
+
+  it('accepts the same save once the drop is declared', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      saveStore(two(), file);
+
+      loadStore(file);
+      saveStore([task({ id: 'stays' })], file, ['goes']);
+      expect(loadStore(file).map((entry) => entry.id)).toEqual(['stays']);
+    });
+  });
+
+  it('names every undeclared drop, not the first, so one declaration cannot smuggle another out', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      saveStore([task({ id: 'stays' }), task({ id: 'goes' }), task({ id: 'also-goes' })], file);
+
+      loadStore(file);
+      expect(() => saveStore([task({ id: 'stays' })], file, ['goes'])).toThrow(/nothing declared: also-goes/);
+    });
+  });
+
+  it('says nothing about a store this process never read, because silence there is not evidence of a drop', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      writeFileSync(file, `${JSON.stringify(task({ id: 'written-by-somebody-else' }))}\n`, 'utf8');
+      // No `loadStore`: nothing here has seen the previous contents, so
+      // nothing here can claim a record left.
+      saveStore([task({ id: 'fresh' })], file);
+      expect(loadStore(file).map((entry) => entry.id)).toEqual(['fresh']);
+    });
   });
 });

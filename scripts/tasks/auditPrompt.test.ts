@@ -824,7 +824,9 @@ describe('the brief arriving with the answers rather than the instructions', () 
       expect(stepsBlock(stdout)).toContain('--breaches <lesson-handle>');
       // The invariant, of which the deleted markdown file was one instance:
       // nothing the tooling generates may direct a report outside the store.
-      expect(stdout).not.toContain('.planning/');
+      // Scoped to the instructions, because the brief also echoes the branch
+      // diff and a deleted path there is a fact, not a direction.
+      expect(stepsBlock(stdout)).not.toContain('.planning/');
     });
   });
 

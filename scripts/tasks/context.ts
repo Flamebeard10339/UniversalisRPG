@@ -188,11 +188,30 @@ export function flushSkippedStoreLines(): void {
   skippedStoreLines.length = 0;
 }
 
+// A record leaving the store, and the reason it left. Both halves travel
+// together because a caller able to declare one without the other is exactly
+// the gap this pair exists to close: `saveStore` refuses an undeclared drop,
+// and declaring it here is what writes the event, so there is no order of
+// calls that removes a record and logs nothing.
+export interface Removal {
+  task: Task;
+  reason: string;
+}
+
 // The staleness check reads the pre-write state, so it runs before the
 // save: after it, the mtime is this write's own and the question is gone.
-export function saveStoreAndWarn(tasks: Task[], config: Config): void {
+export function saveStoreAndWarn(tasks: Task[], config: Config, removals: Removal[] = []): void {
   warnIfStoreDirtyAndStale(config);
-  saveStore(tasks, config.storePath);
+  saveStore(
+    tasks,
+    config.storePath,
+    removals.map(({ task }) => task.id),
+  );
+  recordEvents(
+    config,
+    'remove',
+    removals.map(({ task, reason }) => subjectOf(task, `removed from the store: ${reason}`)),
+  );
 }
 
 // "the spec whose branch is checked out" — a branch not named after any spec

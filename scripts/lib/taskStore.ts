@@ -506,6 +506,20 @@ export function loadStoreTolerantly(path: string = DEFAULT_STORE_PATH): Tolerate
   return parseStoreTolerantly(readAndRemember(path), path);
 }
 
+// Which ids are about to leave and were not declared. Answered from the bytes
+// this process read, so it costs no second read and cannot disagree with the
+// concurrent-write check above, which is comparing the same string. A store
+// this process never read is one it cannot know the previous contents of, and
+// silence there is not evidence of a drop.
+function undeclaredDrops(seen: string | undefined, path: string, saving: Task[], removing: string[]): string[] {
+  if (seen === undefined) return [];
+  const staying = new Set(saving.map((task) => task.id));
+  const declared = new Set(removing);
+  return parseStoreTolerantly(seen, path)
+    .tasks.map((task) => task.id)
+    .filter((id) => !staying.has(id) && !declared.has(id));
+}
+
 // One task per line, in id order — the file on disk is a function of the
 // record set alone, never of what order the caller happened to build it in.
 // A line only ever moves when the id set itself changes, so two branches
@@ -593,7 +607,10 @@ function replace(staging: string, path: string): void {
 // writing would delete it with no error anywhere. Refusing costs the caller a
 // re-run, which is what `docs/workflow.md` already asks agents to arrange by
 // hand.
-export function saveStore(tasks: Task[], path: string = DEFAULT_STORE_PATH): void {
+// The ids a caller has said out loud it is dropping. Passing them is what
+// separates a removal from a record silently going missing, and the default
+// is the honest one: a caller that says nothing may drop nothing.
+export function saveStore(tasks: Task[], path: string = DEFAULT_STORE_PATH, removing: string[] = []): void {
   const sorted = [...tasks].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const body = sorted.map((task) => renderTask(task)).join('\n');
   const text = body.length > 0 ? `${body}\n` : '';
@@ -602,6 +619,17 @@ export function saveStore(tasks: Task[], path: string = DEFAULT_STORE_PATH): voi
     const seen = lastSeen.get(resolve(path));
     if (seen !== undefined && (existsSync(path) ? readFileSync(path, 'utf8') : '') !== seen) {
       throw new StoreError(`${path} changed on disk after this command read it — another write landed in between, and saving now would delete it. Nothing was written; re-run the command.`);
+    }
+    // This function rewrites the whole file from the array it was handed, so
+    // a record missing from that array leaves the store — which for sixteen
+    // ops was a thing the log had no verb for and no caller had to declare.
+    // Declaring it is now the only way to do it, so a caller that forgets
+    // gets a refusal here rather than a gap somebody finds by re-auditing
+    // every record. Closing the set is the durable part: an op added later
+    // cannot re-open the hole by being write-path-only.
+    const undeclared = undeclaredDrops(seen, path, sorted, removing);
+    if (undeclared.length > 0) {
+      throw new StoreError(`saving ${path} would drop ${undeclared.length} record(s) nothing declared: ${undeclared.join(', ')}. A record leaving the store is an operation with a reason — \`tasks remove <id> --reason "..."\` is it. Nothing was written.`);
     }
 
     const staging = `${path}.${process.pid}.tmp`;
