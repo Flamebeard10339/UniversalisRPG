@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
 import { Condition } from '../grammar/condition';
 import {
-  actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, renderSegments, travelSecondsPerUnit, useAction } from './runtime';
+  actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, GameState, initResources, renderSegments, resolve, travelSecondsPerUnit, useAction } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadModule } from '../content/registry';
 import { secondsToMs } from './units';
@@ -440,5 +440,163 @@ out: 1 cooked-shrimp
     craft('cook', registry, state);
     expect(state.time).toBe(secondsToMs(2));
     expect(state.inventory['cooked-shrimp']).toBe(1);
+  });
+});
+
+// Four repeating deterministic actions against a 30-unit pool their own results
+// drain, so each settles `on empty:` a few grinds into a span rather than at
+// whatever segment boundary the caller happens to ask for. They differ in what
+// the batch planner has to see through: `sap` is settled by a rate as well,
+// `ichor`'s drain is drawn from a selector rather than fixed at 12, and `ash`
+// says its piece without a `stop`, so its action grinds on against a pool that
+// is already empty.
+const DRAIN_MODULE = `
+# stat max-vigor
+base: 30
+
+# stat max-sap
+base: 30
+
+# stat sap-seep
+
+# stat max-ichor
+base: 30
+
+# stat max-ash
+base: 30
+
+# item trophy
+
+# resource vigor
+max: max-vigor
+on empty:
+  say: Your vigor gutters out.
+  stop
+
+# resource sap
+rate: sap-seep
+max: max-sap
+on empty:
+  say: The sap runs dry.
+  stop
+
+# resource ichor
+max: max-ichor
+on empty:
+  say: The ichor runs out.
+  stop
+
+# resource ash
+max: max-ash
+on empty:
+  say: The ash settles.
+
+# location den
+x: 0, y: 0
+starting
+entities: grindstone, millstone, wheel, bellows
+
+# entity grindstone
+grind:
+  continuous
+  time: 1
+  give: 1 trophy
+  on success:
+    drain: 12 vigor
+
+# entity millstone
+grind:
+  continuous
+  time: 1
+  -300 sap-seep
+  give: 1 trophy
+  on success:
+    drain: 12 sap
+
+# entity wheel
+turn:
+  continuous
+  time: 1
+  give: 1 trophy
+  on success:
+    one of:
+      1x: drain: 12 ichor
+      1x: drain: 4 ichor
+
+# entity bellows
+work:
+  continuous
+  time: 1
+  give: 1 trophy
+  on success:
+    drain: 12 ash
+`;
+
+describe('a deterministic batch settles `on empty:` at the completion that drains the pool', () => {
+  function grinding(entity: string, action: string, splits: number[]): GameState {
+    const registry = loadModule(DRAIN_MODULE);
+    const state = createGameState('den');
+    initResources(state, registry);
+    armAction('entity', entity, action, registry, state);
+    for (const seconds of splits) resolve(state, registry, secondsToMs(seconds));
+    return state;
+  }
+
+  function agreesWithOneShot(entity: string, action: string, oneShot: GameState, splitSets: number[][]): void {
+    for (const splits of splitSets) {
+      const folded = grinding(entity, action, splits);
+      expect(folded.inventory).toEqual(oneShot.inventory);
+      expect(folded.resources).toEqual(oneShot.resources);
+      expect(folded.log).toEqual(oneShot.log);
+      expect(folded.activeAction).toEqual(oneShot.activeAction);
+      expect(folded.time).toBe(oneShot.time);
+    }
+  }
+
+  it('banks the third grind and no more over a 200s span, one-shot or split at 3s or 10s', () => {
+    const oneShot = grinding('grindstone', 'grind', [200]);
+
+    expect(oneShot.inventory['trophy']).toBe(3);
+    expect(oneShot.resources['vigor']).toBe(0);
+    expect(oneShot.activeAction).toBeNull();
+    expect(oneShot.log.filter((line) => line === 'Your vigor gutters out.')).toHaveLength(1);
+    expect(oneShot.time).toBe(secondsToMs(200));
+
+    agreesWithOneShot('grindstone', 'grind', oneShot, [[3, 200], [10, 200], [1, 2, 3, 4, 200], [2.5, 7.5, 60, 200]]);
+  });
+
+  it('reads a rate settling the same pool, which crosses zero a grind before the results alone would', () => {
+    // -300/min is 5 a second against 12 a grind: 30 is gone on the second one,
+    // where results alone reach it on the third and the rate alone at t=6.
+    const oneShot = grinding('millstone', 'grind', [200]);
+
+    expect(oneShot.inventory['trophy']).toBe(2);
+    expect(oneShot.resources['sap']).toBe(0);
+    expect(oneShot.activeAction).toBeNull();
+    expect(oneShot.log.filter((line) => line === 'The sap runs dry.')).toHaveLength(1);
+
+    agreesWithOneShot('millstone', 'grind', oneShot, [[2, 200], [3, 200], [1, 2, 3, 200], [0.5, 6, 200]]);
+  });
+
+  it('walks a drain it cannot plan — one drawn from a selector — a completion at a time', () => {
+    const oneShot = grinding('wheel', 'turn', [200]);
+
+    expect(oneShot.inventory['trophy']).toBe(4);
+    expect(oneShot.resources['ichor']).toBe(0);
+    expect(oneShot.activeAction).toBeNull();
+    expect(oneShot.log.filter((line) => line === 'The ichor runs out.')).toHaveLength(1);
+
+    agreesWithOneShot('wheel', 'turn', oneShot, [[4, 200], [10, 200], [1, 2, 3, 4, 5, 200], [3.5, 60, 200]]);
+  });
+
+  it('goes back to batching once the pool is empty, because an empty one cannot empty again', () => {
+    const oneShot = grinding('bellows', 'work', [200]);
+
+    expect(oneShot.inventory['trophy']).toBe(200);
+    expect(oneShot.resources['ash']).toBe(0);
+    expect(oneShot.activeAction).not.toBeNull();
+    expect(oneShot.log.filter((line) => line === 'The ash settles.')).toHaveLength(1);
+
+    agreesWithOneShot('bellows', 'work', oneShot, [[3, 200], [10, 200], [1, 2, 3, 4, 200], [2.5, 7.5, 60, 200]]);
   });
 });

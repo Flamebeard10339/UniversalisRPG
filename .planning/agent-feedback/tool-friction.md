@@ -865,7 +865,523 @@ class the run's own worktree isolation was designed to avoid for the *task store
 down in the toolchain.
 
 
-## 2026-08-06, auditing `the-workflow-records-what-cost-it-in-one-place` (pass 1)
+## 2026-08-06, auditing `the-workflow-records-what-cost-it-in-one-place` (pass 1, branch lesson-handle)
+
+Three costs, all measured rather than felt.
+
+**The pass file is keyed on the spec slug alone, in the shared OS temp directory.** Step 7 of the
+brief prints `C:\Users\yonat\AppData\Local\Temp\audit-<slug>-pass1.txt`, and it printed the same
+path a sibling branch auditing the same spec would be handed. Two branches audit one spec whenever
+a spec has more than one member, which is the normal case — this spec has three. Nothing in the
+generated brief warns about it and nothing in the filename distinguishes the auditor, so the
+second one to write wins silently and the first files the other's verdicts. Avoided here only
+because the dispatch carried a hand-written instruction to copy the file to an `lh-` prefixed name
+first, which is the orchestrator paying per dispatch for something the tool knows at generation
+time. The same hazard is already a shipped lesson (`orchestrator/scratch-prefix`, "concurrent
+agents share one directory and can overwrite each other's mutation manifests") — the tool teaches
+the rule in the brief and then breaks it in the same brief's step 7. Cheapest fix: put the branch
+name in the path, since `audit-prompt` already resolves it to print the diff range.
+
+**The manifest step is the one the brief cannot do and the one it says least about.** Step 4 said
+"no manifest was written; see `Mutation manifest:` below for why", and the reason given was that
+no proof target resolved to a test the brief could name — even though c6's proof target,
+`vitest scripts/tasks/briefLessons.test.ts`, names a file that exists in this diff and has 20
+tests in it. So the brief declined to aim a manifest at the one clause in scope that was
+mutation-testable, and writing the fifteen entries by hand was about 25 minutes, the largest single
+block of this pass. The eight clauses whose targets genuinely do not resolve are unbuilt, and the
+brief cannot tell that apart from a target it simply did not try to resolve; it reports both as
+the same silence. Worth noting the neighbour: this is the same defect the spec's own Deliverable
+section names as the run's largest repeated cost ("a mutation manifest that never generates,
+because `proof: vitest <file>` names a file where `mutationManifest` needs a test") — still
+unfixed, hit again here, and this is the ninth recorded instance.
+
+**What the manifest bought, for the record on whether hand-writing it was worth 25 minutes.**
+13 killed, 2 survived, 0 errored over 15 entries. Both survivors are findings this pass filed and
+neither was reachable by reading the code — one of them, `unknownLessonIds` silently dropping an
+empty citation, is invisible precisely because the sibling function *is* tested on that input.
+Verdict: worth it, and the argument for generating the manifest is not that it saves the writing
+but that an auditor who spent 25 minutes on setup files fewer entries than one who spent none.
+
+**Cheap and worth keeping.** `npm run tasks -- merge-ready` answered all seven legs in one call and
+correctly separated the three mechanical FAILs (base drift, two open members, no recorded pass)
+from the code legs, all green. Checking whether the `base` FAIL staled the diff range took one
+`git log HEAD..main` and cost nothing: two commits, one event-log line, no code. `tasks show` on
+the member task carried the worker's recorded decisions in full, which is the reason point 3 of
+this dispatch could be judged rather than guessed — the decision note argued the case and named
+the alternative, so the audit's job was to test the argument rather than reconstruct it.
+
+**node_modules survived this pass.** The previous entry's HIGH finding held: nothing here ran an
+install, the junction stayed populated for the whole audit, and every `npm run` call worked. One
+data point that the rule works when it is carried in the dispatch; it is still carried by hand.
+## 2026-08-07, auditing `a-mutation-verdict-names-the-test-that-changed` (pass 1)
+
+The subject was `npm run mutate` itself, so step 4's instruction — aim a manifest and run the tool
+— is circular on its face: the thing being asked to prove the clauses is the thing the clauses are
+about. What resolved it was cheap and should be named as the standard move for a self-referential
+audit rather than reinvented: drive the mutation by hand (edit the line, `npx vitest run` the
+scope directly, read the failing test names out of vitest's own stderr, `git checkout --` the
+file, `git status --porcelain` for clean), then run `npm run mutate` over the identical manifest
+and check the two agree. Sixty lines of throwaway script; both passes agreed on all six entries.
+The agreement is corroboration, not proof, and only the hand-driven half is cited as evidence.
+
+The genuinely load-bearing step the brief does not ask for: capture what the tool *parses* before
+judging the parser. One `spawnSync` of vitest with stdout and stderr written to separate files,
+against a fixture built to be hostile (nested describes, `it.each`, a name containing ` > `, a
+150-character name, a `beforeAll` that throws), settled in one run what the reporter actually
+emits — stream, path separator, truncation, and whether a thrown hook prints a test-less FAIL
+line. Every one of the worker's recorded reporter decisions was checkable against that capture in
+seconds, and the highest-severity finding of this pass came out of the same capture aimed at a
+real repository file. Reading the parse and reasoning about vitest's format would have missed it.
+
+`npm run inspect -- -` with a body on stdin carried the whole second half of the audit: six
+adversarial scenarios driven through `runMutations` with injected `runTests`/`baselineFor`, plus
+feeding real captured streams to `tallyOf`. No file in the worktree, no `*.test.ts` to clean up.
+This is the tool working exactly as its own comment says it should; nothing to fix.
+
+Two real costs. `resolveVitest` is not exported in a form a scratch driver can call — reproducing
+it meant copying eight lines of `createRequire`/`package.json` `bin` resolution into the capture
+script, and the first attempt (`require.resolve('vitest/vitest.mjs')`) failed on package exports.
+A tiny exported `vitestCli()` would have saved two rounds. And `merge-ready` reports `base: main
+has moved past the merge base` as a FAIL, which is correct but arrives in the same block as the
+gates, so a reader has to know that one of the two red lines is a merge and not a defect.
+
+Cost of the pass itself, measured rather than estimated: `merge-ready` 43s for the whole gate,
+well inside the five-minute rule. `npm run mutate` over the six clause entries 97s against 56s for
+the same manifest under `main`'s `mutate.ts` — the +73% is the confirmation phase and is filed.
+
+
+## 2026-08-07, auditing `save-fixture-migration` (pass 1)
+
+Three specs landed on one branch and `audit-prompt` infers one spec per branch, so the brief for
+two of the three refuses to write its pass file and mutation manifest. The `--branch <slug>`
+override is what unblocks it, and it then prints a branch name that is false. That is survivable
+once you are told; nothing in the brief says it, and a pass filed with the override would record
+the wrong branch in the event log. Filing without the flag and briefing with it is the working
+shape — worth making `audit-prompt` able to say "this branch carries N specs" instead.
+
+Step 4 had nothing to run: all six clauses write `proof: vitest <file>` with no quoted test name,
+and `resolveTarget` only wires a target written as `vitest <file> "<exact test name>"`, so the
+manifest section printed `- none` for every clause. The step is still the whole exercise, so the
+manifest was hand-written. The cost is not the writing — it is that a spec author has no signal
+that the proof line they wrote will resolve to nothing until an auditor three commits later finds
+an empty manifest section. `tasks plan`, or `spec show`, could say "this proof target resolves to
+no test" at the moment the clause is written, which is the only moment it is cheap to fix.
+
+What the hand-written manifest bought, and the argument for keeping step 4 binding even with no
+generated one: 13 mutations, 11 killed, 2 survived, and both survivors are filed findings. Neither
+was reachable by asking "is this line covered" — both came from asking what the clause promises
+that the code merely happens to do. The sharper of the two is a test that disables itself in the
+failure state (`it.skipIf(SHAPE_CHANGE !== null)` is the only end-to-end refusal test, and it
+skips exactly when the value it guards is wrong). A survivor is the finding, but a survivor whose
+scope walked to the whole suite and came back green because the test *skipped* rather than passed
+is invisible in the report — there is already a finding on the shortfall check missing skips, and
+this pass is a second, independent instance of it.
+
+Cheap and load-bearing, worth naming as the standard move: measure the clause instead of trusting
+the number in it. c6 states a count ("three failures in one file"). Driving the bump through
+`npm run mutate` with `all: true` rather than by hand cost one command and produced the whole
+answer — 6 of 1815 with the pre-existing red subtracted, and the re-run scope column naming the
+two files. The count was correct when the event log recorded it and false by the time the branch
+ended, because a later commit *on the same branch* added two tests coupled to shipped content. A
+clause that pins a measurement can be falsified by its own branch, and only re-measuring finds it.
+
+Costs. `npm run inspect` resolves its dynamic `import()` relative to `scripts/`, not the repo
+root, so `./scripts/migrate-saves.ts` fails and `./migrate-saves.ts` works; the error does suggest
+the fix, which saved the round trip. `merge-ready` was 4m10s all in and reports `npm test` FAIL
+with no indication that the single red test is a known, filed, non-hermetic one — every auditor on
+this branch pays the same few minutes to re-establish that. A `merge-ready` that could name the
+failures it saw against the open findings would turn that into a line of output. Measured: the
+13-entry manifest 4m02s (two survivors each escalating to a whole-suite run), the single c6
+mutation 5m18s, `merge-ready` 4m10s.
+
+
+## 2026-08-07, auditing `resolve-forward-progress-guard` (pass 1)
+
+Second auditor on the same three-spec branch, so the `--branch <slug>` override and the empty
+`Mutation manifest:` section are already logged above and cost nothing here — being told in
+advance is what made them free, which is the argument for `audit-prompt` learning to say "this
+branch carries N specs" rather than for another entry about it. One thing the previous entry
+could not know: the pass file is named for the spec, not the branch, so three auditors sharing
+one temp directory cannot collide. The brief's line about the file being "yours if you have
+aimed it" reads as a warning about exactly that collision and is not one.
+
+The cost this pass actually paid was hang-screening. `npm run mutate` spawns vitest with no
+timeout, and the spec's own Decisions section records why that matters here: deleting the throw
+from `requireForwardProgress` makes `resolve()` spin synchronously, so vitest's per-test timeout
+cannot fire and the tool hangs holding a mutated tree. Every one of the 11 entries I ran had to
+be reasoned about first — "can this mutation only add throws, or can it remove one the loop's
+termination depends on?" — before it was safe to run. That screening is real work, it is
+invisible in the report, and it is what pushes an auditor toward scalings (`STALL_BOUND + 1`,
+`< now - 1`) and away from deletions. A per-mutation timeout would remove it outright: the
+restore-from-captured-bytes path already exists, and a killed child is exactly the case it was
+written for. Until then the constraint deserves to be in the brief's "how to read what mutate
+prints back" section, not only in one spec's Decisions.
+
+The move worth carrying forward: mutate a line in a PAIR, in opposite directions. Deleting the
+`requireBoundaryNotPast` call SURVIVED the whole suite; shifting its argument by one millisecond
+was KILLED. Either mutation alone gives a confident and wrong answer — deletion alone reads as
+"dead code", the shift alone reads as "fully covered". Together they say precisely what is true:
+the loop provably executes the call, and nothing observes whether it is there. That is the
+finding, and no single-mutation-per-line manifest could have produced it.
+
+Two smaller costs. `npm run inspect` takes a body of statements but not `import` declarations —
+the first attempt spent a round on "Cannot use import statement outside a module" before the
+usage text's `await load('src/runtime/runtime.ts')` form; the error names the symptom and not the
+fix, which is one line of message away from being free. And `merge-ready` still reports `npm test
+FAIL` with no hint that the one red test is filed and non-hermetic, which is the same tax the
+previous entry measured; I re-established it independently on purpose, and it took a targeted
+vitest run plus a `git diff --name-only main...<base>` to prove the test was green before this
+range and that this spec's three files are independently sufficient to redden it. Worth the
+minutes once per branch, not once per auditor.
+
+Measured this pass: `src/runtime/resolve.test.ts` 32 tests in 1.0s, which is why an 11-entry
+manifest scoped to it is cheap and why the four whole-suite escalations (one per survivor) are
+where the wall clock goes. `merge-ready` 1815 tests, one red. Two numbers the audit produced
+rather than consumed, both from `npm run inspect`: `resolve()` over a boundary-dense span is
+quadratic in active buffs — 500 buffs 34ms, 1000 buffs 133ms, 2000 buffs 653ms — which is
+pre-existing and belongs to `offline-progression`, not here; and the branch's switch from
+`Object.values` to `Object.entries` in that scan costs 637ms against 512ms over 2000 calls on
+2000 keys, i.e. real and immaterial at any count a session reaches. Measuring it was cheaper than
+arguing about it, and is the reason no performance finding was filed.
+
+## 2026-08-07, auditing `non-entity-action-owner-inherits-player-stats` (pass 1)
+
+The third audit of one branch carrying three specs, and the first whose spec owns no
+`src/runtime` path — which turned the branch's one red test from a thing to re-litigate into a
+thing to measure. `audit-prompt`'s prior-art heading is built from the live working tree's diff
+filtered to system-owned paths, and the heading its own fixture printed was
+`prior art on src/runtime/forwardProgress.ts, resolve.test.ts, runtime.ts, save.test.ts,
+save.ts, session.test.ts`. Not one `src/content` path appears, because the fixture's manifest
+owns none — so attribution was a single grep rather than an argument: reverting this spec's three
+files leaves the assertion failing identically. Two prior entries had to reason about whether the
+red was theirs; this one could read the answer off the failure output. Cost: about four minutes,
+and worth stating as a technique — when a non-hermetic test leaks the tree, the leak itself is
+the attribution evidence.
+
+`resolveTarget` still resolves nothing for any of the three specs, because all three write
+`proof: vitest <file>` with no quoted test name. Third audit in a row hand-writing a manifest.
+The gap is one line wide: a `proof: vitest <file>` with no test name could resolve to the file and
+run the whole file as the scope, which is strictly better than "- none" and refusing to write a
+manifest. As it stands the tool's one automated step is off for every spec that does not know the
+undocumented quoting rule.
+
+What the manifest bought that reading could not. Five mutations of one 8-line function, each
+aimed at a different clause of the rule, all KILLED by five *different* named tests — including
+`const max = registry.resources.get(action.target)?.max` -> `const max = action.target`, which is
+the only one that proves the resource-to-stat indirection is watched rather than the mere presence
+of a check. Two more on `statRange`, which this branch does not touch, for c3's "nothing changed":
+deleting the global-base fallthrough is killed inside the named proof target, but *swapping* the
+two operands — an actor's own sheet losing to the global base, the exact asymmetry the spec is
+about — survives `src/runtime/stat.test.ts` and escalates to the whole suite. c3's proof target
+covers the player's half of its clause and not the entity's. That is a fact no amount of reading
+green tests produces, and it cost one 40-second run.
+
+The finding the clause-by-clause pass cannot reach came from `npm run inspect`, not from the diff:
+after this branch a `# entity` with `stats: max-health 5` and a `target: health` action loads
+clean and `statRange('attack', …, 'ghoul')` returns the player's 10. The branch closes one of the
+six stats shipped `melee-foe` reads. Every clause is honestly met and the deliverable's own
+sentence is discharged for a sixth of its subject — which is exactly the "the reproduction is
+always narrower than the property" lesson the brief prints, arriving from the other direction:
+here the *fix* was narrower than the property, and only asking the runtime a question caught it.
+
+Measured this pass: `src/content/references.test.ts` 41 tests, five mutations plus six baselines
+in ~50s; full suite 1815 tests, one red, ~90s. `npm run probe -` with a heredoc answered "is
+`max:` required on a `# resource`" in one call and killed a would-be finding about the
+`max === undefined` arm being a silent hole — it is not, the schema refuses a resource without a
+max, so that arm only fires for a target naming no resource, which the reference check then
+reports properly. Cheapest measurement of the pass.
+
+### non-entity-action-owner-inherits-player-stats (pass 2, run concurrently in its own worktree)
+
+## 2026-08-07 — non-entity-action-owner-inherits-player-stats audit pass 2 (concurrent, worktree audit2)
+
+Cheap pass. Roughly 25 tool calls end to end, ~12 minutes of wall clock, and the only real cost
+was the two full test suites (43s each) and the mutation run (~2 min for 8 mutations across 7
+baseline scopes).
+
+**Audit tool.**
+- `audit-prompt` resolved the branch by the strict route and wrote the pass file without a
+  `--branch` flag, exactly as promised. The "Who owns each changed path" and prior-art sections
+  were the single most useful thing in the brief: `[unreviewed] ...-pass1-an-entit` showing up
+  under prior art on registry.ts is what let me recognise the pool-only residual on sight and
+  step around it instead of re-deriving and re-filing it. That section paid for itself.
+- `Mutation manifest: - none` cost me nothing this time only because the dispatch told me in
+  advance why. Standing cost is real: `resolveTarget` wires a target only for
+  `vitest <file> "<exact test name>"`, and all five clauses here write `proof: vitest <file>`.
+  Every clause on this spec is mutation-testable and none of them is wired. Hand-writing the
+  manifest took ~5 minutes; the harder part is that nothing in the brief tells an auditor which
+  line a clause is *about*, which is correct (that judgement is the exercise) but means the
+  "wired to the tests above" framing promises something the tool cannot deliver on this spec
+  shape. Either specs should be pushed toward quoted proof targets, or the brief should stop
+  describing a manifest it will not write.
+- The pass file's `#`-at-column-zero comment rule collided with DSL evidence: every error message
+  this spec produces starts `# item …` / `# location …`, which would be silently eaten as a
+  comment. I rewrote them as `... item …`. Small, but it makes the one system whose error
+  messages all begin with `#` awkward to quote in its own audit record. A `\#` escape, or
+  requiring the comment marker at column zero followed by a space, would fix it.
+- Goal line: the spec records none, so the brief printed the deferral warning and `deferred` was
+  unavailable as a weighed option. Did not bite (all clauses met) but it is a live gap.
+
+**Mutation tool.** Excellent this pass — 8/8 killed, every verdict attributed to a named test and
+re-confirmed at that test's own file. The named-test attribution is what let me trust the two new
+neighbour mutations (unwiring the call site; emptying entityTypeBase's inherited actions) rather
+than just re-running pass 1's four. Baseline pre-measurement of seven scopes cost ~40s before
+anything was written; worth it. No unrestored files, journal clean, `git status` empty after.
+
+**Probe and inspect.** `npm run probe -- - --each` over a 9-variant heredoc answered the whole
+over-strictness question in one call and was the highest-value tool of the pass. `inspect` cost
+me four round-trips to discover the fixture shape: `ModuleSource` is `{name, text}` not `{id,...}`,
+the namespace separator is `.` not `:`, the info id is on the header line (`# info base`) not an
+`id:` field, and the dependency field is `dependencies:` not `needs:`. Each was a one-line error
+and a re-run. A `--help` example showing one two-module `loadUniverse` call would have saved all
+four; this is the single cheapest fix available in this list.
+
+**Harness.** Bash tool resets cwd between calls — every command needed the absolute worktree path
+prefixed, and a compound `cd &&` silently produced NO OUTPUT AT ALL on one call (the
+`git diff --stat -- content/` + `--name-only` chain), which I initially misread as "content is
+untouched" rather than "the command did not run". That is a dangerous failure mode for an auditor:
+an empty diff and an unexecuted command look identical. Using `;` instead of `&&` after the `cd`
+fixed it. Worth a line in the auditor brief.
+
+**merge-ready.** One invocation, ~2 min, and its `npm test ok pass` doubled as my second
+independent full-suite run — which is what made the flake protocol a no-op (nothing failed, so
+nothing needed isolating). Its final two FAIL lines (`spec`: the held unreviewed finding;
+`clauses`: the c4 this pass clears) are both correct and both self-explanatory. No friction.
+
+### save-fixture-migration (pass 2, run concurrently in its own worktree)
+
+## 2026-08-07 — save-fixture-migration audit pass 2 (concurrent, worktree audit2-save-fixture-migration)
+
+**No mutation manifest was generated, and the brief said so honestly.** `resolveTarget` only wires a target written as `vitest <file> "<exact test name>"`; this spec writes `proof: vitest scripts/migrate-saves.test.ts` with no quoted name, so the brief printed "- none". Cost: I hand-wrote a 15-entry manifest and a 1-entry manifest in scratch. That is the right division of labour (aiming the mutation IS the exercise), but the brief could pay for itself by emitting a manifest *skeleton* with `file`/`find` blank and `tests` pre-filled from the proof target's file — the file half is mechanical, only `find` is judgement. Measured: roughly 12 minutes of this pass went into transcribing test names out of the source into the manifest, which the tool already knows.
+
+**mutate is excellent and the verdict format did its job.** 15 mutations, 15 KILLED, every one attributed to a named test and re-run at that test's own file. Two of them (`c3c`, `c5c`) were aimed specifically at fix-pass commits and killed, which is what let me certify the fixes rather than the clause text. Wall clock for the 15-entry run over one test file: ~3 min including 12 baseline measurements. The `all: true` c6 run: ~6 min for baseline + mutant + re-run scope.
+
+**The `all: true` baseline is where the flake costs money.** mutate's own whole-suite baseline reported "1 test(s) were already failing before this mutation" and its escalation walked into scripts/modportal.test.ts and scripts/tasks/handoff.test.ts — both flake-set files — so its kill line named a mixture of real and flaky failures with no way to tell them apart from the report. I could not use mutate's output for c6 at all; I re-did the measurement by hand (sed the constant, `npm test` to a log, `git checkout --`, grep the FAIL lines) to get the failure *names*, then ran the three suspects in isolation under the same mutation. Cost: ~15 extra minutes and three extra full-suite runs. The cheap fix is on mutate, not on the flake: when a whole-suite run is the scope, print the failing test names of the baseline and of the mutant side by side, so "1 already failing" is a name rather than a count. Today the number moves and the reader cannot see which name moved.
+
+**The isolation check paid for itself immediately.** 9 failed of 1822 under the bump looked like c6 was worse than the clause claims (it claims 5). Re-running scripts/modportal.test.ts + scripts/tasks/doctor.test.ts + scripts/tasks/handoff.test.ts alone under the *same* mutation gave 57/57, which is what made the 5 exact. Note for the flake finding: this run adds `scripts/tasks/doctor.test.ts` to the sighting list, and the set that tripped (modportal x2, doctor, handoff) was again not the set the previous sightings recorded.
+
+**Verifying c6's second half required editing two source files and could not be done with mutate.** "goes green once `npm run migrate-saves` restamps content" needs SAVE_VERSION bumped *and* SHAPE_CHANGE declared *and* the command actually run, before the suite means anything. mutate does one find/replace and restores; it cannot express "mutate, run a command, then measure". I did it by hand with an explicit `git checkout -- <three paths>` and a `git status --porcelain` after every step. That is a legitimate gap rather than a tool defect, but it is worth naming: a clause whose proof is "do X, then run a command, then the suite is green" has no tool, and this spec had one.
+
+**inspect's import base is relative to scripts/, not to the repo root.** `await import('./scripts/migrate-saves.ts')` resolved to `scripts/scripts/migrate-saves.ts`. The error message did say "Did you mean to import './migrate-saves.ts'?", which recovered it in one round trip — good failure message, but the base is surprising and is not in the brief's tool list.
+
+**Harness.** The Bash tool resets cwd between calls, so every command carried its own absolute `cd`; combined with heredocs into a Windows scratch path this cost two malformed-command retries. `npm run probe`/`inspect` also echo the full scratch path with a `***` redaction in the middle, so a reported path cannot be copy-pasted back into a command.
+
+**Total: ~70 minutes wall clock, of which ~35 was test execution (two full suites, the two mutate runs, the migrated-tree suite) and ~15 was recovering the c6 measurement from the flake.**
+
+### resolve-forward-progress-guard (pass 2, run concurrently in its own worktree)
+
+## 2026-08-07 — resolve-forward-progress-guard, audit pass 2
+
+Fourth audit in a row where `resolveTarget` wrote no manifest, for the same one-line reason: all
+three specs on this branch write `proof: vitest <file>` with no quoted test name, so the brief
+prints "- none" and step 4 — the step the brief itself calls "the whole exercise" — starts from
+zero. I hand-wrote three manifests (15 entries total). The gap is still one line wide: a
+`proof: vitest <file>` with no test name could resolve to the file and run the file as the scope,
+which is strictly better than refusing to write anything. As it stands the tool's one automated
+step is off for 100% of the specs an auditor actually meets.
+
+**What the manifest bought that reading could not, and what it cost.** Group A: 10 mutations of
+`src/runtime/forwardProgress.ts` and `runtime.ts`, all file-scoped, 8 baselines — about 2 minutes,
+10 killed by 5 distinct named tests. That is the cheap, high-yield shape. Group C: 4 mutations
+aimed at the source-wiring residual, 3 of which escalated to whole-suite — about 6 minutes, and it
+returned the pass's only real finding: two of the four boundary sources can be rewired to the wrong
+candidate with the whole suite green.
+
+**The flake cost me a verdict, not just a re-run.** This is the number worth carrying forward.
+mutate's own whole-suite baseline came back with **8 already-failing tests**, and the third wiring
+mutation returned UNSTABLE rather than SURVIVED purely because of that noise — a failure that did
+not reproduce on re-measurement. So under contention, whole-suite escalation does not merely cost
+four minutes, it can cost the answer. `npm test` itself: 3 full runs at one tree — 1 green
+1822/1822 (merge-ready's leg), 2 red on exactly `scripts/tasks.test.ts > "refuses five junk
+arguments on every bounded command surface"` with `Test timed out in 5000ms`. In isolation that
+file is 18/18 in **3.25s** and the single test passes twice at **3.69s / 3.71s**. The filed finding
+describes "fails once and passes twice"; with three auditors sharing the machine it is two-in-three,
+against a 5s timeout on work that takes 2.2s alone. The isolation check is what makes the
+distinction, and it took 40 seconds — cheap, and I would not have trusted the verdict without it.
+
+**Step 4's artifact is not cumulative.** The `--args-from` pass file has nowhere to put the
+manifest, so the manifest — the one durable product of the most expensive step — survives only as
+prose inside `--evidence N=`. Pass 3 will hand-write it again. A `--manifest <path>` flag that
+parked the JSON beside the spec would make each pass start from the last one's aim instead of from
+the source. Related and concrete: my first c3 mutation (`return 0` -> `return consecutiveStalls`)
+was the WRONG aim and the tool told me so correctly — it escalated and named a different test — but
+I only knew to re-aim because the brief explains that `"<a test>" -> <a file>` is not the clause
+proving itself. That paragraph earned its place; keep it.
+
+**Cheapest measurement of the pass, again `inspect`.** One call —
+`npm run inspect -- "[Object.is(Math.round(-0.0004*1000), -0), Math.ceil((60000*(1-1)-1-0)/Math.round(-0.0004*1000))]"`
+-> `[true, Infinity]` — killed a would-be finding about `msUntilEmpty` dividing by zero for a rate
+that rounds to zero milli-units. JS `Math.round` returns `-0` there, so the result is `+Infinity`
+and the candidate is never selected. Thirty seconds against what would otherwise have been a
+paragraph of reasoning I could not have trusted.
+
+**Noise in the brief.** `Goal: (none recorded — add a `## Goal` line …)` is printed as though it
+were this spec's omission. 7 of 50 specs have a `## Goal`. Either the field is a convention nobody
+adopted, in which case the nag should go, or it is required, in which case 43 specs need it — but
+telling one auditor about it mid-brief converts a repo-wide gap into per-pass noise, and the
+deferral route it gates is effectively unavailable for almost every spec.
+
+Wall clock for the pass: roughly 35 minutes, of which ~8 was mutation runs, ~6 was three full-suite
+runs plus the isolation check, and the rest reading `runtime.ts`/`effects.ts`/`units.ts` closely
+enough to prove which mutations could not hang. That last part is unavoidable and correct — the
+spec's own Decisions section warns about it — but it is the reason a manifest is expensive to aim
+for this particular subject.
+
+## 2026-08-07 — dangling-reference-on-field-edit and offline-progression, passes 1 and 2 (six auditors, one shared worktree)
+
+Written by the orchestrator, not the auditors. That is itself the first entry.
+
+**The orchestrator suppressed step 8 six times and nearly lost every lesson below.** Three auditors
+per pass ran concurrently in ONE worktree, so each brief carried "do not write the tool-friction
+file; put it in your report instead" — the same override that kept them off `docs/tasks.jsonl` and
+the git index. Store writes and git writes genuinely must be serialised. This file must not: it is
+append-only prose, one dated section per pass, and two agents appending to it conflict no worse than
+two commits do. The override was applied to it by reflex because it sat in the same sentence as the
+real hazards. Everything here survived only because the orchestrator still had the reports in
+context when asked whether the lessons had persisted. The sibling session, which gave each auditor
+its own worktree, wrote its six entries normally.
+
+**`npx rg` fetches and executes an untrusted package.** An auditor typed `npx rg`; npm installed
+`rg@0.0.2` from the registry and ran it. It printed `README.md already exists. run with -f to
+overwrite` and returned nothing for three consecutive searches — output a scanner reads as "no
+matches", not as failure. In a read-only audit over a worktree two other auditors were reading, an
+arbitrary package executing with write access is a real hazard, and it was caught only because the
+auditor checked `git status` afterwards. Filed as a finding as well as recorded here.
+
+**Concurrent agents share one scratchpad path and silently overwrite each other's measurements.**
+Two pass-1 auditors wrote `scratchpad/perf.js` and `scratchpad/perf2.js`; both were clobbered
+mid-audit, one of them by a benchmark referencing a `scratchpad/before/src/` tree its author never
+created. No numbers were lost only because both had already captured them. A run that wrote then
+read would have measured another agent's code and reported it as its own. Pass 2's briefs added
+"write into your own private subdirectory", which worked — but nothing in the tooling suggests or
+enforces it.
+
+**`mutate` has no way to validate a manifest without running it.** It refuses a `find` that does not
+occur exactly once, but only after starting. Because the auditors were forbidden from running it,
+they hand-verified every `find` string — occurrence counts, indentation, a literal `\0`, and CRLF —
+with node one-liners and `sed | cat -A`. A `--check` that parses the manifest and reports occurrence
+counts per entry would have cost nothing and saved that in three separate passes. The orchestrator
+paid it too: one manifest's first target reported 0 occurrences purely from shell escaping of `\0`,
+and only re-verifying by `JSON.parse`ing the manifest itself showed the target was fine.
+
+**`mutate` escalating to the whole suite collides with the known subprocess-timeout flake.** Two
+mutations came back UNSTABLE — not KILLED, not SURVIVED — because `scripts/modportal.test.ts` timed
+out during whole-suite escalation and could not be attributed. Settling one of them took three runs
+and a re-scope to `tests: ["src"]`. The flake is filed; the compounding effect on `mutate`'s verdict
+ladder is worth knowing, because an UNSTABLE verdict costs a whole re-run and reads as neither
+evidence nor absence of it.
+
+**`audit-prompt` wrote no mutation manifest for either spec**, reporting "no proof target on this
+spec resolved to a test this brief could name" — while every clause carries `proof: vitest <file>`
+and those files exist. Step 4 then instructs the auditor to set each entry's `file` and `find`
+against a manifest that does not exist, so three auditors wrote one from scratch, including
+discovering the field names by reading `scripts/mutate.ts`. The message names what the tool did not
+do rather than which target failed to resolve, so none of them could tell a resolver bug from a
+deliberate refusal.
+
+**`audit-prompt` on a branch whose inferred spec is not the one being audited suppresses the pass
+file itself.** Auditing `offline-progression` from a branch inferred as
+`dangling-reference-on-field-edit` printed a WARNING and wrote neither manifest nor pass file. The
+warning is right; the consequence is that the pass-file format then exists nowhere the brief points
+to, and the auditor recovered it by reading `auditArgsSkeleton` in `scripts/tasks/audit.ts`.
+
+**The pass-file parser has one trap worth stating.** A continuation line beginning with `--`
+is parsed as a new flag. Evidence prose that wrapped before `--maxWorkers=4` silently truncated a
+clause's evidence; the fix was to reflow so no continuation line starts with a dash. Nothing warns.
+
+**`merge-ready` re-runs the full suite unconditionally** — 62s of its wall clock, immediately after
+the auditor had run the identical suite. There is no way to hand it a result it could trust.
+
+**Two findings' reproductions were not re-runnable as written.** Neither recorded its modules'
+`dependencies:` lines, and module load order is topological, so a pass-2 auditor's first two
+attempts put `# remove` after the re-creation and then hit "base is not this module or one of its
+dependencies". Three round-trips to reproduce a finding that claimed to be measured. A finding's
+evidence should carry the module sources verbatim.
+
+**`serializeSave` and `loadSave` disagree on shape.** `serializeSave` emits `{version, ...diff}`;
+`loadSave` wants `{version, diff}`, so round-tripping the repo's own save bytes fails with "save
+holds an unknown field: version" until reshaped by hand.
+
+**`npm run inspect` is the load-bearing tool of a concurrent audit, and worth protecting.** It
+answered every question `mutate` could not, left nothing on disk, and is safe to run while other
+agents read the tree — which `mutate` is not. One auditor ran sixteen load-path fixtures through it
+as stdin bodies; another used it for a 3972-universe fuzz and a before/after differential against
+`git archive` of the base tree. Every one of those would otherwise have been a scratch `*.test.ts`
+inside a worktree two other agents were reading. Recording it as friction avoided rather than
+friction met.
+
+## 2026-08-07 — audit pass 1, a-green-run-means-the-tree-is-green (opus-auditor-p1)
+
+- `npm run mutate` could not return a single KILLED verdict. 22 of the 24 entries I aimed broke a
+  test and every one came back ERROR: `parseFailedTests` cannot read vitest's project-qualified
+  `FAIL  |tools| <file> > <suite> > <test>` line, which is what two configured projects make it
+  print. Cost: two full manifest runs (~13 and ~9 minutes) plus a throwaway failing test to
+  confirm the reporter format, and every "met" verdict in this pass had to be justified from
+  failure text read by eye out of an ERROR row. Filed HIGH. This is step 4 of the brief the tool
+  itself generates, and no auditor on any spec can currently satisfy it as written.
+- `audit-prompt` printed "no manifest was written" for step 4 and then step 4 told me to aim one
+  anyway. Aiming it by hand was the right instruction, but the brief spends a line saying the tool
+  declined rather than a line saying what a good entry looks like; the format had to be read out of
+  `parseManifest` in `scripts/mutate.ts`. Already filed as
+  `audit-prompt-generates-no-mutation-manifest-for-any-spec-who`.
+- Measuring c7 and c8 honestly cost five full suite runs (two `npx vitest run --reporter=json
+  scripts` and three `npm test`), about 5 minutes of wall clock, and that was the cheapest way to
+  check a measurement the branch had recorded rather than asserted. Worth it: the re-run disagreed
+  with the record, which is the finding.
+- `npm run tasks -- merge-ready` was the one leg of this that cost nothing to trust: one invocation,
+  every gate, and the only failure was the pass I was about to file.
+
+## 2026-08-07 — audit pass 2, a-green-run-means-the-tree-is-green (opus-auditor-p2)
+
+- `audit-prompt` run from the main checkout answered about the wrong tree, and answered
+  confidently. The branch lives in `.claude/worktrees/<slug>`; run from `C:/…/UniversalisRPG` the
+  brief printed `Diff range: 431ab07..431ab07`, "Commits in this range: none", "Diff stat: (none)",
+  every clause `unknown`, no pass-1 record, and step 7 as "do not file a pass — nothing relates this
+  slug to this branch". Every one of those is a true statement about the checkout it was run in and
+  a false statement about the audit I was commissioned for. Cost: one wasted brief and the ~2
+  minutes to notice `git worktree list` explained it. The branch name is in the command line; a
+  brief that cannot find the slug's commits could say "this slug is checked out at <path>" instead
+  of concluding the branch has no diff.
+- `mutate`'s `test` field takes a vitest `-t` substring, but the brief, the usage text and the
+  survivor rows all print names in `file > suite > test` form. Copying a name out of a survivor row
+  into a manifest is refused with "no test named … ran in <file>", which reads as "you aimed at a
+  test that does not exist" rather than "drop the suite prefix". Cost: one refused manifest run.
+- `mutate` itself was the whole value of this pass and worked exactly as documented — pass 1's
+  `|tools|` fix has landed, and 17 of 22 entries came back KILLED with a named test and a
+  re-measurement. The five survivors are five of the six findings I filed; four of them are lines
+  no reading of the diff would have flagged. Two manifest runs, ~11 and ~8 minutes.
+- Measuring c7 and c8 again cost five full suite runs (two `npx vitest run --reporter=json scripts`,
+  three `npm test`), ~5 minutes wall. Unavoidable and worth it: c7's residue moved from six tests
+  over 2000ms to one-to-three, which is a number no static reading produces.
+- `merge-ready` again cost one invocation and reported exactly the two legs the pass was about.
+
+## 2026-08-07 — audit pass 3, a-green-run-means-the-tree-is-green (opus-auditor-p3)
+
+- `tasks audit --args-from` refused the whole file with "`--commit` describes a finding, and no
+  `--finding` has been opened yet" because one wrapped line of clause evidence happened to begin
+  with `--commit HEAD`. The continuation rule is "a line that does not open with `--`", and the
+  evidence a pass is asked to write quotes command lines and test names constantly, so any flag-like
+  token landing at column zero after a wrap is indistinguishable from a flag. Cost: one refused
+  filing and a scan of the file for stray `^--` lines. The error names the offending flag but not
+  the line number, and the flag it names does not exist in the file as a flag.
+- Three whole-suite mutation escalations cost ~9 minutes between them, and all three came back
+  SURVIVED — which is the point: they were re-measurements of pass 2's three unreviewed findings,
+  and confirming a survivor still survives is worth the wall clock. Narrow entries were nearly free;
+  the price is entirely in the escalation, and `mutate` spends it only where it must.
+- `mutate`'s `test` field taking a `-t` substring bit again, but only because pass 2 wrote it down
+  here — that note is what saved the round-trip. Worth keeping.
+- Measuring c7 and c8 cost five full suite runs (two `npx vitest run --reporter=json
+  --configLoader runner scripts`, three `npm test`), ~5 minutes wall. Third pass in a row to pay it,
+  third pass in a row where the number moved: c7's residue went six tests over 2000ms, then one to
+  three, now exactly one in both runs. A clause whose grade turns on a measurement nobody can cache
+  is expensive on purpose and cheap against the alternative.
+- Recording a clause `deferred` resolves the clause standing but leaves the `undelivered` record an
+  earlier pass created open, so `merge-ready`'s `spec` leg still fails on member tasks the `clauses`
+  leg now says are settled. Already filed as
+  `a-later-pass-grading-a-clause-deferred-cannot-convert-the-un`; this pass is its second sighting,
+  and c5 shows it is not specific to `deferred` — grading a clause `met` leaves the record open too.
+
+## 2026-08-07, auditing `the-workflow-records-what-cost-it-in-one-place` (pass 2, branch friction-record)
 
 ### The pass file is keyed on the spec slug alone, in the shared OS temp directory, so two auditors
 ### of one spec on two branches write to the same path

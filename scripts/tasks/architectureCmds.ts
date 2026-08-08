@@ -261,8 +261,8 @@ export function reportPriorArtOnWrites(config: Config, tasks: Task[], task: Task
 // exists for is running step 1's survey rather than trusting a planner to
 // remember the command, so it reaches this the way `cmdWhere` does rather
 // than printing advice about it.
-export function printWhere(config: Config, target: string): void {
-  const { manifest, tree, modules } = architecture(config);
+export function printWhere(config: Config, target: string, arch = architecture(config)): void {
+  const { manifest, tree, modules } = arch;
   const view = regionView(manifest, tree, modules, target);
 
   console.log(`${view.path}`);

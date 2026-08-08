@@ -1,5 +1,15 @@
 # graph-based-items-research
 
+**Retired 2026-08-07. Do not work this spec.** It gated `items-mods-and-crafting` on whether a rolled
+directed graph of mod nodes, interacting through a universe-wide resonance relation, gives the player
+real and legible agency. That spec was rewritten the same day to replace the graph with an authored
+passive tree grown by slotting orbs: balance is local to an orb rather than global to the resonance
+constants, and legibility — which the clauses below name as the load-bearing uncertainty no probe
+could settle — is answered structurally by a tree the player reads. There is no graph left to
+research. `docs/smithing/topology-probe.md` stands as a measurement of a design not taken.
+
+Everything below is the promise as it was written, kept as history.
+
 ## Deliverable
 
 One short report, beside `docs/smithing/topology-probe.md`, answering whether placing mods into a

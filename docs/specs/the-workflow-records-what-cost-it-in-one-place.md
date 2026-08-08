@@ -61,19 +61,29 @@ Proof:
   with the dispatch it is supposed to control. A stored blocking flag and a derived one are two
   answers to one question, which is the defect this clause exists to refuse.
   proof: vitest scripts/tasks/friction.test.ts
-- [c4] A blocking question has a route that is neither deciding it nor stalling the worker, and it
-  names **who should decide it**. An agent can file one against the record it is working, address it
-  to the role whose decision would hold, name it where the dispatch machinery already reads, and
-  have exactly what depends on it halt while the rest proceeds; answering or dismissing it releases
-  the hold. The addressee is the point rather than a label on it: a question parked with no decider
-  is a stall with extra steps, and the run failed its own c3 because escalating had no destination.
-  Recorded as the remedy for `run-an-orchestrator-over-three-parallel-tasks` c3 — which is deferred
-  out of that spec, still unmet, and is this clause's real acceptance test.
+- [c4] **A question reaches its decider.** Every mechanism below serves that one property, and a
+  reader grading this clause grades the property — the list is how it is reached today, never its
+  extent. An agent can file a question against the record it is working and address it to the role
+  whose decision would hold; exactly what depends on it halts while the rest proceeds; answering or
+  dismissing it releases the hold; and **the addressee changes what the tooling does with it**, so
+  that a question addressed away from the worker is never handed back to one as work to implement.
+  A recorded decider that routes nothing is a label, and a question parked behind a label is a stall
+  with extra steps. Amended 2026-08-06 after an audit graded the enumeration and not the property;
+  the original text mixed the two, which is the error `PLANNER_LESSONS` names first.
+  Owned by two slices, and outstanding until both land. Recorded as the remedy for
+  `run-an-orchestrator-over-three-parallel-tasks` c3 — deferred out of that spec, still unmet, and
+  this clause's real acceptance test.
   proof: vitest scripts/tasks/friction.test.ts
-- [c5] Fault `nobody` is never counted as a defect. The query reports it, because a question nobody
-  could have answered is real information about where knowledge was missing, and excludes it from
-  every count and rate presented as a defect measure. Reporting and counting are different acts and
-  this clause turns on the difference.
+- [c5] Fault `nobody` is never counted as a defect, and **absence of a fault is never read as one**.
+  The query reports `nobody`, because a question nobody could have answered is real information about
+  where knowledge was missing, and excludes it from every count and rate presented as a defect
+  measure. Reporting and counting are different acts and this clause turns on the difference. A
+  record predating the field is reported in its own **unclassified** bucket and excluded from those
+  same rates — never folded into `nobody`, which would look like a small convenience and would empty
+  the value of the meaning the whole axis depends on. Unclassified is a reported category, not a
+  fourth fault: fault stays exactly tooling, contract or nobody, and absence stays absence. They are
+  not backfilled — 76 live records carry no fault, the number falls as they close, and guessing one
+  for a record whose author is gone is how `nobody` becomes the catch-all.
   proof: vitest scripts/tasks/friction.test.ts
 - [c6] A record may name the lesson it breaches, by a handle that survives editing the lesson's own
   prose. Renaming or rewording an instruction must not orphan the records that cite it, and a
@@ -91,6 +101,44 @@ Proof:
 - [c9] Nothing gates on any of it. No leg of `merge-ready`, no CI check and no command's exit code
   reads a fault, a breach or a count. The channel is a report and refuses to become a threshold.
   proof: vitest scripts/tasks/mergeReady.test.ts
+- [c10] **A recurrence is a new observation, never an edit.** Recording that a friction happened
+  again appends an occurrence that carries its own note and names the record it recurs on; nothing
+  is incremented and no description is overwritten, so the count is derived from the occurrences and
+  cannot disagree with them. Two reasons, both already written down here. `.gitattributes` keeps the
+  store out of `merge=union` because two branches editing one record silently keep both copies under
+  one id — and a counter is a field concurrent branches edit by construction, whose correct
+  resolution is to add the two sides, which git cannot compute. And one description overwritten N
+  times loses what N observations each said: the nine mutation-manifest instances differed by spec,
+  by pass, and by what each cost. **Owned by two slices — the append and the derivation — and
+  outstanding until both land.**
+  proof: vitest scripts/tasks/friction.test.ts
+- [c11] **Filing a record shows what already claims the path it names, and never refuses.** The
+  prompt is by path and never by title, because a path is the same string for everyone while a title
+  is authored prose two agents will not choose alike — `priorArt` already reads every record's
+  `writes` and `files` in every state, so this is wiring, not a new query. Attaching an occurrence to
+  an existing record is available and deliberate; filing a new record stays the cheap default. That
+  asymmetry is the clause, not a preference: a duplicate is visible and cheap to triage, while a
+  wrong merge makes a distinct defect vanish and the count lie, so the tool must never make the
+  merge the path of least resistance — least of all for an agent that has just hit the friction and
+  is the worst placed to classify it.
+  proof: vitest scripts/tasks/friction.test.ts
+
+- [c12] **A lesson that keeps costing something surfaces as work for a planner, and nothing in the
+  tooling ever elevates it.** No count is compared to anything, anywhere in any code path. The
+  breach records are the flag: they dedupe by c11 and accumulate by c10, so one lesson holds one
+  record with N occurrences, and a planner reading N decides. The number is a reading aid for a
+  human and never a rule — a stated threshold has been the wrong instrument four times in this
+  repository inside one day, and a raw breach count is confounded by attention besides, which is why
+  c8's denominator is per-lesson and c7's marker is where it comes from. Written as a refusal
+  because the reasonable-sounding alternative is one `if` statement away and would look like
+  tidying.
+  proof: vitest scripts/tasks/friction.test.ts
+- [c13] **A lesson can be retired, and the retirement is recorded.** Removing an instruction is an
+  operation that says what left and why, not a deletion from an array — the same shape, one table
+  over, as a record leaving the store with nothing able to say that it did. Its citations become
+  reportable rather than silently resolving to nothing, which is c6's second half arriving at the
+  case that motivates it.
+  proof: vitest scripts/tasks/briefLessons.test.ts
 
 ## Goal
 
@@ -172,6 +220,59 @@ re-deriving it.
 ## Audit passes
 
 ### Pass 1 — 2026-08-07
+
+- base: `ea6262fada438d58a821ed0d43786fba52deac4f`
+- head: `2505bacf323ca85fb9e3756e90af3de42685a6b2`
+- proof 1: unknown — Not looked at, because there is nothing yet to look at. The member task that
+owns this clause, one-query-over-the-channel-and-the-second-place-retired, is open and BLOCKED.
+There is no `friction` verb (no scripts/tasks/friction.ts, no scripts/lib/friction*), and
+.planning/agent-feedback/tool-friction.md is still present at 65241 bytes. Recording unmet here
+would claim a verification nobody performed.
+- proof 2: unknown — Not looked at. No fault field exists on any record; scripts/lib carries no
+`fault` and no `breach`. Owned by a-record-carries-its-fault-and-a-question-blocks-only-what-d,
+which is open.
+- proof 3: unknown — Not looked at. The named proof, scripts/tasks/friction.test.ts, does not exist.
+Owned by a-record-carries-its-fault-and-a-question-blocks-only-what-d, which is open.
+- proof 4: unknown — Not looked at. No blocking-question route exists yet; the `question` kind the
+spec's Decisions section takes over still has zero records. Owned by
+a-record-carries-its-fault-and-a-question-blocks-only-what-d, which is open.
+- proof 5: unknown — Not looked at. There is no query to report or count anything, so there is nothing
+that could include or exclude fault `nobody`.
+- proof 6: met — Delivered by a-lesson-has-a-handle-that-survives-rewording-it, as an explicit `id`
+field on `Lesson` — the choice recorded as a decision against the record, with the reasoning that
+array-name-plus-index makes this clause's second half unimplementable rather than awkward, since
+after a reorder a stale citation still resolves to a different lesson. Re-derived rather than
+confirmed: I built my own fifteen-entry manifest aimed at every line the clause is about, not at
+the two survivors the worker reports fixing. Re-run it with
+`npm run mutate -- <manifest>` over scripts/tasks/briefLessons.ts. 13 killed, 2 survived, 0 errored.
+Both halves of the clause are pinned by mutations that die:
+lh-index-keys-on-prose (index.set keyed on lesson.title instead of lesson.id) KILLED 6;
+lh-an-id-silently-reworded ('auditor/next-neighbour' to 'auditor/next-neighbor', which is the
+orphaning event itself) KILLED 4 — nothing but the literal id lists held outside the arrays at
+briefLessons.test.ts:11-14 can catch that, and they do;
+lh-find-falls-back-to-a-suffix KILLED 3 and lh-find-normalises-case KILLED 2, so a dead citation
+cannot resolve to whatever is nearest;
+lh-unknown-reports-nothing KILLED 3, lh-unknown-decides-liveness-by-prefix KILLED 1 and
+lh-unknown-loses-dedupe KILLED 1, so the reporting half is real;
+lh-index-snapshot-narrowed KILLED 3, lh-all-lessons-drops-a-brief KILLED 4,
+lh-duplicate-refusal-removed KILLED 1;
+lh-printed-handle-derived-from-prose KILLED 4 and lh-brief-stops-printing-the-handle KILLED 4,
+which covers the third place the handle is computed — the bracket an agent actually reads and would
+cite. The two survivors are one boundary the clause does not turn on, filed as a finding below
+rather than graded against this clause: citation matching is pinned exact against case,
+truncation, suffix and prefix, and unpinned against whitespace and the empty string.
+- proof 7: unknown — Not looked at. No checked-and-clean marker exists in either candidate home — no new
+EVENT_OPS entry and no record field — and there is no query whose output the distinction could be
+readable in.
+- proof 8: unknown — Not looked at. No count is presented anywhere yet, so no denominator can accompany one.
+- proof 9: unknown — Not looked at as the clause is written. Nothing in this branch reads a fault, a
+breach or a count, but that is vacuous rather than verified: none of the three exists. Grading it
+met on an absent subject would be an assertion that cannot be false while the feature is missing,
+which is the shape this repository's own auditor lesson refuses. Noted for the pass that grades it
+for real: `merge-ready` gained no leg here, and the module-load refusal filed below is not a
+threshold over a fault, a breach or a count — the worker's recorded argument on that point is right.
+
+### Pass 2 — 2026-08-07
 
 - base: `405eb154b5b8e0c643acd129b0f9e062f38cb88e`
 - head: `e9218fddf52d20923eb9c010271f2a11b58ed05e`

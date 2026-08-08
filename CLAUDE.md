@@ -67,7 +67,6 @@ The auditor's brief is generated, never hand-written: `npm run tasks -- audit-pr
 - enemy-shaped actions and instant actions are two intentionally different design tools
 - location connectivity is always explicit and directional
 - travel actions without cost or reward are treated as pathfinding edges for multi step map navigation
-- all skill-XP-granting moments must produce floating text
 - progress signals get lightweight UI acknowledgement (e.g. map tab flashing on location discovery)
 - record a regression as a `# test` section via `/create-test` rather than writing an ad-hoc script
 - the dev-only `window.__test` browser harness (batched checks via `window.__test.batch([...])`) was removed with the legacy GUI; pending the GUI rebuild, reintroduce it rather than reaching for ad-hoc `page.evaluate`/screenshot loops

@@ -98,9 +98,11 @@ gain 4 experience in cooking on succeeded
 - **Resources are out of scope.** This branch owns what a level-up does to a *stat*. How a resource
   responds to a stat that changed — whether a raised `max` lifts the current value or only the
   ceiling — belongs to whoever owns resources, and is not decided here.
-- **Floating text is not in this branch.** CLAUDE.md requires every skill-XP-granting moment to
-  produce floating text, and there is no GUI to produce it in — the runtime publishes the xp event
-  and `gui-rebuild` owns rendering it. This branch owes the event, not the animation.
+- **Floating text is not in this branch.** There is no GUI to produce it in: this branch publishes
+  the xp event and `floating-text-for-xp-events` owns rendering it, over the general transient-text
+  channel `gui-rebuild` builds. The requirement used to live in CLAUDE.md and became that record on
+  2026-08-07, so the two branches no longer wait on each other. This branch owes the event, not the
+  animation.
 - **Separable from `combat-events`.** Combat is where several of these events originate, but the
   event vocabulary is this branch's and `combat-events` consumes it. The two specs must not both
   define it.

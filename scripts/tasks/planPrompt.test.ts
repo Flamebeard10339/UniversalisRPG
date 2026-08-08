@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fixture } from './cliFixtures';
+import { enclosingGitFixture, fixture } from './cliFixtures';
 
 // `plan-prompt` is the planner's brief, symmetric with `work-prompt` and
 // `audit-prompt`: it runs step 1's survey rather than listing the commands
@@ -43,7 +43,7 @@ describe('tasks plan-prompt', () => {
   // This is the wiring the whole task exists for: the same survey `tasks
   // where` runs, reached without a planner having to type the command.
   it('runs the same survey `tasks where` answers, for every path named on the command line', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('plan-prompt', 'demo-spec', 'src/runtime/save.ts', 'src/ui');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('--- src/runtime/save.ts ---');
@@ -57,7 +57,7 @@ describe('tasks plan-prompt', () => {
   // writes/files. If plan-prompt's per-path survey did not carry rulings
   // through, a planner reading only this brief would still miss it.
   it('surfaces a ruling on a named path, not only the claims on it', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       tasks('add', 'shrink the save test', '--id', 'save-test-shrink', '--spec', 'demo-spec');
       tasks('decline', 'save-test-shrink', '--reason', 'save.test.ts is 16s of a 25s wall, and shrinking it further means faking the subprocess it tests');
 

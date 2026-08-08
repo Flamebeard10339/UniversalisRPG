@@ -136,3 +136,166 @@ Proof:
 - `first-class-modals` also forecasts writing `session.ts` and `test.ts`. Both grants are forecasts
   and neither side has read the region, so `tasks plan` grades it a note rather than a defect — but
   if that branch starts first, `offline:` and its directive spelling touch the same `applyDirective`.
+
+## Audit passes
+
+### Pass 1 — 2026-08-07
+
+- base: `b56ba3ee30365f83e10738189ac42d94bcad295c`
+- head: `007b8afedbe51c101c8dd168ca79f01c8b2f9a4e`
+- proof 1: met — Mutation-measured, not asserted. Four mutations over the cap in src/runtime/runtime.ts, each KILLED by a
+  named test in src/runtime/runtime.test.ts that passed unmutated and failed with the line broken, re-measured at its
+  own file: c1-drain-cap-removed (completionsBeforeDrain -> Infinity) and c1-cap-off-by-one (Math.ceil(current /
+  milliPerCompletion) -> +1) both die on "banks the third grind and no more over a 200s span, one-shot or split at 3s
+  or 10s"; c1-rate-also-settling-the-pool-ignored (the "< 0" sign in alsoRated inverted) dies on "reads a rate settling
+  the same pool, which crosses zero a grind before the results alone would"; c1-wrapper-drain-unseen (the nestedResults
+  recursion deleted) dies on "walks a drain it cannot plan - one drawn from a selector - a completion at a time". The
+  contingency this evidence carried on its first draft - drop to unmet if either of the first two survived - is
+  DISCHARGED: both were KILLED, 1 of 37.
+  Re-run with: npx vitest run --maxWorkers=4 src/runtime/runtime.test.ts -t "a deterministic batch settles" (4 green;
+  full suite 1794/1794 at --maxWorkers=4, 41s).
+  The tests are falsifiable, not structural: src/runtime/runtime.test.ts:445-601 pins ABSOLUTE outcomes before
+  comparing splits - grindstone banks 3 trophies / vigor 0 / activeAction null / exactly one "Your vigor gutters out."
+  at t=200s, and agrees one-shot with [3,200], [10,200], [1,2,3,4,200], [2.5,7.5,60,200]. The pre-fix reading of that
+  same fixture was 200 / 3 / 10 for those splits (d9dd982's message), so every assertion was false before this commit.
+  Mechanism: runtime.ts:143-159 completionsBeforeDrain over 109-136 collectDrainSites, consumed at 174-186.
+  On the branch collapse the worker claimed was "exactly reproduced": re-derived rather than trusted, and it holds -
+  with the drain term at Infinity the new Math.min is algebraically identical to the two branches it replaced, on all
+  three shapes. (repeating && !stopsOnOutcome) reduces to min(Infinity, limit) = limit, including limit=0 and
+  limit=Infinity; (repeating && stopsOnOutcome) reduces to 1 and runway = inFlight + max(0,0)*... = the old
+  else-branch expression; (!repeating) likewise reduces to 1. inFlight is the old "remainingAttempts * duration -
+  player.progress" character-for-character. EMPIRICALLY, two of those three shapes are covered and one is not:
+  collapse-input-limit-term was KILLED 2 of 26 (resolve.test.ts "also holds when the action is input-limited partway
+  through" AND "wait(1_000_000) with only 28 raw-shrimp ... quickly") and collapse-non-repeating-term KILLED 1 of 26
+  (resolve.test.ts "grants a slow meal's buff on the armed path as well as the instant one"), but
+  collapse-stops-on-outcome-term SURVIVED the whole suite, 0 failed of 1794. See the F5 finding on this pass: the
+  evidence points at an equivalent mutant rather than an unwatched line, because fightBatch (src/runtime/actions.ts:130-133)
+  caps a stops-on-outcome batch at one completion independently. Either way, no part of this clause's grade rests on
+  that term, and the first draft of this evidence line was wrong to cite all three shapes as covered.
+  Also verified, since the new code sets a boundary where the old left one unbounded: resolve() cannot spin. For a
+  repeating action inFlight >= duration - progress > 0 whenever duration > 0, and duration <= 0 on a repeating action
+  throws at runtime.ts:208 under both readings.
+- proof 2: unknown — Not built and not looked at by anyone; recorded unknown rather than unmet because the member task
+  declare-the-offline-span-cap-as-a-tuning-variable is still open and was never dispatched. What was checked, so the
+  next pass does not repeat it: grep -rn "offline" src/ content/ finds only a test title at resolve.test.ts:845;
+  src/runtime/tuning.ts exports travelSecondsPerUnit, minDamage, contestSpread, defaultActionDuration and no fifth
+  accessor; src/runtime/tuning.test.ts (this clause's proof target) has no offline case. Nothing in d9dd982 touches
+  tuning.ts.
+- proof 3: unknown — No reconciliation entry point exists. src/runtime/session.ts exports startSession, view, apply, wait,
+  beginAction, cancelAction, submitModal, applyDirective, runTest and nothing that takes an elapsed span. The
+  invariant the clause promises to keep is intact today but vacuously: grep -rn "Date.now|performance.now" src/
+  --include=*.ts excluding tests returns nothing, and src/runtime/state.ts:41 still carries "The one seam through
+  which simulated time advances; nothing reads a real clock." d9dd982 adds no clock read. Nobody built or verified
+  the clamp-and-call this clause is about.
+- proof 4: unknown — Recorded unknown, not met: the clause is about a feature that does not exist, so a green tree proves
+  nothing about it. The negative check that WAS run, so the next pass need not: applyDirective's "load:" case
+  (src/runtime/session.ts:352-359) calls loadSave and resets dialogue/logCursor only - no resolve(), no time write;
+  src/runtime/save.ts is not in this branch's diff at all; content/tutorial-island.dsl is unchanged, and
+  integration.test.ts over its shipped "# test" sections passes byte-identical (full suite 1794/1794 at
+  --maxWorkers=4). So d9dd982 does NOT violate this clause - but nothing has been verified about the load path in
+  the presence of a reconciliation entry point, because there is none.
+- proof 5: unknown — Nothing built. There is no store stamp, no store, and no span source: the spec's own Decisions record
+  that this waits on auto-save-export-and-load. src/runtime/session.test.ts (this clause's proof target) has no case
+  naming a store write or an inert import; its only "load:" case is line 203, a stale-save warning.
+- proof 6: unknown — Nothing built. resolve() still throws on a backwards toTime (src/runtime/runtime.ts:410) and there is
+  no entry point above it to clamp, so no negative-span case exists to grade. d9dd982 leaves both guards at
+  runtime.ts:410-411 untouched.
+- proof 7: unknown — No "offline:" directive. src/runtime/session.ts:315-373 switches on run/talk/choose/use/travel/craft/
+  begin/assert/expect/load/cancel/wait/equip/unequip and nothing else; "wait:" (line 364) is the grammar it would
+  mirror. src/content/test.test.ts, this clause's proof target, has no offline case.
+- proof 8: unknown — Recorded unknown, not met, for the same reason as c4: the stamp this clause rules on does not exist, so
+  "the save format is unchanged" is true of a tree that was never asked to change it. The negative check: this
+  branch's diff (git diff --name-only b56ba3e..HEAD) does not include src/runtime/save.ts or src/runtime/state.ts;
+  d9dd982 adds no GameState field, no SaveDiff field, no envelope field and no SAVE_VERSION change - its runtime.ts
+  hunk is confined to nextBoundary and two new module-private helpers. src/runtime/save.test.ts passes unchanged.
+  ADJACENCY the next pass should not lose, raised by this auditor but owned by the dangling-reference-on-field-edit
+  finding: loadSave prunes fields holding no registry id (src/runtime/save.ts:49, prune: "holds no registry id") and
+  warns, the behaviour save.test.ts:235 pins for mod.gem/mod.flag. A flag key wrongly undeclared at load is therefore
+  a flag id a previously-valid save loses on load, with a warning rather than an error - which is the failure mode
+  this clause exists to forbid, arriving from a direction the clause did not anticipate. "No GameState field changed"
+  and "a save loads back to what was written" are not the same promise.
+- proof 9: unknown — Nothing built, and nothing to survive. resolve() neither reads nor writes pendingModal before or after
+  d9dd982 (grep -n pendingModal src/runtime/runtime.ts - no hits in the resolve path). src/runtime/session.test.ts
+  has no reconciliation-with-outstanding-modal case because there is no reconciliation.
+
+### Pass 2 — 2026-08-07
+
+- base: `b56ba3ee30365f83e10738189ac42d94bcad295c`
+- head: `f69159b287ea5e8a8e89b3b146eceda237fb8c76`
+- proof 1: met — Carried forward and re-verified, not re-derived. git diff --name-only 007b8af..HEAD (pass 1's head to
+  pass 2's) touches only docs/, src/content/registry.ts and src/content/flags.test.ts - src/runtime/ is
+  byte-identical, so pass 1's six KILLED verdicts stand on unchanged bytes: c1-drain-cap-removed, c1-cap-off-by-one,
+  c1-rate-also-settling-the-pool-ignored and c1-wrapper-drain-unseen (each KILLED 1 of 37 in
+  src/runtime/runtime.test.ts), collapse-input-limit-term (KILLED 2 of 26) and collapse-non-repeating-term (KILLED 1
+  of 26). Re-ran the clause's four tests on f69159b: npx vitest run with a worker cap of 4 over
+  src/runtime/runtime.test.ts -t "a deterministic batch settles" - 4 passed, 33 skipped, 686ms.
+  NEW for this pass, the question pass 1 could not ask: whether 673d6a3 disturbed what c1 rests on. It does not, and
+  the argument is structural. c1's mechanism reads registry.resources and registry.dropTables (collectDrainSites,
+  runtime.ts:118-136); 673d6a3 rewrites reconcileMembers (registry.ts:628-641), which calls namespace.undeclare and
+  nothing else - it writes neither map. Its change is also monotone in the safe direction: the surviving set went
+  from per-kind to a union over every kind, and per-kind surviving is a subset of the union, so it undeclares
+  strictly fewer member keys than b56ba3e did. Fewer undeclares means fewer load-time unknown-flag throws, so a
+  resource whose on-empty results reference a flag is if anything more loadable, never less.
+  Full suite green on f69159b: 72 files, 1796 passed, 40.25s.
+- proof 2: unknown — Still not built and still not dispatched; member task declare-the-offline-span-cap-as-a-tuning-variable
+  is open. Re-verified on f69159b rather than copied from pass 1: a grep for offline over src/ and content/ returns
+  exactly one hit, the test title at src/runtime/resolve.test.ts:845 - no declaration, no accessor, no authored
+  variable. src/runtime/tuning.ts exports exactly four accessors (travelSecondsPerUnit:6, minDamage:14,
+  contestSpread:20, defaultActionDuration:29) and no fifth; src/runtime/tuning.test.ts, this clause's proof target,
+  has no offline case. Neither commit in this window (673d6a3, f69159b) touches tuning.ts.
+- proof 3: unknown — No reconciliation entry point exists. Re-verified on f69159b: src/runtime/session.ts exports
+  choiceToDirective, startSession, SAID_HEAD_KEPT, SAID_TAIL_KEPT, view, sessionResources, apply, beginAction, wait,
+  cancelAction, submitModal, applyDirective and runTest - nothing takes an elapsed span. The invariant the clause
+  promises to keep is intact but vacuously: a Date.now / performance.now sweep over src/ returns four hits, all in
+  src/runtime/resolve.test.ts (364, 366, 707, 709) measuring test wall clock, and none in shipped code. 673d6a3 is a
+  content-layer commit and adds no clock read. Nobody built or verified the clamp-and-call this clause is about.
+- proof 4: unknown — Recorded unknown, not met: the clause is about a load path in the presence of a reconciliation entry
+  point that does not exist, so a green tree is a structural pass rather than evidence. Negative checks re-verified
+  on f69159b: applyDirective's load case (src/runtime/session.ts:352-359) calls loadSave at :355 and resets
+  session.dialogue and session.logCursor at :356-357 only - no resolve(), no write to state.time; no non-test clock
+  read anywhere in src/ (see c3); content/tutorial-island.dsl is unchanged by both commits in this window, and
+  integration.test.ts over its shipped test sections is green inside the full 1796-passing run.
+  Pass 1's c4/c8 adjacency was chased to ground this pass and is NOT closed - the measurement is under c8. It does
+  not move this grade, and that is a result rather than a dodge: c4's promise is about state.time, and the adjacency
+  is about flag identity. The one sentence of c4 it touches - a save loads back to what was written or the feature
+  has corrupted it - is not violated by this feature, which has no code; the route is pre-existing on b56ba3e, lives
+  in the DSL load path, and is filed on two dangling-reference-on-field-edit records.
+- proof 5: unknown — Nothing built. There is no store, no store stamp and no span source; the spec's own Decisions record
+  that this waits on auto-save-export-and-load. Re-verified on f69159b: src/runtime/session.test.ts, this clause's
+  proof target, has no case naming a store write, a store stamp or an inert import - its only load case is the
+  stale-save warning at line 203. Neither commit in this window touches session.ts or session.test.ts.
+- proof 6: unknown — Nothing built. resolve() still throws on a backwards toTime at src/runtime/runtime.ts:410 and on a
+  non-integer at :411, and there is no entry point above it to clamp, so no negative-span case exists to grade. Both
+  guards are byte-identical to pass 1 - src/runtime/ is unchanged across 007b8af..HEAD.
+- proof 7: unknown — No offline directive. Re-verified on f69159b: applyDirective (src/runtime/session.ts:312-373) switches
+  on run, talk, choose, use, travel, craft, begin, assert, expect, load, cancel, wait, equip and unequip and nothing
+  else; the wait case at line 364, resolve(state, registry, state.time + secondsToMs(directive.seconds)), is the
+  grammar c7 would mirror. src/content/test.test.ts, this clause's proof target, has no offline case, and the
+  whole-tree grep for offline finds only resolve.test.ts:845.
+- proof 8: unknown — Recorded unknown, not met, for c4's reason: the stamp this clause rules on does not exist, so "the save
+  format is unchanged" is true of a tree never asked to change it. Format half re-verified on f69159b: git diff
+  --name-only b56ba3e..HEAD contains neither src/runtime/save.ts nor src/runtime/state.ts; SAVE_VERSION is still 6
+  (save.ts:8); no GameState field, no SaveDiff field and no envelope field is added by either commit in this window.
+  PASS 1'S ADJACENCY, RESOLVED AS FAR AS IT CAN BE WITHOUT A FIX. 673d6a3 does NOT close it and structurally cannot:
+  it rewrites reconcileMembers, which is retain-only and runs after merge (registry.ts:719), whereas the surviving
+  door is the remove branch at registry.ts:690 calling namespace.undeclare inline, whose prefix sweep at
+  namespace.ts:60-62 crosses EVERY kind. Measured on f69159b with npm run inspect, both variants, each writing a save
+  on the universe before the offending module and loading it after. (1) A location and an entity sharing an id, with
+  a remove of entity.base.beach in a dependent module: load SUCCEEDS, the location survives carrying flags
+  ["searched"], and both base.beach.searched AND the engine-owned base.beach.discovered leave the namespace. A save
+  holding {"flags":{"base.beach.searched":true}} loads to {} with the warning "Removed flags base.beach.searched
+  because its flag is not loaded." - which is false; the flag is on the surviving location in the registry.
+  (2) Remove-then-recreate (base declares entity door with flags: unlocked, mid removes it, late re-creates it with
+  +flags: bolted): load SUCCEEDS, registry.entities holds base.door carrying flags ["bolted"],
+  namespace.has("flag","base.door.bolted") is false, and the same save round-trip loses the flag with the same false
+  message. In both, the control load on the universe without the offending module returns zero warnings and keeps the
+  flag. Why this still does not make the clause unmet: the route is pre-existing on b56ba3e, untouched by this
+  branch, and owned by the DSL load path rather than by offline-progression. This branch moves it strictly in the
+  SAFE direction - per-kind surviving is a subset of the union, so 673d6a3 undeclares fewer member keys than b56ba3e
+  did and therefore prunes fewer flags, restoring saves b56ba3e wrongly damaged. No save that loaded correctly on
+  b56ba3e loads worse on f69159b. The residual exposure is this pass's one new finding plus two already-filed
+  dangling-reference-on-field-edit records, and belongs to whoever rules on the kind-agnostic member key.
+- proof 9: unknown — Nothing built, and nothing to survive. grep -n pendingModal src/runtime/runtime.ts returns no hits at
+  all, so resolve() neither reads nor writes it, before or after this window; src/runtime/ is byte-identical across
+  007b8af..HEAD. src/runtime/session.test.ts has no reconciliation-with-outstanding-modal case because there is no
+  reconciliation.

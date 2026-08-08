@@ -10,28 +10,45 @@ payload=$(cat)
 field() { printf '%s' "$payload" | node "$here/lib/hook-field.js" "$1"; }
 
 command=$(field tool_input.command)
+cwd=$(field cwd)
 
-case "$command" in
-  *git\ add*|*git\ commit*)
-    # Ask git about the directory the command will run in. A worktree is on
-    # its own branch, and a bare `git rev-parse` answers for wherever this
-    # hook happens to be invoked from — which is the primary checkout. That
-    # made the guard report `main` for a worktree nowhere near it, blocking
-    # every write in every worktree the moment the primary checkout was
-    # switched to main, and silently passing them all back while it sat on a
-    # feature branch. Neither answer had anything to do with the branch being
-    # written to.
-    #
-    # An unreadable cwd falls back to the old behaviour, which errs toward
-    # blocking rather than toward letting a write onto main through.
-    cwd=$(field cwd)
-    branch=$(git -C "${cwd:-.}" rev-parse --abbrev-ref HEAD 2>/dev/null || git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+# Which directories this command would commit into, decided by tokenizing it
+# rather than by globbing for two adjacent words. The previous matcher asked
+# only whether the string contained "git add" or "git commit" and then asked
+# git about the caller's cwd, which is two independent wrong questions: any
+# option between the verb and the subcommand hid the write completely, and the
+# branch it reported belonged to a directory the command need not touch. Both
+# were observed on 2026-08-06 — worktree commits blocked because the primary
+# checkout sat on main, while `git -C <worktree> commit` passed unexamined.
+targets=$(node "$here/lib/git-write-dirs.js" "$command")
+[ -z "$targets" ] && exit 0
 
-    if [ "$branch" = "main" ]; then
-      echo "Blocked: git add / git commit are not allowed on main. Create or switch to a feature branch first." >&2
-      exit 2
-    fi
-    ;;
-esac
+blocked=$(
+  printf '%s\n' "$targets" | while IFS= read -r target; do
+    [ -z "$target" ] && continue
+    [ "$target" = "." ] && target="${cwd:-.}"
+    # A relative -C or cd is relative to where the command starts, not to
+    # wherever this hook happens to be invoked from.
+    case "$target" in
+      /*|[A-Za-z]:[/\\]*|\\\\*) ;;
+      *) target="${cwd:-.}/$target" ;;
+    esac
+    # An unreadable target falls back to the caller's own checkout and then to
+    # this hook's, which errs toward blocking rather than toward letting a
+    # write onto main through.
+    branch=$(git -C "$target" rev-parse --abbrev-ref HEAD 2>/dev/null \
+      || git -C "${cwd:-.}" rev-parse --abbrev-ref HEAD 2>/dev/null \
+      || git rev-parse --abbrev-ref HEAD 2>/dev/null \
+      || true)
+    [ "$branch" = "main" ] && printf '%s\n' "$target"
+  done
+)
+
+if [ -n "$blocked" ]; then
+  echo "Blocked: git add / git commit are not allowed on main. Create or switch to a feature branch first." >&2
+  echo "The write resolved to main in: $(printf '%s' "$blocked" | tr '\n' ' ')" >&2
+  echo "If this is wrong, say so rather than rephrasing the command — a form this guard cannot see is not a form it approves." >&2
+  exit 2
+fi
 
 exit 0

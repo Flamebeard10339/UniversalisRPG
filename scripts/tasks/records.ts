@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import * as git from '../lib/git';
 import { parseSpecDoc } from '../lib/specDoc';
@@ -419,9 +418,8 @@ function storeStateAt(config: Config, commit: string, id: string): State | null 
 // flipped the record. One git log plus a parse per commit, so it is called
 // for a single task on demand and never for a whole queue.
 function deriveClosingCommit(config: Config, id: string): string | null {
-  const log = spawnSync('git', ['log', '--format=%H', '--', config.storePath], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  if ((log.status ?? 1) !== 0) return null;
-  const commits = log.stdout.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+  const commits = git.commitsTouching(config.storePath);
+  if (commits === null) return null;
   for (let i = 0; i < commits.length; i++) {
     if (storeStateAt(config, commits[i], id) !== 'done') continue;
     const previous = commits[i + 1];

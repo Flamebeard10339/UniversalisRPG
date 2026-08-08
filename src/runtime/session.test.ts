@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState, PLAYER, travelSecondsPerUnit } from './runtime';
 import { loadModule } from '../content/registry';
+import { SAVE_VERSION } from './save';
 import { apply, applyDirective, beginAction, cancelAction, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, startSession, submitModal, view, wait } from './session';
 import { secondsToMs } from './units';
 
@@ -196,7 +197,7 @@ x: 0, y: 0
 starting
 
 # save stale
-{"version":6,"inventory":{"mod.gem":1}}
+{"version":${SAVE_VERSION},"inventory":{"mod.gem":1}}
 `);
     const session = startSession(registry);
 
