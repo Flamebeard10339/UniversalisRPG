@@ -21,6 +21,7 @@ export interface GitFacts {
   mergeInProgress(): boolean;
   dirtyPaths(pathspec?: string): string[] | null;
   changedFiles(range: string): string[] | null;
+  changedIn(rev: string): string[] | null;
   diffStat(range: string): string | null;
   commitLog(range: string): Commit[] | null;
   commitsTouching(filePath: string): string[] | null;
@@ -132,6 +133,13 @@ export const realGit: GitFacts = {
     return lines(run(['diff', '--name-only', range]));
   },
 
+  // One commit against its parent, which `changedFiles` cannot express: a
+  // range excludes its own left end, so no two-dot spelling names a single
+  // commit's diff.
+  changedIn(rev) {
+    return lines(run(['show', '--name-only', '--format=', rev]));
+  },
+
   diffStat(range) {
     return raw(['diff', '--stat', range])?.trimEnd() ?? null;
   },
@@ -196,6 +204,10 @@ export function dirtyPaths(pathspec?: string): string[] | null {
 
 export function changedFiles(range: string): string[] | null {
   return installed.changedFiles(range);
+}
+
+export function changedIn(rev: string): string[] | null {
+  return installed.changedIn(rev);
 }
 
 export function diffStat(range: string): string | null {

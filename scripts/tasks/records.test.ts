@@ -878,6 +878,26 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('done --commit reports the grant against what that commit actually changed', () => {
+    gitFixture(({ commit, tasks }) => {
+      tasks('add', 'granted work', '--id', 'granted', '--writes', 'src/runtime/save.ts,src/runtime/never.ts');
+      commit('record the task');
+      const sha = commit('the work', ['src/runtime/save.ts', 'src/ui/panel.ts']);
+      const result = tasks('done', 'granted', '--commit', sha);
+      expect(result.stdout).toContain('wrote, ungranted: src/ui/panel.ts');
+      expect(result.stdout).toContain('granted, untouched: src/runtime/never.ts');
+    });
+  });
+
+  it('done --commit says so when the grant and the diff agree, which is the measurement either way', () => {
+    gitFixture(({ commit, tasks }) => {
+      tasks('add', 'granted work', '--id', 'granted', '--writes', 'src/runtime/');
+      commit('record the task');
+      const sha = commit('the work', ['src/runtime/save.ts']);
+      expect(tasks('done', 'granted', '--commit', sha).stdout).toContain('grant and diff agree');
+    });
+  });
+
   // closedCommit answers "what commit closed this", but `done` cannot know
   // that at the time it runs (H6). `show` fills the gap after the fact by
   // walking git history over the store for the commit that flipped this
@@ -1187,7 +1207,9 @@ describe('a record that declares its grant kind', () => {
 
   it('keeps a commitment through an edit that changes something else', () =>
     fixture(({ tasks }) => {
-      tasks('add', 'read work', '--id', 'read', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
+      tasks('add', 'read work', '--id', 'read', '--writes', 'src/runtime/combat.ts');
+      tasks('start', 'read');
+      tasks('edit', 'read', '--grant', 'commitment');
       tasks('edit', 'read', '--title', 'read work, retitled');
       expect(tasks('show', 'read').stdout).toContain('writes (commitment):');
     }));
@@ -1199,6 +1221,19 @@ describe('a record that declares its grant kind', () => {
       expect(tasks('edit', 'silent', '--severity', 'low').stdout).toBe('edited silent: severity\n');
     }));
 
+  it('refuses a commitment on a record nobody has taken, at add and at edit alike', () =>
+    fixture(({ tasks }) => {
+      const added = tasks('add', 'planned work', '--id', 'planned', '--writes', 'src/runtime/', '--grant', 'commitment');
+      expect(added.status).toBe(1);
+      expect(added.stderr).toContain('records that someone has read the region');
+
+      tasks('add', 'planned work', '--id', 'planned', '--writes', 'src/runtime/');
+      const edited = tasks('edit', 'planned', '--grant', 'commitment');
+      expect(edited.status).toBe(1);
+      expect(edited.stderr).toContain('tasks start planned');
+      expect(tasks('show', 'planned').stdout).toContain('writes (forecast):');
+    }));
+
   it('refuses a grant kind it does not know, rather than recording it', () =>
     fixture(({ tasks }) => {
       const result = tasks('add', 'bad grant', '--id', 'bad', '--writes', 'src/runtime/', '--grant', 'maybe');
@@ -1208,8 +1243,11 @@ describe('a record that declares its grant kind', () => {
 
   it('grades an overlap between two commitments as a defect and the same overlap under a forecast as a note', () =>
     fixture(({ tasks }) => {
-      tasks('add', 'left', '--id', 'left', '--spec', 'demo-spec', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
-      tasks('add', 'right', '--id', 'right', '--spec', 'demo-spec', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
+      for (const id of ['left', 'right']) {
+        tasks('add', id, '--id', id, '--spec', 'demo-spec', '--writes', 'src/runtime/combat.ts');
+        tasks('start', id);
+        tasks('edit', id, '--grant', 'commitment');
+      }
       const committed = tasks('plan', 'left', 'right').stdout;
       expect(committed).toContain('2 of those a commitment');
       expect(committed).toContain('[defect] left and right both write');

@@ -173,6 +173,7 @@ const noRepositoryGit: GitFacts = {
   mergeInProgress: () => false,
   dirtyPaths: () => null,
   changedFiles: () => null,
+  changedIn: () => null,
   diffStat: () => null,
   commitLog: () => null,
   commitsTouching: () => null,
@@ -263,6 +264,7 @@ class DataGit {
         if (commits === null) return null;
         return [...new Set(commits.flatMap((commit) => commit.files))].sort();
       },
+      changedIn: (rev) => this.commits.find((commit) => commit.sha === rev || commit.sha.startsWith(rev))?.files.slice().sort() ?? null,
       diffStat: (range) => {
         const commits = this.inRange(range);
         if (commits === null) return null;

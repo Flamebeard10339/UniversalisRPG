@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import * as git from '../lib/git';
 import { clauseStandings, parseSpecDoc } from '../lib/specDoc';
 import { findProducers, producerIndex } from '../lib/producers';
-import { loadManifest } from '../lib/systems';
+import { canonicalPath, covers, loadManifest } from '../lib/systems';
 import { filterEvents, loadEvents } from '../lib/eventLog';
 import {
   claimSummary,
@@ -69,15 +69,33 @@ export function reportUnresolvedRequires(task: Task, tasks: Task[]): void {
   console.log(`recorded ${unresolved.length} requirement(s) no record answers to: ${unresolved.join(', ')} — they hold the task until the record exists, and \`tasks doctor\` reports them until it does`);
 }
 
+// The word `commitment` says one thing — someone has read this region — and
+// the party it exists to distrust is the planner, who by definition has not.
+// Taking the record is the act that makes the claim true, so this is what
+// permits the word: all three Phase 3 records were born commitments at the
+// planning commit, `tasks plan` graded their declared regions clean, and two
+// of them then collided in five files neither had declared.
+function claimHolds(task: Task | null): boolean {
+  return task !== null && (task.state === 'in-progress' || CLOSING_STATES.includes(task.state));
+}
+
 // A grant nobody has read the code for is a forecast, so that is what a
 // grant declared here is unless its author says otherwise: `add` and a
 // planner's `edit` both run before the region has been read, and the
 // workflow's correction point is a worker narrowing its own grant at
 // dispatch. Returning the previous kind for an edit that touches nothing
 // else keeps a worker's commitment from being demoted by a later title fix.
-function resolveGrant(flags: Record<string, string>, current: Grant | null): { grant: Grant | null } | { error: string } {
+function resolveGrant(flags: Record<string, string>, task: Task | null): { grant: Grant | null } | { error: string } {
+  const current = task?.grant ?? null;
   const given = flags.grant;
-  if (given !== undefined) return GRANTS.includes(given as Grant) ? { grant: given as Grant } : { error: `error: --grant must be one of ${GRANTS.join(', ')}` };
+  if (given !== undefined) {
+    if (!GRANTS.includes(given as Grant)) return { error: `error: --grant must be one of ${GRANTS.join(', ')}` };
+    if (given === 'commitment' && !claimHolds(task)) {
+      const start = task === null ? '`tasks add` … then `tasks start <id> --actor <you>`' : `\`tasks start ${task.id} --actor <you>\``;
+      return { error: `error: --grant commitment records that someone has read the region, and ${task === null ? 'a record being created' : `${task.id} is ${task.state}`} — ${start} takes the record, and the same edit is a commitment from there` };
+    }
+    return { grant: given as Grant };
+  }
   if (flags.writes === undefined) return { grant: current };
   return { grant: current ?? 'forecast' };
 }
@@ -104,6 +122,31 @@ function reportMisfiledSystem(config: Config, task: Task): void {
   const issue = misfiledSystem(task, pathOwner(config));
   if (issue === null) return;
   console.log(`note: ${issue.message} — \`tasks edit ${task.id} --system "<name>"\` corrects the field if that is what is wrong; a record that genuinely spans systems needs nothing.`);
+}
+
+// The comparison `docs/workflow.md` asks a worker to make by eye, made where
+// both halves are already in hand. It reports and nothing turns on it: the
+// workflow's own line is that a diff diverging from its grant is information,
+// not a violation. What is new is that the information is now recorded —
+// this is the only measurement anyone has of how wrong a forecast is, and the
+// sample this audit took by hand was 10-50% recall.
+function reportGrantAgainstDiff(task: Task, sha: string): void {
+  if (task.writes.length === 0) return;
+  const changed = git.changedIn(sha);
+  if (changed === null) {
+    console.log(`  git could not say what ${sha.slice(0, 12)} changed, so the grant is not compared against it`);
+    return;
+  }
+  const granted = task.writes.map(canonicalPath);
+  const wrote = changed.filter((file) => !granted.some((region) => covers(region, file)));
+  const untouched = granted.filter((region) => !changed.some((file) => covers(region, file)));
+  if (wrote.length === 0 && untouched.length === 0) {
+    console.log(`  grant and diff agree: ${sha.slice(0, 12)} touched only what this record granted`);
+    return;
+  }
+  if (wrote.length > 0) console.log(`  wrote, ungranted: ${wrote.join(', ')}`);
+  if (untouched.length > 0) console.log(`  granted, untouched: ${untouched.join(', ')}`);
+  console.log(`  \`tasks edit ${task.id} --writes <what it really touched>\` corrects the record — a divergence is information, and this is the one measurement of how wrong a forecast is`);
 }
 
 function reportGrant(task: Task): void {
@@ -315,7 +358,7 @@ export function cmdEdit(args: Flags, usage: string): void {
     return;
   }
 
-  const grant = resolveGrant(args.flags, task.grant);
+  const grant = resolveGrant(args.flags, task);
   if ('error' in grant) {
     console.error(grant.error);
     process.exitCode = 1;
@@ -900,6 +943,7 @@ export function cmdDone(args: Flags, usage: string): void {
     if (task.kind === 'undelivered') console.log(`clause standing at close: ${clauseStanding(task, (spec) => specSource(config, spec))}`);
     if (alreadyDone) console.log(`the recorded close date stands: ${task.closed ?? 'undated'}`);
     if (waiting.length > 0) console.log(`closed with ${waiting.length} requirement(s) still open: ${waiting.join(', ')}`);
+    if (task.closedCommit !== null) reportGrantAgainstDiff(task, task.closedCommit);
     reportReleasedHolds(task, tasks);
     printDecisionPrompt(task);
   }
