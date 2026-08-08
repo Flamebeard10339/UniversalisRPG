@@ -1,11 +1,12 @@
 import { existsSync } from 'node:fs';
 import * as git from '../lib/git';
-import { checkStore, coldClaimIssues, loadStoreTolerantly, type CheckIssue, type Task } from '../lib/taskStore';
+import { checkStore, coldClaimIssues, loadStoreTolerantly, misfiledSystem, type CheckIssue, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import {
   closedCommitIssues,
   CLOSING_STATES,
   dirtyStoreIssue,
+  pathOwner,
   recordEvents,
   resolveConfig,
   saveStoreAndWarn,
@@ -39,6 +40,11 @@ function repairStore(tasks: Task[]): Array<{ task: Task; message: string }> {
 // count — `merge-ready`, whose summary was swallowing five warnings about
 // closes that existed only in the working tree — reads the same list the
 // report prints rather than parsing it back out of the output.
+function misfiledSystemIssues(config: Config, tasks: Task[]): CheckIssue[] {
+  const owner = pathOwner(config);
+  return tasks.flatMap((task) => misfiledSystem(task, owner) ?? []);
+}
+
 export function doctorIssues(config: Config, tasks: Task[]): CheckIssue[] {
   const dirtyIssue = dirtyStoreIssue(config);
   // Mid-merge, HEAD is still the pre-merge commit: every record the other
@@ -49,6 +55,7 @@ export function doctorIssues(config: Config, tasks: Task[]): CheckIssue[] {
   const gitAnchored = git.mergeInProgress() ? [] : [...closedCommitIssues(tasks), ...workingTreeOnlyIssues(config, tasks)];
   return [
     ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))),
+    ...misfiledSystemIssues(config, tasks),
     ...gitAnchored,
     ...coldClaimIssues(tasks, today()),
     ...specIssues(config),

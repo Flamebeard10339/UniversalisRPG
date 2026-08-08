@@ -104,6 +104,12 @@ export const DECIDERS: Decider[] = ['worker', 'planner', 'author'];
 export const DEPARTURES: Departure[] = ['deferred', 'unmet', 'retriage'];
 const SEVERITIES: Severity[] = ['high', 'medium', 'low'];
 
+// The states that mean the record is answered. What separates them from the
+// rest is that nothing about the work is still to be decided, which is why
+// several checks below stop at them rather than asking a finished record to
+// agree with a tree that has moved on since.
+export const CLOSING_STATES: State[] = ['done', 'declined'];
+
 // The kinds that report what working the process cost. A `task` is planned
 // work and an `undelivered` record is a clause verdict the spec document
 // already carries; neither is a report of a cost.
@@ -868,6 +874,29 @@ export function coldClaimIssues(tasks: Task[], today: string): CheckIssue[] {
     }));
 }
 
+// A doc backlink is `path#H1` and a code reference is `path:88`; the path is
+// what either names.
+export const pathOf = (reference: string): string => reference.split(/[:#]/)[0];
+
+// `system` and the system that owns the paths the record names are two
+// statements about where the work sits, and nothing has ever compared them.
+// Reported and never refused, because a record may legitimately span systems
+// — so this fires only when the record names paths and not one of them
+// belongs to the system it claims, which is the shape all eight live
+// misfilings have. `owner` is passed in because resolving a path needs the
+// manifest and everything else here is pure over the record set.
+//
+// A closed record is not asked. What the field costs is visibility to
+// `--system` queries, and nothing queries for work that is finished; asking
+// anyway turns one answer into 137 and buries the eight that can still be
+// acted on.
+export function misfiledSystem(task: Task, owner: (path: string) => string | null): CheckIssue | null {
+  if (task.system === null || CLOSING_STATES.includes(task.state)) return null;
+  const owners = new Set([...task.writes, ...task.files].map((reference) => owner(pathOf(reference))).filter((name): name is string => name !== null));
+  if (owners.size === 0 || owners.has(task.system)) return null;
+  return { level: 'warning', message: `${task.id} is filed under ${task.system}, and every path it names is owned by ${[...owners].sort().join(', ')}` };
+}
+
 // `specExists` has no default on purpose: the spec directory is the
 // caller's configuration, and a default here would hard-code a path that
 // `specFile` owns.
@@ -896,10 +925,7 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
     if (task.system !== null && !systems.includes(task.system)) issues.push({ level: 'error', message: `${task.id} has a system not in systems.json: ${task.system}` });
     if (task.spec !== null && !specExists(task.spec)) issues.push({ level: 'error', message: `${task.id} references a spec with no file: ${task.spec}` });
     for (const file of task.files) {
-      // A doc backlink is `path#H1`, a code reference is `path:88` — strip
-      // whichever suffix is present before checking the path itself exists.
-      const path = file.split(/[:#]/)[0];
-      if (!existsSync(path)) issues.push({ level: 'warning', message: `${task.id} lists a file that no longer exists: ${file}` });
+      if (!existsSync(pathOf(file))) issues.push({ level: 'warning', message: `${task.id} lists a file that no longer exists: ${file}` });
     }
   }
 

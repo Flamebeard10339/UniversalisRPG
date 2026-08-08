@@ -3,8 +3,8 @@ import path from 'node:path';
 import { appendEvents, eventsPathFor, type EventOp, type TaskEvent } from '../lib/eventLog';
 import * as git from '../lib/git';
 import { duplicateClauseIds, parseSpecDoc } from '../lib/specDoc';
-import { loadManifest, systemNames as manifestSystemNames } from '../lib/systems';
-import { DEFAULT_STORE_PATH, loadStoreTolerantly, parseStore, saveStore, type CheckIssue, type State, type Task } from '../lib/taskStore';
+import { loadManifest, ManifestError, owningSystem, systemNames as manifestSystemNames, type Manifest } from '../lib/systems';
+import { CLOSING_STATES, DEFAULT_STORE_PATH, loadStoreTolerantly, parseStore, saveStore, type CheckIssue, type Task } from '../lib/taskStore';
 
 // `--actor` is not here: a global flag is accepted by every command, and a
 // read command that accepted it would drop it, which is exactly the silent
@@ -66,6 +66,22 @@ export function systemNames(config: Config): string[] {
   return manifestSystemNames(loadManifest(config.systemsPath));
 }
 
+// The other half of the same manifest: which system owns a given path, for
+// the callers comparing that against what a record says about itself. A
+// manifest that will not parse costs this answer and nothing else — every
+// caller is reporting, and none of them may fail a write over it.
+export function pathOwner(config: Config): (path: string) => string | null {
+  if (!existsSync(config.systemsPath)) return () => null;
+  let manifest: Manifest;
+  try {
+    manifest = loadManifest(config.systemsPath);
+  } catch (error) {
+    if (!(error instanceof ManifestError)) throw error;
+    return () => null;
+  }
+  return (path) => owningSystem(manifest, path);
+}
+
 export function specFile(config: Config, spec: string): string {
   return `${config.specsDir}/${spec}.md`;
 }
@@ -109,7 +125,7 @@ function warnIfStoreDirtyAndStale(config: Config): void {
   warnedStoreDirty = true;
 }
 
-export const CLOSING_STATES: State[] = ['done', 'declined'];
+export { CLOSING_STATES };
 
 export function workingTreeOnlyIssues(config: Config, tasks: Task[]): CheckIssue[] {
   if (!usesDefaultStore(config)) return [];

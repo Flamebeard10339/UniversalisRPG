@@ -19,6 +19,7 @@ import {
   listQueue,
   loadStore,
   matchesSearchTerm,
+  misfiledSystem,
   nextSeq,
   parseStore,
   requirementStates,
@@ -39,6 +40,7 @@ import {
 import type { Flags } from './cli';
 import {
   CLOSING_STATES,
+  pathOwner,
   readStore,
   recordEvents,
   refuseUnknownSpec,
@@ -91,6 +93,17 @@ function parseDischarges(given: string | undefined, current: number[]): { number
     numbers.push(parsed);
   }
   return { numbers: [...new Set(numbers)].sort((a, b) => a - b) };
+}
+
+// At the record, not at the flag: `--system` alone says nothing wrong, and
+// `--writes` alone says nothing wrong; the disagreement only exists once both
+// are on one record. Reported, never refused — a record may span systems, and
+// what fires here is the narrower case where not one path it names belongs to
+// the system it claims.
+function reportMisfiledSystem(config: Config, task: Task): void {
+  const issue = misfiledSystem(task, pathOwner(config));
+  if (issue === null) return;
+  console.log(`note: ${issue.message} — \`tasks edit ${task.id} --system "<name>"\` corrects the field if that is what is wrong; a record that genuinely spans systems needs nothing.`);
 }
 
 function reportGrant(task: Task): void {
@@ -197,6 +210,7 @@ export function cmdAdd(args: Flags, usage: string): void {
   if (kind === 'finding' && args.flags.spec !== undefined) console.log(`--spec is not recorded on a finding — it starts unreviewed outside every spec, and triage or \`tasks promote\` moves it in`);
   reportUnresolvedRequires(task, tasks);
   reportGrant(task);
+  reportMisfiledSystem(config, task);
   if (args.flags.writes !== undefined) reportPriorArtOnWrites(config, tasks, task);
 }
 
@@ -397,6 +411,7 @@ export function cmdEdit(args: Flags, usage: string): void {
   console.log(`edited ${task.id}: ${changes.join(', ')}`);
   reportUnresolvedRequires(task, tasks);
   if (changes.includes('grant')) reportGrant(task);
+  if (changes.some((change) => change === 'system' || change === 'writes' || change === 'files')) reportMisfiledSystem(config, task);
   if (args.flags.writes !== undefined) reportPriorArtOnWrites(config, tasks, task);
 }
 

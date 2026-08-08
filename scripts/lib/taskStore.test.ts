@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { makeRealGitRepo } from './realGitRepo';
 import { tsxCli } from './tsxCli';
-import { backfillSeq, checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, matchesSearchTerm, nearMatches, nextSeq, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
+import { backfillSeq, checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, matchesSearchTerm, misfiledSystem, nearMatches, nextSeq, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -272,6 +272,29 @@ describe('loadStore / saveStore', () => {
       expect(readFileSync(fileA, 'utf8')).toBe(readFileSync(fileB, 'utf8'));
       expect(readFileSync(fileA, 'utf8').split('\n')[0]).toContain('"x-record"');
     });
+  });
+});
+
+describe('misfiledSystem', () => {
+  const owner = (path: string): string | null => (path.startsWith('scripts/') ? 'Task system' : path.startsWith('src/') ? 'Runtime' : null);
+
+  it('reports a record whose every path belongs to a system other than the one it claims', () => {
+    const issue = misfiledSystem(task({ id: 'a', system: 'Testing procedure', writes: ['scripts/tasks/records.ts'], files: ['scripts/lib/taskStore.ts:12'] }), owner);
+    expect(issue).toEqual({ level: 'warning', message: 'a is filed under Testing procedure, and every path it names is owned by Task system' });
+  });
+
+  it('says nothing when one of the paths does belong to the declared system, because a record may span two', () => {
+    expect(misfiledSystem(task({ id: 'a', system: 'Runtime', writes: ['scripts/tasks/records.ts', 'src/runtime/save.ts'] }), owner)).toBeNull();
+  });
+
+  it('says nothing about a record with no system, no paths, or only paths nothing owns', () => {
+    expect(misfiledSystem(task({ id: 'a', writes: ['scripts/tasks/records.ts'] }), owner)).toBeNull();
+    expect(misfiledSystem(task({ id: 'b', system: 'Runtime' }), owner)).toBeNull();
+    expect(misfiledSystem(task({ id: 'c', system: 'Runtime', files: ['docs/audits/x.md#H1'] }), owner)).toBeNull();
+  });
+
+  it('says nothing about a closed record, whose system field can no longer hide it from anything', () => {
+    expect(misfiledSystem(task({ id: 'a', state: 'done', system: 'Testing procedure', writes: ['scripts/tasks/records.ts'] }), owner)).toBeNull();
   });
 });
 
