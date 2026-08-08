@@ -649,23 +649,57 @@ function releaseClaim(task: Task, to: State): string[] {
   return [`released the claim: ${released}`];
 }
 
+// The one place `ask`'s sentinel is written, so a reader has exactly one
+// writer to be correct about. Both `cmdAsk` and triage's interactive walk
+// call this instead of building the line themselves.
+const ASKED_PREFIX = 'triage asked (';
+
+export function writeAskedQuestion(task: Task, question: string): void {
+  task.evidence = `${task.evidence ? `${task.evidence}\n\n` : ''}${ASKED_PREFIX}${today()}): ${question}`;
+}
+
+// The one place that sentinel is read back. Nothing marks a question
+// answered — retriage (below) and every closing move are what actually get a
+// record past a mover that saw this and went anyway — so "live" here means
+// "asked and never cleared", which is exactly what the data can say.
+export function liveQuestion(task: Task): string | null {
+  if (task.evidence === null) return null;
+  const asked = task.evidence.split('\n\n').filter((paragraph) => paragraph.startsWith(ASKED_PREFIX));
+  if (asked.length === 0) return null;
+  const last = asked[asked.length - 1];
+  const colon = last.indexOf('): ');
+  return colon === -1 ? last : last.slice(colon + 3);
+}
+
+// The one call every verb that can take a record out of `unreviewed` shares,
+// so a question `ask` left there is named before the move, never after.
+// Warns and never refuses: the mover is usually the one answering it.
+function warnLiveQuestion(task: Task, to: State): string[] {
+  if (task.state !== 'unreviewed' || to === 'unreviewed') return [];
+  const question = liveQuestion(task);
+  return question === null ? [] : [`warning: this record has a live, unanswered question — ${truncateLine(question, 120)} — moving it anyway, since the mover is usually the one answering`];
+}
+
 // Every state verb moves a record and reports what the move displaced, so
 // that no transition is silent about the state it overwrote. Leaving a
 // closing state un-closes the record: its close date and closing commit
 // describe a close that no longer holds. The reason survives — it says why
 // the record was closed then, which stays true of the period it covers, and
-// is the only trace a reopened decline leaves.
+// is the only trace a reopened decline leaves. This is also the one place a
+// record leaves `unreviewed`, which is where the live-question warning is
+// assembled — every verb that reaches state through here inherits it.
 export function transition(task: Task, to: State): string[] {
   const from = task.state;
+  const warning = warnLiveQuestion(task, to);
   task.state = to;
   const notes = releaseClaim(task, to);
-  if (from === to) return [...notes, `it was already ${to}`];
-  if (!CLOSING_STATES.includes(from)) return [...notes, `was ${from}`];
+  if (from === to) return [...warning, ...notes, `it was already ${to}`];
+  if (!CLOSING_STATES.includes(from)) return [...warning, ...notes, `was ${from}`];
   const kept = task.reason ? `, keeping its ${from} reason: ${task.reason}` : '';
   const closed = task.closed ? ` (closed ${task.closed})` : '';
   task.closed = null;
   task.closedCommit = null;
-  return [...notes, `reopened a ${from} record${closed}${kept}`];
+  return [...warning, ...notes, `reopened a ${from} record${closed}${kept}`];
 }
 
 export function cmdStart(args: Flags, usage: string): void {
@@ -924,13 +958,13 @@ export function cmdPromote(args: Flags, usage: string): void {
   }
   const promotions: Array<{ task: Task; note: string }> = [];
   for (const task of resolved) {
-    const from = task.state;
     const widening = pass2Promotion(task, spec);
     if (widening) console.log(`${widening}: ${task.id}`);
-    task.state = 'open';
+    const notes = transition(task, 'open');
     task.spec = spec;
-    promotions.push({ task, note: `promoted into spec ${spec} (was ${from})` });
+    promotions.push({ task, note: [`promoted into spec ${spec}`, ...notes].join('; ') });
     console.log(`promoted ${task.id} into ${spec}`);
+    for (const note of notes) console.log(note);
   }
   saveStoreAndWarn(tasks, config);
   recordEvents(config, 'triage', promotions.map((promotion) => subjectOf(promotion.task, promotion.note)));
@@ -965,13 +999,49 @@ export function cmdDefer(args: Flags, usage: string): void {
   }
   const defers: Array<{ task: Task; note: string }> = [];
   for (const task of resolved) {
-    task.state = 'open';
+    const notes = transition(task, 'open');
     task.spec = null;
-    defers.push({ task, note: 'deferred: opened outside every spec' });
+    defers.push({ task, note: ['deferred: opened outside every spec', ...notes].join('; ') });
     console.log(`deferred ${task.id}`);
+    for (const note of notes) console.log(note);
   }
   saveStoreAndWarn(tasks, config);
   recordEvents(config, 'triage', defers.map((defer) => subjectOf(defer.task, defer.note)));
+}
+
+// The inverse of defer, and c4's route: a deferred record — open, outside
+// every spec — sent back to `unreviewed` so the queue offers it again. Its
+// own state check reuses `listQueue`'s `deferred` filter rather than
+// restating "open and spec is null" here, since that classification is
+// owned by `scripts/lib/taskStore.ts`, not by this file. This is where a
+// question answered after `defer` finally has somewhere to land.
+export function cmdRetriage(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  if (args.positional.length === 0) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  const tasks = loadStore(config.storePath);
+  const resolved = resolveTaskIds(args.positional, tasks);
+  if (resolved === null) return;
+  const deferred = new Set(listQueue(tasks, { deferred: true }).map((task) => task.id));
+  for (const task of resolved) {
+    if (!deferred.has(task.id)) {
+      console.error(`error: ${task.id} is ${task.state}${task.spec ? `, spec ${task.spec}` : ''} — retriage only routes a deferred record (open, no spec) back to the unreviewed queue. Nothing was retriaged`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+  const retriages: Array<{ task: Task; note: string }> = [];
+  for (const task of resolved) {
+    const notes = transition(task, 'unreviewed');
+    retriages.push({ task, note: ['retriaged: back in the unreviewed queue', ...notes].join('; ') });
+    console.log(`retriaged ${task.id}`);
+    for (const note of notes) console.log(note);
+  }
+  saveStoreAndWarn(tasks, config);
+  recordEvents(config, 'triage', retriages.map((retriage) => subjectOf(retriage.task, retriage.note)));
 }
 
 // The non-interactive form of triage's redirect: the same operation as the
@@ -1034,7 +1104,7 @@ export function cmdAsk(args: Flags, usage: string): void {
   }
   const asks: Array<{ task: Task; note: string }> = [];
   for (const task of resolved) {
-    task.evidence = `${task.evidence ? `${task.evidence}\n\n` : ''}triage asked (${today()}): ${question}`;
+    writeAskedQuestion(task, question);
     asks.push({ task, note: `asked for more information: ${truncateLine(question, 120)}` });
     console.log(`asked ${task.id}; it stays ${task.state} until the question is answered`);
   }

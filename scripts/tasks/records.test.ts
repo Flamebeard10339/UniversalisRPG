@@ -1354,3 +1354,133 @@ describe('a query that cannot see a record', () => {
     });
   });
 });
+
+// c1-c3: one predicate for "this record has a live, unanswered question",
+// read where every mover assembles its state change (`transition`, in
+// records.ts), so a verb that calls it inherits the warning without being
+// edited for it.
+describe('a move never strands a question', () => {
+  it('promote warns, naming the question, and still promotes rather than refusing', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('ask', 'needs-context', '--question', 'which universe was this measured against?');
+      const result = tasks('promote', 'needs-context');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('warning: this record has a live, unanswered question');
+      expect(result.stdout).toContain('which universe was this measured against?');
+      expect(tasks('show', 'needs-context').stdout).toContain('spec: demo-spec');
+      expect(tasks('log', '--op', 'triage').stdout).toContain('which universe was this measured against?');
+    });
+  });
+
+  it('defer warns over the same predicate', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('ask', 'needs-context', '--question', 'still unclear');
+      const result = tasks('defer', 'needs-context');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('warning: this record has a live, unanswered question');
+      expect(tasks('show', 'needs-context').stdout).toContain('spec: (deferred)');
+    });
+  });
+
+  it('decline warns over the same predicate', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('ask', 'needs-context', '--question', 'worth doing at all?');
+      const result = tasks('decline', 'needs-context', '--reason', 'not worth it');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('warning: this record has a live, unanswered question');
+      expect(tasks('show', 'needs-context').stdout).toContain('declined');
+    });
+  });
+
+  it('start warns over the same predicate — unreviewed straight to in-progress strands the question exactly as promote would', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('ask', 'needs-context', '--question', 'is this reproducible?');
+      const result = tasks('start', 'needs-context', '--actor', 'someone');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('warning: this record has a live, unanswered question');
+      expect(tasks('show', 'needs-context').stdout).toContain('in-progress');
+    });
+  });
+
+  it('done warns over the same predicate', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('ask', 'needs-context', '--question', 'is this still needed?');
+      const result = tasks('done', 'needs-context');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('warning: this record has a live, unanswered question');
+      expect(tasks('show', 'needs-context').stdout).toContain('[finding/done');
+    });
+  });
+
+  it('a record with no live question moves with no warning at all', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'plain finding', '--id', 'plain-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      const result = tasks('promote', 'plain-finding');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('warning:');
+    });
+  });
+
+  it('a question asked through the interactive walk is recognised by the non-interactive movers too — one write, one predicate', async () => {
+    await fixture(async ({ tasks, triage }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      await triage('a\nasked through the walk\n');
+      const result = tasks('promote', 'needs-context');
+      expect(result.stdout).toContain('warning: this record has a live, unanswered question');
+      expect(result.stdout).toContain('asked through the walk');
+    });
+  });
+
+  describe('retriage: the inverse of defer, where a late answer lands', () => {
+    it('routes a deferred record back into the unreviewed queue', () => {
+      fixture(({ tasks }) => {
+        tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--fault', 'tooling', '--severity', 'medium', '--deliverable', 'fix it');
+        tasks('defer', 'defer-me');
+        expect(tasks('show', 'defer-me').stdout).toContain('spec: (deferred)');
+        const result = tasks('retriage', 'defer-me');
+        expect(result.status).toBe(0);
+        expect(tasks('show', 'defer-me').stdout).toContain('[finding/unreviewed');
+        expect(tasks('log', '--op', 'triage').stdout).toContain('retriaged: back in the unreviewed queue');
+      });
+    });
+
+    it('refuses a record that was never deferred, naming its actual state', () => {
+      fixture(({ tasks }) => {
+        tasks('add', 'still open', '--id', 'still-open', '--spec', 'demo-spec');
+        const result = tasks('retriage', 'still-open');
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain('retriage only routes a deferred record');
+        expect(result.stderr).toContain('is open, spec demo-spec');
+      });
+    });
+
+    it('refuses a closed record rather than reopening it as a side effect', () => {
+      fixture(({ tasks }) => {
+        tasks('add', 'closed already', '--id', 'closed-already', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+        tasks('decline', 'closed-already', '--reason', 'closed for the refusal check');
+        const result = tasks('retriage', 'closed-already');
+        expect(result.status).toBe(1);
+        expect(tasks('show', 'closed-already').stdout).toContain('declined');
+      });
+    });
+
+    it('is where a question answered after deferring finally has somewhere to land', () => {
+      fixture(({ tasks }) => {
+        tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+        tasks('ask', 'needs-context', '--question', 'which universe?');
+        tasks('defer', 'needs-context');
+        expect(tasks('show', 'needs-context').stdout).toContain('spec: (deferred)');
+        const result = tasks('retriage', 'needs-context');
+        expect(result.status).toBe(0);
+        expect(tasks('show', 'needs-context').stdout).toContain('[finding/unreviewed');
+        const promoted = tasks('promote', 'needs-context');
+        expect(promoted.status).toBe(0);
+      });
+    });
+  });
+});

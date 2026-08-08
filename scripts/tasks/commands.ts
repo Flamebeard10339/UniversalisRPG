@@ -9,7 +9,7 @@ import { cmdPlan, cmdConcept, cmdProduces, cmdSystem, cmdWhere } from './archite
 import { cmdDoctor } from './doctor';
 import { cmdCheckCommitMessage, cmdLog, recordStandaloneEvent } from './handoff';
 import { cmdMergeReady } from './mergeReady';
-import { cmdAdd, cmdAsk, cmdDecline, cmdDefer, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdQuestion, cmdRedirect, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
+import { cmdAdd, cmdAsk, cmdDecline, cmdDefer, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdQuestion, cmdRedirect, cmdRetriage, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
 import { cmdOrchestratePrompt } from './orchestratePrompt';
 import { cmdRoadmap } from './roadmapCmd';
 import { cmdPlanPrompt } from './planPrompt';
@@ -17,7 +17,7 @@ import { cmdSpecAdd, cmdSpecDone, cmdSpecNew, cmdSpecRemove, cmdSpecShow } from 
 import { cmdTriage } from './triage';
 import { cmdWorkPrompt } from './workPrompt';
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|question|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|defer|redirect|ask|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|orchestrate-prompt|merge-ready> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|question|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|defer|retriage|redirect|ask|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|orchestrate-prompt|merge-ready> ...';
 
 interface Command {
   usage: string;
@@ -80,6 +80,7 @@ const COMMANDS: Record<string, Command> = {
   decline: { usage: `usage: tasks decline <id>... --reason "..." [--trigger "..."] ${ACTOR_USAGE}  (several ids share the one reason and trigger; --trigger states a condition for revisiting, filed where \`tasks list --triggered\` finds it)`, run: cmdDecline },
   promote: { usage: `usage: tasks promote <id>... [--spec <slug>] ${ACTOR_USAGE}  (the non-interactive form of triage's promote: moves unreviewed or deferred records into the spec as open members)`, run: cmdPromote },
   defer: { usage: `usage: tasks defer <id>... ${ACTOR_USAGE}  (the non-interactive form of triage's defer, the inverse of promote: opens unreviewed or already-open records outside every spec)`, run: cmdDefer },
+  retriage: { usage: `usage: tasks retriage <id>... ${ACTOR_USAGE}  (the inverse of defer: routes a deferred record — open, no spec — back into the unreviewed queue, where a question answered late finally has somewhere to land)`, run: cmdRetriage },
   redirect: { usage: `usage: tasks redirect <id>... --deliverable "..." ${ACTOR_USAGE}  (the non-interactive form of triage's redirect: replaces the deliverable, filing the same triage event the walk records)`, run: cmdRedirect },
   ask: { usage: `usage: tasks ask <id>... --question "..." ${ACTOR_USAGE}  (the non-interactive form of triage's ask: appends the dated question to each record's evidence and leaves it unreviewed so the queue keeps offering it; refuses an id that is not already unreviewed rather than moving it back)`, run: cmdAsk },
   import: { usage: `usage: tasks import <audit-doc> --fault tooling|contract|nobody ${ACTOR_USAGE}  (the migration path for legacy audit documents, which carry no fault of their own — the caller classifies the document)`, run: cmdImport },
@@ -106,8 +107,9 @@ export function allUsages(): string[] {
 
 // Every verb's usage, keyed the way a caller types it, so a refusal can be
 // answered out of the same table the parser enforces. Nothing here is a
-// second list to keep in sync: both halves read COMMANDS.
-function everyVerb(): Array<[name: string, usage: string]> {
+// second list to keep in sync: both halves read COMMANDS. Exported so a test
+// can sweep every registered surface instead of retyping its names.
+export function everyVerb(): Array<[name: string, usage: string]> {
   return [...Object.entries(COMMANDS).map(([name, command]): [string, string] => [name, command.usage]), ...Object.entries(SPEC_COMMANDS).map(([name, command]): [string, string] => [`spec ${name}`, command.usage])];
 }
 

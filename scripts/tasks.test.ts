@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { flagArities } from './tasks/cli';
-import { allUsages } from './tasks/commands';
+import { flagArities, positionalArity } from './tasks/cli';
+import { allUsages, everyVerb } from './tasks/commands';
 import { enclosingGitFixture, fixture } from './tasks/cliFixtures';
 
 describe('tasks CLI', () => {
@@ -110,9 +110,23 @@ describe('tasks CLI', () => {
   // its own share of the test clock.
   const junkArgs = ['j1', 'j2', 'j3', 'j4', 'j5'] as const;
 
+  // The subject set is read off `commands.ts`'s own registry rather than
+  // retyped here, the way `TRIAGE_ACTIONS` is what `triage.test.ts`'s own
+  // completeness check reads. A verb registered with a bounded usage string
+  // is swept whether or not this file was touched when it was added — which
+  // is the property a hardcoded list cannot have, and the reason `defer`,
+  // `ask` and `redirect` went three verbs deep before anyone noticed none of
+  // them were here.
   it('refuses five junk arguments on every bounded command surface', () => {
     fixture(({ tasks }) => {
-      const bounded: string[][] = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['work-prompt'], ['check-commit-msg'], ['spec'], ['spec', 'new'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
+      const registry = everyVerb();
+      const bounded = registry.filter(([, usage]) => positionalArity(usage) !== null).map(([name]) => name.split(' '));
+      // A golden lower bound, not the registry's exact size: the hardcoded
+      // list this replaced named 23 surfaces and missed 3 real ones, so a
+      // count that can only grow proves the sweep gained ground rather than
+      // merely reproducing the old list under a new name.
+      expect(bounded.length).toBeGreaterThan(23);
+      expect(bounded.length).toBeLessThan(registry.length);
       for (const surface of bounded) {
         const name = surface.join(' ');
         const result = tasks(...surface, ...junkArgs);
@@ -124,10 +138,23 @@ describe('tasks CLI', () => {
 
   it('takes five junk arguments without an arity complaint on every unbounded surface', () => {
     fixture(({ tasks }) => {
-      for (const surface of [['spec', 'add'], ['spec', 'remove'], ['plan'], ['done'], ['decline'], ['promote']]) {
+      for (const surface of [['spec', 'add'], ['spec', 'remove'], ['plan'], ['done'], ['decline'], ['promote'], ['defer'], ['redirect'], ['ask'], ['retriage']]) {
         const result = tasks(...surface, ...junkArgs);
         expect(result.stderr, surface.join(' ')).not.toContain('unexpected argument');
       }
+    });
+  });
+
+  // c5's specific callout: `defer` takes ids only, so five junk arguments
+  // are five unresolved ids — a refusal from `resolveTaskIds`, not from the
+  // arity check above, and the unbounded sweep only proves the latter never
+  // fires. Both are "refuses"; only this one shows the record actually
+  // moved nowhere.
+  it('tasks defer refuses five junk arguments as unresolved ids, so it does not exit 0 for want of an arity complaint', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('defer', ...junkArgs);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no such task');
     });
   });
 
@@ -165,9 +192,14 @@ describe('tasks CLI', () => {
     });
   });
 
+  // Derived the same way the arity sweep above is: `--help` short-circuits
+  // before a command body runs (even plan-prompt's filesystem survey), so
+  // every registered surface is safe to ask, not just the ones a prior list
+  // remembered to name.
   it('answers --help on every command and subcommand, and names the flags it will accept', () => {
     fixture(({ tasks }) => {
-      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['work-prompt'], ['plan-prompt'], ['orchestrate-prompt'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
+      const commands = everyVerb().map(([name]) => name.split(' '));
+      expect(commands.length).toBeGreaterThan(30);
       for (const command of commands) {
         const result = tasks(...command, '--help');
         expect(result.status, command.join(' ')).toBe(0);

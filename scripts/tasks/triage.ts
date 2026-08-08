@@ -2,7 +2,7 @@ import type { Task } from '../lib/taskStore';
 import { loadStore, unreviewedQueue } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { recordEvents, resolveActiveSpec, resolveConfig, saveStoreAndWarn, subjectOf, today, type Config } from './context';
-import { pass2Promotion, printDecisionPrompt } from './records';
+import { pass2Promotion, printDecisionPrompt, transition, writeAskedQuestion } from './records';
 import { activePrompter } from './prompt';
 import { printEvidence, printRow, truncateLine } from './render';
 
@@ -40,15 +40,17 @@ async function runPromote({ task, spec }: TriageContext): Promise<TriageResult> 
   }
   const widening = pass2Promotion(task, spec);
   if (widening) console.log(widening);
-  task.state = 'open';
+  const notes = transition(task, 'open');
   task.spec = spec;
-  return { decision: `promoted into spec ${spec}` };
+  for (const note of notes) console.log(note);
+  return { decision: [`promoted into spec ${spec}`, ...notes].join('; ') };
 }
 
 async function runDefer({ task }: TriageContext): Promise<TriageResult> {
-  task.state = 'open';
+  const notes = transition(task, 'open');
   task.spec = null;
-  return { decision: 'deferred: opened outside every spec' };
+  for (const note of notes) console.log(note);
+  return { decision: ['deferred: opened outside every spec', ...notes].join('; ') };
 }
 
 async function runDecline({ task, ask }: TriageContext): Promise<TriageResult> {
@@ -57,10 +59,11 @@ async function runDecline({ task, ask }: TriageContext): Promise<TriageResult> {
     console.log('a reason is required to decline — skipping');
     return { control: 'break' };
   }
-  task.state = 'declined';
+  const notes = transition(task, 'declined');
   task.reason = reason;
   task.closed = today();
-  return { decision: `declined: ${truncateLine(reason, 120)}` };
+  for (const note of notes) console.log(note);
+  return { decision: [`declined: ${truncateLine(reason, 120)}`, ...notes].join('; ') };
 }
 
 async function runRedirect({ task, ask, tasks, config }: TriageContext): Promise<TriageResult> {
@@ -85,7 +88,7 @@ async function runAsk({ task, ask, tasks, config }: TriageContext): Promise<Tria
     console.log('empty — nothing asked');
     return { control: 'continue' };
   }
-  task.evidence = `${task.evidence ? `${task.evidence}\n\n` : ''}triage asked (${today()}): ${question}`;
+  writeAskedQuestion(task, question);
   saveStoreAndWarn(tasks, config);
   recordEvents(config, 'triage', [subjectOf(task, `asked for more information: ${truncateLine(question, 120)}`)]);
   console.log('recorded on the finding; it stays unreviewed until the question is answered');
