@@ -62,6 +62,7 @@ import {
   type Config,
 } from './context';
 import { reportPriorArtOnPaths } from './architectureCmds';
+import { unknownLessonIds } from './briefLessons';
 import { printRow, printTask, truncateLine, wrapUnder } from './render';
 import { resolveTaskIds } from './resolveIds';
 
@@ -159,6 +160,18 @@ function reportGrantAgainstDiff(task: Task, sha: string): void {
   console.log(`  \`tasks edit ${task.id} --writes <what it really touched>\` corrects the record — a divergence is information, and this is the one measurement of how wrong a forecast is`);
 }
 
+// A citation naming no live lesson is reported and kept, never dropped and
+// never refused. Kept because the lesson may be one a concurrent branch is
+// adding and the record is still the honest observation; reported because a
+// handle that resolves to nothing is how a breach count silently goes to
+// zero. Not a `doctor` condition and not a gate: c9 is that no exit code
+// reads a breach.
+function reportUnknownBreaches(task: Task): void {
+  const unknown = unknownLessonIds(task.breaches);
+  if (unknown.length === 0) return;
+  console.log(`note: ${unknown.length} cited lesson handle(s) name no live lesson: ${unknown.join(', ')} — the citation is kept, and \`tasks friction\` reports it there too. A lesson's handle survives rewording its prose, so a miss here is a typo or a retirement rather than an edit`);
+}
+
 function reportGrant(task: Task): void {
   if (task.grant !== 'forecast') return;
   console.log(`its write grant is recorded as a forecast — \`tasks edit ${task.id} --writes <paths> --grant commitment\` is what a worker that has read the region says, and \`tasks plan\` grades an overlap between commitments as a defect and one resting on a forecast as a note`);
@@ -251,6 +264,7 @@ export function cmdAdd(args: Flags, usage: string): void {
     requires: splitList(args.flags.requires),
     writes: splitList(args.flags.writes),
     grant: grant.grant,
+    breaches: splitList(args.flags.breaches),
     produces: splitList(args.flags.produces),
     files: splitList(args.flags.files),
     deliverable: args.flags.deliverable ?? null,
@@ -263,6 +277,7 @@ export function cmdAdd(args: Flags, usage: string): void {
   if (kind === 'finding' && args.flags.spec !== undefined) console.log(`--spec is not recorded on a finding — it starts unreviewed outside every spec, and triage or \`tasks promote\` moves it in`);
   reportUnresolvedRequires(task, tasks);
   reportGrant(task);
+  reportUnknownBreaches(task);
   reportMisfiledSystem(config, task);
   offerRecurrence(task, reportPriorArtOnPaths(config, tasks, task));
 }
@@ -498,6 +513,10 @@ export function cmdEdit(args: Flags, usage: string): void {
     task.grant = grant.grant;
     changes.push('grant');
   }
+  if (args.flags.breaches !== undefined) {
+    task.breaches = splitList(args.flags.breaches);
+    changes.push('breaches');
+  }
   if (args.flags.produces !== undefined) {
     task.produces = splitList(args.flags.produces);
     changes.push('produces');
@@ -521,6 +540,7 @@ export function cmdEdit(args: Flags, usage: string): void {
   console.log(`edited ${task.id}: ${changes.join(', ')}`);
   reportUnresolvedRequires(task, tasks);
   if (changes.includes('grant')) reportGrant(task);
+  if (changes.includes('breaches')) reportUnknownBreaches(task);
   if (changes.some((change) => change === 'system' || change === 'writes' || change === 'files')) reportMisfiledSystem(config, task);
   if (changes.includes('writes') || changes.includes('files')) offerRecurrence(task, reportPriorArtOnPaths(config, tasks, task));
 }

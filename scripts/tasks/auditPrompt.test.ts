@@ -814,13 +814,17 @@ describe('the brief arriving with the answers rather than the instructions', () 
     expect(toolLines(null).join('\n')).not.toContain('stale');
   });
 
-  it('makes logging tool friction a numbered step rather than a line to skip', () => {
+  it('makes filing what the audit cost a numbered step, and sends it to the channel rather than a markdown file', () => {
     enclosingGitFixture(({ tasks }) => {
       const { stdout } = tasks('audit-prompt', 'demo-spec');
       // Of the two passes that had it as prose elsewhere in the brief, one
       // wrote nothing at all; the pass that had it as a step wrote it.
-      expect(stepsBlock(stdout)).toContain('8. Log what this audit cost you');
-      expect(stepsBlock(stdout)).toContain('.planning/agent-feedback/tool-friction.md');
+      expect(stepsBlock(stdout)).toContain('8. File what this audit cost you');
+      expect(stepsBlock(stdout)).toContain('npm run tasks -- add');
+      expect(stepsBlock(stdout)).toContain('--breaches <lesson-handle>');
+      // The invariant, of which the deleted markdown file was one instance:
+      // nothing the tooling generates may direct a report outside the store.
+      expect(stdout).not.toContain('.planning/');
     });
   });
 

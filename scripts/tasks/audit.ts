@@ -567,7 +567,10 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
 // The last step of the auditor's brief, said by the command that completes
 // the step before it. Of the two passes carrying the friction log as prose
 // somewhere in the brief, one wrote nothing; the pass that had it as a
-// numbered step wrote it.
+// numbered step wrote it. It now names the channel rather than a markdown
+// file: what the tooling generates may not direct a report outside the store,
+// because a report outside the store does not aggregate and the friction that
+// recurs is exactly the friction that stays invisible.
 export function nextAfterPass(outstanding: boolean, slug: string): string {
-  return `Next: log what this audit cost you in .planning/agent-feedback/tool-friction.md, dated, then commit${outstanding ? `. This pass leaves a clause outstanding — \`npm run tasks -- next --spec ${slug}\` is what picks it up` : ''}`;
+  return `Next: file what this audit cost you — \`npm run tasks -- add "<title>" --kind finding --fault tooling|contract|nobody --deliverable "..."\`, one record per friction, adding \`--breaches <lesson-handle>\` where it was an instruction that did not land, and \`npm run tasks -- recur <id> --note "..."\` where the channel already holds it. Then commit${outstanding ? `. This pass leaves a clause outstanding — \`npm run tasks -- next --spec ${slug}\` is what picks it up` : ''}`;
 }

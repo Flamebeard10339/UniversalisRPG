@@ -6,8 +6,10 @@ import path from 'node:path';
 // was decided about this" has to be answerable without a text heuristic.
 // `recur` is its own op for the same reason and a stronger one: it is counted,
 // and a count assembled by matching prose would be a different number every
-// time the prose was reworded.
-export const EVENT_OPS = ['add', 'edit', 'start', 'stop', 'done', 'decline', 'triage', 'import', 'audit', 'spec-add', 'spec-remove', 'spec-defer', 'spec-done', 'doctor-fix', 'note', 'decision', 'recur'] as const;
+// time the prose was reworded. `checked` is the one place an event's `id` is
+// not a task id but a lesson handle — the subject of the event is the lesson,
+// and "who looked, and when" is what an append-only log answers well.
+export const EVENT_OPS = ['add', 'edit', 'start', 'stop', 'done', 'decline', 'triage', 'import', 'audit', 'spec-add', 'spec-remove', 'spec-defer', 'spec-done', 'doctor-fix', 'note', 'decision', 'recur', 'checked'] as const;
 
 export type EventOp = (typeof EVENT_OPS)[number];
 

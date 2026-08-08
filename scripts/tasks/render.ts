@@ -88,6 +88,7 @@ export function renderTask(task: Task, byId: Map<string, Task>, detail: Detail, 
   // The kind rides with the grant, never on its own line: a reader deciding
   // whether these paths are a promise or a guess is looking at the paths.
   if (task.writes.length > 0) lines.push(`writes (${task.grant ?? 'kind unstated'}): ${task.writes.join(', ')}`);
+  if (task.breaches.length > 0) lines.push(`breaches: ${task.breaches.join(', ')}`);
   if (task.produces.length > 0) lines.push(`produces: ${task.produces.join(', ')}`);
   if (task.deliverable || task.evidence) lines.push('');
   if (task.deliverable) lines.push(...proseLines('deliverable', prose(task.deliverable)));

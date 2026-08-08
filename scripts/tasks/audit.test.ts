@@ -825,7 +825,11 @@ describe('the brief arriving with the answers rather than the instructions', () 
   it('tasks audit names the step that follows recording a pass', async () => {
     await fixture(async ({ audit }) => {
       const met = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=measured', '--proof', '2=met', '--evidence', '2=measured');
-      expect(met.stdout).toContain('Next: log what this audit cost you in .planning/agent-feedback/tool-friction.md');
+      // The channel, not a markdown file: what the tooling generates may not
+      // send a report outside the store.
+      expect(met.stdout).toContain('Next: file what this audit cost you');
+      expect(met.stdout).toContain('--kind finding --fault tooling|contract|nobody');
+      expect(met.stdout).not.toContain('.planning/');
       // A clause left outstanding is a different next move, and `tasks next`
       // is what picks it up.
       expect(met.stdout).not.toContain('tasks -- next');

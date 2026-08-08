@@ -415,6 +415,14 @@
             "scripts/tasks/handoff.ts"
           ],
           "note": "produced by a-question-s-decider-changes-what-the-tooling-does-with-it: awaitsADecider, and the three routes that read it — work-prompt briefs an answer instead of an implementation, the member queue does not dispatch one, and start refuses to claim one"
+        },
+        {
+          "name": "process friction channel",
+          "paths": [
+            "scripts/tasks/friction.ts",
+            "scripts/lib/taskStore.ts"
+          ],
+          "note": "produced by one-query-over-the-channel-and-the-second-place-retired: tasks friction over the store's fault and breaches fields and the log's recur and checked events, plus tasks checked; .planning/agent-feedback/tool-friction.md is retired and no generated brief names a second place"
         }
       ]
     },

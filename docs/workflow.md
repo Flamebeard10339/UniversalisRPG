@@ -101,7 +101,17 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
     state is meant to be read as noise: a red spec or clauses leg is real debt, on a member this
     branch itself worked. It stops short of merging: the merge body is the one
     artifact whoever did the work has to write.
-10. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
+10. **Record what it cost**: a friction is filed into the store like anything else —
+    `tasks add "<what cost you>" --kind finding --fault tooling|contract|nobody`, with
+    `--breaches <lesson-handle>` when what failed was an instruction that did not land. There is no
+    second place: prose in a markdown file does not aggregate, so the friction that recurs is
+    exactly the friction that stays invisible, and nothing the tooling generates may send a report
+    outside the store. Hitting one the channel already holds is
+    `tasks recur <id> --note "what it cost this time"`, which appends an occurrence and increments
+    nothing; reading a lesson and finding it clean is `tasks checked <handle> --note "..."`, which
+    is what separates a lesson that is working from one nobody looked at. `tasks friction` is the
+    one query over all of it, and none of it gates anything.
+11. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
     `tasks decision "<one line>" --spec <slug>` as they happen; `tasks log --id <id>` /
     `--op decision` answers later, from the log alone, and `tasks show <id>` prints both back
     against the record they name. A decision made in a session and not recorded here is a

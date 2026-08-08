@@ -605,3 +605,143 @@ describe('c11: filing shows what already claims the path, and never refuses', ()
     });
   });
 });
+
+describe('c1, c5, c7, c8, c10, c12: one query over the channel', () => {
+  // A channel with one of everything in it, so a single run can be asserted
+  // about from several sides.
+  const fillTheChannel = (tasks: (...args: string[]) => Run): void => {
+    tasks('add', 'the tool lost a write', '--id', 'tooling-one', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'lock it', '--breaches', 'worker/mutation-proof');
+    tasks('add', 'the brief did not say', '--id', 'contract-one', '--kind', 'finding', '--fault', 'contract', '--severity', 'medium', '--deliverable', 'say it');
+    tasks('add', 'nobody could have known', '--id', 'nobody-one', '--kind', 'finding', '--fault', 'nobody', '--severity', 'low', '--deliverable', 'record it');
+    tasks('add', 'planned work', '--id', 'planned-one');
+  };
+
+  it('reports nobody and unclassified, and counts neither as a defect', () => {
+    fixture(({ tasks, dir }) => {
+      fillTheChannel(tasks);
+      const store = path.join(dir, 'tasks.jsonl');
+      writeFileSync(store, `${readFileSync(store, 'utf8')}${JSON.stringify({ id: 'legacy', seq: 9, title: 'from before the channel', kind: 'finding', state: 'unreviewed', severity: 'low', system: null, spec: null, clause: null, discharges: [], requires: [], files: [], writes: [], grant: null, produces: [], deliverable: 'fix it', evidence: 'x', source: null, reason: null, trigger: null, closed: null, closedCommit: null, claimed: null, claimedBy: null })}\n`, 'utf8');
+
+      const { stdout } = tasks('friction');
+      // Reported: all four buckets, each named.
+      expect(stdout).toContain('tooling          1 record(s)');
+      expect(stdout).toContain('contract         1 record(s)');
+      expect(stdout).toContain('nobody           1 record(s)');
+      expect(stdout).toContain('unclassified     1 record(s)');
+      // Counted: only the two that are a defect measure. Reporting and
+      // counting are different acts and the clause turns on the difference.
+      expect(stdout).toContain('2 of those are a defect measure — fault tooling or contract only, with the other 2 reported above and excluded here');
+      // Unclassified is its own answer and is never folded into nobody.
+      expect(stdout).toMatch(/nobody.*Reported, and counted in nothing below/);
+      expect(stdout).toMatch(/unclassified.*Not backfilled/);
+    });
+  });
+
+  it('presents every count beside the denominator it is a rate over, drawn from the log', () => {
+    fixture(({ tasks }) => {
+      fillTheChannel(tasks);
+      tasks('start', 'planned-one', '--actor', 'worker-a');
+
+      const { stdout } = tasks('friction');
+      expect(stdout).toContain('2 against 1 dispatches (start events)');
+      expect(stdout).toContain('2 against 0 audit passes (audit events) — no denominator yet');
+      expect(stdout).toContain('2 against 0 specs closed (spec-done events)');
+    });
+  });
+
+  it('derives the recurrence count from the occurrences and prints what each one cost', () => {
+    fixture(({ tasks }) => {
+      fillTheChannel(tasks);
+      tasks('recur', 'tooling-one', '--note', 'pass 2, ten minutes');
+      tasks('recur', 'tooling-one', '--note', 'pass 3, a round trip');
+
+      const { stdout } = tasks('friction');
+      expect(stdout).toContain('2 recurrence(s) recorded against 1 record(s)');
+      expect(stdout).toContain('tooling-one — 2 occurrence(s) (unreviewed)');
+      expect(stdout).toContain('pass 2, ten minutes');
+      expect(stdout).toContain('pass 3, a round trip');
+    });
+  });
+
+  it('distinguishes a lesson checked and found clean from one nobody looked at', () => {
+    fixture(({ tasks }) => {
+      fillTheChannel(tasks);
+      expect(tasks('friction').stdout).toMatch(/worker\/record-decisions\s+0 record\(s\), 0 further occurrence\(s\) — nobody has looked/);
+
+      const recorded = tasks('checked', 'worker/record-decisions', '--note', 'read every decision on this branch, all recorded', '--actor', 'auditor-b');
+      expect(recorded.status).toBe(0);
+
+      const { stdout } = tasks('friction');
+      expect(stdout).toMatch(/worker\/record-decisions\s+0 record\(s\), 0 further occurrence\(s\) — checked clean .* by auditor-b: read every decision on this branch, all recorded/);
+      expect(stdout).toMatch(/worker\/file-findings\s+0 record\(s\), 0 further occurrence\(s\) — nobody has looked/);
+    });
+  });
+
+  it('counts a breach against the lesson it cites, and rolls that record’s occurrences up to it', () => {
+    fixture(({ tasks }) => {
+      fillTheChannel(tasks);
+      tasks('recur', 'tooling-one', '--note', 'again');
+
+      expect(tasks('friction').stdout).toMatch(/worker\/mutation-proof\s+1 record\(s\), 1 further occurrence\(s\) — tooling-one/);
+    });
+  });
+
+  it('refuses a check against a handle no live lesson answers to, and reports a citation that names none', () => {
+    fixture(({ tasks }) => {
+      const refused = tasks('checked', 'worker/no-such-lesson', '--note', 'looked');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('no live lesson has the handle worker/no-such-lesson');
+
+      // A citation, by contrast, is kept and reported: the record is still
+      // the honest observation, and a handle resolving to nothing is how a
+      // breach count silently goes to zero.
+      const filed = tasks('add', 'a breach of something', '--id', 'orphan-cite', '--kind', 'finding', '--fault', 'contract', '--severity', 'low', '--deliverable', 'fix it', '--breaches', 'worker/no-such-lesson');
+      expect(filed.status).toBe(0);
+      expect(filed.stdout).toContain('1 cited lesson handle(s) name no live lesson: worker/no-such-lesson');
+      expect(tasks('friction').stdout).toContain('orphan-cite cites worker/no-such-lesson');
+    });
+  });
+
+  it('orders lessons by the briefs and never by the count, and compares no number to anything', () => {
+    fixture(({ tasks }) => {
+      fillTheChannel(tasks);
+      const { stdout } = tasks('friction');
+      // worker/comment-rule is first in WORKER_LESSONS and has no breach;
+      // worker/mutation-proof is second and has one. Count-ordering would
+      // invert them, and ordering by count is comparing it to something.
+      expect(stdout.indexOf('worker/comment-rule')).toBeLessThan(stdout.indexOf('worker/mutation-proof'));
+      expect(stdout).toContain('Nothing here gates. No number above is compared to anything');
+      // The refusal, checked at the source rather than in the output: an
+      // `if` over a count is one line away and would look like tidying.
+      expect(readFileSync(path.join(__dirname, 'friction.ts'), 'utf8')).not.toMatch(/\.length\s*[<>]|count\s*[<>]|>=\s*\d/);
+    });
+  });
+
+  it('exits zero over a channel with nothing in it, because a report is not a verdict', () => {
+    fixture(({ tasks }) => {
+      const empty = tasks('friction');
+      expect(empty.status).toBe(0);
+      expect(empty.stdout).toContain('by fault, over 0 record(s)');
+      expect(empty.stdout).toContain('no denominator yet');
+    });
+  });
+});
+
+// c1's invariant, of which the deleted markdown file was one instance and not
+// the extent: nothing the tooling generates may direct a report outside the
+// store.
+describe('c1: there is one place, and no generated brief names another', () => {
+  it('has no tracked file left under the retired feedback directory', () => {
+    expect(existsSync(path.join(process.cwd(), '.planning', 'agent-feedback', 'tool-friction.md'))).toBe(false);
+  });
+
+  it('sends every generated brief to the channel', () => {
+    fixture(({ tasks }) => {
+      for (const brief of [['work-prompt', 'demo-spec'], ['plan-prompt', 'demo-spec'], ['orchestrate-prompt']]) {
+        const { stdout } = tasks(...brief);
+        expect(stdout, brief.join(' ')).not.toContain('tool-friction.md');
+        expect(stdout, brief.join(' ')).not.toContain('agent-feedback');
+      }
+    });
+  });
+});

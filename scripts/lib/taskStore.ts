@@ -70,6 +70,11 @@ export interface Task {
   // Who should decide it, for a `question`: the role whose decision would
   // hold. Null on every other kind.
   decider: Decider | null;
+  // The lessons this record is an instance of breaching, by the handle that
+  // survives rewording the lesson's own prose. Empty on almost everything:
+  // most records breach nothing, and a citation is worth having only because
+  // it turns "how many defects" into "which instruction is not landing".
+  breaches: string[];
   produces: string[];
   deliverable: string | null;
   evidence: string | null;
@@ -198,6 +203,7 @@ const KNOWN_KEYS: ReadonlyArray<keyof KnownFields> = Object.keys({
   grant: true,
   fault: true,
   decider: true,
+  breaches: true,
   produces: true,
   deliverable: true,
   evidence: true,
@@ -278,6 +284,7 @@ function normalizeTask(value: unknown, where: string): Task {
     grant: grant as Grant | null,
     fault: fault as Fault | null,
     decider: decider as Decider | null,
+    breaches: optionalStringArray(value, 'breaches', where),
     produces: optionalStringArray(value, 'produces', where),
     deliverable: nullableString(value, 'deliverable', where),
     evidence: nullableString(value, 'evidence', where),
@@ -316,6 +323,7 @@ function renderTask(task: Task): string {
     grant: task.grant,
     fault: task.fault,
     decider: task.decider,
+    breaches: task.breaches,
     produces: task.produces,
     deliverable: task.deliverable,
     evidence: task.evidence,
@@ -376,6 +384,7 @@ export function createTask(record: NewRecord, draft: Draft = {}): Task {
     grant: null,
     fault: record.fault ?? null,
     decider: record.decider ?? null,
+    breaches: [],
     produces: [],
     deliverable: null,
     evidence: null,

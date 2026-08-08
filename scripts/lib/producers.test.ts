@@ -23,6 +23,7 @@ function task(id: string, produces: string[], state: Task['state'] = 'done', pat
     grant: null,
     fault: null,
     decider: null,
+    breaches: [],
     produces,
     deliverable: null,
     evidence: null,

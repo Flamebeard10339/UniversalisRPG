@@ -42,6 +42,7 @@ const task = (overrides: Partial<Task> = {}): Task => ({
   grant: null,
   fault: null,
   decider: null,
+  breaches: [],
   produces: [],
   deliverable: null,
   evidence: null,
@@ -852,5 +853,23 @@ describe('the commands the legs name', () => {
     const named = [...new Set(nexts.flatMap((line) => [...line.matchAll(/npm run tasks -- ([a-z-]+)( [a-z-]+)?/g)].map((match) => match[1])))];
     expect(named.length).toBeGreaterThan(0);
     for (const verb of named) expect(verbs).toContain(verb);
+  });
+});
+
+// c9. The channel reports and refuses to become a threshold. Written as a
+// test rather than as intent because every previous measurement added to
+// this repository grew a gate within two branches, and the `if` statement
+// that would do it here is one line away and would look like tidying.
+describe('the gate reads no fault, no breach and no count', () => {
+  it('runs no leg over the channel, and none of its legs is the friction query', () => {
+    expect(LEGS.map((leg) => leg.command)).not.toContain('npm run tasks -- friction');
+    for (const leg of LEGS) expect(leg.command).not.toMatch(/friction|fault|breach|recur|checked/);
+  });
+
+  it('names neither field anywhere in the gate, so no value of either can reach a leg', () => {
+    const source = readFileSync(path.join(__dirname, 'mergeReady.ts'), 'utf8');
+    // The reads that would make a count matter, rather than the words: the
+    // gate's own prose is allowed to say "recurrence" about something else.
+    for (const read of ['.fault', '.breaches', "'recur'", "'checked'", 'friction']) expect(source).not.toContain(read);
   });
 });

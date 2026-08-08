@@ -8,6 +8,7 @@ import { flagArities, parseArgs, positionalArity, type Flags } from './cli';
 import { ACTOR_USAGE, flushSkippedStoreLines, GLOBAL_USAGE } from './context';
 import { cmdPlan, cmdConcept, cmdProduces, cmdSystem, cmdWhere } from './architectureCmds';
 import { cmdDoctor } from './doctor';
+import { cmdChecked, cmdFriction } from './friction';
 import { cmdCheckCommitMessage, cmdLog, recordStandaloneEvent } from './handoff';
 import { cmdMergeReady } from './mergeReady';
 import { cmdAdd, cmdAsk, cmdDecline, cmdDefer, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdQuestion, cmdRecur, cmdRedirect, cmdRetriage, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
@@ -18,7 +19,7 @@ import { cmdSpecAdd, cmdSpecDone, cmdSpecNew, cmdSpecRemove, cmdSpecShow } from 
 import { cmdTriage } from './triage';
 import { cmdWorkPrompt } from './workPrompt';
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|question|recur|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|defer|retriage|redirect|ask|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|orchestrate-prompt|merge-ready> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|question|recur|friction|checked|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|defer|retriage|redirect|ask|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|orchestrate-prompt|merge-ready> ...';
 
 interface Command {
   usage: string;
@@ -48,19 +49,27 @@ const SPEC_USAGE = `usage: tasks spec <new|add|remove|show|done> ...  (\`tasks s
 const COMMANDS: Record<string, Command> = {
   doctor: { usage: `usage: tasks doctor [--fix] ${ACTOR_USAGE}`, run: cmdDoctor },
   add: {
-    usage: `usage: tasks add "<title>" [--kind task|finding] [--fault tooling|contract|nobody (required for --kind finding)] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--discharges c3,c6] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--grant forecast|commitment] [--produces \"policy module\"] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>] ${ACTOR_USAGE}`,
+    usage: `usage: tasks add "<title>" [--kind task|finding] [--fault tooling|contract|nobody (required for --kind finding)] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--discharges c3,c6] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--grant forecast|commitment] [--breaches worker/mutation-proof,auditor/next-neighbour] [--produces \"policy module\"] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>] ${ACTOR_USAGE}`,
     run: cmdAdd,
   },
   question: {
     usage: `usage: tasks question "<title>" --blocks id1,id2 --decider worker|planner|author --fault tooling|contract|nobody [--severity high|medium|low] [--system "<name>"] [--evidence "..."] ${ACTOR_USAGE}  (files a decision you should not make against the records it holds up, addressed to the role whose decision would hold. Nothing is stored as blocked: the question's id lands in each named record's requires, so \`tasks done\` on it once answered — or \`tasks decline\` once dismissed — releases exactly those and nothing else)`,
     run: cmdQuestion,
   },
+  friction: {
+    usage: 'usage: tasks friction  (one query over the channel: what the workflow has cost, by fault, by lesson breached, and every count beside the denominator it is a rate over. Reports only — nothing here is compared to anything)',
+    run: cmdFriction,
+  },
+  checked: {
+    usage: `usage: tasks checked <lesson-handle> --note "what you looked at" ${ACTOR_USAGE}  (records that somebody looked at a lesson and found it clean, so zero breaches stops being ambiguous between the lesson working and nobody looking)`,
+    run: cmdChecked,
+  },
   recur: {
     usage: `usage: tasks recur <id> --note "what it cost this time" ${ACTOR_USAGE}  (records that a filed friction happened again: appends an occurrence to the event log and leaves the record untouched. Nothing is incremented — the count is read back off the occurrences, and each keeps its own note)`,
     run: cmdRecur,
   },
   edit: {
-    usage: `usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--fault tooling|contract|nobody] [--decider worker|planner|author] [--discharges c3,c6] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--grant forecast|commitment] [--produces \"policy module\"] ${ACTOR_USAGE}  (content only: state, spec, kind and reason are moved by start/stop/done/decline/spec add, never by edit)`,
+    usage: `usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--fault tooling|contract|nobody] [--decider worker|planner|author] [--discharges c3,c6] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--grant forecast|commitment] [--breaches worker/mutation-proof,auditor/next-neighbour] [--produces \"policy module\"] ${ACTOR_USAGE}  (content only: state, spec, kind and reason are moved by start/stop/done/decline/spec add, never by edit)`,
     run: cmdEdit,
   },
   show: { usage: 'usage: tasks show <id>', run: cmdShow },

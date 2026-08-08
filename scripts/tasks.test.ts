@@ -409,7 +409,7 @@ describe('a refusal that names the near miss', () => {
       expect(result.status).toBe(1);
       // Every owner, not the first one found: a flag two verbs take is
       // answered with both, or the caller is sent to the wrong one.
-      expect(result.stderr).toContain('--note: not a flag of `add` — it belongs to `recur`, `concept`');
+      expect(result.stderr).toContain('--note: not a flag of `add` — it belongs to `checked`, `recur`, `concept`');
       // The list flags, the choices and the identifiers are not the near
       // miss and are not offered as one — checked on the near-miss line
       // itself, since the usage printed below it names every flag.

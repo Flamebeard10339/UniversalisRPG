@@ -643,7 +643,10 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
     console.log(`     npm run tasks -- audit ${slug} --args-from ${argsPath}`);
     if (argsKept) console.log(`     ${keptNote(argsPath, 'pass file')}`);
   }
-  console.log('8. Log what this audit cost you — task tool, audit tool, harness — in .planning/agent-feedback/tool-friction.md, dated, with what you measured.');
+  console.log('8. File what this audit cost you — task tool, audit tool, harness — into the channel, with what you measured. One record per friction:');
+  console.log('     npm run tasks -- add "<what cost you>" --kind finding --fault tooling|contract|nobody --deliverable "what fixing it would mean" --evidence "what you measured"');
+  console.log('   Add `--breaches <lesson-handle>` when what failed was an instruction below that did not land, and use `npm run tasks -- recur <id> --note "what it cost this time"` when the channel already holds it — a recurrence is counted and a second record is not. `npm run tasks -- friction` is the query over all of it.');
+  console.log('   Nothing you file here gates anything, and a fault of `nobody` is never counted as a defect. There is no markdown file to append to: prose does not aggregate, and the friction that recurs is the one that stays invisible.');
   console.log('');
   console.log('Look specifically for:');
   for (const item of AUDIT_CHECKLIST) console.log(`- ${item}`);
