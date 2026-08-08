@@ -93,27 +93,53 @@ paths are exactly the ones `Testing procedure`'s `scripts/lib` directory grant s
 mechanism — and removing that grant is the record's own deliverable. A decision on the record says
 so.
 
-## 5. What §7 asked for and this branch did not do
+## 5. What §7 asked for, and where it stands
 
-- **Phases 4–6 are not resumed here, and that is a scope decision, not an omission.** §7.4 says the
-  paused plan is well aimed and should be resumed; each of those specs is one branch's promise, and
-  `merge-ready` grades a branch on every spec its own store diff declares. Carrying them here would
-  make this branch owe clauses it never worked. What this branch did instead is make them
-  dispatchable: the set is graded, the collision is ruled, the ordering is in the store.
-  `npm run tasks -- plan one-query-over-the-channel-and-the-second-place-retired
-  a-recurrence-is-appended-and-filing-shows-what-already-claim
-  a-question-s-decider-changes-what-the-tooling-does-with-it lessons-say-what-the-run-learned
-  a-record-cannot-leave-the-store-unrecorded every-system-owns-its-files-by-name` reports one
-  `defect` and three notes. **The defect is a known false positive** — a declined record's
-  `produces` claim graded as a live duplicate, already filed as
-  `tasks-plan-grades-a-declined-record-s-produces-claim-as-a-li`. The three notes are the real
-  answer: two records start blocked, in the order they should.
 - **§7.5 and §7.6 are prohibitions and were obeyed.** The store was not rebuilt; no capability was
   added ahead of its use. Every new function here has a caller in the same commit.
-- **`merge-ready` reports this branch as declaring a second spec** it never worked, because the
-  §7.4 ruling is a `requires` edit on that spec's member. That is filed as
+- **`merge-ready` reports this branch as declaring a spec it never worked**, because the §7.4
+  ruling is a `requires` edit on `a-lesson-is-folded-from-its-own-log`'s member. That is filed as
   `ordering-a-member-declares-its-spec` — the branch reproduced it on itself while obeying the
-  sweep — and it is the one leg still red. Every other leg passes, this spec included.
+  sweep. That spec is out of §7.4's scope and its one member is now unblocked and open; the leg is
+  red for that reason and for no other.
+- **Two specs this branch did work are red on clauses only, and the reason is procedural.**
+  `the-workflow-records-what-cost-it-in-one-place` and `a-record-cannot-leave-the-store-unrecorded`
+  have every member closed and no audit pass over the work §6 below describes. Step 7 of
+  `docs/workflow.md` gives that to a separate actor on purpose, and the session that did the work
+  is the one party that cannot supply it. `npm run tasks -- audit-prompt <slug>` is the whole
+  instruction.
+
+## 5b. Phases 4–6, resumed
+
+Written in a later session against the same branch. §7.4 said the paused plan was well aimed and
+should be resumed; it now is, and every record it named is closed. What a reader needs beyond the
+commit bodies:
+
+- **The order was forced and the branch followed it.** `a-recurrence` → `a-record-cannot-leave` →
+  `every-system-owns` is a `requires` chain, and phase 6 declares itself last and alone because the
+  file list it enumerates has to be the final one. Running them as one sequential branch rather
+  than six is therefore the same schedule the six branches would have had, with the merges removed.
+- **c6 was graded `met` and its record half did not exist.** The lesson handle survived rewording,
+  which is what pass 1 checked; no field on any record ever cited one, so c7 and c12 had nothing to
+  count. `Task.breaches` is that field. Adding it forced a literal into eight test fixtures that
+  construct a whole `Task`, which no grant forecast — the shape a schema change always has here,
+  and one `tasks plan` still cannot see.
+- **`proof-targets-resolve` was superseded by `targets-resolve-across-files`, not by
+  `rg-m3-dead-proof-targets`.** The spec offered the second as the likely candidate and it is a
+  declined Testing procedure finding about stale proof targets in a spec document. The answer came
+  out of the concept registry, whose note names its own producer, rather than out of titles.
+- **Three defects were found by the new tooling on its first real use, and each is fixed or filed
+  where it belongs.** `checkPlan` grades a record's own concept registration as a duplicate of
+  itself, which workflow step 5 guarantees for every worker — filed. `cmdConcept` blocked on every
+  manifest error rather than the ones its own write introduced — fixed, because making `paths`
+  exact caused it. `orphanedFiles` had no test home in a top-level script — moved into `systems.ts`,
+  because a mutation making `covers` satisfy the orphan check left the whole suite green.
+- **One new `doctor` warning is this branch's own and is correct.** A declined 2026-08-06 record
+  lists `.planning/agent-feedback/tool-friction.md` in its `files`, and c1 deleted that file. The
+  stale-file report is doing its job; editing a closed record's `files` to quiet it would erase what
+  the record actually observed.
+- **The Task system is frozen.** `docs/audits/systems.json` carries the SHA and the note on its
+  entry, which is what `npm run audit-status` prints first for it.
 
 ## 5a. Pass 1, and what it changed after the fact
 
@@ -149,7 +175,8 @@ and blames a holder that does not exist (`LOCK_WAIT_MS` 5 s is shorter than `LOC
 ## 6. The sweep's findings, after this branch
 
 Closed against the work above: **H1, H2, H3, H4, H7, H12, H13, H14, M4, M8**, and pass 1's own EPERM regression, plus the older
-`stranded-spec-members-have-no-repair` that M8 extended.
+`stranded-spec-members-have-no-repair` that M8 extended. Closed by phases 4–6: **M5**, and Testing
+procedure's own L4 with it.
 
 Still open and unchanged, with what a later reader should know:
 
@@ -163,19 +190,19 @@ Still open and unchanged, with what a later reader should know:
 - **H9** (`CLAUDE.md`'s wisdom line drifted from its tested source) — a one-word fix, deliberately
   not made: it is in §5 and not in §7, and an unclaused change is what an audit exists to catch.
   It is the cheapest item left in the whole list.
-- **H10, H11, H15, H16, M1–M3, M5–M7, M9–M13, L1–L6** — untouched. Note that **M5 is now
-  load-bearing for a check that runs**: `Testing procedure` declaring the directory `scripts/lib`
-  is what puts 11 of `doctor`'s 14 warnings there, and `every-system-owns-its-files-by-name` is the
-  record that removes it.
+- **H10, H11, H15, H16, M1–M3, M6, M7, M9–M13, L1–L6** — untouched. M5 is gone: no system declares
+  a directory in `paths` any more, so `doctor`'s misfiled-system warnings are now about records
+  rather than about the manifest, and the shared-window count fell from 32 files to 12 — all twelve
+  the deliberate second read `covers` now states outright.
 
 ## 7. What did not change, and should not be re-measured
 
-The sweep's arithmetic still holds and this branch does not move it: the tool is still larger than
-the game, the Task system still holds 22 of 43 registered concepts (23 now — `atomic store write`
-was registered by this branch), 83% of `produces` claims are still unregistered, and `docs/specs/`
-still has 34 fully historical files. What changed is that those 34 **can now be deleted** without
-stranding their closed members; nobody has deleted them.
+The sweep's arithmetic still holds in the direction that matters and this branch moves it the wrong
+way: the tool is still larger than the game, and the Task system now holds **28 of 49** registered
+concepts rather than 22 of 43 — phases 4–6 added five of the six. 83% of `produces` claims are still
+unregistered, and `docs/specs/` still has 34 fully historical files. What changed is that those 34
+**can now be deleted** without stranding their closed members; nobody has deleted them.
 
-The suite is 1,977 tests at ~25 s wall, with one new real-subprocess test — three concurrent
+The suite is 2,040 tests at ~25 s wall, with one new real-subprocess test — three concurrent
 `tasks add` — that costs about half a second and is the only thing proving the c1 seam between
 processes rather than inside one.
