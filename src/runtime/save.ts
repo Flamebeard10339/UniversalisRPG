@@ -225,9 +225,7 @@ function checkSave(saved: ParsedSave): void {
 export function loadSave(state: GameState, saved: ParsedSave, registry: Registry): PruneWarning[] {
   checkSave(saved);
   const base = initialState(registry);
-  // Copied, because a `# save` outlives the load: without this the state holds
-  // the registry's own objects, so playing on rewrites the save that was loaded
-  // and whoever authored the save keeps a live handle on the game.
+  // A save outlives the load, so the state may not be built from its objects.
   const diff = structuredClone(saved.diff);
   const target = state as unknown as Record<string, unknown>;
   const baseline = base as unknown as Record<string, unknown>;

@@ -397,3 +397,107 @@ doctor and the byte check all pass.
   c8 says it is. One line fixes it and the finding says so. Performance was checked as well and is
   not a regression: 2000 view() calls over content/tutorial-island.dsl measured 25ms on this head
   against 21ms on the merge base, through npm run inspect on both trees.
+
+### Pass 4 — 2026-08-09
+
+- base: `6d6815f04182e1c1ecdf25f1ffb534a1dd78d0ff`
+- head: `8573d95c0106461b8fa7da87e60fdb295579cc6a`
+- proof 1: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer, still open.
+  Re-checked cold rather than taking passes 1-3 on trust: scripts/play-cli.ts still dispatches by a
+  chain of string tests, 18 of them by
+  `grep -c "trimmed === '\|trimmed.startsWith('" scripts/play-cli.ts`, split across
+  handleGameplayCommand and handleCommand. No table exists below ui:
+  `grep -rn "COMMANDS\|commands: *Record" src/` returns nothing. Re-runnable as those two greps.
+  Nothing in the pass-3-to-head delta (one commit, two source lines in save.ts and session.ts)
+  touches this.
+- proof 2: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer.
+  `grep -n HELP_LINES scripts/play-cli.ts` prints exactly two lines: the hand-written array at :52
+  and the verbatim return at :445. c2 is the one clause a player is supposed to see change and no
+  player sees anything change.
+- proof 3: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer, and
+  correctly so, because the shared surface c3 speaks about does not exist yet. The negative half
+  still holds: `grep -rn "\[time: \|progressBar\|MINIMAL_STAGES" src/` is empty and every piece of
+  terminal vocabulary is in the driver. What this branch moved down it moved as numbers.
+- proof 4: met — Both halves now hold and both are re-runnable. This is the first pass to grade c4 met
+  and the change since pass 3 is the aliasing route pass 3 opened being closed.
+  PUBLICATION, re-measured rather than inherited: manifest at
+  C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass4-mutations.json. c4-stats and
+  c4-discovered are the two kinds pass 1 and pass 2 independently measured as SURVIVED against the
+  whole suite; on this head both are KILLED by a named test in session.test.ts's "what the engine
+  publishes" block, each re-run at its own file with the mutant still applied. c4-handle-carries-no
+  -state (putting `state` back on the object sessionOver returns) is KILLED by "carries no route to
+  the state it plays, by enumeration or by key". The third sentence of the clause is met by reading:
+  formatInventory and formatState at scripts/play-cli.ts:176 and :184 both take a PlayStatus.
+  GUARD, attacked rather than re-read. I could not obtain a reference into the live GameState by any
+  route I could construct from a session startSession hands out. Script at
+  C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass4-attack-alias.js replays pass
+  3's two reproductions and adds four more: activeAction by reference, the modals array by
+  reference, the player object by reference, a nested activeBuffs value inside a RECORD field
+  (which the spread would have aliased even with the scalars copied), the instance table, and
+  whether playing on rewrites the fixture. All six report no alias and the loaded save reads back
+  exactly as authored. A second script,
+  ...-pass4-attack-identity.js, compares object identity across two sessionStatus calls for every
+  object-valued published field: all twelve differ per call, and mutating the published inventory,
+  flags, xp, player, equipment, stats, discovered and choices writes through to nothing.
+  The copy is taken where the value is assembled (save.ts:231, one structuredClone over the whole
+  diff before either the RECORD spread or the SCALAR assignment reads it), not per field, which is
+  what makes the six attacks above one measurement rather than six. structuredClone is the right
+  primitive and not merely a working one: loadSave:240 distinguishes `field in diff` from
+  undefined, and structuredClone preserves an own key whose value is undefined where the
+  JSON round-trip in src/content/modportal.ts:98 would have dropped it (verified through
+  npm run inspect).
+  The boundary this grade does NOT claim, recorded so the next pass does not have to rediscover it:
+  a driver can still write arbitrary state into the session by putting a ParsedSave in
+  session.registry.saves and calling applyDirective with {kind:'load'}, and read all of it back
+  through serializeSession. That is the engine's own save channel rather than a reference into
+  GameState, so it does not fail this clause's words, but it is what
+  in-process-module-api-pass3-the-sealed-surface-has-no-way-to is about and it stays open. New fact
+  for that record: `registry.saves` is a map on shared content, so a driver loading a save mutates
+  the registry in place, which is exactly the act adoptRegistry exists to mediate, and two sessions
+  over one registry share the slot namespace.
+- proof 5: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer. No
+  module below ui holds the command set, so the effects-as-data rule has nothing to apply to yet.
+  Read this branch's own additions rather than assuming: adoptRegistry, serializeSession,
+  sessionStatus, runSessionTest and publishAction each take everything they use as an argument and
+  reach for no file, clock or subprocess. The one import the fix commit added, newCadence from
+  ./encounter, is a pure constructor. layer-check passes inside merge-ready.
+- proof 6: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer.
+  `grep -rn "export function liveTick" scripts/ src/` names one line, scripts/play-cli.ts:603,
+  above ui where a second driver cannot call it. Unchanged since pass 3, which also recorded that
+  the direction of travel is not purely toward c6: liveTick's signature carries `previous: PlayView`
+  and LiveTickResult carries the view the tick produced, so whatever moves down takes that threading
+  with it or drops it.
+- proof 7: unmet — Not attempted on this branch; owed by layer-check-reads-every-source-file.
+  `git diff --name-only 33c020b..8573d95 -- scripts/layer-check.ts scripts/lib/layers.ts` is empty
+  across the whole branch, so the partition assertion c7 asks for was never written. src/main.tsx
+  still belongs to no declared root and is read by no rule.
+- proof 8: met — Pass 3's divergence is closed, re-measured by me, and nothing in the two-line delta
+  produces a new one.
+  THE DIVERGENCE PASS 3 FOUND: its exact bytes, unchanged. Content
+  C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass3-content2.dsl and the six-line
+  input ...-pass3-transcript-input.txt piped into
+  `npx tsx scripts/play-cli.ts <that dsl> --no-modportal local=<a temp file>`. Pass 3 recorded this
+  head dying on the /look after the load with an uncaught TypeError at publishAction. On this head
+  it prints the whole transcript through /quit and exits 0. Mutation c8-cadence-guard (removing the
+  `?? newCadence()` fallback) is KILLED by the named test "publishes an action a save left without
+  a player clock instead of dying on the next look", re-run at its own file with the mutant still
+  applied.
+  THE REST OF THE CLAUSE: `git diff --name-only 33c020b..8573d95 -- content/` is empty over the
+  whole branch, so no `# save` fixture was regenerated and every shipped `# test` runs unchanged;
+  merge-ready's npm test leg is green on the first run this time.
+  WHAT DID CHANGE BEFORE AND AFTER, stated rather than left silent, because c8's words are absolute.
+  The copy at save.ts:231 stops play rewriting the `# save` it was loaded from, and the engine does
+  mutate activeAction in place, so that is observable: load a save carrying an activeAction, wait
+  3s, and the published progress reads 0.75 while `registry.saves.get(id).diff.activeAction` still
+  reads progress 0 (npm run inspect, this head). On the merge base the fixture would have moved with
+  the state. A REPL script that loads one save twice around a wait therefore prints different lines
+  on the two trees. I am grading this met anyway and naming it rather than hiding it: the behaviour
+  it changes is a defect pass 3 filed and instructed be fixed on this branch, the fix is in the
+  branch's diff and audited here, and no shipped `# test` or fixture observes it. A future pass
+  reading "the transcripts are identical" should read this paragraph as the exception.
+  NOT MEASURED, and why: passes 1 and 2 each ran a full base-vs-head REPL transcript diff and found
+  it empty, and pass 3 did not dispute them. I did not run a fourth, because the only route to a
+  merge-base tree in this repository is a second worktree and the previous auditor's attempt at one
+  destroyed the shared node_modules for every worktree. Filed as a recurrence rather than worked
+  around. The delta I would have been measuring is one commit and two source lines, both of which
+  are covered above by narrower measurements.

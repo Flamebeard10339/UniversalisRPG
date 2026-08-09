@@ -696,6 +696,36 @@ describe('what the engine withholds', () => {
   });
 });
 
+// A pool to whittle down, so encounterView reads the player clock too.
+const FIGHT_MODULE = `
+# stat attack
+base: 2
+
+# stat max-health
+base: 12
+
+# stat swings-per-minute
+base: 60
+
+# resource health
+max: max-health
+
+# location camp
+x: 0, y: 0
+starting
+entities:
+  dummy
+
+# entity dummy
+title: Dummy
+stats: attack 1, max-health 12, swings-per-minute 60
+hit:
+  continuous
+  rate: swings-per-minute
+  ability: attack
+  target: health
+`;
+
 describe('a save is data the engine takes a copy of, not a handle onto it', () => {
   const module = `
 # location camp
@@ -736,13 +766,38 @@ roast:
   it('does not let play rewrite the save it was loaded from', () => {
     const registry = loadModule(module);
     const session = startSession(registry);
-    registry.saves.set('start', { version: SAVE_VERSION, diff: { inventory: { bun: 1 }, player: { name: 'Rowan', race: 'Elf' } } });
+    // The clock, not the player: modals.ts answers by replacing `state.player`
+    // wholesale, so an alias could never show through it. The engine writes
+    // progress into the cadence in place, which is what an alias would move.
+    const fixture = { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: { player: { progress: 0, attemptsMade: 0 } } };
+    registry.saves.set('midbake', { version: SAVE_VERSION, diff: { activeAction: fixture } });
 
-    applyDirective(session, { kind: 'load', save: 'start' });
-    apply(session, 'use:entity.mirror.look in');
-    submitModal(session, { name: 'Wren' });
+    applyDirective(session, { kind: 'load', save: 'midbake' });
+    const v = wait(session, 3); // three seconds into the four-second roast
 
-    expect(registry.saves.get('start')!.diff.player).toEqual({ name: 'Rowan', race: 'Elf' });
+    expect(v.action!.progress).toBe(0.75);
+    expect(fixture.cadences.player.progress).toBe(0);
+  });
+
+  // One missing clock, every path that reads one. publishAction was guarded on
+  // its own first and the other two still died on the same input.
+  it('plays on through every path when a save left an action with no player clock', () => {
+    const registry = loadModule(FIGHT_MODULE);
+    const session = startSession(registry);
+    registry.saves.set('midfight', {
+      version: SAVE_VERSION,
+      diff: { activeAction: { ownerRef: 'entity.dummy', actionLabel: 'hit', repeating: true, implicitTarget: 1000, cadences: {}, actors: { dummy: { resources: { health: 12000 }, rateRemainders: {} } } } },
+    });
+
+    applyDirective(session, { kind: 'load', save: 'midfight' });
+
+    // The encounter readout reads the player clock before the action block does.
+    const v = view(session);
+    expect(v.encounter!.cadence).toBe(0);
+    expect(v.action!.label).toBe('hit');
+
+    // And the simulation reads it again, which `view` alone never reaches.
+    expect(() => wait(session, 3)).not.toThrow();
   });
 
   it('publishes an action a save left without a player clock instead of dying on the next look', () => {
