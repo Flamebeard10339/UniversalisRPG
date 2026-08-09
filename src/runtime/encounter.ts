@@ -154,6 +154,15 @@ function seatedAction(seat: Seat, registry: Registry, actorId: string): Action |
   return owner?.actions?.find((each) => each.label === seat.actionLabel);
 }
 
+// What the performer of the armed action actually brings: its own copy, with
+// its overload applied. `findActiveAction` answers what the ownerRef names,
+// which is the declaration an overload overlays rather than the overlay.
+export function armedAction(state: GameState, registry: Registry): Action {
+  const active = state.activeAction!;
+  const seat = active.roster?.[PLAYER];
+  return (seat && seatedAction(seat, registry, PLAYER)) ?? findActiveAction(active, registry);
+}
+
 export function participants(state: GameState, registry: Registry): Participant[] {
   const active = state.activeAction!;
   const list: Participant[] = [];

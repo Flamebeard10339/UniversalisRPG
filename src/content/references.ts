@@ -39,9 +39,14 @@ export function registryCapabilities(registry: Registry): Set<string> {
 // Entities supply the slot vocabulary the way they supply capabilities, and
 // items fall back to supplying it only while no entity declares any — a
 // vocabulary read off `slot:` alone quietly gives a rat a head.
-export function registrySlots(registry: Registry): Set<string> {
+function declaredSlots(registry: Registry): Set<string> {
   const declared = new Set<string>();
   for (const entity of registry.entities.values()) for (const slot of entity.equipmentSlots) declared.add(slot);
+  return declared;
+}
+
+export function registrySlots(registry: Registry): Set<string> {
+  const declared = declaredSlots(registry);
   if (declared.size > 0) return declared;
   const slots = new Set<string>();
   for (const item of registry.items.values()) if (item.slot !== undefined) slots.add(item.slot);
@@ -51,8 +56,7 @@ export function registrySlots(registry: Registry): Set<string> {
 // An item naming a slot nothing can wear can never be equipped, so it is a load
 // error rather than a refusal at the moment it is spent.
 export function validateItemSlots(registry: Registry): void {
-  const declared = new Set<string>();
-  for (const entity of registry.entities.values()) for (const slot of entity.equipmentSlots) declared.add(slot);
+  const declared = declaredSlots(registry);
   if (declared.size === 0) return;
   for (const item of registry.items.values()) {
     if (item.slot !== undefined && !declared.has(item.slot)) {

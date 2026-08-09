@@ -28,6 +28,8 @@ trigger: on empty
 
 # flag truce
 
+# flag gave-up
+
 # item token
 
 # item bandit-ear
@@ -103,6 +105,27 @@ swing:
 stats: max-health 100000, attack 4, attack-rate 60
 uses: swing
 aggressive
+
+// A gate on the declaration, so an overload has something to replace and
+// something to append to.
+# action guarded
+title: guarded
+requires: truce
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their health
+
+# entity warden
+stats: max-health 8, attack 4, attack-rate 60
+uses: guarded
+guarded:
+  +requires: has token
+
+# entity gatekeeper
+stats: max-health 8, attack 4, attack-rate 60
+uses: guarded
+guarded:
+  requires: has token
 
 # location camp
 x: 0, y: 0
@@ -265,15 +288,24 @@ describe('an overload governs its own entity performance', () => {
     const registry = loaded();
     const declaration = registry.actions.get('swing')!;
     const overloaded = registry.entities.get('ogre')!.actions[0];
-    const gated = registry.entities.get('boulder')!.actions[0];
 
-    // Bare: the overload's damage: stands in for the declaration's.
+    // Bare: the overload's damage: stands in for the declaration's, and what
+    // it does not name is inherited.
     expect(declaration.damage).toEqual({ left: { side: 'my', id: 'attack' }, right: { side: 'their', id: 'dr' } });
     expect(overloaded.damage).toEqual({ left: { side: 'my', id: 'hard-blow' }, right: { side: 'their', id: 'dr' } });
     expect(overloaded.depletes).toEqual(declaration.depletes);
-    // `+`: the declaration carries no gate, so appending to nothing is the gate.
-    expect(declaration.hiddenIf).toBeUndefined();
-    expect(gated.hiddenIf).toEqual({ kind: 'reference', reference: { path: ['truce'] } });
+  });
+
+  // The declaration carries a gate here, so replacing and appending are two
+  // different answers rather than the same one.
+  it('tells a bare line from a + line where the declaration already holds one', () => {
+    const registry = loaded();
+    const truce = { kind: 'reference', reference: { path: ['truce'] } };
+    const hasToken = { kind: 'has', item: 'token', count: 1 };
+
+    expect(registry.actions.get('guarded')!.requires).toEqual(truce);
+    expect(registry.entities.get('warden')!.actions[0].requires).toEqual({ kind: 'and', conditions: [truce, hasToken] });
+    expect(registry.entities.get('gatekeeper')!.actions[0].requires).toEqual(hasToken);
   });
 
   it('stops that entity swinging without removing it', () => {
@@ -343,6 +375,32 @@ describe('respawn after: is the thing own fact, and the count is the place own',
 
     resolve(state, registry, state.time + secondsToMs(600));
     expect(state.populations['camp']['bandit-leader']).toEqual({ down: 1, due: [] });
+  });
+});
+
+describe('an overload bounds and ends the action it overlays', () => {
+  // What SWINGS and what ENDS the action have to be the same copy, or an
+  // overload governs half of its own entity's performance.
+  const patient = MODULE.replace('# entity player', ['# entity player', 'swing:', '  attempts: 2', '  on unfinished:', '    set: gave-up'].join(String.fromCharCode(10)));
+
+  it('reads attempts: and on unfinished: off the copy that swings', () => {
+    // The ogre carries 1000 health against 4 a hit and opens nothing itself, so
+    // nothing here completes and nothing re-arms: what ends it is the
+    // overload's own bound.
+    const registry = loadModule(patient);
+    const overloaded = standing(registry, 'camp');
+    armFightAction('swing', 'ogre', registry, overloaded);
+    resolve(overloaded, registry, secondsToMs(10));
+
+    expect(overloaded.flags['gave-up']).toBe(true);
+    expect(overloaded.activeAction).toBeNull();
+
+    const plain = loaded();
+    const control = standing(plain, 'camp');
+    armFightAction('swing', 'ogre', plain, control);
+    resolve(control, plain, secondsToMs(10));
+    expect(control.flags['gave-up']).toBeUndefined();
+    expect(control.activeAction).not.toBeNull();
   });
 });
 

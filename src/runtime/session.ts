@@ -2,8 +2,8 @@ import { Action } from '../content/entity';
 import { DISCOVERED, Location } from '../content/location';
 import {
   actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, useTravel } from './runtime';
-import { findActiveAction, parseOwnerRef } from './actions';
-import { hasPool, playerCadence } from './encounter';
+import { parseOwnerRef } from './actions';
+import { armedAction, hasPool, playerCadence } from './encounter';
 import { declaredId } from '../content/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
@@ -348,7 +348,7 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
     label: active.actionLabel,
     progress: cycle > 0 ? Math.min(1, Math.max(0, clock.progress / cycle)) : 1,
     attempts: clock.attemptsMade,
-    targeted: Boolean(findActiveAction(active, registry).depletes),
+    targeted: Boolean(armedAction(state, registry).depletes),
     completion: fromMilliUnits(active.implicitTarget),
   };
 }

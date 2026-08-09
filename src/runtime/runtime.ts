@@ -3,7 +3,6 @@ import {
   actionVisible,
   fightBatch,
   findActionOwner,
-  findActiveAction,
   FightOutcome,
   inputLimit,
   outcomeResults,
@@ -30,6 +29,7 @@ import {
 import {
   ActiveAction,
   actorEntity,
+  armedAction,
   damageTarget,
   enterEncounter,
   IMPLICIT_TARGET_FULL,
@@ -48,7 +48,7 @@ import {
   targetLevel,
 } from './encounter';
 import { applyRespawns, downOne, isStanding, nextRespawn, standing } from './population';
-import { Action } from '../content/entity';
+import { Action, declaredId } from '../content/entity';
 import { actionKind } from '../grammar/action';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { isPoint } from '../grammar/range';
@@ -181,7 +181,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): Bou
   if (state.activeAction) {
     const active = state.activeAction;
     const source: BoundarySource = { kind: 'action', ownerRef: active.ownerRef, actionLabel: active.actionLabel };
-    const action = findActiveAction(active, registry);
+    const action = armedAction(state, registry);
     if (!resolvesPerAttempt(action)) {
       const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
       const player = playerCadence(active);
@@ -391,7 +391,7 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
   if (!state.activeAction) {
     advanceTime(state, segEnd - start);
   } else {
-    const action = findActiveAction(state.activeAction, registry);
+    const action = armedAction(state, registry);
     if (resolvesPerAttempt(action)) {
       resolveStochasticSegment(segment, action, segEnd);
     } else {
@@ -421,7 +421,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
     }
 
     if (state.activeAction) {
-      const action = findActiveAction(state.activeAction, registry);
+      const action = armedAction(state, registry);
       if (!actionStillValid(action, state.activeAction, state)) {
         endAction(state);
         changed = true;
@@ -558,7 +558,7 @@ function grantActionFoodBuff(state: GameState, registry: Registry): void {
   if (!item) return;
   // Eating is the item consuming itself. A repeating action isn't a meal.
   if (active.repeating) return;
-  if (!findActiveAction(active, registry).results.some((r) => r.kind === 'take' && r.item === objId)) return;
+  if (!armedAction(state, registry).results.some((r) => r.kind === 'take' && r.item === objId)) return;
   grantFoodBuff(item, state);
 }
 
@@ -620,8 +620,11 @@ export function actionFirstUnit(obj: string, objId: string, actionId: string, re
 // The two-sided face of `armAction`: an action reached by id and applied to what
 // it names, rather than one offered by the object that owns it.
 export function armFightAction(actionId: string, targetId: string, registry: Registry, state: GameState): ArmResult {
-  const action = registry.actions.get(actionId);
-  if (!action) throw new RuntimeError(`unknown action: ${actionId}`);
+  // The player's own copy, so an overload of the action the player brings is
+  // what its gates, its inputs and its first unit are read from.
+  const declared = registry.actions.get(actionId);
+  const action = actorEntity(registry, PLAYER)?.actions.find((each) => declaredId(each) === actionId) ?? declared;
+  if (!declared || !action) throw new RuntimeError(`unknown action: ${actionId}`);
   if (!registry.entities.has(targetId)) throw new RuntimeError(`unknown entity: ${targetId}`);
   if (!requiresMet(action, state)) throw new RuntimeError(`action requires unmet: ${actionId}`);
   if (!actionVisible(action, state)) throw new RuntimeError(`action hidden: ${actionId}`);

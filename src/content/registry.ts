@@ -646,7 +646,7 @@ function entityProblem(entity: Entity, registry: Registry): string | undefined {
   for (const ally of entity.allies) {
     // A side is you and your allies, so naming yourself makes you your own
     // ally, and naming the player puts the player on both sides of the fight.
-    if (namesSame(entity.id, ally.entity) || ally.entity === entity.id) return `allies: names this entity itself: ${ally.entity}`;
+    if (namesSame(entity.id, ally.entity)) return `allies: names this entity itself: ${ally.entity}`;
     if (namesSame(ally.entity, PLAYER_ENTITY)) return `allies: names the player, who is a side rather than a member of one: ${ally.entity}`;
   }
   for (const handler of entity.handlers) {
