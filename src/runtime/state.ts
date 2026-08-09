@@ -1,6 +1,7 @@
 import type { Range } from '../grammar/range';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import type { ActiveAction } from './encounter';
+import { createInstanceTable, type InstanceTable } from './instances';
 import type { ModalFrame } from './modals';
 
 export class RuntimeError extends Error {}
@@ -31,13 +32,15 @@ export interface GameState extends RngCursor {
   resources: PoolLevels;
   resourceRateRemainders: Record<string, number>;
   equipped: Record<string, string>;
+  // instances.ts owns every write, and with it minting, pruning and liveness.
+  instances: InstanceTable;
   player: { name: string; race: string };
   // Readonly because modals.ts owns every write, and with it open and close.
   modals: readonly ModalFrame[];
 }
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
 }
 
 // The one seam through which simulated time advances; nothing reads a real clock.

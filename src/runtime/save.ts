@@ -2,6 +2,7 @@ import { createGameState, GameState, initResources, RuntimeError } from './runti
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
 import { findActionOwner, parseOwnerRef } from './actions';
+import { isInstanceTable, pruneInstances } from './instances';
 import { isModalFrame, pruneModals } from './modals';
 import { PLAYER } from './state';
 
@@ -47,6 +48,7 @@ const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   equipped: { shape: 'record', holds: (value) => typeof value === 'string', prune: 'pruned by a rule of its own' },
   activeBuffs: { shape: 'record', holds: isObject, prune: 'pruned by a rule of its own' },
   activeAction: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
+  instances: { shape: 'scalar', holds: isInstanceTable, prune: 'pruned by a rule of its own' },
   time: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   rng: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   player: { shape: 'scalar', holds: isObject, prune: 'holds no registry id' },
@@ -135,6 +137,10 @@ function activeActionProblem(state: GameState, registry: Registry): string | nul
 
 export function pruneStateForRegistry(state: GameState, registry: Registry): PruneWarning[] {
   const warnings: PruneWarning[] = [];
+
+  // First, so every rule under it asks a settled table rather than one still
+  // being pruned beneath it: a field holding an instance id gets one answer.
+  warnings.push(...pruneInstances(state, registry));
 
   if (state.location && !registry.locations.has(state.location)) {
     const old = state.location;
