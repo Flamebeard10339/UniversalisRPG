@@ -494,3 +494,145 @@ because a reader arriving at this spec needs the answer more than the history of
  2119 of 2119 green standalone under `npx vitest run --reporter=dot` two minutes earlier.
  This is the fourth-and-now-fifth occurrence of an existing record; recurrence filed rather
  than a second record.
+
+### Pass 4 — 2026-08-09
+
+- base: `ea9ce1cd4964f4cef0058787d22653f7122f3ce5`
+- head: `ea9ce1cd4964f4cef0058787d22653f7122f3ce5`
+- proof 1: met — Re-read at ea9ce1c; the fix touched only instances.ts and its test, so the shape is
+ unchanged and re-verified rather than assumed. One field (state.ts:36), one SAVE_FIELDS row
+ (save.ts:51), one call in pruneStateForRegistry (save.ts:143).
+ `grep -rn "from './instances'|runtime/instances" src scripts` still returns exactly save.ts:5,
+ state.ts:4 and the test. The tsc guard re-run by hand in pass 3 (inserting a second
+ InstanceTable field gives TS2741 at save.ts(40,7) and state.ts(44,3)) is unaffected, because
+ the fix added no field and no SAVE_FIELDS row. Mutation c1-prune-rule-not-wired: KILLED,
+ 9 failed of 58, by 'prunes the instance whose template is gone, and warns like every other
+ prune' and 8 more.
+- proof 2: met — Re-checked specifically because the fix added code to createInstance, which is the
+ one function that takes a payload from a consumer. It added no payload access:
+ `grep -n "payload" src/runtime/instances.ts` still shows every access going through a kind
+ method, plus `'payload' in held` at instances.ts:172 and one JSON.stringify inside an error
+ message. The new guard reads table.next and nothing else, and its error message names the
+ counter rather than the payload. Mutation c7-live-answer-inverted (the `live` callback handed
+ to repair replaced with `() => true`): KILLED, 4 failed of 26, so the substrate's one
+ contribution to a payload's repair is still load-bearing. Independently re-driven through a
+ payload kind defined in an inspect body with a shape instances.ts has never seen: create,
+ load, prune and repair all work without the module learning anything about it, and the new
+ counter guard fired on that foreign kind exactly as it does on the test kind.
+- proof 3: met — Mint, load and repair all still closed, and the mint route re-checked because the
+ fix inserted a throw two lines below c3's own guard. Order is right: holds, then empty, then
+ the counter guard, so a payload recording nothing is still refused for that reason rather
+ than masked by the new one. Mutation c3-mint-refuses-nothing: KILLED, 1 failed of 26.
+ Mutation c3-fixed-point-collapse: KILLED, 3 failed of 26, by 'drops a copy a # save wrote
+ already recording nothing, the one route past the refusal at the mint' and 2 more. Both are
+ the pass-3 mutations re-run unchanged, so the laziness proof did not regress.
+- proof 4: met — All four properties re-proved, and the fix strengthens this clause rather than
+ only c8: the counter is now the one thing that cannot be pushed out of the range where
+ `+ 1` moves it, which is what "an id, once minted, names the same instance for that
+ instance's whole life" actually rests on. Mutation c4-counter-does-not-advance: KILLED,
+ 9 failed of 26 (up from 7 at pass 3 - the fix's own two new tests also catch it).
+ Mutation c4-minted-id-bound-dropped: KILLED, 3 failed of 58. Mutation
+ c4-minted-id-regex-dropped (the spelling half of isMintedId removed, leaving only the
+ ordering half): KILLED, 3 failed of 58 - worth aiming now that the counter is routed through
+ the same function, because the spelling half is what rejects an exponential counter.
+ The top of the range is proved end to end by 'never writes a save it would refuse to load,
+ and refuses to mint rather than break that': load at MAX_SAFE_INTEGER - 1, mint, serialize,
+ reload clean, and the mint after that throws. Last mintable id is 9007199254740990.
+- proof 5: met — Unchanged by the fix and re-verified. instanceIsLive (instances.ts:99) is the one
+ answer; mutation c5-liveness-always-true: KILLED, 8 failed of 58. pruneInstances is still the
+ first statement of pruneStateForRegistry, pinned by 'settles the table before any other rule
+ runs' and by mutation c1-prune-rule-not-wired: KILLED. The honest limit stands: no field of
+ GameState holds an instance id yet, so what is proved is the shape a reference site will ask.
+ The low finding pass 3 filed against removeInstance and collapseInstance (they delete without
+ running the repair fixed point, while instances.ts tells reference sites not to check at
+ read) is untouched by this fix and still stands.
+- proof 6: met — Unchanged by the fix and re-verified. Mutation c6-template-prune: KILLED, 6 failed
+ of 26. Mutation c6-one-round-is-not-a-fixed-point: KILLED, 1 failed of 26, by 'reports a
+ repair once however many rounds the table takes to settle'. Warning shape, path, order and
+ the end-to-end 'leaves a loaded state holding no reference to an instance that is gone' all
+ still assert. Termination re-argued against the new code: the fix added no table write and no
+ loop, so a further round is still requested only by a drop and the loop is still bounded by
+ the table size.
+- proof 7: met — Unchanged by the fix and re-verified. `grep -rn "\.repair\(" src/runtime` returns
+ exactly one line inside pruneInstances; `grep -rn "byId" src` returns only instances.ts and
+ its test, so no consumer can prune by walking the table. Mutation c7-repair-hook-never-called:
+ KILLED, 5 failed of 26. Mutation c7-live-answer-inverted: KILLED, 4 failed of 26. The
+ extension-point count is still one, and the fix added no hook and no call site.
+- proof 8: met — Regraded from unmet. Both pass-3 reproductions are closed and I re-ran them at
+ ea9ce1c: instances {next: Number.MAX_VALUE, byId: {}} and {next: -1, byId: {}} are now both
+ refused by checkSave, so neither the double-mint nor the unloadable-save route exists.
+ The claim I was asked to attack is that the accepted set is closed under minting - that the
+ engine never writes a save it would refuse to load. I attacked it at the boundary and it
+ holds. Drove every candidate counter end to end through loadSave, createInstance and back
+ through isInstanceTable on the serialized result: 0, 1, MAX_SAFE_INTEGER - 2,
+ MAX_SAFE_INTEGER - 1, MAX_SAFE_INTEGER, 2^53, 2^53+2, 2^53+6, 2^53+10. Every counter that
+ loads and mints produces a table this validator still accepts. There is no value that loads,
+ mints, and lands on a rejected table, which was the stated test for c8 remaining unmet.
+ The boundary is exactly right where it has to be: at MAX_SAFE_INTEGER the mint would produce
+ a table whose counter is 2^53, which the validator rejects, and createInstance refuses that
+ mint - so the guard is not over-strict either, it stops precisely one short of the first
+ unsafe successor.
+ Mutations, all aimed by this pass at the fix's own two lines and all KILLED:
+ c8-counter-check-reverted-to-isinteger (the pre-fix rule put back) killed by 'refuses a
+ counter that could not spell a legal id next'; c8-counter-successor-too-loose (next + 2)
+ killed by the same; c8-counter-check-type-only killed by two; c8-mint-saturation-guard-dropped
+ killed by 'never writes a save it would refuse to load, and refuses to mint rather than break
+ that'; c8-mint-guard-off-by-one (isSafeInteger(next) instead of isSafeInteger(next + 1))
+ killed by the same. The additive half re-proved unchanged: SAVE_VERSION still 7, mutation
+ c8-baseline-not-empty-table KILLED, mutation c8-save-field-holds-weakened KILLED 5 of 58.
+ One thing the fix's own stated boundary gets wrong, filed as a low finding rather than held
+ against this grade because it cannot corrupt anything: the accepted set is not [0, 2^53-1].
+ isInstanceTable also accepts every counter in [2^53, 2^54) congruent to 2 mod 4 - 2^51 values -
+ because at that magnitude `next + 1` is a tie that rounds up by 2 when the significand is odd,
+ so the successor the rule checks against is not one the counter can reach. Measured: 100000
+ of 200000 sampled even steps above 2^53 load clean, with 0 mismatches against the mod-4
+ prediction, and nothing above 2^54 leaks. Every one of those tables is then refused by
+ createInstance's separate isSafeInteger guard, so the promise this clause makes survives -
+ such a save loads and the first mint throws a named RuntimeError rather than misreading
+ anything. That is why the grade is met and the finding is low.
+- proof 9: met — Re-run at ea9ce1c.
+ `git diff --stat 0115673..ea9ce1c -- content src/grammar src/content src/ui .github` is empty,
+ so the fix changed no authored surface, no fixture and no CI leg; the whole branch is four
+ files under src/runtime. `npx vitest run --reporter=dot` at this head: 80 files, 2122 of 2122
+ passed, including integration.test.ts which replays every shipped `# test`. The three new
+ tests are the whole delta from pass 3's 2119. The merge gate's byte and tree legs pass.
+ The one way the fix could have changed observable behaviour is the throw it added to a path
+ that never threw, so I checked its reach rather than assuming it: it fires only when
+ table.next + 1 is not a safe integer, createInstanceTable starts at 1, and the guard itself
+ caps the counter, so no state the engine can reach from a fresh game arrives there. The only
+ route in is a hand-written `# save` at 2^53 magnitude, and `grep -rn "test-token" src content
+ scripts` still returns one line, so shipped content cannot make an instance at all.
+- proof 10: met — 26 cases now, three added by the fix, and the test-only kind is still defined at
+ instances.test.ts:42 and registered nowhere else. This pass did not reuse the fix author's
+ mutations: it wrote 18 of its own, five aimed at the two lines the fix added and thirteen
+ re-run from pass 3 as a regression check, and all 18 came back KILLED with named killers,
+ 0 survived, 0 unstable, 0 errored, tree gained and lost nothing.
+ Checked the three new tests for the shape that cannot fail. 'never writes a save it would
+ refuse to load, and refuses to mint rather than break that' is the strongest of them - it
+ asserts a real round trip through serializeSave and parse, and it is what kills both
+ mint-guard mutations, so it can be false in both directions. 'mints a distinct id from every
+ counter a save is allowed to carry' can be false and is one of the nine killers of
+ c4-counter-does-not-advance. One weakness recorded rather than filed against this clause:
+ 'refuses a counter that could not spell a legal id next' encodes the author's boundary claim
+ rather than the boundary, and its refused vector stops at MAX_SAFE_INTEGER + 1, which is 2^53
+ and happens to be refused because its significand is even. The very next representable value,
+ 2^53 + 2, is accepted, and no case reaches it. That is the low finding, and it is a test
+ vector chosen from the claim instead of from the arithmetic.
+- proof 11: met — `npm run tasks -- log --spec instanced-objects --op decision` still returns the
+ six decision events pass 3 verified: items-mods-and-crafting c11, c15 and c21 read against
+ the built substrate with the mapping written out; the settled combat spawn model read against
+ it; the correction that the durable combat consumer is one thing rather than four; and the
+ walk's two leftovers, one fixed on the branch and one left to the consumer, both present as
+ open records in the store. Re-read against the fix rather than only re-counted: neither
+ consumer's mapping changes, because the counter guard is invisible to a payload - the item
+ payload and the entity payload are minted the same way and the only new behaviour is a refusal
+ at a magnitude no consumer will reach. The JSON-only constraint the walk recorded still holds.
+- proof 12: met — `npm run tasks -- merge-ready` at ea9ce1c: tsc pass, layer-check pass,
+ audit-status pass, doctor pass (17 warnings, none introduced here), bytes pass, tree pass,
+ spec pass, and base now pass - 'main has not moved past the merge base', which is the leg
+ that was structurally red at pass 3 and is green now that main carries the branch.
+ npm test reported 2 of 2122 failed, both 5000ms timeouts on spawn-heavy tests
+ (doctor.test.ts, handoff.test.ts) that touch nothing in this diff, while the identical bytes
+ ran 2122 of 2122 green standalone under npx vitest run minutes earlier. Sixth occurrence of
+ an existing record; recurrence filed rather than a second record, and the clause is graded on
+ the standalone run plus the eight green legs.
