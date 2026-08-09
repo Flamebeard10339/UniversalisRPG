@@ -205,3 +205,113 @@ to answer that modal until `submit-modal:` exists.
   `Rowan` with `Error: invalid choice: "Rowan"` and leaves the modal open, so no line is silently eaten as
   a name either. `vitest scripts/play-cli.test.ts "never takes a line as a modal field…"` and
   `"refuses a bare line while a modal is open…"` cover the same two shapes.
+
+### Pass 2 — 2026-08-09
+
+- base: `af892db6fd7684dde4cb72d55dfbeb208923516b`
+- head: `fe058b7823f45765b16f54eb09eaf982a0432e33`
+- proof 1: met — `grep -rn "submit-modal" --include=*.ts src/ scripts/ | grep -v .test.ts` still resolves to one
+parse site: src/content/test.ts:53 `SUBMIT_MODAL = /^submit-modal:[ \t]*(?<key>[a-z][a-z0-9-]*)=(?<value>.*)$/`
+inside `parseDirectiveLine`. The other eight hits consume an already-parsed `Directive` (referenceSites.ts:184,
+serialize.ts:273, session.ts:320, play-cli.ts:65/149/238/440) and parse no text. key=value, not JSON.
+The DslError arm is held by `vitest src/content/test.test.ts "names the offending line for a payload that is
+not key=value, rather than reading as an unknown directive"`, which pins the offending line verbatim and also
+covers an empty payload and an uppercase key. Verified live end to end this pass:
+`printf '4\nsubmit-modal: name=Rowan\n2\n/create-valid-test crossed\n/quit\n' | npm run play` emits a
+`# test crossed` carrying `submit-modal: name=Rowan` / `submit-modal: race=Elf`.
+- proof 2: met — src/runtime/modals.ts:19-22 — `Modal = { name: string; options: readonly ModalOption[] }`,
+`ModalOption = { key; label; values }`. `vitest src/runtime/modals.test.ts "offers only the options still to be
+answered, and nothing about how to draw them"` asserts `Object.keys(published).sort()` is exactly
+`['name','options']` and each option's keys exactly `['key','label','values']`, so a presentation field added
+later fails it. `grep -niE "widget|layout|styl|colou?r|icon|render[A-Z]" src/runtime/modals.ts
+src/runtime/session.ts` returns one prose line and nothing else. My own mutation this pass —
+`view`'s `modals: state.modals.map(publishModal)` replaced with `modals: []` — was KILLED by 7 named tests
+across session.test.ts and play-cli.test.ts, so the publication seam itself is watched.
+Driver half re-proven live rather than by assertion, in a piped session: `printf '4\nsubmit-modal:
+name=Rowan\n2\n/quit\n' | npm run play` prints `[character-creation] name, race` / `Name:` /
+`  submit-modal: name=<text>`, then `[character-creation] race` and the numbered `1) Human … 4) Orc` — every
+line produced by `formatModals`, which reads only `modal.name` and `modal.options`.
+Standing caveat, unchanged and already filed by pass 1: the shape is renderer-agnostic, the engine is not open.
+- proof 3: met — Pass 1's counterexample is gone and I could not reconstruct it. `openModal` (src/runtime/modals.ts:84)
+now pushes unconditionally — the `state.modals.some(open => open.name === frame.name)` early return is deleted —
+and the batch-repetition job it was doing moved to effects.ts. Two frames of one name now both survive:
+`vitest src/runtime/modals.test.ts "stacks a second dialogue rather than dropping it after its effects have
+already run"` walks a two-NPC module, sees `['dialogue','dialogue']`, reads the scholar's own menu off
+`modals[1]`, and gets the sage's menu back with its cursor intact when the scholar is answered. Reproduced
+independently through `npm run inspect` against content/tutorial-island.dsl: `talk: miki` twice leaves
+`['dialogue:greeting','dialogue:greeting']` with `visits['tutorial-island.miki.greeting'] === 2`, where before
+the fix the second menu was discarded after its effects had run.
+The third sentence holds: `GameState.modals: readonly ModalFrame[]` (src/runtime/state.ts:36), no
+`pendingModal` anywhere. "Answering the top reveals the one beneath" is proven by mutation, not only by
+assertion: my mutation of `topModal` from `state.modals[state.modals.length - 1]` to `state.modals[0]` was
+KILLED by 4 named tests, re-run at src/runtime/modals.test.ts with the mutant still on disk.
+Two neighbours of the always-push change are filed as findings rather than graded here: a wrapped
+`open modal:` now opens one frame per batch repetition, and a hand-written `# save` can carry a frame the
+stack can never publish an option for.
+- proof 4: met — `grep -rn "state.modals" --include=*.ts src/ scripts/ | grep -v .test.ts` returns six hits and every
+write is inside src/runtime/modals.ts, through the single `stack(state)` cast at line 72; the two hits outside
+that file (session.ts:135, session.ts:207) are reads. `GameState.modals` is `readonly`, so a write anywhere
+else is a type error, and `npx tsc --noEmit` passes (via `npm run tasks -- merge-ready`, all six gates green).
+Open is `openModal`/`openModalNamed`; close is the single `stack(state).pop()` in `answerModal` plus
+`pruneModals`' splice. src/runtime/effects.ts:193 reaches it through `openModalNamed(state, result.modal)`.
+The exception pass 1 flagged is unchanged: `loadSave` writes `modals` generically through a
+`state as unknown as Record<string, unknown>` cast, which is whole-state restore rather than open or close.
+Two findings sit against this clause without unseating it: `answerModal`'s pop-before-submit ordering is a
+behavioural claim no test can falsify, and the one guard `narrateModal` still carries for the same rule
+effects.ts now enforces is unreachable.
+- proof 5: met — `grep -rn "inDialogue\|DialogueSession\|session.dialogue" src/ scripts/` returns one stale word in a
+session.test.ts comment and no code. `PlaySession` has no `dialogue` field and `PlayChoiceKind` has no
+`'dialogue'` member (src/runtime/session.ts:13,26); `dialogueChoices` and the `choose` arm of
+`choiceToDirective` are deleted. A menu publishes through the same shape as any other modal:
+`vitest src/runtime/modals.test.ts "publishes a dialogue menu as one option whose values are the choices the
+state currently allows"` pins `{ key: 'choice', label: 'Choice', values: [...] }`, and
+`vitest src/runtime/session.test.ts "drives the tutorial-island miki route through the choice-list API"`
+reaches the miki menu through `v.modals[0].options[0]` with `v.choices` empty.
+Held by mutation this pass as well: `cursorProblem`'s `node.steps[cursor.resumeIndex - 1]?.kind !== 'menu'`
+shifted to `resumeIndex` was KILLED by 11 named tests, so the named-not-held cursor that makes a dialogue
+storable as a frame is actually watched.
+- proof 6: met — src/runtime/session.ts:392-394 — `runTest` ends on `const open = topModal(state); if (open) return
+{ passed: false, failure: 'modal left open: ' + open.name }`.
+`vitest src/runtime/session.test.ts "fails, naming the modal, and passes once every option of it is answered"`
+pins `{ passed: false, failure: 'modal left open: character-creation' }` for a wholly unanswered and a
+half-answered modal and `{ passed: true }` once both land;
+`"holds a dialogue to the same standard, since a menu left hanging is the same unfinished route"` pins
+`modal left open: dialogue`. My mutation of `topModal` (the function this guard reads) was KILLED with this
+file in the scope. The sequencing the spec demanded holds: the guard ships with the directive and
+`# test miki-route-full` answers rather than ends on the modal.
+- proof 7: met — Re-verified at this head, not carried over from pass 1 — commit fe058b7 touched
+content/tutorial-island.dsl after pass 1 graded it. Through `npm run inspect`: load content/tutorial-island.dsl,
+`runTest('tutorial-island.miki-route-full', registry, createGameState())` returns `{"passed":true}`, and
+`serializeSave(state, registry)` is character-for-character equal to the shipped `# save miki-route-end` body —
+752 bytes against 752, `identicalBytes: true`. The test answers through the directive
+(`submit-modal: name=Rowan` / `submit-modal: race=Elf`, content/tutorial-island.dsl:429-430) and carries
+`expect: miki-route-end`. Also live outside vitest:
+`printf '/test tutorial-island.miki-route-full\n/quit\n' | npm run play` prints
+`Test 'tutorial-island.miki-route-full' PASSED`.
+Pass 1's caveat about the route's opening line is not closed and is refiled below with what it costs.
+- proof 8: met — `grep -n "character-creation" scripts/play-cli.ts` returns nothing; the literal survives only in
+play-cli.test.ts fixtures. `submitModal(session, answers: Record<string, string>)` names no field of any modal
+(src/runtime/session.ts:282). `formatModals` and `askedOption` read only `modal.name`, `option.key`,
+`option.label`, `option.values`. Proven live this pass by the piped run under proof 2, whose output carries the
+modal name, both option keys, the free-text hint for the option whose `values` is null, and the numbered list
+for the one with values. Pass 1's survivor here is closed: `vitest scripts/play-cli.test.ts "asks for the top
+of the stack, not the bottom, when one modal sits over another"` now pins the driver's rule, and I confirmed
+the engine's copy of that rule independently — mutating `topModal` to the bottom of the stack was KILLED.
+- proof 9: met — Live, in a piped session at this head:
+`printf '4\nsubmit-modal: name=Rowan\n2\n/create-valid-test crossed\n/quit\n' | npm run play` emits
+`# test crossed` whose body is `load: crossed-start` / `use: entity.tutorial-island.mirror.look in` /
+`submit-modal: name=Rowan` / `submit-modal: race=Elf` / `expect: crossed-end`, alongside a `# save crossed-end`
+carrying `"player":{"name":"Rowan","race":"Elf"}` — so the modal answered by number is recorded as the
+canonical directive and the emitted test replays with no hand-editing.
+`grep -rn "TODO(modal-recording)" --include=*.ts .` returns nothing; the TODO is deleted, not restated.
+Also covered by `vitest scripts/play-cli.test.ts "emits a replayable # test from a session that crossed a
+modal, with no hand-editing"`.
+- proof 10: met — `grep -n "nextLine\|promptCharacterCreation" scripts/*.ts` returns nothing; both are deleted and
+nothing reads the input iterator outside the main loop. Live, with input piped:
+`printf '/test tutorial-island.miki-route-full\n/state\n/inventory\n/quit\n' | npm run play` — the test crosses
+the character-creation modal, prints PASSED, and the two following lines are executed as commands
+(`Location: tutorial-island.beach`, then the inventory listing), not consumed as fields.
+With a modal actually open, `printf '4\nRowan\n/quit\n' | npm run play` answers the bare line `Rowan` with
+`Error: invalid choice: "Rowan"` and leaves the modal open, so no line is silently eaten as a name either.
+`vitest scripts/play-cli.test.ts "never takes a line as a modal field…"` and `"refuses a bare line while a
+modal is open…"` cover the same two shapes.
