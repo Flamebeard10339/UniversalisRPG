@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from '../content/registry';
-import { answerModal, Modal, ModalFrame, openModalNamed, pruneModals, publishModal, topModal } from './modals';
-import { choose, createGameState, DialogueCursor, GameState, RuntimeError } from './runtime';
+import { loadModule, Registry } from '../content/registry';
+import { answerModal, dialogueFrame, Modal, ModalFrame, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { choose, createGameState, DialogueCursor, GameState, RuntimeError, talk } from './runtime';
 import { applyResultsNow } from './effects';
-import { apply, applyDirective, PlaySession, startSession, submitModal, view } from './session';
+import { apply, applyDirective, PlaySession, PlayStatus, startSession, submitModal, view } from './session';
 
 // One entity that opens a modal from a dialogue effect and then offers a menu,
 // which is the only shape in the shipped grammar that stacks two modals.
@@ -56,6 +56,9 @@ title: Sage
 
 # entity scholar
 title: Scholar
+
+# entity rumour
+tell: set: secret
 
 # dialogue sage-talk
 owner = sage
@@ -111,6 +114,20 @@ function names(state: GameState): string[] {
   return state.modals.map((frame) => frame.name);
 }
 
+function modalNames(status: PlayStatus): string[] {
+  return status.modals.map((modal) => modal.name);
+}
+
+// The stack `talk:sage` raises, over a state the test keeps: pruneModals and
+// choose take a GameState, which a session does not hand out.
+function talking(registry: Registry): GameState {
+  const state = createGameState('camp');
+  const cursor = talk('sage', registry, state);
+  if (!cursor) throw new Error('the sage has nothing to say');
+  openModal(state, dialogueFrame(cursor));
+  return state;
+}
+
 describe('the modal stack', () => {
   it('leaves both when one opens over another, and reveals the one beneath when the top is answered', () => {
     const session = stackingSession();
@@ -119,19 +136,18 @@ describe('the modal stack', () => {
     expect(v.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
 
     v = submitModal(session, { choice: 'Ask about the mirror.' });
-    expect(session.state.flags.asked).toBe(true);
+    expect(v.flags.asked).toBe(true);
     expect(v.modals.map((modal) => modal.name)).toEqual(['character-creation']);
 
     submitModal(session, { name: 'Rowan' });
     v = submitModal(session, { race: 'Dwarf' });
     expect(v.modals).toEqual([]);
-    expect(session.state.player).toEqual({ name: 'Rowan', race: 'Dwarf' });
+    expect(v.player).toEqual({ name: 'Rowan', race: 'Dwarf' });
   });
 
   it('offers only the options still to be answered, and nothing about how to draw them', () => {
     const session = stackingSession();
-    apply(session, 'talk:sage');
-    const published: Modal = publishModal(session.state.modals[0], session.state, session.registry);
+    const published: Modal = apply(session, 'talk:sage').modals[0];
 
     expect(Object.keys(published).sort()).toEqual(['name', 'options']);
     for (const option of published.options) expect(Object.keys(option).sort()).toEqual(['key', 'label', 'values']);
@@ -221,9 +237,9 @@ describe('opening and answering', () => {
     // open modal — which is exactly how a `# test` reaches the second NPC.
     applyDirective(session, { kind: 'talk', entity: 'scholar' });
     const both = view(session);
-    expect(names(session.state)).toEqual(['dialogue', 'dialogue']);
+    expect(modalNames(both)).toEqual(['dialogue', 'dialogue']);
     expect(both.modals[1].options[0].values).toEqual(['Leave the scholar.']);
-    expect(session.state.flags['scholar-seen']).toBe(true);
+    expect(both.flags['scholar-seen']).toBe(true);
 
     // Answering the scholar hands the sage's own menu back, cursor intact.
     const back = submitModal(session, { choice: 'Leave the scholar.' });
@@ -232,23 +248,21 @@ describe('opening and answering', () => {
   });
 
   it('closes a dialogue whose content is gone rather than carrying a cursor into a registry without it', () => {
-    const session = stackingSession();
-    apply(session, 'talk:sage');
-    expect(names(session.state)).toEqual(['character-creation', 'dialogue']);
+    const state = talking(loadModule(STACKING_MODULE));
+    expect(names(state)).toEqual(['character-creation', 'dialogue']);
 
-    const dropped = pruneModals(session.state, loadModule('# location camp\nx: 0, y: 0\nstarting\n'));
+    const dropped = pruneModals(state, loadModule('# location camp\nx: 0, y: 0\nstarting\n'));
     expect(dropped).toEqual([{ name: 'dialogue', reason: 'dialogue sage-talk is not loaded' }]);
-    expect(names(session.state)).toEqual(['character-creation']);
+    expect(names(state)).toEqual(['character-creation']);
   });
 
   it('closes a frame naming a modal nothing defines, and one whose node no longer offers a menu there', () => {
-    const session = stackingSession();
-    apply(session, 'talk:sage');
-    const cursor = { ...(session.state.modals[1] as { cursor: DialogueCursor }).cursor };
+    const registry = loadModule(STACKING_MODULE);
+    const cursor = { ...(talking(registry).modals[1] as { cursor: DialogueCursor }).cursor };
 
     const withStranger = createGameState();
     (withStranger.modals as ModalFrame[]).push({ name: 'quest-journal', answers: {} } as unknown as ModalFrame);
-    expect(pruneModals(withStranger, session.registry)).toEqual([{ name: 'quest-journal', reason: 'it is not a modal this engine knows' }]);
+    expect(pruneModals(withStranger, registry)).toEqual([{ name: 'quest-journal', reason: 'it is not a modal this engine knows' }]);
     expect(withStranger.modals).toEqual([]);
 
     for (const [broken, reason] of [
@@ -257,7 +271,7 @@ describe('opening and answering', () => {
     ] as const) {
       const state = createGameState();
       (state.modals as ModalFrame[]).push({ name: 'dialogue', answers: {}, cursor: broken });
-      expect(pruneModals(state, session.registry)).toEqual([{ name: 'dialogue', reason }]);
+      expect(pruneModals(state, registry)).toEqual([{ name: 'dialogue', reason }]);
       expect(state.modals).toEqual([]);
     }
   });
@@ -269,7 +283,9 @@ describe('opening and answering', () => {
     expect(gated.modals[0].options[0].values).toEqual(['Leave the sage.']);
     expect(() => submitModal(session, { choice: 'Ask about the secret.' })).toThrow(/has no choice that takes "Ask about the secret."/);
 
-    session.state.flags.secret = true;
+    // Through the directive, which walks past the choice list a modal has
+    // withdrawn — the only way to move the world while a menu is up.
+    applyDirective(session, { kind: 'use', obj: 'entity', objId: 'rumour', actionId: 'tell' });
     expect(view(session).modals[0].options[0].values).toEqual(['Leave the sage.', 'Ask about the secret.']);
   });
 
@@ -290,36 +306,35 @@ describe('opening and answering', () => {
   it('stacks what an answer opens on what is left, and never on the frame that answer spent', () => {
     const session = startSession(loadModule(ANSWER_OPENS_MODULE));
 
-    apply(session, 'talk:sage');
-    expect(names(session.state)).toEqual(['dialogue']);
+    expect(modalNames(apply(session, 'talk:sage'))).toEqual(['dialogue']);
 
     // The choice's own effects raise a modal and its goto opens a second menu:
     // both must land above the spent frame, not under it or in place of it.
     const after = submitModal(session, { choice: 'Look at the mirror.' });
     expect(after.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
     expect(after.modals[1].options[0].values).toEqual(['Nod.']);
-    expect(session.state.modals.filter((frame) => frame.name === 'dialogue')).toHaveLength(1);
+    expect(after.modals.filter((modal) => modal.name === 'dialogue')).toHaveLength(1);
   });
 
   // answerModal weighs the text against the same menu before it ever gets here,
   // so this guard is only reachable by a caller of its own — which the runtime
   // barrel exports, and which is the reason it is not deleted as unreachable.
   it('refuses a choice text the menu is not offering when choose is called directly', () => {
-    const session = stackingSession();
-    apply(session, 'talk:sage');
-    const { cursor } = session.state.modals[1] as { cursor: DialogueCursor };
+    const registry = loadModule(STACKING_MODULE);
+    const state = talking(registry);
+    const { cursor } = state.modals[1] as { cursor: DialogueCursor };
 
-    expect(() => choose('Ask about the weather.', cursor, session.registry, session.state)).toThrow(/no choice matches: "Ask about the weather."/);
-    expect(choose('Say nothing.', cursor, session.registry, session.state)).toBeNull();
+    expect(() => choose('Ask about the weather.', cursor, registry, state)).toThrow(/no choice matches: "Ask about the weather."/);
+    expect(choose('Say nothing.', cursor, registry, state)).toBeNull();
   });
 
   it('keeps the dialogue spelling from answering a modal that is not a dialogue', () => {
     const session = stackingSession();
     apply(session, 'talk:sage');
-    submitModal(session, { choice: 'Say nothing.' });
-    expect(names(session.state)).toEqual(['character-creation']);
+    expect(modalNames(submitModal(session, { choice: 'Say nothing.' }))).toEqual(['character-creation']);
 
     expect(() => applyDirective(session, { kind: 'choose', text: 'Say nothing.' })).toThrow(/choose with no active dialogue/);
-    expect(topModal(session.state)?.answers).toEqual({});
+    // Nothing was taken as an answer, so both options are still being asked for.
+    expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['name', 'race']);
   });
 });

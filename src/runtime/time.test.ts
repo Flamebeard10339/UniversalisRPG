@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { advanceTime, createGameState, evaluateCondition, renderSegments, RuntimeError, useAction } from './runtime';
 import { loadModule } from '../content/registry';
-import { runTest, startSession, view, wait } from './session';
+import { runTest, sessionStatus, startSession, view, wait } from './session';
 import { secondsToMs } from './units';
 
 describe('advanceTime', () => {
@@ -114,14 +114,14 @@ x: 0, y: 0
 starting
 `;
 
-  it('advances session.state.time and reflects it in the returned PlayView', () => {
+  it('advances the session’s simulated time and reflects it in the returned PlayView', () => {
     const registry = loadModule(MODULE);
     const session = startSession(registry);
     expect(view(session).time).toBe(0);
 
     const v = wait(session, 15);
-    expect(session.state.time).toBe(secondsToMs(15));
     expect(v.time).toBe(15);
+    expect(sessionStatus(session).time).toBe(15);
   });
 });
 

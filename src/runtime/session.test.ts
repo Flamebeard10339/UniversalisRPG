@@ -1,12 +1,21 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { createGameState, PLAYER, travelSecondsPerUnit } from './runtime';
-import { loadModule } from '../content/registry';
-import { SAVE_VERSION } from './save';
-import { apply, applyDirective, beginAction, cancelAction, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, startSession, submitModal, view, wait } from './session';
+import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
+import { loadModule, Registry } from '../content/registry';
+import { SaveDiff, SAVE_VERSION } from './save';
 import { secondsToMs } from './units';
+import { apply, applyDirective, beginAction, cancelAction, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
+
+// A save is how a session starts anywhere but the beginning, so it is how a
+// test stocks one too.
+function primed(registry: Registry, diff: SaveDiff): PlaySession {
+  registry.saves.set('primed', { version: SAVE_VERSION, diff });
+  const session = startSession(registry);
+  applyDirective(session, { kind: 'load', save: 'primed' });
+  return session;
+}
 
 function ids(v: PlayView): string[] {
   return v.choices.map((c) => c.id);
@@ -42,11 +51,11 @@ describe('session', () => {
 
     v = submitModal(session, { choice: menu.values![0] });
     expect(modalNames(v)).toEqual([]);
-    expect(session.state.flags['tutorial-island.quest-given']).toBe(true);
+    expect(v.flags['tutorial-island.quest-given']).toBe(true);
 
     v = apply(session, 'use:entity.tutorial-island.mirror.look in');
     expect(v.said).toContain('modal:character-creation');
-    expect(session.state.flags['tutorial-island.mirror-done']).toBe(true);
+    expect(v.flags['tutorial-island.mirror-done']).toBe(true);
     // A modal sits atop the world, so nothing in the room is offered until it
     // is answered — and it takes two answers to be done with.
     expect(v.choices).toEqual([]);
@@ -58,23 +67,23 @@ describe('session', () => {
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual([]);
-    expect(session.state.inventory['tutorial-island.jug-of-water']).toBe(1);
-    expect(session.state.inventory['tutorial-island.pot-of-flour']).toBe(1);
+    expect(v.inventory['tutorial-island.jug-of-water']).toBe(1);
+    expect(v.inventory['tutorial-island.pot-of-flour']).toBe(1);
 
     expect(ids(v)).toContain('craft:tutorial-island.dough');
     v = apply(session, 'craft:tutorial-island.dough');
-    expect(session.state.inventory['tutorial-island.dough']).toBe(1);
+    expect(v.inventory['tutorial-island.dough']).toBe(1);
 
     expect(ids(v)).toContain('craft:tutorial-island.bread');
     v = apply(session, 'craft:tutorial-island.bread');
-    expect(session.state.inventory['tutorial-island.bread']).toBe(1);
+    expect(v.inventory['tutorial-island.bread']).toBe(1);
 
     v = apply(session, 'use:entity.tutorial-island.stairs.ascend');
     expect(v.location.id).toBe('tutorial-island.guide-house-upstairs');
     expect(ids(v)).toContain('use:entity.tutorial-island.dresser.search drawer');
 
     v = apply(session, 'use:entity.tutorial-island.dresser.search drawer');
-    expect(session.state.inventory['tutorial-island.lockpick']).toBe(1);
+    expect(v.inventory['tutorial-island.lockpick']).toBe(1);
 
     v = apply(session, 'use:entity.tutorial-island.stairs-down.descend');
     expect(v.location.id).toBe('tutorial-island.guide-house');
@@ -82,12 +91,12 @@ describe('session', () => {
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual([]);
-    expect(session.state.flags['tutorial-island.made-bread']).toBe(true);
+    expect(v.flags['tutorial-island.made-bread']).toBe(true);
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual([]);
-    expect(session.state.inventory['tutorial-island.iron-sword']).toBe(1);
-    expect(session.state.inventory['tutorial-island.wooden-shield']).toBe(1);
+    expect(v.inventory['tutorial-island.iron-sword']).toBe(1);
+    expect(v.inventory['tutorial-island.wooden-shield']).toBe(1);
 
     v = apply(session, 'use:entity.tutorial-island.stairs.descend');
     expect(v.location.id).toBe('tutorial-island.basement');
@@ -101,7 +110,7 @@ describe('session', () => {
       expect(v.encounter!.foes.map((foe) => foe.title)).toEqual(['Giant Rat']);
 
       v = wait(session, 30);
-      expect(session.state.flags['tutorial-island.rats-killed']).toBe(killed);
+      expect(v.flags['tutorial-island.rats-killed']).toBe(killed);
       expect(v.encounter).toBeNull(); // the fight is over, so is the readout
     }
     expect(ids(v)).not.toContain('use:entity.tutorial-island.giant-rat.fight');
@@ -112,8 +121,8 @@ describe('session', () => {
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual([]);
-    expect(session.state.flags['tutorial-island.miki-complete']).toBe(true);
-    expect(session.state.flags['tutorial-island.front-door.unlocked']).toBe(true);
+    expect(v.flags['tutorial-island.miki-complete']).toBe(true);
+    expect(v.flags['tutorial-island.front-door.unlocked']).toBe(true);
 
     v = view(session);
     expect(ids(v)).toContain('travel:tutorial-island.beach');
@@ -157,16 +166,15 @@ starting
 # item bread
 eat: take: 1 bread, say: You eat the bread.
 `;
-    const registry = loadModule(module);
-    const session = startSession(registry);
-    session.state.inventory.bread = 1;
+    const session = primed(loadModule(module), { inventory: { bread: 1 } });
 
     let v = view(session);
     expect(ids(v)).toContain('use:item.bread.eat');
 
     v = apply(session, 'use:item.bread.eat');
     expect(v.said).toContain('You eat the bread.');
-    expect(session.state.inventory.bread).toBe(0);
+    // Spent, so it is gone from what is published rather than held at zero.
+    expect(v.inventory).toEqual({});
     expect(ids(v)).not.toContain('use:item.bread.eat');
   });
 
@@ -199,17 +207,17 @@ node greeting:
       { key: 'name', label: 'Name', values: null },
       { key: 'race', label: 'Race', values: ['Human', 'Elf', 'Dwarf', 'Orc'] },
     ] }]);
-    expect(session.state.player).toEqual({ name: '', race: '' });
+    expect(v.player).toEqual({ name: '', race: '' });
 
     // Answered one option at a time: the modal stays up, publishing only what
     // is left, until the last answer lands.
     v = submitModal(session, { name: 'Rowan' });
     expect(v.modals[0].options.map((option) => option.key)).toEqual(['race']);
-    expect(session.state.player).toEqual({ name: '', race: '' });
+    expect(v.player).toEqual({ name: '', race: '' });
 
     v = submitModal(session, { race: 'Elf' });
     expect(v.modals).toEqual([]);
-    expect(session.state.player).toEqual({ name: 'Rowan', race: 'Elf' });
+    expect(v.player).toEqual({ name: 'Rowan', race: 'Elf' });
 
     v = apply(session, 'talk:mirror');
     expect(v.said).toContain('There you are, Rowan, Elf.');
@@ -230,7 +238,7 @@ starting
     const v = view(session);
 
     expect(v.said).toEqual(['Removed inventory mod.gem because its item is not loaded.']);
-    expect(session.state.inventory).toEqual({});
+    expect(v.inventory).toEqual({});
   });
 });
 
@@ -273,21 +281,18 @@ out: 1 mix
     const session = startSession(registry);
 
     const v = beginAction(session, 'use:entity.oven.roast');
-    expect(session.state.activeAction).not.toBeNull();
-    expect(session.state.activeAction?.cadences[PLAYER].progress).toBe(0);
-    expect(session.state.time).toBe(0);
-    expect(session.state.inventory['roasted-chestnut'] ?? 0).toBe(0);
+    expect(v.action).not.toBeNull();
+    expect(v.action?.progress).toBe(0);
+    expect(v.inventory['roasted-chestnut'] ?? 0).toBe(0);
     expect(v.time).toBe(0);
   });
 
   it('completes an instant item action (no time:) immediately, same as apply', () => {
-    const registry = loadModule(module);
-    const session = startSession(registry);
-    session.state.inventory.bread = 1;
+    const session = primed(loadModule(module), { inventory: { bread: 1 } });
 
     const v = beginAction(session, 'use:item.bread.eat');
-    expect(session.state.activeAction).toBeNull();
-    expect(session.state.inventory.bread).toBe(0);
+    expect(v.action).toBeNull();
+    expect(v.inventory).toEqual({});
     expect(v.said).toContain('You eat the bread.');
   });
 
@@ -296,9 +301,8 @@ out: 1 mix
     const session = startSession(registry);
 
     const v = beginAction(session, 'craft:dough');
-    expect(session.state.activeAction).not.toBeNull();
-    expect(session.state.time).toBe(0);
-    expect(session.state.inventory.dough ?? 0).toBe(0);
+    expect(v.action).not.toBeNull();
+    expect(v.inventory.dough ?? 0).toBe(0);
     expect(v.time).toBe(0);
   });
 
@@ -306,9 +310,9 @@ out: 1 mix
     const registry = loadModule(module);
     const session = startSession(registry);
 
-    beginAction(session, 'craft:mix');
-    expect(session.state.activeAction).toBeNull();
-    expect(session.state.inventory.mix).toBe(1);
+    const v = beginAction(session, 'craft:mix');
+    expect(v.action).toBeNull();
+    expect(v.inventory.mix).toBe(1);
   });
 
   it('throws on an unavailable or unknown choice id, same as apply', () => {
@@ -346,7 +350,7 @@ adjacent:
     const v = apply(session, 'travel:beach');
     expect(v.location.id).toBe('beach');
     expect(v.time).toBe(journey);
-    expect(session.state.activeAction).toBeNull();
+    expect(v.action).toBeNull();
   });
 
   it('beginAction arms the journey spannably — location and time unchanged until driven', () => {
@@ -355,15 +359,14 @@ adjacent:
     const journey = 1 * travelSecondsPerUnit(registry);
 
     const v = beginAction(session, 'travel:beach');
-    expect(session.state.activeAction).not.toBeNull();
-    expect(session.state.location).toBe('camp');
-    expect(session.state.time).toBe(0);
+    expect(v.action).not.toBeNull();
     expect(v.location.id).toBe('camp');
+    expect(v.time).toBe(0);
 
     const arrived = wait(session, journey);
     expect(arrived.location.id).toBe('beach');
-    expect(session.state.activeAction).toBeNull();
-    expect(session.state.time).toBe(secondsToMs(journey));
+    expect(arrived.action).toBeNull();
+    expect(arrived.time).toBe(journey);
   });
 });
 
@@ -371,7 +374,6 @@ describe('travel edges aliased by a free entity relocate are hidden', () => {
   it('hides a travel edge that a stairs-like entity already offers as a free relocate', () => {
     const registry = loadModule(source);
     const session = startSession(registry);
-    session.state.location = 'tutorial-island.guide-house';
 
     const choiceIds = ids(view(session));
     // The stairs entity relocates to both floors, so the duplicate vertical
@@ -407,9 +409,7 @@ enter:
   take: 1 coin
   relocate: cave
 `;
-    const registry = loadModule(module);
-    const session = startSession(registry);
-    session.state.inventory.coin = 1;
+    const session = primed(loadModule(module), { inventory: { coin: 1 } });
 
     const choiceIds = ids(view(session));
     // gate.enter relocates to cave but costs a coin, so it is not a free alias —
@@ -421,20 +421,17 @@ enter:
 
 describe('cancelAction', () => {
   it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
-    const registry = loadModule(source);
-    const session = startSession(registry);
-    session.state.location = 'tutorial-island.guide-house';
-    session.state.inventory['tutorial-island.dough'] = 2; // two loaves' worth
+    const session = primed(loadModule(source), { inventory: { 'tutorial-island.dough': 2 } }); // two loaves' worth
 
     beginAction(session, 'craft:tutorial-island.bread');
-    wait(session, 4); // one full 3s bake done, a second one 1s in
-    expect(session.state.inventory['tutorial-island.bread']).toBe(1);
-    expect(session.state.activeAction).not.toBeNull();
+    const baked = wait(session, 4); // one full 3s bake done, a second one 1s in
+    expect(baked.inventory['tutorial-island.bread']).toBe(1);
+    expect(baked.action).not.toBeNull();
 
     const v = cancelAction(session);
-    expect(session.state.activeAction).toBeNull();
-    expect(session.state.inventory['tutorial-island.bread']).toBe(1); // no partial credit for the aborted bake
-    expect(session.state.inventory['tutorial-island.dough']).toBe(1); // its input was not consumed
+    expect(v.action).toBeNull();
+    expect(v.inventory['tutorial-island.bread']).toBe(1); // no partial credit for the aborted bake
+    expect(v.inventory['tutorial-island.dough']).toBe(1); // its input was not consumed
     expect(v.choices.length).toBeGreaterThan(0); // back to ordinary choices
   });
 
@@ -442,7 +439,7 @@ describe('cancelAction', () => {
     const registry = loadModule(source);
     const session = startSession(registry);
     expect(() => cancelAction(session)).not.toThrow();
-    expect(session.state.activeAction).toBeNull();
+    expect(sessionStatus(session).action).toBeNull();
   });
 });
 
@@ -574,6 +571,272 @@ submit-modal: choice=Nod.
   });
 });
 
+// Everything c4 names, in one world: a stat with a base and an item that raises
+// it, a skill that earns xp, a slot to fill, and a location reached only by
+// being told about it.
+const PUBLISHED_MODULE = `
+# stat might
+base: 4
+
+# skill smithing
+
+# location forge
+x: 0, y: 0
+starting
+entities:
+  window
+  bench
+
+# location overlook
+x: 1, y: 0
+
+# item ore
+examine: Streaked with red.
+
+# item ingot
+examine: A dull grey bar.
+
+# item gauntlet
+title: Gauntlet
+slot: hand
++3 might
+
+# entity window
+look through: discover: overlook
+
+# entity bench
+stations: bench
+
+# recipe ingot
+station: bench
+in: ore
+out: ingot
+skill: smithing 5
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"ore":1,"gauntlet":1}}
+`;
+
+describe('what the engine publishes', () => {
+  it('carries stat values, and recomputes them when equipment changes them', () => {
+    const session = primed(loadModule(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
+
+    expect(view(session).stats.might).toBe(4);
+
+    const armed = apply(session, 'equip:gauntlet');
+    expect(armed.equipment).toEqual({ hand: 'gauntlet' });
+    expect(armed.stats.might).toBe(7);
+
+    const bare = apply(session, 'unequip:hand');
+    expect(bare.equipment).toEqual({});
+    expect(bare.stats.might).toBe(4);
+  });
+
+  it('carries skill xp as it is earned', () => {
+    const registry = loadModule(PUBLISHED_MODULE);
+    const session = startSession(registry);
+    applyDirective(session, { kind: 'load', save: 'stocked' });
+
+    expect(view(session).xp).toEqual({});
+
+    const forged = apply(session, 'craft:ingot');
+    expect(forged.xp).toEqual({ smithing: 5 });
+    expect(forged.inventory).toEqual({ ingot: 1, gauntlet: 1 });
+  });
+
+  it('carries the locations discovery has revealed, and nothing it has not', () => {
+    const session = startSession(loadModule(PUBLISHED_MODULE));
+
+    expect(view(session).discovered).toEqual([]);
+
+    const told = apply(session, 'use:entity.window.look through');
+    expect(told.discovered).toEqual(['overlook']);
+    expect(told.flags).toEqual({ 'overlook.discovered': true });
+  });
+});
+
+describe('what the engine withholds', () => {
+  it('has a standing answer for every GameState field, so a new one cannot arrive unclassified', () => {
+    // The Record is the guard, not the assertion: adding a field to GameState
+    // stops compiling here until somebody says whether a driver sees it.
+    // `instances` reached this repo unpublished with nothing noticing, which is
+    // what this exists to stop happening twice.
+    const classified: Record<keyof GameState, 'published' | 'withheld'> = {
+      location: 'published',
+      time: 'published',
+      flags: 'published',
+      inventory: 'published',
+      equipped: 'published',
+      xp: 'published',
+      resources: 'published',
+      modals: 'published',
+      player: 'published',
+      activeAction: 'published',
+      // `said` is this drained, so the array itself never leaves the engine.
+      log: 'withheld',
+      // Bookkeeping the engine reasons with and no driver renders. Each stays
+      // withheld until something asks: a field published before anything reads
+      // it is how `discovered` became a list that is always empty.
+      rng: 'withheld',
+      visits: 'withheld',
+      activeBuffs: 'withheld',
+      resourceRateRemainders: 'withheld',
+      instances: 'withheld',
+    };
+
+    // The constructor, not the type: the two drift only if a field is built
+    // without being declared, which the type above cannot see.
+    expect(Object.keys(createGameState()).sort()).toEqual(Object.keys(classified).sort());
+
+    const published = Object.keys(classified).filter((field) => classified[field as keyof GameState] === 'published');
+    const carried = new Set(Object.keys(view(startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n')))));
+    // Two of them are renamed on the way out and one is drained into `said`.
+    const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action' };
+    for (const field of published) expect(carried.has(renamed[field] ?? field), field).toBe(true);
+  });
+});
+
+// A pool to whittle down, so encounterView reads the player clock too.
+const FIGHT_MODULE = `
+# stat attack
+base: 2
+
+# stat max-health
+base: 12
+
+# stat swings-per-minute
+base: 60
+
+# resource health
+max: max-health
+
+# location camp
+x: 0, y: 0
+starting
+entities:
+  dummy
+
+# entity dummy
+title: Dummy
+stats: attack 1, max-health 12, swings-per-minute 60
+hit:
+  continuous
+  rate: swings-per-minute
+  ability: attack
+  target: health
+`;
+
+describe('a save is data the engine takes a copy of, not a handle onto it', () => {
+  const module = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  oven
+  mirror
+
+# item bun
+examine: Warm.
+
+# entity mirror
+look in: open modal: character-creation
+
+# entity oven
+roast:
+  continuous
+  time: 4
+  give: 1 bun
+`;
+
+  // `registry.saves` is writable and is the only route a driver has to load
+  // one, so what a save carries has to stop being the state once it lands.
+  it('does not leave the author of a save holding the state it loaded', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+    const mine = { name: 'Rowan', race: 'Elf' };
+    registry.saves.set('forged', { version: SAVE_VERSION, diff: { player: mine } });
+
+    applyDirective(session, { kind: 'load', save: 'forged' });
+    expect(sessionStatus(session).player.name).toBe('Rowan');
+
+    mine.name = 'MUTATED';
+    expect(sessionStatus(session).player.name).toBe('Rowan');
+  });
+
+  it('does not let play rewrite the save it was loaded from', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+    // The clock, not the player: modals.ts answers by replacing `state.player`
+    // wholesale, so an alias could never show through it. The engine writes
+    // progress into the cadence in place, which is what an alias would move.
+    const fixture = { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: { player: { progress: 0, attemptsMade: 0 } } };
+    registry.saves.set('midbake', { version: SAVE_VERSION, diff: { activeAction: fixture } });
+
+    applyDirective(session, { kind: 'load', save: 'midbake' });
+    const v = wait(session, 3); // three seconds into the four-second roast
+
+    expect(v.action!.progress).toBe(0.75);
+    expect(fixture.cadences.player.progress).toBe(0);
+  });
+
+  // One missing clock, every path that reads one. publishAction was guarded on
+  // its own first and the other two still died on the same input.
+  it('plays on through every path when a save left an action with no player clock', () => {
+    const registry = loadModule(FIGHT_MODULE);
+    const session = startSession(registry);
+    registry.saves.set('midfight', {
+      version: SAVE_VERSION,
+      diff: { activeAction: { ownerRef: 'entity.dummy', actionLabel: 'hit', repeating: true, implicitTarget: 1000, cadences: {}, actors: { dummy: { resources: { health: 12000 }, rateRemainders: {} } } } },
+    });
+
+    applyDirective(session, { kind: 'load', save: 'midfight' });
+
+    // The encounter readout reads the player clock before the action block does.
+    const v = view(session);
+    expect(v.encounter!.cadence).toBe(0);
+    expect(v.action!.label).toBe('hit');
+
+    // And the simulation reads it again, which `view` alone never reaches.
+    expect(() => wait(session, 3)).not.toThrow();
+  });
+
+  it('publishes an action a save left without a player clock instead of dying on the next look', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+    // checkSave takes any object here, and pruneStateForRegistry keeps it: the
+    // owner and the label both resolve. Only the clock is missing.
+    registry.saves.set('midbake', {
+      version: SAVE_VERSION,
+      diff: { activeAction: { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: {} } },
+    });
+
+    applyDirective(session, { kind: 'load', save: 'midbake' });
+
+    const v = view(session);
+    expect(v.action).toEqual({ label: 'roast', progress: 0, attempts: 0, targeted: false, completion: 1 });
+  });
+});
+
+describe('the handle a driver obtains', () => {
+  it('carries no route to the state it plays, by enumeration or by key', () => {
+    const session = startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n'));
+
+    // `session.state` is the compile-time half and tsc owns it. This is the
+    // runtime half: a symbol member satisfied the type and handed the live
+    // GameState back out of getOwnPropertySymbols.
+    expect(Object.getOwnPropertySymbols(session)).toEqual([]);
+    expect(Object.keys(session)).toEqual(['registry']);
+    expect(Object.values(session).some((value) => value instanceof Object && 'inventory' in value)).toBe(false);
+  });
+
+  it('refuses to play a handle it did not hand out, rather than reading undefined', () => {
+    const registry = loadModule('# location camp\nx: 0, y: 0\nstarting\n');
+    const forged = { registry };
+
+    expect(() => view(forged)).toThrow(/not a session startSession handed out/);
+  });
+});
+
 describe('starting a session with nowhere to begin', () => {
   it('says so instead of failing later with an empty location id', () => {
     expect(() => startSession(loadModule('# location camp\nx: 0, y: 0'))).toThrow(/no # location is marked starting/);
@@ -641,10 +904,10 @@ hit:
     const session = swinging();
 
     wait(session, 3600);
-    expect(session.state.log).toEqual([]);
+    expect(view(session).said).toEqual([]);
 
     wait(session, 3600);
-    expect(session.state.log).toEqual([]);
+    expect(view(session).said).toEqual([]);
   });
 
   it('hands back a short span whole', () => {

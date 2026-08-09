@@ -32,8 +32,12 @@ export interface ActorState {
   rateRemainders: Record<string, number>;
 }
 
+// Installed rather than defaulted, because callers write attemptsMade and
+// progress back through this. An action can reach here without one: a `# save`
+// carries `cadences` as authored JSON and nothing before now required a clock
+// in it.
 export function playerCadence(active: ActiveAction): Cadence {
-  return active.cadences[PLAYER];
+  return (active.cadences[PLAYER] ??= newCadence());
 }
 
 export const IMPLICIT_TARGET_FULL = MILLI_UNITS;

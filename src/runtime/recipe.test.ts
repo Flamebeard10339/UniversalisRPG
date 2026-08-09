@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { craft, createGameState, RuntimeError, recipeCraftable, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
-import { startSession, view } from './session';
+import { applyDirective, startSession, view } from './session';
+import { SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
 const MODULE = `
@@ -44,6 +45,9 @@ in: dough
 out: bread
 skill: cooking 4
 say: The oven bakes your dough into a golden loaf.
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"jug-of-water":1,"pot-of-flour":1}}
 `;
 
 function loaded(): Registry {
@@ -133,13 +137,12 @@ describe('recipeCraftable', () => {
 describe('session craft choices', () => {
   it('enumerates a craft choice when craftable and omits it otherwise', () => {
     const registry = loaded();
-    const session = startSession(registry, createGameState('guide-house'));
+    const session = startSession(registry);
     let v = view(session);
     expect(v.choices.map((c) => c.id)).not.toContain('craft:dough');
     expect(v.choices.map((c) => c.id)).not.toContain('craft:bread');
 
-    session.state.inventory['jug-of-water'] = 1;
-    session.state.inventory['pot-of-flour'] = 1;
+    applyDirective(session, { kind: 'load', save: 'stocked' });
     v = view(session);
     expect(v.choices.map((c) => c.id)).toContain('craft:dough');
     expect(v.choices.map((c) => c.id)).not.toContain('craft:bread');

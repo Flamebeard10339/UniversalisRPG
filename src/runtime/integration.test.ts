@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
 import { createGameState, resolve, useAction } from './runtime';
 import { loadModule } from '../content/registry';
-import { runTest, startSession } from './session';
+import { runTest } from './session';
+import { initialState } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
@@ -59,7 +60,7 @@ describe('tutorial-island content', () => {
 
 describe('tutorial-island health resource (Pass 2 end-to-end)', () => {
   it('starts full, drains as the rat bites back, then regenerates from a meal as time passes', () => {
-    const { state } = startSession(registry);
+    const state = initialState(registry);
     expect(state.resources['tutorial-island.health']).toBe(toMilliUnits(30)); // full = statValue(max-health) at start
 
     // One `use:` is one swing at 25/min; the rat answers on its own 16/min clock.

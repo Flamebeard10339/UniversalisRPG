@@ -225,7 +225,8 @@ function checkSave(saved: ParsedSave): void {
 export function loadSave(state: GameState, saved: ParsedSave, registry: Registry): PruneWarning[] {
   checkSave(saved);
   const base = initialState(registry);
-  const diff = saved.diff;
+  // A save outlives the load, so the state may not be built from its objects.
+  const diff = structuredClone(saved.diff);
   const target = state as unknown as Record<string, unknown>;
   const baseline = base as unknown as Record<string, unknown>;
 
