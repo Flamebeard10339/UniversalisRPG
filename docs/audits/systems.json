@@ -137,6 +137,8 @@
         "src/runtime/equipment.test.ts",
         "src/runtime/equipment.ts",
         "src/runtime/forwardProgress.ts",
+        "src/runtime/instances.test.ts",
+        "src/runtime/instances.ts",
         "src/runtime/integration.test.ts",
         "src/runtime/location.test.ts",
         "src/runtime/modals.test.ts",
@@ -205,6 +207,13 @@
             "src/runtime/modals.ts"
           ],
           "note": "produced by first-class-modals: the stack, the published name+options shape, and the one open and close"
+        },
+        {
+          "name": "object instancing",
+          "paths": [
+            "src/runtime/instances.ts"
+          ],
+          "note": "produced by instanced-objects: the one instance table, its ids, its payload kinds and its prune"
         }
       ]
     },

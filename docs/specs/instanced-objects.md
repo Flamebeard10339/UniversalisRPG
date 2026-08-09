@@ -152,3 +152,167 @@ because a reader arriving at this spec needs the answer more than the history of
 - **Whether an instance whose payload empties collapses back into a stack**, still delegated. c3 says
   nothing carrying nothing is an instance; whether the substrate enforces that eagerly or offers the
   operation and lets the consumer call it is the worker's call, and the honest default is to offer it.
+
+## Audit passes
+
+### Pass 1 — 2026-08-09
+
+- base: `0115673633133af064a724780d6cb21acc4d1e4b`
+- head: `76b6375d68cb469bd9e22a5f8d926e9ba7b23b23`
+- proof 1: met — One field on GameState (state.ts:36 `instances: InstanceTable`), one row in SAVE_FIELDS
+  (save.ts:50), one rule in pruneStateForRegistry (save.ts:143). Both consumers reach it through
+  src/runtime/instances.ts, the only module that writes the table. The invariant is enforced by tsc
+  rather than by a test: SaveField is Exclude<keyof GameState,'log'> and SAVE_FIELDS is a Record over
+  it, so a second InstanceTable field on GameState is TS2741 at save.ts:40. Re-run by adding
+  `instances2?: InstanceTable` beside state.ts:36 and running `npx tsc --noEmit`; it errors. The same
+  mutation SURVIVES `npm test`, which is the reason this clause's proof target is a command and not a
+  vitest name — recorded here so a next pass does not read that survivor as a finding.
+- proof 2: met — Every payload access in instances.ts goes through the kind: holds, empty and repair.
+  The substrate's own reads are `'payload' in held` (presence, in isInstanceTable) and a
+  JSON.stringify in one error message, which is what save.ts's checkSave already does for every
+  field. Instance.kind/.template/.payload and InstanceTable.next/.byId are readonly outside the
+  module, opened by one cast at instances.ts:31, so a consumer cannot repoint the template the
+  reference rests on. `npm run mutate` on the holds call in createInstance: KILLED by
+  instances.test.ts "refuses a payload its kind does not keep, and a kind nothing registered".
+  Structural half verified by inspection: instances.ts names no item, cluster, entity or respawn
+  concept, and the test-only kind is the only thing in the tree that knows what a payload contains.
+- proof 3: met — Three routes into the table, all closed. Mint: createInstance refuses a payload its kind
+  calls empty (instances.ts:67) — mutation KILLED by "refuses a payload recording nothing, so no
+  instance carries nothing". Load: a hand-written `# save` can carry an already-empty payload past
+  checkSave, which asks holds and never empty; the prune pass drops it — mutation of the collapse
+  KILLED by "drops a copy a # save wrote already recording nothing, the one route past the refusal at
+  the mint". Repair: a payload a repair empties is dropped in the same fixed point — KILLED by "drops
+  a copy a repair left recording nothing, and follows the reference that strands". The open question
+  the spec left (eager or offered) is taken both ways: enforced at the mint, offered as
+  collapseInstance for a consumer that empties one mid-session.
+- proof 4: met — Ids are decimal strings from a counter inside the table. No randomness: "draws no
+  randomness, so a session that makes one rolls what a session that does not rolls" asserts
+  nextRandom agrees between a state that minted an instance and one that did not. No reuse: the
+  counter never rewinds, asserted by "never answers a removed id with a later instance" and by
+  "keeps a counter that has run on past the instances it minted" across a save round trip. Round
+  trip: "comes back with the same id and the same payload". Mutations c4-counter-rewinds (id derived
+  from the live row count) and c4-minted-id-check (isMintedId returns true) both KILLED. The save
+  side refuses an id no counter could have minted, so a hand-written body cannot plant one that a
+  later mint collides with.
+- proof 5: met — instanceIsLive is the one answer, and pruneInstances hands it to the repair hook as
+  `live` rather than re-deriving it (instances.ts:129, fixed in this pass — it had a second
+  `ref in table.byId`). Mutating instanceIsLive to return false is KILLED. The guard acts where state
+  is assembled: pruneInstances is the FIRST rule in pruneStateForRegistry, so every rule below it
+  asks a settled table. Pinned by "settles the table before any other rule runs, so a field holding
+  an id asks an answer that is final", which asserts warning order is rule order, and
+  mutation-verified by moving the block back below the record prunes: KILLED. No read site checks
+  liveness — there is no read site yet, which is the honest limit of this grade: the clause names
+  inventory, equipped, encounter actors and location contents, and none of them holds an instance id
+  on this branch. What is provable here is the shape they will ask.
+- proof 6: met — Two ways a template goes: out of the registry, and its payload kind unregistered. Both
+  drop with a PruneWarning of the same {path,id,message} shape every other rule in save.ts produces,
+  path `instances.<id>`, message ending in a period, appended to state.log by loadSave. Asserted by
+  "prunes the instance whose template is gone, and warns like every other prune" and "prunes an
+  instance whose payload kind nothing registered". References repaired in the same pass: "repairs a
+  reference to a pruned instance in the same pass that prunes it" asserts both messages in order, and
+  "leaves a loaded state holding no reference to an instance that is gone" asserts it end to end
+  through serialize -> parseSaveSection -> loadSave against a registry the template left. Mutations
+  c6-template-prune, c6-unknown-kind-prune and c1-prune-rule-call-site all KILLED.
+- proof 7: met — One extension point, InstanceKind, registered by defineInstanceKind. `repair` has exactly
+  one call site, instances.ts:129 inside pruneInstances; `grep -n "\.repair(" src/runtime` returns
+  that line and nothing else. A consumer never walks the table: the payload's own stale references
+  and its references to other instances are the same call, because `live` is passed in — which is
+  what kept this from needing a second hook for reference repair. Deleting the call KILLED four
+  tests. The countable promise holds at one because reference repair folded into the repair hook
+  rather than becoming a sibling of it.
+- proof 8: met — SAVE_VERSION is still 7; `git diff main...HEAD -- src/runtime/save.ts` shows the constant
+  untouched. Absent-means-empty: "is absent from a save that has none, and does not move
+  SAVE_VERSION" asserts serializeSave of a fresh state is exactly `{version}` and that loading a diff
+  with no instances field resets a populated table to the baseline. Mutating the baseline off the
+  empty table KILLED it. checkSave validates through isInstanceTable the way every other field
+  validates through its own holds: five cases under "a # save body holding nonsense in the instance
+  table" cover a table that is not one, a row that is not an instance, an id no counter could have
+  minted, and a payload the owning kind does not keep; weakening holds to isObject KILLED four of
+  them. A kind nothing registered passes the shape check on purpose and is pruned, which is how
+  modals.ts already treats a frame this engine does not know.
+- proof 9: met — `git diff --stat main...HEAD` touches four source files, all under src/runtime, plus
+  three unowned docs. No file under content/, src/grammar or src/content changed, so no authored
+  content gained any way to make an instance and no `# save` or `expect:` fixture moved. npm test:
+  2118 passed, 82 files, including integration.test.ts which replays every shipped `# test`. The
+  substrate is inert without a registered kind, and the only kind in the tree is registered inside
+  instances.test.ts.
+- proof 10: met — `test-token` is defined in src/runtime/instances.test.ts and registered nowhere else, so
+  no shipped content can name it. It carries free-form notes, a registry stat id and links to other
+  instances, which between them is every way a payload goes stale. 22 cases walk the lifecycle the
+  clause enumerates: create, save, load with identity and payload intact, template removed and the
+  instance pruned, a link to the pruned instance repaired, and a stat declaration gone repaired
+  through the c7 hook. Eleven mutations aimed at the clauses' own lines, all KILLED
+  (c3-mint-refuses-empty, c4-counter-rewinds, c4-minted-id-check, c6-template-prune,
+  c6-unknown-kind-prune, c7-repair-hook, c3-fixed-point-collapse, c1-prune-rule-call-site,
+  c8-save-field-shape, c8-additive-round-trip, c5-instances-prune-first), plus three more in the
+  audit pass (c3-load-empty-payload, c5-one-liveness-answer, c2-payload-opacity).
+- proof 11: met — Three decisions recorded against the spec, readable with
+  `npm run tasks -- log --spec instanced-objects --op decision`. items-mods-and-crafting c11, c15 and
+  c21 are each expressible with no substrate change: c11 is createInstance over an opaque
+  {plane, allocations, experience}; c15's cluster effect is a record inside that same payload, which
+  is why jewels stay stackable; c21's first half is c6 here and its second half is InstanceKind.repair
+  with the point return being arithmetic the substrate never sees. The settled spawn model needs an
+  entity template, a per-skill-experience payload and no content-facing identity, all of which the
+  table already holds. The walk was not free: it found the prune-order defect fixed in 0d4f8d3, and
+  it left two things on the record — RecordPrune.loaded takes no state, so a record field cannot yet
+  ask instanceIsLive, and a payload must be JSON because serializeSave round-trips it through
+  JSON.stringify. Both are filed as findings below.
+- proof 12: met — `npm run tasks -- merge-ready` at 3e252b8 and again after the audit fixes: tsc, npm
+  test, layer-check, audit-status, doctor, bytes, tree and base all pass. The spec leg passes; the
+  clauses leg is what this file closes.
+
+### Pass 2 — 2026-08-09
+
+- base: `0115673633133af064a724780d6cb21acc4d1e4b`
+- head: `4b87f5e14c6dc506a7b78054d08214b52c5178ed`
+- proof 1: met — Unchanged from pass 1 and re-verified at HEAD. One field (state.ts:37), one SAVE_FIELDS
+  row (save.ts:50), one rule (save.ts:143, now a single `warnings.push(...pruneInstances(...))`).
+  Enforced by tsc, not by a test: add `instances2?: InstanceTable` beside the field and
+  `npx tsc --noEmit` gives TS2741 at save.ts:40 while `npm test` stays green. A next pass must not
+  read that survivor as a finding.
+- proof 2: met — Re-checked after the readonly tightening landed. `grep -n "payload" src/runtime/instances.ts`
+  shows every access going through a kind method, plus one `'payload' in held` presence check and one
+  JSON.stringify in an error message. Pass 2 mutation-tested the boundary the other way: making
+  `instance()` return `{...held}` SURVIVES the whole suite. Recorded as an equivalent mutant rather
+  than filed — the shallow copy shares the payload object, and payload identity is the only thing a
+  consumer needs from the accessor, so nothing observable differs. Named here so a third pass does
+  not re-derive it.
+- proof 3: met — Unchanged from pass 1. Mint, load and repair are all closed, each mutation-killed. The
+  eager/offered question the spec left open is answered both ways and both halves are asserted.
+- proof 4: met — Unchanged from pass 1, all four properties still mutation-killed. Pass 2 added the
+  regression check that matters here: `npm run build` (tsc + vite) succeeds, so the counter and the
+  table survive the production bundle, and no id is derived from anything the bundler reorders.
+- proof 5: met — Unchanged from pass 1. instanceIsLive is the single answer and is mutation-killed;
+  pruneInstances is the first rule in pruneStateForRegistry and the order is pinned by warning order
+  and mutation-verified by moving it back. The limit stated in pass 1 still stands and is the honest
+  boundary of this grade: no field of GameState holds an instance id yet, so what is proved is the
+  shape a reference site will ask, not a reference site.
+- proof 6: met — Pass 2 found this one under-proved and fixed it. Every earlier case reached the repair
+  loop with a chain that resolved in a single round, because each was minted in the order the loop
+  walks — so replacing the fixed point with one pass stayed green, and one pass leaves a live
+  reference to an instance that is gone. "reports a repair once however many rounds the table takes
+  to settle" mints the chain against the iteration order so the outer link cannot be repaired before
+  round two, and asserts both the settled table and that a repair is reported exactly once.
+  Mutation `c6-one-round-is-not-a-fixed-point` (loop rewritten as a single pass): KILLED. The warning
+  shape is now built where it is owned: pruneInstances returns PruneWarning itself, so path, id and
+  message are one sentence in one file; mutating the path to drop the id KILLED four tests.
+- proof 7: met — Unchanged from pass 1. `grep -n "\.repair(" src/runtime` returns exactly instances.ts:139.
+  Pass 2 added the clause the interface was missing: repair is called until the table settles, so an
+  implementor must return nothing when there is nothing left to repair. That obligation is now stated
+  on InstanceKind and proved on the substrate side by the once-only assertion in c6's new case.
+- proof 8: met — Unchanged from pass 1. SAVE_VERSION is 7. Five nonsense cases, absent-means-empty
+  asserted in both directions, both mutations killed.
+- proof 9: met — Re-run at HEAD. `git diff --stat main...HEAD` still touches only four files under
+  src/runtime plus unowned docs; nothing under content/, src/grammar or src/content. npm test 2119
+  passed. Pass 2 added two regression checks pass 1 did not run: `npm run build` succeeds, and
+  `grep` for anything enumerating GameState's keys finds only save.ts's SaveField type — no loop
+  over GameState that a new field silently joins.
+- proof 10: met — 23 cases now, one added by each pass. Sixteen mutations aimed at the clauses' own lines
+  across the two passes, fifteen KILLED and one recorded as an equivalent mutant. The test-only kind
+  is still registered nowhere but its own file.
+- proof 11: met — Unchanged from pass 1; three decisions on the record, readable with
+  `npm run tasks -- log --spec instanced-objects --op decision`. The walk's two leftovers are filed
+  as findings and deferred, with the triage reasoning recorded as a fourth decision.
+- proof 12: met — `npm run tasks -- merge-ready` at HEAD: tsc, npm test, layer-check, audit-status,
+  doctor, bytes, tree, base, spec and clauses all pass. 17 doctor warnings, none of which fail a leg
+  and none of which this branch introduced.
