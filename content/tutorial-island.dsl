@@ -420,8 +420,7 @@ talk: miki
 choose: Sounds good. Teach me.
 assert: quest-given
 
-// Opens on a save so the route is walked with the pools a played game has;
-// without one this ends at zero health and proves nothing about `on empty:`.
+// Opens on a save so the route is walked with the pools a played game has.
 # test miki-route-full
 load: miki-route-start
 run: tutorial-quest-given

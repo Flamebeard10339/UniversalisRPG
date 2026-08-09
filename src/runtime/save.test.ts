@@ -156,6 +156,22 @@ describe('loadSave', () => {
       expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { modals: body } as never }, registry), JSON.stringify(body)).toThrow(/modals holds/);
     }
   });
+
+  it('closes a modal frame the loaded registry cannot answer, and says so, instead of restoring it', () => {
+    const registry = loadModule(MODULE);
+    for (const [frame, message] of [
+      [{ name: 'quest-journal', answers: {} }, 'Closed modal quest-journal because it is not a modal this engine knows.'],
+      [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'gone', node: 'greeting', resumeIndex: 1, replay: true } }, 'Closed modal dialogue because dialogue gone is not loaded.'],
+      [{ name: 'character-creation', answers: { name: 'Rowan', race: 'Elf' } }, 'Closed modal character-creation because it was saved with every option already answered.'],
+    ] as const) {
+      const state = createGameState();
+      const warnings = loadSave(state, { version: SAVE_VERSION, diff: { modals: [frame] } as never }, registry);
+
+      expect(state.modals, JSON.stringify(frame)).toEqual([]);
+      expect(warnings.map((warning) => warning.message)).toContain(message);
+      expect(state.log).toContain(message);
+    }
+  });
 });
 
 const PRUNE_MODULE = `

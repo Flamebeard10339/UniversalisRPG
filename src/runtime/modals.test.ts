@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from '../content/registry';
 import { answerModal, Modal, ModalFrame, openModalNamed, pruneModals, publishModal, topModal } from './modals';
-import { createGameState, DialogueCursor, GameState, RuntimeError } from './runtime';
+import { choose, createGameState, DialogueCursor, GameState, RuntimeError } from './runtime';
 import { applyResultsNow } from './effects';
 import { apply, applyDirective, PlaySession, startSession, submitModal, view } from './session';
 
@@ -73,6 +73,34 @@ node greeting:
   when: not scholar-seen
   set: scholar-seen
   -> Leave the scholar.
+`;
+
+// A choice that both raises a modal and walks the dialogue on to a second menu,
+// so answering one modal opens two — the spec's open question, made executable.
+const ANSWER_OPENS_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  sage
+
+# flag greeted
+
+# entity sage
+title: Sage
+
+# dialogue sage-talk
+owner = sage
+
+node greeting:
+  when: not greeted
+  set: greeted
+  -> Look at the mirror.
+    open modal: character-creation
+    goto after
+
+node after:
+  -> Nod.
 `;
 
 function stackingSession(): PlaySession {
@@ -149,6 +177,13 @@ describe('opening and answering', () => {
     applyResultsNow(repeated, registry, [{ kind: 'open-modal', modal: 'character-creation' }, { kind: 'xp', skill: 'lore', amount: { min: 1, max: 4 } }], 4);
     expect(names(repeated)).toEqual(['character-creation']);
     expect(repeated.xp.lore).toBeGreaterThan(0);
+
+    // And from inside a wrapper, which re-enters applyResults as its own group
+    // and so leads every repetition — a `say:` speaks each time, deliberately,
+    // and a screen still goes up once.
+    const wrapped = createGameState();
+    applyResultsNow(wrapped, registry, [{ kind: 'chance', numerator: 1, denominator: 1, results: [{ kind: 'open-modal', modal: 'character-creation' }] }, { kind: 'xp', skill: 'lore', amount: { min: 1, max: 4 } }], 100);
+    expect(names(wrapped)).toEqual(['character-creation']);
   });
 
   it('refuses a modal nothing defines, and one that carries a payload no result line can spell', () => {
@@ -165,7 +200,7 @@ describe('opening and answering', () => {
 
     openModalNamed(state, 'character-creation');
     expect(() => answerModal(state, registry, { title: 'Ser' })).toThrow(/has no option title/);
-    expect(() => answerModal(state, registry, { race: 'Wyvern' })).toThrow(/does not take "Wyvern"/);
+    expect(() => answerModal(state, registry, { race: 'Wyvern' })).toThrow(/has no race that takes "Wyvern"/);
     expect(topModal(state)?.name).toBe('character-creation');
   });
 
@@ -173,7 +208,7 @@ describe('opening and answering', () => {
     const state = createGameState();
     openModalNamed(state, 'character-creation');
 
-    expect(() => answerModal(state, registry, { name: 'Rowan', race: 'Wyvern' })).toThrow(/does not take "Wyvern"/);
+    expect(() => answerModal(state, registry, { name: 'Rowan', race: 'Wyvern' })).toThrow(/has no race that takes "Wyvern"/);
     expect(topModal(state)?.answers).toEqual({});
     expect(publishModal(topModal(state)!, state, registry).options.map((option) => option.key)).toEqual(['name', 'race']);
   });
@@ -232,10 +267,50 @@ describe('opening and answering', () => {
 
     const gated = apply(session, 'talk:sage');
     expect(gated.modals[0].options[0].values).toEqual(['Leave the sage.']);
-    expect(() => submitModal(session, { choice: 'Ask about the secret.' })).toThrow(/does not take "Ask about the secret."/);
+    expect(() => submitModal(session, { choice: 'Ask about the secret.' })).toThrow(/has no choice that takes "Ask about the secret."/);
 
     session.state.flags.secret = true;
     expect(view(session).modals[0].options[0].values).toEqual(['Leave the sage.', 'Ask about the secret.']);
+  });
+
+  it('closes a frame a save left unanswerable — every option already answered, or one holding a value it refuses', () => {
+    const registry = loadModule(STACKING_MODULE);
+    for (const [answers, reason] of [
+      [{ name: 'Rowan', race: 'Elf' }, 'it was saved with every option already answered'],
+      [{ name: 'Rowan', race: 'Wombat' }, 'it has no race that takes "Wombat"'],
+      [{ title: 'Ser' }, 'it has no option title'],
+    ] as const) {
+      const state = createGameState();
+      (state.modals as ModalFrame[]).push({ name: 'character-creation', answers });
+      expect(pruneModals(state, registry)).toEqual([{ name: 'character-creation', reason }]);
+      expect(state.modals).toEqual([]);
+    }
+  });
+
+  it('stacks what an answer opens on what is left, and never on the frame that answer spent', () => {
+    const session = startSession(loadModule(ANSWER_OPENS_MODULE));
+
+    apply(session, 'talk:sage');
+    expect(names(session.state)).toEqual(['dialogue']);
+
+    // The choice's own effects raise a modal and its goto opens a second menu:
+    // both must land above the spent frame, not under it or in place of it.
+    const after = submitModal(session, { choice: 'Look at the mirror.' });
+    expect(after.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
+    expect(after.modals[1].options[0].values).toEqual(['Nod.']);
+    expect(session.state.modals.filter((frame) => frame.name === 'dialogue')).toHaveLength(1);
+  });
+
+  // answerModal weighs the text against the same menu before it ever gets here,
+  // so this guard is only reachable by a caller of its own — which the runtime
+  // barrel exports, and which is the reason it is not deleted as unreachable.
+  it('refuses a choice text the menu is not offering when choose is called directly', () => {
+    const session = stackingSession();
+    apply(session, 'talk:sage');
+    const { cursor } = session.state.modals[1] as { cursor: DialogueCursor };
+
+    expect(() => choose('Ask about the weather.', cursor, session.registry, session.state)).toThrow(/no choice matches: "Ask about the weather."/);
+    expect(choose('Say nothing.', cursor, session.registry, session.state)).toBeNull();
   });
 
   it('keeps the dialogue spelling from answering a modal that is not a dialogue', () => {

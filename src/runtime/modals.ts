@@ -81,7 +81,20 @@ function definitionFor<F extends ModalFrame>(frame: F): ModalDefinition<F> {
   return DEFINITIONS[frame.name] as ModalDefinition<F>;
 }
 
+// Two frames are the same screen when they differ only in how much of them has
+// been answered. Reopening what is already up is a no-op, which is what makes
+// the count of `open modal:` applications — batched, scaled or reached once per
+// repetition from inside a wrapper — not the count of screens raised.
+function sameScreen(a: ModalFrame, b: ModalFrame): boolean {
+  if (a.name !== b.name) return false;
+  if (a.name === 'dialogue' && b.name === 'dialogue') {
+    return a.cursor.dialogue === b.cursor.dialogue && a.cursor.node === b.cursor.node && a.cursor.resumeIndex === b.cursor.resumeIndex;
+  }
+  return true;
+}
+
 export function openModal(state: GameState, frame: ModalFrame): void {
+  if (state.modals.some((open) => sameScreen(open, frame))) return;
   stack(state).push(frame);
 }
 
@@ -115,9 +128,8 @@ export function answerModal(state: GameState, registry: Registry, answers: Modal
   // last field leaves the modal exactly as the player found it.
   const options = allOptions(frame, state, registry);
   for (const [key, value] of Object.entries(answers)) {
-    const option = options.find((each) => each.key === key);
-    if (!option) throw new RuntimeError(`modal ${frame.name} has no option ${key}`);
-    if (option.values && !option.values.includes(value)) throw new RuntimeError(`modal ${frame.name} option ${key} does not take ${JSON.stringify(value)}`);
+    const refusal = optionRefusal(options, key, value);
+    if (refusal) throw new RuntimeError(`modal ${frame.name} ${refusal}`);
   }
   Object.assign(answersOf(frame), answers);
 
@@ -147,16 +159,38 @@ function isCursor(value: unknown): boolean {
   return typeof value.dialogue === 'string' && typeof value.node === 'string' && Number.isInteger(value.resumeIndex) && typeof value.replay === 'boolean';
 }
 
-function frameProblem(frame: ModalFrame, registry: Registry): string | null {
+// The one place an answer is weighed against the option it names, so what
+// `answerModal` refuses live and what a `# save` may not carry cannot drift.
+function optionRefusal(options: readonly ModalOption[], key: string, value: string): string | null {
+  const option = options.find((each) => each.key === key);
+  if (!option) return `has no option ${key}`;
+  if (option.values && !option.values.includes(value)) return `has no ${key} that takes ${JSON.stringify(value)}`;
+  return null;
+}
+
+function frameProblem(frame: ModalFrame, state: GameState, registry: Registry): string | null {
   if (!(frame.name in DEFINITIONS)) return 'it is not a modal this engine knows';
-  return frame.name === 'dialogue' ? cursorProblem(frame.cursor, registry) : null;
+  if (frame.name === 'dialogue') {
+    const stale = cursorProblem(frame.cursor, registry);
+    if (stale) return stale;
+  }
+  const options = allOptions(frame, state, registry);
+  for (const [key, value] of Object.entries(frame.answers)) {
+    const refusal = optionRefusal(options, key, value);
+    if (refusal) return `it ${refusal}`;
+  }
+  // Answering the last option is what closes a modal, so a frame that reaches
+  // here already complete was never one this engine put down: it publishes no
+  // option, withdraws the world, and nothing can clear it.
+  if (options.every((option) => option.key in frame.answers)) return 'it was saved with every option already answered';
+  return null;
 }
 
 export function pruneModals(state: GameState, registry: Registry): Array<{ name: string; reason: string }> {
   const dropped: Array<{ name: string; reason: string }> = [];
   const kept: ModalFrame[] = [];
   for (const frame of state.modals) {
-    const problem = frameProblem(frame, registry);
+    const problem = frameProblem(frame, state, registry);
     if (problem) dropped.push({ name: frame.name, reason: problem });
     else kept.push(frame);
   }

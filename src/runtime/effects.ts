@@ -185,11 +185,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     case 'discover':
       state.flags[`${result.location}.${DISCOVERED}`] = true;
       return 0;
-    // Opened once for the whole batch, on the same `lead` a `say:` speaks on:
-    // a hundred crafted loaves raise one screen, and the repetition is what
-    // this has to be defended against rather than the screen's own name.
     case 'open-modal':
-      if (!lead) return undefined;
       openModalNamed(state, result.modal);
       return 0;
     case 'pool': {
