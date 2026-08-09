@@ -24,13 +24,13 @@ import {
   runTest,
   sessionResources,
   startSession,
-  submitModal,
   view,
   wait,
   type PlayChoice,
   type PlaySession,
   type PlayView,
 } from '../src/runtime/session';
+import { type Modal, type ModalOption } from '../src/runtime/runtime';
 import { pruneStateForRegistry, serializeSave } from '../src/runtime/save';
 import { type ParsedSave } from '../src/content/saveSection';
 import { parseDirectiveLine, type Directive } from '../src/content/test';
@@ -62,6 +62,7 @@ const HELP_LINES = [
   '  /expect <id> assert current state matches a # save by id',
   '  /assert <c>  assert a condition against current state',
   '  /cancel      cancel the in-flight spannable action, if any',
+  '  submit-modal: <key>=<value>  answer one option of the open modal',
   '  <directive>  any raw directive line (talk:/use:/travel:/craft:/begin:/…)',
   '  /dsl <kind> <id> [body] stage or replace one local DSL section; use | for new lines',
   '  /local       list local changes',
@@ -134,6 +135,27 @@ function formatEncounter(encounter: PlayView['encounter']): string[] {
   return [...lines, meters.join('   ')];
 }
 
+// Rendered from the published name and options alone, so a modal this driver
+// has never heard of prints the same way the ones it has do. The option being
+// asked for is the top modal's first; a listed value is answerable by number.
+function formatModals(modals: Modal[]): string[] {
+  const lines: string[] = [];
+  for (const modal of modals) lines.push(`[${modal.name}] ${modal.options.map((option) => option.key).join(', ') || '(answered)'}`);
+
+  const asking = askedOption(modals);
+  if (!asking) return lines;
+  lines.push(`${asking.label}:`);
+  if (asking.values) asking.values.forEach((value, index) => lines.push(`  ${index + 1}) ${value}`));
+  else lines.push(`  submit-modal: ${asking.key}=<text>`);
+  return lines;
+}
+
+// The one option the driver is waiting on: the first unanswered of the topmost
+// modal, since the ones beneath it are covered over until that is cleared.
+function askedOption(modals: Modal[]): ModalOption | undefined {
+  return modals[modals.length - 1]?.options[0];
+}
+
 function formatView(v: PlayView): string[] {
   const lines: string[] = [];
   for (const said of v.said) lines.push(said);
@@ -145,6 +167,7 @@ function formatView(v: PlayView): string[] {
   if (v.entities.length > 0) lines.push(`Here: ${v.entities.map((entity) => entity.title).join(', ')}`);
   lines.push(...formatResources(v.resources));
   lines.push(...formatEncounter(v.encounter));
+  lines.push(...formatModals(v.modals));
   lines.push(...formatChoices(v.choices));
   lines.push(`[time: ${v.time}s]`);
   return lines;
@@ -175,7 +198,6 @@ function formatState(session: PlaySession): string[] {
 function runTestCommand(session: PlaySession, testId: string): CommandResult {
   try {
     const result = runTest(testId, session.registry, session.state);
-    session.dialogue = null;
     const next = view(session);
     const message = result.passed ? `Test '${testId}' PASSED` : `Test '${testId}' FAILED: ${result.failure}`;
     return { view: next, output: [message, ...formatView(next)], quit: false };
@@ -213,6 +235,8 @@ function canonicalDirective(directive: Directive): string {
       return `equip: ${directive.item}`;
     case 'unequip':
       return `unequip: ${directive.slot}`;
+    case 'submit-modal':
+      return `submit-modal: ${directive.key}=${directive.value}`;
     // Exhaustive, so widening Directive is a type error here rather than a
     // throw at the moment a player picks the new kind. These three are
     // authored, never recorded, so they never reach this.
@@ -229,7 +253,6 @@ function recordedForChoice(choice: PlayChoice): string {
 }
 
 // `startSave` is taken before the first command, so a replay starts where this did.
-// TODO(modal-recording): modal interactions are not captured. See backlog.
 export interface Recorder {
   history: string[];
   startSave: string;
@@ -329,7 +352,6 @@ function commitLocalChanges(session: PlaySession, authoring: AuthoringContext, t
 
   authoring.localSource.text = text;
   session.registry = loaded.registry;
-  session.dialogue = null;
   const warnings = pruneStateForRegistry(session.state, session.registry);
   for (const warning of warnings) session.state.log.push(warning.message);
   session.logCursor = Math.max(0, session.state.log.length - warnings.length);
@@ -407,6 +429,17 @@ function formatElapsed(seconds: number): string {
   return Number(seconds.toFixed(3)).toString();
 }
 
+// A number picks one of a listed value, and nothing else a modal is shown
+// answers it: an option taking free text is answered by the directive itself,
+// so no line is ever consumed as a field it was not typed as.
+function numberedModalAnswer(currentView: PlayView, trimmed: string): string | null {
+  const asking = askedOption(currentView.modals);
+  if (!asking?.values) return null;
+  const index = Number(trimmed);
+  if (!Number.isInteger(index) || index < 1 || index > asking.values.length) return null;
+  return `submit-modal: ${asking.key}=${asking.values[index - 1]}`;
+}
+
 function handleGameplayCommand(session: PlaySession, currentView: PlayView, line: string): CommandResult {
   const trimmed = line.trim();
 
@@ -458,6 +491,7 @@ function handleGameplayCommand(session: PlaySession, currentView: PlayView, line
   else if (trimmed.startsWith('/expect')) toParse = `expect: ${trimmed.slice('/expect'.length).trim()}`;
   else if (trimmed.startsWith('/assert')) toParse = `assert: ${trimmed.slice('/assert'.length).trim()}`;
   else if (trimmed.startsWith('/wait')) toParse = `wait: ${trimmed.slice('/wait'.length).trim()}`;
+  else toParse = numberedModalAnswer(currentView, trimmed) ?? toParse;
 
   let directive: Directive | null;
   try {
@@ -781,29 +815,6 @@ export function loadModportalSources(dir: string): ModportalLoadResult {
   return { sources, warnings };
 }
 
-const RACES = ['Human', 'Elf', 'Dwarf', 'Orc'];
-
-async function nextLine(it: AsyncIterator<string>): Promise<string> {
-  const result = await it.next();
-  return result.done ? '' : result.value;
-}
-
-// The SAME iterator the main loop drives: rl.question drops piped lines on Node 24.
-async function promptCharacterCreation(it: AsyncIterator<string>): Promise<{ name: string; race: string }> {
-  process.stdout.write('Name: ');
-  const rawName = (await nextLine(it)).trim();
-  const name = rawName === '' ? 'Adventurer' : rawName;
-
-  console.log('Race:');
-  RACES.forEach((race, index) => console.log(`  ${index + 1}) ${race}`));
-  process.stdout.write('Race: ');
-  const rawRace = (await nextLine(it)).trim();
-  const index = Number(rawRace);
-  const race = Number.isInteger(index) && index >= 1 && index <= RACES.length ? RACES[index - 1] : 'Human';
-
-  return { name, race };
-}
-
 async function main(): Promise<void> {
   const args = parseCliArgs(process.argv.slice(2));
   // Nobody to press a key on a non-TTY run, and a repeating action would tick
@@ -890,11 +901,6 @@ async function main(): Promise<void> {
         quit = result.quit;
       }
 
-      if (current.pendingModal === 'character-creation') {
-        const data = await promptCharacterCreation(it);
-        current = submitModal(session, data);
-        console.log(formatView(current).join('\n'));
-      }
       if (quit) break;
       process.stdout.write('> ');
     }

@@ -3,6 +3,7 @@ import { restorePools } from './effects';
 import { createGameState, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadModule } from '../content/registry';
+import { answerModal, openModalNamed } from './modals';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
@@ -128,6 +129,48 @@ describe('loadSave', () => {
     const registry = loadModule(MODULE);
     const state = createGameState();
     expect(() => loadSave(state, { version: SAVE_VERSION + 1, diff: {} }, registry)).toThrow(/version/);
+  });
+
+  it('carries an open modal stack across a round trip, and refuses a body that is not one', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    openModalNamed(state, 'character-creation');
+    answerModal(state, registry, { name: 'Rowan' });
+
+    const { version, ...diff } = JSON.parse(serializeSave(state, registry));
+    const restored = createGameState();
+    loadSave(restored, { version, diff }, registry);
+    expect(restored.modals).toEqual([{ name: 'character-creation', answers: { name: 'Rowan' } }]);
+
+    // Every one of these used to load clean and then kill the next view() with
+    // a raw TypeError from inside the code the validator exists to protect.
+    for (const body of [
+      'character-creation',
+      [{ answers: {} }],
+      [{ name: 'character-creation' }],
+      [{ name: 'character-creation', answers: { name: 7 } }],
+      [{ name: 'dialogue', answers: {} }],
+      [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'chat', node: 'greeting', resumeIndex: 1.5, replay: true } }],
+      [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'chat', node: 'greeting', resumeIndex: 1 } }],
+    ]) {
+      expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { modals: body } as never }, registry), JSON.stringify(body)).toThrow(/modals holds/);
+    }
+  });
+
+  it('closes a modal frame the loaded registry cannot answer, and says so, instead of restoring it', () => {
+    const registry = loadModule(MODULE);
+    for (const [frame, message] of [
+      [{ name: 'quest-journal', answers: {} }, 'Closed modal quest-journal because it is not a modal this engine knows.'],
+      [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'gone', node: 'greeting', resumeIndex: 1, replay: true } }, 'Closed modal dialogue because dialogue gone is not loaded.'],
+      [{ name: 'character-creation', answers: { name: 'Rowan', race: 'Elf' } }, 'Closed modal character-creation because it was saved with every option already answered.'],
+    ] as const) {
+      const state = createGameState();
+      const warnings = loadSave(state, { version: SAVE_VERSION, diff: { modals: [frame] } as never }, registry);
+
+      expect(state.modals, JSON.stringify(frame)).toEqual([]);
+      expect(warnings.map((warning) => warning.message)).toContain(message);
+      expect(state.log).toContain(message);
+    }
   });
 });
 

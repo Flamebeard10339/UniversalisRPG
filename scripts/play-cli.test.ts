@@ -60,7 +60,7 @@ describe('play-cli handleCommand', () => {
 
     const result = handleCommand(session, current, String(talkIndex + 1));
     expect(result.quit).toBe(false);
-    expect(result.view?.inDialogue).toBe(true);
+    expect(result.view?.modals.map((modal) => modal.name)).toEqual(['dialogue']);
     expect(result.output.some((line) => line.includes('Greetings, adventurer!'))).toBe(true);
   });
 
@@ -223,6 +223,173 @@ describe('play-cli handleCommand: /test, /load, /expect, /assert, /cancel', () =
     const result = handleCommand(session, current, '/cancel');
     expect(session.state.activeAction).toBeNull();
     expect(result.recorded).toBe('cancel');
+  });
+});
+
+// A mirror that opens the shipped multi-field modal and a sage whose menu is
+// the other shape one comes in, plus a `# test` that crosses both.
+const MODAL_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  mirror
+  sage
+
+# flag greeted
+
+# entity mirror
+look in: open modal: character-creation
+
+# entity sage
+title: Sage
+
+# dialogue sage-talk
+owner = sage
+
+node greeting:
+  when: not greeted
+  set: greeted
+  -> Ask the way.
+  -> Say nothing.
+
+# save fresh
+{"version":${SAVE_VERSION}}
+
+# test crosses-a-modal
+load: fresh
+use: entity.mirror.look in
+submit-modal: name=Rowan
+submit-modal: race=Elf
+`;
+
+// A dialogue whose own effect raises a second modal underneath it, so the
+// driver has two open at once and has to pick which it is asking about.
+const STACKED_MODAL_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  sage
+
+# flag greeted
+
+# entity sage
+title: Sage
+
+# dialogue sage-talk
+owner = sage
+
+node greeting:
+  when: not greeted
+  set: greeted
+  open modal: character-creation
+  -> Ask about the mirror.
+`;
+
+describe('play-cli drives a modal by its published name and options', () => {
+  function modalFixture() {
+    const registry = loadModule(MODAL_MODULE);
+    const session = startSession(registry);
+    const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
+    return { session, current: view(session), recorder };
+  }
+
+  it('prints the open modal and the option it is waiting on, from the name and options alone', () => {
+    const { session, current, recorder } = modalFixture();
+
+    const opened = handleCommand(session, current, 'use: entity.mirror.look in', recorder);
+    expect(opened.output).toContain('[character-creation] name, race');
+    expect(opened.output).toContain('Name:');
+    expect(opened.output).toContain('  submit-modal: name=<text>');
+
+    const named = handleCommand(session, opened.view!, 'submit-modal: name=Rowan', recorder);
+    expect(named.output).toContain('[character-creation] race');
+    expect(named.output).toContain('Race:');
+    expect(named.output).toContain('  2) Elf');
+  });
+
+  it('answers a listed value by number and records the canonical submit-modal: line either way', () => {
+    const { session, current, recorder } = modalFixture();
+
+    const opened = handleCommand(session, current, 'talk: sage', recorder);
+    expect(opened.output).toContain('  1) Ask the way.');
+    expect(opened.output).toContain('  2) Say nothing.');
+
+    // The second value, not the first: a driver that answered by position but
+    // always handed back the head of the list would pass on `1` alone.
+    const answered = handleCommand(session, opened.view!, '2', recorder);
+    expect(answered.recorded).toBe('submit-modal: choice=Say nothing.');
+    expect(answered.view?.modals).toEqual([]);
+    expect(recorder.history).toEqual(['talk: sage', 'submit-modal: choice=Say nothing.']);
+  });
+
+  it('emits a replayable # test from a session that crossed a modal, with no hand-editing', () => {
+    const { session, current, recorder } = modalFixture();
+
+    let v = handleCommand(session, current, 'use: entity.mirror.look in', recorder).view!;
+    v = handleCommand(session, v, 'submit-modal: name=Rowan', recorder).view!;
+    v = handleCommand(session, v, 'submit-modal: race=Elf', recorder).view!;
+    expect(session.state.player).toEqual({ name: 'Rowan', race: 'Elf' });
+
+    const created = handleCommand(session, v, '/create-valid-test crossed', recorder);
+    expect(created.output).toContain('submit-modal: name=Rowan');
+    expect(created.output).toContain('submit-modal: race=Elf');
+
+    const blocks = created.output.slice(created.output.findIndex((line) => line.startsWith('# ')));
+    const freshRegistry = loadModule(`${MODAL_MODULE}\n${blocks.join('\n')}\n`);
+    expect(runTest('crossed', freshRegistry, createGameState())).toEqual({ passed: true });
+  });
+
+  it('never takes a line as a modal field: a command after a /test that crossed a modal is still a command', () => {
+    const { session, current, recorder } = modalFixture();
+
+    const replayed = handleCommand(session, current, '/test crosses-a-modal', recorder);
+    expect(replayed.output[0]).toBe(`Test 'crosses-a-modal' PASSED`);
+    expect(replayed.view?.modals).toEqual([]);
+
+    // The two lines that used to be eaten as the name and the race.
+    const marker = handleCommand(session, replayed.view!, '/state', recorder);
+    expect(marker.output.some((line) => line.startsWith('Location: camp'))).toBe(true);
+    const second = handleCommand(session, replayed.view!, '/inventory', recorder);
+    expect(second.output.some((line) => line.startsWith('Inventory: '))).toBe(true);
+  });
+
+  it('asks for the top of the stack, not the bottom, when one modal sits over another', () => {
+    const registry = loadModule(STACKED_MODAL_MODULE);
+    const session = startSession(registry);
+    const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
+
+    const opened = handleCommand(session, view(session), 'talk: sage', recorder);
+    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
+    // The dialogue is on top, so its menu is what is numbered — the bottom
+    // modal's first option is free text and would print no list at all.
+    expect(opened.output).toContain('Choice:');
+    expect(opened.output).toContain('  1) Ask about the mirror.');
+    expect(opened.output).not.toContain('Name:');
+
+    const answered = handleCommand(session, opened.view!, '1', recorder);
+    expect(answered.recorded).toBe('submit-modal: choice=Ask about the mirror.');
+    expect(answered.output).toContain('Name:');
+  });
+
+  it('refuses a bare line while a modal is open instead of taking it as the field being asked for', () => {
+    const { session, current, recorder } = modalFixture();
+
+    const opened = handleCommand(session, current, 'use: entity.mirror.look in', recorder);
+    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation']);
+    expect(opened.output).toContain('Name:');
+
+    // The line the old prompt would have swallowed as the name, and the one it
+    // would have swallowed as the race.
+    const eaten = handleCommand(session, opened.view!, 'Rowan', recorder);
+    expect(eaten.output.some((line) => line.startsWith('Error:'))).toBe(true);
+    const marker = handleCommand(session, opened.view!, '/state', recorder);
+    expect(marker.output.some((line) => line.startsWith('Location: camp'))).toBe(true);
+
+    expect(session.state.player).toEqual({ name: '', race: '' });
+    expect(session.state.modals.map((frame) => frame.name)).toEqual(['character-creation']);
+    expect(recorder.history).toEqual(['use: entity.mirror.look in']);
   });
 });
 

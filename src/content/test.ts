@@ -16,7 +16,8 @@ export type Directive =
   | { kind: 'cancel' }
   | { kind: 'wait'; seconds: number }
   | { kind: 'equip'; item: string }
-  | { kind: 'unequip'; slot: string };
+  | { kind: 'unequip'; slot: string }
+  | { kind: 'submit-modal'; key: string; value: string };
 
 export interface Test {
   id: string;
@@ -46,6 +47,10 @@ const CANCEL = /^cancel$/;
 const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
 const EQUIP = new RegExp(`^equip:[ \\t]*(?<item>${PATH})$`);
 const UNEQUIP = new RegExp(`^unequip:[ \\t]*(?<slot>${PATH})$`);
+const SUBMIT_MODAL_VERB = /^submit-modal:/;
+// One pair per line, the value running to the end of it, so an answer may hold
+// the spaces and punctuation a dialogue line is written with.
+const SUBMIT_MODAL = /^submit-modal:[ \t]*(?<key>[a-z][a-z0-9-]*)=(?<value>.*)$/;
 
 function parseBegin(text: string, verb: string, rest: string): Directive {
   if (verb === 'use') {
@@ -108,6 +113,12 @@ export function parseDirectiveLine(text: string): Directive | null {
 
   const unequip = UNEQUIP.exec(text)?.groups;
   if (unequip) return { kind: 'unequip', slot: unequip.slot };
+
+  if (SUBMIT_MODAL_VERB.test(text)) {
+    const submit = SUBMIT_MODAL.exec(text)?.groups;
+    if (!submit) throw new DslError(`malformed submit-modal: payload (expected <key>=<value>): ${text}`);
+    return { kind: 'submit-modal', key: submit.key, value: submit.value };
+  }
 
   return null;
 }

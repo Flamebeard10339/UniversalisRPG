@@ -2,10 +2,11 @@ import { createGameState, GameState, initResources, RuntimeError } from './runti
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
 import { findActionOwner, parseOwnerRef } from './actions';
+import { isModalFrame, pruneModals } from './modals';
 import { PLAYER } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 // A sparse diff against initialState: a new game saves as `{}`, and `log` is not state.
 export type SaveDiff = Partial<Omit<GameState, 'log'>>;
@@ -49,7 +50,7 @@ const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   time: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   rng: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   player: { shape: 'scalar', holds: isObject, prune: 'holds no registry id' },
-  pendingModal: { shape: 'scalar', holds: (value) => value === undefined || typeof value === 'string', prune: 'holds no registry id' },
+  modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), prune: 'pruned by a rule of its own' },
 };
 
 const SAVE_FIELD_NAMES = Object.keys(SAVE_FIELDS) as SaveField[];
@@ -160,6 +161,10 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     if (!missing) continue;
     delete state.equipped[slot];
     addWarning(warnings, `equipped.${slot}`, itemId, `Unequipped ${slot} because its ${missing}.`);
+  }
+
+  for (const { name, reason } of pruneModals(state, registry)) {
+    addWarning(warnings, `modals.${name}`, name, `Closed modal ${name} because ${reason}.`);
   }
 
   const activeProblem = activeActionProblem(state, registry);
