@@ -80,6 +80,10 @@ export function createInstance(state: GameState, kind: string, template: string,
   if (definition.empty(payload as never)) throw new RuntimeError(`instance kind ${kind} was handed a payload recording nothing; a copy carrying nothing is a template`);
 
   const table = writable(state.instances);
+  // The counter stops one short of where `+ 1` no longer moves it, because a
+  // counter that cannot advance mints one id twice. Refusing here is what keeps
+  // the set of tables a `# save` may hold closed under minting.
+  if (!Number.isSafeInteger(table.next + 1)) throw new RuntimeError(`the instance counter has reached ${table.next} and cannot advance without minting one id twice`);
   const id = String(table.next);
   table.next += 1;
   table.byId[id] = { kind, template, payload };
@@ -162,9 +166,14 @@ function isMintedId(id: string, next: number): boolean {
 export function isInstanceTable(value: unknown): boolean {
   if (!isRecord(value) || !isRecord(value.byId)) return false;
   const next = value.next;
-  if (!Number.isInteger(next)) return false;
+  // The id this counter would mint next has to be an id this same function
+  // accepts. That is one rule rather than a list of numeric ones, and it is
+  // what stops the engine writing a save it would then refuse to load: a
+  // counter too large to advance, or one no id can be spelled from, is caught
+  // here rather than as a silent collision at the next mint.
+  if (typeof next !== 'number' || !isMintedId(String(next), next + 1)) return false;
   for (const [id, held] of Object.entries(value.byId)) {
-    if (!isMintedId(id, next as number)) return false;
+    if (!isMintedId(id, next)) return false;
     if (!isRecord(held) || typeof held.kind !== 'string' || typeof held.template !== 'string' || !('payload' in held)) return false;
     // A kind nothing has registered is stale rather than malformed, and the
     // prune pass drops it the way it drops a missing template.
