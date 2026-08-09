@@ -119,6 +119,13 @@
             "src/grammar/actionResult.ts"
           ],
           "note": "produced by droptables"
+        },
+        {
+          "name": "two-sided action grammar",
+          "paths": [
+            "src/grammar/action.ts"
+          ],
+          "note": "produced by combat-grammar-sides-and-attempts"
         }
       ]
     },
