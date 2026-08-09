@@ -571,6 +571,26 @@ submit-modal: choice=Nod.
   });
 });
 
+describe('the handle a driver obtains', () => {
+  it('carries no route to the state it plays, by enumeration or by key', () => {
+    const session = startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n'));
+
+    // `session.state` is the compile-time half and tsc owns it. This is the
+    // runtime half: a symbol member satisfied the type and handed the live
+    // GameState back out of getOwnPropertySymbols.
+    expect(Object.getOwnPropertySymbols(session)).toEqual([]);
+    expect(Object.keys(session).sort()).toEqual(['logCursor', 'registry']);
+    expect(Object.values(session).some((value) => value instanceof Object && 'inventory' in value)).toBe(false);
+  });
+
+  it('refuses to play a handle it did not hand out, rather than reading undefined', () => {
+    const registry = loadModule('# location camp\nx: 0, y: 0\nstarting\n');
+    const forged = { registry, logCursor: 0 };
+
+    expect(() => view(forged)).toThrow(/not a session startSession handed out/);
+  });
+});
+
 describe('starting a session with nowhere to begin', () => {
   it('says so instead of failing later with an empty location id', () => {
     expect(() => startSession(loadModule('# location camp\nx: 0, y: 0'))).toThrow(/no # location is marked starting/);

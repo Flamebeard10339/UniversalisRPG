@@ -55,14 +55,26 @@ export interface PlayView extends PlayStatus {
   said: string[];
 }
 
-// Nothing outside this module can name the key, so a driver holding a session
-// has the published status and no way to the state behind it.
-const STATE = Symbol('game state');
-
 export interface PlaySession {
   registry: Registry;
   logCursor: number;
-  readonly [STATE]: GameState;
+}
+
+// The handle carries no route to the state: it holds no key to enumerate, and
+// the map that answers for it is not exported. A symbol member was tried first
+// and came straight back out of Object.getOwnPropertySymbols.
+const STATES = new WeakMap<PlaySession, GameState>();
+
+function stateOf(session: PlaySession): GameState {
+  const state = STATES.get(session);
+  if (!state) throw new RuntimeError('this is not a session startSession handed out, so it plays nothing');
+  return state;
+}
+
+function sessionOver(registry: Registry, state: GameState): PlaySession {
+  const session: PlaySession = { registry, logCursor: state.log.length };
+  STATES.set(session, state);
+  return session;
 }
 
 type Actable = { actions?: Action[] };
@@ -100,7 +112,8 @@ function canTalk(entityId: string, registry: Registry, state: GameState): boolea
 }
 
 function locationChoices(session: PlaySession): PlayChoice[] {
-  const { registry, [STATE]: state } = session;
+  const { registry } = session;
+  const state = stateOf(session);
   const location = registry.locations.get(state.location);
   if (!location) return [];
   const choices: PlayChoice[] = [];
@@ -160,7 +173,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 // A modal sits atop the world, so what the world offers is withdrawn until it
 // is answered; the modal publishes its own options through `view`.
 function computeChoices(session: PlaySession): PlayChoice[] {
-  if (session[STATE].modals.length > 0) return [];
+  if (stateOf(session).modals.length > 0) return [];
   return locationChoices(session);
 }
 
@@ -196,13 +209,13 @@ export function startSession(registry: Registry): PlaySession {
   if (!starting) throw new RuntimeError('no # location is marked starting, so a new game has nowhere to begin');
   state.location = starting;
   initResources(state, registry);
-  return { registry, logCursor: state.log.length, [STATE]: state };
+  return sessionOver(registry, state);
 }
 
 // Content changed under a live session: what no longer resolves is dropped and
 // said, and pools are re-read against the registry that replaced it.
 export function adoptRegistry(session: PlaySession, registry: Registry): void {
-  const state = session[STATE];
+  const state = stateOf(session);
   session.registry = registry;
   const warnings = pruneStateForRegistry(state, registry);
   for (const warning of warnings) state.log.push(warning.message);
@@ -211,7 +224,7 @@ export function adoptRegistry(session: PlaySession, registry: Registry): void {
 }
 
 export function serializeSession(session: PlaySession): string {
-  return serializeSave(session[STATE], session.registry);
+  return serializeSave(stateOf(session), session.registry);
 }
 
 export const SAID_HEAD_KEPT = 40;
@@ -225,7 +238,7 @@ function elideMiddle(said: string[]): string[] {
 
 export function view(session: PlaySession): PlayView {
   const status = sessionStatus(session);
-  const state = session[STATE];
+  const state = stateOf(session);
 
   const said = elideMiddle(state.log.slice(session.logCursor));
   state.log.length = 0;
@@ -237,7 +250,8 @@ export function view(session: PlaySession): PlayView {
 // Side-effect-free, so a driver can re-read the world without consuming the
 // lines `view` hands back once.
 export function sessionStatus(session: PlaySession): PlayStatus {
-  const { registry, [STATE]: state } = session;
+  const { registry } = session;
+  const state = stateOf(session);
   const location = registry.locations.get(state.location);
   if (!location) throw new RuntimeError(`unknown location: ${state.location}`);
 
@@ -319,7 +333,8 @@ export function beginAction(session: PlaySession, choiceId: string): PlayView {
   const choice = computeChoices(session).find((c) => c.id === choiceId);
   if (!choice) throw new RuntimeError(`unavailable choice: ${JSON.stringify(choiceId)}`);
   const directive = choiceToDirective(choice);
-  const { registry, [STATE]: state } = session;
+  const { registry } = session;
+  const state = stateOf(session);
 
   // Arm, then route on what arming returned. Probing first asked for a quantity
   // computed against the state before arming, and arming can move what it
@@ -353,7 +368,7 @@ export function cancelAction(session: PlaySession): PlayView {
 // Answers by option key, so a driver that has never heard of the modal it is
 // answering can still answer it. One pair or the whole form, either way.
 export function submitModal(session: PlaySession, answers: Record<string, string>): PlayView {
-  answerModal(session[STATE], session.registry, answers);
+  answerModal(stateOf(session), session.registry, answers);
   return view(session);
 }
 
@@ -371,7 +386,8 @@ function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'travel' | 'craft
 // `run:` is excluded: it recurses into another test, which only runTest can do
 // with its cyclic-run detection.
 export function applyDirective(session: PlaySession, directive: Directive): { failure?: string } {
-  const { registry, [STATE]: state } = session;
+  const { registry } = session;
+  const state = stateOf(session);
 
   switch (directive.kind) {
     case 'run':
@@ -448,7 +464,7 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
   const test = registry.tests.get(testId);
   if (!test) throw new RuntimeError(`unknown test: ${testId}`);
 
-  const session: PlaySession = { registry, logCursor: state.log.length, [STATE]: state };
+  const session = sessionOver(registry, state);
 
   for (const directive of test.directives) {
     if (directive.kind === 'run') {
@@ -470,5 +486,5 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
 
 // Replays a `# test` against the session in hand, which is what a driver has.
 export function runSessionTest(session: PlaySession, testId: string): TestResult {
-  return runTest(testId, session.registry, session[STATE]);
+  return runTest(testId, session.registry, stateOf(session));
 }
