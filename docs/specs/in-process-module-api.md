@@ -112,3 +112,177 @@ One in-process API for playing the game, below `ui`, that a driver renders and c
 - Whether the recorder (`/create-test`) is part of the shared surface or stays a REPL concern. It
   records commands, so it probably follows them, but nothing in `gui-rebuild` asks for it and a
   wrong guess here costs a move later.
+
+## Audit passes
+
+### Pass 1 — 2026-08-09
+
+- base: `33c020be09a43da6765389df04c6d33eb6b0b13c`
+- head: `43d7e7867fad3f053c5d3ef49b1a32dcb551e79e`
+- proof 1: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer,
+which is still open. scripts/play-cli.ts still dispatches by a chain of
+`trimmed === '/x'` / `trimmed.startsWith('/x')` branches across handleCommand and
+handleGameplayCommand, and there is no table anywhere below `ui`.
+- proof 2: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer.
+HELP_LINES is still the hand-written list at scripts/play-cli.ts:52 and /help still
+prints it verbatim. Confirmed by the c8 transcript check: /help is byte-identical
+across this branch, which is the same fact read from the other side.
+- proof 3: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer.
+The bar glyphs, the numbered choice list, `[time: Ns]`, the ✓/⚠ pair and the
+progress bar all still live in scripts/play-cli.ts, which is correct for this
+branch: the shared surface c3 speaks about does not exist yet.
+- proof 4: unmet — The guard half holds and is re-runnable: `npx tsc --noEmit` passes, and
+PlaySession no longer declares `state` — its GameState sits under a module-private
+`const STATE = Symbol(...)` in src/runtime/session.ts, so `session.state` is a
+compile error in every file but that one, and startSession takes no GameState to
+hand back. Reverting only the type (re-adding `state: GameState`) is what a next
+pass re-runs. formatInventory and formatState now take a PlayStatus.
+The publication half is implemented but not proved. c4 names six kinds of data;
+`npm run mutate` over
+C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass1-mutations.json
+replaced four of them with empty and the whole suite stayed green:
+c4-xp SURVIVED, c4-equipment SURVIVED, c4-discovered SURVIVED, c4-stats SURVIVED,
+0 failed of 2121 each. Only inventory and flags are killed (m2 and m3 of the
+worker's own run). A clause whose proof covers two of the six things it names by
+name is not met, so this is unmet on evidence, not on behaviour — see the finding.
+- proof 5: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer.
+No module below `ui` holds the command set, so there is nothing yet for the
+effects-as-data rule to apply to. This branch's own additions (adoptRegistry,
+serializeSession, runSessionTest, sessionStatus) take everything as arguments and
+reach for no file, clock or subprocess, so they do not stand in c5's way.
+- proof 6: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer.
+liveTick still lives at scripts/play-cli.ts, above `ui`. It did get smaller here —
+cycleDuration is gone and the bar, pools and clock come from the PlayView `wait`
+returns — so what c6 has left to move is the wait-and-decide, not the arithmetic.
+- proof 7: unmet — Not attempted on this branch; owed by layer-check-reads-every-source-file.
+scripts/layer-check.ts is untouched in this diff and still reports only on the
+imports it finds, naming no file that belongs to no declared root.
+- proof 8: met — Three re-runnable measurements, all against 33c020b (the merge base):
+(1) A 33-command scripted REPL session — /help, /state, /inventory, /look, a
+numbered choice, talk:, submit-modal:, craft:, use:, begin:, wait:, /assert,
+/expect, /wait, /cancel, an unknown command, an out-of-range choice, /create-test
+and /quit — piped into `npx tsx scripts/play-cli.ts --no-modportal` on this tree
+and on a stashed HEAD: 304 lines, `diff` empty.
+(2) liveTick's rendered lines over six action shapes (a continuous time: action, a
+one-shot time: action through completion, a targeted fight with an encounter
+readout, an untargeted rate: action, a contested action, and a low-ability action
+that exercises the `hits:N completion:X` branch): identical on both trees, via
+`npm run inspect`.
+(3) The published `action` block (label, progress, attempts, targeted, completion)
+printed against the raw activeAction reads it replaced, over five action shapes
+and six ticks each: identical.
+No file under content/ is in the diff, so no `# save` fixture was regenerated and
+every shipped `# test` runs unchanged — integration.test.ts passes.
+Mutation: c8-state-location (the /state location line reporting the title where it
+reported the id) is KILLED by two named tests in scripts/play-cli.test.ts.
+`npm run tasks -- merge-ready`: tsc, npm test (2121), layer-check, audit-status,
+doctor and the byte check all pass.
+
+### Pass 2 — 2026-08-09
+
+- base: `33c020be09a43da6765389df04c6d33eb6b0b13c`
+- head: `43d7e7867fad3f053c5d3ef49b1a32dcb551e79e`
+- proof 1: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer, still open.
+  Re-read the dispatcher rather than taking pass 1's word: scripts/play-cli.ts still decides by a
+  chain of string tests, handleCommand testing trimmed === '/dsl' / startsWith('/dsl ') / '/local' /
+  '/create-valid-test' / '/create-test' and then handing the rest to handleGameplayCommand, which
+  tests '' , '/help', '/state', '/inventory'|'/inv', '/look', '/quit'|'/q', startsWith('/speed'),
+  startsWith('/test'), then rewrites '/cancel' '/load' '/expect' '/assert' '/wait' into directive
+  text before parseDirectiveLine. No table of commands exists anywhere below ui: grep for a
+  Record or Map of handlers under src/ returns nothing. Re-runnable: read scripts/play-cli.ts
+  lines 437-540 and look for a single table; there is none.
+- proof 2: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer.
+  HELP_LINES is still the hand-written 28-entry array at scripts/play-cli.ts:52-79, and
+  handleGameplayCommand returns it verbatim for '/help'. Measured from the player's side rather
+  than by reading: the scripted REPL transcript this pass ran on the merge base and on the branch
+  head prints the same 28 help lines at lines 14-40 of both files, byte-identical. c2 is the one
+  clause whose text a player is supposed to see change, and it did not.
+- proof 3: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer, and
+  correctly so - the shared surface c3 speaks about does not exist yet. Worth recording that the
+  negative half held while the positive half was not built: the branch moved rendering inputs down
+  as numbers, not as glyphs. PlayAction publishes progress as a 0-to-1 fraction and completion as
+  a unit count; progressBar, MINIMAL_STAGES, fullBar, the numbered choice list, the check and
+  warning glyphs and the [time: Ns] suffix all still live in scripts/play-cli.ts and nothing below
+  ui produces terminal vocabulary. Re-runnable: grep the runtime for the bar characters and the
+  bracketed time - src/runtime has none of them.
+- proof 4: unmet — The guard half holds and is re-runnable; the publication half is half-built. Guard:
+  a probe file added at src/runtime/zz-audit-probe.ts and then deleted made npx tsc --noEmit
+  report exactly two errors, TS2339 "Property 'state' does not exist on type 'PlaySession'" for a
+  read of session.state, and TS2353 for an object literal that tries to hand a PlaySession a state
+  of its own. formatInventory and formatState now take a PlayStatus and there is no constructor
+  that returns a GameState from a session. That is the re-runnable half.
+  It is a type-level guard only, not the "cannot reach" c4 asks for: the third line of the same
+  probe, a cast through Object.getOwnPropertySymbols, produced no tsc diagnostic at all, and
+  running it under npm run inspect returned the live GameState (16 keys, symbol printed as
+  "Symbol(game state)"); writing state.inventory.gem = 99 and state.time = 123456 through it came
+  straight back out of view() as inventory {gem: 99} and time 123.456. Filed as a finding.
+  Publication: an 11-entry mutation manifest was hand-built at
+  C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass2-mutations.json and run.
+  Emptying each of the six kinds c4 names: inventory KILLED (7 named tests), flags KILLED
+  (1 named test), and equipment, xp, stats and discovered all SURVIVED the whole 2121-test suite,
+  0 failed each. The control confirms the instrument rather than the code: player, which c4 does
+  not name, is KILLED by 3 named tests. The same run kills adoptRegistry's prune-and-say and both
+  publishAction fields the live line reads. So four of the six kinds the clause names by name have
+  nothing watching them, reproduced independently of pass 1.
+  Sharper than "unproved", and the reason a fix aimed only at the finding's text would be too
+  small: equipment and xp are at least rendered, so the transcript check below does cover them
+  behaviourally (three distinct Equipped: lines, byte-identical across trees). stats and
+  discovered are read by nothing in the repository at all - not a test, not the driver, not
+  src/main.tsx - so no transcript can ever reach them and only a test written against them will.
+- proof 5: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer.
+  No module below ui holds the command set, so the effects-as-data rule has nothing yet to apply
+  to. Checked that this branch's own four additions do not stand in its way, by reading them
+  rather than assuming: adoptRegistry, serializeSession, runSessionTest and sessionStatus each
+  take everything they use as an argument and reach for no file, clock or subprocess.
+  npm run layer-check passes, so nothing in src/runtime imports scripts.
+- proof 6: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer.
+  liveTick is still exported from scripts/play-cli.ts, above ui, where a second driver cannot
+  call it. It did lose arithmetic - cycleDuration is gone and the bar, pools and clock now come
+  from the PlayView that wait() returns - but note the direction of travel is not purely toward
+  c6: liveTick's signature gained a previous: PlayView parameter, so the driver now has to carry
+  the last view across ticks to name the action a tick finishes. Whatever eventually moves down
+  has to take that threading with it, or drop it. Re-runnable: grep -n "export function liveTick"
+  scripts/play-cli.ts.
+- proof 7: unmet — Not attempted on this branch; owed by layer-check-reads-every-source-file.
+  scripts/layer-check.ts is not in this diff and read cold it makes no partition assertion: it
+  loops "for (const layer of LAYERS) for (const file of sourceFiles(ROOTS[layer]))" and reports
+  only on the imports it finds, so a file belonging to no root is never visited and never named.
+  ROOTS in scripts/lib/layers.ts is src/grammar, src/content, src/runtime, src/ui and scripts;
+  src/main.tsx sits under none of them and src/ui does not exist yet, so the second driver's own
+  entry point is read by no rule. Re-runnable: npm run layer-check reports "cross-file imports
+  checked" and says nothing about files.
+- proof 8: met — Three measurements of my own, all against the merge base 33c020b checked out into its
+  own worktree, so both trees could be driven with the same input.
+  (1) A 45-command scripted REPL session written for this pass and deliberately aimed at what
+  pass 1 did not cover, saved at
+  C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass2-transcript-input.txt: help,
+  state, inventory, look, a numbered dialogue choice, a two-field modal answered field by field,
+  craft, begin plus wait plus the published action block, ascend/descend, equip of two slots and
+  an unequip (which is what puts the Equipped: line under test), dsl authoring, local list, local
+  show, local clear (the adoptRegistry path), assert, create-valid-test (the serializeSession
+  path), test, a failing expect, cancel with nothing in flight, an out-of-range choice, an unknown
+  command and quit. Piped into npx tsx scripts/play-cli.ts --no-modportal with local= pointed at a
+  temp file so neither tree was dirtied. 445 lines out of each; diff is empty. That covers the
+  serialized save that create-valid-test prints, so serializeSession is byte-identical to the
+  serializeSave call it replaced.
+  (2) Read for equivalence where the code changed shape rather than value: cycleDuration's
+  recipe branch was dropped when publishAction replaced it, and craftFirstUnit(id) is defined as
+  actionFirstUnit('recipe', id, recipeActions.get(id).label) while armCraft sets exactly that
+  ownerRef and actionLabel, so the two are the same number; showImplicitTarget's
+  implicitTarget < toMilliUnits(1) became completion < 1 over fromMilliUnits, the same predicate;
+  and the recorded wait: elapsed moved from ms subtraction to seconds subtraction, which is exact
+  because msToSeconds is division with no rounding.
+  (3) No file under content/ is in the diff, so no # save fixture was regenerated, and every
+  shipped # test runs unchanged - src/runtime/integration.test.ts passes and npm test reports
+  2121 of 2121 standalone.
+  Mutation, aimed at the lines that carry the rendering this clause says did not change:
+  c8-liveTick-label-from-previous KILLED by two named tests, c8-publishAction-progress KILLED,
+  c8-publishAction-targeted KILLED, all re-run at their own files with the mutant still applied.
+  Gate: npm run tasks -- merge-ready is green on tsc, layer-check, audit-status, doctor and the
+  byte check. Its npm test leg went red on three of four runs and the two named failures are
+  scripts/tasks/handoff.test.ts "beats git log -S on the edits it misses" and
+  scripts/tasks/mergeReady.test.ts "stays fixed at the merge base's copy of the store", both
+  "Test timed out in 5000ms", both real-git spawn-heavy Task-system tests that this diff does not
+  touch, and both green when npm test is run on its own (2121 of 2121, twice, once under the same
+  four concurrent gate commands merge-ready launches). Recorded as a recurrence of the existing
+  flake record, not as a defect of this branch.
