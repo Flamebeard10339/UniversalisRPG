@@ -5,6 +5,7 @@ import { isPoint, Range, sampleCount, sampleRange } from '../grammar/range';
 import { Registry } from '../content/registry';
 import { Resource } from '../content/resource';
 import { evaluateCondition } from './conditions';
+import { openModalNamed } from './modals';
 import { nextRandom } from './rng';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
 import { hitChance, statValue } from './stats';
@@ -34,9 +35,8 @@ export interface ResultApplication {
 
 export type ResultObserver = (segment: Segment, application: ResultApplication) => void;
 
-// The `modal:` line narrates an applied result; the modal itself is
-// `pendingModal`. Reaching the log from out here is what lets a modal system
-// replace the narration without reopening the switch that applies results.
+// Narration only — opening the modal happens in the switch below. Reaching the
+// log from an observer is what keeps the narration out of that switch.
 const narrateModal: ResultObserver = ({ state }, { result, lead }) => {
   if (result.kind === 'open-modal' && lead) state.log.push(`modal:${result.modal}`);
 };
@@ -186,7 +186,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       state.flags[`${result.location}.${DISCOVERED}`] = true;
       return 0;
     case 'open-modal':
-      state.pendingModal = result.modal;
+      openModalNamed(state, result.modal);
       return 0;
     case 'pool': {
       requireResource(registry, result.resource);

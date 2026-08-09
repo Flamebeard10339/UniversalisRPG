@@ -270,6 +270,8 @@ function directive(value: Directive): string {
       return `equip: ${value.item}`;
     case 'unequip':
       return `unequip: ${value.slot}`;
+    case 'submit-modal':
+      return `submit-modal: ${value.key}=${value.value}`;
   }
 }
 

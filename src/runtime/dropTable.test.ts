@@ -172,11 +172,11 @@ describe('a stochastic group is applied count times, not scaled once', () => {
   it('opens a modal once for the batch too, the other line a count ignores', () => {
     const { registry } = fight('give: 1 bones');
     const state = createGameState();
-    // The pending modal is idempotent; the line it logs is not, which is the
-    // half that had to be gated with `say:` rather than beside it.
+    // Opening is idempotent; the line it logs is not, which is the half that
+    // had to be gated with `say:` rather than beside it.
     applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'character-creation' }, { kind: 'give', item: 'coins', amount: { min: 1, max: 4 } }], 5);
     expect(state.log.filter((line) => line === 'modal:character-creation')).toHaveLength(1);
-    expect(state.pendingModal).toBe('character-creation');
+    expect(state.modals.map((frame) => frame.name)).toEqual(['character-creation']);
   });
 
   it('lets a say inside a wrapper speak on every repetition that reaches it', () => {

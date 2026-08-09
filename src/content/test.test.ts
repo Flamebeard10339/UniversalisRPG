@@ -82,6 +82,30 @@ describe('test: composable in-game scripts', () => {
   });
 });
 
+describe('submit-modal: answers one option of the open modal', () => {
+  it('takes one key=value pair, with the value running to the end of the line', () => {
+    const source = [
+      '# test creation',
+      'submit-modal: name=Rowan of the Vale',
+      'submit-modal: race=Elf',
+      'submit-modal: choice=Sounds good. Teach me.',
+    ].join('\n');
+
+    const [section] = parseModule(source) as { value: { directives: unknown[] } }[];
+    expect(section.value.directives).toEqual([
+      { kind: 'submit-modal', key: 'name', value: 'Rowan of the Vale' },
+      { kind: 'submit-modal', key: 'race', value: 'Elf' },
+      { kind: 'submit-modal', key: 'choice', value: 'Sounds good. Teach me.' },
+    ]);
+  });
+
+  it('names the offending line for a payload that is not key=value, rather than reading as an unknown directive', () => {
+    expect(() => parseModule('# test bad\nsubmit-modal: Rowan')).toThrow(/malformed submit-modal: payload \(expected <key>=<value>\): submit-modal: Rowan/);
+    expect(() => parseModule('# test bad\nsubmit-modal:')).toThrow(DslError);
+    expect(() => parseModule('# test bad\nsubmit-modal: Name=Rowan')).toThrow(/malformed submit-modal:/);
+  });
+});
+
 describe('begin: arm-only directive', () => {
   it('parses begin: use/travel/craft into a begin directive wrapping the matching inner one', () => {
     const source = [

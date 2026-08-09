@@ -1,7 +1,8 @@
 import { Action } from '../content/entity';
 import { Location } from '../content/location';
 import {
-  actionVisible, ArmResult, armAction, armCraft, armTravel, craft, describeCondition, DialogueSession, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, RuntimeError, choose, createGameState, initResources, recipeCraftable, renderSegments, requiresMet, resolve, statValue, talk, unequip, useAction, useTravel } from './runtime';
+  actionVisible, ArmResult, armAction, armCraft, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, RuntimeError, createGameState, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useTravel } from './runtime';
+import { answerModal, dialogueFrame, Modal, openModal, publishModal, topModal } from './modals';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
 import { compareSave, loadSave, startingLocationId } from './save';
@@ -9,7 +10,7 @@ import { Directive } from '../content/test';
 import { humanize } from '../grammar/values';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 
-export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'dialogue' | 'craft' | 'equip' | 'unequip';
+export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'equip' | 'unequip';
 
 export interface PlayChoice {
   id: string;
@@ -21,19 +22,18 @@ export interface PlayChoice {
 export interface PlayView {
   location: { id: string; title: string; description: string };
   entities: Array<{ id: string; title: string; examine?: string }>;
-  inDialogue: boolean;
   said: string[];
   choices: PlayChoice[];
   time: number;
   resources: Array<{ id: string; title: string; current: number; max: number; display: ResourceDisplay }>;
   encounter: EncounterView | null;
-  pendingModal?: string;
+  // Bottom of the stack first, so the last one is the one being answered.
+  modals: Modal[];
 }
 
 export interface PlaySession {
   registry: Registry;
   state: GameState;
-  dialogue: DialogueSession | null;
   logCursor: number;
 }
 
@@ -129,17 +129,10 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   return choices;
 }
 
-function dialogueChoices(dialogueSession: DialogueSession, state: GameState): PlayChoice[] {
-  const choices: PlayChoice[] = [];
-  (dialogueSession.choices ?? []).forEach((choice, index) => {
-    if (choice.when && !evaluateCondition(choice.when, state)) return;
-    choices.push({ id: `dialogue:${index}`, kind: 'dialogue', label: renderSegments(choice.segments, state) });
-  });
-  return choices;
-}
-
+// A modal sits atop the world, so what the world offers is withdrawn until it
+// is answered; the modal publishes its own options through `view`.
 function computeChoices(session: PlaySession): PlayChoice[] {
-  if (session.dialogue && session.dialogue.choices) return dialogueChoices(session.dialogue, session.state);
+  if (session.state.modals.length > 0) return [];
   return locationChoices(session);
 }
 
@@ -160,8 +153,6 @@ export function choiceToDirective(choice: PlayChoice): Directive {
       return { kind: 'travel', location: choice.id.slice('travel:'.length) };
     case 'craft':
       return { kind: 'craft', recipe: choice.id.slice('craft:'.length) };
-    case 'dialogue':
-      return { kind: 'choose', text: choice.label };
     case 'equip':
       return { kind: 'equip', item: choice.id.slice('equip:'.length) };
     case 'unequip':
@@ -178,7 +169,7 @@ export function startSession(registry: Registry, state: GameState = createGameSt
     state.location = starting;
   }
   initResources(state, registry);
-  return { registry, state, dialogue: null, logCursor: state.log.length };
+  return { registry, state, logCursor: state.log.length };
 }
 
 export const SAID_HEAD_KEPT = 40;
@@ -208,13 +199,12 @@ export function view(session: PlaySession): PlayView {
   return {
     location: { id: location.id, title: location.title, description: location.examine ?? '' },
     entities,
-    inDialogue: session.dialogue !== null && session.dialogue.choices !== null,
     said,
     choices: computeChoices(session),
     time: msToSeconds(state.time),
     resources: sessionResources(session),
     encounter: encounterView(state, registry),
-    pendingModal: state.pendingModal,
+    modals: state.modals.map((frame) => publishModal(frame, state, registry)),
   };
 }
 
@@ -289,10 +279,10 @@ export function cancelAction(session: PlaySession): PlayView {
   return view(session);
 }
 
-// The one place `state.player` is set; character-creation is the only modal.
-export function submitModal(session: PlaySession, data: { name: string; race: string }): PlayView {
-  session.state.player = { name: data.name, race: data.race };
-  session.state.pendingModal = undefined;
+// Answers by option key, so a driver that has never heard of the modal it is
+// answering can still answer it. One pair or the whole form, either way.
+export function submitModal(session: PlaySession, answers: Record<string, string>): PlayView {
+  answerModal(session.state, session.registry, answers);
   return view(session);
 }
 
@@ -316,16 +306,20 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
     case 'run':
       throw new RuntimeError('run: is handled by runTest, not applyDirective');
     case 'talk': {
-      const result = talk(directive.entity, registry, state);
-      session.dialogue = result.choices ? result : null;
+      const cursor = talk(directive.entity, registry, state);
+      if (cursor) openModal(state, dialogueFrame(cursor));
       return {};
     }
+    // The dialogue-facing spelling of `submit-modal:`, kept because that is how
+    // every authored menu answer already reads; one implementation under both.
     case 'choose': {
-      if (!session.dialogue) throw new RuntimeError('choose with no active dialogue');
-      const result = choose(directive.text, session.dialogue, registry, state);
-      session.dialogue = result.choices ? result : null;
+      if (topModal(state)?.name !== 'dialogue') throw new RuntimeError('choose with no active dialogue');
+      answerModal(state, registry, { choice: directive.text });
       return {};
     }
+    case 'submit-modal':
+      answerModal(state, registry, { [directive.key]: directive.value });
+      return {};
     case 'use':
       useAction(directive.obj, directive.objId, directive.actionId, registry, state);
       return {};
@@ -353,7 +347,6 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
       const saved = registry.saves.get(directive.save);
       if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
       const warnings = loadSave(state, saved, registry);
-      session.dialogue = null;
       session.logCursor = Math.max(0, state.log.length - warnings.length);
       return {};
     }
@@ -384,7 +377,7 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
   const test = registry.tests.get(testId);
   if (!test) throw new RuntimeError(`unknown test: ${testId}`);
 
-  const session: PlaySession = { registry, state, dialogue: null, logCursor: state.log.length };
+  const session: PlaySession = { registry, state, logCursor: state.log.length };
 
   for (const directive of test.directives) {
     if (directive.kind === 'run') {
@@ -395,6 +388,11 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
     const result = applyDirective(session, directive);
     if (result.failure) return { passed: false, failure: result.failure };
   }
+
+  // Directives ran out with a screen still waiting on the player, which is a
+  // route that was never walked to its end rather than one that succeeded.
+  const open = topModal(state);
+  if (open) return { passed: false, failure: `modal left open: ${open.name}` };
 
   return { passed: true };
 }

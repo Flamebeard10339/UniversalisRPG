@@ -12,6 +12,10 @@ function ids(v: PlayView): string[] {
   return v.choices.map((c) => c.id);
 }
 
+function modalNames(v: PlayView): string[] {
+  return v.modals.map((modal) => modal.name);
+}
+
 describe('session', () => {
   // Not a second copy of the `# test` that walks the same route: that one
   // asserts flags and an end-state save, this one asserts the choice-list API
@@ -28,20 +32,32 @@ describe('session', () => {
     expect(ids(v)).not.toContain('use:entity.tutorial-island.front-door.pick lock');
 
     v = apply(session, 'talk:tutorial-island.miki');
-    expect(v.inDialogue).toBe(true);
-    expect(ids(v)).toEqual(expect.arrayContaining(['dialogue:0', 'dialogue:1']));
+    expect(modalNames(v)).toEqual(['dialogue']);
+    // The menu arrives as the one option of a dialogue modal, not as a
+    // second kind of choice sitting beside the world's.
+    expect(v.choices).toEqual([]);
+    const menu = v.modals[0].options[0];
+    expect(menu.key).toBe('choice');
+    expect(menu.values).toHaveLength(2);
 
-    v = apply(session, 'dialogue:0');
-    expect(v.inDialogue).toBe(false);
+    v = submitModal(session, { choice: menu.values![0] });
+    expect(modalNames(v)).toEqual([]);
     expect(session.state.flags['tutorial-island.quest-given']).toBe(true);
 
     v = apply(session, 'use:entity.tutorial-island.mirror.look in');
     expect(v.said).toContain('modal:character-creation');
     expect(session.state.flags['tutorial-island.mirror-done']).toBe(true);
+    // A modal sits atop the world, so nothing in the room is offered until it
+    // is answered — and it takes two answers to be done with.
+    expect(v.choices).toEqual([]);
+    v = submitModal(session, { name: 'Rowan' });
+    expect(modalNames(v)).toEqual(['character-creation']);
+    v = submitModal(session, { race: 'Elf' });
+    expect(modalNames(v)).toEqual([]);
     expect(ids(v)).not.toContain('use:entity.tutorial-island.mirror.look in');
 
     v = apply(session, 'talk:tutorial-island.miki');
-    expect(v.inDialogue).toBe(false);
+    expect(modalNames(v)).toEqual([]);
     expect(session.state.inventory['tutorial-island.jug-of-water']).toBe(1);
     expect(session.state.inventory['tutorial-island.pot-of-flour']).toBe(1);
 
@@ -65,11 +81,11 @@ describe('session', () => {
     expect(ids(v)).toContain('use:entity.tutorial-island.front-door.pick lock');
 
     v = apply(session, 'talk:tutorial-island.miki');
-    expect(v.inDialogue).toBe(false);
+    expect(modalNames(v)).toEqual([]);
     expect(session.state.flags['tutorial-island.made-bread']).toBe(true);
 
     v = apply(session, 'talk:tutorial-island.miki');
-    expect(v.inDialogue).toBe(false);
+    expect(modalNames(v)).toEqual([]);
     expect(session.state.inventory['tutorial-island.iron-sword']).toBe(1);
     expect(session.state.inventory['tutorial-island.wooden-shield']).toBe(1);
 
@@ -95,7 +111,7 @@ describe('session', () => {
     expect(ids(v)).not.toContain('travel:tutorial-island.beach');
 
     v = apply(session, 'talk:tutorial-island.miki');
-    expect(v.inDialogue).toBe(false);
+    expect(modalNames(v)).toEqual([]);
     expect(session.state.flags['tutorial-island.miki-complete']).toBe(true);
     expect(session.state.flags['tutorial-island.front-door.unlocked']).toBe(true);
 
@@ -103,7 +119,7 @@ describe('session', () => {
     expect(ids(v)).toContain('travel:tutorial-island.beach');
 
     v = apply(session, 'talk:tutorial-island.miki');
-    expect(v.inDialogue).toBe(false);
+    expect(modalNames(v)).toEqual([]);
     expect(v.said).toContain("Still here? The boat to the mainland won't wait forever.");
 
     v = apply(session, 'travel:tutorial-island.beach');
@@ -154,7 +170,7 @@ eat: take: 1 bread, say: You eat the bread.
     expect(ids(v)).not.toContain('use:item.bread.eat');
   });
 
-  it('surfaces a pending modal from open modal:, and submitModal captures player name/race and clears it', () => {
+  it('publishes a modal from open modal:, and closes it on the answer that completes it', () => {
     const module = `
 # location camp
 x: 0, y: 0
@@ -179,11 +195,20 @@ node greeting:
     const session = startSession(registry);
 
     let v = apply(session, 'use:entity.mirror.look in');
-    expect(v.pendingModal).toBe('character-creation');
+    expect(v.modals).toEqual([{ name: 'character-creation', options: [
+      { key: 'name', label: 'Name', values: null },
+      { key: 'race', label: 'Race', values: ['Human', 'Elf', 'Dwarf', 'Orc'] },
+    ] }]);
     expect(session.state.player).toEqual({ name: '', race: '' });
 
-    v = submitModal(session, { name: 'Rowan', race: 'Elf' });
-    expect(v.pendingModal).toBeUndefined();
+    // Answered one option at a time: the modal stays up, publishing only what
+    // is left, until the last answer lands.
+    v = submitModal(session, { name: 'Rowan' });
+    expect(v.modals[0].options.map((option) => option.key)).toEqual(['race']);
+    expect(session.state.player).toEqual({ name: '', race: '' });
+
+    v = submitModal(session, { race: 'Elf' });
+    expect(v.modals).toEqual([]);
     expect(session.state.player).toEqual({ name: 'Rowan', race: 'Elf' });
 
     v = apply(session, 'talk:mirror');
@@ -477,6 +502,75 @@ cancel
     expect(state.activeAction).toBeNull();
     expect(state.inventory['roasted-chestnut'] ?? 0).toBe(0);
     expect(state.time).toBe(secondsToMs(2));
+  });
+});
+
+describe('runTest: a route that ends holding a modal has not been walked to its end', () => {
+  const module = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  mirror
+  sage
+
+# flag greeted
+
+# entity mirror
+look in: open modal: character-creation
+
+# entity sage
+title: Sage
+
+# dialogue sage-talk
+owner = sage
+
+node greeting:
+  when: not greeted
+  set: greeted
+  -> Nod.
+
+# test leaves-the-modal-open
+travel: camp
+use: entity.mirror.look in
+
+# test half-answers-the-modal
+travel: camp
+use: entity.mirror.look in
+submit-modal: name=Rowan
+
+# test answers-the-modal
+travel: camp
+use: entity.mirror.look in
+submit-modal: name=Rowan
+submit-modal: race=Elf
+
+# test leaves-a-dialogue-open
+travel: camp
+talk: sage
+
+# test answers-the-dialogue-as-a-modal
+travel: camp
+talk: sage
+submit-modal: choice=Nod.
+`;
+
+  it('fails, naming the modal, and passes once every option of it is answered', () => {
+    const registry = loadModule(module);
+
+    expect(runTest('leaves-the-modal-open', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: character-creation' });
+    expect(runTest('half-answers-the-modal', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: character-creation' });
+
+    const answered = createGameState();
+    expect(runTest('answers-the-modal', registry, answered)).toEqual({ passed: true });
+    expect(answered.player).toEqual({ name: 'Rowan', race: 'Elf' });
+  });
+
+  it('holds a dialogue to the same standard, since a menu left hanging is the same unfinished route', () => {
+    const registry = loadModule(module);
+
+    expect(runTest('leaves-a-dialogue-open', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: dialogue' });
+    expect(runTest('answers-the-dialogue-as-a-modal', registry, createGameState())).toEqual({ passed: true });
   });
 });
 

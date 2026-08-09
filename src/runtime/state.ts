@@ -1,6 +1,7 @@
 import type { Range } from '../grammar/range';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import type { ActiveAction } from './encounter';
+import type { ModalFrame } from './modals';
 
 export class RuntimeError extends Error {}
 
@@ -31,11 +32,12 @@ export interface GameState extends RngCursor {
   resourceRateRemainders: Record<string, number>;
   equipped: Record<string, string>;
   player: { name: string; race: string };
-  pendingModal?: string;
+  // Readonly because modals.ts owns every write, and with it open and close.
+  modals: readonly ModalFrame[];
 }
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' } };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
 }
 
 // The one seam through which simulated time advances; nothing reads a real clock.

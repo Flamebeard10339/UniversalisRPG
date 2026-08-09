@@ -177,9 +177,11 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'equip':
       put(value, 'item', 'item', `${where} equip:`, visit);
       return;
-    // `unequip:` names a slot, which is no section's id, so it resolves nothing
-    // here; validateTestReferences checks it against what items declare.
+    // `unequip:` names a slot and `submit-modal:` an option key, neither of
+    // which is a section's id, so they resolve nothing here; a slot is checked
+    // against what items declare by validateTestReferences.
     case 'unequip':
+    case 'submit-modal':
   }
 }
 
