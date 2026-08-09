@@ -3,6 +3,7 @@ import { DISCOVERED, Location } from '../content/location';
 import {
   actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, PLAYER, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useTravel } from './runtime';
 import { findActiveAction, parseOwnerRef } from './actions';
+import { newCadence } from './encounter';
 import { truthy } from './conditions';
 import { answerModal, dialogueFrame, Modal, openModal, publishModal, topModal } from './modals';
 import { Registry } from '../content/registry';
@@ -309,7 +310,10 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
   if (!active) return null;
   const { obj, objId } = parseOwnerRef(active.ownerRef);
   const cycle = actionFirstUnit(obj, objId, active.actionLabel, registry, state);
-  const clock = active.cadences[PLAYER];
+  // A hand-written `# save` can carry an action with no player clock, and
+  // checkSave takes it. Publishing a stopped one keeps what the view did
+  // before it reported the action at all: read nothing, kill nothing.
+  const clock = active.cadences[PLAYER] ?? newCadence();
   return {
     label: active.actionLabel,
     progress: cycle > 0 ? Math.min(1, Math.max(0, clock.progress / cycle)) : 1,

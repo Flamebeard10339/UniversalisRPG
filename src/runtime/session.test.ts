@@ -696,6 +696,72 @@ describe('what the engine withholds', () => {
   });
 });
 
+describe('a save is data the engine takes a copy of, not a handle onto it', () => {
+  const module = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  oven
+  mirror
+
+# item bun
+examine: Warm.
+
+# entity mirror
+look in: open modal: character-creation
+
+# entity oven
+roast:
+  continuous
+  time: 4
+  give: 1 bun
+`;
+
+  // `registry.saves` is writable and is the only route a driver has to load
+  // one, so what a save carries has to stop being the state once it lands.
+  it('does not leave the author of a save holding the state it loaded', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+    const mine = { name: 'Rowan', race: 'Elf' };
+    registry.saves.set('forged', { version: SAVE_VERSION, diff: { player: mine } });
+
+    applyDirective(session, { kind: 'load', save: 'forged' });
+    expect(sessionStatus(session).player.name).toBe('Rowan');
+
+    mine.name = 'MUTATED';
+    expect(sessionStatus(session).player.name).toBe('Rowan');
+  });
+
+  it('does not let play rewrite the save it was loaded from', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+    registry.saves.set('start', { version: SAVE_VERSION, diff: { inventory: { bun: 1 }, player: { name: 'Rowan', race: 'Elf' } } });
+
+    applyDirective(session, { kind: 'load', save: 'start' });
+    apply(session, 'use:entity.mirror.look in');
+    submitModal(session, { name: 'Wren' });
+
+    expect(registry.saves.get('start')!.diff.player).toEqual({ name: 'Rowan', race: 'Elf' });
+  });
+
+  it('publishes an action a save left without a player clock instead of dying on the next look', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+    // checkSave takes any object here, and pruneStateForRegistry keeps it: the
+    // owner and the label both resolve. Only the clock is missing.
+    registry.saves.set('midbake', {
+      version: SAVE_VERSION,
+      diff: { activeAction: { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: {} } },
+    });
+
+    applyDirective(session, { kind: 'load', save: 'midbake' });
+
+    const v = view(session);
+    expect(v.action).toEqual({ label: 'roast', progress: 0, attempts: 0, targeted: false, completion: 1 });
+  });
+});
+
 describe('the handle a driver obtains', () => {
   it('carries no route to the state it plays, by enumeration or by key', () => {
     const session = startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n'));
