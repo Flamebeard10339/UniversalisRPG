@@ -3,8 +3,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { DslError } from '../src/grammar/parser';
-import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, initResources, PLAYER, RuntimeError, type ActiveAction, type GameState } from '../src/runtime/runtime';
-import { findActiveAction } from '../src/runtime/actions';
+import { describeCondition, RuntimeError } from '../src/runtime/runtime';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
 import { type ModuleSource } from '../src/content/universe';
 import {
@@ -17,25 +16,26 @@ import {
 } from '../src/content/localChanges';
 import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './lib/modportalCache';
 import {
+  adoptRegistry,
   apply,
   applyDirective,
   beginAction,
   choiceToDirective,
-  runTest,
-  sessionResources,
+  runSessionTest,
+  serializeSession,
+  sessionStatus,
   startSession,
   view,
   wait,
   type PlayChoice,
   type PlaySession,
+  type PlayStatus,
   type PlayView,
 } from '../src/runtime/session';
 import { type Modal, type ModalOption } from '../src/runtime/runtime';
-import { pruneStateForRegistry, serializeSave } from '../src/runtime/save';
 import { type ParsedSave } from '../src/content/saveSection';
 import { parseDirectiveLine, type Directive } from '../src/content/test';
 import { resolveDirective } from '../src/content/typed';
-import { fromMilliUnits, msToSeconds, toMilliUnits } from '../src/runtime/units';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -173,31 +173,29 @@ function formatView(v: PlayView): string[] {
   return lines;
 }
 
-function formatInventory(state: GameState): string[] {
-  const inventory = Object.fromEntries(Object.entries(state.inventory).filter(([, count]) => count > 0));
-  const lines = [`Inventory: ${JSON.stringify(inventory)}`, `XP: ${JSON.stringify(state.xp)}`];
-  if (Object.keys(state.equipped).length > 0) {
-    lines.push(`Equipped: ${JSON.stringify(state.equipped)}`);
+function formatInventory(status: PlayStatus): string[] {
+  const lines = [`Inventory: ${JSON.stringify(status.inventory)}`, `XP: ${JSON.stringify(status.xp)}`];
+  if (Object.keys(status.equipment).length > 0) {
+    lines.push(`Equipped: ${JSON.stringify(status.equipment)}`);
   }
   return lines;
 }
 
-function formatState(session: PlaySession): string[] {
-  const { state } = session;
+function formatState(status: PlayStatus): string[] {
   return [
-    `Location: ${state.location}`,
-    `Elapsed simulated time: ${msToSeconds(state.time)}s`,
-    `Flags: ${JSON.stringify(state.flags)}`,
-    ...formatInventory(state),
-    ...formatResources(sessionResources(session)),
-    ...formatEncounter(encounterView(state, session.registry)),
+    `Location: ${status.location.id}`,
+    `Elapsed simulated time: ${status.time}s`,
+    `Flags: ${JSON.stringify(status.flags)}`,
+    ...formatInventory(status),
+    ...formatResources(status.resources),
+    ...formatEncounter(status.encounter),
   ];
 }
 
 // The one place PASSED/FAILED prints, so both entry points cannot drift.
 function runTestCommand(session: PlaySession, testId: string): CommandResult {
   try {
-    const result = runTest(testId, session.registry, session.state);
+    const result = runSessionTest(session, testId);
     const next = view(session);
     const message = result.passed ? `Test '${testId}' PASSED` : `Test '${testId}' FAILED: ${result.failure}`;
     return { view: next, output: [message, ...formatView(next)], quit: false };
@@ -304,7 +302,7 @@ function buildCreateTest(session: PlaySession, recorder: Recorder, id: string, o
     directives.push(directive);
   }
 
-  const endSaveSerialized = opts.valid ? serializeSave(session.state, session.registry) : undefined;
+  const endSaveSerialized = opts.valid ? serializeSession(session) : undefined;
 
   if (usesStartSave) session.registry.saves.set(startSaveId, savedGameFromSerialized(recorder.startSave));
   if (endSaveSerialized !== undefined) session.registry.saves.set(endSaveId, savedGameFromSerialized(endSaveSerialized));
@@ -351,11 +349,7 @@ function commitLocalChanges(session: PlaySession, authoring: AuthoringContext, t
   }
 
   authoring.localSource.text = text;
-  session.registry = loaded.registry;
-  const warnings = pruneStateForRegistry(session.state, session.registry);
-  for (const warning of warnings) session.state.log.push(warning.message);
-  session.logCursor = Math.max(0, session.state.log.length - warnings.length);
-  initResources(session.state, session.registry);
+  adoptRegistry(session, loaded.registry);
 
   try {
     const next = view(session);
@@ -452,11 +446,11 @@ function handleGameplayCommand(session: PlaySession, currentView: PlayView, line
   }
 
   if (trimmed === '/state') {
-    return { output: formatState(session), quit: false };
+    return { output: formatState(sessionStatus(session)), quit: false };
   }
 
   if (trimmed === '/inventory' || trimmed === '/inv') {
-    return { output: formatInventory(session.state), quit: false };
+    return { output: formatInventory(sessionStatus(session)), quit: false };
   }
 
   if (trimmed === '/look') {
@@ -466,7 +460,7 @@ function handleGameplayCommand(session: PlaySession, currentView: PlayView, line
   }
 
   if (trimmed === '/quit' || trimmed === '/q') {
-    return { output: formatState(session), quit: true };
+    return { output: formatState(sessionStatus(session)), quit: true };
   }
 
   if (trimmed.startsWith('/speed')) {
@@ -588,50 +582,37 @@ function progressBar(fraction: number, width = 20): string {
   return `[${'#'.repeat(filled)}${'-'.repeat(width - filled)}]`;
 }
 
-// A multi-attempt fight reports its whole span, so the bar is coarse but readable.
-function cycleDuration(session: PlaySession, active: ActiveAction): number {
-  const dot = active.ownerRef.indexOf('.');
-  const obj = active.ownerRef.slice(0, dot);
-  const objId = active.ownerRef.slice(dot + 1);
-  if (obj === 'recipe') return craftFirstUnit(objId, session.registry, session.state);
-  return actionFirstUnit(obj, objId, active.actionLabel, session.registry, session.state);
-}
-
 export interface LiveTickResult {
   active: boolean;
   line: string;
+  view: PlayView;
 }
 
-function liveCombatDetail(session: PlaySession): string {
-  const encounter = encounterView(session.state, session.registry);
-  if (!encounter) return '';
-  const mine = sessionResources(session).filter((r) => r.display === 'full');
+function liveCombatDetail(status: PlayStatus): string {
+  if (!status.encounter) return '';
+  const mine = status.resources.filter((r) => r.display === 'full');
   const parts = [
     ...mine.map((r) => ` ${r.title} ${tidy(r.current)}/${tidy(r.max)}`),
-    ...encounter.foes.map((foe) => ` ${foe.title} ${tidy(foe.current)}/${tidy(foe.max)}`),
+    ...status.encounter.foes.map((foe) => ` ${foe.title} ${tidy(foe.current)}/${tidy(foe.max)}`),
   ];
   return parts.join('');
 }
 
-export function liveTick(session: PlaySession, elapsedMs: number, multiplier: number): LiveTickResult {
-  const before = session.state.activeAction;
-  const label = before?.actionLabel ?? 'action';
-  const dt = (elapsedMs / 1000) * multiplier;
-  wait(session, dt);
+// `previous` names the action being driven, which is gone from the view the
+// tick that finishes it hands back.
+export function liveTick(session: PlaySession, previous: PlayView, elapsedMs: number, multiplier: number): LiveTickResult {
+  const label = previous.action?.label ?? 'action';
+  const next = wait(session, (elapsedMs / 1000) * multiplier);
 
-  const after = session.state.activeAction;
-  if (!after) {
-    return { active: false, line: `${label}: done.  [time: ${msToSeconds(session.state.time).toFixed(1)}s]` };
+  const action = next.action;
+  if (!action) {
+    return { active: false, line: `${label}: done.  [time: ${next.time.toFixed(1)}s]`, view: next };
   }
-  const duration = cycleDuration(session, after);
-  const clock = after.cadences[PLAYER];
-  const bar = duration > 0 ? progressBar(clock.progress / duration) : progressBar(1);
   // Show implicit target progress only when there's no real target to narrate.
-  const action = findActiveAction(after, session.registry);
-  const showImplicitTarget = clock.attemptsMade > 0 || after.implicitTarget < toMilliUnits(1);
-  const detail = liveCombatDetail(session) || (!action.target && showImplicitTarget ? ` hits:${clock.attemptsMade} completion:${fromMilliUnits(after.implicitTarget).toFixed(1)}` : '');
-  const line = `${label}... ${bar}${detail}  [time: ${msToSeconds(session.state.time).toFixed(1)}s]`;
-  return { active: true, line };
+  const showImplicitTarget = action.attempts > 0 || action.completion < 1;
+  const detail = liveCombatDetail(next) || (!action.targeted && showImplicitTarget ? ` hits:${action.attempts} completion:${action.completion.toFixed(1)}` : '');
+  const line = `${label}... ${progressBar(action.progress)}${detail}  [time: ${next.time.toFixed(1)}s]`;
+  return { active: true, line, view: next };
 }
 
 const LIVE_TICK_MS = 200;
@@ -645,7 +626,7 @@ type LineResult = IteratorResult<string>;
 // and input.resume() — the non-obvious one, since attaching a `data` listener only
 // auto-flows a stream for the FIRST listener and readline already installed one.
 // Ctrl-C raises no SIGINT in raw mode, so it is honoured explicitly below.
-function runLiveAction(session: PlaySession, rl: ReturnType<typeof createInterface>): Promise<{ cancelled: boolean }> {
+function runLiveAction(session: PlaySession, rl: ReturnType<typeof createInterface>, opening: PlayView): Promise<{ cancelled: boolean }> {
   return new Promise<{ cancelled: boolean }>((resolvePromise) => {
     const input = process.stdin;
     const isTTY = Boolean(input.isTTY);
@@ -695,11 +676,13 @@ function runLiveAction(session: PlaySession, rl: ReturnType<typeof createInterfa
     input.on('data', onData);
     input.on('end', onEnd);
 
+    let latest = opening;
     const timer = setInterval(() => {
       const now = Date.now();
       const elapsedMs = now - lastTick;
       lastTick = now;
-      const tick = liveTick(session, elapsedMs, speedMultiplier);
+      const tick = liveTick(session, latest, elapsedMs, speedMultiplier);
+      latest = tick.view;
       process.stdout.write(`\r\x1b[K${tick.line}`);
       if (!tick.active) finish();
     }, LIVE_TICK_MS);
@@ -834,7 +817,7 @@ async function main(): Promise<void> {
   for (const each of loaded.diagnostics) console.error(`Disabled module: ${formatModuleDiagnostic(each)}`);
   const registry = loaded.registry;
   const session = startSession(registry);
-  const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
+  const recorder: Recorder = { history: [], startSave: serializeSession(session) };
   const authoring: AuthoringContext = {
     baseSources,
     dependencies,
@@ -877,13 +860,13 @@ async function main(): Promise<void> {
         const choice = current.choices[index - 1];
         try {
           const next = beginAction(session, choice.id);
-          if (session.state.activeAction) {
+          if (next.action) {
             recorder.history.push(`begin: ${beginInnerForChoice(choice)}`);
-            const t0 = session.state.time;
-            const { cancelled } = await runLiveAction(session, rl);
+            const t0 = next.time;
+            const { cancelled } = await runLiveAction(session, rl, next);
             current = view(session);
-            const elapsed = session.state.time - t0;
-            if (elapsed > 0) recorder.history.push(`wait: ${formatElapsed(msToSeconds(elapsed))}`);
+            const elapsed = current.time - t0;
+            if (elapsed > 0) recorder.history.push(`wait: ${formatElapsed(elapsed)}`);
             if (cancelled) recorder.history.push('cancel');
           } else {
             console.log(formatView(next).join('\n'));

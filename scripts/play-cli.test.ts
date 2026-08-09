@@ -6,10 +6,9 @@ import { createGameState } from '../src/runtime/runtime';
 import { loadModule } from '../src/content/registry';
 import { initialLocalChangesModule } from '../src/content/localChanges';
 import type { ModuleSource } from '../src/content/universe';
-import { SAVE_VERSION, serializeSave } from '../src/runtime/save';
-import { beginAction, runTest, startSession, view } from '../src/runtime/session';
+import { SAVE_VERSION } from '../src/runtime/save';
+import { beginAction, runTest, serializeSession, sessionStatus, startSession, view } from '../src/runtime/session';
 import { handleCommand, liveTick, loadModportalSources, type AuthoringContext, type Recorder } from './play-cli';
-import { secondsToMs } from '../src/runtime/units';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -18,6 +17,8 @@ const SAVE_MODULE = `
 # location camp
 x: 0, y: 0
 starting
+entities:
+  chest
 
 # item gold
 title: Gold
@@ -77,14 +78,13 @@ describe('play-cli handleCommand', () => {
   it('/state reports the current sim-time without advancing it', () => {
     const registry = loadModule(source);
     const session = startSession(registry);
-    const current = view(session);
-    session.state.time = secondsToMs(42);
+    const waited = handleCommand(session, view(session), '/wait 42');
 
-    const result = handleCommand(session, current, '/state');
+    const result = handleCommand(session, waited.view!, '/state');
     expect(result.quit).toBe(false);
     expect(result.view).toBeUndefined();
     expect(result.output.some((line) => line.includes('42'))).toBe(true);
-    expect(session.state.time).toBe(secondsToMs(42));
+    expect(sessionStatus(session).time).toBe(42);
   });
 
   it('reports a friendly error for an out-of-range choice number, without throwing or quitting', () => {
@@ -140,7 +140,6 @@ describe('play-cli handleCommand', () => {
 
     const result = handleCommand(session, current, 'travel: basement');
     expect(result.quit).toBe(false);
-    expect(session.state.location).toBe('tutorial-island.basement');
     expect(result.view?.location.id).toBe('tutorial-island.basement');
     expect(result.recorded).toBe('travel: tutorial-island.basement');
   });
@@ -156,7 +155,7 @@ describe('play-cli handleCommand', () => {
 
     const result = handleCommand(session, current, String(travelIndex + 1));
     expect(result.recorded).toBe('travel: ruins');
-    expect(session.state.location).toBe('ruins');
+    expect(result.view?.location.id).toBe('ruins');
   });
 });
 
@@ -166,10 +165,10 @@ describe('play-cli handleCommand: /test, /load, /expect, /assert, /cancel', () =
     const session = startSession(registry);
     const current = view(session);
 
-    session.state.time = secondsToMs(99); // diverge, so we can observe /load resetting it
-    const ok = handleCommand(session, current, '/load empty');
+    const waited = handleCommand(session, current, '/wait 99'); // diverge, so we can observe /load resetting it
+    const ok = handleCommand(session, waited.view!, '/load empty');
     expect(ok.recorded).toBe('load: empty');
-    expect(session.state.time).toBe(0);
+    expect(ok.view?.time).toBe(0);
 
     const bad = handleCommand(session, ok.view ?? current, '/load badsave');
     expect(bad.output.some((line) => line.startsWith('Error:'))).toBe(true);
@@ -184,7 +183,7 @@ describe('play-cli handleCommand: /test, /load, /expect, /assert, /cancel', () =
     expect(match.output.some((line) => line.startsWith('✓'))).toBe(true);
     expect(match.recorded).toBeUndefined();
 
-    session.state.inventory.gold = 1; // diverge from the empty save
+    handleCommand(session, current, 'use: entity.chest.open'); // diverge from the empty save
     const mismatch = handleCommand(session, current, '/expect empty');
     expect(mismatch.output.some((line) => line.startsWith('⚠'))).toBe(true);
   });
@@ -216,12 +215,11 @@ describe('play-cli handleCommand: /test, /load, /expect, /assert, /cancel', () =
   it('/cancel clears an in-flight spannable action and records "cancel"', () => {
     const registry = loadModule(LIVE_MODULE);
     const session = startSession(registry);
-    beginAction(session, 'use:entity.oven.roast');
-    expect(session.state.activeAction).not.toBeNull();
+    expect(beginAction(session, 'use:entity.oven.roast').action).not.toBeNull();
 
     const current = view(session);
     const result = handleCommand(session, current, '/cancel');
-    expect(session.state.activeAction).toBeNull();
+    expect(result.view?.action).toBeNull();
     expect(result.recorded).toBe('cancel');
   });
 });
@@ -291,7 +289,7 @@ describe('play-cli drives a modal by its published name and options', () => {
   function modalFixture() {
     const registry = loadModule(MODAL_MODULE);
     const session = startSession(registry);
-    const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
+    const recorder: Recorder = { history: [], startSave: serializeSession(session) };
     return { session, current: view(session), recorder };
   }
 
@@ -330,7 +328,7 @@ describe('play-cli drives a modal by its published name and options', () => {
     let v = handleCommand(session, current, 'use: entity.mirror.look in', recorder).view!;
     v = handleCommand(session, v, 'submit-modal: name=Rowan', recorder).view!;
     v = handleCommand(session, v, 'submit-modal: race=Elf', recorder).view!;
-    expect(session.state.player).toEqual({ name: 'Rowan', race: 'Elf' });
+    expect(v.player).toEqual({ name: 'Rowan', race: 'Elf' });
 
     const created = handleCommand(session, v, '/create-valid-test crossed', recorder);
     expect(created.output).toContain('submit-modal: name=Rowan');
@@ -358,7 +356,7 @@ describe('play-cli drives a modal by its published name and options', () => {
   it('asks for the top of the stack, not the bottom, when one modal sits over another', () => {
     const registry = loadModule(STACKED_MODAL_MODULE);
     const session = startSession(registry);
-    const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
+    const recorder: Recorder = { history: [], startSave: serializeSession(session) };
 
     const opened = handleCommand(session, view(session), 'talk: sage', recorder);
     expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
@@ -387,8 +385,9 @@ describe('play-cli drives a modal by its published name and options', () => {
     const marker = handleCommand(session, opened.view!, '/state', recorder);
     expect(marker.output.some((line) => line.startsWith('Location: camp'))).toBe(true);
 
-    expect(session.state.player).toEqual({ name: '', race: '' });
-    expect(session.state.modals.map((frame) => frame.name)).toEqual(['character-creation']);
+    const still = sessionStatus(session);
+    expect(still.player).toEqual({ name: '', race: '' });
+    expect(still.modals.map((modal) => modal.name)).toEqual(['character-creation']);
     expect(recorder.history).toEqual(['use: entity.mirror.look in']);
   });
 });
@@ -425,58 +424,125 @@ describe('liveTick: pure per-tick core of live mode', () => {
   it('advances sim-time by exactly elapsedMs/1000*multiplier for one tick', () => {
     const registry = loadModule(LIVE_MODULE);
     const session = startSession(registry);
-    beginAction(session, 'use:entity.oven.roast');
-    expect(session.state.time).toBe(0); // armed, not yet resolved
+    const armed = beginAction(session, 'use:entity.oven.roast');
+    expect(armed.time).toBe(0); // armed, not yet resolved
 
-    const result = liveTick(session, 500, 2); // 0.5s real * 2x = 1 sim-second
-    expect(session.state.time).toBe(secondsToMs(1));
+    const result = liveTick(session, armed, 500, 2); // 0.5s real * 2x = 1 sim-second
+    expect(result.view.time).toBe(1);
     expect(result.active).toBe(true);
   });
 
   it('a repeating action stays active across many ticks and eventually produces output', () => {
     const registry = loadModule(LIVE_MODULE);
     const session = startSession(registry);
-    beginAction(session, 'use:entity.oven.roast');
+    let v = beginAction(session, 'use:entity.oven.roast');
 
     // 25 ticks of 200ms at 1x = 5 simulated seconds, clearing the 4s cycle.
     for (let i = 0; i < 25; i++) {
-      const result = liveTick(session, 200, 1);
+      const result = liveTick(session, v, 200, 1);
       expect(result.active).toBe(true); // repeating: never self-completes
+      v = result.view;
     }
-    expect(session.state.time).toBe(secondsToMs(5));
-    expect(session.state.inventory['roasted-chestnut']).toBe(1);
-    expect(session.state.activeAction).not.toBeNull();
+    expect(v.time).toBe(5);
+    expect(v.inventory['roasted-chestnut']).toBe(1);
+    expect(v.action).not.toBeNull();
   });
 
   it('multiplier scales elapsed real time into simulated time', () => {
     const registry = loadModule(LIVE_MODULE);
     const session = startSession(registry);
-    beginAction(session, 'use:entity.oven.roast');
+    const armed = beginAction(session, 'use:entity.oven.roast');
 
     // 1 real second at 4x => 4 simulated seconds, exactly one cycle.
-    const result = liveTick(session, 1000, 4);
-    expect(session.state.time).toBe(secondsToMs(4));
+    const result = liveTick(session, armed, 1000, 4);
+    expect(result.view.time).toBe(4);
     expect(result.active).toBe(true);
-    expect(session.state.inventory['roasted-chestnut']).toBe(1);
+    expect(result.view.inventory['roasted-chestnut']).toBe(1);
+  });
+
+  it('draws the bar, the pools and the clock from the published view alone', () => {
+    const registry = loadModule(LIVE_MODULE);
+    const session = startSession(registry);
+    let v = beginAction(session, 'use:entity.anvil.strike');
+
+    const lines: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const tick = liveTick(session, v, 700, 1);
+      lines.push(tick.line);
+      if (!tick.active) break;
+      v = tick.view;
+    }
+
+    expect(lines).toEqual([
+      'strike... [#####---------------]  [time: 0.7s]',
+      'strike... [#########-----------]  [time: 1.4s]',
+      'strike... [##############------]  [time: 2.1s]',
+      'strike... [###################-]  [time: 2.8s]',
+      // The action is gone from the view that ends it, so its name comes from
+      // the one before.
+      'strike: done.  [time: 3.5s]',
+    ]);
+  });
+
+  // A tap worth a fifth of a completion, so the run to one takes five swings
+  // and the countdown to it is visible between them.
+  const TAPPING_MODULE = `
+# stat tap
+base: 0.2
+
+# stat taps-per-minute
+base: 60
+
+# location camp
+x: 0, y: 0
+starting
+entities:
+  bell
+
+# entity bell
+title: Bell
+ring:
+  continuous
+  rate: taps-per-minute
+  ability: tap
+`;
+
+  it('counts an untargeted action’s swings down to its completion instead of a foe’s pool', () => {
+    const session = startSession(loadModule(TAPPING_MODULE));
+    let v = beginAction(session, 'use:entity.bell.ring');
+
+    const lines: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const tick = liveTick(session, v, 1000, 1);
+      lines.push(tick.line);
+      v = tick.view;
+    }
+
+    expect(lines).toEqual([
+      'ring... [--------------------] hits:1 completion:0.8  [time: 1.0s]',
+      'ring... [--------------------] hits:2 completion:0.6  [time: 2.0s]',
+      'ring... [--------------------] hits:3 completion:0.4  [time: 3.0s]',
+      'ring... [--------------------] hits:4 completion:0.2  [time: 4.0s]',
+    ]);
   });
 
   it('reports active: false once a non-repeating spannable action completes on its own', () => {
     const registry = loadModule(LIVE_MODULE);
     const session = startSession(registry);
-    beginAction(session, 'use:entity.anvil.strike');
-    expect(session.state.activeAction).not.toBeNull();
+    const armed = beginAction(session, 'use:entity.anvil.strike');
+    expect(armed.action).not.toBeNull();
 
-    let result = liveTick(session, 1000, 1); // 1s of 3
+    let result = liveTick(session, armed, 1000, 1); // 1s of 3
     expect(result.active).toBe(true);
-    expect(session.state.activeAction).not.toBeNull();
+    expect(result.view.action).not.toBeNull();
 
-    result = liveTick(session, 1000, 1); // 2s of 3
+    result = liveTick(session, result.view, 1000, 1); // 2s of 3
     expect(result.active).toBe(true);
 
-    result = liveTick(session, 2000, 1); // crosses the 3s completion boundary
+    result = liveTick(session, result.view, 2000, 1); // crosses the 3s completion boundary
     expect(result.active).toBe(false);
-    expect(session.state.activeAction).toBeNull();
-    expect(session.state.inventory.ingot).toBe(1);
+    expect(result.view.action).toBeNull();
+    expect(result.view.inventory.ingot).toBe(1);
   });
 });
 
@@ -487,7 +553,7 @@ describe('play-cli recorder: /create-test and /create-valid-test', () => {
     const registry = loadModule(TRAVEL_MODULE);
     const session = startSession(registry);
     const current = view(session);
-    const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
+    const recorder: Recorder = { history: [], startSave: serializeSession(session) };
     return { registry, session, current, recorder };
   }
 
@@ -591,7 +657,7 @@ describe('play-cli local DSL authoring', () => {
     const session = startSession(registry);
     const current = view(session);
     const writes: string[] = [];
-    const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
+    const recorder: Recorder = { history: [], startSave: serializeSession(session) };
     const authoring: AuthoringContext = {
       baseSources,
       dependencies: ['base'],
@@ -664,12 +730,15 @@ describe('play-cli local DSL authoring', () => {
     const current = { value: fixture.current };
 
     runLocal(fixture, '/dsl item gem title: Gem', current);
-    fixture.session.state.inventory['local-changes.gem'] = 1;
+    runLocal(fixture, `/dsl save carried {"version":${SAVE_VERSION},"inventory":{"local-changes.gem":1}}`, current);
+    runLocal(fixture, '/load local-changes.carried', current);
+    expect(current.value.inventory['local-changes.gem']).toBe(1);
+
     const cleared = runLocal(fixture, '/local clear', current);
 
     expect(cleared.output[0]).toBe('Cleared local-changes.');
     expect(cleared.output.some((line) => line.includes('Removed inventory local-changes.gem'))).toBe(true);
-    expect(fixture.session.state.inventory['local-changes.gem']).toBeUndefined();
+    expect(cleared.view?.inventory['local-changes.gem']).toBeUndefined();
   });
 
   it('/dsl can author every DSL section kind that local-changes is allowed to own', () => {

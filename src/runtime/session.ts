@@ -1,11 +1,12 @@
 import { Action } from '../content/entity';
-import { Location } from '../content/location';
+import { DISCOVERED, Location } from '../content/location';
 import {
-  actionVisible, ArmResult, armAction, armCraft, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, RuntimeError, createGameState, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useTravel } from './runtime';
+  actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, PLAYER, RuntimeError, createGameState, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useTravel } from './runtime';
+import { findActiveAction, parseOwnerRef } from './actions';
 import { answerModal, dialogueFrame, Modal, openModal, publishModal, topModal } from './modals';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
-import { compareSave, loadSave, startingLocationId } from './save';
+import { compareSave, loadSave, pruneStateForRegistry, serializeSave, startingLocationId } from './save';
 import { Directive } from '../content/test';
 import { humanize } from '../grammar/values';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
@@ -19,22 +20,49 @@ export interface PlayChoice {
   detail?: string;
 }
 
-export interface PlayView {
+export interface PlayAction {
+  label: string;
+  // Through the cycle under way, 0 to 1.
+  progress: number;
+  attempts: number;
+  // Whittling a named pool down, rather than counting its own completions.
+  targeted: boolean;
+  completion: number;
+}
+
+// Everything the engine shows, as copies: a driver renders this and reaches
+// past it for nothing.
+export interface PlayStatus {
   location: { id: string; title: string; description: string };
   entities: Array<{ id: string; title: string; examine?: string }>;
-  said: string[];
   choices: PlayChoice[];
   time: number;
   resources: Array<{ id: string; title: string; current: number; max: number; display: ResourceDisplay }>;
   encounter: EncounterView | null;
   // Bottom of the stack first, so the last one is the one being answered.
   modals: Modal[];
+  inventory: Record<string, number>;
+  equipment: Record<string, string>;
+  xp: Record<string, number>;
+  stats: Record<string, number>;
+  flags: Record<string, boolean | number>;
+  discovered: string[];
+  player: { name: string; race: string };
+  action: PlayAction | null;
 }
+
+export interface PlayView extends PlayStatus {
+  said: string[];
+}
+
+// Nothing outside this module can name the key, so a driver holding a session
+// has the published status and no way to the state behind it.
+const STATE = Symbol('game state');
 
 export interface PlaySession {
   registry: Registry;
-  state: GameState;
   logCursor: number;
+  readonly [STATE]: GameState;
 }
 
 type Actable = { actions?: Action[] };
@@ -72,7 +100,7 @@ function canTalk(entityId: string, registry: Registry, state: GameState): boolea
 }
 
 function locationChoices(session: PlaySession): PlayChoice[] {
-  const { registry, state } = session;
+  const { registry, [STATE]: state } = session;
   const location = registry.locations.get(state.location);
   if (!location) return [];
   const choices: PlayChoice[] = [];
@@ -132,7 +160,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 // A modal sits atop the world, so what the world offers is withdrawn until it
 // is answered; the modal publishes its own options through `view`.
 function computeChoices(session: PlaySession): PlayChoice[] {
-  if (session.state.modals.length > 0) return [];
+  if (session[STATE].modals.length > 0) return [];
   return locationChoices(session);
 }
 
@@ -160,16 +188,30 @@ export function choiceToDirective(choice: PlayChoice): Directive {
   }
 }
 
-export function startSession(registry: Registry, state: GameState = createGameState()): PlaySession {
-  if (!state.location) {
-    const starting = startingLocationId(registry);
-    // Said here rather than at the first `view()`, where it surfaced as
-    // "unknown location: " and named nothing an author could act on.
-    if (!starting) throw new RuntimeError('no # location is marked starting, so a new game has nowhere to begin');
-    state.location = starting;
-  }
+export function startSession(registry: Registry): PlaySession {
+  const state = createGameState();
+  const starting = startingLocationId(registry);
+  // Said here rather than at the first `view()`, where it surfaced as
+  // "unknown location: " and named nothing an author could act on.
+  if (!starting) throw new RuntimeError('no # location is marked starting, so a new game has nowhere to begin');
+  state.location = starting;
   initResources(state, registry);
-  return { registry, state, logCursor: state.log.length };
+  return { registry, logCursor: state.log.length, [STATE]: state };
+}
+
+// Content changed under a live session: what no longer resolves is dropped and
+// said, and pools are re-read against the registry that replaced it.
+export function adoptRegistry(session: PlaySession, registry: Registry): void {
+  const state = session[STATE];
+  session.registry = registry;
+  const warnings = pruneStateForRegistry(state, registry);
+  for (const warning of warnings) state.log.push(warning.message);
+  session.logCursor = Math.max(0, state.log.length - warnings.length);
+  initResources(state, registry);
+}
+
+export function serializeSession(session: PlaySession): string {
+  return serializeSave(session[STATE], session.registry);
 }
 
 export const SAID_HEAD_KEPT = 40;
@@ -182,35 +224,49 @@ function elideMiddle(said: string[]): string[] {
 }
 
 export function view(session: PlaySession): PlayView {
-  const { registry, state } = session;
-  const location = registry.locations.get(state.location);
-  if (!location) throw new RuntimeError(`unknown location: ${state.location}`);
-
-  const entities: PlayView['entities'] = [];
-  for (const entityId of location.entities) {
-    const entity = registry.entities.get(entityId);
-    if (entity) entities.push({ id: entity.id, title: entity.title, examine: entity.examine });
-  }
+  const status = sessionStatus(session);
+  const state = session[STATE];
 
   const said = elideMiddle(state.log.slice(session.logCursor));
   state.log.length = 0;
   session.logCursor = 0;
 
+  return { ...status, said };
+}
+
+// Side-effect-free, so a driver can re-read the world without consuming the
+// lines `view` hands back once.
+export function sessionStatus(session: PlaySession): PlayStatus {
+  const { registry, [STATE]: state } = session;
+  const location = registry.locations.get(state.location);
+  if (!location) throw new RuntimeError(`unknown location: ${state.location}`);
+
+  const entities: PlayStatus['entities'] = [];
+  for (const entityId of location.entities) {
+    const entity = registry.entities.get(entityId);
+    if (entity) entities.push({ id: entity.id, title: entity.title, examine: entity.examine });
+  }
+
   return {
     location: { id: location.id, title: location.title, description: location.examine ?? '' },
     entities,
-    said,
     choices: computeChoices(session),
     time: msToSeconds(state.time),
-    resources: sessionResources(session),
+    resources: publishResources(state, registry),
     encounter: encounterView(state, registry),
     modals: state.modals.map((frame) => publishModal(frame, state, registry)),
+    inventory: Object.fromEntries(Object.entries(state.inventory).filter(([, count]) => count > 0)),
+    equipment: { ...state.equipped },
+    xp: { ...state.xp },
+    stats: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, statValue(stat.id, state, registry)])),
+    flags: { ...state.flags },
+    discovered: [...registry.locations.values()].filter((each) => Boolean(state.flags[`${each.id}.${DISCOVERED}`])).map((each) => each.id),
+    player: { ...state.player },
+    action: publishAction(state, registry),
   };
 }
 
-// Side-effect-free, so a driver can re-read pools without consuming the log cursor.
-export function sessionResources(session: PlaySession): PlayView['resources'] {
-  const { registry, state } = session;
+function publishResources(state: GameState, registry: Registry): PlayStatus['resources'] {
   return [...registry.resources.values()].map((resource) => ({
     id: resource.id,
     title: resource.title,
@@ -218,6 +274,21 @@ export function sessionResources(session: PlaySession): PlayView['resources'] {
     max: statValue(resource.max, state, registry),
     display: resource.display,
   }));
+}
+
+function publishAction(state: GameState, registry: Registry): PlayAction | null {
+  const active = state.activeAction;
+  if (!active) return null;
+  const { obj, objId } = parseOwnerRef(active.ownerRef);
+  const cycle = actionFirstUnit(obj, objId, active.actionLabel, registry, state);
+  const clock = active.cadences[PLAYER];
+  return {
+    label: active.actionLabel,
+    progress: cycle > 0 ? Math.min(1, Math.max(0, clock.progress / cycle)) : 1,
+    attempts: clock.attemptsMade,
+    targeted: Boolean(findActiveAction(active, registry).target),
+    completion: fromMilliUnits(active.implicitTarget),
+  };
 }
 
 export function apply(session: PlaySession, choiceId: string): PlayView {
@@ -248,7 +319,7 @@ export function beginAction(session: PlaySession, choiceId: string): PlayView {
   const choice = computeChoices(session).find((c) => c.id === choiceId);
   if (!choice) throw new RuntimeError(`unavailable choice: ${JSON.stringify(choiceId)}`);
   const directive = choiceToDirective(choice);
-  const { registry, state } = session;
+  const { registry, [STATE]: state } = session;
 
   // Arm, then route on what arming returned. Probing first asked for a quantity
   // computed against the state before arming, and arming can move what it
@@ -282,7 +353,7 @@ export function cancelAction(session: PlaySession): PlayView {
 // Answers by option key, so a driver that has never heard of the modal it is
 // answering can still answer it. One pair or the whole form, either way.
 export function submitModal(session: PlaySession, answers: Record<string, string>): PlayView {
-  answerModal(session.state, session.registry, answers);
+  answerModal(session[STATE], session.registry, answers);
   return view(session);
 }
 
@@ -300,7 +371,7 @@ function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'travel' | 'craft
 // `run:` is excluded: it recurses into another test, which only runTest can do
 // with its cyclic-run detection.
 export function applyDirective(session: PlaySession, directive: Directive): { failure?: string } {
-  const { registry, state } = session;
+  const { registry, [STATE]: state } = session;
 
   switch (directive.kind) {
     case 'run':
@@ -377,7 +448,7 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
   const test = registry.tests.get(testId);
   if (!test) throw new RuntimeError(`unknown test: ${testId}`);
 
-  const session: PlaySession = { registry, state, logCursor: state.log.length };
+  const session: PlaySession = { registry, logCursor: state.log.length, [STATE]: state };
 
   for (const directive of test.directives) {
     if (directive.kind === 'run') {
@@ -395,4 +466,9 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
   if (open) return { passed: false, failure: `modal left open: ${open.name}` };
 
   return { passed: true };
+}
+
+// Replays a `# test` against the session in hand, which is what a driver has.
+export function runSessionTest(session: PlaySession, testId: string): TestResult {
+  return runTest(testId, session.registry, session[STATE]);
 }
