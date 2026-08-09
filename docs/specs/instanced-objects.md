@@ -316,3 +316,323 @@ because a reader arriving at this spec needs the answer more than the history of
 - proof 12: met — `npm run tasks -- merge-ready` at HEAD: tsc, npm test, layer-check, audit-status,
   doctor, bytes, tree, base, spec and clauses all pass. 17 doctor warnings, none of which fail a leg
   and none of which this branch introduced.
+
+### Pass 3 — 2026-08-09
+
+- base: `799585bd3c3d1c0e58186da3303294e61e803c8a`
+- head: `799585bd3c3d1c0e58186da3303294e61e803c8a`
+- proof 1: met — One field (src/runtime/state.ts:36 `instances: InstanceTable`), one SAVE_FIELDS row
+ (src/runtime/save.ts:51), one call in pruneStateForRegistry (src/runtime/save.ts:143).
+ `grep -rn "from './instances'|runtime/instances" src scripts` returns exactly save.ts:5,
+ state.ts:4 and the test, so both future consumers reach the table through one module and
+ nothing else in the tree can walk byId. Pass 1's tsc guard re-verified by this pass rather
+ than inherited: inserting `instances2: InstanceTable;` beside state.ts:36 and running
+ `npx tsc --noEmit` gives TS2741 at save.ts(40,7) and state.ts(44,3); file restored, tsc green.
+ Mutation c1-prune-rule-not-wired (save.ts:143 replaced with `void pruneInstances;`): KILLED,
+ 9 failed of 55, by instances.test.ts 'prunes the instance whose template is gone, and warns
+ like every other prune' and 8 more, re-run at its own file with the mutant still applied.
+ The branch also reuses the pattern that was already there rather than inventing one: modals
+ is the same shape (owner module, readonly field, isModalFrame in SAVE_FIELDS, pruneModals in
+ pruneStateForRegistry) and instances is a faithful copy of it.
+- proof 2: met — `grep -n "payload" src/runtime/instances.ts`: every access goes through a kind
+ method (holds, empty, repair), plus exactly two substrate-side reads, both structural rather
+ than semantic: `'payload' in held` at instances.ts:168 and a JSON.stringify inside one error
+ message at instances.ts:79, which is what save.ts:214 already does for every other field.
+ The module's import list is Registry, PruneWarning, GameState, RuntimeError and it names no
+ item, cluster, entity, plane or respawn concept anywhere. Mutation c7-live-answer-inverted
+ (the `live` callback handed to repair replaced with `() => true`): KILLED, 4 failed of 23 -
+ the substrate's only contribution to a payload's repair is the liveness answer it passes in,
+ and breaking that is visible, which is the seam being load-bearing rather than decorative.
+ Independently confirmed the seam is reachable from outside: a payload kind defined in a
+ scratch `npm run inspect` body, with a shape instances.ts has never seen, drives create,
+ load, prune and repair without the module learning anything about it.
+- proof 3: met — Three routes into the table, all closed, each mutation-killed by this pass.
+ Mint: mutation c3-mint-refuses-nothing (instances.ts:80 guard disabled) KILLED, 1 failed of
+ 23, by 'refuses a payload recording nothing, so no instance carries nothing'. Load and
+ repair share the fixed point: mutation c3-fixed-point-collapse (instances.ts:142 collapse
+ branch disabled) KILLED, 3 failed of 23, by 'drops a copy a # save wrote already recording
+ nothing, the one route past the refusal at the mint', 'drops a copy a repair left recording
+ nothing, and follows the reference that strands' and one more. The spec's open question
+ (eager or offered) is answered both ways on purpose: enforced at the mint, offered as
+ collapseInstance for a consumer that empties a payload mid-session, and both halves assert.
+- proof 4: met — Ids are decimal strings from a counter carried inside the table, so the mechanism
+ draws no randomness and touches no clock; instances.ts imports neither rng nor any clock.
+ Mutation c4-counter-does-not-advance (`table.next += 1` weakened to `+= 0`): KILLED, 7 failed
+ of 23, by 'never answers a removed id with a later instance', 'comes back with the same id
+ and the same payload' and 5 more. Mutation c4-minted-id-bound-dropped (isMintedId returns
+ true): KILLED by 'refuses an id no counter could have minted, which would collide with a real
+ one'. Round trip and counter survival are asserted by 'comes back with the same id and the
+ same payload' and 'keeps a counter that has run on past the instances it minted'.
+ One boundary recorded here so a next pass does not have to re-find it: for every state the
+ engine itself can produce, all four properties hold. They are breakable only through a
+ counter value that no mint could have reached and that checkSave does not refuse, which is a
+ hole in the load-side validator rather than in the mechanism. That is graded under c8, where
+ the promise to refuse it lives, and filed as a finding.
+- proof 5: met — instanceIsLive (instances.ts:95) is the one answer and everything asks it:
+ removeInstance, collapseInstance and the `live` callback the repair hook receives all route
+ through it, and `grep -n "in state.instances.byId|in table.byId" src/runtime` finds no second
+ derivation. Mutation c5-liveness-always-true (`return id in state.instances.byId` replaced
+ with `return true`): KILLED, 8 failed of 55. The guard acts where state is assembled:
+ pruneInstances is the first statement of pruneStateForRegistry, pinned by 'settles the table
+ before any other rule runs, so a field holding an id asks an answer that is final', which
+ asserts warning order equals rule order, and by mutation c1-prune-rule-not-wired: KILLED.
+ The honest limit pass 1 stated still stands and this pass re-confirmed it by grep: no field
+ of GameState holds an instance id yet, so what is proved is the shape a reference site will
+ ask, not a reference site. One live gap inside that limit is filed as a low finding -
+ removeInstance and collapseInstance delete without running the repair fixed point, so a
+ mid-session removal leaves stale ids in other payloads until the next load. That is
+ consistent with what c5 and c6 actually promise (the load-time pass) and is filed as a
+ contract-statement gap rather than graded against this clause.
+- proof 6: met — Two ways a template goes, both dropping with a PruneWarning of the same
+ {path,id,message} shape every other rule in save.ts produces, built inside pruneInstances
+ where it is owned. Mutation c6-template-prune (instances.ts:129 branch disabled): KILLED,
+ 6 failed of 23. Unknown-kind drop asserted by 'prunes an instance whose payload kind nothing
+ registered' with an exact one-element warning list. References repaired in the same pass:
+ 'repairs a reference to a pruned instance in the same pass that prunes it' asserts both
+ messages in order, and 'leaves a loaded state holding no reference to an instance that is
+ gone' asserts it end to end through serialize, parseSaveSection and loadSave. The fixed point
+ pass 2 added is real and this pass re-proved it independently: mutation
+ c6-one-round-is-not-a-fixed-point (the `settled = false` that forces another round flipped to
+ `settled = true`): KILLED, 1 failed of 23, by 'reports a repair once however many rounds the
+ table takes to settle'. Termination checked by reading rather than by test: a further round
+ is requested only by a drop, drops are the only table write in the loop and nothing adds
+ rows, so the loop is bounded by the table size and a badly-behaved repair costs duplicate
+ warnings rather than a hang.
+- proof 7: met — One extension point, InstanceKind, registered by defineInstanceKind.
+ `grep -rn "\.repair\(" src/runtime` returns exactly instances.ts:139 and nothing else, and
+ `grep -rn "byId" src` returns only instances.ts and its test, so no consumer can prune by
+ walking the table. Mutation c7-repair-hook-never-called (the repair call replaced with an
+ empty iterable): KILLED, 5 failed of 23. Mutation c7-live-answer-inverted (`live` replaced
+ with `() => true`): KILLED, 4 failed of 23 - which is what shows the count stays at one
+ rather than needing a sibling hook for reference repair, since a payload's stale declarations
+ and its stale instance references are the same call. The obligation pass 2 added to the
+ interface (return nothing when there is nothing left, because repair runs to a fixed point)
+ is stated on InstanceKind at instances.ts:51-52 and is the reason the once-only assertion in
+ c6's new case can be written at all.
+- proof 8: unmet — The additive half is fully met and mutation-proved; the validation half has a
+ reachable hole, so the clause is graded on its own second sentence.
+ Met and re-proved by this pass: SAVE_VERSION is still 7 and untouched in the diff;
+ 'is absent from a save that has none, and does not move SAVE_VERSION' asserts serializeSave
+ of a fresh state is exactly {version} and that a diff with no instances field resets a
+ populated table to the baseline; mutation c8-baseline-not-empty-table (createInstanceTable
+ returns next 2) KILLED, 2 failed of 55; mutation c8-save-field-holds-weakened (SAVE_FIELDS'
+ holds swapped from isInstanceTable to isObject) KILLED, 4 failed of 55; no fixture under
+ content/ moved and the merge gate's byte leg passes.
+ Not met: isInstanceTable (instances.ts:162-175) checks the counter with Number.isInteger and
+ nothing else, while isMintedId next to it is strict about every id. A hand-written `# save`
+ body holding a counter no mint could have reached is accepted at load and misread at first
+ use, which is exactly the failure this clause's second sentence names. Reproduced with
+ `npm run inspect`, both directions:
+ with instances {next: Number.MAX_VALUE, byId: {}} the load is accepted, `table.next += 1` is
+ a no-op at that magnitude, and two successive createInstance calls both return the id
+ '1.7976931348623157e+308' - one row in byId, the first instance's payload silently replaced
+ by the second's.
+ with instances {next: -1, byId: {}} the load is accepted and the first mint returns the id
+ '-1'; serializeSave then writes a body that the same validator refuses on reload with
+ 'save field instances holds ... which is not what instances keeps', so the engine produces a
+ save it cannot load back.
+ Re-run: npm run inspect with a body that defines any instance kind, calls loadSave with each
+ of those two diffs, then calls createInstance twice. Verified at HEAD 799585b.
+ The fix is two conditions in one predicate - Number.isSafeInteger(next) and next >= 0, which
+ is the bound every accepted id already implies through `Number(id) < next` - so no
+ over-strictness is introduced: every counter the engine can reach satisfies both. Filed as a
+ finding with that deliverable.
+- proof 9: met — `git diff --stat 0115673..799585b -- content src/grammar src/content src/ui .github`
+ is empty, so no authored content gained any way to make an instance, no `# save` or `expect:`
+ fixture moved and no CI leg changed. The whole diff is four files under src/runtime plus
+ three unowned docs and systems.json. `npx vitest run --reporter=dot` at HEAD: 80 files,
+ 2119 of 2119 passed, including integration.test.ts which replays every shipped `# test`.
+ The merge gate's byte leg passes (every tracked text file valid UTF-8, no NUL bytes) and its
+ tree leg reports nothing uncommitted. The substrate is inert without a registered kind and
+ `grep -rn "test-token" src content scripts` returns one line, instances.test.ts:42, so the
+ only kind in the tree cannot be reached from shipped content. Checked the one way a new
+ GameState field could leak observably: `grep -rn "Object.keys(state)|keyof GameState" src
+ scripts` finds only save.ts's SaveField type and diffRecord's per-record key union, so no
+ loop over GameState silently gains a member.
+- proof 10: met — `test-token` is defined at src/runtime/instances.test.ts:42 and registered
+ nowhere else in the tree, and .test.ts files reach no bundle, so shipped content cannot name
+ it. Its payload carries free-form notes, a registry stat id and links to other instances,
+ which between them is every way a payload goes stale, and 23 cases walk the lifecycle the
+ clause enumerates. This pass did not inherit the earlier passes' mutation results: it wrote
+ its own twelve-entry manifest aimed at the lines it judged each clause to be about, and all
+ twelve came back KILLED with named killers, 0 survived, 0 unstable, 0 errored, tree gained
+ and lost nothing. Checked the assertions for the shape that cannot fail: the load-bearing
+ ones can - 'is absent from a save that has none' asserts an exact object, the nonsense cases
+ assert a throw over five and seven enumerated bodies, and 'draws no randomness' compares
+ nextRandom across two states and would fail the moment minting touched the cursor. Two
+ weaker spots recorded rather than filed: 'reports a repair once however many rounds' also
+ asserts Object.keys order, which is an artifact of insertion order rather than a promise,
+ and 'accepts a payload whose kind nothing registered' calls isInstanceTable directly instead
+ of going through loadSave. Neither is the clause's load-bearing assertion.
+- proof 11: met — `npm run tasks -- log --spec instanced-objects --op decision` returns six
+ decision events, four of them the walk itself: items-mods-and-crafting c11, c15 and c21 read
+ against the built substrate with the mapping written out for each; the settled combat spawn
+ model read against it; the correction that the combat consumer is one durable thing (the
+ player) rather than four, with the reasoning for why no clause changes; and the walk's two
+ leftovers, one fixed on this branch (prune order, which is why pruneInstances is first) and
+ one left to the consumer (RecordPrune.loaded takes no state). Both leftovers exist as open
+ records in the store outside every spec, so the first branch to register a real payload kind
+ finds them in the queue - confirmed present in the brief's own prior-art list for
+ src/runtime/save.ts. The walk also produced a constraint the substrate does not enforce and
+ both payloads must respect (a payload round-trips through JSON.stringify, so no Map or Set),
+ which is recorded rather than absorbed. This is a clause discharged by recorded reasoning
+ rather than by a test, and the record is complete and queryable.
+- proof 12: met — `npm run tasks -- merge-ready` at HEAD 799585b: tsc pass, layer-check pass (814
+ cross-file imports across 5 layers, every import downward), audit-status pass (the partition
+ holds and this branch's two new files are declared under Runtime with the `object instancing`
+ concept over instances.ts), doctor pass (17 warnings, none introduced by this branch, none
+ failing a leg), bytes pass, tree pass, spec pass.
+ Two legs report red at this HEAD and neither is a defect of this diff, which is why the
+ clause is graded met with the caveat written down rather than left for a next pass to
+ rediscover:
+ base - 'main has moved past the merge base', which is structural: this branch is already
+ merged into main, which is also why this brief has to be run with --base-branch 0115673 to
+ resolve a diff at all. merge-ready takes no equivalent flag. Filed as friction.
+ npm test - 5 of 2119 failed, every one a 5000ms timeout on a spawn-heavy test under full
+ suite load (rng.test.ts, auditPrompt.test.ts, doctor.test.ts, handoff.test.ts,
+ mergeReady.test.ts), none of them touching anything in this diff. The identical bytes ran
+ 2119 of 2119 green standalone under `npx vitest run --reporter=dot` two minutes earlier.
+ This is the fourth-and-now-fifth occurrence of an existing record; recurrence filed rather
+ than a second record.
+
+### Pass 4 — 2026-08-09
+
+- base: `ea9ce1cd4964f4cef0058787d22653f7122f3ce5`
+- head: `ea9ce1cd4964f4cef0058787d22653f7122f3ce5`
+- proof 1: met — Re-read at ea9ce1c; the fix touched only instances.ts and its test, so the shape is
+ unchanged and re-verified rather than assumed. One field (state.ts:36), one SAVE_FIELDS row
+ (save.ts:51), one call in pruneStateForRegistry (save.ts:143).
+ `grep -rn "from './instances'|runtime/instances" src scripts` still returns exactly save.ts:5,
+ state.ts:4 and the test. The tsc guard re-run by hand in pass 3 (inserting a second
+ InstanceTable field gives TS2741 at save.ts(40,7) and state.ts(44,3)) is unaffected, because
+ the fix added no field and no SAVE_FIELDS row. Mutation c1-prune-rule-not-wired: KILLED,
+ 9 failed of 58, by 'prunes the instance whose template is gone, and warns like every other
+ prune' and 8 more.
+- proof 2: met — Re-checked specifically because the fix added code to createInstance, which is the
+ one function that takes a payload from a consumer. It added no payload access:
+ `grep -n "payload" src/runtime/instances.ts` still shows every access going through a kind
+ method, plus `'payload' in held` at instances.ts:172 and one JSON.stringify inside an error
+ message. The new guard reads table.next and nothing else, and its error message names the
+ counter rather than the payload. Mutation c7-live-answer-inverted (the `live` callback handed
+ to repair replaced with `() => true`): KILLED, 4 failed of 26, so the substrate's one
+ contribution to a payload's repair is still load-bearing. Independently re-driven through a
+ payload kind defined in an inspect body with a shape instances.ts has never seen: create,
+ load, prune and repair all work without the module learning anything about it, and the new
+ counter guard fired on that foreign kind exactly as it does on the test kind.
+- proof 3: met — Mint, load and repair all still closed, and the mint route re-checked because the
+ fix inserted a throw two lines below c3's own guard. Order is right: holds, then empty, then
+ the counter guard, so a payload recording nothing is still refused for that reason rather
+ than masked by the new one. Mutation c3-mint-refuses-nothing: KILLED, 1 failed of 26.
+ Mutation c3-fixed-point-collapse: KILLED, 3 failed of 26, by 'drops a copy a # save wrote
+ already recording nothing, the one route past the refusal at the mint' and 2 more. Both are
+ the pass-3 mutations re-run unchanged, so the laziness proof did not regress.
+- proof 4: met — All four properties re-proved, and the fix strengthens this clause rather than
+ only c8: the counter is now the one thing that cannot be pushed out of the range where
+ `+ 1` moves it, which is what "an id, once minted, names the same instance for that
+ instance's whole life" actually rests on. Mutation c4-counter-does-not-advance: KILLED,
+ 9 failed of 26 (up from 7 at pass 3 - the fix's own two new tests also catch it).
+ Mutation c4-minted-id-bound-dropped: KILLED, 3 failed of 58. Mutation
+ c4-minted-id-regex-dropped (the spelling half of isMintedId removed, leaving only the
+ ordering half): KILLED, 3 failed of 58 - worth aiming now that the counter is routed through
+ the same function, because the spelling half is what rejects an exponential counter.
+ The top of the range is proved end to end by 'never writes a save it would refuse to load,
+ and refuses to mint rather than break that': load at MAX_SAFE_INTEGER - 1, mint, serialize,
+ reload clean, and the mint after that throws. Last mintable id is 9007199254740990.
+- proof 5: met — Unchanged by the fix and re-verified. instanceIsLive (instances.ts:99) is the one
+ answer; mutation c5-liveness-always-true: KILLED, 8 failed of 58. pruneInstances is still the
+ first statement of pruneStateForRegistry, pinned by 'settles the table before any other rule
+ runs' and by mutation c1-prune-rule-not-wired: KILLED. The honest limit stands: no field of
+ GameState holds an instance id yet, so what is proved is the shape a reference site will ask.
+ The low finding pass 3 filed against removeInstance and collapseInstance (they delete without
+ running the repair fixed point, while instances.ts tells reference sites not to check at
+ read) is untouched by this fix and still stands.
+- proof 6: met — Unchanged by the fix and re-verified. Mutation c6-template-prune: KILLED, 6 failed
+ of 26. Mutation c6-one-round-is-not-a-fixed-point: KILLED, 1 failed of 26, by 'reports a
+ repair once however many rounds the table takes to settle'. Warning shape, path, order and
+ the end-to-end 'leaves a loaded state holding no reference to an instance that is gone' all
+ still assert. Termination re-argued against the new code: the fix added no table write and no
+ loop, so a further round is still requested only by a drop and the loop is still bounded by
+ the table size.
+- proof 7: met — Unchanged by the fix and re-verified. `grep -rn "\.repair\(" src/runtime` returns
+ exactly one line inside pruneInstances; `grep -rn "byId" src` returns only instances.ts and
+ its test, so no consumer can prune by walking the table. Mutation c7-repair-hook-never-called:
+ KILLED, 5 failed of 26. Mutation c7-live-answer-inverted: KILLED, 4 failed of 26. The
+ extension-point count is still one, and the fix added no hook and no call site.
+- proof 8: met — Regraded from unmet. Both pass-3 reproductions are closed and I re-ran them at
+ ea9ce1c: instances {next: Number.MAX_VALUE, byId: {}} and {next: -1, byId: {}} are now both
+ refused by checkSave, so neither the double-mint nor the unloadable-save route exists.
+ The claim I was asked to attack is that the accepted set is closed under minting - that the
+ engine never writes a save it would refuse to load. I attacked it at the boundary and it
+ holds. Drove every candidate counter end to end through loadSave, createInstance and back
+ through isInstanceTable on the serialized result: 0, 1, MAX_SAFE_INTEGER - 2,
+ MAX_SAFE_INTEGER - 1, MAX_SAFE_INTEGER, 2^53, 2^53+2, 2^53+6, 2^53+10. Every counter that
+ loads and mints produces a table this validator still accepts. There is no value that loads,
+ mints, and lands on a rejected table, which was the stated test for c8 remaining unmet.
+ The boundary is exactly right where it has to be: at MAX_SAFE_INTEGER the mint would produce
+ a table whose counter is 2^53, which the validator rejects, and createInstance refuses that
+ mint - so the guard is not over-strict either, it stops precisely one short of the first
+ unsafe successor.
+ Mutations, all aimed by this pass at the fix's own two lines and all KILLED:
+ c8-counter-check-reverted-to-isinteger (the pre-fix rule put back) killed by 'refuses a
+ counter that could not spell a legal id next'; c8-counter-successor-too-loose (next + 2)
+ killed by the same; c8-counter-check-type-only killed by two; c8-mint-saturation-guard-dropped
+ killed by 'never writes a save it would refuse to load, and refuses to mint rather than break
+ that'; c8-mint-guard-off-by-one (isSafeInteger(next) instead of isSafeInteger(next + 1))
+ killed by the same. The additive half re-proved unchanged: SAVE_VERSION still 7, mutation
+ c8-baseline-not-empty-table KILLED, mutation c8-save-field-holds-weakened KILLED 5 of 58.
+ One thing the fix's own stated boundary gets wrong, filed as a low finding rather than held
+ against this grade because it cannot corrupt anything: the accepted set is not [0, 2^53-1].
+ isInstanceTable also accepts every counter in [2^53, 2^54) congruent to 2 mod 4 - 2^51 values -
+ because at that magnitude `next + 1` is a tie that rounds up by 2 when the significand is odd,
+ so the successor the rule checks against is not one the counter can reach. Measured: 100000
+ of 200000 sampled even steps above 2^53 load clean, with 0 mismatches against the mod-4
+ prediction, and nothing above 2^54 leaks. Every one of those tables is then refused by
+ createInstance's separate isSafeInteger guard, so the promise this clause makes survives -
+ such a save loads and the first mint throws a named RuntimeError rather than misreading
+ anything. That is why the grade is met and the finding is low.
+- proof 9: met — Re-run at ea9ce1c.
+ `git diff --stat 0115673..ea9ce1c -- content src/grammar src/content src/ui .github` is empty,
+ so the fix changed no authored surface, no fixture and no CI leg; the whole branch is four
+ files under src/runtime. `npx vitest run --reporter=dot` at this head: 80 files, 2122 of 2122
+ passed, including integration.test.ts which replays every shipped `# test`. The three new
+ tests are the whole delta from pass 3's 2119. The merge gate's byte and tree legs pass.
+ The one way the fix could have changed observable behaviour is the throw it added to a path
+ that never threw, so I checked its reach rather than assuming it: it fires only when
+ table.next + 1 is not a safe integer, createInstanceTable starts at 1, and the guard itself
+ caps the counter, so no state the engine can reach from a fresh game arrives there. The only
+ route in is a hand-written `# save` at 2^53 magnitude, and `grep -rn "test-token" src content
+ scripts` still returns one line, so shipped content cannot make an instance at all.
+- proof 10: met — 26 cases now, three added by the fix, and the test-only kind is still defined at
+ instances.test.ts:42 and registered nowhere else. This pass did not reuse the fix author's
+ mutations: it wrote 18 of its own, five aimed at the two lines the fix added and thirteen
+ re-run from pass 3 as a regression check, and all 18 came back KILLED with named killers,
+ 0 survived, 0 unstable, 0 errored, tree gained and lost nothing.
+ Checked the three new tests for the shape that cannot fail. 'never writes a save it would
+ refuse to load, and refuses to mint rather than break that' is the strongest of them - it
+ asserts a real round trip through serializeSave and parse, and it is what kills both
+ mint-guard mutations, so it can be false in both directions. 'mints a distinct id from every
+ counter a save is allowed to carry' can be false and is one of the nine killers of
+ c4-counter-does-not-advance. One weakness recorded rather than filed against this clause:
+ 'refuses a counter that could not spell a legal id next' encodes the author's boundary claim
+ rather than the boundary, and its refused vector stops at MAX_SAFE_INTEGER + 1, which is 2^53
+ and happens to be refused because its significand is even. The very next representable value,
+ 2^53 + 2, is accepted, and no case reaches it. That is the low finding, and it is a test
+ vector chosen from the claim instead of from the arithmetic.
+- proof 11: met — `npm run tasks -- log --spec instanced-objects --op decision` still returns the
+ six decision events pass 3 verified: items-mods-and-crafting c11, c15 and c21 read against
+ the built substrate with the mapping written out; the settled combat spawn model read against
+ it; the correction that the durable combat consumer is one thing rather than four; and the
+ walk's two leftovers, one fixed on the branch and one left to the consumer, both present as
+ open records in the store. Re-read against the fix rather than only re-counted: neither
+ consumer's mapping changes, because the counter guard is invisible to a payload - the item
+ payload and the entity payload are minted the same way and the only new behaviour is a refusal
+ at a magnitude no consumer will reach. The JSON-only constraint the walk recorded still holds.
+- proof 12: met — `npm run tasks -- merge-ready` at ea9ce1c: tsc pass, layer-check pass,
+ audit-status pass, doctor pass (17 warnings, none introduced here), bytes pass, tree pass,
+ spec pass, and base now pass - 'main has not moved past the merge base', which is the leg
+ that was structurally red at pass 3 and is green now that main carries the branch.
+ npm test reported 2 of 2122 failed, both 5000ms timeouts on spawn-heavy tests
+ (doctor.test.ts, handoff.test.ts) that touch nothing in this diff, while the identical bytes
+ ran 2122 of 2122 green standalone under npx vitest run minutes earlier. Sixth occurrence of
+ an existing record; recurrence filed rather than a second record, and the clause is graded on
+ the standalone run plus the eight green legs.

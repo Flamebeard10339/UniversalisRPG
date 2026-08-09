@@ -108,6 +108,34 @@ describe('creating an instance', () => {
     expect(second).not.toBe(first);
     expect(instanceIsLive(state, first)).toBe(false);
   });
+
+  // The counters a `# save` may carry and the ones a mint may advance are one
+  // set on purpose, so the two tests below are the same property from each end:
+  // no accepted table mints a collision, and no mint leaves the accepted set.
+  it('mints a distinct id from every counter a save is allowed to carry', () => {
+    const registry = loadModule(MODULE);
+    for (const next of [0, 1, Number.MAX_SAFE_INTEGER - 2]) {
+      const state = createGameState();
+      loadSave(state, { version: SAVE_VERSION, diff: { instances: { next, byId: {} } } }, registry);
+      const first = createInstance(state, TOKEN, 'charm', token({ notes: ['first'] }));
+      const second = createInstance(state, TOKEN, 'charm', token({ notes: ['second'] }));
+
+      expect(second, String(next)).not.toBe(first);
+      expect(Object.keys(state.instances.byId), String(next)).toEqual([first, second]);
+      expect(instance(state, first)!.payload, String(next)).toEqual(token({ notes: ['first'] }));
+    }
+  });
+
+  it('never writes a save it would refuse to load, and refuses to mint rather than break that', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    loadSave(state, { version: SAVE_VERSION, diff: { instances: { next: Number.MAX_SAFE_INTEGER - 1, byId: {} } } }, registry);
+    createInstance(state, TOKEN, 'charm', token({ notes: ['the last one'] }));
+
+    const written = serializeSave(state, registry);
+    expect(() => loadSave(createGameState(), parse(written), registry)).not.toThrow();
+    expect(() => createInstance(state, TOKEN, 'charm', token({ notes: ['one too many'] }))).toThrow(/cannot advance without minting one id twice/);
+  });
 });
 
 describe('liveness is answered in one place', () => {
@@ -176,6 +204,15 @@ describe('a # save body holding nonsense in the instance table', () => {
   it('refuses a table that is not one', () => {
     for (const body of [3, null, [], { byId: {} }, { next: 1 }, { next: 1.5, byId: {} }, { next: 1, byId: [] }]) {
       expect(load(body), JSON.stringify(body)).toThrow(/save field instances holds/);
+    }
+  });
+
+  it('refuses a counter that could not spell a legal id next', () => {
+    for (const next of [-1, Number.MAX_VALUE, Number.MAX_SAFE_INTEGER + 1, Number.NaN, Number.POSITIVE_INFINITY, '3']) {
+      expect(load({ next, byId: {} }), String(next)).toThrow(/save field instances holds/);
+    }
+    for (const next of [0, 1, Number.MAX_SAFE_INTEGER]) {
+      expect(load({ next, byId: {} }), String(next)).not.toThrow();
     }
   });
 
