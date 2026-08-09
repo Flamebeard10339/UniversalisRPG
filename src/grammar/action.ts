@@ -257,14 +257,19 @@ export function actionTableProblem(action: Action): string | undefined {
   const value = action.time ?? (typeof action.rate === 'number' ? action.rate : undefined);
   if (value !== undefined && !(value > 0)) return `${written} must be positive — something that takes no time carries no cadence at all`;
 
-  return twoSidedProblem(action);
-}
-
-function twoSidedProblem(action: Action): string | undefined {
   if (!isTwoSided(action)) return undefined;
   const unmarked = sidedFields(action).find((field) => field.value.side === undefined);
   if (unmarked) return `${unmarked.written}: ${unmarked.value.id} names no side — write ${SIDES.map((side) => `${side} ${unmarked.value.id}`).join(' or ')}, because this action already names one`;
-  if (!action.depletes) return 'a side-naming action with nothing to deplete is not a contest — write `depletes: their <pool>`';
+  return undefined;
+}
+
+// What is true of a WHOLE action and not of a fragment. An entity's overload
+// names only what it changes, so a block that writes a side and leaves the
+// pool to the declaration it overlays is well-formed until the two are one.
+export function assembledActionProblem(action: Action): string | undefined {
+  const problem = actionTableProblem(action);
+  if (problem) return problem;
+  if (isTwoSided(action) && !action.depletes) return 'a side-naming action with nothing to deplete is not a contest — write `depletes: their <pool>`';
   return undefined;
 }
 

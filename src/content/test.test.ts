@@ -1,8 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { parseModule } from './module';
 import { DslError } from '../grammar/parser';
+import { parseDirectiveLine } from './test';
 
 const ref = (...path: string[]) => ({ kind: 'reference' as const, reference: { path } });
+
+// Both readings can match one line, and which it is has to be decided rather
+// than fall out of the order the two regexes are tried in.
+describe('use: has two payloads and one rule for telling them apart', () => {
+  it('reads a leading object kind as the dotted form, however the label ends', () => {
+    expect(parseDirectiveLine('use: entity.mirror.look on shelf')).toEqual({ kind: 'use', obj: 'entity', objId: 'mirror', actionId: 'look on shelf' });
+    expect(parseDirectiveLine('use: entity.giant-rat.fight')).toEqual({ kind: 'use', obj: 'entity', objId: 'giant-rat', actionId: 'fight' });
+  });
+
+  it('reads anything else before the first dot as the two-sided form', () => {
+    expect(parseDirectiveLine('use: melee-combat on giant-rat')).toEqual({ kind: 'use-on', action: 'melee-combat', target: 'giant-rat' });
+    expect(parseDirectiveLine('use: orc-pack.swing on orc-pack.rat')).toEqual({ kind: 'use-on', action: 'orc-pack.swing', target: 'orc-pack.rat' });
+  });
+
+  it('keeps an unknown object kind readable as the dotted form, so the load path can name it', () => {
+    expect(parseDirectiveLine('use: creature.dummy.strike')).toEqual({ kind: 'use', obj: 'creature', objId: 'dummy', actionId: 'strike' });
+  });
+
+  it('decides a begin: payload by the same rule', () => {
+    expect(parseDirectiveLine('begin: use entity.mirror.look on shelf')).toEqual({ kind: 'begin', inner: { kind: 'use', obj: 'entity', objId: 'mirror', actionId: 'look on shelf' } });
+    expect(parseDirectiveLine('begin: use melee-combat on giant-rat')).toEqual({ kind: 'begin', inner: { kind: 'use-on', action: 'melee-combat', target: 'giant-rat' } });
+  });
+});
 
 describe('test: composable in-game scripts', () => {
   it('parses a run composition alongside the other directives and an assert', () => {

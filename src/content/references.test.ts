@@ -283,6 +283,26 @@ describe('an overload governs only its own entity', () => {
   });
 });
 
+describe('the slot vocabulary is what entities declare', () => {
+  const NL = String.fromCharCode(10);
+  const wearing = (slots: string): string => VALID.replace('# entity player', `# entity player${NL}equipment-slots: ${slots}`);
+
+  it('refuses an item naming a slot nothing can wear, at load rather than at equip', () => {
+    expect(() => loadModule(wearing('head'))).not.toThrow();
+    expect(() => loadModule(wearing('mainhand'))).toThrow(/# item hat slot: names head, which no # entity declares among its equipment-slots:/);
+  });
+
+  it('takes the vocabulary from any entity, not from the player alone', () => {
+    const alsoTheDummy = wearing('mainhand').replace('# entity training-dummy', `# entity training-dummy${NL}equipment-slots: head`);
+    expect(() => loadModule(alsoTheDummy)).not.toThrow();
+  });
+
+  it('falls back to what items declare while no entity declares any', () => {
+    expect(() => loadModule(`${VALID}${NL}# test walk${NL}unequip: head${NL}`)).not.toThrow();
+    expect(() => loadModule(`${wearing('mainhand').replace('slot: head', 'slot: mainhand')}${NL}# test walk${NL}unequip: head${NL}`)).toThrow(/unequip: names an unknown slot: head/);
+  });
+});
+
 describe('a skill names the stat it raises', () => {
   it('checks stat-id like any other reference, though nothing reads it yet', () => {
     expect(loading('stat-id: attack', 'stat-id: attak')).toThrow(/# skill brawling stat-id: names an unknown stat: attak/);

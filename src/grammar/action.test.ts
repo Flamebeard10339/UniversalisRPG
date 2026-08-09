@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Action, actionBody, actionTableProblem, isTwoSided } from './action';
+import { Action, actionBody, assembledActionProblem, isTwoSided } from './action';
 import { Cursor } from './parser';
 import { splitSections } from './structure';
 
@@ -95,8 +95,11 @@ describe('contests', () => {
     }
   });
 
+  // Asked of a whole action rather than of a block: an entity's overload names
+  // only what it changes, and the pool may be on the declaration it overlays.
   it('refuses a side-naming action with nothing to deplete', () => {
-    expect(refusal('accuracy: my accuracy vs their evasion')).toContain('nothing to deplete is not a contest');
+    expect(assembledActionProblem(parse('accuracy: my accuracy vs their evasion'))).toContain('nothing to deplete is not a contest');
+    expect(parse('accuracy: my accuracy vs their evasion').accuracy).toBeDefined();
   });
 });
 
@@ -124,9 +127,9 @@ describe('how an action ends', () => {
 describe('the table over an assembled action', () => {
   it('applies the marker and depletes: rules to an action nobody authored a block for', () => {
     const compiled: Action = { label: 'Craft Bread', results: [], damage: { left: { side: 'my', id: 'attack' } } };
-    expect(actionTableProblem(compiled)).toContain('nothing to deplete is not a contest');
-    expect(actionTableProblem({ ...compiled, depletes: { id: 'health' } })).toContain('depletes: health names no side');
-    expect(actionTableProblem({ ...compiled, depletes: { side: 'their', id: 'health' } })).toBeUndefined();
+    expect(assembledActionProblem(compiled)).toContain('nothing to deplete is not a contest');
+    expect(assembledActionProblem({ ...compiled, depletes: { id: 'health' } })).toContain('depletes: health names no side');
+    expect(assembledActionProblem({ ...compiled, depletes: { side: 'their', id: 'health' } })).toBeUndefined();
   });
 });
 

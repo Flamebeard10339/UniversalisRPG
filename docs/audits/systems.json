@@ -145,6 +145,7 @@
         "src/runtime/enemy-pool.test.ts",
         "src/runtime/equipment.test.ts",
         "src/runtime/equipment.ts",
+        "src/runtime/fight.test.ts",
         "src/runtime/forwardProgress.ts",
         "src/runtime/instances.test.ts",
         "src/runtime/instances.ts",

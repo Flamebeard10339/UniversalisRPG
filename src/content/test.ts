@@ -41,6 +41,9 @@ const USE = new RegExp(`^use:[ \\t]*${USE_PAYLOAD}$`);
 const USE_ON = new RegExp(`^use:[ \\t]*${USE_ON_PAYLOAD}$`);
 const TRAVEL = new RegExp(`^travel:[ \\t]*${TRAVEL_PAYLOAD}$`);
 const CRAFT = new RegExp(`^craft:[ \\t]*${CRAFT_PAYLOAD}$`);
+// The kinds an object reference names. A line whose leading segment is one of
+// these is the dotted form, whatever else it holds.
+const OBJECT_KINDS: ReadonlySet<string> = new Set(['entity', 'item', 'location', 'recipe', 'travel']);
 const BEGIN = /^begin:[ \t]*(?<verb>use|travel|craft)[ \t]+(?<rest>.+)$/;
 const BEGIN_USE = new RegExp(`^${USE_PAYLOAD}$`);
 const BEGIN_USE_ON = new RegExp(`^${USE_ON_PAYLOAD}$`);
@@ -61,8 +64,8 @@ const SUBMIT_MODAL = /^submit-modal:[ \t]*(?<key>[a-z][a-z0-9-]*)=(?<value>.*)$/
 function parseBegin(text: string, verb: string, rest: string): Directive {
   if (verb === 'use') {
     const m = BEGIN_USE.exec(rest)?.groups;
-    if (m) return { kind: 'begin', inner: { kind: 'use', obj: m.obj, objId: m.objId, actionId: m.actionId } };
     const on = BEGIN_USE_ON.exec(rest)?.groups;
+    if (m && (OBJECT_KINDS.has(m.obj) || !on)) return { kind: 'begin', inner: { kind: 'use', obj: m.obj, objId: m.objId, actionId: m.actionId } };
     if (!on) throw new DslError(`malformed begin: use payload (expected obj.objId.actionId, or <action> on <target>): ${text}`);
     return { kind: 'begin', inner: { kind: 'use-on', action: on.action, target: on.target } };
   }
@@ -90,14 +93,13 @@ export function parseDirectiveLine(text: string): Directive | null {
   const choose = CHOOSE.exec(text)?.groups;
   if (choose) return { kind: 'choose', text: choose.text };
 
-  // The dotted form is tried first, because its `<obj>.<objId>.` prefix is the
-  // narrower shape: an action LABEL may hold the word "on", and reading
-  // `use: entity.mirror.look on shelf` as two-sided would make that label
-  // unaddressable.
+  // Both readings can match one line — an action LABEL may hold the word "on",
+  // and an action ID may hold dots. What decides is the leading segment: only
+  // the dotted form names an object kind there, so `entity.mirror.look on
+  // shelf` is one-sided and `orc-pack.swing on rat` is two-sided.
   const use = USE.exec(text)?.groups;
-  if (use) return { kind: 'use', obj: use.obj, objId: use.objId, actionId: use.actionId };
-
   const useOn = USE_ON.exec(text)?.groups;
+  if (use && (OBJECT_KINDS.has(use.obj) || !useOn)) return { kind: 'use', obj: use.obj, objId: use.objId, actionId: use.actionId };
   if (useOn) return { kind: 'use-on', action: useOn.action, target: useOn.target };
 
   const travel = TRAVEL.exec(text)?.groups;

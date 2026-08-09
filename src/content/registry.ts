@@ -1,6 +1,6 @@
 import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { point } from '../grammar/range';
-import { Action, actionProblem, actionTableProblem, isTwoSided, sidedFields } from '../grammar/action';
+import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields } from '../grammar/action';
 import { Condition } from '../grammar/condition';
 import { Dialogue } from './dialogue';
 import { DropTable } from './dropTable';
@@ -370,7 +370,7 @@ interface ActionOwner {
 // where the section that owns the action can name itself.
 function validateActionTable(kind: string, id: string, owner: ActionOwner): void {
   for (const action of owner.actions ?? []) {
-    const problem = actionTableProblem(action);
+    const problem = assembledActionProblem(action);
     if (problem) throw new DslError(`# ${kind} ${id} ${actionProblem(action.label, problem)}`);
   }
 }
@@ -643,6 +643,12 @@ function performerStatProblem(entity: Entity, action: Action, registry: Registry
 }
 
 function entityProblem(entity: Entity, registry: Registry): string | undefined {
+  for (const ally of entity.allies) {
+    // A side is you and your allies, so naming yourself makes you your own
+    // ally, and naming the player puts the player on both sides of the fight.
+    if (namesSame(entity.id, ally.entity) || ally.entity === entity.id) return `allies: names this entity itself: ${ally.entity}`;
+    if (namesSame(ally.entity, PLAYER_ENTITY)) return `allies: names the player, who is a side rather than a member of one: ${ally.entity}`;
+  }
   for (const handler of entity.handlers) {
     if (!registry.events.has(handler.event)) return `on ${handler.event}: names an unknown event: ${handler.event}`;
   }

@@ -87,14 +87,35 @@ uses: swing
 swing:
   +hidden if: truce
 
+// The same declaration, performed differently: this one hits for its own
+// hard-blow stat and swings at its own pace, and neither is on # action swing.
+# stat hard-blow
+base: 40
+
+# entity ogre
+stats: max-health 1000, attack 4, attack-rate 60, hard-blow 40
+uses: swing
+swing:
+  damage: my hard-blow vs their dr
+  rate: 30
+
+# entity urchin
+stats: max-health 100000, attack 4, attack-rate 60
+uses: swing
+aggressive
+
 # location camp
 x: 0, y: 0
 starting
-entities: 2 bandit-leader, boulder
+entities: 2 bandit-leader, boulder, ogre
 
 # location shore
 x: 1, y: 0
 entities: 3 crab
+
+# location reef
+x: 2, y: 0
+entities: urchin
 `;
 
 function loaded(): Registry {
@@ -153,15 +174,20 @@ describe('aggressive opens the fight, and a location bounds it', () => {
     expect(state.activeAction).toBeNull();
   });
 
-  // Travelling out is how a fight is broken off, and it needs no authored leash.
+  // Travelling out is how a fight is broken off, and it needs no authored
+  // leash. The urchin outlasts the span by four orders of magnitude, so the
+  // fight ending is the leash and never the fight being won.
   it('disengages when the target is no longer where the fight is', () => {
     const registry = loaded();
-    const state = standing(registry, 'shore');
-    resolve(state, registry, secondsToMs(1));
+    const state = standing(registry, 'reef');
+    armFightAction('swing', 'urchin', registry, state);
+
+    resolve(state, registry, secondsToMs(20));
     expect(state.activeAction).not.toBeNull();
+    expect(state.activeAction!.actors!['urchin'].resources['health']).toBeGreaterThan(0);
 
     state.location = 'camp';
-    resolve(state, registry, secondsToMs(2));
+    resolve(state, registry, secondsToMs(21));
     expect(state.activeAction).toBeNull();
   });
 });
@@ -222,6 +248,34 @@ describe('allies: is a roster, not a filter over what the location holds', () =>
 });
 
 describe('an overload governs its own entity performance', () => {
+  // Everything the overload says, not only the gates it writes: what swings is
+  // the performer's own copy of the declaration.
+  it('is what swings, so its damage: and rate: are the ones that land', () => {
+    const registry = loaded();
+    const state = standing(registry, 'camp');
+    armFightAction('swing', 'ogre', registry, state);
+
+    // The ogre's own copy: 40 a hit at 30/min, so one bite of 40 lands by t=2
+    // where the declaration would have landed two of 4.
+    resolve(state, registry, secondsToMs(2));
+    expect(toMilliUnits(1000) - state.resources['health']).toBe(toMilliUnits(40));
+  });
+
+  it('replaces what it names bare and adds to what it names with +', () => {
+    const registry = loaded();
+    const declaration = registry.actions.get('swing')!;
+    const overloaded = registry.entities.get('ogre')!.actions[0];
+    const gated = registry.entities.get('boulder')!.actions[0];
+
+    // Bare: the overload's damage: stands in for the declaration's.
+    expect(declaration.damage).toEqual({ left: { side: 'my', id: 'attack' }, right: { side: 'their', id: 'dr' } });
+    expect(overloaded.damage).toEqual({ left: { side: 'my', id: 'hard-blow' }, right: { side: 'their', id: 'dr' } });
+    expect(overloaded.depletes).toEqual(declaration.depletes);
+    // `+`: the declaration carries no gate, so appending to nothing is the gate.
+    expect(declaration.hiddenIf).toBeUndefined();
+    expect(gated.hiddenIf).toEqual({ kind: 'reference', reference: { path: ['truce'] } });
+  });
+
   it('stops that entity swinging without removing it', () => {
     const registry = loaded();
     const gated = standing(registry, 'camp');
@@ -289,6 +343,35 @@ describe('respawn after: is the thing own fact, and the count is the place own',
 
     resolve(state, registry, state.time + secondsToMs(600));
     expect(state.populations['camp']['bandit-leader']).toEqual({ down: 1, due: [] });
+  });
+});
+
+describe('a fight nobody can swing in is no fight', () => {
+  // `hidden if:` closing over every seat used to leave the action armed with
+  // no participant, which is a stall rather than an end.
+  it('ends rather than stalling when every seat gate has closed', () => {
+    // No ally, so the boulder's gated seat and the player's are the whole
+    // roster; taking the player's clock away leaves nobody at all.
+    const registry = loadModule(MODULE.replace(`uses: swing${String.fromCharCode(10)}allies: miki`, 'uses: swing'));
+    const state = standing(registry, 'camp');
+    state.flags['truce'] = true;
+    armFightAction('swing', 'boulder', registry, state);
+    expect(Object.keys(state.activeAction!.cadences)).toEqual([PLAYER]);
+    delete state.activeAction!.cadences[PLAYER];
+
+    resolve(state, registry, secondsToMs(5));
+    expect(state.activeAction).toBeNull();
+    expect(state.time).toBe(secondsToMs(5));
+  });
+});
+
+describe('allies: names somebody else', () => {
+  const withAlly = (line: string): string => MODULE.replace('# entity bandit\nfaction: bandits', `# entity bandit\nfaction: bandits\n${line}`);
+
+  it('refuses an entity that names itself, or the player, as its own ally', () => {
+    expect(() => loadModule(withAlly('allies: bandit'))).toThrow(/allies: names this entity itself/);
+    expect(() => loadModule(withAlly('allies: player'))).toThrow(/allies: names the player/);
+    expect(() => loadModule(withAlly('allies: miki'))).not.toThrow();
   });
 });
 

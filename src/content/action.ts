@@ -1,4 +1,4 @@
-import { Action, actionBody } from '../grammar/action';
+import { Action, actionBody, actionProblem, assembledActionProblem } from '../grammar/action';
 import { DslError } from '../grammar/parser';
 import { RawSection } from '../grammar/structure';
 import { humanize } from '../grammar/values';
@@ -19,5 +19,10 @@ export function parseActionSection(section: RawSection): ActionDeclaration {
   if (titles[0]?.children.length) throw new DslError(`# action ${section.id}: title takes no indented block`, titles[0].span);
   const label = titles[0] ? titles[0].text.replace(TITLE, '') : humanize(section.id);
   const body = section.body.filter((line) => !TITLE.test(line.text));
-  return { id: section.id, ...actionBody.parseBlock(body, label), label } as ActionDeclaration;
+  const declared = { id: section.id, ...actionBody.parseBlock(body, label), label } as ActionDeclaration;
+  // A declaration is whole where an entity's overload of it is a fragment, so
+  // this is where the rules about a whole action are asked.
+  const problem = assembledActionProblem(declared);
+  if (problem) throw new DslError(`# action ${section.id}: ${actionProblem(label, problem)}`, section.span);
+  return declared;
 }

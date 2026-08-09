@@ -27,11 +27,8 @@ function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatF
   }
 }
 
-// What an actor carries of its own. A save holds one store of buffs and one of
-// equipment, and they belong to the entity that save is about; every other
-// participant reads an empty store because it HAS none, not because this asks
-// who it is. Giving a second entity a store is `buffs-generalized`, and this is
-// the one place that would change when it does.
+// A state holds one store of buffs and one of equipment, and both belong to
+// `PLAYER`. Every other actor reads an empty store because it has none.
 function ownStores(state: GameState, actorId: string): { buffs: ActiveBuff[]; equipped: string[] } {
   const stored = actorId === PLAYER;
   return { buffs: stored ? Object.values(state.activeBuffs) : [], equipped: stored ? Object.values(state.equipped) : [] };

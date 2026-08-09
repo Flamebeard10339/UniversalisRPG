@@ -139,9 +139,18 @@ export interface Participant {
   cadence: Cadence;
 }
 
-function seatedAction(seat: Seat, registry: Registry): Action | undefined {
+// The performer's own copy first: an overload governs that entity's
+// performance of the action, so reading the top-level declaration back would
+// discard everything the overload said but its label.
+function seatedAction(seat: Seat, registry: Registry, actorId: string): Action | undefined {
   const dot = seat.ownerRef.indexOf('.');
-  const owner = findActionOwner(seat.ownerRef.slice(0, dot), seat.ownerRef.slice(dot + 1), registry) as { actions?: Action[] } | undefined;
+  const obj = seat.ownerRef.slice(0, dot);
+  const objId = seat.ownerRef.slice(dot + 1);
+  if (obj === 'action') {
+    const own = actorEntity(registry, actorId)?.actions.find((each) => declaredId(each) === objId);
+    if (own) return own;
+  }
+  const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   return owner?.actions?.find((each) => each.label === seat.actionLabel);
 }
 
@@ -151,7 +160,7 @@ export function participants(state: GameState, registry: Registry): Participant[
   for (const [actorId, cadence] of Object.entries<Cadence>(active.cadences)) {
     const seat = active.roster?.[actorId];
     if (!seat) continue;
-    const action = seatedAction(seat, registry);
+    const action = seatedAction(seat, registry, actorId);
     if (action && performable(action, state)) list.push({ self: actorId, other: seat.target, action, cadence });
   }
   return list;

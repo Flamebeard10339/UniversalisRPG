@@ -317,6 +317,14 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       }
     }
 
+    // Nobody is swinging, so there is no fight: every seat's own gates have
+    // closed and leaving the action armed would stall it forever.
+    if (roster.length === 0) {
+      endAction(state);
+      advanceTime(state, segEnd - state.time);
+      return;
+    }
+
     if (!next || nextAt > segEnd) {
       const elapsed = segEnd - state.time;
       for (const participant of roster) participant.cadence.progress += elapsed;

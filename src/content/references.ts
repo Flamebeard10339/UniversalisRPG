@@ -36,25 +36,27 @@ export function registryCapabilities(registry: Registry): Set<string> {
 
 // Items supply the slot vocabulary the way entities supply capabilities, so a
 // slot demanded by name is checked against what some item actually declares.
+// Entities supply the slot vocabulary the way they supply capabilities, and
+// items fall back to supplying it only while no entity declares any — a
+// vocabulary read off `slot:` alone quietly gives a rat a head.
 export function registrySlots(registry: Registry): Set<string> {
-  // Declared where an entity says what it can wear, and inferred from items
-  // only while nothing declares any — a vocabulary read off `slot:` alone
-  // quietly gives a rat a head.
-  const declared = registry.player?.equipmentSlots ?? [];
-  if (declared.length > 0) return new Set(declared);
+  const declared = new Set<string>();
+  for (const entity of registry.entities.values()) for (const slot of entity.equipmentSlots) declared.add(slot);
+  if (declared.size > 0) return declared;
   const slots = new Set<string>();
   for (const item of registry.items.values()) if (item.slot !== undefined) slots.add(item.slot);
   return slots;
 }
 
-// An item naming a slot the wearer does not declare can never be equipped, so
-// it is a load error rather than a refusal at the moment it is spent.
+// An item naming a slot nothing can wear can never be equipped, so it is a load
+// error rather than a refusal at the moment it is spent.
 export function validateItemSlots(registry: Registry): void {
-  const declared = registry.player?.equipmentSlots ?? [];
-  if (declared.length === 0) return;
+  const declared = new Set<string>();
+  for (const entity of registry.entities.values()) for (const slot of entity.equipmentSlots) declared.add(slot);
+  if (declared.size === 0) return;
   for (const item of registry.items.values()) {
-    if (item.slot !== undefined && !declared.includes(item.slot)) {
-      throw new DslError(`# item ${item.id} slot: names ${item.slot}, which # entity ${registry.player!.id} does not declare among its equipment-slots:`);
+    if (item.slot !== undefined && !declared.has(item.slot)) {
+      throw new DslError(`# item ${item.id} slot: names ${item.slot}, which no # entity declares among its equipment-slots:`);
     }
   }
 }
