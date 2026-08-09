@@ -1,5 +1,34 @@
 # combat-events
 
+> **This spec needs another planning session before it is worked.** `combat-encounter-grammar`
+> settled the encounter grammar on 2026-08-09 (`docs/combat/encounter-grammar.md`) and three things
+> below rest on the grammar it replaces. None of this branch's recorded decisions is overturned —
+> thorns stays a persistent effect, rage stays a resource, the chance mechanism stays `droptables`',
+> the event vocabulary stays closed — and the mechanism survives whole. What has to be re-planned:
+>
+> 1. **The host.** This spec's lead example is a weapon that poisons its target, scoped by declaring
+>    `on hit:` on an action. Under today's grammar the swing is `fight:` on the foe, so the only
+>    thing an author can actually scope a hook to is *this rat*, not this weapon. The new grammar's
+>    top-level `# action`, referenced by an entity's `uses:`, is the per-weapon host this was written
+>    for — so the scope argument for keeping action-declared and actor-carried hooks both gets
+>    stronger, and the branch should be ordered after `full-refactor-of-enemies-and-combat` rather
+>    than authoring hooks onto blocks that are about to move.
+> 2. **`on hit:` / `on hit self:` must both be marked.** One unmarked block whose results land on the
+>    struck actor and one marked block whose results land on the swinger is exactly the defect
+>    `combat-encounter-grammar` exists to remove, one level up: the recipient is a rule in another
+>    file rather than a fact on the page. Under that grammar's `my`/`their` vocabulary they are
+>    `on hit them:` and `on hit me:`.
+> 3. **Two clauses dissolve rather than move.** "A hook on an action that cannot swing is a load
+>    error", tested by `resolvesPerAttempt` over `accuracy:`/`target:`, has nothing to range over
+>    once those fields leave actions — a hook lives on a two-sided action and a two-sided action
+>    always swings. And the depletion clause is written in terms of "a retaliation that empties a
+>    pool"; `retaliates` is deleted and retaliation becomes unconditional, so that clause needs
+>    restating in terms of any participant's swing.
+>
+> The requirement recorded against this record on 2026-08-07 — that a persistent effect's results
+> must be able to name the other party in the moment — is supplied by the new grammar rather than
+> left open: `my` and `their` are how a two-sided moment names its parties.
+
 ## Deliverable
 
 The runtime gains the strategies; the DSL keeps the shapes and the names. An action can declare
