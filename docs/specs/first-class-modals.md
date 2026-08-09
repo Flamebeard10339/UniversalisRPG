@@ -2,17 +2,20 @@
 
 ## Goal
 
-Leave the runtime with one modal mechanism instead of several, published as a name and its options,
-so that the screens the game still has to grow — inventory, shop, quest journal, craft menu — cost
-content rather than engine, and so a `# test` can answer a modal instead of ending on one.
+Leave the runtime with one modal mechanism instead of several — one stack, one open, one close, one
+published name-and-options shape — so that the screens the game still has to grow are a definition
+against that shape rather than a mechanism of their own, and so a `# test` can answer a modal
+instead of ending on one. Declaring a modal in content is a separate deliverable and is not this
+one; see the Decisions.
 
 ## Deliverable
 
 The runtime gains one modal concept and stops having several. A modal is a named screen that
 presents options, sits atop whatever is beneath it, and is cleared by the player choosing one of
 those options. Character creation and dialogue are both instances of it rather than two bespoke
-mechanisms, and the main action sheet, inventory, shop, quest journal and craft menu become
-expressible as modals without further engine work. The engine publishes a modal's name and its
+mechanisms, and the main action sheet, inventory, shop, quest journal and craft menu become one
+definition each against that shape — a name, its options, and what its answer does — rather than a
+mechanism each. The engine publishes a modal's name and its
 options and never its presentation — every rendering layer decides for itself how a named modal
 looks. Opening and closing each happen in exactly one place. A `submit-modal:` directive gives the
 DSL a way to answer a modal, which is what lets `runTest` stop reporting a test that ends holding an
@@ -72,6 +75,19 @@ to answer that modal until `submit-modal:` exists.
   2026-07-29.
 - **The engine never describes presentation.** It publishes name and options; each rendering layer
   owns how that is drawn. Settled 2026-07-29.
+- **A modal is defined in the engine, not authored in content, and that is where this branch
+  stops.** Pass 1 was right that `DEFINITIONS` enumerates every modal that can be opened, and the
+  Goal originally read as though content could add one. Making that true needs a `# modal` DSL
+  section, a registry kind, and a way for content to say what an answer *does* — and the layer
+  ordering forbids the cheap half on its own, since `src/content` sits below `src/runtime` and
+  cannot see the engine's modal names to validate an `open modal:` at load time. Filed as
+  `content-declared-modals`. What this branch delivers is the shape those definitions are written
+  against, which is the part every one of them would otherwise have invented separately.
+- **An `open modal:` naming a modal nothing defines raises a `RuntimeError` where it used to be
+  inert.** Before, the name was stored and every driver ignored it, so an author's typo was a screen
+  that never appeared and never complained. It now fails the way an unknown `restore:` resource
+  already does, in the same switch, mid-action — consistent with the existing posture rather than a
+  new one, and loud at first play rather than silent forever.
 - **Saves break rather than migrate.** `loadSave` refuses any `version` that is not exactly
   `SAVE_VERSION` and no migration path exists, so turning `pendingModal` into a stack bumps the
   version and invalidates older saves. That is this repository's existing posture, not a new one;

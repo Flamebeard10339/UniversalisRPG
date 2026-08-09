@@ -2,7 +2,7 @@ import { createGameState, GameState, initResources, RuntimeError } from './runti
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
 import { findActionOwner, parseOwnerRef } from './actions';
-import { pruneModals } from './modals';
+import { isModalFrame, pruneModals } from './modals';
 import { PLAYER } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
@@ -50,7 +50,7 @@ const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   time: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   rng: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   player: { shape: 'scalar', holds: isObject, prune: 'holds no registry id' },
-  modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every((frame) => isObject(frame) && typeof (frame as { name?: unknown }).name === 'string'), prune: 'pruned by a rule of its own' },
+  modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), prune: 'pruned by a rule of its own' },
 };
 
 const SAVE_FIELD_NAMES = Object.keys(SAVE_FIELDS) as SaveField[];

@@ -263,6 +263,30 @@ submit-modal: name=Rowan
 submit-modal: race=Elf
 `;
 
+// A dialogue whose own effect raises a second modal underneath it, so the
+// driver has two open at once and has to pick which it is asking about.
+const STACKED_MODAL_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  sage
+
+# flag greeted
+
+# entity sage
+title: Sage
+
+# dialogue sage-talk
+owner = sage
+
+node greeting:
+  when: not greeted
+  set: greeted
+  open modal: character-creation
+  -> Ask about the mirror.
+`;
+
 describe('play-cli drives a modal by its published name and options', () => {
   function modalFixture() {
     const registry = loadModule(MODAL_MODULE);
@@ -329,6 +353,24 @@ describe('play-cli drives a modal by its published name and options', () => {
     expect(marker.output.some((line) => line.startsWith('Location: camp'))).toBe(true);
     const second = handleCommand(session, replayed.view!, '/inventory', recorder);
     expect(second.output.some((line) => line.startsWith('Inventory: '))).toBe(true);
+  });
+
+  it('asks for the top of the stack, not the bottom, when one modal sits over another', () => {
+    const registry = loadModule(STACKED_MODAL_MODULE);
+    const session = startSession(registry);
+    const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
+
+    const opened = handleCommand(session, view(session), 'talk: sage', recorder);
+    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
+    // The dialogue is on top, so its menu is what is numbered — the bottom
+    // modal's first option is free text and would print no list at all.
+    expect(opened.output).toContain('Choice:');
+    expect(opened.output).toContain('  1) Ask about the mirror.');
+    expect(opened.output).not.toContain('Name:');
+
+    const answered = handleCommand(session, opened.view!, '1', recorder);
+    expect(answered.recorded).toBe('submit-modal: choice=Ask about the mirror.');
+    expect(answered.output).toContain('Name:');
   });
 
   it('refuses a bare line while a modal is open instead of taking it as the field being asked for', () => {

@@ -142,8 +142,19 @@ describe('loadSave', () => {
     loadSave(restored, { version, diff }, registry);
     expect(restored.modals).toEqual([{ name: 'character-creation', answers: { name: 'Rowan' } }]);
 
-    expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { modals: 'character-creation' } as never }, registry)).toThrow(/modals holds/);
-    expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { modals: [{ answers: {} }] } as never }, registry)).toThrow(/modals holds/);
+    // Every one of these used to load clean and then kill the next view() with
+    // a raw TypeError from inside the code the validator exists to protect.
+    for (const body of [
+      'character-creation',
+      [{ answers: {} }],
+      [{ name: 'character-creation' }],
+      [{ name: 'character-creation', answers: { name: 7 } }],
+      [{ name: 'dialogue', answers: {} }],
+      [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'chat', node: 'greeting', resumeIndex: 1.5, replay: true } }],
+      [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'chat', node: 'greeting', resumeIndex: 1 } }],
+    ]) {
+      expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { modals: body } as never }, registry), JSON.stringify(body)).toThrow(/modals holds/);
+    }
   });
 });
 

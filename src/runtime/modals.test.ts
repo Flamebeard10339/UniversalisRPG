@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from '../content/registry';
-import { answerModal, Modal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
-import { createGameState, GameState, RuntimeError } from './runtime';
+import { answerModal, Modal, ModalFrame, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { createGameState, DialogueCursor, GameState, RuntimeError } from './runtime';
 import { applyResultsNow } from './effects';
-import { apply, PlaySession, startSession, submitModal, view } from './session';
+import { apply, applyDirective, PlaySession, startSession, submitModal, view } from './session';
 
 // One entity that opens a modal from a dialogue effect and then offers a menu,
 // which is the only shape in the shipped grammar that stacks two modals.
@@ -31,6 +31,48 @@ node greeting:
   -> Ask about the mirror.
     set: asked
   -> Say nothing.
+`;
+
+// Two menus of the same name, which is the case a dedupe on the frame's name
+// rather than on the batch that opened it silently swallows.
+const TWO_NPC_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  sage
+  scholar
+
+# flag sage-seen
+
+# flag scholar-seen
+
+# flag secret
+
+# skill lore
+
+# entity sage
+title: Sage
+
+# entity scholar
+title: Scholar
+
+# dialogue sage-talk
+owner = sage
+
+node greeting:
+  when: not sage-seen
+  set: sage-seen
+  -> Leave the sage.
+  -> Ask about the secret. (when secret)
+
+# dialogue scholar-talk
+owner = scholar
+
+node greeting:
+  when: not scholar-seen
+  set: scholar-seen
+  -> Leave the scholar.
 `;
 
 function stackingSession(): PlaySession {
@@ -97,10 +139,16 @@ describe('opening and answering', () => {
   const registry = loadModule(STACKING_MODULE);
 
   it('opens the same modal once however many times a batch applies the result', () => {
-    const state = createGameState();
-    applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'character-creation' }], 4);
-    openModalNamed(state, 'character-creation');
-    expect(names(state)).toEqual(['character-creation']);
+    const scaled = createGameState();
+    applyResultsNow(scaled, registry, [{ kind: 'open-modal', modal: 'character-creation' }], 4);
+    expect(names(scaled)).toEqual(['character-creation']);
+
+    // The other batch shape: a group that draws is applied once per repetition
+    // rather than once and scaled, and the screen still goes up once.
+    const repeated = createGameState();
+    applyResultsNow(repeated, registry, [{ kind: 'open-modal', modal: 'character-creation' }, { kind: 'xp', skill: 'lore', amount: { min: 1, max: 4 } }], 4);
+    expect(names(repeated)).toEqual(['character-creation']);
+    expect(repeated.xp.lore).toBeGreaterThan(0);
   });
 
   it('refuses a modal nothing defines, and one that carries a payload no result line can spell', () => {
@@ -121,6 +169,33 @@ describe('opening and answering', () => {
     expect(topModal(state)?.name).toBe('character-creation');
   });
 
+  it('lands no part of a form it refuses, so a rejected last field leaves the modal untouched', () => {
+    const state = createGameState();
+    openModalNamed(state, 'character-creation');
+
+    expect(() => answerModal(state, registry, { name: 'Rowan', race: 'Wyvern' })).toThrow(/does not take "Wyvern"/);
+    expect(topModal(state)?.answers).toEqual({});
+    expect(publishModal(topModal(state)!, state, registry).options.map((option) => option.key)).toEqual(['name', 'race']);
+  });
+
+  it('stacks a second dialogue rather than dropping it after its effects have already run', () => {
+    const session = startSession(loadModule(TWO_NPC_MODULE));
+
+    apply(session, 'talk:sage');
+    // Through the directive, since the world's choices are withdrawn under an
+    // open modal — which is exactly how a `# test` reaches the second NPC.
+    applyDirective(session, { kind: 'talk', entity: 'scholar' });
+    const both = view(session);
+    expect(names(session.state)).toEqual(['dialogue', 'dialogue']);
+    expect(both.modals[1].options[0].values).toEqual(['Leave the scholar.']);
+    expect(session.state.flags['scholar-seen']).toBe(true);
+
+    // Answering the scholar hands the sage's own menu back, cursor intact.
+    const back = submitModal(session, { choice: 'Leave the scholar.' });
+    expect(back.modals.map((modal) => modal.name)).toEqual(['dialogue']);
+    expect(back.modals[0].options[0].values).toEqual(['Leave the sage.']);
+  });
+
   it('closes a dialogue whose content is gone rather than carrying a cursor into a registry without it', () => {
     const session = stackingSession();
     apply(session, 'talk:sage');
@@ -129,5 +204,47 @@ describe('opening and answering', () => {
     const dropped = pruneModals(session.state, loadModule('# location camp\nx: 0, y: 0\nstarting\n'));
     expect(dropped).toEqual([{ name: 'dialogue', reason: 'dialogue sage-talk is not loaded' }]);
     expect(names(session.state)).toEqual(['character-creation']);
+  });
+
+  it('closes a frame naming a modal nothing defines, and one whose node no longer offers a menu there', () => {
+    const session = stackingSession();
+    apply(session, 'talk:sage');
+    const cursor = { ...(session.state.modals[1] as { cursor: DialogueCursor }).cursor };
+
+    const withStranger = createGameState();
+    (withStranger.modals as ModalFrame[]).push({ name: 'quest-journal', answers: {} } as unknown as ModalFrame);
+    expect(pruneModals(withStranger, session.registry)).toEqual([{ name: 'quest-journal', reason: 'it is not a modal this engine knows' }]);
+    expect(withStranger.modals).toEqual([]);
+
+    for (const [broken, reason] of [
+      [{ ...cursor, node: 'farewell' }, 'dialogue sage-talk has no node farewell'],
+      [{ ...cursor, resumeIndex: 1 }, 'dialogue sage-talk node greeting no longer offers a menu there'],
+    ] as const) {
+      const state = createGameState();
+      (state.modals as ModalFrame[]).push({ name: 'dialogue', answers: {}, cursor: broken });
+      expect(pruneModals(state, session.registry)).toEqual([{ name: 'dialogue', reason }]);
+      expect(state.modals).toEqual([]);
+    }
+  });
+
+  it('withholds a choice its when: gate refuses, and refuses to answer with it', () => {
+    const session = startSession(loadModule(TWO_NPC_MODULE));
+
+    const gated = apply(session, 'talk:sage');
+    expect(gated.modals[0].options[0].values).toEqual(['Leave the sage.']);
+    expect(() => submitModal(session, { choice: 'Ask about the secret.' })).toThrow(/does not take "Ask about the secret."/);
+
+    session.state.flags.secret = true;
+    expect(view(session).modals[0].options[0].values).toEqual(['Leave the sage.', 'Ask about the secret.']);
+  });
+
+  it('keeps the dialogue spelling from answering a modal that is not a dialogue', () => {
+    const session = stackingSession();
+    apply(session, 'talk:sage');
+    submitModal(session, { choice: 'Say nothing.' });
+    expect(names(session.state)).toEqual(['character-creation']);
+
+    expect(() => applyDirective(session, { kind: 'choose', text: 'Say nothing.' })).toThrow(/choose with no active dialogue/);
+    expect(topModal(session.state)?.answers).toEqual({});
   });
 });

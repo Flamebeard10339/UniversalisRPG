@@ -82,9 +82,6 @@ function definitionFor<F extends ModalFrame>(frame: F): ModalDefinition<F> {
 }
 
 export function openModal(state: GameState, frame: ModalFrame): void {
-  // A screen cannot sit atop itself, so a result applied once per repetition of
-  // a batch opens one modal rather than one per repetition.
-  if (state.modals.some((open) => open.name === frame.name)) return;
   stack(state).push(frame);
 }
 
@@ -114,13 +111,15 @@ export function answerModal(state: GameState, registry: Registry, answers: Modal
   const frame = topModal(state);
   if (!frame) throw new RuntimeError(`no modal is open to answer: ${Object.keys(answers).join(', ')}`);
 
+  // Every pair is checked before any of them lands, so a form rejected on its
+  // last field leaves the modal exactly as the player found it.
   const options = allOptions(frame, state, registry);
   for (const [key, value] of Object.entries(answers)) {
     const option = options.find((each) => each.key === key);
     if (!option) throw new RuntimeError(`modal ${frame.name} has no option ${key}`);
     if (option.values && !option.values.includes(value)) throw new RuntimeError(`modal ${frame.name} option ${key} does not take ${JSON.stringify(value)}`);
-    answersOf(frame)[key] = value;
   }
+  Object.assign(answersOf(frame), answers);
 
   if (options.some((option) => !(option.key in frame.answers))) return;
   // Popped before the modal acts, so anything its answer opens stacks on what
@@ -128,6 +127,24 @@ export function answerModal(state: GameState, registry: Registry, answers: Modal
   stack(state).pop();
   const next = definitionFor(frame).submit(frame, state, registry);
   if (next) openModal(state, next);
+}
+
+// What a `# save` body has to hold to be a frame at all. Shape only: a name
+// nothing defines and a cursor pointing at content that has gone are both
+// well-formed here and are closed by pruneModals against a registry.
+export function isModalFrame(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.name !== 'string') return false;
+  if (!isRecord(value.answers) || !Object.values(value.answers).every((answer) => typeof answer === 'string')) return false;
+  return value.name !== 'dialogue' || isCursor(value.cursor);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isCursor(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return typeof value.dialogue === 'string' && typeof value.node === 'string' && Number.isInteger(value.resumeIndex) && typeof value.replay === 'boolean';
 }
 
 function frameProblem(frame: ModalFrame, registry: Registry): string | null {

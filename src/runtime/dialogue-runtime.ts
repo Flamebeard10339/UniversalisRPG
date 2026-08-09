@@ -82,16 +82,21 @@ export function talk(entityId: string, registry: Registry, state: GameState): Di
   return enterNode(dialogue, chosen, registry, state);
 }
 
-// The rendered text of every choice the menu is currently offering, which is
-// also what `choose` matches on, so the offer and the answer cannot disagree.
+// One gate, one rendering: the offer and the answer are read off the same list,
+// so a choice withheld by its `when:` cannot be reachable by typing its text.
+function offered(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ choice: Choice; text: string }> {
+  return resolveMenu(cursor, registry)
+    .choices.filter((choice) => !choice.when || evaluateCondition(choice.when, state))
+    .map((choice) => ({ choice, text: renderSegments(choice.segments, state) }));
+}
+
 export function menuTexts(cursor: DialogueCursor, registry: Registry, state: GameState): string[] {
-  const { choices } = resolveMenu(cursor, registry);
-  return choices.filter((choice) => !choice.when || evaluateCondition(choice.when, state)).map((choice) => renderSegments(choice.segments, state));
+  return offered(cursor, registry, state).map((entry) => entry.text);
 }
 
 export function choose(text: string, cursor: DialogueCursor, registry: Registry, state: GameState): DialogueCursor | null {
-  const { dialogue, node, choices } = resolveMenu(cursor, registry);
-  const match = choices.find((c) => (!c.when || evaluateCondition(c.when, state)) && renderSegments(c.segments, state) === text);
+  const { dialogue, node } = resolveMenu(cursor, registry);
+  const match = offered(cursor, registry, state).find((entry) => entry.text === text)?.choice;
   if (!match) throw new RuntimeError(`no choice matches: ${JSON.stringify(text)}`);
 
   applyResultsNow(state, registry, match.effects);

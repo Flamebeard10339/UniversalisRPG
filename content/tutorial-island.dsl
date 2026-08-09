@@ -420,11 +420,8 @@ talk: miki
 choose: Sounds good. Teach me.
 assert: quest-given
 
-// Opens on a loaded save rather than on the bare state a `# test` is handed,
-// because that state has no pools: `runTest` never calls initResources, so a
-// route that does not load starts at zero health and the whole `on empty:`
-// half of the sheet below is dead weight. It is also what lets the end save be
-// regenerated from a live session, which starts the same way this now does.
+// Opens on a save so the route is walked with the pools a played game has;
+// without one this ends at zero health and proves nothing about `on empty:`.
 # test miki-route-full
 load: miki-route-start
 run: tutorial-quest-given
