@@ -1,5 +1,11 @@
 # first-class-modals
 
+## Goal
+
+Leave the runtime with one modal mechanism instead of several, published as a name and its options,
+so that the screens the game still has to grow — inventory, shop, quest journal, craft menu — cost
+content rather than engine, and so a `# test` can answer a modal instead of ending on one.
+
 ## Deliverable
 
 The runtime gains one modal concept and stops having several. A modal is a named screen that
