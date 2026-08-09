@@ -205,7 +205,7 @@ function runTestCommand(session: PlaySession, testId: string): CommandResult {
   }
 }
 
-function beginInnerText(inner: Extract<Directive, { kind: 'use' | 'travel' | 'craft' }>): string {
+function beginInnerText(inner: Extract<Directive, { kind: 'use' | 'use-on' | 'travel' | 'craft' }>): string {
   return canonicalDirective(inner).replace(': ', ' ');
 }
 
@@ -217,6 +217,8 @@ function canonicalDirective(directive: Directive): string {
       return `choose: ${directive.text}`;
     case 'use':
       return `use: ${directive.obj}.${directive.objId}.${directive.actionId}`;
+    case 'use-on':
+      return `use: ${directive.action} on ${directive.target}`;
     case 'travel':
       return `travel: ${directive.location}`;
     case 'craft':

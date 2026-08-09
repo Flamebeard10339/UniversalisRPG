@@ -7,9 +7,12 @@ export type Directive =
   | { kind: 'talk'; entity: string }
   | { kind: 'choose'; text: string }
   | { kind: 'use'; obj: string; objId: string; actionId: string }
+  // The two-sided spelling, beside the form it does not replace: an action
+  // brought by the player and applied to what it names.
+  | { kind: 'use-on'; action: string; target: string }
   | { kind: 'travel'; location: string }
   | { kind: 'craft'; recipe: string }
-  | { kind: 'begin'; inner: Extract<Directive, { kind: 'use' | 'travel' | 'craft' }> }
+  | { kind: 'begin'; inner: Extract<Directive, { kind: 'use' | 'use-on' | 'travel' | 'craft' }> }
   | { kind: 'assert'; condition: Condition }
   | { kind: 'expect'; save: string }
   | { kind: 'load'; save: string }
@@ -27,6 +30,7 @@ export interface Test {
 // Factored out so `begin:` can take the same payload with the verb inline.
 const PATH = '[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*';
 const USE_PAYLOAD = `(?<obj>[a-z][a-z0-9-]*)\\.(?<objId>${PATH})\\.(?<actionId>.+)`;
+const USE_ON_PAYLOAD = `(?<action>${PATH})[ \\t]+on[ \\t]+(?<target>${PATH})`;
 const TRAVEL_PAYLOAD = `(?<id>${PATH})`;
 const CRAFT_PAYLOAD = `(?<id>${PATH})`;
 
@@ -34,10 +38,12 @@ const RUN = new RegExp(`^run:[ \\t]*(?<id>${PATH})$`);
 const TALK = new RegExp(`^talk:[ \\t]*(?<id>${PATH})$`);
 const CHOOSE = /^choose:[ \t]*(?<text>.*)$/;
 const USE = new RegExp(`^use:[ \\t]*${USE_PAYLOAD}$`);
+const USE_ON = new RegExp(`^use:[ \\t]*${USE_ON_PAYLOAD}$`);
 const TRAVEL = new RegExp(`^travel:[ \\t]*${TRAVEL_PAYLOAD}$`);
 const CRAFT = new RegExp(`^craft:[ \\t]*${CRAFT_PAYLOAD}$`);
 const BEGIN = /^begin:[ \t]*(?<verb>use|travel|craft)[ \t]+(?<rest>.+)$/;
 const BEGIN_USE = new RegExp(`^${USE_PAYLOAD}$`);
+const BEGIN_USE_ON = new RegExp(`^${USE_ON_PAYLOAD}$`);
 const BEGIN_TRAVEL = new RegExp(`^${TRAVEL_PAYLOAD}$`);
 const BEGIN_CRAFT = new RegExp(`^${CRAFT_PAYLOAD}$`);
 const ASSERT = /^assert:[ \t]*(?<cond>.+)$/;
@@ -54,8 +60,10 @@ const SUBMIT_MODAL = /^submit-modal:[ \t]*(?<key>[a-z][a-z0-9-]*)=(?<value>.*)$/
 
 function parseBegin(text: string, verb: string, rest: string): Directive {
   if (verb === 'use') {
+    const on = BEGIN_USE_ON.exec(rest)?.groups;
+    if (on) return { kind: 'begin', inner: { kind: 'use-on', action: on.action, target: on.target } };
     const m = BEGIN_USE.exec(rest)?.groups;
-    if (!m) throw new DslError(`malformed begin: use payload (expected obj.objId.actionId): ${text}`);
+    if (!m) throw new DslError(`malformed begin: use payload (expected obj.objId.actionId, or <action> on <target>): ${text}`);
     return { kind: 'begin', inner: { kind: 'use', obj: m.obj, objId: m.objId, actionId: m.actionId } };
   }
   if (verb === 'travel') {
@@ -81,6 +89,12 @@ export function parseDirectiveLine(text: string): Directive | null {
 
   const choose = CHOOSE.exec(text)?.groups;
   if (choose) return { kind: 'choose', text: choose.text };
+
+  // Tried first: `use: melee-combat on giant-rat` also matches the dotted form
+  // when an action id carries dots, and the two-sided reading is the one an
+  // author writing `on` meant.
+  const useOn = USE_ON.exec(text)?.groups;
+  if (useOn) return { kind: 'use-on', action: useOn.action, target: useOn.target };
 
   const use = USE.exec(text)?.groups;
   if (use) return { kind: 'use', obj: use.obj, objId: use.objId, actionId: use.actionId };

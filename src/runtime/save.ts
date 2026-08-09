@@ -3,11 +3,13 @@ import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
 import { findActionOwner, parseOwnerRef } from './actions';
 import { isInstanceTable, pruneInstances } from './instances';
+import { isPopulations, prunePopulations } from './population';
 import { isModalFrame, pruneModals } from './modals';
 import { PLAYER } from './state';
+import { templateOf } from './encounter';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 // A sparse diff against initialState: a new game saves as `{}`, and `log` is not state.
 export type SaveDiff = Partial<Omit<GameState, 'log'>>;
@@ -49,6 +51,7 @@ const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   activeBuffs: { shape: 'record', holds: isObject, prune: 'pruned by a rule of its own' },
   activeAction: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
   instances: { shape: 'scalar', holds: isInstanceTable, prune: 'pruned by a rule of its own' },
+  populations: { shape: 'scalar', holds: isPopulations, prune: 'pruned by a rule of its own' },
   time: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   rng: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   player: { shape: 'scalar', holds: isObject, prune: 'holds no registry id' },
@@ -127,8 +130,8 @@ function activeActionProblem(state: GameState, registry: Registry): string | nul
   if (!owner) return `unknown ${obj}: ${objId}`;
   if (!owner.actions?.some((action) => action.label === active.actionLabel)) return `unknown action ${JSON.stringify(active.actionLabel)} on ${active.ownerRef}`;
 
-  for (const actorId of Object.keys(active.actors ?? {})) if (!registry.entities.has(actorId)) return `unknown encounter actor: ${actorId}`;
-  for (const actorId of Object.keys(active.cadences)) if (actorId !== PLAYER && !registry.entities.has(actorId)) return `unknown encounter cadence actor: ${actorId}`;
+  for (const actorId of Object.keys(active.actors ?? {})) if (!registry.entities.has(templateOf(actorId))) return `unknown encounter actor: ${actorId}`;
+  for (const actorId of Object.keys(active.cadences)) if (actorId !== PLAYER && !registry.entities.has(templateOf(actorId))) return `unknown encounter cadence actor: ${actorId}`;
   for (const actor of Object.values(active.actors ?? {})) {
     for (const resourceId of Object.keys(actor.resources)) if (!registry.resources.has(resourceId)) return `unknown encounter resource: ${resourceId}`;
   }
@@ -141,6 +144,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   // First, so every rule under it asks a settled table rather than one still
   // being pruned beneath it: a field holding an instance id gets one answer.
   warnings.push(...pruneInstances(state, registry));
+  warnings.push(...prunePopulations(state, registry));
 
   if (state.location && !registry.locations.has(state.location)) {
     const old = state.location;

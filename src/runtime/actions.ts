@@ -11,6 +11,10 @@ export function findActionOwner(obj: string, objId: string, registry: Registry):
   switch (obj) {
     case 'entity':
       return registry.entities.get(objId);
+    case 'action': {
+      const declared = registry.actions.get(objId);
+      return declared ? { actions: [declared] } : undefined;
+    }
     case 'item':
       return registry.items.get(objId);
     case 'location':
@@ -67,11 +71,11 @@ export function findActiveAction(active: ActiveAction, registry: Registry): Acti
   return action;
 }
 
-export type FightOutcome = 'completion' | 'escape';
+export type FightOutcome = 'completion' | 'unfinished';
 
 // Reads authored fields only, so it cannot flip partway and strand a planned batch.
 export function resolvesPerAttempt(action: Action): boolean {
-  return action.accuracy !== undefined || action.target !== undefined;
+  return action.accuracy !== undefined || action.depletes !== undefined;
 }
 
 // Visibility is excluded: a fight must not abort because a kill count hid it.
@@ -115,7 +119,7 @@ export function inputLimit(action: Action, state: GameState): InputLimit {
 }
 
 export function outcomeResults(action: Action, outcome: FightOutcome): ActionResult[] {
-  return outcome === 'completion' ? [...action.results, ...(action.onSuccess ?? [])] : (action.onEscape ?? []);
+  return outcome === 'completion' ? [...action.results, ...(action.onSuccess ?? [])] : (action.onUnfinished ?? []);
 }
 
 // Deliberately shallow. A `stop` nested inside a selector is reached by

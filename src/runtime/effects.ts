@@ -1,6 +1,7 @@
 import { ActionResult, DropRow, nestedResults } from '../grammar/actionResult';
 import { DISCOVERED } from '../content/location';
 import { DropTable } from '../content/dropTable';
+import { EventTrigger, GameEvent } from '../content/event';
 import { isPoint, Range, sampleCount, sampleRange } from '../grammar/range';
 import { Registry } from '../content/registry';
 import { Resource } from '../content/resource';
@@ -19,6 +20,11 @@ export interface Segment {
   // Control flow, not a write: only the segment's owner may end the action.
   stopped: boolean;
   observers: readonly ResultObserver[];
+  // Who last emptied whose pool, so a handler's `credit:` reaches the causer.
+  causedBy: Map<string, string>;
+  // Who a `credit:` inside a handler moves its results to. The moment supplies
+  // it, which is why an author never names one.
+  credit?: string;
 }
 export type PoolDeltas = Map<string, Map<string, number>>;
 
@@ -48,7 +54,14 @@ const narrateModal: ResultObserver = ({ state }, { result, lead }) => {
 export const RESULT_OBSERVERS: readonly ResultObserver[] = [narrateModal];
 
 export function newSegment(state: GameState, registry: Registry, observers: readonly ResultObserver[] = RESULT_OBSERVERS): Segment {
-  return { state, registry, deltas: new Map(), stopped: false, observers };
+  return { state, registry, deltas: new Map(), stopped: false, observers, causedBy: new Map() };
+}
+
+// Which names are bound to a pool crossing a threshold. Asked rather than
+// stored on the resource, because a `# resource` declares the pool's shape and
+// nothing else.
+export function eventsFor(registry: Registry, resourceId: string, trigger: EventTrigger): GameEvent[] {
+  return [...registry.events.values()].filter((event) => event.resource === resourceId && event.trigger === trigger);
 }
 
 export function addDelta(deltas: PoolDeltas, actorId: string, resourceId: string, milliAmount: number): void {
@@ -210,6 +223,10 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     case 'gate':
       if (evaluateCondition(result.condition, state)) applyResults(segment, result.results, actor, count);
       return undefined;
+    // The one marked exception to "results land on the entity it happened to".
+    case 'credit':
+      applyResults(segment, result.results, segment.credit ?? actor, count);
+      return undefined;
     case 'one-of': {
       const row = selectRow(result.rows, state, registry);
       if (row) applyResults(segment, row.results, actor, count);
@@ -270,19 +287,19 @@ export function restorePools(state: GameState, restored: Record<string, number>)
   for (const [id, level] of Object.entries(restored)) levels(state)[id] = level;
 }
 
-function setPoolLevel(state: GameState, registry: Registry, resource: Resource, current: number, raw: number, max: number): 'stored' | 'clamped' {
-  if (raw > current && resource.onFull.length > 0 && max > 0) {
-    const fires = Math.floor(raw / max);
-    levels(state)[resource.id] = raw - fires * max;
-    if (fires > 0) applyResultsNow(state, registry, resource.onFull, fires);
-    return 'stored';
+// What an entity answers a name with. A handler's results apply to the entity
+// the event happened to, on the player and on the rat alike.
+export function handlersFor(registry: Registry, actorId: string, eventId: string): ActionResult[][] {
+  const entity = actorId === PLAYER ? registry.player : registry.entities.get(actorId);
+  return (entity?.handlers ?? []).filter((handler) => handler.event === eventId).map((handler) => handler.results);
+}
+
+function fireEvents(segment: Segment, actorId: string, resourceId: string, trigger: EventTrigger, count: number): void {
+  for (const event of eventsFor(segment.registry, resourceId, trigger)) {
+    for (const results of handlersFor(segment.registry, actorId, event.id)) {
+      applyResults(segment, results, actorId, count);
+    }
   }
-  const clamped = Math.min(max, Math.max(0, raw));
-  levels(state)[resource.id] = clamped;
-  if (raw < current && current > 0 && clamped <= 0 && resource.onEmpty.length > 0) {
-    applyResultsNow(state, registry, resource.onEmpty);
-  }
-  return clamped === raw ? 'stored' : 'clamped';
 }
 
 export function requireResource(registry: Registry, resourceId: string): Resource {
@@ -295,27 +312,34 @@ interface PoolStore {
   actorId: string;
   levels: Record<string, number>;
   remainders: Record<string, number>;
-  // A foe's pool takes the clamp but not the authored handlers: `on empty:` and
-  // `on full:` are written in the player's voice.
-  handlers: boolean;
 }
 
 function poolStores(state: GameState): PoolStore[] {
-  const stores: PoolStore[] = [{ actorId: PLAYER, levels: levels(state), remainders: state.resourceRateRemainders, handlers: true }];
+  const stores: PoolStore[] = [{ actorId: PLAYER, levels: levels(state), remainders: state.resourceRateRemainders }];
   for (const [actorId, actor] of Object.entries(state.activeAction?.actors ?? {})) {
-    stores.push({ actorId, levels: actor.resources, remainders: actor.rateRemainders, handlers: false });
+    stores.push({ actorId, levels: actor.resources, remainders: actor.rateRemainders });
   }
   return stores;
 }
 
-function clampInto(store: PoolStore, resource: Resource, raw: number, max: number): 'stored' | 'clamped' {
+// The one write of a pool level, for every actor alike. A rollover meter is one
+// whose pool has a name bound to `on full`; without one it is a plain capped
+// pool, which is the same rule the resource's own block used to carry.
+function setPoolLevel(segment: Segment, store: PoolStore, resource: Resource, current: number, raw: number, max: number): 'stored' | 'clamped' {
+  if (raw > current && max > 0 && eventsFor(segment.registry, resource.id, 'on full').length > 0) {
+    const fires = Math.floor(raw / max);
+    store.levels[resource.id] = raw - fires * max;
+    if (fires > 0) fireEvents(segment, store.actorId, resource.id, 'on full', fires);
+    return 'stored';
+  }
   const clamped = Math.min(max, Math.max(0, raw));
   store.levels[resource.id] = clamped;
+  if (raw < current && current > 0 && clamped <= 0) fireEvents(segment, store.actorId, resource.id, 'on empty', 1);
   return clamped === raw ? 'stored' : 'clamped';
 }
 
 // Iterates the registry, not the deltas, so settle order is split-independent.
-export function settlePools(state: GameState, registry: Registry, snapshots: ResourceSnapshot[], dt: number, deltas: PoolDeltas): void {
+export function settlePools(state: GameState, registry: Registry, snapshots: ResourceSnapshot[], dt: number, deltas: PoolDeltas, credit?: ReadonlyMap<string, string>): void {
   const rated = new Map<string, Map<string, ResourceSnapshot>>();
   for (const snapshot of snapshots) {
     const byResource = rated.get(snapshot.actorId) ?? new Map<string, ResourceSnapshot>();
@@ -323,6 +347,7 @@ export function settlePools(state: GameState, registry: Registry, snapshots: Res
     rated.set(snapshot.actorId, byResource);
   }
   const stores = poolStores(state);
+  const segment = newSegment(state, registry);
 
   for (const resource of registry.resources.values()) {
     for (const store of stores) {
@@ -334,18 +359,45 @@ export function settlePools(state: GameState, registry: Registry, snapshots: Res
       const rate = snapshot ? divideRateRemainder(rateAcc) : { units: 0, remainder: 0 };
       const raw = current + delta + rate.units;
       const max = snapshot?.max ?? toMilliUnits(statValue(resource.max, state, registry, store.actorId));
-      const result = store.handlers ? setPoolLevel(state, registry, resource, current, raw, max) : clampInto(store, resource, raw, max);
+      segment.credit = credit?.get(store.actorId);
+      const result = setPoolLevel(segment, store, resource, current, raw, max);
       if (snapshot) store.remainders[resource.id] = result === 'clamped' ? 0 : rate.remainder;
     }
   }
+  settleHandlerDeltas(state, registry, segment);
+}
+
+// A handler is an ordinary result list, so it can drain a pool of its own. Its
+// deltas settle here rather than being dropped, and without handlers of their
+// own to run, because a handler that empties the pool it handles would recurse.
+function settleHandlerDeltas(state: GameState, registry: Registry, segment: Segment): void {
+  if (segment.deltas.size === 0) {
+    if (segment.stopped) endAction(state);
+    return;
+  }
+  const stores = poolStores(state);
+  for (const resource of registry.resources.values()) {
+    for (const store of stores) {
+      const delta = getDelta(segment.deltas, store.actorId, resource.id);
+      if (delta === 0) continue;
+      const max = toMilliUnits(statValue(resource.max, state, registry, store.actorId));
+      store.levels[resource.id] = Math.min(max, Math.max(0, (store.levels[resource.id] ?? 0) + delta));
+    }
+  }
+  if (segment.stopped) endAction(state);
 }
 
 export function clampResources(state: GameState, registry: Registry): void {
+  const segment = newSegment(state, registry);
+  const stores = poolStores(state);
   for (const resource of registry.resources.values()) {
-    const level = state.resources[resource.id];
-    if (level === undefined) continue;
-    const max = toMilliUnits(statValue(resource.max, state, registry));
-    // The ceiling-limited destination is what lets setPoolLevel fire `on empty`.
-    setPoolLevel(state, registry, resource, level, Math.min(max, level), max);
+    for (const store of stores) {
+      const level = store.levels[resource.id];
+      if (level === undefined) continue;
+      const max = toMilliUnits(statValue(resource.max, state, registry, store.actorId));
+      // The ceiling-limited destination is what lets setPoolLevel fire `on empty`.
+      setPoolLevel(segment, store, resource, level, Math.min(max, level), max);
+    }
   }
+  settleHandlerDeltas(state, registry, segment);
 }

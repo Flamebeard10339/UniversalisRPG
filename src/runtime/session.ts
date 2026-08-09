@@ -1,9 +1,12 @@
 import { Action } from '../content/entity';
 import { DISCOVERED, Location } from '../content/location';
 import {
-  actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useTravel } from './runtime';
+  actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, useTravel } from './runtime';
 import { findActiveAction, parseOwnerRef } from './actions';
-import { playerCadence } from './encounter';
+import { hasPool, playerCadence } from './encounter';
+import { declaredId } from '../content/entity';
+import { isTwoSided } from '../grammar/action';
+import { standing } from './population';
 import { truthy } from './conditions';
 import { answerModal, dialogueFrame, Modal, openModal, publishModal, topModal } from './modals';
 import { Registry } from '../content/registry';
@@ -94,8 +97,10 @@ function sessionOver(registry: Registry, state: GameState): PlaySession {
 
 type Actable = { actions?: Action[] };
 
+// A two-sided action is brought by whoever swings, so it is never offered by the
+// object it is written under; the player performs its own copy from `uses:`.
 function actionAvailable(action: Action, state: GameState): boolean {
-  if (action.retaliates) return false;
+  if (isTwoSided(action)) return false;
   return requiresMet(action, state) && actionVisible(action, state);
 }
 
@@ -108,16 +113,40 @@ function isFreeTravelAction(action: Action, target: string): boolean {
   const relocatesToTarget = action.results.some((r) => r.kind === 'relocate' && r.location === target);
   if (!relocatesToTarget) return false;
   const onlyMovement = action.results.every((r) => r.kind === 'relocate' || r.kind === 'say');
-  const noBranches = !action.onSuccess && !action.onFailure && !action.onEscape;
+  const noBranches = !action.onSuccess && !action.onFailure && !action.onUnfinished;
   return onlyMovement && noBranches;
 }
 
 function entityAliasesTravelTo(location: Location, target: string, registry: Registry, state: GameState): boolean {
-  return location.entities.some((entityId) => {
+  return standingHere(registry, state, location).some((entityId) => {
     const entity = registry.entities.get(entityId);
     if (!entity) return false;
     return availableActions(entity, state).some((action) => isFreeTravelAction(action, target));
   });
+}
+
+// One id per type with a copy still standing. A count is the place's fact, and
+// nothing addresses one copy of it.
+const standingHere = (registry: Registry, state: GameState, location: Location): string[] => standing(state, registry, location).map((entry) => entry.entity);
+
+// What makes a target valid is the pool the performer's action names, and
+// nothing on the target: there is no list of permitted types anywhere.
+function fightChoices(registry: Registry, state: GameState, location: Location): PlayChoice[] {
+  const choices: PlayChoice[] = [];
+  const player = registry.player;
+  if (!player) return choices;
+  for (const entityId of standingHere(registry, state, location)) {
+    const entity = registry.entities.get(entityId);
+    if (!entity) continue;
+    for (const action of player.actions) {
+      const id = declaredId(action);
+      if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
+      if (!requiresMet(action, state) || !actionVisible(action, state)) continue;
+      if (action.depletes.side === 'their' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
+      choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: action.label, detail: entity.title });
+    }
+  }
+  return choices;
 }
 
 function canTalk(entityId: string, registry: Registry, state: GameState): boolean {
@@ -133,7 +162,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   if (!location) return [];
   const choices: PlayChoice[] = [];
 
-  for (const entityId of location.entities) {
+  for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
     if (!entity) continue;
     if (canTalk(entityId, registry, state)) {
@@ -143,6 +172,8 @@ function locationChoices(session: PlaySession): PlayChoice[] {
       choices.push({ id: `use:entity.${entityId}.${action.label}`, kind: 'action', label: action.label, detail: entity.title });
     }
   }
+
+  choices.push(...fightChoices(registry, state, location));
 
   for (const action of availableActions(location, state)) {
     choices.push({ id: `use:location.${location.id}.${action.label}`, kind: 'action', label: action.label, detail: location.title });
@@ -169,7 +200,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   for (const recipe of registry.recipes.values()) {
     if (!recipeCraftable(recipe, registry, state)) continue;
     const detail = recipe.requiresCapability
-      ? (location.entities.map((entityId) => registry.entities.get(entityId)).find((entity) => entity?.capabilities.includes(recipe.requiresCapability!))?.title ?? humanize(recipe.requiresCapability))
+      ? (standingHere(registry, state, location).map((entityId) => registry.entities.get(entityId)).find((entity) => entity?.capabilities.includes(recipe.requiresCapability!))?.title ?? humanize(recipe.requiresCapability))
       : undefined;
     choices.push({ id: `craft:${recipe.id}`, kind: 'craft', label: `Craft ${humanize(recipe.id)}`, detail });
   }
@@ -198,6 +229,8 @@ export function choiceToDirective(choice: PlayChoice): Directive {
     case 'talk':
       return { kind: 'talk', entity: choice.id.slice('talk:'.length) };
     case 'action': {
+      const fight = /^fight:([a-z0-9.-]+):([a-z0-9.-]+)$/.exec(choice.id);
+      if (fight) return { kind: 'use-on', action: fight[1], target: fight[2] };
       // The objId is namespaced, so it carries dots of its own; the greedy match
       // hands the last one to the action label.
       const match = /^use:([a-z]+)\.([a-z0-9.-]+)\.(.+)$/.exec(choice.id);
@@ -271,7 +304,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
   if (!location) throw new RuntimeError(`unknown location: ${state.location}`);
 
   const entities: PlayStatus['entities'] = [];
-  for (const entityId of location.entities) {
+  for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
     if (entity) entities.push({ id: entity.id, title: entity.title, examine: entity.examine });
   }
@@ -315,7 +348,7 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
     label: active.actionLabel,
     progress: cycle > 0 ? Math.min(1, Math.max(0, clock.progress / cycle)) : 1,
     attempts: clock.attemptsMade,
-    targeted: Boolean(findActiveAction(active, registry).target),
+    targeted: Boolean(findActiveAction(active, registry).depletes),
     completion: fromMilliUnits(active.implicitTarget),
   };
 }
@@ -337,6 +370,8 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
       return armCraft(directive.recipe, registry, state);
     case 'use':
       return armAction(directive.obj, directive.objId, directive.actionId, registry, state);
+    case 'use-on':
+      return armFightAction(directive.action, directive.target, registry, state);
     case 'travel':
       return state.location ? armTravel(state.location, directive.location, registry, state) : null;
     default:
@@ -387,10 +422,12 @@ export function submitModal(session: PlaySession, answers: Record<string, string
   return view(session);
 }
 
-function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'travel' | 'craft' }>): string {
+function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'use-on' | 'travel' | 'craft' }>): string {
   switch (inner.kind) {
     case 'use':
       return `use:${inner.obj}.${inner.objId}.${inner.actionId}`;
+    case 'use-on':
+      return `fight:${inner.action}:${inner.target}`;
     case 'travel':
       return `travel:${inner.location}`;
     case 'craft':
@@ -424,6 +461,9 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
       return {};
     case 'use':
       useAction(directive.obj, directive.objId, directive.actionId, registry, state);
+      return {};
+    case 'use-on':
+      useFight(directive.action, directive.target, registry, state);
       return {};
     case 'travel':
       if (!registry.locations.has(directive.location)) throw new RuntimeError(`unknown location: ${directive.location}`);

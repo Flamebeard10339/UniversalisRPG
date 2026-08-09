@@ -1,14 +1,15 @@
-import { Action } from '../grammar/action';
+import { Action, Sided } from '../grammar/action';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { Condition, isEngineRoot, Reference, VISITS, visitedNode } from '../grammar/condition';
 import { Dialogue, TextSegment } from './dialogue';
 import { Directive } from './test';
-import { Edge, Relative } from './location';
+import { Ally, handlerEvent } from './entity';
+import { Edge, Population, Relative } from './location';
 import { isFieldEdits, listMembers } from '../grammar/section';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
-export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'entitytype' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node';
+export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'action' | 'event' | 'faction' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node';
 
 // Returns what the id should become. Resolution rewrites it into a namespaced
 // key; validation hands it back and throws if it names nothing.
@@ -129,19 +130,49 @@ function tags(list: unknown, where: string, visit: Visit): void {
   for (const tag of listMembers<TagClause>(list)) if (tag.kind === 'stat-bonus') put(tag, 'statId', 'stat', `${where} tag`, visit);
 }
 
+// A side marker says which participant a name is read off; the name itself
+// resolves like every other reference, whichever side carries it.
+function sidedNames(action: Action): { held: Sided; kind: ReferenceKind; written: string }[] {
+  const sites: { held: Sided; kind: ReferenceKind; written: string }[] = [];
+  // `rate` is a stat only when it is written as a name; a per-minute literal is
+  // a number and carries no side to resolve.
+  if (typeof action.rate === 'object' && action.rate !== null) sites.push({ held: action.rate, kind: 'stat', written: 'rate' });
+  for (const [written, contest] of [['accuracy', action.accuracy], ['damage', action.damage]] as const) {
+    if (!contest) continue;
+    sites.push({ held: contest.left, kind: 'stat', written });
+    if (contest.right) sites.push({ held: contest.right, kind: 'stat', written });
+  }
+  if (action.depletes) sites.push({ held: action.depletes, kind: 'resource', written: 'depletes' });
+  return sites;
+}
+
 export function visitAction(action: Action, where: string, visit: Visit): void {
-  // `rate` is a stat only when it is written as a name; `put` leaves the
-  // per-minute literal alone because it is not a string.
-  for (const field of ['rate', 'accuracy', 'evasion', 'ability', 'dr'] as const) put(action, field, 'stat', `${where} ${field}:`, visit);
-  put(action, 'target', 'resource', `${where} target:`, visit);
+  for (const site of sidedNames(action)) put(site.held, 'id', site.kind, `${where} ${site.written}:`, visit);
   tags(action.tags, where, visit);
   condition(action.requires, `${where} requires:`, visit);
   condition(action.hiddenIf, `${where} hidden if:`, visit);
-  for (const group of [action.results, action.onSuccess, action.onFailure, action.onEscape]) results(group, where, visit);
+  for (const group of [action.results, action.onSuccess, action.onFailure, action.onUnfinished]) results(group, where, visit);
 }
 
 function actions(list: unknown, where: string, visit: Visit): void {
   for (const action of listMembers<Action>(list)) visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit);
+}
+
+// An entity's labelled blocks. A handler's event name is the reference its label
+// carries, and it is rewritten in place so `on death:` resolves the way `uses:`
+// does rather than being matched by spelling later.
+function blocks(list: unknown, where: string, visit: Visit): void {
+  for (const block of listMembers<Action>(list)) {
+    const event = handlerEvent(block.label);
+    if (event === undefined) {
+      visitAction(block, `${where} action ${JSON.stringify(block.label)}`, visit);
+      continue;
+    }
+    const at = `${where} on ${event}:`;
+    const resolved = visit('event', event, at);
+    if (resolved !== event) block.label = `on ${resolved}`;
+    results(block.results, at, visit);
+  }
 }
 
 // Exported because a directive also arrives typed at the CLI, where the names
@@ -173,6 +204,10 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'use':
       // `obj` names the kind, so the object it addresses is resolved as one.
       if (value.obj === 'entity' || value.obj === 'location' || value.obj === 'item') put(value, 'objId', value.obj, `${where} use:`, visit);
+      return;
+    case 'use-on':
+      put(value, 'action', 'action', `${where} use:`, visit);
+      put(value, 'target', 'entity', `${where} use: on`, visit);
       return;
     case 'equip':
       put(value, 'item', 'item', `${where} equip:`, visit);
@@ -214,19 +249,30 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       // A stat sheet is authored as a list of assignments; the stat id leading
       // each one is the reference.
       for (const assignment of listMembers<[string, unknown]>(section.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
-      put(section, 'type', 'entitytype', `${where} type:`, visit);
-      actions(section.actions, where, visit);
+      strings(section, 'uses', 'action', `${where} uses:`, visit);
+      strings(section, 'faction', 'faction', `${where} faction:`, visit);
+      strings(section, 'skills', 'skill', `${where} skills:`, visit);
+      for (const entry of listMembers<Ally>(section.allies)) put(entry, 'entity', 'entity', `${where} allies:`, visit);
+      condition(section.hiddenIf as Condition | undefined, `${where} hidden if:`, visit);
+      // A block is an action unless its label names an event, which is the one
+      // label shape whose name is a reference rather than a title.
+      blocks(section.blocks, where, visit);
       return;
     }
-    case 'entitytype':
-      actions(section.actions, where, visit);
+    case 'action':
+      visitAction(value as Action, where, visit);
+      return;
+    case 'event':
+      put(section, 'resource', 'resource', `${where} resource:`, visit);
+      return;
+    case 'faction':
       return;
     case 'item':
       tags(section.tags, where, visit);
       actions(section.actions, where, visit);
       return;
     case 'location':
-      strings(section, 'entities', 'entity', `${where} entities:`, visit);
+      for (const entry of listMembers<Population>(section.entities)) put(entry, 'entity', 'entity', `${where} entities:`, visit);
       for (const edge of listMembers<Edge>(section.adjacent)) {
         put(edge, 'target', 'location', `${where} adjacent:`, visit);
         condition(edge.condition, `${where} adjacent: ${edge.target} while`, visit);
@@ -246,8 +292,6 @@ export function visitSection(kind: string, value: object, where: string, visit: 
     case 'resource':
       put(section, 'max', 'stat', `${where} max:`, visit);
       put(section, 'rate', 'stat', `${where} rate:`, visit);
-      results(section.onEmpty as ActionResult[], `${where} on empty:`, visit);
-      results(section.onFull as ActionResult[], `${where} on full:`, visit);
       return;
     case 'droptable':
       results(section.results as ActionResult[], where, visit);

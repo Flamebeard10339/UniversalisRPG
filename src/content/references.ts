@@ -75,6 +75,13 @@ export function validateTestReferences(test: Test, registry: Registry): void {
       if (!slots.has(value.slot)) throw new DslError(`${where} unequip: names an unknown slot: ${value.slot}`);
       return;
     }
+    // A two-sided action is reached by id and its target by pool, both of which
+    // the reference check already proved; what is left is that the performer can
+    // bring it, and the player is the performer of everything a test drives.
+    if (value.kind === 'use-on') {
+      if (!registry.player?.uses.some((used) => used === value.action)) throw new DslError(`${where} use: names an action the player does not use:: ${value.action}`);
+      return;
+    }
     if (value.kind !== 'use') return;
     const owner = owners[value.obj];
     if (!owner) throw new DslError(`${where} use: names an unknown kind: ${value.obj}`);

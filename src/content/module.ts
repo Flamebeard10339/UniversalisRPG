@@ -1,7 +1,9 @@
+import { parseActionSection } from './action';
 import { parseDialogue } from './dialogue';
 import { parseDropTable } from './dropTable';
 import { entitySchema } from './entity';
-import { entityTypeSchema } from './entityType';
+import { eventSchema } from './event';
+import { factionSchema } from './faction';
 import { flagSchema } from './flag';
 import { infoSchema } from './info';
 import { itemSchema } from './item';
@@ -25,7 +27,8 @@ export const SCHEMAS: Record<string, AnySchema> = {
   skill: skillSchema,
   location: locationSchema,
   entity: entitySchema,
-  entitytype: entityTypeSchema,
+  event: eventSchema,
+  faction: factionSchema,
   flag: flagSchema,
   recipe: recipeSchema,
   resource: resourceSchema,
@@ -35,6 +38,7 @@ export const SCHEMAS: Record<string, AnySchema> = {
 // A few kinds have a grammar too far from key/value to fit the generic engine
 // and bring their own parser. They merge on their own terms too — see mergeSection.
 const BESPOKE: Record<string, (section: RawSection) => object> = {
+  action: parseActionSection,
   dialogue: parseDialogue,
   droptable: parseDropTable,
   test: parseTest,

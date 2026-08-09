@@ -47,6 +47,23 @@ export const numberOrStat: Parser<number | string> = {
   },
 };
 
+const SECONDS_PER_MINUTE = 60;
+const DURATION = /(?:(?<minutes>\d+)m)?(?:(?<seconds>\d+)s)?/;
+
+// A span of time as an author writes one — `30s`, `2m`, `1m30s` — held as
+// seconds. Zero is refused because a delay of none is the absence of a delay,
+// and a field that means "never" says so by being absent.
+export const duration: Parser<number> = {
+  parse(cursor) {
+    const start = cursor.pos;
+    const raw = cursor.take(DURATION);
+    const groups = raw === null ? undefined : DURATION.exec(raw)?.groups;
+    const total = Number(groups?.minutes ?? 0) * SECONDS_PER_MINUTE + Number(groups?.seconds ?? 0);
+    if (total <= 0) throw new DslError('expected a duration, as in 30s, 2m or 1m30s', { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
+    return total;
+  },
+};
+
 export const REFERENCE = /[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*/;
 
 // Every id an author writes is a path into the namespace tree, whether or not

@@ -2,6 +2,7 @@ import type { Range } from '../grammar/range';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import type { ActiveAction } from './encounter';
 import { createInstanceTable, type InstanceTable } from './instances';
+import type { Populations } from './population';
 import type { ModalFrame } from './modals';
 
 export class RuntimeError extends Error {}
@@ -34,13 +35,16 @@ export interface GameState extends RngCursor {
   equipped: Record<string, string>;
   // instances.ts owns every write, and with it minting, pruning and liveness.
   instances: InstanceTable;
+  // How many of each location's population are down and when each is due back.
+  // population.ts owns every write.
+  populations: Populations;
   player: { name: string; race: string };
   // Readonly because modals.ts owns every write, and with it open and close.
   modals: readonly ModalFrame[];
 }
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
 }
 
 // The one seam through which simulated time advances; nothing reads a real clock.
