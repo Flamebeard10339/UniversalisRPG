@@ -87,6 +87,36 @@ describe('play-cli handleCommand', () => {
     expect(sessionStatus(session).time).toBe(42);
   });
 
+  it('/inventory prints all three lines the published status carries, and drops Equipped when nothing is worn', () => {
+    const registry = loadModule(`
+# skill smithing
+
+# location forge
+x: 0, y: 0
+starting
+
+# item gauntlet
+title: Gauntlet
+slot: hand
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"gauntlet":1},"xp":{"smithing":5}}
+`);
+    const session = startSession(registry);
+
+    const bare = handleCommand(session, view(session), '/inventory');
+    expect(bare.output).toEqual(['Inventory: {}', 'XP: {}']);
+
+    const loaded = handleCommand(session, view(session), '/load stocked');
+    const worn = handleCommand(session, loaded.view!, 'equip: gauntlet');
+    const carried = handleCommand(session, worn.view!, '/inventory');
+    expect(carried.output).toEqual([
+      'Inventory: {"gauntlet":1}',
+      'XP: {"smithing":5}',
+      'Equipped: {"hand":"gauntlet"}',
+    ]);
+  });
+
   it('reports a friendly error for an out-of-range choice number, without throwing or quitting', () => {
     const registry = loadModule(source);
     const session = startSession(registry);

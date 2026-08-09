@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { createGameState, travelSecondsPerUnit } from './runtime';
+import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { SaveDiff, SAVE_VERSION } from './save';
 import { secondsToMs } from './units';
@@ -571,6 +571,131 @@ submit-modal: choice=Nod.
   });
 });
 
+// Everything c4 names, in one world: a stat with a base and an item that raises
+// it, a skill that earns xp, a slot to fill, and a location reached only by
+// being told about it.
+const PUBLISHED_MODULE = `
+# stat might
+base: 4
+
+# skill smithing
+
+# location forge
+x: 0, y: 0
+starting
+entities:
+  window
+  bench
+
+# location overlook
+x: 1, y: 0
+
+# item ore
+examine: Streaked with red.
+
+# item ingot
+examine: A dull grey bar.
+
+# item gauntlet
+title: Gauntlet
+slot: hand
++3 might
+
+# entity window
+look through: discover: overlook
+
+# entity bench
+stations: bench
+
+# recipe ingot
+station: bench
+in: ore
+out: ingot
+skill: smithing 5
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"ore":1,"gauntlet":1}}
+`;
+
+describe('what the engine publishes', () => {
+  it('carries stat values, and recomputes them when equipment changes them', () => {
+    const session = primed(loadModule(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
+
+    expect(view(session).stats.might).toBe(4);
+
+    const armed = apply(session, 'equip:gauntlet');
+    expect(armed.equipment).toEqual({ hand: 'gauntlet' });
+    expect(armed.stats.might).toBe(7);
+
+    const bare = apply(session, 'unequip:hand');
+    expect(bare.equipment).toEqual({});
+    expect(bare.stats.might).toBe(4);
+  });
+
+  it('carries skill xp as it is earned', () => {
+    const registry = loadModule(PUBLISHED_MODULE);
+    const session = startSession(registry);
+    applyDirective(session, { kind: 'load', save: 'stocked' });
+
+    expect(view(session).xp).toEqual({});
+
+    const forged = apply(session, 'craft:ingot');
+    expect(forged.xp).toEqual({ smithing: 5 });
+    expect(forged.inventory).toEqual({ ingot: 1, gauntlet: 1 });
+  });
+
+  it('carries the locations discovery has revealed, and nothing it has not', () => {
+    const session = startSession(loadModule(PUBLISHED_MODULE));
+
+    expect(view(session).discovered).toEqual([]);
+
+    const told = apply(session, 'use:entity.window.look through');
+    expect(told.discovered).toEqual(['overlook']);
+    expect(told.flags).toEqual({ 'overlook.discovered': true });
+  });
+});
+
+describe('what the engine withholds', () => {
+  it('has a standing answer for every GameState field, so a new one cannot arrive unclassified', () => {
+    // The Record is the guard, not the assertion: adding a field to GameState
+    // stops compiling here until somebody says whether a driver sees it.
+    // `instances` reached this repo unpublished with nothing noticing, which is
+    // what this exists to stop happening twice.
+    const classified: Record<keyof GameState, 'published' | 'withheld'> = {
+      location: 'published',
+      time: 'published',
+      flags: 'published',
+      inventory: 'published',
+      equipped: 'published',
+      xp: 'published',
+      resources: 'published',
+      modals: 'published',
+      player: 'published',
+      activeAction: 'published',
+      // `said` is this drained, so the array itself never leaves the engine.
+      log: 'withheld',
+      // Bookkeeping the engine reasons with and no driver renders. Each stays
+      // withheld until something asks: a field published before anything reads
+      // it is how `discovered` became a list that is always empty.
+      rng: 'withheld',
+      visits: 'withheld',
+      activeBuffs: 'withheld',
+      resourceRateRemainders: 'withheld',
+      instances: 'withheld',
+    };
+
+    // The constructor, not the type: the two drift only if a field is built
+    // without being declared, which the type above cannot see.
+    expect(Object.keys(createGameState()).sort()).toEqual(Object.keys(classified).sort());
+
+    const published = Object.keys(classified).filter((field) => classified[field as keyof GameState] === 'published');
+    const carried = new Set(Object.keys(view(startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n')))));
+    // Two of them are renamed on the way out and one is drained into `said`.
+    const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action' };
+    for (const field of published) expect(carried.has(renamed[field] ?? field), field).toBe(true);
+  });
+});
+
 describe('the handle a driver obtains', () => {
   it('carries no route to the state it plays, by enumeration or by key', () => {
     const session = startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n'));
@@ -579,13 +704,13 @@ describe('the handle a driver obtains', () => {
     // runtime half: a symbol member satisfied the type and handed the live
     // GameState back out of getOwnPropertySymbols.
     expect(Object.getOwnPropertySymbols(session)).toEqual([]);
-    expect(Object.keys(session).sort()).toEqual(['logCursor', 'registry']);
+    expect(Object.keys(session)).toEqual(['registry']);
     expect(Object.values(session).some((value) => value instanceof Object && 'inventory' in value)).toBe(false);
   });
 
   it('refuses to play a handle it did not hand out, rather than reading undefined', () => {
     const registry = loadModule('# location camp\nx: 0, y: 0\nstarting\n');
-    const forged = { registry, logCursor: 0 };
+    const forged = { registry };
 
     expect(() => view(forged)).toThrow(/not a session startSession handed out/);
   });

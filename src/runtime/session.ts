@@ -1,12 +1,13 @@
 import { Action } from '../content/entity';
 import { DISCOVERED, Location } from '../content/location';
 import {
-  actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, PLAYER, RuntimeError, createGameState, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useTravel } from './runtime';
+  actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, PLAYER, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useTravel } from './runtime';
 import { findActiveAction, parseOwnerRef } from './actions';
+import { truthy } from './conditions';
 import { answerModal, dialogueFrame, Modal, openModal, publishModal, topModal } from './modals';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
-import { compareSave, loadSave, pruneStateForRegistry, serializeSave, startingLocationId } from './save';
+import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { Directive } from '../content/test';
 import { humanize } from '../grammar/values';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
@@ -55,25 +56,38 @@ export interface PlayView extends PlayStatus {
   said: string[];
 }
 
+// A driver reads the registry — it is content, and content is a layer below.
+// Assigning one is a different act: the state left behind refers to what the
+// old registry had, which is why adoptRegistry and not a field.
 export interface PlaySession {
+  readonly registry: Registry;
+}
+
+// The three things that only ever move together. The handle carries no key to
+// enumerate and this map is not exported, so it is the whole route in. A symbol
+// member was tried first and came straight back out of getOwnPropertySymbols.
+interface SessionInternals {
   registry: Registry;
+  state: GameState;
   logCursor: number;
 }
 
-// The handle carries no route to the state: it holds no key to enumerate, and
-// the map that answers for it is not exported. A symbol member was tried first
-// and came straight back out of Object.getOwnPropertySymbols.
-const STATES = new WeakMap<PlaySession, GameState>();
+const INTERNALS = new WeakMap<PlaySession, SessionInternals>();
+
+function own(session: PlaySession): SessionInternals {
+  const internals = INTERNALS.get(session);
+  if (!internals) throw new RuntimeError('this is not a session startSession handed out, so it plays nothing');
+  return internals;
+}
 
 function stateOf(session: PlaySession): GameState {
-  const state = STATES.get(session);
-  if (!state) throw new RuntimeError('this is not a session startSession handed out, so it plays nothing');
-  return state;
+  return own(session).state;
 }
 
 function sessionOver(registry: Registry, state: GameState): PlaySession {
-  const session: PlaySession = { registry, logCursor: state.log.length };
-  STATES.set(session, state);
+  const internals: SessionInternals = { registry, state, logCursor: state.log.length };
+  const session: PlaySession = { get registry() { return internals.registry; } };
+  INTERNALS.set(session, internals);
   return session;
 }
 
@@ -202,24 +216,22 @@ export function choiceToDirective(choice: PlayChoice): Directive {
 }
 
 export function startSession(registry: Registry): PlaySession {
-  const state = createGameState();
-  const starting = startingLocationId(registry);
+  const state = initialState(registry);
   // Said here rather than at the first `view()`, where it surfaced as
   // "unknown location: " and named nothing an author could act on.
-  if (!starting) throw new RuntimeError('no # location is marked starting, so a new game has nowhere to begin');
-  state.location = starting;
-  initResources(state, registry);
+  if (!state.location) throw new RuntimeError('no # location is marked starting, so a new game has nowhere to begin');
   return sessionOver(registry, state);
 }
 
 // Content changed under a live session: what no longer resolves is dropped and
 // said, and pools are re-read against the registry that replaced it.
 export function adoptRegistry(session: PlaySession, registry: Registry): void {
-  const state = stateOf(session);
-  session.registry = registry;
+  const internals = own(session);
+  const { state } = internals;
+  internals.registry = registry;
   const warnings = pruneStateForRegistry(state, registry);
   for (const warning of warnings) state.log.push(warning.message);
-  session.logCursor = Math.max(0, state.log.length - warnings.length);
+  internals.logCursor = Math.max(0, state.log.length - warnings.length);
   initResources(state, registry);
 }
 
@@ -238,11 +250,13 @@ function elideMiddle(said: string[]): string[] {
 
 export function view(session: PlaySession): PlayView {
   const status = sessionStatus(session);
-  const state = stateOf(session);
+  const internals = own(session);
 
-  const said = elideMiddle(state.log.slice(session.logCursor));
-  state.log.length = 0;
-  session.logCursor = 0;
+  // Spliced, not sliced-then-cleared: reading the lines is what removes them,
+  // so a session that idles forever cannot grow a log nobody drains.
+  const drained = internals.state.log.splice(0);
+  const said = elideMiddle(drained.slice(internals.logCursor));
+  internals.logCursor = 0;
 
   return { ...status, said };
 }
@@ -274,7 +288,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     xp: { ...state.xp },
     stats: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, statValue(stat.id, state, registry)])),
     flags: { ...state.flags },
-    discovered: [...registry.locations.values()].filter((each) => Boolean(state.flags[`${each.id}.${DISCOVERED}`])).map((each) => each.id),
+    discovered: [...registry.locations.values()].filter((each) => truthy(state.flags[`${each.id}.${DISCOVERED}`])).map((each) => each.id),
     player: { ...state.player },
     action: publishAction(state, registry),
   };
@@ -434,7 +448,7 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
       const saved = registry.saves.get(directive.save);
       if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
       const warnings = loadSave(state, saved, registry);
-      session.logCursor = Math.max(0, state.log.length - warnings.length);
+      own(session).logCursor = Math.max(0, state.log.length - warnings.length);
       return {};
     }
     case 'cancel':
