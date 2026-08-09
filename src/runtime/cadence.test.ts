@@ -34,6 +34,11 @@ trigger: on empty
 # item rat-tail
 examine: Still twitching.
 
+# stat max-carapace
+
+# resource carapace
+max: max-carapace
+
 # location den
 x: 0, y: 0
 starting
@@ -46,6 +51,15 @@ rate: my attack-rate
 damage: my attack vs their dr
 depletes: their health
 
+// First in the rat's uses: list, and reaching a pool the player does not
+// carry, so order alone would pick it and the pool rule is what does not.
+# action shell-crack
+title: shell-crack
+continuous
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their carapace
+
 # entity player
 stats: attack 10, dr 0, max-health 100, attack-rate 25
 uses: fight
@@ -54,7 +68,7 @@ on death:
 
 # entity giant-rat
 stats: attack 4, dr 2, max-health 10000, attack-rate 16
-uses: fight
+uses: shell-crack, fight
 on death:
   credit:
     give: 1 rat-tail
@@ -225,10 +239,18 @@ describe('the rat sheet', () => {
     });
   });
 
+  // `uses:` order is the tiebreak, and the pool the attacker carries is the
+  // filter: `shell-crack` comes first and reaches a pool the player has none of.
   it('answers with the first action in uses: whose depletes: names a pool the attacker has', () => {
     const registry = loaded();
     const state = fighting(registry);
     expect(state.activeAction!.roster!['giant-rat']).toEqual({ ownerRef: 'action.fight', actionLabel: 'fight', target: PLAYER });
+
+    // The same rat against a target that DOES carry a carapace answers with the
+    // earlier one, so the order is doing work rather than the filter alone.
+    const shelled = loadModule(MODULE.replace('stats: attack 10, dr 0, max-health 100, attack-rate 25', 'stats: attack 10, dr 0, max-health 100, max-carapace 20, attack-rate 25'));
+    const against = fighting(shelled);
+    expect(against.activeAction!.roster!['giant-rat'].actionLabel).toBe('shell-crack');
   });
 
   it('gives an entity that uses nothing no answer at all, and no attack-rate of 0 to write', () => {

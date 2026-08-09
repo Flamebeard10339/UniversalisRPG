@@ -36,9 +36,11 @@ import {
   logSwing,
   newCadence,
   FIGHT_SCOPED,
+  isFightScoped,
   opposes,
   Participant,
   participants,
+  leaveFight,
   playerCadence,
   retaliation,
   seatOf,
@@ -282,7 +284,7 @@ function resolveAttempt(participant: Participant, segment: Segment): boolean {
 // as at a boundary, because a segment that felled the last of a population and
 // stood a fresh one up out of nothing would depend on where the span was cut.
 function standsAgain(state: GameState, registry: Registry, action: Action, targetId: string): boolean {
-  if (!action.depletes) return true;
+  if (!action.depletes || isFightScoped(targetId)) return true;
   const location = registry.locations.get(state.location);
   return !location || isStanding(state, registry, location, targetId);
 }
@@ -328,17 +330,22 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
 
     const depleted = resolveAttempt(next, segment);
 
-    // The armed action's own performer is what the outcome is measured on; every
-    // other participant is a damage source swinging on its own clock.
-    if (next.self !== PLAYER) {
-      // Unless it empties a pool, which must settle at the instant it ran out.
-      if (depleted || state.time > segEnd) return;
-      continue;
+    // A copy whose pool ran out has left the world, whoever landed the blow:
+    // its own handlers run at the instant it ran out, and its place records
+    // that it is down. The player's own pool settles with the segment instead,
+    // because it is the one the save carries.
+    const struck = depleted && next.action.depletes ? sideOf(next.action.depletes, next.self, next.other) : undefined;
+    if (struck !== undefined && struck !== PLAYER) {
+      emptyPoolNow(segment, struck, next.action.depletes!.id, next.self);
+      downOne(state, registry, state.location, struck);
     }
 
+    // The fight is measured on what the armed action targets, not on who
+    // swung: an ally's killing blow ends it exactly as the player's does.
+    const armedTarget = active.roster?.[PLAYER]?.target;
     let fightOutcome: FightOutcome | null = null;
-    if (depleted) fightOutcome = 'completion';
-    else if (playerCadence(active).attemptsMade >= (action.attempts ?? Infinity)) fightOutcome = 'unfinished';
+    if (depleted && (struck === undefined ? next.self === PLAYER : struck === armedTarget)) fightOutcome = 'completion';
+    else if (next.self === PLAYER && playerCadence(active).attemptsMade >= (action.attempts ?? Infinity)) fightOutcome = 'unfinished';
 
     if (fightOutcome) {
       const batch = fightBatch(action, 1, fightOutcome);
@@ -347,17 +354,10 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         endAction(state);
         return;
       }
-      // A copy whose pool ran out has left the world: its own handlers run at
-      // the instant it ran out, and its place records that it is down.
-      if (fightOutcome === 'completion' && action.depletes) {
-        const felled = sideOf(action.depletes, next.self, next.other);
-        emptyPoolNow(segment, felled, action.depletes.id, next.self);
-        downOne(state, registry, state.location, felled);
-      }
-      if (active.repeating && standsAgain(state, registry, action, next.other)) {
+      if (active.repeating && standsAgain(state, registry, action, armedTarget ?? next.other)) {
         if (action.depletes) {
-          clearActorDeltas(segment.deltas, next.other);
-          enterEncounter(active, next.other, state, registry, PLAYER);
+          clearActorDeltas(segment.deltas, armedTarget ?? next.other);
+          enterEncounter(active, armedTarget ?? next.other, state, registry, PLAYER);
         } else active.implicitTarget = IMPLICIT_TARGET_FULL;
         playerCadence(active).attemptsMade = 0;
       } else {
@@ -365,6 +365,9 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         endAction(state);
         return;
       }
+    } else if (struck !== undefined && struck !== PLAYER) {
+      // Somebody else went down. The fight goes on without them.
+      leaveFight(active, struck);
     }
 
     if (state.time > segEnd || drainedAPool(segment)) return;
@@ -439,12 +442,15 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
 
 // A fight is bounded by its location: an aggressive entity disengages when its
 // target leaves and does not follow, so travelling out is how a fight is broken
-// off and no authored leash exists.
+// off and no authored leash exists. It is the TARGET's presence that bounds it,
+// never a participant's: an ally joins from wherever it is, and a fight-scoped
+// copy stands nowhere at all.
 function fightLeftItsLocation(state: GameState, registry: Registry): boolean {
   const active = state.activeAction;
   const location = registry.locations.get(state.location);
-  if (!active?.actors || !location) return false;
-  return Object.keys(active.actors).some((actorId) => !isStanding(state, registry, location, actorId));
+  const target = active?.roster?.[PLAYER]?.target;
+  if (!active?.actors || !location || target === undefined || isFightScoped(target) || !active.actors[target]) return false;
+  return !isStanding(state, registry, location, target);
 }
 
 // An aggressive entity opens the fight itself against any hostile entity in its

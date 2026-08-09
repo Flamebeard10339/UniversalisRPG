@@ -3,7 +3,7 @@ import { attemptDuration, statValue } from './stats';
 import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
 import { declaredId, Entity } from '../content/entity';
 import { hostile, Registry } from '../content/registry';
-import { findActiveAction, findActionOwner } from './actions';
+import { actionVisible, findActiveAction, findActionOwner, requiresMet } from './actions';
 import { GameState, PLAYER, RuntimeError } from './state';
 import { humanize } from '../grammar/values';
 import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
@@ -59,6 +59,10 @@ export const FIGHT_SCOPED = '#';
 
 export const templateOf = (actorId: string): string => actorId.split(FIGHT_SCOPED)[0];
 
+// A copy minted for the fight stands in no location at all, so no question
+// about a place can be asked of it — it is present while the fight is.
+export const isFightScoped = (actorId: string): boolean => actorId !== templateOf(actorId);
+
 // The sheet an actor is measured by. `player` is a well-known id rather than a
 // privileged one: what it names declares its stats the way a rat does.
 export function actorEntity(registry: Registry, actorId: string): Entity | undefined {
@@ -83,11 +87,17 @@ export function retaliation(state: GameState, registry: Registry, actorId: strin
   for (const action of actorEntity(registry, actorId)?.actions ?? []) {
     const id = declaredId(action);
     if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
+    if (!performable(action, state)) continue;
     if (!hasPool(state, registry, attackerId, action.depletes.id)) continue;
     return { id, action };
   }
   return undefined;
 }
+
+// An overload governs its entity's own performance of the action, so the gates
+// it writes have to be read where that entity swings — not only where the
+// player is offered a choice.
+export const performable = (action: Action, state: GameState): boolean => requiresMet(action, state) && actionVisible(action, state);
 
 export const seatOf = (id: string, action: Action, target: string): Seat => ({ ownerRef: `action.${id}`, actionLabel: action.label, target });
 
@@ -106,6 +116,12 @@ export function enterEncounter(active: ActiveAction, actorId: string, state: Gam
     delete active.cadences[actorId];
     delete active.roster?.[actorId];
   }
+}
+
+export function leaveFight(active: ActiveAction, actorId: string): void {
+  delete active.cadences[actorId];
+  if (active.roster) delete active.roster[actorId];
+  if (active.actors) delete active.actors[actorId];
 }
 
 export function actorInEncounter(state: GameState, actorId: string): ActorState {
@@ -136,7 +152,7 @@ export function participants(state: GameState, registry: Registry): Participant[
     const seat = active.roster?.[actorId];
     if (!seat) continue;
     const action = seatedAction(seat, registry);
-    if (action) list.push({ self: actorId, other: seat.target, action, cadence });
+    if (action && performable(action, state)) list.push({ self: actorId, other: seat.target, action, cadence });
   }
   return list;
 }
@@ -214,13 +230,10 @@ function spoken(milliAmount: number): string {
 }
 
 export function logSwing(state: GameState, registry: Registry, self: string, other: string, damage: number | null): void {
-  if (self === PLAYER) {
-    const title = actorTitle(other, registry);
-    state.log.push(damage === null ? `You miss the ${title}.` : `You hit the ${title} for ${spoken(damage)}.`);
-  } else {
-    const title = actorTitle(self, registry);
-    state.log.push(damage === null ? `The ${title} misses you.` : `The ${title} hits you for ${spoken(damage)}.`);
-  }
+  const swinger = self === PLAYER ? 'You' : `The ${actorTitle(self, registry)}`;
+  const struck = other === PLAYER ? 'you' : `the ${actorTitle(other, registry)}`;
+  const verb = self === PLAYER ? { hit: 'hit', miss: 'miss' } : { hit: 'hits', miss: 'misses' };
+  state.log.push(damage === null ? `${swinger} ${verb.miss} ${struck}.` : `${swinger} ${verb.hit} ${struck} for ${spoken(damage)}.`);
 }
 
 export function poolLevel(state: GameState, registry: Registry, actorId: string, resourceId: string): number {

@@ -27,13 +27,14 @@ function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatF
   }
 }
 
-// What an actor carries of its own. `activeBuffs` and `equipped` are the stores
-// of the entity this save is about; a fight-scoped participant is minted with
-// the fight and owns nothing, so it reads empty rather than reading the
-// player's sword.
+// What an actor carries of its own. A save holds one store of buffs and one of
+// equipment, and they belong to the entity that save is about; every other
+// participant reads an empty store because it HAS none, not because this asks
+// who it is. Giving a second entity a store is `buffs-generalized`, and this is
+// the one place that would change when it does.
 function ownStores(state: GameState, actorId: string): { buffs: ActiveBuff[]; equipped: string[] } {
-  const durable = actorId === PLAYER;
-  return { buffs: durable ? Object.values(state.activeBuffs) : [], equipped: durable ? Object.values(state.equipped) : [] };
+  const stored = actorId === PLAYER;
+  return { buffs: stored ? Object.values(state.activeBuffs) : [], equipped: stored ? Object.values(state.equipped) : [] };
 }
 
 // The action this actor is performing, which is where its tag bonuses come from

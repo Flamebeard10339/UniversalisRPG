@@ -17,7 +17,7 @@ import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseMod
 import { DslError, Span } from '../grammar/parser';
 import { Namespace } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
-import { registryCapabilities, validateDialogueReferences, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
+import { registryCapabilities, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
 import { ReferenceKind, Visit, visitAction, visitSection } from './referenceSites';
 import { Removal } from './removal';
 import { declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
@@ -752,6 +752,16 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
       if (!(error instanceof DslError)) throw error;
       return { module: sectionOwner(owners, 'recipe', id)!, stage: 'validate', error };
     }
+  }
+
+  try {
+    validateItemSlots(registry);
+  } catch (error) {
+    if (!(error instanceof DslError)) throw error;
+    const id = /^# item (\S+)/.exec(error.message)?.[1];
+    const module = id ? sectionOwner(owners, 'item', id) : undefined;
+    if (!module) throw error;
+    return { module, stage: 'validate', error };
   }
 
   const capabilities = registryCapabilities(registry);

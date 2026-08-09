@@ -6,10 +6,6 @@ export function equip(state: GameState, registry: Registry, itemId: string): voi
   if (!item) throw new RuntimeError(`equip: unknown item: ${itemId}`);
   if (!item.slot) throw new RuntimeError(`equip: item ${itemId} has no slot`);
   if ((state.inventory[itemId] ?? 0) === 0) throw new RuntimeError(`equip: player does not carry item ${itemId}`);
-  // Declared, not inferred from what items exist: a slot vocabulary read off
-  // `slot:` gives a rat a head.
-  const slots = registry.player?.equipmentSlots ?? [];
-  if (slots.length > 0 && !slots.includes(item.slot)) throw new RuntimeError(`equip: ${item.slot} is not a slot the player declares`);
   state.equipped[item.slot] = itemId;
 }
 

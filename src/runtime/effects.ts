@@ -6,6 +6,7 @@ import { isPoint, Range, sampleCount, sampleRange } from '../grammar/range';
 import { Registry } from '../content/registry';
 import { Resource } from '../content/resource';
 import { evaluateCondition } from './conditions';
+import { actorEntity } from './encounter';
 import { openModalNamed } from './modals';
 import { nextRandom } from './rng';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
@@ -290,7 +291,7 @@ export function restorePools(state: GameState, restored: Record<string, number>)
 // What an entity answers a name with. A handler's results apply to the entity
 // the event happened to, on the player and on the rat alike.
 export function handlersFor(registry: Registry, actorId: string, eventId: string): ActionResult[][] {
-  const entity = actorId === PLAYER ? registry.player : registry.entities.get(actorId);
+  const entity = actorEntity(registry, actorId);
   return (entity?.handlers ?? []).filter((handler) => handler.event === eventId).map((handler) => handler.results);
 }
 

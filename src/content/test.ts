@@ -60,11 +60,11 @@ const SUBMIT_MODAL = /^submit-modal:[ \t]*(?<key>[a-z][a-z0-9-]*)=(?<value>.*)$/
 
 function parseBegin(text: string, verb: string, rest: string): Directive {
   if (verb === 'use') {
-    const on = BEGIN_USE_ON.exec(rest)?.groups;
-    if (on) return { kind: 'begin', inner: { kind: 'use-on', action: on.action, target: on.target } };
     const m = BEGIN_USE.exec(rest)?.groups;
-    if (!m) throw new DslError(`malformed begin: use payload (expected obj.objId.actionId, or <action> on <target>): ${text}`);
-    return { kind: 'begin', inner: { kind: 'use', obj: m.obj, objId: m.objId, actionId: m.actionId } };
+    if (m) return { kind: 'begin', inner: { kind: 'use', obj: m.obj, objId: m.objId, actionId: m.actionId } };
+    const on = BEGIN_USE_ON.exec(rest)?.groups;
+    if (!on) throw new DslError(`malformed begin: use payload (expected obj.objId.actionId, or <action> on <target>): ${text}`);
+    return { kind: 'begin', inner: { kind: 'use-on', action: on.action, target: on.target } };
   }
   if (verb === 'travel') {
     const m = BEGIN_TRAVEL.exec(rest)?.groups;
@@ -90,14 +90,15 @@ export function parseDirectiveLine(text: string): Directive | null {
   const choose = CHOOSE.exec(text)?.groups;
   if (choose) return { kind: 'choose', text: choose.text };
 
-  // Tried first: `use: melee-combat on giant-rat` also matches the dotted form
-  // when an action id carries dots, and the two-sided reading is the one an
-  // author writing `on` meant.
-  const useOn = USE_ON.exec(text)?.groups;
-  if (useOn) return { kind: 'use-on', action: useOn.action, target: useOn.target };
-
+  // The dotted form is tried first, because its `<obj>.<objId>.` prefix is the
+  // narrower shape: an action LABEL may hold the word "on", and reading
+  // `use: entity.mirror.look on shelf` as two-sided would make that label
+  // unaddressable.
   const use = USE.exec(text)?.groups;
   if (use) return { kind: 'use', obj: use.obj, objId: use.objId, actionId: use.actionId };
+
+  const useOn = USE_ON.exec(text)?.groups;
+  if (useOn) return { kind: 'use-on', action: useOn.action, target: useOn.target };
 
   const travel = TRAVEL.exec(text)?.groups;
   if (travel) return { kind: 'travel', location: travel.id };

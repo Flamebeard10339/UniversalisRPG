@@ -26,6 +26,12 @@ base: 30
 rate: regeneration
 max: max-health
 
+# stat max-sawdust
+base: 8
+
+# resource sawdust
+max: max-sawdust
+
 # event death
 resource: health
 trigger: on empty
@@ -64,6 +70,7 @@ flags: dummies-felled
 stats: max-health 12, dr 2
 on death:
   add: dummies-felled 1
+  restore: 4 sawdust
 
 # entity straw-man
 stats: max-health 40, dr 1
@@ -128,7 +135,7 @@ describe('encounter state', () => {
 
     // 12, from the dummy's own max-health — not the player's 30, and its own
     // rate remainders, which start empty because no span has settled yet.
-    expect(state.activeAction!.actors).toEqual({ 'training-dummy': { resources: { health: toMilliUnits(12) }, rateRemainders: {} } });
+    expect(state.activeAction!.actors).toEqual({ 'training-dummy': { resources: { health: toMilliUnits(12), sawdust: toMilliUnits(8) }, rateRemainders: {} } });
     expect(state.resources['health']).toBe(toMilliUnits(30));
   });
 
@@ -183,12 +190,18 @@ describe('damage against a target pool', () => {
     expect(state.time).toBe(secondsToMs(2));
   });
 
-  it('runs the felled actor own handler rather than the player one', () => {
+  // The dummy's handler writes to a pool the dummy carries, so the subject is
+  // what this reads: rewriting it to the player would move the sawdust onto the
+  // player's own store, which the second assertion rules out.
+  it('runs the felled actor own handler on the felled actor', () => {
     const registry = loaded();
     const state = started(registry);
+    (state.resources as Record<string, number>)['sawdust'] = 0;
     useFight('strike', 'training-dummy', registry, state);
     resolve(state, registry, secondsToMs(10));
 
+    expect(state.activeAction!.actors!['training-dummy'].resources['sawdust']).toBeGreaterThan(0);
+    expect(state.resources['sawdust']).toBe(0);
     // "You black out." belongs to the player's health, not a felled dummy's.
     expect(state.log).not.toContain('You black out.');
     expect(state.resources['health']).toBe(toMilliUnits(30));
