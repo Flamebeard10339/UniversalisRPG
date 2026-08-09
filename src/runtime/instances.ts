@@ -1,4 +1,5 @@
 import type { Registry } from '../content/registry';
+import type { PruneWarning } from './save';
 import { GameState, RuntimeError } from './state';
 
 // One table for everything that carries state about a single copy of a
@@ -109,17 +110,15 @@ export function collapseInstance(state: GameState, id: string): boolean {
   return true;
 }
 
-export interface InstanceNotice {
-  id: string;
-  message: string;
-}
-
-export function pruneInstances(state: GameState, registry: Registry): InstanceNotice[] {
+export function pruneInstances(state: GameState, registry: Registry): PruneWarning[] {
   const table = open(state.instances);
-  const notices: InstanceNotice[] = [];
+  const warnings: PruneWarning[] = [];
+  const warn = (id: string, message: string): void => {
+    warnings.push({ path: `instances.${id}`, id, message });
+  };
   const drop = (id: string, because: string): void => {
     delete table.byId[id];
-    notices.push({ id, message: `Removed instance ${id} because ${because}` });
+    warn(id, `Removed instance ${id} because ${because}.`);
   };
 
   for (const [id, held] of Object.entries(table.byId)) {
@@ -136,7 +135,7 @@ export function pruneInstances(state: GameState, registry: Registry): InstanceNo
     for (const [id, held] of Object.entries(table.byId)) {
       const definition = kindOf(held.kind)!;
       for (const repaired of definition.repair(held.payload as never, registry, (ref) => instanceIsLive(state, ref))) {
-        notices.push({ id, message: `Repaired instance ${id}: ${repaired}` });
+        warn(id, `Repaired instance ${id}: ${repaired}.`);
       }
       if (definition.empty(held.payload as never)) {
         drop(id, 'nothing is left recorded about it');
@@ -145,7 +144,7 @@ export function pruneInstances(state: GameState, registry: Registry): InstanceNo
     }
   }
 
-  return notices;
+  return warnings;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -140,9 +140,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
 
   // First, so every rule under it asks a settled table rather than one still
   // being pruned beneath it: a field holding an instance id gets one answer.
-  for (const { id, message } of pruneInstances(state, registry)) {
-    addWarning(warnings, `instances.${id}`, id, `${message}.`);
-  }
+  warnings.push(...pruneInstances(state, registry));
 
   if (state.location && !registry.locations.has(state.location)) {
     const old = state.location;
