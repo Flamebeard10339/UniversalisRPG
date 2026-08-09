@@ -456,3 +456,199 @@ Why the goal still holds without it: an action performed rather than owned needs
   to the manifest, which is the one condition the partition fails on and which CI runs on the ubuntu leg. This
   is a regression against the pass-1 head, where the same leg passed. The remaining two failing legs (spec and
   clauses, on the three open clause records) are what this pass is for; audit-status is not.
+
+### Pass 3 — 2026-08-09
+
+- base: `20a2557a2e8216fc07a51afe98e88280c204e504`
+- head: `9f49923bf9a2dd1f82c6e90ee093083b7b171301`
+- proof 1: met — Carried forward from pass 2 and re-checked, because the repair commit split
+`twoSidedProblem`. The marker walk is untouched: `const unmarked = sidedFields(action).find((field)
+=> field.value.side === undefined)` still sits inside `actionTableProblem` (src/grammar/action.ts:260),
+which every entry point calls. Re-run: `npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass2-mutations-b.json`
+name c1. `grep -rn "BOOLEAN_ACTION_FLAGS\|retaliationOf" src/` returns nothing; `retaliates` survives
+only as the RETIRED_ACTION_TAGS message. No default is supplied anywhere: the marker rule refuses
+before an action is built, and it did not move with the depletes rule.
+- proof 2: met — Carried forward from pass 2 and re-checked, because the repair commit touched both
+src/grammar/action.ts and src/content/action.ts. `parseActionSection` still builds a top-level
+`# action` through the same `actionBody.parseBlock` an inline entry uses; the only addition is an
+assembly-time check after it. Re-run: same manifest, name c2 KILLED by src/grammar/action.test.ts >
+side vocabulary is the whole declaration of kind > "makes an action two-sided when it writes a marker
+and one-sided when it writes none". `npx vitest run src/runtime/integration.test.ts` still plays
+`roast chestnuts:` and `use: entity.mirror.look in` from the shipped module.
+- proof 3: met — Re-checked, because this is the rule the repair commit MOVED. It is now asked on the
+assembled action rather than on the block — `assembledActionProblem` (src/grammar/action.ts:270),
+called from `parseActionSection` for a `# action` section and from `validateActionTable` for every
+inline or overlaid action an owner carries. Re-run: `npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass3-mutations.json`
+name c5-assembled-depletes is KILLED by src/grammar/action.test.ts > contests > "refuses a
+side-naming action with nothing to deplete" and > the table over an assembled action > "applies the
+marker and depletes: rules to an action nobody authored a block for", confirmed at its own file. The
+move is the right direction under CLAUDE.md's "enforce where a value is assembled, not where it is
+written": a whole action with no `depletes:` is still a load error, and pass 2's noted consequence —
+a partial overload writing `damage: my X vs their Y` without restating `depletes:` being refused — is
+gone. Re-run: `npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass2-overload.js`,
+key `partialDamageOverload`, which now loads and swings. One spelling of each half is unchanged
+(RETIRED_ACTION_FIELDS), pinned by action.test.ts "keeps exactly one spelling of each half".
+- proof 4: met — Carried forward from pass 2; the repair commit did not touch the attempt bound or
+`on failure:`. Re-run: `npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass2-mutations-b.json`
+name c4 KILLED by src/runtime/contest.test.ts > a contest inside a fight > "escapes a deterministic
+fight on its attempt count, not on an emptied pool". `on failure:` is still read only by
+`armAction`/`armFightAction`'s input-shortfall branch; absent `attempts:` is still `?? Infinity`.
+Noted rather than graded here: a DECLARED `attempts:` bounds the action exactly as this clause says —
+re-run `npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass3-attempts.js`,
+key `declaredAttempts` (2 swings, action ended, `on unfinished:` fired) — while the same two lines
+written as an entity's OVERLOAD of that action are inert (key `overloadedAttempts`: 10 swings, still
+armed). That is filed as a c5-neighbourhood finding, not against c4, because the field itself works.
+- proof 5: met — The two reproductions pass 2 recorded now behave. Re-run: `npm run inspect -- - <
+C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass2-overload.js` — the
+ogre whose `swing:` overload writes `damage: my big-attack vs their dr` now kills the 1000-health
+player in five seconds (`damageOverload.playerHealth` 0 against the ungated control's 980), and
+`rate: my slow-rate` now yields 0 swings in five seconds against the control's 5. Re-run:
+`...-pass2-overload-gate.js` — a `+hidden if: truce` overload gates the ogre BOTH before the fight
+(1000) and one second INTO it (996 at the flip, 996 five seconds later, `keptSwinging` false) against
+the ungated 976, so the gate is re-read every tick rather than at seat time. The cause pass 2 named is
+fixed at one line: `seatedAction` (src/runtime/encounter.ts:145) now prefers the performer's own copy
+of a `# action` before falling back to the declaration. Re-run: `npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass3-mutations.json`
+name c5-seated-own-copy is KILLED by src/runtime/fight.test.ts > an overload governs its own entity
+performance > "is what swings, so its damage: and rate: are the ones that land", confirmed at its own
+file; name c5-empty-roster-ends is KILLED by "ends rather than stalling when every seat gate has
+closed" (the stall pass 2 filed). The bare/`+` rule holds behaviourally in all four combinations —
+re-run `npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass3-append.js`:
+a bare `hidden if:` replaces the declaration's, `+hidden if:` builds `{kind:'and'}` over both, a bare
+`on success:` replaces the declaration's results and `+on success:` concatenates them. The refusal of
+a block naming an action the entity does not `use:` is unchanged (src/content/registry.ts:617), and
+`uses:` as an ordered list stays watched by cadence.test.ts (pass-2 name c7-attacker-pool). TWO
+CAVEATS, both filed as findings rather than against this clause: the rule is still watched by nothing
+— name c5-append-vs-replace SURVIVED the whole suite for the second pass running, and the test the
+repair added for it cannot fail, because its fixture appends to a declaration carrying no gate; and
+the overload's WHOLE-ACTION half (`attempts:`, `on success:`, `on unfinished:`) is still inert,
+because `resolveStochasticSegment` reads those off `findActiveAction` while the swing half reads the
+performer's copy.
+- proof 6: met — Carried forward from pass 2 and improved by the repair. `npx vitest run
+src/content/references.test.ts` is a confirmed kill of `performerStatProblem`'s
+`if (needed === undefined || entity.stats[needed] !== undefined) continue;` (pass-1/2 manifest name
+c6), killed by "refuses an entity performing an action over a pool its own stats: does not measure".
+There is still no list of permitted target types: `grep -rn "hasPool" src/runtime` shows the only
+target gate is whether the actor's `depletes:` pool reads a positive max (src/runtime/encounter.ts:78).
+The permitted-VALUE list pass 2 flagged elsewhere — item slots read off the player alone — is gone:
+`registrySlots` and `validateItemSlots` now read every entity's `equipment-slots:`
+(src/content/references.ts:44, :55), watched by name c10-slot-vocabulary (KILLED, see c10).
+- proof 7: met — Carried forward from pass 2 and re-checked, because the repair commit rewrote the
+function above `retaliation()`. `retaliation()` (src/runtime/encounter.ts:86) is unchanged: it walks
+`uses:` order, skips anything with no `declaredId`, anything not two-sided, anything with no
+`depletes:`, anything not `performable`, and anything whose pool the attacker lacks. Re-run:
+`npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass2-mutations.json`
+name c7-attacker-pool KILLED by src/runtime/cadence.test.ts > the rat sheet > "answers with the first
+action in uses: whose depletes: names a pool the attacker has". `grep -rn retaliationOf src/` returns
+nothing.
+- proof 8: met — Carried forward from pass 2, and the caveat it filed is repaired. Re-run:
+`npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass3-mutations-b.json`
+name c8-leash is now KILLED by src/runtime/fight.test.ts > aggressive opens the fight, and a location
+bounds it > "disengages when the target is no longer where the fight is", confirmed at its own file —
+it SURVIVED at pass 2, because the old fixture killed the target before the leash could fire. The
+repair swapped in an urchin with 100000 health, and the test now asserts the target is still alive
+(`resources['health'] > 0`) at the instant the fight is expected to still be armed, so winning cannot
+masquerade as leashing. Hostility is unchanged and still watched by pass-2 manifest name c8-hostile.
+- proof 9: met — Carried forward from pass 2; the repair commit did not touch src/runtime/effects.ts.
+Re-run: `npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass2-mutations.json`
+names c9-handler-subject and c9-handlers-template, both KILLED. `# event` binds a name to a pool
+crossing a threshold and nothing else; `# resource` no longer holds onEmpty/onFull; `credit:` is an
+ordinary wrapper beside the chance wrappers.
+- proof 10: met — Graded on the clause's own closing rule — "a `PLAYER` constant surviving as a
+well-known entity id is fine; a branch in behaviour taken on it is what this clause forbids" — rather
+than on the earlier passes. Both NAMED special-cases are gone and the third named thing is delivered
+and watched. Re-run: `npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass3-mutations.json`
+— name c10-sheet-is-the-actors (reading `registry.player`'s sheet for every actor) is KILLED by 16
+tests across cadence.test.ts, encounter.test.ts and fight.test.ts, so `statRange`'s
+`actorEntity(registry, actorId)?.stats[statId]` is measured against a rat as against the player;
+name c10-tag-bonus-performer (emptying the `performing(...)` fold) is KILLED by src/runtime/stat.test.ts
+> statRange > "sums flat bonuses endpoint-wise onto a ranged base, from buffs and the active action
+alike"; `participants()` (src/runtime/encounter.ts:157) builds every seat the same way with no
+identity test; `grep -n "PLAYER" src/runtime/runtime.ts` no longer returns `if (next.self !== PLAYER)`.
+The NEW load-path branch pass 2 found is gone: name c10-slot-vocabulary (reinstating the player-only
+reading) is KILLED by src/content/references.test.ts > the slot vocabulary is what entities declare >
+"takes the vocabulary from any entity, not from the player alone", confirmed at its own file.
+The boundary this pass draws for what remains, which the spec's own `--op note` records: the `PLAYER`
+mentions that survive in the runtime are (i) WHICH CONTAINER holds an actor's single-owner state —
+`ownStores` for buffs and equipment (src/runtime/stats.ts:33), `poolLevel` for pools
+(src/runtime/encounter.ts:250), `playerCadence` for the armed clock — and (ii) WHO ARMED the action
+(`active.roster?.[PLAYER]?.target`, and the attempt bound at runtime.ts:356). Neither is a rule about
+combat taken on identity. Checked rather than assumed: no reachable path puts a buff or an equipped
+item on a non-player actor — `grep -n "activeBuffs\|equipped" src/runtime/*.ts` shows the only writers
+are `grantFoodBuff`/`grantActionFoodBuff` (runtime.ts:545, reached from the player's own consumption
+and from her own action completing) and `equip`/`unequip` (equipment.ts:9, :14), and `state.activeBuffs`
+and `state.equipped` carry no actor key at all — so `ownStores` returns a store to its owner and an
+empty store to everyone who HAS none, which is a lookup rather than a differing answer to equal
+inputs. The branch is itself watched: name c10-player-only-stores is KILLED by
+src/runtime/encounter.test.ts > "keeps the player buffs and the running action off other actors". The
+alternative reading — that the surviving `actorId === PLAYER` is the named gate relocated — would
+equally condemn `poolLevel`, which pre-dates this branch and which neither earlier pass called a
+breach, and would require inventing per-entity buff and equipment stores, which is `buffs-generalized`'s
+scope. That re-scoping is real and is filed as a finding: the spec's Decisions and the
+`buffs-generalized` record both still say this branch delivers the identity half of "buffs apply to
+any entity", and after this ruling it does not.
+- proof 11: met — Carried forward from pass 2 and re-verified at this head, plus the caveat pass 2 filed
+is repaired. Re-run: `npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass3-mutations.json`
+— name c11-allies-count is KILLED by src/runtime/fight.test.ts > "mints one fight-scoped copy per
+count and joins a named one from wherever it is" and two more; name c11-respawn is KILLED by "brings
+a copy back at its due instant and not before" and "draws no randomness at spawn time"; names
+c11-allies-self and c11-allies-player are each KILLED by fight.test.ts > allies: names somebody else >
+"refuses an entity that names itself, or the player, as its own ally". The runtime crash pass 2 found
+(`allies: player` loading clean and then throwing `RuntimeError: actor is not in the encounter`) is
+now a load error. Over-strictness checked, not assumed — re-run `npm run inspect -- - <
+C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass3-allies.js`: the
+player naming an ally (`allies: miki` on `# entity player`) and a foe naming a counted one
+(`allies: 2 miki` on `# entity bandit`) both still load, with absent count meaning the one that
+exists; only self-naming and player-naming are refused, and each names why in its message. No syntax
+names one copy: FIGHT_SCOPED is `#`, which the id grammar cannot produce.
+- proof 12: deferred — Unchanged by the repair commit, which touched neither src/runtime/population.ts nor
+src/runtime/instances.ts. The half the clause is named for holds and is watched: pass-2 manifest name
+c12-prune is KILLED by fight.test.ts "survives a round trip and is pruned when the place or the thing
+leaves". What is still not delivered is the trigger: `grep -rn "skills" src/runtime/*.ts` returns only
+a comment in instances.ts and the xp prune rule in save.ts, so nothing reads an entity's `skills:` to
+mint an instance and this branch creates no durable instance.
+Why the goal still holds without it: the goal — an action performed rather than owned — needs no durable instance minted,
+because nothing yet reads one. `instanced-objects` ships with zero live consumers rather than the one
+this spec forecast, and the clause's own defence (no second table, no second prune rule, no second
+save field for instances) is delivered and watched. The branch already filed the gap itself as
+`c12-s-durable-instancing-has-no-consumer-skills-mints-nothin`, so it is tracked rather than lost.
+- proof 13: met — Carried forward from pass 2 and re-checked, because the repair commit touched
+src/content/action.ts, registry.ts and references.ts. Re-run: `npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass2-mutations-b.json`
+name c13 is KILLED, 18 tests of src/content/references.test.ts failing. All three sections still parse,
+register, resolve, reference-check, serialize and round-trip — `npm test` is green at this head
+(81 files, 2161 tests), which includes roundTrip.test.ts and serialize.test.ts. The deleted kind
+leaves no residue: `grep -rn "entitytype" --include=*.ts --include=*.dsl --include=*.json .` outside
+node_modules returns nothing.
+- proof 14: met — Re-checked, because the repair commit rewrote exactly this decision, and the pass-2
+caveat is repaired. Which reading wins is now decided by the leading segment against a named set of
+object kinds (src/content/test.ts:44, OBJECT_KINDS) rather than by regex order. Re-run:
+`npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass2-repeat.js`,
+key `parses`: all five survey lines now read as intended — `use: melee-combat on giant-rat` and
+`use: island.melee-combat on island.giant-rat` two-sided, `use: entity.mirror.look on shelf` and
+`use: entity.mirror.look in` dotted, and `use: a.b.melee-combat on giant-rat` two-sided, which pass 2
+found reading as the dotted form. The rule is watched by the new src/content/test.test.ts > "use: has
+two payloads and one rule for telling them apart", four cases including the `begin:` payload. Both
+spellings remain load-bearing in the shipped module (pass-2 manifest names c14/c14b, each an
+unparseable content file when its arm is disabled).
+- proof 15: met — Carried forward from pass 2; the repair commit did not touch src/runtime/save.ts or
+src/runtime/state.ts. Re-run: `npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-full-refactor-of-enemies-and-combat-pass2-mutations.json`
+name c15-holds KILLED by fight.test.ts "refuses a shape that is not a deficit rather than misreading
+it at first use". SAVE_VERSION moves 7 to 8 and commit ae08d1b states it and why.
+- proof 16: met — Re-run: `git diff --stat 6bcaf15..9f49923 -- content/` prints nothing, so the repair
+commit regenerated no fixture and the pass-2 reading of the content diff stands unchanged at this
+head. `npx vitest run src/runtime/integration.test.ts` passes, and pass-2 manifest name c16 (dropping
+the counted list from `3 giant-rat` to `1 giant-rat`) is a confirmed kill of the shipped regression.
+- proof 17: met — Re-run over the WHOLE range including both repair commits:
+`git diff --stat 20a2557a2e8216fc07a51afe98e88280c204e504..9f49923bf9a2dd1f82c6e90ee093083b7b171301 -- src/grammar/condition.ts src/grammar/tagClause.ts src/grammar/range.ts src/content/item.ts src/content/recipe.ts src/content/dropTable.ts src/content/skill.ts` prints nothing: all seven are
+untouched. The repair's one new condition operation reuses `Condition`'s existing `and` shape
+(`appendCondition`, src/content/registry.ts:579) rather than adding a spelling to condition.ts.
+- proof 18: met — Re-run: `npm run tasks -- merge-ready`. tsc ok, npm test ok, layer-check ok,
+audit-status ok, doctor ok (17 warnings, which that leg does not fail on), bytes ok, tree ok, base ok.
+The audit-status regression pass 2 recorded is repaired: `src/runtime/fight.test.ts` is now declared
+under Runtime in docs/audits/systems.json, and the partition condition passes. The only failing legs
+are `spec` (4 open member records: clauses 5, 10, 11 and 18) and `clauses` (c5, c10, c18 outstanding),
+which are the records this pass closes — the same self-referential standing pass 1 recorded and
+accepted. One caveat, filed as friction rather than against this clause: the FIRST merge-ready run at
+this head reported `npm test FAIL exit=1`; a standalone `npm test -- --reporter=dot` then passed
+81 files / 2161 tests, and a second merge-ready run passed every leg. That is the known
+`npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s` under merge-ready's contending legs,
+recorded as a recurrence.
