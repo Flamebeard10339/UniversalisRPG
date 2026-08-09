@@ -260,3 +260,59 @@ because a reader arriving at this spec needs the answer more than the history of
 - proof 12: met — `npm run tasks -- merge-ready` at 3e252b8 and again after the audit fixes: tsc, npm
   test, layer-check, audit-status, doctor, bytes, tree and base all pass. The spec leg passes; the
   clauses leg is what this file closes.
+
+### Pass 2 — 2026-08-09
+
+- base: `0115673633133af064a724780d6cb21acc4d1e4b`
+- head: `4b87f5e14c6dc506a7b78054d08214b52c5178ed`
+- proof 1: met — Unchanged from pass 1 and re-verified at HEAD. One field (state.ts:37), one SAVE_FIELDS
+  row (save.ts:50), one rule (save.ts:143, now a single `warnings.push(...pruneInstances(...))`).
+  Enforced by tsc, not by a test: add `instances2?: InstanceTable` beside the field and
+  `npx tsc --noEmit` gives TS2741 at save.ts:40 while `npm test` stays green. A next pass must not
+  read that survivor as a finding.
+- proof 2: met — Re-checked after the readonly tightening landed. `grep -n "payload" src/runtime/instances.ts`
+  shows every access going through a kind method, plus one `'payload' in held` presence check and one
+  JSON.stringify in an error message. Pass 2 mutation-tested the boundary the other way: making
+  `instance()` return `{...held}` SURVIVES the whole suite. Recorded as an equivalent mutant rather
+  than filed — the shallow copy shares the payload object, and payload identity is the only thing a
+  consumer needs from the accessor, so nothing observable differs. Named here so a third pass does
+  not re-derive it.
+- proof 3: met — Unchanged from pass 1. Mint, load and repair are all closed, each mutation-killed. The
+  eager/offered question the spec left open is answered both ways and both halves are asserted.
+- proof 4: met — Unchanged from pass 1, all four properties still mutation-killed. Pass 2 added the
+  regression check that matters here: `npm run build` (tsc + vite) succeeds, so the counter and the
+  table survive the production bundle, and no id is derived from anything the bundler reorders.
+- proof 5: met — Unchanged from pass 1. instanceIsLive is the single answer and is mutation-killed;
+  pruneInstances is the first rule in pruneStateForRegistry and the order is pinned by warning order
+  and mutation-verified by moving it back. The limit stated in pass 1 still stands and is the honest
+  boundary of this grade: no field of GameState holds an instance id yet, so what is proved is the
+  shape a reference site will ask, not a reference site.
+- proof 6: met — Pass 2 found this one under-proved and fixed it. Every earlier case reached the repair
+  loop with a chain that resolved in a single round, because each was minted in the order the loop
+  walks — so replacing the fixed point with one pass stayed green, and one pass leaves a live
+  reference to an instance that is gone. "reports a repair once however many rounds the table takes
+  to settle" mints the chain against the iteration order so the outer link cannot be repaired before
+  round two, and asserts both the settled table and that a repair is reported exactly once.
+  Mutation `c6-one-round-is-not-a-fixed-point` (loop rewritten as a single pass): KILLED. The warning
+  shape is now built where it is owned: pruneInstances returns PruneWarning itself, so path, id and
+  message are one sentence in one file; mutating the path to drop the id KILLED four tests.
+- proof 7: met — Unchanged from pass 1. `grep -n "\.repair(" src/runtime` returns exactly instances.ts:139.
+  Pass 2 added the clause the interface was missing: repair is called until the table settles, so an
+  implementor must return nothing when there is nothing left to repair. That obligation is now stated
+  on InstanceKind and proved on the substrate side by the once-only assertion in c6's new case.
+- proof 8: met — Unchanged from pass 1. SAVE_VERSION is 7. Five nonsense cases, absent-means-empty
+  asserted in both directions, both mutations killed.
+- proof 9: met — Re-run at HEAD. `git diff --stat main...HEAD` still touches only four files under
+  src/runtime plus unowned docs; nothing under content/, src/grammar or src/content. npm test 2119
+  passed. Pass 2 added two regression checks pass 1 did not run: `npm run build` succeeds, and
+  `grep` for anything enumerating GameState's keys finds only save.ts's SaveField type — no loop
+  over GameState that a new field silently joins.
+- proof 10: met — 23 cases now, one added by each pass. Sixteen mutations aimed at the clauses' own lines
+  across the two passes, fifteen KILLED and one recorded as an equivalent mutant. The test-only kind
+  is still registered nowhere but its own file.
+- proof 11: met — Unchanged from pass 1; three decisions on the record, readable with
+  `npm run tasks -- log --spec instanced-objects --op decision`. The walk's two leftovers are filed
+  as findings and deferred, with the triage reasoning recorded as a fourth decision.
+- proof 12: met — `npm run tasks -- merge-ready` at HEAD: tsc, npm test, layer-check, audit-status,
+  doctor, bytes, tree, base, spec and clauses all pass. 17 doctor warnings, none of which fail a leg
+  and none of which this branch introduced.
