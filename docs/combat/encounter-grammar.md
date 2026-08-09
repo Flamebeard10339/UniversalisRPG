@@ -70,7 +70,7 @@ carries no side marker, because a count has no other side to be confused with.
 
 `on unfinished:` is deliberately not called `on failure:`. That name is occupied by a different
 moment — today `on failure:` fires only when an action cannot *start* for want of inputs
-(`src/runtime/runtime.ts:478`) — and repointing it silently is the class of defect this document is
+(`src/runtime/runtime.ts:480`) — and repointing it silently is the class of defect this document is
 written against. That `on failure:` means "could not begin" is a real naming defect, but it is in a
 non-combat corner of the grammar and is filed separately rather than fixed here.
 
@@ -106,9 +106,15 @@ rather than as a ban on one kind of owner.
 
 ### Retaliation, factions and aggression
 
-Retaliation is unconditional: an entity attacked by a two-sided action performs its own matching
-action in return, if it has one. It is not authored, because nothing that can retaliate ever wants
-not to — a tree does not need `attack-rate: 0`, it simply has no `uses:`.
+Retaliation is unconditional: an entity attacked by a two-sided action swings back with one of its
+own, if it has one. It is not authored, because nothing that can retaliate ever wants not to — a tree
+does not need `attack-rate: 0`, it simply has no `uses:`.
+
+**Which one is a stated rule, not a match against the attacker:** the first two-sided action in the
+entity's `uses:` whose `depletes:` names a pool its attacker has. `uses:` order is the tiebreak, so
+an entity with several attacks has one place to say which it prefers. Deliberately *not* "the same
+action the attacker used", because under that rule a rat shot with `ranged-combat` would never bite
+back — a silent change from today, where `bite` answers every swing.
 
 What *is* authored is disposition, on the entity, because the player and the rat share
 `melee-combat` and only one of them is hostile:
@@ -129,9 +135,17 @@ itself against any hostile entity in its location; everything else waits to be a
 
 `faction:` takes one or more declared names. Each declaration takes a bit, so membership is a mask
 and the check is one `and`: `world` is the first bit and the default, `player` the second, and
-`faction: world, player` is 3 — the neutral nobody attacks, because it shares a bit with everyone.
-An entity that says nothing is `world`, which is why almost nothing needs the line: rats do not
-fight rats, and only the player and its allies declare anything.
+`faction: world, player` is 3 — at peace with both. An entity that says nothing is `world`, which is
+why almost nothing needs the line: rats do not fight rats, and only the player and its allies declare
+anything.
+
+**Peace is per-faction, and there is no universal neutral.** A third declaration — `# faction bandits`
+appears two sections below — is hostile to `world, player` unless that entity joins it too, so a
+shopkeeper safe from everyone means enumerating every faction in the module. That is the same
+per-species enumeration this document rejects nineteen lines earlier as the reason `# entitytype`
+loses, and it is a real limit rather than an oversight: an `everyone` wildcard, or peace declared as
+a relation between factions instead of as membership, is the obvious answer and neither is proposed
+here because nothing needs one yet. Listed under open questions.
 
 The names are authored and the bits are compiled. `faction: 3` on a page is unreadable, which is the
 thing this grammar exists for, and an undeclared name is a load error the way every other reference
@@ -164,7 +178,8 @@ on death:
 ```
 
 `credit:` is an ordinary result wrapper, so it composes with `1 in 3:`, `luck vs 60:` and `if` the
-way `droptables` already defines. Counters and log lines have no subject and are unaffected by it.
+way `droptables` already defines. Counters and log lines carry no subject, so `credit:` does not move
+them — which is a limit on `say:` rather than a property to be pleased about, and it is named below.
 
 This is where `on empty:`/`on full:` go. They are on `# resource` today, which is why they can only
 be written in the player's voice — `# resource health`'s block says "You slump to the floor" for
@@ -176,7 +191,7 @@ nothing else.
 ```
 # entity player
 title: You
-stats: max-health 10, attack-rate 25
+stats: max-health 10, attack 5, defense 1, attack-rate 25, accuracy 75, evasion 50
 skills: melee, cooking, thieving
 equipment-slots: head, body, legs
 uses: melee-combat
@@ -223,6 +238,11 @@ what the location holds, so `allies: 2 bandit` brings two bandits into the fight
 camp was authored with any. They are fight-scoped: they exist while the fight does, the way
 `ActiveAction.actors` already does at `src/runtime/encounter.ts:17`.
 
+**A count is what spawns.** `allies: 2 bandit` mints two fight-scoped bandits; `allies: miki`, with no
+count, is the Miki that already exists and joins from wherever he is. Without that rule the same line
+would conjure a second Miki beside the first, and a named individual is exactly the thing this
+grammar refuses to let content address twice.
+
 ### Performing an action
 
 Two forms, following the two kinds of action:
@@ -253,7 +273,7 @@ trigger: on empty
 # entity player
 title: You
 faction: player
-stats: max-health 10, attack-rate 25
+stats: max-health 10, attack 5, defense 1, attack-rate 25, accuracy 75, evasion 50
 skills: melee, cooking, thieving
 equipment-slots: head, body, legs
 uses: melee-combat
@@ -470,12 +490,21 @@ draft of this design put the killer's rewards in an unmarked `on death:` block o
 victim's own consequences in an unmarked `on death:` block on the player. That is the original defect
 one level up: same block name, opposite recipient, decided by which entity you were reading.
 
-**Where it does not hold.** Two places, named against this proposal rather than only against today's:
+**Where it does not hold.** Three places, named against this proposal rather than only against
+today's:
 
-1. `attempts: 20` does not say whose attempts. It cannot mean the other side's, because a count is
+1. A `say:` inside a handler is written in the player's voice, and nothing on the page says who "you"
+   is. `say: You put down another rat.` in the rat's `on death:` is correct while the player is the
+   only one who kills things, and wrong the moment Miki does. This is the same defect the document
+   uses to justify moving `on empty:` off `# resource`, surviving at smaller scale: the log is a
+   single second-person channel, so a subject-less `say:` cannot name its killer. It is smaller
+   because an entity's own handler is at least specific to that entity, where the resource's block was
+   shared by everyone who could ever empty a pool — but it is the same defect, and calling it
+   subject-less is a description, not a defence.
+2. `attempts: 20` does not say whose attempts. It cannot mean the other side's, because a count is
    not a stat and there is no second one to confuse it with, but the reader is relying on that
    argument rather than on the page.
-2. An action with `accuracy:` and no `depletes:` keeps today's abstract progress pool. Nothing on the
+3. An action with `accuracy:` and no `depletes:` keeps today's abstract progress pool. Nothing on the
    page says what it is depleting, because it is depleting the action itself. This is inherited, not
    introduced, and it is out of scope here.
 
@@ -600,9 +629,9 @@ A forecast for `full-refactor-of-enemies-and-combat`. Nothing here is changed by
   branch and builds a symmetric roster; `Participant`'s `self`/`other` survive and the comment at
   line 58 goes, because the grammar now says what it said.
 - `content/tutorial-island.dsl` — the two combat blocks, `# resource health`'s `on empty:`, the
-  location's entity list, a new `# entity player`, and the `# test` at line 438, where
+  location's entity list, a new `# entity player`, and the `# test` at line 441, where
   `use: entity.giant-rat.fight` becomes `use: melee-combat on giant-rat`. The `expect:` save at line
-  452 is regenerated.
+  455 is regenerated.
 
 **New:**
 
@@ -612,6 +641,16 @@ A forecast for `full-refactor-of-enemies-and-combat`. Nothing here is changed by
 
 **Also touched:**
 
+- `src/content/registry.ts` — every `# entitytype` site, and the section-kind map the three new
+  sections have to enter. Deleting a section kind and adding three is a bigger edit here than in any
+  single schema file.
+- `src/content/serialize.ts` — the `# entitytype` emitter goes and three emitters arrive; round-trip
+  is what proves the new sections survive a save.
+- `src/content/referenceSites.ts` — `type:` stops being a reference and `uses:`, `faction:`,
+  `allies:` and a handler's event name start being ones, which is what makes an undeclared faction a
+  load error rather than a silent new faction.
+- `src/content/test.ts` — the `use:` payload regex at line 29, which the change to `dsl:441` requires
+  widening to accept `<action> on <target>`.
 - `src/content/location.ts` — counts in `entities:`.
 - `src/content/resource.ts` — `on empty:`/`on full:` removed.
 - `src/runtime/stats.ts` — the gate, per the section above.
@@ -666,6 +705,14 @@ grammar exists when it is worked, and it is already blocked behind `items-mods-a
 - **Does the implicit target pool survive?** An action with `accuracy:` and no `depletes:` keeps
   today's abstract progress bar, unchanged, because it is one-sided and out of this branch's scope.
   Decided by whoever revisits the action kind taxonomy.
+- **How is an entity at peace with everyone written?** Membership makes peace pairwise, so a
+  universal neutral has to enumerate every faction in the module. An `everyone` wildcard, or peace
+  declared as a relation between factions rather than as shared membership, would both fix it and
+  neither is proposed here because no content needs one. Decided by `starting-zone`, the first module
+  with more than two factions.
+- **Can a `say:` name who it is about?** The log is one second-person channel, so a handler's `say:`
+  is in the player's voice whoever triggered it. Decided by whoever gives the log a subject —
+  plausibly `combat-events`, whose persistent effects have the same problem.
 - **Should today's `on failure:` be renamed, freeing that word for `on unfinished:`?** It means
   "could not begin", which no reader would guess, and the better end state is plainly that this
   branch's outcome branch gets the obvious name. It is filed as its own record because it reaches
