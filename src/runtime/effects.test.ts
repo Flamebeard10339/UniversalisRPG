@@ -138,7 +138,7 @@ describe('applyResults: watching what was applied', () => {
 
     applyResults(bare, [{ kind: 'open-modal', modal: 'character-creation' }], PLAYER);
 
-    expect(state.pendingModal).toBe('character-creation');
+    expect(state.modals.map((frame) => frame.name)).toEqual(['character-creation']);
     expect(state.log).toEqual([]);
   });
 
@@ -152,7 +152,7 @@ describe('applyResults: watching what was applied', () => {
     ], PLAYER, 5);
 
     expect(state.log).toEqual(['modal:character-creation']);
-    expect(state.pendingModal).toBe('character-creation');
+    expect(state.modals.map((frame) => frame.name)).toEqual(['character-creation']);
   });
 
   it('lets a caller subscribe alongside the default list rather than in place of it', () => {

@@ -139,6 +139,8 @@
         "src/runtime/forwardProgress.ts",
         "src/runtime/integration.test.ts",
         "src/runtime/location.test.ts",
+        "src/runtime/modals.test.ts",
+        "src/runtime/modals.ts",
         "src/runtime/recipe.test.ts",
         "src/runtime/resolve.test.ts",
         "src/runtime/resource.test.ts",
@@ -196,6 +198,13 @@
             "src/runtime/effects.ts"
           ],
           "note": "produced by result-application-seam: applyResults takes the actor a result applies to, and every applied result is offered to the observers the segment carries"
+        },
+        {
+          "name": "modal system",
+          "paths": [
+            "src/runtime/modals.ts"
+          ],
+          "note": "produced by first-class-modals: the stack, the published name+options shape, and the one open and close"
         }
       ]
     },

@@ -420,10 +420,17 @@ talk: miki
 choose: Sounds good. Teach me.
 assert: quest-given
 
+// Opens on a loaded save rather than on the bare state a `# test` is handed,
+// because that state has no pools: `runTest` never calls initResources, so a
+// route that does not load starts at zero health and the whole `on empty:`
+// half of the sheet below is dead weight. It is also what lets the end save be
+// regenerated from a live session, which starts the same way this now does.
 # test miki-route-full
-travel: guide-house
+load: miki-route-start
 run: tutorial-quest-given
 use: entity.mirror.look in
+submit-modal: name=Rowan
+submit-modal: race=Elf
 assert: mirror-done
 talk: miki
 assert: has jug-of-water
@@ -453,14 +460,17 @@ expect: miki-route-end
 
 // --- saves ---
 
+# save miki-route-start
+{"version":7}
+
 # save miki-route-end
-{"version":6,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":0},"location":"tutorial-island.beach","time":107200,"rng":2776008081,"pendingModal":"character-creation"}
+{"version":7,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"Elf"}}
 
 # save dresser-trinket-end
-{"version":6,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}
+{"version":7,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}
 
 # save explored-and-unlocked
-{"version":6,"flags":{"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true}}
+{"version":7,"flags":{"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true}}
 
 // The drawer's contested roll over shipped content. On the default seed this
 // search comes up empty behind the lockpick, so an assertion over inventory

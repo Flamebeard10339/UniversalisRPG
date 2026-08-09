@@ -3,6 +3,7 @@ import { restorePools } from './effects';
 import { createGameState, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadModule } from '../content/registry';
+import { answerModal, openModalNamed } from './modals';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
@@ -128,6 +129,21 @@ describe('loadSave', () => {
     const registry = loadModule(MODULE);
     const state = createGameState();
     expect(() => loadSave(state, { version: SAVE_VERSION + 1, diff: {} }, registry)).toThrow(/version/);
+  });
+
+  it('carries an open modal stack across a round trip, and refuses a body that is not one', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    openModalNamed(state, 'character-creation');
+    answerModal(state, registry, { name: 'Rowan' });
+
+    const { version, ...diff } = JSON.parse(serializeSave(state, registry));
+    const restored = createGameState();
+    loadSave(restored, { version, diff }, registry);
+    expect(restored.modals).toEqual([{ name: 'character-creation', answers: { name: 'Rowan' } }]);
+
+    expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { modals: 'character-creation' } as never }, registry)).toThrow(/modals holds/);
+    expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { modals: [{ answers: {} }] } as never }, registry)).toThrow(/modals holds/);
   });
 });
 
