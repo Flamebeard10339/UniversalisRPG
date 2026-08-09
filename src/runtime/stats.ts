@@ -4,10 +4,11 @@ import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } f
 import { actorEntity, participants, sideOf } from './encounter';
 import { Registry } from '../content/registry';
 import { nextRandom } from './rng';
+import { skillLevel } from './skills';
 import { ActiveBuff, GameState, PLAYER, RuntimeError } from './state';
 import { contestSpread, defaultActionDuration, minDamage } from './tuning';
 import { MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
-import { TagClause } from '../grammar/tagClause';
+import { BonusAmount, TagClause } from '../grammar/tagClause';
 
 // Difficulty is a stat, never an authored probability, so gear and buffs move it.
 export function hitChance(accuracy: number, evasion: number, registry: Registry): number {
@@ -19,19 +20,31 @@ interface StatFold {
   increased: number;
 }
 
-function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatFold): void {
-  for (const tag of tags) {
-    if (tag.kind !== 'stat-bonus' || tag.statId !== statId) continue;
-    if (tag.percent) fold.increased += tag.amount / 100;
-    else fold.added = addRanges(fold.added, tag.amount);
-  }
+function foldBonus(bonus: BonusAmount, fold: StatFold, times: number): void {
+  if (bonus.percent) fold.increased += (bonus.amount * times) / 100;
+  else fold.added = addRanges(fold.added, scaleRange(bonus.amount, times));
 }
 
-// A state holds one store of buffs and one of equipment, and both belong to
-// `PLAYER`. Every other actor reads an empty store because it has none.
-function ownStores(state: GameState, actorId: string): { buffs: ActiveBuff[]; equipped: string[] } {
+function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatFold): void {
+  for (const tag of tags) if (tag.kind === 'stat-bonus' && tag.statId === statId) foldBonus(tag, fold, 1);
+}
+
+// A state holds one store of buffs, one of equipment and one of skill xp, and
+// all three belong to `PLAYER`. Every other actor reads an empty store because
+// it has none.
+function ownStores(state: GameState, actorId: string): { buffs: ActiveBuff[]; equipped: string[]; xp: Record<string, number> } {
   const stored = actorId === PLAYER;
-  return { buffs: stored ? Object.values(state.activeBuffs) : [], equipped: stored ? Object.values(state.equipped) : [] };
+  return { buffs: stored ? Object.values(state.activeBuffs) : [], equipped: stored ? Object.values(state.equipped) : [], xp: stored ? state.xp : {} };
+}
+
+// Which skills an actor has is the entity's to say, so a skill sheet is read off
+// whoever is being evaluated rather than off the player.
+function foldSkillLevels(registry: Registry, actorId: string, statId: string, xp: Record<string, number>, fold: StatFold): void {
+  for (const skillId of actorEntity(registry, actorId)?.skills ?? []) {
+    const skill = registry.skills.get(skillId);
+    if (!skill?.['per-level'] || skill['stat-id'] !== statId) continue;
+    foldBonus(skill['per-level'], fold, skillLevel(xp[skillId] ?? 0));
+  }
 }
 
 // The action this actor is performing, which is where its tag bonuses come from
@@ -48,6 +61,7 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
     increased: 0,
   };
   const own = ownStores(state, actorId);
+  foldSkillLevels(registry, actorId, statId, own.xp, fold);
   for (const buff of own.buffs) {
     if (buff.statId !== statId) continue;
     if (buff.kind === 'added') fold.added = addRanges(fold.added, buff.amount);

@@ -254,6 +254,7 @@ function applySection(registry: Registry, section: ModuleSection): void {
     }
     case 'skill': {
       const skill = hydrateSection(section.value as Authored<Skill>, skillSchema);
+      if (skill['per-level'] && !skill['stat-id']) throw new DslError(`# skill ${skill.id}: per-level: needs a stat-id: to raise`);
       registry.skills.set(skill.id, skill);
       break;
     }
