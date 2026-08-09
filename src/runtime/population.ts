@@ -52,6 +52,9 @@ export function isStanding(state: GameState, registry: Registry, location: Locat
 // A copy has left the world. It is due back after the entity's `respawn after:`,
 // and absent means never — so a boss omits it and zero is not a magic value.
 export function downOne(state: GameState, registry: Registry, locationId: string, entityId: string): void {
+  // A deficit is a fact about a place holding that population. A fight-scoped
+  // copy, or one fought somewhere it does not stand, has no place to be down at.
+  if (!registry.locations.get(locationId)?.entities.some((entry) => entry.entity === entityId)) return;
   const byEntity = (state.populations[locationId] ??= {});
   const deficit = (byEntity[entityId] ??= { down: 0, due: [] });
   deficit.down += 1;

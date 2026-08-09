@@ -5,7 +5,7 @@ import { Condition } from '../grammar/condition';
 import { Dialogue } from './dialogue';
 import { DropTable } from './dropTable';
 import { ActionDeclaration } from './action';
-import { AuthoredEntity, Entity, entitySchema, Handler, handlerEvent, handlerOf, isHandlerBlock } from './entity';
+import { AuthoredEntity, Entity, EntityBlock, entitySchema, Handler, isHandlerBlock } from './entity';
 import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
 import { GameEvent, eventSchema } from './event';
@@ -381,13 +381,11 @@ function pruneActions(actions: Action[], where: string, visit: Visit): Action[] 
 
 // A handler's event name is a reference the label carries, so a block survives
 // only if what it names survives — the same rule its results already follow.
-function pruneBlocks(blocks: Action[], where: string, visit: Visit): Action[] {
+function pruneBlocks(blocks: EntityBlock[], where: string, visit: Visit): EntityBlock[] {
   return blocks.filter((block) =>
-    referencesLoaded(() => {
-      const event = handlerEvent(block.label);
-      if (event === undefined) return visitAction(block, `${where} action ${JSON.stringify(block.label)}`, visit);
-      visit('event', event, `${where} on ${event}:`);
-    }),
+    referencesLoaded(() =>
+      isHandlerBlock(block) ? visit('event', block.event, `${where} ${block.label}:`) : visitAction(block, `${where} action ${JSON.stringify(block.label)}`, visit),
+    ),
   );
 }
 
@@ -606,7 +604,7 @@ function linkEntity(entity: Entity, registry: Registry): Entity {
 
   for (const block of entity.blocks) {
     if (isHandlerBlock(block)) {
-      handlers.push(handlerOf(block));
+      handlers.push({ event: block.event, results: block.results });
       continue;
     }
     const used = entity.uses.find((id) => namesSame(id, block.label));
@@ -665,10 +663,13 @@ function linkRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModu
       const linked = linkEntity(entity, registry);
       registry.entities.set(id, linked);
       const problem = entityProblem(linked, registry);
-      if (problem) throw new DslError(`# entity ${id}: ${problem}`);
+      if (problem) throw new DslError(problem);
       if (namesSame(id, PLAYER_ENTITY)) players.push(linked);
-    } catch (error) {
-      if (!(error instanceof DslError)) throw error;
+    } catch (raw) {
+      if (!(raw instanceof DslError)) throw raw;
+      // Prefixed here, so every message an entity's own linking raises names the
+      // entity without each throw site repeating it.
+      const error = new DslError(`# entity ${id}: ${raw.message}`, raw.span);
       const module = sectionOwner(owners, 'entity', id);
       if (!module) throw error;
       return { module, stage: 'validate', error };

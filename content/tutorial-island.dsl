@@ -21,14 +21,14 @@ value: 0
 
 // --- stats ---
 
-// The player's sheet. An entity that fights names its own values for these in a
-// `stats:` block; anything it doesn't name falls through to the base here, which
-// is how the player — who has no `# entity` of their own — works at all.
+// What a stat is worth to anything that does not name its own. A fighter names
+// every stat its action reads off it, so these are defaults rather than
+// anyone's sheet.
 # stat attack
 base: 10
 
 // Flat damage reduction, subtracted from each incoming hit. Named `defense`
-// because that is what a player calls it; an action points at it with `dr:`.
+// because that is what a player calls it; a contest points at it by name.
 # stat defense
 base: 5
 
@@ -46,8 +46,10 @@ base: 25
 
 # stat regeneration
 
+// Deliberately without a base: a health pool is what makes something worth
+// swinging at, so a door and an oven have none and only what declares
+// `max-health` can be fought.
 # stat max-health
-base: 30
 
 // Chestnuts per minute: 15/min is one every 4 seconds.
 # stat cooking-rate
@@ -61,19 +63,26 @@ base: 60
 // --- resources ---
 
 // Health falls to the rats' bites and recovers from the regeneration a meal
-// grants. Rates are per minute.
+// grants. Rates are per minute. What happens when it runs out is an event
+// below, and a handler on whoever it ran out for.
 # resource health
 rate: regeneration
 max: max-health
 display: full
-// `stop` is what makes running out of health end whatever you were doing —
-// the engine has no privileged pool, so this block is where health becomes the
-// fatal one. Anything else that should happen on blacking out (dropping what
-// you carried, waking up elsewhere) belongs here beside it.
-on empty:
-  say: You slump to the floor, spent. (You should have eaten something.)
-  set: fainted
-  stop
+
+// --- events ---
+
+// The name a pool running out is bound to. Any entity may write `on death:`,
+// and what it says applies to the entity it happened to.
+# event death
+resource: health
+trigger: on empty
+
+// --- factions ---
+
+# faction world
+
+# faction player
 
 // --- flags ---
 
@@ -102,6 +111,18 @@ stat-id: attack
 stat-id: attack
 
 # skill cooking
+
+// --- actions ---
+
+// The shape every combattable thing in the game shares, written once and
+// brought by whoever swings: `my` reads off the swinger and `their` off the
+// struck, so one block is both the player's fight and the rat's bite.
+# action melee-combat
+title: Fight
+rate: my attack-rate
+accuracy: my accuracy vs their evasion
+damage: my attack vs their defense
+depletes: their health
 
 // --- items ---
 
@@ -205,7 +226,7 @@ examine: A damp cellar, crates stacked against the walls.
 adjacent:
   guide-house
 entities:
-  giant-rat, stairs-up
+  3 giant-rat, stairs-up
 
 # location beach
 east of guide-house
@@ -215,7 +236,23 @@ adjacent:
 
 // --- entities ---
 
+// The player is an entity like any other, and declares everything that measures
+// it. The global `# stat` bases above are what something that names none falls
+// back to; they stopped being this sheet.
+# entity player
+title: You
+faction: player
+stats: max-health 30, attack 10, defense 5, attack-rate 25, accuracy 100, evasion 0
+skills: melee, cooking, thieving
+equipment-slots: mainhand, offhand
+uses: melee-combat
+on death:
+  say: You slump to the floor, spent. (You should have eaten something.)
+  set: fainted
+  stop
+
 # entity miki
+faction: player
 examine: A weathered man in patched leather, quick to smile.
 
 # entity front-door
@@ -284,44 +321,20 @@ search drawer:
   luck vs 60:
     roll: trinket
 
-// The shape every combattable thing in the game shares, written once: a swing
-// of its own on its own clock, and a pool that runs out. The two actions are
-// the same action seen from either end — `rate`, `ability` and `accuracy` read
-// whoever is swinging, `target`, `dr` and `evasion` whoever is being hit — so
-// `fight` and `bite` differ only in who runs them.
-//
-// A foe naming this supplies its own stat sheet and, where it has something of
-// its own to say, a block under one of these labels.
-# entitytype melee-foe
-fight:
-  rate: attack-rate
-  accuracy: accuracy
-  evasion: evasion
-  ability: attack
-  dr: defense
-  target: health
-bite:
-  retaliates
-  rate: attack-rate
-  accuracy: accuracy
-  evasion: evasion
-  ability: attack
-  dr: defense
-  target: health
-
 // 20 health against the player's 10 a hit is two hits, ~2.5 swings at 80%, so a
-// rat falls in about six seconds and lands a bite or two on the way out.
+// rat falls in about six seconds and lands a bite or two on the way out. It
+// swings back because it `uses:` an action, not because a tag says so.
 # entity giant-rat
-type: melee-foe
 title: Giant Rat
 examine: A hunched rat claws at an overturned crate, eyes red in the dark.
 stats: attack 8, defense 0, max-health 20, attack-rate 16, accuracy 60, evasion 40
-fight:
-  hidden if: rats-killed >= 3
-  xp: melee 4-6
-  on success:
-    add: rats-killed 1
-    say: You put down another rat.
+uses: melee-combat
+hidden if: rats-killed >= 3
+on death:
+  add: rats-killed 1
+  say: You put down another rat.
+  credit:
+    xp: melee 4-6
     roll: rat-remains
     1 in 3:
       roll: trinket
@@ -438,11 +451,11 @@ talk: miki
 assert: made-bread
 // A rat takes a few swings to put down, so each `use:` starts the fight and the
 // `wait:` lets it play out — 30s is far longer than the ~6s it actually needs.
-use: entity.giant-rat.fight
+use: melee-combat on giant-rat
 wait: 30
-use: entity.giant-rat.fight
+use: melee-combat on giant-rat
 wait: 30
-use: entity.giant-rat.fight
+use: melee-combat on giant-rat
 wait: 30
 assert: rats-killed >= 3
 talk: miki
@@ -457,16 +470,16 @@ expect: miki-route-end
 // --- saves ---
 
 # save miki-route-start
-{"version":7}
+{"version":8}
 
 # save miki-route-end
-{"version":7,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"Elf"}}
+{"version":8}
 
 # save dresser-trinket-end
-{"version":7,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}
+{"version":8,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}
 
 # save explored-and-unlocked
-{"version":7,"flags":{"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true}}
+{"version":8,"flags":{"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true}}
 
 // The drawer's contested roll over shipped content. On the default seed this
 // search comes up empty behind the lockpick, so an assertion over inventory

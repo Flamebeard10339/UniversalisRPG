@@ -3,7 +3,7 @@ import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { Condition, isEngineRoot, Reference, VISITS, visitedNode } from '../grammar/condition';
 import { Dialogue, TextSegment } from './dialogue';
 import { Directive } from './test';
-import { Ally, handlerEvent } from './entity';
+import { Ally, EntityBlock, isHandlerBlock } from './entity';
 import { Edge, Population, Relative } from './location';
 import { isFieldEdits, listMembers } from '../grammar/section';
 import { Quantified } from '../grammar/values';
@@ -162,15 +162,13 @@ function actions(list: unknown, where: string, visit: Visit): void {
 // carries, and it is rewritten in place so `on death:` resolves the way `uses:`
 // does rather than being matched by spelling later.
 function blocks(list: unknown, where: string, visit: Visit): void {
-  for (const block of listMembers<Action>(list)) {
-    const event = handlerEvent(block.label);
-    if (event === undefined) {
+  for (const block of listMembers<EntityBlock>(list)) {
+    if (!isHandlerBlock(block)) {
       visitAction(block, `${where} action ${JSON.stringify(block.label)}`, visit);
       continue;
     }
-    const at = `${where} on ${event}:`;
-    const resolved = visit('event', event, at);
-    if (resolved !== event) block.label = `on ${resolved}`;
+    const at = `${where} ${block.label}:`;
+    put(block, 'event', 'event', at, visit);
     results(block.results, at, visit);
   }
 }

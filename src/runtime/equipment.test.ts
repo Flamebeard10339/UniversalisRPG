@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
-import { armAction, createGameState, equip, GameState, initResources, resolve, statValue, unequip } from './runtime';
+import { armFightAction, createGameState, equip, GameState, initResources, resolve, statValue, unequip } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
 
@@ -27,20 +27,21 @@ x: 0, y: 0
 starting
 entities: target
 
+# action strike
+title: strike
+continuous
+rate: my attack-rate
+damage: my attack vs their defense
+depletes: their health
+
+# entity player
+stats: max-health 100000, attack 10, attack-rate 60
+equipment-slots: mainhand, offhand
+uses: strike
+
 # entity target
-stats: max-health 100000, dodge 0
-strike:
-  continuous
-  rate: attack-rate
-  target: health
-  ability: attack
-  dr: defense
-bite:
-  retaliates
-  rate: attack-rate
-  target: health
-  ability: attack
-  dr: defense
+stats: max-health 100000, dodge 0, attack 10, attack-rate 60
+uses: strike
 
 # item attack-bonus
 slot: mainhand
@@ -58,7 +59,7 @@ function loaded(source = MODULE): Registry {
 function fighting(registry: Registry, entityId: string): GameState {
   const state = createGameState('arena');
   initResources(state, registry);
-  armAction('entity', entityId, 'strike', registry, state);
+  armFightAction('strike', entityId, registry, state);
   return state;
 }
 

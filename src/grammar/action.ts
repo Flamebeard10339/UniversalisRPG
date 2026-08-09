@@ -187,6 +187,10 @@ const APPENDABLE: ReadonlySet<string> = new Set(['requires', 'hidden if', 'on su
 
 function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'label'>, label: string): void {
   const held = action as Record<string, unknown>;
+  // A leading `+` is an append marker only when a field follows it. `+3 attack`
+  // is a stat bonus and `+100% luck` a percent one, so the cursor rewinds rather
+  // than eating the sign off a tag clause.
+  const beforePlus = cursor.pos;
   const appends = cursor.take(/\+[ \t]*/) !== null;
   for (const retired of RETIRED_ACTION_FIELDS) {
     if (cursor.take(retired.label) !== null) throw new DslError(actionProblem(label, retired.message), line.span);
@@ -200,7 +204,7 @@ function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'l
     if (appends) action.appended = (action.appended ?? []).concat(field.name);
     return;
   }
-  if (appends) throw new DslError(actionProblem(label, `+ leads an action field, and ${JSON.stringify(cursor.rest())} is not one`), line.span);
+  if (appends) cursor.pos = beforePlus;
 
   if (startsResult(cursor)) {
     // The whole line, because a wrapper's body may be the block hanging off it,

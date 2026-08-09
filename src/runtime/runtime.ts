@@ -20,6 +20,7 @@ import {
   captureResourceRates,
   clampResources,
   clearActorDeltas,
+  emptyPoolNow,
   eventsFor,
   getDelta,
   newSegment,
@@ -337,9 +338,13 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         endAction(state);
         return;
       }
-      // A copy whose pool ran out has left the world; its place records that,
-      // and its `respawn after:` decides whether it is due back.
-      if (fightOutcome === 'completion' && action.depletes) downOne(state, registry, state.location, next.other);
+      // A copy whose pool ran out has left the world: its own handlers run at
+      // the instant it ran out, and its place records that it is down.
+      if (fightOutcome === 'completion' && action.depletes) {
+        const felled = sideOf(action.depletes, next.self, next.other);
+        emptyPoolNow(segment, felled, action.depletes.id, next.self);
+        downOne(state, registry, state.location, felled);
+      }
       if (active.repeating) {
         if (action.depletes) {
           clearActorDeltas(segment.deltas, next.other);
@@ -377,7 +382,7 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
 
   // Over the time actually consumed: a segment can stop short of segEnd.
   const elapsed = state.time - start;
-  if (elapsed > 0 || segment.deltas.size > 0) settlePools(state, registry, snapshots, Math.max(0, elapsed), segment.deltas);
+  if (elapsed > 0 || segment.deltas.size > 0) settlePools(state, registry, snapshots, Math.max(0, elapsed), segment.deltas, segment.causedBy);
 }
 
 function applyDueBoundaries(state: GameState, registry: Registry, at: number): void {

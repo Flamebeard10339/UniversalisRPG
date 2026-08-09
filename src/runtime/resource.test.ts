@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { restorePools } from './effects';
+import { eventsFor, restorePools } from './effects';
 import { applyResultsNow, createGameState, initResources } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { initialState } from './save';
@@ -21,15 +21,25 @@ base: 4
 rate: regeneration
 max: max-health
 display: full
-on empty:
-  say: You collapse.
-  set: fainted
 
 # resource focus
 max: max-focus
 start: 0
 display: minimal
-on full:
+
+# event fainting
+resource: health
+trigger: on empty
+
+# event focused
+resource: focus
+trigger: on full
+
+# entity player
+on fainting:
+  say: You collapse.
+  set: fainted
+on focused:
   give: 1 focus-charge
 
 # item focus-charge
@@ -46,14 +56,17 @@ describe('# resource: parsing and defaults', () => {
     expect(health.max).toBe('max-health');
     expect(health.start).toBeUndefined(); // absent => start full
     expect(health.display).toBe('full');
-    expect(health.onEmpty.map((r) => r.kind)).toEqual(['say', 'set']);
-    expect(health.onFull).toEqual([]);
+    // A `# resource` declares the pool's shape and nothing else; what happens
+    // when it runs out is an event, and a handler on whoever it ran out for.
+    expect(eventsFor(registry, 'health', 'on empty').map((event) => event.id)).toEqual(['fainting']);
+    expect(eventsFor(registry, 'health', 'on full')).toEqual([]);
 
     const focus = registry.resources.get('focus')!;
     expect(focus.rate).toBeUndefined(); // static pool, no rate stat
     expect(focus.start).toBe(0);
     expect(focus.display).toBe('minimal');
-    expect(focus.onFull.map((r) => r.kind)).toEqual(['give']);
+    expect(eventsFor(registry, 'focus', 'on full').map((event) => event.id)).toEqual(['focused']);
+    expect(registry.player!.handlers.map((handler) => handler.event)).toEqual(['fainting', 'focused']);
   });
 
   it('initResources fills each pool: full for an absent start, the literal for an explicit one', () => {

@@ -19,7 +19,10 @@ base: 25
 # resource health
 rate: regeneration
 max: max-health
-on empty: stop
+
+# event death
+resource: health
+trigger: on empty
 
 # skill brawling
 stat-id: attack
@@ -38,15 +41,21 @@ entities: training-dummy
 # location shed
 x: 1, y: 0
 
+# action strike
+title: Strike
+continuous
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their health
+xp: brawling 2
+
+# entity player
+stats: max-health 30, attack 10, attack-rate 25
+uses: strike
+
 # entity training-dummy
 stats: max-health 12, dr 2
-strike:
-  continuous
-  rate: attack-rate
-  target: health
-  ability: attack
-  dr: dr
-  xp: brawling 2
+on death: stop
 
 # dialogue caretaker
 owner = training-dummy
@@ -67,18 +76,18 @@ describe('load-time reference resolution', () => {
   });
 
   it('names the section and the field it failed in', () => {
-    expect(loading('rate: attack-rate', 'rate: attack-rat')).toThrow(/# entity training-dummy action "strike" rate: names an unknown stat: attack-rat/);
+    expect(loading('rate: my attack-rate', 'rate: my attack-rat')).toThrow(/# action strike rate: names an unknown stat: attack-rat/);
   });
 
   // Each fell through to a different silent default, so they are pinned
   // individually rather than as one representative case.
   it.each([
-    ['rate: attack-rate', 'rate: nope', /unknown stat: nope/],
-    ['ability: attack', 'ability: nope', /unknown stat: nope/],
-    ['dr: dr', 'dr: nope', /unknown stat: nope/],
-    ['target: health', 'target: helth', /unknown resource: helth/],
-    ['  rate: attack-rate', '  rate: attack-rate\n  accuracy: nope', /unknown stat: nope/],
-    ['  rate: attack-rate', '  rate: attack-rate\n  evasion: nope', /unknown stat: nope/],
+    ['rate: my attack-rate', 'rate: my nope', /unknown stat: nope/],
+    ['damage: my attack vs their dr', 'damage: my nope vs their dr', /unknown stat: nope/],
+    ['damage: my attack vs their dr', 'damage: my attack vs their nope', /unknown stat: nope/],
+    ['depletes: their health', 'depletes: their helth', /unknown resource: helth/],
+    ['depletes: their health', 'depletes: their health\naccuracy: my nope', /unknown stat: nope/],
+    ['depletes: their health', 'depletes: their health\naccuracy: my attack vs their nope', /unknown stat: nope/],
   ])('rejects %s → %s', (from, to, message) => {
     expect(loading(from, to)).toThrow(message);
   });
@@ -88,8 +97,19 @@ describe('load-time reference resolution', () => {
     expect(loading('rate: regeneration', 'rate: regen')).toThrow(/# resource health rate: names an unknown stat: regen/);
   });
 
+  it('rejects an event, a use: or a faction naming nothing', () => {
+    expect(loading('resource: health\ntrigger: on empty', 'resource: helth\ntrigger: on empty')).toThrow(/# event death resource: names an unknown resource: helth/);
+    expect(loading('uses: strike', 'uses: strke')).toThrow(/# entity player uses: names an unknown action: strke/);
+    expect(loading('on death: stop', 'on deth: stop')).toThrow(/# entity training-dummy on deth: names an unknown event: deth/);
+    expect(loading('uses: strike', 'uses: strike\nfaction: nobody')).toThrow(/# entity player faction: names an unknown faction: nobody/);
+    expect(loading('uses: strike', 'uses: strike\nallies: 2 wisp')).toThrow(/# entity player allies: names an unknown entity: wisp/);
+    expect(loading('skills: nothing', 'skills: nothing')).not.toThrow();
+    expect(loading('uses: strike', 'uses: strike\nskills: brawlin')).toThrow(/# entity player skills: names an unknown skill: brawlin/);
+  });
+
   it('rejects a location pointing at an entity or a neighbour that does not exist', () => {
     expect(loading('entities: training-dummy', 'entities: training-dumy')).toThrow(/# location den entities: names an unknown entity: training-dumy/);
+    expect(loading('entities: training-dummy', 'entities: 3 training-dumy')).toThrow(/# location den entities: names an unknown entity: training-dumy/);
     expect(loading('starting', 'starting\nadjacent: beach')).toThrow(/# location den adjacent: names an unknown location: beach/);
   });
 
@@ -106,20 +126,20 @@ describe('load-time reference resolution', () => {
 
   // An action's RESULTS name ids too, each with its own silent failure mode.
   it.each([
-    ['  ability: attack', '  ability: attack\n  drain: 5 bogus', /drain: names an unknown resource: bogus/],
-    ['  ability: attack', '  ability: attack\n  restore: 5 bogus', /restore: names an unknown resource: bogus/],
-    ['  ability: attack', '  ability: attack\n  give: 1 bogus', /give: names an unknown item: bogus/],
-    ['  ability: attack', '  ability: attack\n  take: 1 bogus', /take: names an unknown item: bogus/],
-    ['  ability: attack', '  ability: attack\n  relocate: bogus', /relocate: names an unknown location: bogus/],
-    ['  ability: attack', '  ability: attack\n  discover: bogus', /discover: names an unknown location: bogus/],
-    ['  xp: brawling 2', '  xp: bogus 2', /xp: names an unknown skill: bogus/],
-    ['  continuous', '  continuous\n  +100% bogus', /tag names an unknown stat: bogus/],
+    ['xp: brawling 2', 'drain: 5 bogus', /drain: names an unknown resource: bogus/],
+    ['xp: brawling 2', 'restore: 5 bogus', /restore: names an unknown resource: bogus/],
+    ['xp: brawling 2', 'give: 1 bogus', /give: names an unknown item: bogus/],
+    ['xp: brawling 2', 'take: 1 bogus', /take: names an unknown item: bogus/],
+    ['xp: brawling 2', 'relocate: bogus', /relocate: names an unknown location: bogus/],
+    ['xp: brawling 2', 'discover: bogus', /discover: names an unknown location: bogus/],
+    ['xp: brawling 2', 'xp: bogus 2', /xp: names an unknown skill: bogus/],
+    ['continuous', 'continuous\n+100% bogus', /tag names an unknown stat: bogus/],
   ])('rejects a result or tag naming nothing: %s → %s', (from, to, message) => {
     expect(loading(from, to)).toThrow(message);
   });
 
-  it('rejects an unreachable handler: a pool block, a dialogue effect, a choice effect', () => {
-    expect(loading('on empty: stop', 'on empty: give: 1 bogus')).toThrow(/# resource health on empty: give: names an unknown item: bogus/);
+  it('rejects an unreachable handler: an event handler, a dialogue effect, a choice effect', () => {
+    expect(loading('on death: stop', 'on death: give: 1 bogus')).toThrow(/# entity training-dummy on death: give: names an unknown item: bogus/);
     expect(loading('  give: 1 straw', '  give: 1 bogus')).toThrow(/# dialogue caretaker node hello give: names an unknown item: bogus/);
     expect(loading('  give: 1 straw', '  -> Take it.\n    give: 1 bogus')).toThrow(/# dialogue caretaker node hello choice give: names an unknown item: bogus/);
     expect(loading('owner = training-dummy', 'owner = training-dumy')).toThrow(/# dialogue caretaker owner names an unknown entity: training-dumy/);
@@ -136,11 +156,11 @@ describe('load-time reference resolution', () => {
   });
 
   it('resolves forward references, since the pass runs once everything has parsed', () => {
-    expect(() => loadModule('# entity ogre\nstats: rage 3\nroar:\n  time: 1\n  ability: rage\n\n# stat rage\n')).not.toThrow();
+    expect(() => loadModule('# entity ogre\nstats: rage 3\nroar:\n  time: 1\n  damage: rage\n\n# stat rage\n')).not.toThrow();
   });
 
   it('raises a DslError, the same failure kind the rest of load uses', () => {
-    expect(loading('target: health', 'target: helth')).toThrow(DslError);
+    expect(loading('depletes: their health', 'depletes: their helth')).toThrow(DslError);
   });
 });
 
@@ -149,16 +169,16 @@ describe('load-time reference resolution', () => {
 // recipe craftable nowhere, a test that only breaks when it runs.
 describe('references the walk used to step over', () => {
   it('rejects a `has` naming no item, wherever the condition sits', () => {
-    expect(loading('  continuous', '  continuous\n  requires: has strawe')).toThrow(/# entity training-dummy action "strike" requires: has names an unknown item: strawe/);
-    expect(loading('  continuous', '  continuous\n  hidden if: has strawe')).toThrow(/hidden if: has names an unknown item: strawe/);
+    expect(loading('continuous', 'continuous\nrequires: has strawe')).toThrow(/# action strike requires: has names an unknown item: strawe/);
+    expect(loading('continuous', 'continuous\nhidden if: has strawe')).toThrow(/hidden if: has names an unknown item: strawe/);
     expect(loading('starting', 'starting\nadjacent: shed while has strawe')).toThrow(/# location den adjacent: shed while has names an unknown item: strawe/);
     expect(loading('  when: time >= 0', '  when: has strawe')).toThrow(/# dialogue caretaker node hello when: has names an unknown item: strawe/);
   });
 
   it('reaches inside not/and/or rather than stopping at the operator', () => {
-    expect(loading('  continuous', '  continuous\n  requires: not has strawe')).toThrow(/has names an unknown item: strawe/);
-    expect(loading('  continuous', '  continuous\n  requires: has straw and has strawe')).toThrow(/has names an unknown item: strawe/);
-    expect(loading('  continuous', '  continuous\n  requires: has strawe or has straw')).toThrow(/has names an unknown item: strawe/);
+    expect(loading('continuous', 'continuous\nrequires: not has strawe')).toThrow(/has names an unknown item: strawe/);
+    expect(loading('continuous', 'continuous\nrequires: has straw and has strawe')).toThrow(/has names an unknown item: strawe/);
+    expect(loading('continuous', 'continuous\nrequires: has strawe or has straw')).toThrow(/has names an unknown item: strawe/);
   });
 
   it('rejects a `has` inside a choice condition and inside interpolated text', () => {
@@ -202,10 +222,19 @@ ${line}
 
   it('rejects a `use:` naming an unknown kind, object, or action', () => {
     const test = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
-    expect(test('use: creature.training-dummy.strike')).toThrow(/# test walk use: names an unknown kind: creature/);
-    expect(test('use: entity.training-dumy.strike')).toThrow(/# test walk use: names an unknown entity: training-dumy/);
-    expect(test('use: entity.training-dummy.strke')).toThrow(/# test walk use: names an unknown entity action: strke/);
-    expect(test('use: entity.training-dummy.strike')).not.toThrow();
+    expect(test('use: creature.training-dummy.eat')).toThrow(/# test walk use: names an unknown kind: creature/);
+    expect(test('use: entity.training-dumy.eat')).toThrow(/# test walk use: names an unknown entity: training-dumy/);
+    expect(test('use: entity.training-dummy.eat')).toThrow(/# test walk use: names an unknown entity action: eat/);
+  });
+
+  // The two-sided spelling, checked on both halves: the action by id and the
+  // target as an entity, and then that the player is able to bring it.
+  it('rejects a `use: <action> on <target>` naming an unknown action or target', () => {
+    const test = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
+    expect(test('use: strike on training-dummy')).not.toThrow();
+    expect(test('use: strke on training-dummy')).toThrow(/# test walk use: names an unknown action: strke/);
+    expect(test('use: strike on training-dumy')).toThrow(/# test walk use: on names an unknown entity: training-dumy/);
+    expect(() => loadModule(`${VALID.replace('uses: strike', '')}\n# test walk\nuse: strike on training-dummy\n`)).toThrow(/use: names an action the player does not use:/);
   });
 
   // The other way a name stops meaning something between authoring and merge:
@@ -218,43 +247,39 @@ ${line}
   });
 });
 
-describe('whatever is fought over declares the pool it is fought over', () => {
-  const withStrawAction = (...lines: string[]) => loading('examine: A fistful of straw.', ['examine: A fistful of straw.', 'smash:', ...lines].join('\n'));
-  const withShedAction = (...lines: string[]) => loading('# location shed\nx: 1, y: 0', ['# location shed', 'x: 1, y: 0', 'collapse:', ...lines].join('\n'));
-
-  it('refuses a target: on an item or a location, which have nowhere to put a sheet', () => {
-    expect(withStrawAction('  target: health', '  ability: attack')).toThrow(/# item straw action "smash": target: health makes this a fight, and only a # entity can carry the stats: a fighter is measured by/);
-    expect(withShedAction('  target: health', '  ability: attack')).toThrow(/# location shed action "collapse": target: health makes this a fight/);
+describe('the performer declares every stat its action reads off it', () => {
+  it('refuses an entity performing an action over a pool its own stats: does not measure', () => {
+    expect(loading('stats: max-health 30, attack 10, attack-rate 25', 'stats: max-health 30, attack 10')).toThrow(/# entity player: action "Strike": rate: reads attack-rate, which stats: does not set/);
   });
 
-  it('leaves an item or a location action that opens no fight alone', () => {
-    expect(withStrawAction('  ability: attack', '  say: Straw everywhere.')).not.toThrow();
-    expect(withShedAction('  say: It groans.')).not.toThrow();
+  it('names the stat the contest reads, not the one it happens to share a word with', () => {
+    expect(loading('stats: max-health 30, attack 10, attack-rate 25', 'stats: max-health 30, attack-rate 25')).toThrow(/action "Strike": damage: reads attack, which stats: does not set/);
   });
 
-  it('refuses an entity fought over a pool its own stats: does not measure', () => {
-    expect(loading('stats: max-health 12, dr 2', 'stats: dr 2')).toThrow(/# entity training-dummy action "strike": target: health is measured by max-health, which stats: does not set/);
+  // `their` halves are the target's business, and the target is decided by
+  // whether it carries the pool — never by a list of permitted types.
+  it('asks nothing of the side the performer does not read', () => {
+    expect(loading('stats: max-health 12, dr 2', 'stats: max-health 12')).not.toThrow();
   });
 
-  it('names the pool the resource is measured by, not the pool the action targets', () => {
-    const module = VALID.replace('max: max-health', 'max: vigour').replace('# stat max-health', '# stat vigour').replace('stats: max-health 12, dr 2', 'stats: dr 2');
-    expect(() => loadModule(module)).toThrow(/action "strike": target: health is measured by vigour, which stats: does not set/);
-    expect(() => loadModule(module.replace('stats: dr 2', 'stats: vigour 12, dr 2'))).not.toThrow();
+  it('leaves a one-sided action alone, whoever owns it', () => {
+    expect(loading('examine: A fistful of straw.', 'examine: A fistful of straw.\nsmash:\n  time: 1\n  say: Straw everywhere.')).not.toThrow();
+    expect(loading('# location shed\nx: 1, y: 0', '# location shed\nx: 1, y: 0\ncollapse:\n  time: 1\n  say: It groans.')).not.toThrow();
   });
 
-  it('exempts a retaliating action, whose target is not the owner pool', () => {
-    expect(() => loadModule(`${VALID}\n# entity ghost\nhaunt:\n  retaliates\n  time: 1\n  target: health\n`)).not.toThrow();
+  it('has no authorable depletes: on a recipe for the rule to reach', () => {
+    expect(() => loadModule(`${VALID}\n# recipe weave\ndepletes: health\nout: 1 straw\n`)).toThrow(/unknown recipe field: depletes/);
+  });
+});
+
+describe('an overload governs only its own entity', () => {
+  it('refuses a block naming an action the entity does not use:', () => {
+    expect(loading('on death: stop', 'strike:\n  hidden if: has straw')).toThrow(/# entity training-dummy: "strike" overloads # action strike, which this entity does not use:/);
   });
 
-  it('exempts an entitytype and asks the entity that merges it instead', () => {
-    const template = `${VALID}\n# entitytype melee-foe\nfight:\n  time: 1\n  target: health\n`;
-    expect(() => loadModule(template)).not.toThrow();
-    expect(() => loadModule(`${template}\n# entity wisp\ntype: melee-foe\n`)).toThrow(/# entity wisp action "fight": target: health is measured by max-health, which stats: does not set/);
-    expect(() => loadModule(`${template}\n# entity wisp\ntype: melee-foe\nstats: max-health 4\n`)).not.toThrow();
-  });
-
-  it('has no authorable target: on a recipe for the ban to reach', () => {
-    expect(() => loadModule(`${VALID}\n# recipe weave\ntarget: health\nout: 1 straw\n`)).toThrow(/unknown recipe field: target/);
+  it('takes a bare line as a replacement and a + line as an addition', () => {
+    const overloaded = VALID.replace('uses: strike', 'uses: strike\nstrike:\n  +hidden if: has straw');
+    expect(() => loadModule(overloaded)).not.toThrow();
   });
 });
 

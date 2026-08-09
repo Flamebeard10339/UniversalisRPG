@@ -1,10 +1,10 @@
 import { Action, actionBody } from '../grammar/action';
-import { ActionResult } from '../grammar/actionResult';
+import { ActionResult, resultBlock, resultList } from '../grammar/actionResult';
 import { Condition, condition } from '../grammar/condition';
 import { list } from '../grammar/list';
 import { DslError, Parser } from '../grammar/parser';
 import { Range, range } from '../grammar/range';
-import { SectionSchema } from '../grammar/section';
+import { EntryBody, SectionSchema } from '../grammar/section';
 import { duration, humanize, id, text } from '../grammar/values';
 
 export type { Action } from '../grammar/action';
@@ -27,6 +27,15 @@ export interface Handler {
   results: ActionResult[];
 }
 
+// A handler as authored. The label stays as written and the event name beside it
+// is the reference, so resolving one never rewrites the heading a reload has to
+// read back.
+export interface HandlerBlock extends Handler {
+  label: string;
+}
+
+export type EntityBlock = Action | HandlerBlock;
+
 // What an entity's body says before `uses:` is resolved against the actions it
 // names. `blocks` holds every labelled block as authored — an inline action, an
 // overload of an action this entity uses, or an `on <event>:` handler.
@@ -47,7 +56,7 @@ export interface AuthoredEntity {
   // Seconds after this leaves the world before it returns; absent means never.
   respawnAfter?: number;
   hiddenIf?: Condition;
-  blocks: Action[];
+  blocks: EntityBlock[];
 }
 
 // The linked form the registry holds: `blocks` split into the actions this
@@ -83,14 +92,20 @@ const HANDLER_LABEL = /^on[ \t]+(?<event>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$
 
 export const handlerEvent = (label: string): string | undefined => HANDLER_LABEL.exec(label)?.groups?.event;
 
-export const isHandlerBlock = (block: { label: string }): boolean => handlerEvent(block.label) !== undefined;
+export const isHandlerBlock = (block: EntityBlock): block is HandlerBlock => 'event' in block;
 
-export function handlerOf(block: Action): Handler {
-  const event = handlerEvent(block.label)!;
-  const carried = Object.keys(block).filter((key) => key !== 'label' && key !== 'results' && (block as unknown as Record<string, unknown>)[key] !== undefined);
-  if (carried.length > 0) throw new DslError(`${JSON.stringify(block.label)} is a handler, so it holds results and nothing else; it also names ${carried.join(', ')}`);
-  return { event, results: block.results };
-}
+// One body reader for both, chosen by the label, because the label is the only
+// thing that says which of the two a block is.
+const entityBlock: EntryBody = {
+  parse(cursor, label) {
+    const event = handlerEvent(label);
+    return event === undefined ? actionBody.parse(cursor, label) : { event, results: resultList.parse(cursor) };
+  },
+  parseBlock(lines, label) {
+    const event = handlerEvent(label);
+    return event === undefined ? actionBody.parseBlock(lines, label) : { event, results: resultBlock(lines) };
+  },
+};
 
 export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'> = {
   kind: 'entity',
@@ -113,5 +128,5 @@ export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'>
     hiddenIf: { parser: condition, keyword: 'hidden if' },
   },
   keywords: ['aggressive'],
-  entries: { into: 'blocks', body: actionBody },
+  entries: { into: 'blocks', body: entityBlock },
 };

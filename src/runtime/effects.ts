@@ -308,6 +308,20 @@ export function requireResource(registry: Registry, resourceId: string): Resourc
   return resource;
 }
 
+// A pool that ran out mid-segment settles at the instant it ran out, because
+// what happens next — a fresh target standing up, the fight ending — would
+// otherwise erase the level that reached zero before anything read it.
+export function emptyPoolNow(segment: Segment, actorId: string, resourceId: string, credit: string): void {
+  const store = poolStores(segment.state).find((each) => each.actorId === actorId);
+  if (!store) return;
+  store.levels[resourceId] = 0;
+  clearActorDeltas(segment.deltas, actorId);
+  const previous = segment.credit;
+  segment.credit = credit;
+  fireEvents(segment, actorId, resourceId, 'on empty', 1);
+  segment.credit = previous;
+}
+
 interface PoolStore {
   actorId: string;
   levels: Record<string, number>;

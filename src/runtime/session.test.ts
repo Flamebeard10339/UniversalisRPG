@@ -769,7 +769,7 @@ roast:
     // The clock, not the player: modals.ts answers by replacing `state.player`
     // wholesale, so an alias could never show through it. The engine writes
     // progress into the cadence in place, which is what an alias would move.
-    const fixture = { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: { player: { progress: 0, attemptsMade: 0 } } };
+    const fixture = { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { [PLAYER]: { ownerRef: 'entity.oven', actionLabel: 'roast', target: '' } } };
     registry.saves.set('midbake', { version: SAVE_VERSION, diff: { activeAction: fixture } });
 
     applyDirective(session, { kind: 'load', save: 'midbake' });
@@ -786,7 +786,7 @@ roast:
     const session = startSession(registry);
     registry.saves.set('midfight', {
       version: SAVE_VERSION,
-      diff: { activeAction: { ownerRef: 'entity.dummy', actionLabel: 'hit', repeating: true, implicitTarget: 1000, cadences: {}, actors: { dummy: { resources: { health: 12000 }, rateRemainders: {} } } } },
+      diff: { activeAction: { ownerRef: 'entity.dummy', actionLabel: 'hit', repeating: true, implicitTarget: 1000, cadences: {}, roster: { [PLAYER]: { ownerRef: 'entity.dummy', actionLabel: 'hit', target: '' } }, actors: { dummy: { resources: { health: 12000 }, rateRemainders: {} } } } },
     });
 
     applyDirective(session, { kind: 'load', save: 'midfight' });
@@ -807,7 +807,7 @@ roast:
     // owner and the label both resolve. Only the clock is missing.
     registry.saves.set('midbake', {
       version: SAVE_VERSION,
-      diff: { activeAction: { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: {} } },
+      diff: { activeAction: { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: {}, roster: { [PLAYER]: { ownerRef: 'entity.oven', actionLabel: 'roast', target: '' } } } },
     });
 
     applyDirective(session, { kind: 'load', save: 'midbake' });
