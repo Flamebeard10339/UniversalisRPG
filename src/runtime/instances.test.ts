@@ -128,7 +128,7 @@ describe('liveness is answered in one place', () => {
     const id = createInstance(state, TOKEN, 'charm', token({ notes: ['worn'] }));
     expect(collapseInstance(state, id)).toBe(false);
 
-    instance(state, id)!.payload = token();
+    (instance(state, id)!.payload as Token).notes.pop();
     expect(collapseInstance(state, id)).toBe(true);
     expect(instanceIsLive(state, id)).toBe(false);
   });
@@ -221,6 +221,16 @@ describe('content moving underneath an instance', () => {
     const warnings = pruneStateForRegistry(state, loadModule(MODULE));
     expect(warnings.map((warning) => warning.message)).toEqual(['Removed instance 1 because kind-from-a-module-not-loaded is not an instance kind this engine knows.']);
     expect(state.instances.byId).toEqual({});
+  });
+
+  it('drops a copy a # save wrote already recording nothing, the one route past the refusal at the mint', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    const row = { kind: TOKEN, template: 'charm', payload: token() };
+
+    const warnings = loadSave(state, { version: SAVE_VERSION, diff: { instances: { next: 2, byId: { 1: row } } } }, registry);
+    expect(warnings.map((warning) => warning.message)).toEqual(['Removed instance 1 because nothing is left recorded about it.']);
+    expect(state.instances).toEqual({ next: 2, byId: {} });
   });
 
   it('repairs a payload whose own declaration is gone, through the kind that owns it', () => {

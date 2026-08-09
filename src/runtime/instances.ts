@@ -8,18 +8,27 @@ import { GameState, RuntimeError } from './state';
 // and never reads inside — which is what lets those two share one table, one
 // prune rule and one save field.
 
+// Readonly because this module owns every write, and with it minting, pruning
+// and the payload's opacity: a template a consumer could repoint is a template
+// reference that stops meaning what c2 says it means.
 export interface Instance {
-  kind: string;
-  template: string;
-  payload: unknown;
+  readonly kind: string;
+  readonly template: string;
+  readonly payload: unknown;
 }
 
 // The counter lives inside the table rather than beside it, so `GameState`
 // gains one field. It never rewinds, so an id names one instance for that
 // instance's whole life and a reference cannot be answered by a later one.
 export interface InstanceTable {
-  next: number;
-  byId: Record<string, Instance>;
+  readonly next: number;
+  readonly byId: Readonly<Record<string, Instance>>;
+}
+
+// The one cast that opens the table for writing, so every write above is in
+// this file and a consumer holding a table cannot reach past its kind.
+function open(table: InstanceTable): { next: number; byId: Record<string, Instance> } {
+  return table as { next: number; byId: Record<string, Instance> };
 }
 
 // The one extension point. A consumer registers its payload kind here and
@@ -67,7 +76,7 @@ export function createInstance(state: GameState, kind: string, template: string,
   if (!definition.holds(payload)) throw new RuntimeError(`instance kind ${kind} does not keep ${JSON.stringify(payload)}`);
   if (definition.empty(payload as never)) throw new RuntimeError(`instance kind ${kind} was handed a payload recording nothing; a copy carrying nothing is a template`);
 
-  const table = state.instances;
+  const table = open(state.instances);
   const id = String(table.next);
   table.next += 1;
   table.byId[id] = { kind, template, payload };
@@ -85,8 +94,8 @@ export function instanceIsLive(state: GameState, id: string): boolean {
 }
 
 export function removeInstance(state: GameState, id: string): boolean {
-  if (!(id in state.instances.byId)) return false;
-  delete state.instances.byId[id];
+  if (!instanceIsLive(state, id)) return false;
+  delete open(state.instances).byId[id];
   return true;
 }
 
@@ -96,7 +105,7 @@ export function collapseInstance(state: GameState, id: string): boolean {
   const held = state.instances.byId[id];
   const definition = held && kindOf(held.kind);
   if (!definition || !definition.empty(held.payload as never)) return false;
-  delete state.instances.byId[id];
+  delete open(state.instances).byId[id];
   return true;
 }
 
@@ -106,7 +115,7 @@ export interface InstanceNotice {
 }
 
 export function pruneInstances(state: GameState, registry: Registry): InstanceNotice[] {
-  const table = state.instances;
+  const table = open(state.instances);
   const notices: InstanceNotice[] = [];
   const drop = (id: string, because: string): void => {
     delete table.byId[id];
@@ -126,7 +135,7 @@ export function pruneInstances(state: GameState, registry: Registry): InstanceNo
     settled = true;
     for (const [id, held] of Object.entries(table.byId)) {
       const definition = kindOf(held.kind)!;
-      for (const repaired of definition.repair(held.payload as never, registry, (ref) => ref in table.byId)) {
+      for (const repaired of definition.repair(held.payload as never, registry, (ref) => instanceIsLive(state, ref))) {
         notices.push({ id, message: `Repaired instance ${id}: ${repaired}` });
       }
       if (definition.empty(held.payload as never)) {
