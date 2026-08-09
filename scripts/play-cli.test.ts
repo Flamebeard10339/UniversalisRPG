@@ -290,11 +290,14 @@ describe('play-cli drives a modal by its published name and options', () => {
 
     const opened = handleCommand(session, current, 'talk: sage', recorder);
     expect(opened.output).toContain('  1) Ask the way.');
+    expect(opened.output).toContain('  2) Say nothing.');
 
-    const answered = handleCommand(session, opened.view!, '1', recorder);
-    expect(answered.recorded).toBe('submit-modal: choice=Ask the way.');
+    // The second value, not the first: a driver that answered by position but
+    // always handed back the head of the list would pass on `1` alone.
+    const answered = handleCommand(session, opened.view!, '2', recorder);
+    expect(answered.recorded).toBe('submit-modal: choice=Say nothing.');
     expect(answered.view?.modals).toEqual([]);
-    expect(recorder.history).toEqual(['talk: sage', 'submit-modal: choice=Ask the way.']);
+    expect(recorder.history).toEqual(['talk: sage', 'submit-modal: choice=Say nothing.']);
   });
 
   it('emits a replayable # test from a session that crossed a modal, with no hand-editing', () => {
@@ -328,14 +331,21 @@ describe('play-cli drives a modal by its published name and options', () => {
     expect(second.output.some((line) => line.startsWith('Inventory: '))).toBe(true);
   });
 
-  it('leaves a slash command working while a modal is open, rather than swallowing it as an answer', () => {
+  it('refuses a bare line while a modal is open instead of taking it as the field being asked for', () => {
     const { session, current, recorder } = modalFixture();
 
     const opened = handleCommand(session, current, 'use: entity.mirror.look in', recorder);
     expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation']);
+    expect(opened.output).toContain('Name:');
 
+    // The line the old prompt would have swallowed as the name, and the one it
+    // would have swallowed as the race.
+    const eaten = handleCommand(session, opened.view!, 'Rowan', recorder);
+    expect(eaten.output.some((line) => line.startsWith('Error:'))).toBe(true);
     const marker = handleCommand(session, opened.view!, '/state', recorder);
     expect(marker.output.some((line) => line.startsWith('Location: camp'))).toBe(true);
+
+    expect(session.state.player).toEqual({ name: '', race: '' });
     expect(session.state.modals.map((frame) => frame.name)).toEqual(['character-creation']);
     expect(recorder.history).toEqual(['use: entity.mirror.look in']);
   });
