@@ -35,6 +35,8 @@ Two relations, deliberately different. **Ownership** is single-valued — one fi
 
 Audits are the one gate that has repeatedly caught real defects, so they stay. Resist adding new automated gates: a gate earns its place by preventing something that actually happened, not by sounding rigorous.
 
+`git worktree remove --force` destroys the node_modules junction. Do not use `--force`.
+
 1. **DSL load path** — `src/grammar` (text to syntax) and `src/content` (syntax to registry, incl. load-time reference resolution)
 2. **Runtime** — `src/runtime`: state, travel, actions, encounters, resources, stats, skills, flags, dialogue, saves; `session.ts` is the entry point everything above plays through
 3. **Contribution system** — unbuilt: editor, validation/merge engine
