@@ -17,8 +17,39 @@ export interface Segment {
   deltas: PoolDeltas;
   // Control flow, not a write: only the segment's owner may end the action.
   stopped: boolean;
+  observers: readonly ResultObserver[];
 }
 export type PoolDeltas = Map<string, Map<string, number>>;
+
+export interface ResultApplication {
+  result: ActionResult;
+  actor: string;
+  // Signed, in the result's own units, with `count` already folded in, and the
+  // amount that actually moved rather than the one asked for: a `take` of five
+  // from an inventory holding two reports -2. Zero where the kind moves no
+  // quantity at all.
+  magnitude: number;
+  lead: boolean;
+}
+
+export type ResultObserver = (segment: Segment, application: ResultApplication) => void;
+
+// The `modal:` line narrates an applied result; the modal itself is
+// `pendingModal`. Reaching the log from out here is what lets a modal system
+// replace the narration without reopening the switch that applies results.
+const narrateModal: ResultObserver = ({ state }, { result, lead }) => {
+  if (result.kind === 'open-modal' && lead) state.log.push(`modal:${result.modal}`);
+};
+
+// Every result a segment applies is offered to each of these, in application
+// order: a consumer of applied results joins this list rather than growing the
+// switch that applies them. Exported so a caller building its own segment can
+// spread it and keep what the game already does.
+export const RESULT_OBSERVERS: readonly ResultObserver[] = [narrateModal];
+
+export function newSegment(state: GameState, registry: Registry, observers: readonly ResultObserver[] = RESULT_OBSERVERS): Segment {
+  return { state, registry, deltas: new Map(), stopped: false, observers };
+}
 
 export function addDelta(deltas: PoolDeltas, actorId: string, resourceId: string, milliAmount: number): void {
   if (!deltas.has(actorId)) deltas.set(actorId, new Map());
@@ -94,87 +125,105 @@ function requireDropTable(registry: Registry, id: string): DropTable {
 // line — and that has to stay true of an action whether or not one of its
 // results happens to draw. A `say:` INSIDE a wrapper is a different sentence: it
 // leads its own group, and speaks on each repetition that reaches it.
-export function applyResults(segment: Segment, results: readonly ActionResult[], count = 1, lead = true): void {
+export function applyResults(segment: Segment, results: readonly ActionResult[], actor: string, count = 1, lead = true): void {
   if (count <= 0) return;
-  const { state, registry } = segment;
   // A group that draws is applied once per repetition, in order, rather than
   // once and scaled — a batched craft rolls its table for every completion.
   if (count > 1 && samplesPerApplication(results)) {
-    for (let i = 0; i < count && !segment.stopped; i++) applyResults(segment, results, 1, lead && i === 0);
+    for (let i = 0; i < count && !segment.stopped; i++) applyResults(segment, results, actor, 1, lead && i === 0);
     return;
   }
 
   for (const result of results) {
-    switch (result.kind) {
-      case 'say':
-        if (lead) state.log.push(result.text);
-        break;
-      case 'set':
-        state.flags[result.variable] = true;
-        break;
-      case 'unset':
-        delete state.flags[result.variable];
-        break;
-      case 'add': {
-        const current = state.flags[result.variable];
-        const base = typeof current === 'number' ? current : 0;
-        state.flags[result.variable] = base + result.amount * count;
-        break;
-      }
-      case 'give':
-        state.inventory[result.item] = (state.inventory[result.item] ?? 0) + drawCount(state, result.amount) * count;
-        break;
-      case 'take':
-        state.inventory[result.item] = Math.max(0, (state.inventory[result.item] ?? 0) - (result.amount ?? 1) * count);
-        break;
-      case 'xp':
-        state.xp[result.skill] = (state.xp[result.skill] ?? 0) + drawCount(state, result.amount) * count;
-        break;
-      case 'relocate':
-        state.location = result.location;
-        break;
-      case 'discover':
-        state.flags[`${result.location}.${DISCOVERED}`] = true;
-        break;
-      case 'open-modal':
-        if (lead) state.log.push(`modal:${result.modal}`);
-        state.pendingModal = result.modal;
-        break;
-      case 'pool':
-        requireResource(registry, result.resource);
-        addDelta(segment.deltas, PLAYER, result.resource, toMilliUnits(drawAmount(state, result.delta)) * count);
-        break;
-      case 'stop':
-        segment.stopped = true;
-        break;
-      // Depth-first in source order: a wrapper draws for its own selector, then
-      // its body draws for whatever is inside it.
-      case 'chance':
-        if (nextRandom(state) * result.denominator < result.numerator) applyResults(segment, result.results, count);
-        break;
-      case 'contest':
-        if (nextRandom(state) < hitChance(statSide(result.left, state, registry), statSide(result.right, state, registry), registry)) {
-          applyResults(segment, result.results, count);
-        }
-        break;
-      case 'gate':
-        if (evaluateCondition(result.condition, state)) applyResults(segment, result.results, count);
-        break;
-      case 'one-of': {
-        const row = selectRow(result.rows, state, registry);
-        if (row) applyResults(segment, row.results, count);
-        break;
-      }
-      case 'roll':
-        applyResults(segment, requireDropTable(registry, result.table).results, count);
-        break;
+    const magnitude = applyOne(segment, result, actor, count, lead);
+    if (magnitude === undefined) continue;
+    for (const observer of segment.observers) observer(segment, { result, actor, magnitude, lead });
+  }
+}
+
+// `undefined` where nothing was applied: a wrapper only selects, and a `say:`
+// that is not the batch's lead does not speak.
+function applyOne(segment: Segment, result: ActionResult, actor: string, count: number, lead: boolean): number | undefined {
+  const { state, registry } = segment;
+  switch (result.kind) {
+    case 'say':
+      if (!lead) return undefined;
+      state.log.push(result.text);
+      return 0;
+    case 'set':
+      state.flags[result.variable] = true;
+      return 0;
+    case 'unset':
+      delete state.flags[result.variable];
+      return 0;
+    case 'add': {
+      const current = state.flags[result.variable];
+      const base = typeof current === 'number' ? current : 0;
+      const amount = result.amount * count;
+      state.flags[result.variable] = base + amount;
+      return amount;
     }
+    case 'give': {
+      const amount = drawCount(state, result.amount) * count;
+      state.inventory[result.item] = (state.inventory[result.item] ?? 0) + amount;
+      return amount;
+    }
+    case 'take': {
+      const held = state.inventory[result.item] ?? 0;
+      const left = Math.max(0, held - (result.amount ?? 1) * count);
+      state.inventory[result.item] = left;
+      return left - held;
+    }
+    case 'xp': {
+      const amount = drawCount(state, result.amount) * count;
+      state.xp[result.skill] = (state.xp[result.skill] ?? 0) + amount;
+      return amount;
+    }
+    case 'relocate':
+      state.location = result.location;
+      return 0;
+    case 'discover':
+      state.flags[`${result.location}.${DISCOVERED}`] = true;
+      return 0;
+    case 'open-modal':
+      state.pendingModal = result.modal;
+      return 0;
+    case 'pool': {
+      requireResource(registry, result.resource);
+      const milliAmount = toMilliUnits(drawAmount(state, result.delta)) * count;
+      addDelta(segment.deltas, actor, result.resource, milliAmount);
+      return milliAmount;
+    }
+    case 'stop':
+      segment.stopped = true;
+      return 0;
+    // Depth-first in source order: a wrapper draws for its own selector, then
+    // its body draws for whatever is inside it.
+    case 'chance':
+      if (nextRandom(state) * result.denominator < result.numerator) applyResults(segment, result.results, actor, count);
+      return undefined;
+    case 'contest':
+      if (nextRandom(state) < hitChance(statSide(result.left, state, registry), statSide(result.right, state, registry), registry)) {
+        applyResults(segment, result.results, actor, count);
+      }
+      return undefined;
+    case 'gate':
+      if (evaluateCondition(result.condition, state)) applyResults(segment, result.results, actor, count);
+      return undefined;
+    case 'one-of': {
+      const row = selectRow(result.rows, state, registry);
+      if (row) applyResults(segment, row.results, actor, count);
+      return undefined;
+    }
+    case 'roll':
+      applyResults(segment, requireDropTable(registry, result.table).results, actor, count);
+      return undefined;
   }
 }
 
 export function applyResultsNow(state: GameState, registry: Registry, results: readonly ActionResult[] | undefined, count = 1): void {
-  const segment: Segment = { state, registry, deltas: new Map(), stopped: false };
-  applyResults(segment, results ?? [], count);
+  const segment = newSegment(state, registry);
+  applyResults(segment, results ?? [], PLAYER, count);
   settlePools(state, registry, [], 0, segment.deltas);
   if (segment.stopped) endAction(state);
 }

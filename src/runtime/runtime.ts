@@ -21,6 +21,7 @@ import {
   clampResources,
   clearActorDeltas,
   getDelta,
+  newSegment,
   Segment,
   settlePools,
 } from './effects';
@@ -222,7 +223,7 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
     const fights = Math.floor(totalAttempts / attemptsToResolve);
     const remainder = totalAttempts - fights * attemptsToResolve;
     const batch = fightBatch(action, fights, outcome);
-    applyResults(segment, batch.results, batch.count);
+    applyResults(segment, batch.results, PLAYER, batch.count);
     if (segment.stopped) {
       endAction(state);
       return;
@@ -321,7 +322,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
 
     if (fightOutcome) {
       const batch = fightBatch(action, 1, fightOutcome);
-      applyResults(segment, batch.results, batch.count);
+      applyResults(segment, batch.results, PLAYER, batch.count);
       if (segment.stopped) {
         endAction(state);
         return;
@@ -347,7 +348,7 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
   const start = state.time;
   // While the action's modifiers still hold; the stochastic path can clear it.
   const snapshots = captureResourceRates(state, registry);
-  const segment: Segment = { state, registry, deltas: new Map(), stopped: false };
+  const segment = newSegment(state, registry);
 
   if (!state.activeAction) {
     advanceTime(state, segEnd - start);
