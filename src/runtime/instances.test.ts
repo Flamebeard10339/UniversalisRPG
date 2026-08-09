@@ -257,6 +257,15 @@ describe('content moving underneath an instance', () => {
     expect([doomed, middle, outer].map((id) => instanceIsLive(state, id))).toEqual([false, false, false]);
   });
 
+  it('settles the table before any other rule runs, so a field holding an id asks an answer that is final', () => {
+    const state = initialState(loadModule(MODULE));
+    state.inventory.charm = 2;
+    const id = createInstance(state, TOKEN, 'charm', token({ notes: ['worn'] }));
+
+    const warnings = pruneStateForRegistry(state, loadModule(WITHOUT_CHARM));
+    expect(warnings.map((warning) => warning.path)).toEqual([`instances.${id}`, 'inventory.charm']);
+  });
+
   it('leaves a loaded state holding no reference to an instance that is gone', () => {
     const registry = loadModule(MODULE);
     const state = initialState(registry);

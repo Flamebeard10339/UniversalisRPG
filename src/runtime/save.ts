@@ -138,6 +138,12 @@ function activeActionProblem(state: GameState, registry: Registry): string | nul
 export function pruneStateForRegistry(state: GameState, registry: Registry): PruneWarning[] {
   const warnings: PruneWarning[] = [];
 
+  // First, so every rule under it asks a settled table rather than one still
+  // being pruned beneath it: a field holding an instance id gets one answer.
+  for (const { id, message } of pruneInstances(state, registry)) {
+    addWarning(warnings, `instances.${id}`, id, `${message}.`);
+  }
+
   if (state.location && !registry.locations.has(state.location)) {
     const old = state.location;
     const replacement = startingLocationId(registry) ?? '';
@@ -147,12 +153,6 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
 
   for (const [field, rule] of RECORD_PRUNES) {
     pruneRecord(state[field] as unknown as Record<string, unknown>, field, (id) => rule.loaded(registry, id), rule.of, warnings);
-  }
-
-  // Ahead of every rule below it, so a field that holds an instance id has one
-  // settled answer to ask rather than a table still being pruned beneath it.
-  for (const { id, message } of pruneInstances(state, registry)) {
-    addWarning(warnings, `instances.${id}`, id, `${message}.`);
   }
 
   for (const [key, buff] of Object.entries(state.activeBuffs)) {
