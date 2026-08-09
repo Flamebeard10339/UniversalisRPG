@@ -2,6 +2,7 @@ import { createGameState, GameState, initResources, RuntimeError } from './runti
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
 import { findActionOwner, parseOwnerRef } from './actions';
+import { isInstanceTable, pruneInstances } from './instances';
 import { isModalFrame, pruneModals } from './modals';
 import { PLAYER } from './state';
 
@@ -47,6 +48,7 @@ const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   equipped: { shape: 'record', holds: (value) => typeof value === 'string', prune: 'pruned by a rule of its own' },
   activeBuffs: { shape: 'record', holds: isObject, prune: 'pruned by a rule of its own' },
   activeAction: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
+  instances: { shape: 'scalar', holds: isInstanceTable, prune: 'pruned by a rule of its own' },
   time: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   rng: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   player: { shape: 'scalar', holds: isObject, prune: 'holds no registry id' },
@@ -145,6 +147,12 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
 
   for (const [field, rule] of RECORD_PRUNES) {
     pruneRecord(state[field] as unknown as Record<string, unknown>, field, (id) => rule.loaded(registry, id), rule.of, warnings);
+  }
+
+  // Ahead of every rule below it, so a field that holds an instance id has one
+  // settled answer to ask rather than a table still being pruned beneath it.
+  for (const { id, message } of pruneInstances(state, registry)) {
+    addWarning(warnings, `instances.${id}`, id, `${message}.`);
   }
 
   for (const [key, buff] of Object.entries(state.activeBuffs)) {
