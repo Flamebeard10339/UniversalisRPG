@@ -449,8 +449,11 @@ craft: bread
 assert: has bread
 talk: miki
 assert: made-bread
-// A rat takes a few swings to put down, so each `use:` starts the fight and the
-// `wait:` lets it play out — 30s is far longer than the ~6s it actually needs.
+// A fight is bounded by its location, so the rats are fought where they stand
+// rather than through the floor. A rat takes a few swings to put down, so each
+// `use:` starts the fight and the `wait:` lets it play out — 30s is far longer
+// than the ~6s it actually needs.
+use: entity.stairs.descend
 use: melee-combat on giant-rat
 wait: 30
 use: melee-combat on giant-rat
@@ -458,6 +461,7 @@ wait: 30
 use: melee-combat on giant-rat
 wait: 30
 assert: rats-killed >= 3
+use: entity.stairs-up.ascend
 talk: miki
 assert: miki-complete
 assert: front-door.unlocked
@@ -473,7 +477,7 @@ expect: miki-route-end
 {"version":8}
 
 # save miki-route-end
-{"version":8}
+{"version":8,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"Elf"}}
 
 # save dresser-trinket-end
 {"version":8,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}

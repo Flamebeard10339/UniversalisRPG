@@ -216,7 +216,7 @@ describe('produced quantities carry the range they were written as', () => {
     expect(load('# item potion', '# entity g', 'p:', '  requires: has 5-10 potion', '  say: hi')).toThrow(threshold);
     expect(load('# flag c', '# entity g', 'p:', '  requires: c >= 1-3', '  say: hi')).toThrow(threshold);
     expect(load('# item x', '# item y', '# skill c', '# recipe r', 'in: 1 x', 'out: 1 y', 'skill: c 15-20')).toThrow(threshold);
-    expect(load('# item x', '# entity g', 'p:', '  escape after 3-5', '  give: 1 x')).toThrow(threshold);
+    expect(load('# item x', '# entity g', 'p:', '  attempts: 3-5', '  give: 1 x')).toThrow(threshold);
   });
 
   it('refuses a range in a selector, where odds are not a quantity at all', () => {

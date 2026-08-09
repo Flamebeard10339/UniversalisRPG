@@ -100,12 +100,12 @@ describe('session', () => {
 
     v = apply(session, 'use:entity.tutorial-island.stairs.descend');
     expect(v.location.id).toBe('tutorial-island.basement');
-    expect(ids(v)).toContain('use:entity.tutorial-island.giant-rat.fight');
+    expect(ids(v)).toContain('fight:tutorial-island.melee-combat:tutorial-island.giant-rat');
 
     // A real fight: one `use:` is one swing, so each rat needs the clock to run
     // on. 30s is far longer than the ~6s one actually lasts.
     for (let killed = 1; killed <= 3; killed++) {
-      v = apply(session, 'use:entity.tutorial-island.giant-rat.fight');
+      v = apply(session, 'fight:tutorial-island.melee-combat:tutorial-island.giant-rat');
       expect(v.encounter).not.toBeNull();
       expect(v.encounter!.foes.map((foe) => foe.title)).toEqual(['Giant Rat']);
 
@@ -113,7 +113,7 @@ describe('session', () => {
       expect(v.flags['tutorial-island.rats-killed']).toBe(killed);
       expect(v.encounter).toBeNull(); // the fight is over, so is the readout
     }
-    expect(ids(v)).not.toContain('use:entity.tutorial-island.giant-rat.fight');
+    expect(ids(v)).not.toContain('fight:tutorial-island.melee-combat:tutorial-island.giant-rat');
 
     v = apply(session, 'use:entity.tutorial-island.stairs-up.ascend');
     expect(v.location.id).toBe('tutorial-island.guide-house');
@@ -682,6 +682,9 @@ describe('what the engine withholds', () => {
       activeBuffs: 'withheld',
       resourceRateRemainders: 'withheld',
       instances: 'withheld',
+      // How many of each place's population are down. A driver renders what is
+      // standing, which `entities` already carries.
+      populations: 'withheld',
     };
 
     // The constructor, not the type: the two drift only if a field is built
@@ -716,14 +719,20 @@ starting
 entities:
   dummy
 
+# action hit
+title: hit
+continuous
+rate: my swings-per-minute
+damage: my attack
+depletes: their health
+
+# entity player
+stats: attack 1, max-health 12, swings-per-minute 60
+uses: hit
+
 # entity dummy
 title: Dummy
 stats: attack 1, max-health 12, swings-per-minute 60
-hit:
-  continuous
-  rate: swings-per-minute
-  ability: attack
-  target: health
 `;
 
 describe('a save is data the engine takes a copy of, not a handle onto it', () => {
@@ -769,7 +778,7 @@ roast:
     // The clock, not the player: modals.ts answers by replacing `state.player`
     // wholesale, so an alias could never show through it. The engine writes
     // progress into the cadence in place, which is what an alias would move.
-    const fixture = { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { [PLAYER]: { ownerRef: 'entity.oven', actionLabel: 'roast', target: '' } } };
+    const fixture = { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'entity.oven', actionLabel: 'roast', target: '' } } };
     registry.saves.set('midbake', { version: SAVE_VERSION, diff: { activeAction: fixture } });
 
     applyDirective(session, { kind: 'load', save: 'midbake' });
@@ -786,7 +795,7 @@ roast:
     const session = startSession(registry);
     registry.saves.set('midfight', {
       version: SAVE_VERSION,
-      diff: { activeAction: { ownerRef: 'entity.dummy', actionLabel: 'hit', repeating: true, implicitTarget: 1000, cadences: {}, roster: { [PLAYER]: { ownerRef: 'entity.dummy', actionLabel: 'hit', target: '' } }, actors: { dummy: { resources: { health: 12000 }, rateRemainders: {} } } } },
+      diff: { activeAction: { ownerRef: 'action.hit', actionLabel: 'hit', repeating: true, implicitTarget: 1000, cadences: {}, roster: { player: { ownerRef: 'action.hit', actionLabel: 'hit', target: 'dummy' } }, actors: { dummy: { resources: { health: 12000 }, rateRemainders: {} } } } },
     });
 
     applyDirective(session, { kind: 'load', save: 'midfight' });
@@ -807,7 +816,7 @@ roast:
     // owner and the label both resolve. Only the clock is missing.
     registry.saves.set('midbake', {
       version: SAVE_VERSION,
-      diff: { activeAction: { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: {}, roster: { [PLAYER]: { ownerRef: 'entity.oven', actionLabel: 'roast', target: '' } } } },
+      diff: { activeAction: { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: {}, roster: { player: { ownerRef: 'entity.oven', actionLabel: 'roast', target: '' } } } },
     });
 
     applyDirective(session, { kind: 'load', save: 'midbake' });
@@ -870,22 +879,27 @@ start: 1000000
 starting
 entities: dummy
 
+# action hit
+title: hit
+continuous
+rate: my swings-per-minute
+accuracy: my accuracy vs their evasion
+damage: my attack
+depletes: their health
+
+# entity player
+stats: attack 0, max-health 1000000, accuracy 100, evasion 0, swings-per-minute 60
+uses: hit
+
 # entity dummy
 title: Dummy
 stats: attack 0, max-health 1000000, accuracy 100, evasion 0, swings-per-minute 60
-hit:
-  continuous
-  rate: swings-per-minute
-  accuracy: accuracy
-  evasion: evasion
-  ability: attack
-  target: health
 `;
 
   function swinging(): ReturnType<typeof startSession> {
     const session = startSession(loadModule(arena));
     view(session);
-    apply(session, 'use:entity.dummy.hit');
+    apply(session, 'fight:hit:dummy');
     return session;
   }
 

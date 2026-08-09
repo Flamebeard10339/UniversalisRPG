@@ -184,7 +184,7 @@ describe('loadUniverseWithDiagnostics', () => {
     expect(result.registry.entities.get('base.chest')!.stats).toEqual({ 'base.guile': { min: 4, max: 4 } });
     expect(result.registry.items.get('base.charm')!.tags.map((tag) => (tag.kind === 'stat-bonus' ? tag.statId : tag.kind))).toEqual(['base.guile']);
     expect(result.registry.recipes.has('base.charm')).toBe(false);
-    expect(result.registry.locations.get('base.camp')!.entities).toEqual(['base.chest']);
+    expect(result.registry.locations.get('base.camp')!.entities).toEqual([{ entity: 'base.chest' }]);
     expect(result.registry.locations.get('base.camp')!.adjacent).toEqual([]);
   });
 

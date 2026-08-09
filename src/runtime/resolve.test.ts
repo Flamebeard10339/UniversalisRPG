@@ -189,7 +189,7 @@ function loaded(): Registry {
 // depend on guessing the compiled action's label text.
 function recipeActive(registry: Registry, recipeId: string): ActiveAction {
   const action = registry.recipeActions.get(recipeId)!;
-  return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.kind === 'continuous', implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, target: '' } } };
+  return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.kind === 'continuous', implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, target: recipeId } } };
 }
 
 function withCampfireCooking(registry: Registry, buffed: boolean): GameState {
@@ -280,7 +280,7 @@ describe('resolve: direct pool writes stay associative alongside a rate', () => 
   function draining(registry: Registry, entityId: string, label: string): GameState {
     const state = createGameState('nowhere');
     initResources(state, registry);
-    state.activeAction = { ownerRef: `entity.${entityId}`, actionLabel: label, repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: `entity.${entityId}`, actionLabel: label, target: '' } } };
+    state.activeAction = { ownerRef: `entity.${entityId}`, actionLabel: label, repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: `entity.${entityId}`, actionLabel: label, target: entityId } } };
     return state;
   }
 
@@ -507,7 +507,7 @@ function withGrillCooking(registry: Registry, rawShrimp: number): GameState {
 
 function withTreeChopping(): GameState {
   const state = createGameState('nowhere');
-  state.activeAction = { ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: '' } } };
+  state.activeAction = { ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: 'tree' } } };
   return state;
 }
 
@@ -574,15 +574,15 @@ describe('resolve: deterministic multi-hit fights (implicit target, no accuracy)
     const oneShot = withTreeChopping();
     resolve(oneShot, registry, secondsToMs(3)); // exactly one full fight (3 attempts * 1s)
     expect(oneShot.inventory['wood']).toBe(1);
-    expect(oneShot.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1), cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: '' } } }); // rearmed fresh
+    expect(oneShot.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1), cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: 'tree' } } }); // rearmed fresh
 
     const midFight = withTreeChopping();
     resolve(midFight, registry, secondsToMs(1)); // 1 of 3 attempts
-    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 1 } }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: '' } } });
+    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 1 } }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: 'tree' } } });
     expect(midFight.inventory['wood'] ?? 0).toBe(0);
 
     resolve(midFight, registry, secondsToMs(2)); // 2 of 3 attempts
-    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - 2 * toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 2 } }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: '' } } });
+    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - 2 * toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 2 } }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: 'tree' } } });
 
     resolve(midFight, registry, secondsToMs(3)); // completes the fight
     expect(midFight.inventory['wood']).toBe(1);
@@ -597,7 +597,7 @@ describe('resolve: onSuccess batches per completion, not per segment (Pass-1 reg
 
     function withKilnFiring(): GameState {
       const state = createGameState('nowhere');
-      state.activeAction = { ownerRef: 'entity.kiln', actionLabel: 'fire', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.kiln', actionLabel: 'fire', target: '' } } };
+      state.activeAction = { ownerRef: 'entity.kiln', actionLabel: 'fire', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.kiln', actionLabel: 'fire', target: 'kiln' } } };
       return state;
     }
 
@@ -753,7 +753,7 @@ describe('resolve: resource associativity (the invariant, extended to pools)', (
     function fresh(): GameState {
       const state = createGameState();
       initResources(state, registry); // hp = 100 (full), spark = 0
-      state.activeAction = { ownerRef: 'entity.engine', actionLabel: 'run', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.engine', actionLabel: 'run', target: '' } } };
+      state.activeAction = { ownerRef: 'entity.engine', actionLabel: 'run', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.engine', actionLabel: 'run', target: 'engine' } } };
       return state;
     }
 
@@ -983,7 +983,7 @@ on dried:
     const registry = loaded();
     const state = createGameState('nowhere');
     state.inventory['raw-shrimp'] = 1;
-    state.activeAction = { ownerRef: 'entity.mill', actionLabel: 'press', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL - 3 * toMilliUnits(0.34), cadences: { [PLAYER]: { progress: 0, attemptsMade: 3 } }, roster: { [PLAYER]: { ownerRef: 'entity.mill', actionLabel: 'press', target: '' } } };
+    state.activeAction = { ownerRef: 'entity.mill', actionLabel: 'press', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL - 3 * toMilliUnits(0.34), cadences: { [PLAYER]: { progress: 0, attemptsMade: 3 } }, roster: { [PLAYER]: { ownerRef: 'entity.mill', actionLabel: 'press', target: 'mill' } } };
 
     resolve(state, registry, secondsToMs(10));
 

@@ -109,7 +109,7 @@ describe('a ~ dependency is visible whichever way the module names sort', () => 
 
   it('resolves a reference into it, which is the whole point of ~', () => {
     for (const id of ['aref', 'zref']) {
-      const registry = loadUniverse([referrer(id, '# entity npc', 'use:', '  give: target.gem'), target]);
+      const registry = loadUniverse([referrer(id, '# entity npc', 'rummage:', '  give: target.gem'), target]);
       expect(registry.entities.get(`${id}.npc`)!.actions[0].results[0]).toEqual({ kind: 'give', item: 'target.gem' });
     }
   });

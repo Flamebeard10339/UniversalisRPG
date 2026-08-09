@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { createGameState, resolve, useAction } from './runtime';
+import { createGameState, resolve, useAction, useFight } from './runtime';
 import { loadModule } from '../content/registry';
 import { runTest } from './session';
 import { initialState } from './save';
@@ -63,8 +63,10 @@ describe('tutorial-island health resource (Pass 2 end-to-end)', () => {
     const state = initialState(registry);
     expect(state.resources['tutorial-island.health']).toBe(toMilliUnits(30)); // full = statValue(max-health) at start
 
+    // The fight is where the rats stand: a fight is bounded by its location.
+    state.location = 'tutorial-island.basement';
     // One `use:` is one swing at 25/min; the rat answers on its own 16/min clock.
-    useAction('entity', 'tutorial-island.giant-rat', 'fight', registry, state);
+    useFight('tutorial-island.melee-combat', 'tutorial-island.giant-rat', registry, state);
     expect(state.time).toBe(secondsToMs(2.4));
 
     resolve(state, registry, secondsToMs(120)); // far longer than the ~6s the rat lasts

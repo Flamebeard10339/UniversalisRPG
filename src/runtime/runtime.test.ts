@@ -382,7 +382,7 @@ open:
     const state = createGameState();
     const result = armAction('entity', 'oven', 'roast', registry, state);
     expect(result).toEqual({ armed: true, firstUnit: secondsToMs(4) });
-    expect(state.activeAction).toEqual({ ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { [PLAYER]: { ownerRef: 'entity.oven', actionLabel: 'roast', target: '' } } });
+    expect(state.activeAction).toEqual({ ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'entity.oven', actionLabel: 'roast', target: 'oven' } } });
     expect(state.time).toBe(0);
     expect(state.inventory['roasted-chestnut'] ?? 0).toBe(0);
   });
@@ -469,26 +469,44 @@ base: 30
 
 # resource vigor
 max: max-vigor
-on empty:
-  say: Your vigor gutters out.
-  stop
 
 # resource sap
 rate: sap-seep
 max: max-sap
-on empty:
-  say: The sap runs dry.
-  stop
 
 # resource ichor
 max: max-ichor
-on empty:
-  say: The ichor runs out.
-  stop
 
 # resource ash
 max: max-ash
-on empty:
+
+# event vigor-gone
+resource: vigor
+trigger: on empty
+
+# event sap-gone
+resource: sap
+trigger: on empty
+
+# event ichor-gone
+resource: ichor
+trigger: on empty
+
+# event ash-settled
+resource: ash
+trigger: on empty
+
+# entity player
+on vigor-gone:
+  say: Your vigor gutters out.
+  stop
+on sap-gone:
+  say: The sap runs dry.
+  stop
+on ichor-gone:
+  say: The ichor runs out.
+  stop
+on ash-settled:
   say: The ash settles.
 
 # location den

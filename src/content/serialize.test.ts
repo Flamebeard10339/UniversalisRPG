@@ -33,14 +33,14 @@ title: Snack
 food, +2 vigor, 30s
 eat: take: 1 snack, say: You eat it.
 
-# entitytype worker
-haul:
-  continuous
-  rate: 12
-  give: 1 ore
+# action haul
+title: haul
+continuous
+rate: 12
+give: 1 ore
 
 # entity npc
-type: worker
+uses: haul
 title: NPC
 stations: forge
 stats: vigor 3-4
@@ -80,7 +80,13 @@ east of camp
 rate: vigor
 max: vigor
 display: minimal
-on empty:
+
+# event tiring
+resource: stamina
+trigger: on empty
+
+# entity player
+on tiring:
   say: Tired.
   set: levered
 
@@ -138,7 +144,7 @@ describe('serializeRegistryModule', () => {
 
     expect(printed).toContain('# info base');
     expect(printed).toContain('# entity npc');
-    expect(printed).toContain('# entitytype worker');
+    expect(printed).toContain('# action haul');
     expect(printed).toContain('use: entity.base.npc.cheer');
     const npcAction = (label: string) => roundTrip.entities.get('base.npc')?.actions.find((each) => each.label === label);
     expect(npcAction('haul')).toMatchObject({ kind: 'continuous', rate: 12 });

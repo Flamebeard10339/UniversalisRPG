@@ -278,7 +278,7 @@ describe('entity action modifiers', () => {
     ]);
 
     const block = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure:\n    say: Not enough shrimp.\n    set: chest-jammed', entitySchema);
-    expect(block.blocks?.[0].onFailure).toEqual([{ kind: 'say', text: 'Not enough shrimp.' }, { kind: 'set', variable: 'chest-jammed' }]);
+    expect((block.blocks?.[0] as Action).onFailure).toEqual([{ kind: 'say', text: 'Not enough shrimp.' }, { kind: 'set', variable: 'chest-jammed' }]);
 
     expect(() => parseOne('# entity chest\nopen:\n  on failure:\n    say: a\n  on failure:\n    say: b', entitySchema)).toThrow(/on failure is defined more than once/);
   });

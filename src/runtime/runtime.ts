@@ -278,6 +278,15 @@ function resolveAttempt(participant: Participant, segment: Segment): boolean {
   return damageTarget(state, registry, action, self, other, dealt, segment.deltas) <= 0;
 }
 
+// Whether a repeating fight has anything left to swing at. Asked here as well
+// as at a boundary, because a segment that felled the last of a population and
+// stood a fresh one up out of nothing would depend on where the span was cut.
+function standsAgain(state: GameState, registry: Registry, action: Action, targetId: string): boolean {
+  if (!action.depletes) return true;
+  const location = registry.locations.get(state.location);
+  return !location || isStanding(state, registry, location, targetId);
+}
+
 // An event queue, not a tick: each participant swings on its own clock.
 function resolveStochasticSegment(segment: Segment, action: Action, segEnd: number): void {
   const { state, registry } = segment;
@@ -345,7 +354,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         emptyPoolNow(segment, felled, action.depletes.id, next.self);
         downOne(state, registry, state.location, felled);
       }
-      if (active.repeating) {
+      if (active.repeating && standsAgain(state, registry, action, next.other)) {
         if (action.depletes) {
           clearActorDeltas(segment.deltas, next.other);
           enterEncounter(active, next.other, state, registry, PLAYER);

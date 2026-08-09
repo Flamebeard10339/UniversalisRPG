@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DslError } from '../grammar/parser';
 import { point } from '../grammar/range';
 import { nextRandom } from './rng';
-import { armAction, createGameState, GameState, hitChance, initResources, resolve } from './runtime';
+import { armAction, armFightAction, createGameState, GameState, hitChance, initResources, resolve } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadModule, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
@@ -40,46 +40,37 @@ x: 0, y: 0
 starting
 entities: dummy, phantom, biter
 
+# action strike
+title: strike
+continuous
+rate: my attack-rate
+accuracy: my attack-skill vs their dodge
+damage: my attack vs their dr
+depletes: their health
+
+// The same block from the other end: the rat reads its own accuracy stat where
+// the player reads its own, so uses: order is the whole difference.
+# action bite
+title: bite
+continuous
+rate: my attack-rate
+accuracy: my rat-skill vs their dodge
+damage: my attack vs their dr
+depletes: their health
+
+# entity player
+stats: max-health 1000000, dodge 0, attack 10, attack-skill 100, attack-rate 60
+uses: strike
+
 # entity dummy
 stats: max-health 1000000, dodge 0
-strike:
-  continuous
-  rate: attack-rate
-  target: health
-  accuracy: attack-skill
-  evasion: dodge
-  ability: attack
-  dr: dr
 
 # entity phantom
 stats: max-health 1000000, dodge 100
-strike:
-  continuous
-  rate: attack-rate
-  target: health
-  accuracy: attack-skill
-  evasion: dodge
-  ability: attack
-  dr: dr
 
 # entity biter
-stats: max-health 1000000, dodge 0
-strike:
-  continuous
-  rate: attack-rate
-  target: health
-  accuracy: attack-skill
-  evasion: dodge
-  ability: attack
-  dr: dr
-bite:
-  retaliates
-  rate: attack-rate
-  target: health
-  accuracy: rat-skill
-  evasion: dodge
-  ability: attack
-  dr: dr
+stats: max-health 1000000, dodge 0, attack 10, rat-skill 100, attack-rate 60
+uses: bite
 `;
 
 const ATTEMPTS = 2000; // one per second at 60/min
@@ -94,7 +85,7 @@ function loaded(source = MODULE): Registry {
 function fighting(registry: Registry, entityId: string): GameState {
   const state = createGameState('arena');
   initResources(state, registry);
-  armAction('entity', entityId, 'strike', registry, state);
+  armFightAction('strike', entityId, registry, state);
   return state;
 }
 
@@ -235,7 +226,7 @@ describe('a contest inside a fight', () => {
   });
 
   // The audit measured one stat at 2.5 spending 2.5 down the healthless path and
-  // 2.0 down the `target:` path — the same authored number worth two amounts.
+  // 2.0 down the `depletes:` path — the same authored number worth two amounts.
   // Neither action carries `accuracy:`, so every attempt lands and the figures
   // below are exact rather than sampled.
   function fighters(blow: number): Registry {
@@ -247,21 +238,33 @@ base: ${blow}
 
 # flag fled
 
+# entity player
+stats: max-health 1000000, dodge 0, attack 10, attack-skill 100, attack-rate 60, blow ${blow}
+uses: strike, test-pool
+
+# action test-pool
+title: test-pool
+rate: my attack-rate
+damage: my blow
+depletes: their health
+
+# location arena
++entities: test-fighter
+
 # entity test-fighter
 stats: max-health 100000, dodge 0
-test-pool:
-  rate: attack-rate
-  ability: blow
-  target: health
+
+# entity striker
+stats: max-health 100000, dodge 0, blow ${blow}, attack-rate 60
 test-implicit:
   rate: attack-rate
-  ability: blow
-  escape after 5
+  damage: blow
+  attempts: 5
 test-escaper:
   rate: attack-rate
-  ability: blow
-  escape after 2
-  on escape:
+  damage: blow
+  attempts: 2
+  on unfinished:
     set: fled
 `
     );
@@ -270,7 +273,7 @@ test-escaper:
   function poolSpentPerAttempt(registry: Registry, attempts: number): number {
     const state = createGameState('arena');
     initResources(state, registry);
-    armAction('entity', 'test-fighter', 'test-pool', registry, state);
+    armFightAction('test-pool', 'test-fighter', registry, state);
     resolve(state, registry, secondsToMs(attempts));
     const foe = state.activeAction!.actors!['test-fighter'];
     return (toMilliUnits(100000) - foe.resources['health']) / attempts;
@@ -283,13 +286,13 @@ test-escaper:
     expect(poolSpentPerAttempt(fighters(0.4), 2)).toBe(toMilliUnits(0.4));
   });
 
-  // `escape after` ends a fight with its target pool still full, so a completion
+  // `attempts:` ends a fight with its target pool still full, so a completion
   // test that reads the pool waits for a boundary the fight never reaches.
   it('escapes a deterministic fight on its attempt count, not on an emptied pool', () => {
     const registry = fighters(0.4); // ceil(1000/400) = 3 attempts to complete
     const state = createGameState('arena');
     initResources(state, registry);
-    armAction('entity', 'test-fighter', 'test-escaper', registry, state);
+    armAction('entity', 'striker', 'test-escaper', registry, state);
 
     // Two attempts of 400 leave the implicit pool at 200, still unemptied.
     resolve(state, registry, secondsToMs(2));
@@ -297,19 +300,19 @@ test-escaper:
     expect(state.flags['fled']).toBe(true);
   });
 
-  // A hit worth nothing empties no pool, so the fight would never end. An
-  // `ability:` naming a bare `# stat` reads zero, which the tutorial ships.
+  // A hit worth nothing empties no pool, so the fight would never end. A
+  // `damage:` naming a bare `# stat` reads zero, which the tutorial ships.
   it('keeps a hit above zero when the ability stat reads zero', () => {
     expect(poolSpentPerAttempt(fighters(0), 2)).toBe(1);
   });
 
   it('unify-action-health-into-target: the implicit target spends it at the same scale (runtime-2026-07-30-m2)', () => {
-    // ceil(1000 / 400) = 3 attempts, so `escape after 5` leaves the fight in
+    // ceil(1000 / 400) = 3 attempts, so `attempts: 5` leaves the fight in
     // flight at two attempts and the pool readable rather than reset.
     const registry = fighters(0.4);
     const state = createGameState('arena');
     initResources(state, registry);
-    armAction('entity', 'test-fighter', 'test-implicit', registry, state);
+    armAction('entity', 'striker', 'test-implicit', registry, state);
     resolve(state, registry, secondsToMs(2));
 
     const spent = IMPLICIT_TARGET_FULL - state.activeAction!.implicitTarget;

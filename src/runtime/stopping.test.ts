@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
 import { point } from '../grammar/range';
-import { armAction, createGameState, GameState, initResources, resolve } from './runtime';
+import { armAction, armFightAction, createGameState, GameState, initResources, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
 
 // Two independent mechanisms: `requires:`/inputs are re-checked by the resolver,
-// while a pool running out is content's call via `stop` in its `on empty:`.
-// The rat bites 16/min for 10 against 30 health, so the player dies at t=11.25;
-// the player needs 100 hits at 25/min, so the rat always outlives them.
+// while a pool running out is content's call via `stop` in the handler the
+// entity it ran out for writes. The rat bites 16/min for 10 against 30 health,
+// so the player dies at t=11.25; the rat always outlives them.
 const MODULE = `
 # stat attack
 base: 10
@@ -26,10 +26,10 @@ base: 30
 # resource health
 rate: regeneration
 max: max-health
-on empty:
-  say: You black out.
-  take: 1 rat-tail
-  stop
+
+# event death
+resource: health
+trigger: on empty
 
 // A pool whose ceiling is entirely buff-granted: max-vigor has no base:, so when
 // the buff lapses the max falls to 0 and the pool has nowhere to be but empty.
@@ -37,7 +37,26 @@ on empty:
 
 # resource vigor
 max: max-vigor
-on empty:
+
+# event vigor-gone
+resource: vigor
+trigger: on empty
+
+# action fight
+title: fight
+continuous
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their health
+
+# entity player
+stats: attack 10, dr 0, max-health 30, attack-rate 25
+uses: fight
+on death:
+  say: You black out.
+  take: 1 rat-tail
+  stop
+on vigor-gone:
   say: Your vigor gutters out.
   stop
 
@@ -50,23 +69,14 @@ examine: A moment of grace.
 # location den
 x: 0, y: 0
 starting
-entities: giant-rat, shrine, beacon, training-post, treadmill, altar, cloister, straw-man
+entities: giant-rat, shrine, beacon, 5 training-post, treadmill, altar, cloister, straw-man
 
 # entity giant-rat
 stats: attack 10, dr 0, max-health 1000, attack-rate 16
-fight:
-  continuous
-  rate: attack-rate
-  target: health
-  ability: attack
-  dr: dr
-  give: 1 rat-tail
-bite:
-  retaliates
-  rate: attack-rate
-  target: health
-  ability: attack
-  dr: dr
+uses: fight
+on death:
+  credit:
+    give: 1 rat-tail
 
 # entity shrine
 flags: moon-up
@@ -84,17 +94,18 @@ tend:
   time: 1
   give: 1 blessing
 
+# action drill
+title: drill
+continuous
+requires: permitted
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their health
+give: 1 blessing
+
 # entity training-post
 flags: permitted
 stats: max-health 30, dr 0
-drill:
-  continuous
-  requires: permitted
-  rate: attack-rate
-  target: health
-  ability: attack
-  dr: dr
-  give: 1 blessing
 
 # entity treadmill
 run:
@@ -134,24 +145,27 @@ chant:
         say: You have had enough.
         stop
 
-# entity straw-man
 // The same request on the per-attempt path, and with stop inline among the
 // results rather than in an on-success block. 20 health at 10 a swing is two
 // swings at 2.4s, so the fight ends at t=4.8 exactly despite resolving
 // attempt-by-attempt.
+# action spar
+title: spar
+continuous
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their health
+give: 1 rat-tail
+stop
+
+# entity straw-man
 stats: max-health 20, dr 0
-spar:
-  continuous
-  rate: attack-rate
-  target: health
-  ability: attack
-  dr: dr
-  give: 1 rat-tail
-  stop
 `;
 
 // The control: nothing declares health fatal, so nothing stops.
-const WITHOUT_STOP = MODULE.replace('\n  stop\n', '\n');
+const WITHOUT_STOP = MODULE.split('\n')
+  .filter((line) => line.trim() !== 'stop')
+  .join('\n');
 
 function started(source = MODULE): { registry: Registry; state: GameState } {
   const registry = loadModule(source);
@@ -162,7 +176,7 @@ function started(source = MODULE): { registry: Registry; state: GameState } {
 
 function fighting(source = MODULE): { registry: Registry; state: GameState } {
   const started_ = started(source);
-  armAction('entity', 'giant-rat', 'fight', started_.registry, started_.state);
+  armFightAction('fight', 'giant-rat', started_.registry, started_.state);
   return started_;
 }
 
@@ -196,10 +210,12 @@ describe('a pool running out stops the fight', () => {
     const { registry, state } = fighting(WITHOUT_STOP);
     resolve(state, registry, secondsToMs(300));
 
-    // The engine has no opinion about a pool named `health`.
+    // The engine has no opinion about a pool named `health`: the player fights
+    // on through an empty one and fells the rat at t=240, which is the fact the
+    // fatal reading above rules out.
     expect(state.resources['health']).toBe(0);
-    expect(state.activeAction).not.toBeNull();
     expect(state.inventory['rat-tail']).toBe(1);
+    expect(state.populations['den']['giant-rat']).toEqual({ down: 1, due: [] });
   });
 
   it('runs the rest of the on-empty block, which is where losing your things lives', () => {
@@ -259,7 +275,10 @@ describe('a pool running out stops the fight', () => {
 describe('`stop` among an action’s own results', () => {
   function stopping(entity: string, action: string): { registry: Registry; state: GameState } {
     const s = started();
-    armAction('entity', entity, action, s.registry, s.state);
+    // A two-sided action is reached by id and applied to what it names; a
+    // one-sided one is offered by the object that owns it.
+    if (s.registry.actions.has(action)) armFightAction(action, entity, s.registry, s.state);
+    else armAction('entity', entity, action, s.registry, s.state);
     return s;
   }
 
@@ -347,7 +366,7 @@ describe('a start condition that stops holding', () => {
   it('ends a per-attempt fight the same way', () => {
     const { registry, state } = started();
     state.flags['training-post.permitted'] = true;
-    armAction('entity', 'training-post', 'drill', registry, state);
+    armFightAction('drill', 'training-post', registry, state);
 
     // 30 health at 10 a hit is 3 swings, so a fight turns over every 7.2s.
     resolve(state, registry, secondsToMs(15));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armAction, createGameState, GameState, initResources, resolve } from './runtime';
+import { armFightAction, createGameState, GameState, initResources, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { secondsToMs } from './units';
 
@@ -25,14 +25,14 @@ base: 100
 
 # resource vigor
 max: max-vigor
-on empty:
-  say: You are spent.
-  set: spent
-  stop
 
 # resource stamina
 rate: foe-regen
 max: foe-max
+
+# event spending
+resource: vigor
+trigger: on empty
 
 # flag spent
 
@@ -41,29 +41,40 @@ max: foe-max
 # location pit
 x: 0, y: 0
 starting
-entities: brute
+entities: 3 brute
+
+# action wear-down
+title: wear-down
+rate: my swing-rate
+damage: my attack
+depletes: their stamina
+
+# action grind-down
+title: grind-down
+continuous
+rate: my swing-rate
+damage: my attack
+depletes: their stamina
+give: trophy
+on success:
+  drain: 12 vigor
+
+# entity player
+stats: max-vigor 30, attack 5, swing-rate 60
+uses: wear-down, grind-down
+on spending:
+  say: You are spent.
+  set: spent
+  stop
 
 # entity brute
 stats: foe-max 100, foe-regen 7
-wear-down:
-  rate: swing-rate
-  target: stamina
-  ability: attack
-
-grind-down:
-  continuous
-  rate: swing-rate
-  target: stamina
-  ability: attack
-  give: trophy
-  on success:
-    drain: 12 vigor
 `;
 
 function fighting(registry: Registry, label: string): GameState {
   const state = createGameState('pit');
   initResources(state, registry);
-  armAction('entity', 'brute', label, registry, state);
+  armFightAction(label, 'brute', registry, state);
   return state;
 }
 
