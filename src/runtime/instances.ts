@@ -28,7 +28,7 @@ export interface InstanceTable {
 
 // The one cast that opens the table for writing, so every write above is in
 // this file and a consumer holding a table cannot reach past its kind.
-function open(table: InstanceTable): { next: number; byId: Record<string, Instance> } {
+function writable(table: InstanceTable): { next: number; byId: Record<string, Instance> } {
   return table as { next: number; byId: Record<string, Instance> };
 }
 
@@ -48,6 +48,8 @@ export interface InstanceKind<P = unknown> {
   // Everything the payload names that may have gone — a declaration out of the
   // registry, another instance — repaired in place, one returned reason per
   // repair. `live` is the substrate's answer, so a kind never asks the table.
+  // Called until the table settles, so a payload with nothing left to repair
+  // must return nothing rather than repeat what it already reported.
   repair(payload: P, registry: Registry, live: (id: string) => boolean): string[];
 }
 
@@ -77,7 +79,7 @@ export function createInstance(state: GameState, kind: string, template: string,
   if (!definition.holds(payload)) throw new RuntimeError(`instance kind ${kind} does not keep ${JSON.stringify(payload)}`);
   if (definition.empty(payload as never)) throw new RuntimeError(`instance kind ${kind} was handed a payload recording nothing; a copy carrying nothing is a template`);
 
-  const table = open(state.instances);
+  const table = writable(state.instances);
   const id = String(table.next);
   table.next += 1;
   table.byId[id] = { kind, template, payload };
@@ -96,22 +98,22 @@ export function instanceIsLive(state: GameState, id: string): boolean {
 
 export function removeInstance(state: GameState, id: string): boolean {
   if (!instanceIsLive(state, id)) return false;
-  delete open(state.instances).byId[id];
+  delete writable(state.instances).byId[id];
   return true;
 }
 
 // Offered rather than enforced: whoever empties a payload decides when the copy
 // rejoins its stack, and only its kind can say the payload is empty.
 export function collapseInstance(state: GameState, id: string): boolean {
-  const held = state.instances.byId[id];
+  const held = instance(state, id);
   const definition = held && kindOf(held.kind);
   if (!definition || !definition.empty(held.payload as never)) return false;
-  delete open(state.instances).byId[id];
+  delete writable(state.instances).byId[id];
   return true;
 }
 
 export function pruneInstances(state: GameState, registry: Registry): PruneWarning[] {
-  const table = open(state.instances);
+  const table = writable(state.instances);
   const warnings: PruneWarning[] = [];
   const warn = (id: string, message: string): void => {
     warnings.push({ path: `instances.${id}`, id, message });

@@ -267,6 +267,26 @@ describe('content moving underneath an instance', () => {
     expect([doomed, middle, outer].map((id) => instanceIsLive(state, id))).toEqual([false, false, false]);
   });
 
+  it('reports a repair once however many rounds the table takes to settle', () => {
+    const state = initialState(loadModule(MODULE));
+    // Minted against the iteration order on purpose: outer is walked before
+    // the middle it points at empties, so its own repair cannot happen until a
+    // second round — and the survivor is walked in both of them.
+    const survivor = createInstance(state, TOKEN, 'token', token({ notes: ['outlives it'] }));
+    const outer = createInstance(state, TOKEN, 'token', token({ notes: ['outlives it too'] }));
+    const doomed = createInstance(state, TOKEN, 'charm', token({ notes: ['worn'] }));
+    const middle = createInstance(state, TOKEN, 'token', token({ linked: [doomed] }));
+    (instance(state, outer)!.payload as Token).linked.push(middle);
+    (instance(state, survivor)!.payload as Token).linked.push(doomed);
+
+    const warnings = pruneStateForRegistry(state, loadModule(WITHOUT_CHARM));
+    expect(Object.keys(state.instances.byId)).toEqual([survivor, outer]);
+    expect((instance(state, outer)!.payload as Token).linked).toEqual([]);
+    expect(warnings.filter((warning) => warning.id === survivor)).toEqual([
+      { path: `instances.${survivor}`, id: survivor, message: `Repaired instance ${survivor}: dropped link to instance ${doomed}, which is gone.` },
+    ]);
+  });
+
   it('settles the table before any other rule runs, so a field holding an id asks an answer that is final', () => {
     const state = initialState(loadModule(MODULE));
     state.inventory.charm = 2;
