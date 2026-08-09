@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { armAction, createGameState, GameState, initResources, PLAYER, resolve, statRange, statValue, useAction } from './runtime';
+import { armAction, armFightAction, createGameState, GameState, initResources, PLAYER, resolve, statRange, statValue, useFight } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';
@@ -25,44 +25,64 @@ base: 30
 # resource health
 rate: regeneration
 max: max-health
-on empty:
-  say: You black out.
+
+# stat max-sawdust
+base: 8
+
+# resource sawdust
+max: max-sawdust
+
+# event death
+resource: health
+trigger: on empty
 
 # item straw
 examine: A fistful of straw.
 
+# action strike
+title: strike
+continuous
+time: 1
+damage: my attack vs their dr
+depletes: their health
+
+# action flail
+title: flail
+continuous
+time: 1
+damage: my wild-attack vs their dr
+depletes: their health
+
+# action chip
+title: chip
+time: 1
+damage: my attack vs their dr
+depletes: their health
+
+# entity player
+stats: max-health 30, attack 10, wild-attack 4-7
+uses: strike, flail, chip
+on death:
+  say: You black out.
+
 # entity training-dummy
 flags: dummies-felled
 stats: max-health 12, dr 2
-strike:
-  continuous
-  time: 1
-  target: health
-  ability: attack
-  dr: dr
-  on success:
-    add: dummies-felled 1
+on death:
+  add: dummies-felled 1
+  restore: 4 sawdust
 
 # entity straw-man
 stats: max-health 40, dr 1
-flail:
-  continuous
-  time: 1
-  target: health
-  ability: wild-attack
-  dr: dr
-  give: 1 straw
+on death:
+  credit:
+    give: 1 straw
 
 # entity iron-golem
 stats: max-health 3, dr 99
-chip:
-  time: 1
-  target: health
-  ability: attack
-  dr: dr
 
 # entity anvil
-// No target: — an ordinary action, which must open no encounter at all.
+// One-sided — an ordinary action, which must open no encounter at all.
 dent:
   time: 1
   say: Clang.
@@ -108,14 +128,14 @@ describe('# entity stats: — an actor sheet', () => {
 });
 
 describe('encounter state', () => {
-  it('arms a target: action with the fought entity and its own pools', () => {
+  it('arms a two-sided action with the fought entity and its own pools', () => {
     const registry = loaded();
     const state = started(registry);
-    armAction('entity', 'training-dummy', 'strike', registry, state);
+    armFightAction('strike', 'training-dummy', registry, state);
 
     // 12, from the dummy's own max-health — not the player's 30, and its own
     // rate remainders, which start empty because no span has settled yet.
-    expect(state.activeAction!.actors).toEqual({ 'training-dummy': { resources: { health: toMilliUnits(12) }, rateRemainders: {} } });
+    expect(state.activeAction!.actors).toEqual({ 'training-dummy': { resources: { health: toMilliUnits(12), sawdust: toMilliUnits(8) }, rateRemainders: {} } });
     expect(state.resources['health']).toBe(toMilliUnits(30));
   });
 
@@ -126,11 +146,11 @@ describe('encounter state', () => {
     const state = started(registry);
     expect(state.resources['health']).toBe(toMilliUnits(5)); // the player does begin there
 
-    armAction('entity', 'training-dummy', 'strike', registry, state);
+    armFightAction('strike', 'training-dummy', registry, state);
     expect(state.activeAction!.actors!['training-dummy'].resources.health).toBe(toMilliUnits(12));
   });
 
-  it('opens no encounter for an action that names no target', () => {
+  it('opens no encounter for a one-sided action', () => {
     const registry = loaded();
     const state = started(registry);
     armAction('entity', 'anvil', 'dent', registry, state);
@@ -140,7 +160,7 @@ describe('encounter state', () => {
   it('survives a save round-trip', () => {
     const registry = loaded();
     const state = started(registry);
-    armAction('entity', 'training-dummy', 'strike', registry, state);
+    armFightAction('strike', 'training-dummy', registry, state);
 
     const diff = diffState(state, initialState(registry));
     const restored = createGameState();
@@ -153,7 +173,7 @@ describe('damage against a target pool', () => {
   it('drains the target by attack minus its own dr, truncated', () => {
     const registry = loaded();
     const state = started(registry);
-    useAction('entity', 'training-dummy', 'strike', registry, state); // one attempt
+    useFight('strike', 'training-dummy', registry, state); // one attempt
 
     expect(state.time).toBe(secondsToMs(1));
     expect(state.activeAction!.actors!['training-dummy'].resources.health).toBe(toMilliUnits(4)); // 12 - (10 - 2)
@@ -162,7 +182,7 @@ describe('damage against a target pool', () => {
   it('ends the fight when the pool empties, firing on success, and stands a fresh target up', () => {
     const registry = loaded();
     const state = started(registry);
-    useAction('entity', 'training-dummy', 'strike', registry, state);
+    useFight('strike', 'training-dummy', registry, state);
     resolve(state, registry, secondsToMs(2)); // second hit takes 4 -> 0
 
     expect(state.flags['training-dummy.dummies-felled']).toBe(1); // entity-scoped, as any bare counter is
@@ -170,12 +190,18 @@ describe('damage against a target pool', () => {
     expect(state.time).toBe(secondsToMs(2));
   });
 
-  it('never fires the pool on empty block for a non-player actor', () => {
+  // The dummy's handler writes to a pool the dummy carries, so the subject is
+  // what this reads: rewriting it to the player would move the sawdust onto the
+  // player's own store, which the second assertion rules out.
+  it('runs the felled actor own handler on the felled actor', () => {
     const registry = loaded();
     const state = started(registry);
-    useAction('entity', 'training-dummy', 'strike', registry, state);
+    (state.resources as Record<string, number>)['sawdust'] = 0;
+    useFight('strike', 'training-dummy', registry, state);
     resolve(state, registry, secondsToMs(10));
 
+    expect(state.activeAction!.actors!['training-dummy'].resources['sawdust']).toBeGreaterThan(0);
+    expect(state.resources['sawdust']).toBe(0);
     // "You black out." belongs to the player's health, not a felled dummy's.
     expect(state.log).not.toContain('You black out.');
     expect(state.resources['health']).toBe(toMilliUnits(30));
@@ -185,7 +211,7 @@ describe('damage against a target pool', () => {
     const registry = loaded();
     const state = started(registry);
     // dr 99 against a flat 10 attack: every hit lands for exactly 1.
-    useAction('entity', 'iron-golem', 'chip', registry, state);
+    useFight('chip', 'iron-golem', registry, state);
     expect(state.activeAction!.actors!['iron-golem'].resources.health).toBe(toMilliUnits(2));
 
     resolve(state, registry, secondsToMs(3));
@@ -195,7 +221,7 @@ describe('damage against a target pool', () => {
   it('samples ranged damage per hit rather than averaging it', () => {
     const registry = loaded();
     const state = started(registry);
-    armAction('entity', 'straw-man', 'flail', registry, state);
+    armFightAction('flail', 'straw-man', registry, state);
 
     const levels: number[] = [];
     for (let t = 1; t <= 8; t++) {
@@ -210,12 +236,12 @@ describe('damage against a target pool', () => {
   });
 });
 
-describe('a target: action resolves per attempt, and stays associative doing it', () => {
+describe('a two-sided action resolves per attempt, and stays associative doing it', () => {
   it('matches one jump against random split points, pools and rng alike', () => {
     const registry = loaded();
     function fighting(): GameState {
       const state = started(registry);
-      armAction('entity', 'straw-man', 'flail', registry, state);
+      armFightAction('flail', 'straw-man', registry, state);
       return state;
     }
 

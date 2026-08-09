@@ -87,11 +87,11 @@ describe('approved mod issues', () => {
   // renamed pointing at a section the published mod no longer contains — so
   // the published module fails to load, blaming the contributor.
   it('carries every section kind through the rename, so the published module still loads', () => {
-    const local = [LOCAL, '# entitytype foe', 'fight:', '  continuous', '  rate: local-changes.vigor', '  say: Swing.', '', '# entity rat', 'type: local-changes.foe'].join('\n');
+    const local = [LOCAL, '# action foe-swing', 'title: Swing', 'continuous', 'rate: local-changes.vigor', 'say: Swing.', '', '# entity rat', 'uses: local-changes.foe-swing'].join('\n');
     const materialized = materialize({ number: 44, title: 'Foes', body: issueBody(local) });
 
-    expect(materialized.text).toContain('# entitytype foe');
-    expect(materialized.text).toContain('type: approved-mod-44.foe');
+    expect(materialized.text).toContain('# action foe-swing');
+    expect(materialized.text).toContain('uses: approved-mod-44.foe-swing');
     expect(() => loadUniverse([...base, { name: materialized.file, text: materialized.text }])).not.toThrow();
   });
 

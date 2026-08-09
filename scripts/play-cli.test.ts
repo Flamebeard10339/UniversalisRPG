@@ -534,7 +534,7 @@ title: Bell
 ring:
   continuous
   rate: taps-per-minute
-  ability: tap
+  damage: tap
 `;
 
   it('counts an untargeted action’s swings down to its completion instead of a foe’s pool', () => {
@@ -804,7 +804,7 @@ describe('play-cli local DSL authoring', () => {
     expect(registry.skills.get('local-changes.focus')?.['stat-id']).toBe('local-changes.vigor');
     expect(registry.items.get('local-changes.token')?.title).toBe('Token');
     expect(registry.entities.get('local-changes.npc')?.actions).toEqual([{ label: 'cheer', results: [{ kind: 'say', text: 'Hello.' }] }]);
-    expect(registry.locations.get('local-changes.grove')).toMatchObject({ x: 1, y: 0, entities: ['local-changes.npc'] });
+    expect(registry.locations.get('local-changes.grove')).toMatchObject({ x: 1, y: 0, entities: [{ entity: 'local-changes.npc' }] });
     expect(registry.flags.has('local-changes.levered')).toBe(true);
     expect(registry.variables.get('local-knob')?.value).toBe(2);
     expect(registry.resources.get('local-changes.stamina')?.max).toBe('local-changes.vigor');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { armAction, createGameState, GameState, initResources, PLAYER, resolve } from './runtime';
+import { armFightAction, createGameState, GameState, initResources, PLAYER, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { startSession, view } from './session';
 import { attemptDuration } from './stats';
@@ -8,7 +8,7 @@ import { secondsToMs, toMilliUnits } from './units';
 
 // `rate:` is attempts per minute, read straight off the stat: player 25/min =
 // 2.4s, rat 16/min = 3.75s, hasted 31.25/min = 1.92s.
-// giant-rat carries a deep pool; punchbag has no `retaliates` and keeps no clock.
+// giant-rat carries a deep pool; punchbag `uses:` nothing and keeps no clock.
 const MODULE = `
 # stat attack
 base: 10
@@ -26,53 +26,67 @@ base: 100
 # resource health
 rate: regeneration
 max: max-health
-on empty:
-  say: You black out.
+
+# event death
+resource: health
+trigger: on empty
 
 # item rat-tail
 examine: Still twitching.
+
+# stat max-carapace
+
+# resource carapace
+max: max-carapace
 
 # location den
 x: 0, y: 0
 starting
 entities: giant-rat, punchbag
 
-# entitytype melee-foe
-fight:
-  continuous
-  rate: attack-rate
-  target: health
-  ability: attack
-  dr: dr
-bite:
-  retaliates
-  rate: attack-rate
-  target: health
-  ability: attack
-  dr: dr
+# action fight
+title: fight
+continuous
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their health
+
+// First in the rat's uses: list, and reaching a pool the player does not
+// carry, so order alone would pick it and the pool rule is what does not.
+# action shell-crack
+title: shell-crack
+continuous
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their carapace
+
+# entity player
+stats: attack 10, dr 0, max-health 100, attack-rate 25
+uses: fight
+on death:
+  say: You black out.
 
 # entity giant-rat
-type: melee-foe
-stats: attack 4, dr 2, max-health 1000, attack-rate 16
-fight:
-  give: 1 rat-tail
+stats: attack 4, dr 2, max-health 10000, attack-rate 16
+uses: shell-crack, fight
+on death:
+  credit:
+    give: 1 rat-tail
 
-// The same foe minus its answer: dropping the inherited retaliation is what
+// The same foe with no uses: line. Nothing to swing back with, which is what
 // makes this one a punchbag rather than a second rat.
 # entity punchbag
-type: melee-foe
 stats: max-health 24, dr 0
--bite:
 `;
 
 function loaded(): Registry {
   return loadModule(MODULE);
 }
 
-function fighting(registry: Registry, entityId = 'giant-rat', label = 'fight'): GameState {
+function fighting(registry: Registry, entityId = 'giant-rat', action = 'fight'): GameState {
   const state = createGameState('den');
   initResources(state, registry);
-  armAction('entity', entityId, label, registry, state);
+  armFightAction(action, entityId, registry, state);
   return state;
 }
 
@@ -97,7 +111,7 @@ describe('independent cadences', () => {
     resolve(state, registry, secondsToMs(12));
 
     // player attack 10 - rat dr 2 = 8, five times
-    expect(ratOf(state).resources.health).toBe(toMilliUnits(1000 - 5 * 8));
+    expect(ratOf(state).resources.health).toBe(toMilliUnits(10000 - 5 * 8));
     // rat attack 4 - player dr 0 = 4, three times
     expect(state.resources['health']).toBe(toMilliUnits(100 - 3 * 4));
   });
@@ -111,24 +125,27 @@ describe('independent cadences', () => {
     expect(state.resources['health']).toBe(toMilliUnits(100)); // nothing swings back
   });
 
-  it('stands a fresh target up with a restarted clock, not the dead one half-swing', () => {
+  // The den holds one punchbag and it declares no respawn, so the fight is over
+  // when it goes down rather than standing a fresh one up out of nothing.
+  it('ends the fight when the last of a population is down', () => {
     const registry = loaded();
     const state = fighting(registry, 'punchbag');
-    // 24 hp at 10 a hit: three swings, so the fight turns over at t=7.2.
+    // 24 hp at 10 a hit: three swings, so it falls at t=7.2.
     resolve(state, registry, secondsToMs(8));
 
     expect(state.inventory['rat-tail']).toBeUndefined();
-    expect(state.activeAction!.actors!['punchbag'].resources.health).toBe(toMilliUnits(24)); // refilled
-    expect(playerClock(state).attemptsMade).toBe(0);
+    expect(state.activeAction).toBeNull();
+    expect(state.populations['den']['punchbag']).toEqual({ down: 1, due: [] });
   });
 
-  it('keeps a retaliation out of the player choice list', () => {
+  // One block, brought by whoever swings: the player is offered its own copy
+  // against each foe, and the rat's copy is never a choice of the player's.
+  it('offers the two-sided action once per foe, and never as the foe own move', () => {
     const registry = loaded();
     const session = startSession(registry);
-    const labels = view(session).choices.map((choice) => choice.label);
+    const choices = view(session).choices.filter((choice) => choice.label === 'fight');
 
-    expect(labels).toContain('fight');
-    expect(labels).not.toContain('bite'); // the rat's move, never the player's
+    expect(choices.map((choice) => choice.id)).toEqual(['fight:fight:giant-rat', 'fight:fight:punchbag']);
   });
 });
 
@@ -217,20 +234,29 @@ describe('the rat sheet', () => {
     expect(registry.entities.get('giant-rat')!.stats).toEqual({
       attack: point(4),
       dr: point(2),
-      'max-health': point(1000),
+      'max-health': point(10000),
       'attack-rate': point(16),
     });
-    expect(registry.entities.get('giant-rat')!.actions.find((a) => a.label === 'bite')!.retaliates).toBe(true);
   });
 
-  it('rejects a retaliation with nothing to hit', () => {
-    expect(() => loadModule('# entity ghost\nwail:\n  retaliates\n  time: 60\n')).toThrow(/requires a target: pool/);
+  // `uses:` order is the tiebreak, and the pool the attacker carries is the
+  // filter: `shell-crack` comes first and reaches a pool the player has none of.
+  it('answers with the first action in uses: whose depletes: names a pool the attacker has', () => {
+    const registry = loaded();
+    const state = fighting(registry);
+    expect(state.activeAction!.roster!['giant-rat']).toEqual({ ownerRef: 'action.fight', actionLabel: 'fight', target: PLAYER });
+
+    // The same rat against a target that DOES carry a carapace answers with the
+    // earlier one, so the order is doing work rather than the filter alone.
+    const shelled = loadModule(MODULE.replace('stats: attack 10, dr 0, max-health 100, attack-rate 25', 'stats: attack 10, dr 0, max-health 100, max-carapace 20, attack-rate 25'));
+    const against = fighting(shelled);
+    expect(against.activeAction!.roster!['giant-rat'].actionLabel).toBe('shell-crack');
   });
 
-  it('rejects a second retaliation instead of leaving it dead', () => {
-    expect(() => loadModule(`${MODULE}\n# entity giant-rat\nclaw:\n  retaliates\n  time: 60\n  target: health\n`)).toThrow(
-      /retaliating action "claw" conflicts with "bite"; only one retaliates action is supported/,
-    );
+  it('gives an entity that uses nothing no answer at all, and no attack-rate of 0 to write', () => {
+    const registry = loaded();
+    const state = fighting(registry, 'punchbag');
+    expect(state.activeAction!.roster!['punchbag']).toBeUndefined();
   });
 });
 
@@ -244,11 +270,12 @@ describe('rate: as the per-minute cadence, to the millisecond', () => {
     const registry = loaded();
     const state = fighting(registry);
 
-    expect(attemptDuration(action(registry, 'giant-rat', 'fight'), state, registry)).toBe(secondsToMs(2.4));
-    expect(attemptDuration(action(registry, 'giant-rat', 'bite'), state, registry, 'giant-rat')).toBe(secondsToMs(3.75));
+    const fight = registry.actions.get('fight')!;
+    expect(attemptDuration(fight, state, registry)).toBe(secondsToMs(2.4));
+    expect(attemptDuration(fight, state, registry, 'giant-rat')).toBe(secondsToMs(3.75));
 
     state.activeBuffs['haste:attack-rate'] = { statId: 'attack-rate', amount: 0.25, kind: 'increased', expiresAt: secondsToMs(60) };
-    expect(attemptDuration(action(registry, 'giant-rat', 'fight'), state, registry)).toBe(secondsToMs(1.92));
+    expect(attemptDuration(fight, state, registry)).toBe(secondsToMs(1.92));
   });
 
   it('takes a flat per-minute literal, where 15 is the 4s the oven used to write as time: 4', () => {

@@ -115,7 +115,7 @@ base: 0.34
 // of becoming a recipe (recipes always compile to completion in one attempt).
 chop:
   continuous
-  ability: chop-power
+  damage: chop-power
   time: 1
   give: 1 wood
 
@@ -126,7 +126,7 @@ chop:
 # entity mill
 press:
   continuous
-  ability: chop-power
+  damage: chop-power
   time: 1
   take: 1 raw-shrimp
   give: 1 wood
@@ -189,7 +189,7 @@ function loaded(): Registry {
 // depend on guessing the compiled action's label text.
 function recipeActive(registry: Registry, recipeId: string): ActiveAction {
   const action = registry.recipeActions.get(recipeId)!;
-  return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.kind === 'continuous', implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
+  return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.kind === 'continuous', implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, target: recipeId } } };
 }
 
 function withCampfireCooking(registry: Registry, buffed: boolean): GameState {
@@ -280,7 +280,7 @@ describe('resolve: direct pool writes stay associative alongside a rate', () => 
   function draining(registry: Registry, entityId: string, label: string): GameState {
     const state = createGameState('nowhere');
     initResources(state, registry);
-    state.activeAction = { ownerRef: `entity.${entityId}`, actionLabel: label, repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
+    state.activeAction = { ownerRef: `entity.${entityId}`, actionLabel: label, repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: `entity.${entityId}`, actionLabel: label, target: entityId } } };
     return state;
   }
 
@@ -497,7 +497,7 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
 
 // grill-cook is STOCHASTIC (cooking 100 vs complexity 60 => ~0.72, and a miss on
 // the one attempt a craft gets fails to `burnt`, since accuracy compiles to
-// escape after 1). tree is DETERMINISTIC: health 3 at 1/hit is always 3 attempts.
+// attempts: 1). tree is DETERMINISTIC: health 3 at 1/hit is always 3 attempts.
 function withGrillCooking(registry: Registry, rawShrimp: number): GameState {
   const state = createGameState('nowhere');
   state.inventory['raw-shrimp'] = rawShrimp;
@@ -507,7 +507,7 @@ function withGrillCooking(registry: Registry, rawShrimp: number): GameState {
 
 function withTreeChopping(): GameState {
   const state = createGameState('nowhere');
-  state.activeAction = { ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
+  state.activeAction = { ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: 'tree' } } };
   return state;
 }
 
@@ -549,7 +549,7 @@ describe('resolve: stochastic associativity — the accuracy/RNG core gate', () 
   });
 });
 
-describe('resolve: raw-to-burnt outcome distribution (accuracy < 1, escape after 1)', () => {
+describe('resolve: raw-to-burnt outcome distribution (accuracy < 1, attempts: 1)', () => {
   it('produces both cooked and burnt outcomes over many fights, each consuming exactly one raw input, cooked + burnt totaling the fight count', () => {
     const registry = loaded();
     const fights = 500;
@@ -574,15 +574,15 @@ describe('resolve: deterministic multi-hit fights (implicit target, no accuracy)
     const oneShot = withTreeChopping();
     resolve(oneShot, registry, secondsToMs(3)); // exactly one full fight (3 attempts * 1s)
     expect(oneShot.inventory['wood']).toBe(1);
-    expect(oneShot.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1), cadences: { [PLAYER]: newCadence() } }); // rearmed fresh
+    expect(oneShot.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1), cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: 'tree' } } }); // rearmed fresh
 
     const midFight = withTreeChopping();
     resolve(midFight, registry, secondsToMs(1)); // 1 of 3 attempts
-    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 1 } } });
+    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 1 } }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: 'tree' } } });
     expect(midFight.inventory['wood'] ?? 0).toBe(0);
 
     resolve(midFight, registry, secondsToMs(2)); // 2 of 3 attempts
-    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - 2 * toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 2 } } });
+    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - 2 * toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 2 } }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionLabel: 'chop', target: 'tree' } } });
 
     resolve(midFight, registry, secondsToMs(3)); // completes the fight
     expect(midFight.inventory['wood']).toBe(1);
@@ -597,7 +597,7 @@ describe('resolve: onSuccess batches per completion, not per segment (Pass-1 reg
 
     function withKilnFiring(): GameState {
       const state = createGameState('nowhere');
-      state.activeAction = { ownerRef: 'entity.kiln', actionLabel: 'fire', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
+      state.activeAction = { ownerRef: 'entity.kiln', actionLabel: 'fire', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.kiln', actionLabel: 'fire', target: 'kiln' } } };
       return state;
     }
 
@@ -649,8 +649,10 @@ base: 100
 # resource hp
 rate: regen-rate
 max: max-hp
-on empty:
-  set: fainted
+
+# event fainting
+resource: hp
+trigger: on empty
 
 # stat spark-rate
 base: 0
@@ -662,7 +664,15 @@ base: 3
 rate: spark-rate
 max: spark-cap
 start: 0
-on full:
+
+# event sparked
+resource: spark
+trigger: on full
+
+# entity player
+on fainting:
+  set: fainted
+on sparked:
   give: 1 ember
 
 # entity engine
@@ -686,7 +696,11 @@ base: 1
 rate: charge-rate
 max: charge-cap
 start: 0
-on full:
+# event charged
+resource: charge
+trigger: on full
+# entity player
+on charged:
   give: 1 spark
 `);
     const state = createGameState();
@@ -711,7 +725,11 @@ base: 5
 # resource pond
 rate: still-rate
 max: still-cap
-on empty:
+# event dried
+resource: pond
+trigger: on empty
+# entity player
+on dried:
   set: dry
 `);
     const state = createGameState();
@@ -735,7 +753,7 @@ describe('resolve: resource associativity (the invariant, extended to pools)', (
     function fresh(): GameState {
       const state = createGameState();
       initResources(state, registry); // hp = 100 (full), spark = 0
-      state.activeAction = { ownerRef: 'entity.engine', actionLabel: 'run', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
+      state.activeAction = { ownerRef: 'entity.engine', actionLabel: 'run', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.engine', actionLabel: 'run', target: 'engine' } } };
       return state;
     }
 
@@ -915,7 +933,11 @@ base: 10
 rate: seep-rate
 max: seep-cap
 start: 10
-on empty:
+# event dried
+resource: pool
+trigger: on empty
+# entity player
+on dried:
   set: dry
 `);
     const state = createGameState();
@@ -941,7 +963,11 @@ base: 10
 rate: leak-rate
 max: leak-cap
 start: 10
-on empty:
+# event dried
+resource: pool
+trigger: on empty
+# entity player
+on dried:
   set: dry
 `);
     const state = createGameState();
@@ -957,7 +983,7 @@ on empty:
     const registry = loaded();
     const state = createGameState('nowhere');
     state.inventory['raw-shrimp'] = 1;
-    state.activeAction = { ownerRef: 'entity.mill', actionLabel: 'press', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL - 3 * toMilliUnits(0.34), cadences: { [PLAYER]: { progress: 0, attemptsMade: 3 } } };
+    state.activeAction = { ownerRef: 'entity.mill', actionLabel: 'press', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL - 3 * toMilliUnits(0.34), cadences: { [PLAYER]: { progress: 0, attemptsMade: 3 } }, roster: { [PLAYER]: { ownerRef: 'entity.mill', actionLabel: 'press', target: 'mill' } } };
 
     resolve(state, registry, secondsToMs(10));
 

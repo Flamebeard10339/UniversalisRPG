@@ -1,11 +1,14 @@
 import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { point } from '../grammar/range';
-import { Action, actionProblem, actionTableProblem } from '../grammar/action';
+import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields } from '../grammar/action';
+import { Condition } from '../grammar/condition';
 import { Dialogue } from './dialogue';
 import { DropTable } from './dropTable';
-import { Entity, entitySchema } from './entity';
-import { EntityType, entityTypeSchema } from './entityType';
+import { ActionDeclaration } from './action';
+import { AuthoredEntity, Entity, EntityBlock, entitySchema, Handler, isHandlerBlock } from './entity';
+import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
+import { GameEvent, eventSchema } from './event';
 import { Item, itemSchema } from './item';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
 import { mergeSection } from './merge';
@@ -14,7 +17,7 @@ import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseMod
 import { DslError, Span } from '../grammar/parser';
 import { Namespace } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
-import { registryCapabilities, validateDialogueReferences, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
+import { registryCapabilities, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
 import { ReferenceKind, Visit, visitAction, visitSection } from './referenceSites';
 import { Removal } from './removal';
 import { declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
@@ -30,7 +33,15 @@ import { Variable, variableSchema } from './variable';
 
 export interface Registry {
   entities: Map<string, Entity>;
-  entityTypes: Map<string, EntityType>;
+  actions: Map<string, ActionDeclaration>;
+  events: Map<string, GameEvent>;
+  factions: Map<string, Faction>;
+  // Membership as a mask, so hostility is one `and`. Compiled from declaration
+  // order, because names are authored and bits are not.
+  factionBits: Map<string, number>;
+  // The entity the runtime plays as, found by name rather than privileged: the
+  // grammar reads nothing from it that it does not read from a rat.
+  player?: Entity;
   locations: Map<string, Location>;
   items: Map<string, Item>;
   stats: Map<string, Stat>;
@@ -54,7 +65,9 @@ export interface Registry {
 // every section a reference can be authored inside.
 export const CONTENT_SECTION_MAPS: readonly (readonly [string, keyof Registry])[] = [
   ['entity', 'entities'],
-  ['entitytype', 'entityTypes'],
+  ['action', 'actions'],
+  ['event', 'events'],
+  ['faction', 'factions'],
   ['location', 'locations'],
   ['item', 'items'],
   ['stat', 'stats'],
@@ -111,22 +124,23 @@ function recipeAction(recipe: Recipe): Action {
   // used, which is `instant` in the vocabulary this compiles into. Whatever was
   // authored is carried through unexamined, so the same table that judges an
   // authored action judges this one rather than a recipe-shaped copy of it.
-  const cadence = recipe.rate !== undefined ? { rate: recipe.rate } : recipe.time !== undefined ? { time: recipe.time } : {};
+  const rate = typeof recipe.rate === 'string' ? { id: recipe.rate } : recipe.rate;
+  const cadence: Pick<Action, 'rate' | 'time'> = rate !== undefined ? { rate } : recipe.time !== undefined ? { time: recipe.time } : {};
   const action: Action = {
     label: `Craft ${humanize(recipe.id)}`,
     kind: 'rate' in cadence || 'time' in cadence ? 'continuous' : 'instant',
     results,
     ...cadence,
-    accuracy: recipe.accuracy,
-    evasion: recipe.evasion,
+    // One-sided: a craft has one participant, so neither half names a side.
+    ...(recipe.accuracy ? { accuracy: { left: { id: recipe.accuracy }, ...(recipe.evasion ? { right: { id: recipe.evasion } } : {}) } } : {}),
   };
 
   if (recipe.accuracy) {
     // The fail path consumes the SAME inputs as success, so inputLimit still
     // bounds a repeating burn-capable craft.
-    action.escapeAfter = 1;
+    action.attempts = 1;
     const burnt: ActionResult[] = recipe.burnt.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
-    action.onEscape = [...takes, ...burnt];
+    action.onUnfinished = [...takes, ...burnt];
   }
 
   return action;
@@ -135,7 +149,10 @@ function recipeAction(recipe: Recipe): Action {
 function emptyRegistry(): Registry {
   return {
     entities: new Map(),
-    entityTypes: new Map(),
+    actions: new Map(),
+    events: new Map(),
+    factions: new Map(),
+    factionBits: new Map(),
     locations: new Map(),
     items: new Map(),
     stats: new Map(),
@@ -197,27 +214,27 @@ export function formatModuleDiagnostic(value: ModuleDiagnostic): string {
 function applySection(registry: Registry, section: ModuleSection): void {
   switch (section.kind) {
     case 'entity': {
-      const entity = hydrateSection(section.value as Authored<Entity>, entitySchema);
-      let retaliation: Action | undefined;
-      for (const action of entity.actions) {
-        // Without a pool to drain, a retaliation falls through to the fight's
-        // own hit counter and wears down the target instead of the player.
-        if (action.retaliates && !action.target) {
-          throw new DslError(`# entity ${entity.id}: retaliating action ${JSON.stringify(action.label)} requires a target: pool`);
-        }
-        if (action.retaliates) {
-          if (retaliation) {
-            throw new DslError(`# entity ${entity.id}: retaliating action ${JSON.stringify(action.label)} conflicts with ${JSON.stringify(retaliation.label)}; only one retaliates action is supported`);
-          }
-          retaliation = action;
-        }
-      }
-      registry.entities.set(entity.id, entity);
+      const entity = hydrateSection(section.value as Authored<AuthoredEntity>, entitySchema);
+      // `actions` and `handlers` are what `blocks` becomes once `uses:` can be
+      // read against the actions it names, which is after every section is in.
+      registry.entities.set(entity.id, { ...entity, actions: [], handlers: [] });
       break;
     }
-    case 'entitytype': {
-      const entityType = hydrateSection(section.value as Authored<EntityType>, entityTypeSchema);
-      registry.entityTypes.set(entityType.id, entityType);
+    case 'action': {
+      const action = section.value as ActionDeclaration;
+      registry.actions.set(action.id, action);
+      break;
+    }
+    case 'event': {
+      const event = hydrateSection(section.value as Authored<GameEvent>, eventSchema);
+      if (!event.resource) throw new DslError(`# event ${event.id} requires a resource: to watch`);
+      if (!event.trigger) throw new DslError(`# event ${event.id} requires a trigger:`);
+      registry.events.set(event.id, event);
+      break;
+    }
+    case 'faction': {
+      const faction = hydrateSection(section.value as Authored<Faction>, factionSchema);
+      registry.factions.set(faction.id, faction);
       break;
     }
     case 'location': {
@@ -303,34 +320,6 @@ interface BuildFailure {
   error: DslError;
 }
 
-// What an entity naming a `type:` is merged onto, in place of the nothing an
-// entity is normally created from. Everything an entity can say about an action
-// — override it, add one, remove one — then goes through the single merge rule
-// instead of a second one bolted on after the fact.
-//
-// Whether the section creates the entity or edits one that is already there is
-// not declared — it follows from what was loaded — so the template has to slide
-// underneath at whichever of the two first names a `type:`. What the entity
-// already held is treated as overrides of the template it just acquired, which
-// is the same relationship a first declaration's own blocks have to it.
-function entityTypeBase(merged: Map<string, Map<string, OwnedSection>>, section: ModuleSection, held: object | undefined): object | undefined {
-  if (section.kind !== 'entity') return held;
-  const entity = section.value as Authored<Entity>;
-  const already = (held as Authored<Entity> | undefined)?.type;
-  if (entity.type === undefined || entity.type === already) return held;
-  if (already !== undefined) throw new DslError(`# entity ${entity.id} is already type: ${already}, and an entity inherits one template`);
-
-  // A `type:` naming nothing is left for the reference check that owns that
-  // message for every kind; inheriting nothing is what an absent template means.
-  const template = merged.get('entitytype')?.get(entity.type)?.value as Authored<EntityType> | undefined;
-  if (!template) return held;
-  // The clone is load-bearing: reference resolution rewrote ids in place before
-  // this ran, and a template object reachable from two entities would be walked
-  // once per entity and bound to whichever went last.
-  const inherited = { id: entity.id, actions: structuredClone(template.actions ?? []) };
-  return held === undefined ? inherited : mergeSection('entity', inherited, held);
-}
-
 class DanglingReference extends Error {}
 
 const ownerKey = (kind: string, id: string): string => `${kind}\0${id}`;
@@ -375,28 +364,29 @@ interface ActionOwner {
   stats?: Record<string, unknown>;
 }
 
-function fightingOwnerProblem(action: Action, kind: string, owner: ActionOwner, registry: Registry): string | undefined {
-  if (action.target === undefined || kind === 'entitytype') return undefined;
-  if (kind !== 'entity') return `target: ${action.target} makes this a fight, and only a # entity can carry the stats: a fighter is measured by`;
-  if (action.retaliates) return undefined;
-  const max = registry.resources.get(action.target)?.max;
-  if (max === undefined || owner.stats?.[max] !== undefined) return undefined;
-  return `target: ${action.target} is measured by ${max}, which stats: does not set`;
-}
-
 // The grammar refuses an unauthorable action, but an action can also be
-// ASSEMBLED — merged onto a template, patched across modules, or compiled from a
-// recipe — and none of those went through the grammar. Same rule, applied where
-// the section that owns the action can name itself.
-function validateActionTable(kind: string, id: string, owner: ActionOwner, registry: Registry): void {
+// ASSEMBLED — patched across modules, overloaded by an entity, or compiled from
+// a recipe — and none of those went through the grammar. Same rule, applied
+// where the section that owns the action can name itself.
+function validateActionTable(kind: string, id: string, owner: ActionOwner): void {
   for (const action of owner.actions ?? []) {
-    const problem = actionTableProblem(action) ?? fightingOwnerProblem(action, kind, owner, registry);
+    const problem = assembledActionProblem(action);
     if (problem) throw new DslError(`# ${kind} ${id} ${actionProblem(action.label, problem)}`);
   }
 }
 
 function pruneActions(actions: Action[], where: string, visit: Visit): Action[] {
   return actions.filter((action) => referencesLoaded(() => visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit)));
+}
+
+// A handler's event name is a reference the label carries, so a block survives
+// only if what it names survives — the same rule its results already follow.
+function pruneBlocks(blocks: EntityBlock[], where: string, visit: Visit): EntityBlock[] {
+  return blocks.filter((block) =>
+    referencesLoaded(() =>
+      isHandlerBlock(block) ? visit('event', block.event, `${where} ${block.label}:`) : visitAction(block, `${where} action ${JSON.stringify(block.label)}`, visit),
+    ),
+  );
 }
 
 // The registry and the namespace must describe the same surviving universe:
@@ -414,22 +404,32 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
     let changed = false;
     const visit = danglingVisit(danglingRoots, pruned);
 
-    for (const [id, entityType] of registry.entityTypes) {
-      const actions = pruneActions(entityType.actions, `# entitytype ${id}`, visit);
-      if (actions.length !== entityType.actions.length) {
-        registry.entityTypes.set(id, { ...entityType, actions });
-        changed = true;
-      }
+    for (const [id, action] of registry.actions) {
+      if (referencesLoaded(() => visitAction(action, `# action ${id}`, visit))) continue;
+      dropContent(registry, 'action', id, pruned, [registry.actions]);
+      changed = true;
+    }
+
+    for (const [id, event] of registry.events) {
+      if (referencesLoaded(() => visitSection('event', { ...event }, `# event ${id}`, visit))) continue;
+      dropContent(registry, 'event', id, pruned, [registry.events]);
+      changed = true;
     }
 
     for (const [id, entity] of registry.entities) {
       const stats = Object.fromEntries(Object.entries(entity.stats).filter(([statId]) => referencesLoaded(() => visit('stat', statId, `# entity ${id} stats:`))));
-      const actions = pruneActions(entity.actions, `# entity ${id}`, visit);
-      // The template's actions are already copied in, so a type: whose template
-      // went with a missing dependency has nothing left to say.
-      const type = entity.type !== undefined && referencesLoaded(() => visit('entitytype', entity.type!, `# entity ${id} type:`)) ? entity.type : undefined;
-      if (Object.keys(stats).length !== Object.keys(entity.stats).length || actions.length !== entity.actions.length || type !== entity.type) {
-        registry.entities.set(id, { ...entity, stats, actions, type });
+      const blocks = pruneBlocks(entity.blocks, `# entity ${id}`, visit);
+      const uses = entity.uses.filter((used) => referencesLoaded(() => visit('action', used, `# entity ${id} uses:`)));
+      const faction = entity.faction.filter((named) => referencesLoaded(() => visit('faction', named, `# entity ${id} faction:`)));
+      const allies = entity.allies.filter((entry) => referencesLoaded(() => visit('entity', entry.entity, `# entity ${id} allies:`)));
+      if (
+        Object.keys(stats).length !== Object.keys(entity.stats).length ||
+        blocks.length !== entity.blocks.length ||
+        uses.length !== entity.uses.length ||
+        faction.length !== entity.faction.length ||
+        allies.length !== entity.allies.length
+      ) {
+        registry.entities.set(id, { ...entity, stats, blocks, uses, faction, allies });
         changed = true;
       }
     }
@@ -449,7 +449,7 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
         changed = true;
         continue;
       }
-      const entities = location.entities.filter((entityId) => !namesDanglingRoot('entity', entityId, danglingRoots) && !referencePruned('entity', entityId, pruned));
+      const entities = location.entities.filter((entry) => !namesDanglingRoot('entity', entry.entity, danglingRoots) && !referencePruned('entity', entry.entity, pruned));
       const adjacent = location.adjacent.filter((edge) =>
         !namesDanglingRoot('location', edge.target, danglingRoots) &&
         !referencePruned('location', edge.target, pruned) &&
@@ -541,6 +541,156 @@ function dropTableCycle(registry: Registry): string[] | null {
   return null;
 }
 
+
+// --- linking ---------------------------------------------------------------
+
+// The well-known id the runtime plays as. It is a name, not a privilege: the
+// entity it finds declares its sheet the way every other entity does.
+export const PLAYER_ENTITY = 'player';
+
+// Membership is a mask so hostility is one `and`. `world` takes the first bit
+// and is what an entity naming no faction belongs to, which is why almost
+// nothing needs the line: rats do not fight rats.
+const WORLD_BIT = 1;
+
+function compileFactionBits(registry: Registry): void {
+  registry.factionBits.clear();
+  let next = 0;
+  for (const id of registry.factions.keys()) {
+    registry.factionBits.set(id, namesSame(id, WORLD_FACTION) ? WORLD_BIT : 1 << ++next);
+  }
+}
+
+export function factionMask(registry: Registry, entity: { faction: readonly string[] } | undefined): number {
+  if (!entity || entity.faction.length === 0) return WORLD_BIT;
+  return entity.faction.reduce((mask, id) => mask | (registry.factionBits.get(id) ?? 0), 0);
+}
+
+// Two entities are hostile exactly when they share no bit.
+export function hostile(registry: Registry, a: { faction: readonly string[] } | undefined, b: { faction: readonly string[] } | undefined): boolean {
+  return (factionMask(registry, a) & factionMask(registry, b)) === 0;
+}
+
+// A shortened id names the same object as the whole path, which is the rule the
+// namespace already resolves references by; an entity's overload block reaches
+// its action the same way rather than through a second spelling.
+const namesSame = (id: string, written: string): boolean => id === written || id.endsWith(`.${written}`);
+
+function appendCondition(base: Condition | undefined, added: Condition): Condition {
+  return base ? { kind: 'and', conditions: [base, added] } : added;
+}
+
+// A bare overload line replaces the inherited value; a `+` line adds to it.
+function overlayAction(base: Action, over: Action): Action {
+  const appended = new Set(over.appended ?? []);
+  const merged = { ...base } as Record<string, unknown>;
+  for (const [key, value] of Object.entries(over)) {
+    if (key === 'label' || key === 'appended' || value === undefined) continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    if (!appended.has(key)) merged[key] = value;
+    else if (key === 'requires' || key === 'hiddenIf') merged[key] = appendCondition(base[key as 'requires' | 'hiddenIf'], value as Condition);
+    else merged[key] = [...(((base as unknown as Record<string, unknown[]>)[key]) ?? []), ...(value as unknown[])];
+  }
+  return merged as unknown as Action;
+}
+
+// An overload governs that entity's own performance of the action and nothing
+// else, so a block naming an action the entity does not `use:` is refused rather
+// than quietly becoming an action of its own.
+function linkEntity(entity: Entity, registry: Registry): Entity {
+  const handlers: Handler[] = [];
+  const overloads = new Map<string, Action>();
+  const own: Action[] = [];
+
+  for (const block of entity.blocks) {
+    if (isHandlerBlock(block)) {
+      handlers.push({ event: block.event, results: block.results });
+      continue;
+    }
+    const used = entity.uses.find((id) => namesSame(id, block.label));
+    if (used !== undefined) {
+      if (overloads.has(used)) throw new DslError(`${JSON.stringify(block.label)} overloads ${used} more than once`);
+      overloads.set(used, block);
+      continue;
+    }
+    const declared = [...registry.actions.keys()].find((id) => namesSame(id, block.label));
+    if (declared !== undefined) throw new DslError(`${JSON.stringify(block.label)} overloads # action ${declared}, which this entity does not use:`);
+    own.push(block);
+  }
+
+  const performed = entity.uses.map((id) => {
+    const declaration = registry.actions.get(id);
+    if (!declaration) throw new DslError(`uses: names an unknown action: ${id}`);
+    const overload = overloads.get(id);
+    return overload ? overlayAction(declaration, overload) : declaration;
+  });
+
+  return { ...entity, actions: [...performed, ...own], handlers };
+}
+
+// The performer's side of the bargain: an entity performing a two-sided action
+// declares every stat that action reads off it, because falling through to the
+// global `# stat` bases would measure the rat by the player's sheet.
+function performerStatProblem(entity: Entity, action: Action, registry: Registry): string | undefined {
+  for (const field of sidedFields(action)) {
+    if (field.value.side !== 'my') continue;
+    const needed = field.written === 'depletes' ? registry.resources.get(field.value.id)?.max : field.value.id;
+    if (needed === undefined || entity.stats[needed] !== undefined) continue;
+    const because = field.written === 'depletes' ? `${field.value.id} is measured by ${needed}, which` : `${field.written}: reads ${needed}, which`;
+    return `${actionProblem(action.label, because)} stats: does not set`;
+  }
+  return undefined;
+}
+
+function entityProblem(entity: Entity, registry: Registry): string | undefined {
+  for (const ally of entity.allies) {
+    // A side is you and your allies, so naming yourself makes you your own
+    // ally, and naming the player puts the player on both sides of the fight.
+    if (namesSame(entity.id, ally.entity)) return `allies: names this entity itself: ${ally.entity}`;
+    if (namesSame(ally.entity, PLAYER_ENTITY)) return `allies: names the player, who is a side rather than a member of one: ${ally.entity}`;
+  }
+  for (const handler of entity.handlers) {
+    if (!registry.events.has(handler.event)) return `on ${handler.event}: names an unknown event: ${handler.event}`;
+  }
+  for (const action of entity.actions) {
+    if (!isTwoSided(action)) continue;
+    const problem = performerStatProblem(entity, action, registry);
+    if (problem) return problem;
+  }
+  return undefined;
+}
+
+function linkRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModule>): BuildFailure | null {
+  compileFactionBits(registry);
+
+  const players: Entity[] = [];
+  for (const [id, entity] of registry.entities) {
+    try {
+      const linked = linkEntity(entity, registry);
+      registry.entities.set(id, linked);
+      const problem = entityProblem(linked, registry);
+      if (problem) throw new DslError(problem);
+      if (namesSame(id, PLAYER_ENTITY)) players.push(linked);
+    } catch (raw) {
+      if (!(raw instanceof DslError)) throw raw;
+      // Prefixed here, so every message an entity's own linking raises names the
+      // entity without each throw site repeating it.
+      const error = new DslError(`# entity ${id}: ${raw.message}`, raw.span);
+      const module = sectionOwner(owners, 'entity', id);
+      if (!module) throw error;
+      return { module, stage: 'validate', error };
+    }
+  }
+  if (players.length > 1) {
+    const module = sectionOwner(owners, 'entity', players[1].id);
+    const error = new DslError(`# entity ${players[1].id} and # entity ${players[0].id} are both the player, and a game is played as one entity`);
+    if (!module) throw error;
+    return { module, stage: 'validate', error };
+  }
+  registry.player = players[0];
+  return null;
+}
+
 // Two `starting` locations used to resolve by source order, which is a coin
 // toss an author cannot see. Zero is not checked here — a module set is allowed
 // to hold locations without holding the one a new game begins in, and the
@@ -555,6 +705,9 @@ function startingLocationFailure(registry: Registry, owners: ReadonlyMap<string,
 
 function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModule>, danglingRoots: ReadonlySet<string>): BuildFailure | null {
   pruneRegistryDanglingReferences(registry, danglingRoots);
+
+  const linked = linkRegistry(registry, owners);
+  if (linked) return linked;
 
   const starting = startingLocationFailure(registry, owners);
   if (starting) return starting;
@@ -589,7 +742,7 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   for (const [kind, map] of CONTENT_SECTION_MAPS) {
     for (const [id, value] of registry[map] as ReadonlyMap<string, object>) {
       try {
-        validateActionTable(kind, id, value as ActionOwner, registry);
+        validateActionTable(kind, id, value as ActionOwner);
         validateSectionReferences(kind, id, value, registry);
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
@@ -600,11 +753,21 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
 
   for (const [id, action] of registry.recipeActions) {
     try {
-      validateActionTable('recipe', id, { actions: [action] }, registry);
+      validateActionTable('recipe', id, { actions: [action] });
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       return { module: sectionOwner(owners, 'recipe', id)!, stage: 'validate', error };
     }
+  }
+
+  try {
+    validateItemSlots(registry);
+  } catch (error) {
+    if (!(error instanceof DslError)) throw error;
+    const id = /^# item (\S+)/.exec(error.message)?.[1];
+    const module = id ? sectionOwner(owners, 'item', id) : undefined;
+    if (!module) throw error;
+    return { module, stage: 'validate', error };
   }
 
   const capabilities = registryCapabilities(registry);
@@ -707,8 +870,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
           if (!owns(section.kind)) continue;
           const byId = merged.get(section.kind) ?? new Map<string, OwnedSection>();
           const id = (section.value as { id: string }).id;
-          const base = entityTypeBase(merged, section, byId.get(id)?.value);
-          byId.set(id, { kind: section.kind, value: mergeSection(section.kind, base, section.value), module });
+          byId.set(id, { kind: section.kind, value: mergeSection(section.kind, byId.get(id)?.value, section.value), module });
           owners.set(ownerKey(section.kind, id), module);
           merged.set(section.kind, byId);
           const declared = declaredMembers.get(ownerKey(section.kind, id)) ?? [];
@@ -723,13 +885,8 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
     return null;
   };
 
-  // Templates settle before anything that inherits one, because a template is
-  // what an entity is merged ONTO: the entity's own blocks then override, add
-  // and remove against it through the one merge rule, rather than through a
-  // second one bolted on after the fact.
-  const isTemplate = (kind: string): boolean => kind === 'entitytype';
-  const templateFailure = mergePass(isTemplate) ?? mergePass((kind) => !isTemplate(kind));
-  if (templateFailure) return { failure: templateFailure };
+  const mergeFailure = mergePass(() => true);
+  if (mergeFailure) return { failure: mergeFailure };
   reconcileMembers(namespace, merged, declaredMembers);
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {

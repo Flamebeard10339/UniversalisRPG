@@ -20,11 +20,14 @@ export type ActionResult =
   | { kind: 'pool'; resource: string; delta: Range }
   // Abandons the action in flight, exactly as a player-initiated cancel does.
   | { kind: 'stop' }
-  // The four wrappers. Each holds an ordinary result list, so layering a drop is
+  // The five wrappers. Each holds an ordinary result list, so layering a drop is
   // nesting one inside another and needs no rule of its own.
   | { kind: 'chance'; numerator: number; denominator: number; results: ActionResult[] }
   | { kind: 'contest'; left: number | string; right: number | string; results: ActionResult[] }
   | { kind: 'gate'; condition: Condition; results: ActionResult[] }
+  // Moves the subject rather than selecting: what is inside lands on whoever
+  // caused the moment, where an unmarked result lands on whoever it happened to.
+  | { kind: 'credit'; results: ActionResult[] }
   | { kind: 'one-of'; rows: DropRow[] }
   | { kind: 'roll'; table: string };
 
@@ -42,7 +45,7 @@ export interface DropRow {
 // only the kinds that existed when it was written.
 export function nestedResults(result: ActionResult): ActionResult[][] {
   if (result.kind === 'one-of') return result.rows.map((row) => row.results);
-  if (result.kind === 'chance' || result.kind === 'contest' || result.kind === 'gate') return [result.results];
+  if (result.kind === 'chance' || result.kind === 'contest' || result.kind === 'gate' || result.kind === 'credit') return [result.results];
   return [];
 }
 
@@ -152,6 +155,11 @@ function parseContest(cursor: Cursor, line: RawLine | null, span: Span): ActionR
   return { kind: 'contest', left, right, results: wrapperBody(cursor, line, `${left} vs ${right}:`, span) };
 }
 
+function parseCredit(cursor: Cursor, line: RawLine | null, span: Span): ActionResult {
+  cursor.take(CREDIT);
+  return { kind: 'credit', results: wrapperBody(cursor, line, 'credit:', span) };
+}
+
 function parseGate(cursor: Cursor, line: RawLine | null, span: Span): ActionResult {
   cursor.take(/if[ \t]+/);
   const gate = condition.parse(cursor);
@@ -165,6 +173,7 @@ function parseGate(cursor: Cursor, line: RawLine | null, span: Span): ActionResu
 // like one.
 const SELECTOR = `(?:${REFERENCE.source}|\\d+(?:\\.\\d+)?)`;
 const ONE_OF = /one of[ \t]*:/;
+const CREDIT = /credit[ \t]*:/;
 const CHANCE = /\d+[ \t]+in[ \t]+\d+[ \t]*:/;
 const CONTEST = new RegExp(`${SELECTOR}[ \\t]+vs[ \\t]+${SELECTOR}[ \\t]*:`);
 // `if` leads more prose than it leads conditions, and a dialogue line chooses
@@ -187,6 +196,7 @@ function opensGate(cursor: Cursor): boolean {
 // `startsResult` answer from.
 function wrapperAt(cursor: Cursor): ((cursor: Cursor, line: RawLine | null, span: Span) => ActionResult) | null {
   if (cursor.peek(ONE_OF)) return parseOneOf;
+  if (cursor.peek(CREDIT)) return parseCredit;
   if (cursor.peek(CHANCE)) return parseChance;
   if (opensGate(cursor)) return parseGate;
   if (cursor.peek(CONTEST)) return parseContest;

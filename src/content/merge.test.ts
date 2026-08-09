@@ -57,7 +57,7 @@ describe('a section applies its fields over what the id already holds', () => {
 
   it('replaces a list field wholesale, because a bare key replaces', () => {
     const location = loadUniverse([BASE, patch('# location base.beach', 'entities: base.crab')]).locations.get('base.beach')!;
-    expect(location.entities).toEqual(['base.crab']);
+    expect(location.entities).toEqual([{ entity: 'base.crab' }]);
     expect(location.adjacent.map((edge) => edge.target)).toEqual(['base.dunes']);
     expect(location.starting).toBe(true);
   });

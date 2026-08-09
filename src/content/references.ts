@@ -36,10 +36,33 @@ export function registryCapabilities(registry: Registry): Set<string> {
 
 // Items supply the slot vocabulary the way entities supply capabilities, so a
 // slot demanded by name is checked against what some item actually declares.
+// Entities supply the slot vocabulary the way they supply capabilities, and
+// items fall back to supplying it only while no entity declares any — a
+// vocabulary read off `slot:` alone quietly gives a rat a head.
+function declaredSlots(registry: Registry): Set<string> {
+  const declared = new Set<string>();
+  for (const entity of registry.entities.values()) for (const slot of entity.equipmentSlots) declared.add(slot);
+  return declared;
+}
+
 export function registrySlots(registry: Registry): Set<string> {
+  const declared = declaredSlots(registry);
+  if (declared.size > 0) return declared;
   const slots = new Set<string>();
   for (const item of registry.items.values()) if (item.slot !== undefined) slots.add(item.slot);
   return slots;
+}
+
+// An item naming a slot nothing can wear can never be equipped, so it is a load
+// error rather than a refusal at the moment it is spent.
+export function validateItemSlots(registry: Registry): void {
+  const declared = declaredSlots(registry);
+  if (declared.size === 0) return;
+  for (const item of registry.items.values()) {
+    if (item.slot !== undefined && !declared.has(item.slot)) {
+      throw new DslError(`# item ${item.id} slot: names ${item.slot}, which no # entity declares among its equipment-slots:`);
+    }
+  }
 }
 
 export function validateRecipeReferences(recipe: Recipe, capabilities: ReadonlySet<string>): void {
@@ -73,6 +96,13 @@ export function validateTestReferences(test: Test, registry: Registry): void {
     if (value.kind === 'begin') return directive(value.inner, `${where} begin:`);
     if (value.kind === 'unequip') {
       if (!slots.has(value.slot)) throw new DslError(`${where} unequip: names an unknown slot: ${value.slot}`);
+      return;
+    }
+    // A two-sided action is reached by id and its target by pool, both of which
+    // the reference check already proved; what is left is that the performer can
+    // bring it, and the player is the performer of everything a test drives.
+    if (value.kind === 'use-on') {
+      if (!registry.player?.uses.some((used) => used === value.action)) throw new DslError(`${where} use: names an action the player does not use:: ${value.action}`);
       return;
     }
     if (value.kind !== 'use') return;

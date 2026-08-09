@@ -17,12 +17,13 @@
       "name": "DSL load path",
       "paths": [
         "content/tutorial-island.dsl",
+        "src/content/action.ts",
         "src/content/dialogue.ts",
         "src/content/dropTable.test.ts",
         "src/content/dropTable.ts",
         "src/content/entity.ts",
-        "src/content/entityType.test.ts",
-        "src/content/entityType.ts",
+        "src/content/event.ts",
+        "src/content/faction.ts",
         "src/content/flag.ts",
         "src/content/flags.test.ts",
         "src/content/info.ts",
@@ -52,6 +53,7 @@
         "src/content/universe.test.ts",
         "src/content/universe.ts",
         "src/content/variable.ts",
+        "src/grammar/action.test.ts",
         "src/grammar/action.ts",
         "src/grammar/actionResult.ts",
         "src/grammar/condition.ts",
@@ -117,6 +119,13 @@
             "src/grammar/actionResult.ts"
           ],
           "note": "produced by droptables"
+        },
+        {
+          "name": "two-sided action grammar",
+          "paths": [
+            "src/grammar/action.ts"
+          ],
+          "note": "produced by combat-grammar-sides-and-attempts"
         }
       ]
     },
@@ -136,6 +145,7 @@
         "src/runtime/enemy-pool.test.ts",
         "src/runtime/equipment.test.ts",
         "src/runtime/equipment.ts",
+        "src/runtime/fight.test.ts",
         "src/runtime/forwardProgress.ts",
         "src/runtime/instances.test.ts",
         "src/runtime/instances.ts",
@@ -143,6 +153,7 @@
         "src/runtime/location.test.ts",
         "src/runtime/modals.test.ts",
         "src/runtime/modals.ts",
+        "src/runtime/population.ts",
         "src/runtime/recipe.test.ts",
         "src/runtime/resolve.test.ts",
         "src/runtime/resource.test.ts",

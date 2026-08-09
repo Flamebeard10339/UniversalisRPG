@@ -1,4 +1,4 @@
-import { Action } from '../grammar/action';
+import { Action, Contest, Sided } from '../grammar/action';
 import { ActionResult, DropRow, nestedResults } from '../grammar/actionResult';
 import { Condition, Reference } from '../grammar/condition';
 import { formatDependency, formatVersion, Version } from '../grammar/dependency';
@@ -7,13 +7,14 @@ import { TagClause } from '../grammar/tagClause';
 import { Produced, Quantified } from '../grammar/values';
 import { Dialogue, TextSegment } from './dialogue';
 import { DropTable } from './dropTable';
+import { ActionDeclaration } from './action';
 import { Entity } from './entity';
-import { EntityType } from './entityType';
+import { GameEvent } from './event';
+import { Faction } from './faction';
 import { Item } from './item';
-import { Location } from './location';
+import { Location, Population } from './location';
 import { Recipe } from './recipe';
 import { Registry } from './registry';
-import { sameValue } from './registryDiff';
 import { Resource } from './resource';
 import { ParsedSave } from './saveSection';
 import { Test, Directive } from './test';
@@ -101,6 +102,7 @@ function result(value: ActionResult): string {
     case 'chance':
     case 'contest':
     case 'gate':
+    case 'credit':
     case 'one-of':
       throw new Error(`a ${value.kind} result spans lines and cannot be inlined`);
   }
@@ -125,6 +127,8 @@ function resultLines(value: ActionResult): Lines {
       return [`${side(value.left)} vs ${side(value.right)}:`, ...indented(value.results.flatMap(resultLines))];
     case 'gate':
       return [`if ${condition(value.condition)}:`, ...indented(value.results.flatMap(resultLines))];
+    case 'credit':
+      return ['credit:', ...indented(value.results.flatMap(resultLines))];
     case 'one-of':
       return ['one of:', ...indented(value.rows.flatMap(rowLines))];
     default:
@@ -182,6 +186,10 @@ function resultBlock(lines: Lines, label: string, values: readonly ActionResult[
   lines.push(`${label}:`, ...indented(values.flatMap(resultLines), childSpaces));
 }
 
+const sided = (value: Sided): string => (value.side === undefined ? value.id : `${value.side} ${value.id}`);
+
+const contest = (value: Contest): string => (value.right === undefined ? sided(value.left) : `${sided(value.left)} vs ${sided(value.right)}`);
+
 function actionLines(action: Action): Lines {
   const modifiers =
     action.requires ||
@@ -189,42 +197,41 @@ function actionLines(action: Action): Lines {
     action.tags?.length ||
     action.onSuccess?.length ||
     action.onFailure?.length ||
-    action.onEscape?.length ||
+    action.onUnfinished?.length ||
     (action.kind !== undefined && action.kind !== 'duration') ||
     action.time !== undefined ||
     action.rate !== undefined ||
     action.accuracy ||
-    action.evasion ||
-    action.ability ||
-    action.target ||
-    action.dr ||
-    action.escapeAfter !== undefined ||
-    action.retaliates;
+    action.damage ||
+    action.depletes ||
+    action.attempts !== undefined;
 
   if (!modifiers && action.results.length === 1 && !spansLines(action.results)) return [`${action.label}: ${results(action.results)}`];
 
+  // A `+` line adds to what this block overlays, so the marker is part of the
+  // field rather than of the value, and dropping it would turn an addition into
+  // a replacement on reload.
+  const appended = new Set(action.appended ?? []);
+  const at = (name: keyof Action): string => (appended.has(name) ? '  +' : '  ');
   const lines = [`${action.label}:`];
-  if (action.requires) lines.push(`  requires: ${condition(action.requires)}`);
-  if (action.hiddenIf) lines.push(`  hidden if: ${condition(action.hiddenIf)}`);
+  if (action.requires) lines.push(`${at('requires')}requires: ${condition(action.requires)}`);
+  if (action.hiddenIf) lines.push(`${at('hiddenIf')}hidden if: ${condition(action.hiddenIf)}`);
   if (action.kind !== undefined && action.kind !== 'duration') lines.push(`  ${action.kind}`);
-  if (action.retaliates) lines.push('  retaliates');
-  // The tags the kind and the flags above already spell; re-emitting one would
-  // round-trip into a second copy of the same fact.
-  const lifted = new Set(['instant', 'continuous', 'retaliates']);
+  // The tags the kind above already spells; re-emitting one would round-trip
+  // into a second copy of the same fact.
+  const lifted = new Set(['instant', 'continuous']);
   const tags = (action.tags ?? []).filter((each) => each.kind !== 'keyword' || !lifted.has(each.value));
   if (tags.length > 0) lines.push(`  ${tags.map(tag).join(', ')}`);
   if (action.time !== undefined) lines.push(`  time: ${n(action.time)}`);
-  if (action.rate !== undefined) lines.push(`  rate: ${typeof action.rate === 'string' ? action.rate : n(action.rate)}`);
-  if (action.accuracy) lines.push(`  accuracy: ${action.accuracy}`);
-  if (action.evasion) lines.push(`  evasion: ${action.evasion}`);
-  if (action.ability) lines.push(`  ability: ${action.ability}`);
-  if (action.target) lines.push(`  target: ${action.target}`);
-  if (action.dr) lines.push(`  dr: ${action.dr}`);
-  if (action.escapeAfter !== undefined) lines.push(`  escape after ${n(action.escapeAfter)}`);
+  if (action.rate !== undefined) lines.push(`  rate: ${typeof action.rate === 'number' ? n(action.rate) : sided(action.rate)}`);
+  if (action.accuracy) lines.push(`  accuracy: ${contest(action.accuracy)}`);
+  if (action.damage) lines.push(`  damage: ${contest(action.damage)}`);
+  if (action.depletes) lines.push(`  depletes: ${sided(action.depletes)}`);
+  if (action.attempts !== undefined) lines.push(`  attempts: ${n(action.attempts)}`);
   lines.push(...indented(action.results.flatMap(resultLines)));
-  resultBlock(lines, '  on success', action.onSuccess, 4);
-  resultBlock(lines, '  on failure', action.onFailure, 4);
-  resultBlock(lines, '  on escape', action.onEscape, 4);
+  resultBlock(lines, `${at('onSuccess')}on success`, action.onSuccess, 4);
+  resultBlock(lines, `${at('onFailure')}on failure`, action.onFailure, 4);
+  resultBlock(lines, `${at('onUnfinished')}on unfinished`, action.onUnfinished, 4);
   return lines;
 }
 
@@ -248,14 +255,15 @@ function directive(value: Directive): string {
       return `choose: ${value.text}`;
     case 'use':
       return `use: ${value.obj}.${value.objId}.${value.actionId}`;
+    case 'use-on':
+      return `use: ${value.action} on ${value.target}`;
     case 'travel':
       return `travel: ${value.location}`;
     case 'craft':
       return `craft: ${value.recipe}`;
-    case 'begin': {
-      const inner = value.inner.kind === 'use' ? `${value.inner.obj}.${value.inner.objId}.${value.inner.actionId}` : value.inner.kind === 'travel' ? value.inner.location : value.inner.recipe;
-      return `begin: ${value.inner.kind} ${inner}`;
-    }
+    case 'begin':
+      // The verb, then whatever that verb's own line carries after its colon.
+      return `begin: ${value.inner.kind === 'use-on' ? 'use' : value.inner.kind} ${directive(value.inner).replace(/^[a-z-]+:[ \t]*/, '')}`;
     case 'assert':
       return `assert: ${condition(value.condition)}`;
     case 'expect':
@@ -293,43 +301,39 @@ function itemSection(moduleId: string, item: Item): string {
   return lines.join('\n');
 }
 
-function entityTypeSection(moduleId: string, entityType: EntityType): string {
-  const lines = [`# entitytype ${moduleLocalId(moduleId, entityType.id)}`];
-  for (const action of entityType.actions) lines.push(...actionLines(action));
-  return lines.join('\n');
+function actionSection(moduleId: string, action: ActionDeclaration): string {
+  const [, ...body] = actionLines({ ...action, label: action.label });
+  return [`# action ${moduleLocalId(moduleId, action.id)}`, `title: ${action.label}`, ...body.map((line) => line.replace(/^ {2}/, ''))].join('\n');
 }
 
-// What the entity said about an action its template already defines: the fields
-// that differ, and nothing else. Printing the inherited ones back would make the
-// reload merge them onto the template a second time — which is a load error the
-// moment the entity changed the kind or the cadence — and would freeze the
-// entity against edits to the template it still claims to follow.
-function actionOverride(action: Action, inherited: Action): Lines {
-  const kept = Object.keys(action).filter((key) => key !== 'label' && !sameValue(action[key as keyof Action], inherited[key as keyof Action]));
-  if (kept.length === 0) return [];
-  const override: Record<string, unknown> = { label: action.label, results: [] };
-  for (const key of kept) override[key] = action[key as keyof Action];
-  return actionLines(override as unknown as Action);
+function eventSection(moduleId: string, event: GameEvent): string {
+  return [`# event ${moduleLocalId(moduleId, event.id)}`, `title: ${event.title}`, `resource: ${event.resource}`, `trigger: ${event.trigger}`].join('\n');
 }
 
-function entitySection(moduleId: string, entity: Entity, template: EntityType | undefined): string {
+function factionSection(moduleId: string, faction: Faction): string {
+  return [`# faction ${moduleLocalId(moduleId, faction.id)}`, `title: ${faction.title}`].join('\n');
+}
+
+const population = (value: Population): string => (value.count === undefined ? value.entity : `${n(value.count)} ${value.entity}`);
+
+function entitySection(moduleId: string, entity: Entity): string {
   const lines = [`# entity ${moduleLocalId(moduleId, entity.id)}`];
-  if (entity.type) lines.push(`type: ${entity.type}`);
   titled(lines, entity);
+  if (entity.aggressive) lines.push('aggressive');
+  if (entity.hiddenIf) lines.push(`hidden if: ${condition(entity.hiddenIf)}`);
+  if (entity.respawnAfter !== undefined) lines.push(`respawn after: ${duration(entity.respawnAfter)}`);
   block(lines, 'stations', entity.capabilities);
   const stats = Object.entries(entity.stats).map(([statId, value]) => `${statId} ${range(value)}`);
   if (stats.length > 0) lines.push(`stats: ${stats.join(', ')}`);
+  if (entity.skills.length > 0) lines.push(`skills: ${entity.skills.join(', ')}`);
+  if (entity.equipmentSlots.length > 0) lines.push(`equipment-slots: ${entity.equipmentSlots.join(', ')}`);
+  if (entity.uses.length > 0) lines.push(`uses: ${entity.uses.join(', ')}`);
+  if (entity.faction.length > 0) lines.push(`faction: ${entity.faction.join(', ')}`);
+  if (entity.allies.length > 0) lines.push(`allies: ${entity.allies.map((ally) => (ally.count === undefined ? ally.entity : `${n(ally.count)} ${ally.entity}`)).join(', ')}`);
   block(lines, 'flags', entity.flags);
-
-  const inheritable = new Map((template?.actions ?? []).map((action) => [action.label, action]));
-  for (const action of entity.actions) {
-    const inherited = inheritable.get(action.label);
-    lines.push(...(inherited ? actionOverride(action, inherited) : actionLines(action)));
-  }
-  // A template action the entity no longer has was removed, and only `-label:`
-  // says so; without it the reload would inherit it straight back.
-  const held = new Set(entity.actions.map((action) => action.label));
-  for (const label of inheritable.keys()) if (!held.has(label)) lines.push(`-${label}:`);
+  // As authored: `actions` and `handlers` are what the linker made of these, and
+  // printing those instead would write an entity's inherited actions into it.
+  for (const authored of entity.blocks) lines.push(...actionLines(authored));
   return lines.join('\n');
 }
 
@@ -339,7 +343,7 @@ function locationSection(moduleId: string, location: Location): string {
   else lines.push(`x: ${n(location.x)}, y: ${n(location.y)}, z: ${n(location.z)}`);
   titled(lines, location);
   if (location.starting) lines.push('starting');
-  block(lines, 'entities', location.entities);
+  block(lines, 'entities', location.entities.map(population));
   block(
     lines,
     'adjacent',
@@ -372,8 +376,6 @@ function resourceSection(moduleId: string, resource: Resource): string {
   lines.push(`max: ${resource.max}`);
   if (resource.start !== undefined) lines.push(`start: ${n(resource.start)}`);
   lines.push(`display: ${resource.display}`);
-  resultBlock(lines, 'on empty', resource.onEmpty);
-  resultBlock(lines, 'on full', resource.onFull);
   return lines.join('\n');
 }
 
@@ -434,8 +436,10 @@ export function serializeRegistryModule(registry: Registry, options: SerializeMo
   for (const stat of registry.stats.values()) if (inModule(moduleId, stat.id)) sections.push([`# stat ${moduleLocalId(moduleId, stat.id)}`, `title: ${stat.title}`, `base: ${range(stat.base)}`].join('\n'));
   for (const skill of registry.skills.values()) if (inModule(moduleId, skill.id)) sections.push([`# skill ${moduleLocalId(moduleId, skill.id)}`, `title: ${skill.title}`, ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : [])].join('\n'));
   for (const item of registry.items.values()) if (inModule(moduleId, item.id)) sections.push(itemSection(moduleId, item));
-  for (const entityType of registry.entityTypes.values()) if (inModule(moduleId, entityType.id)) sections.push(entityTypeSection(moduleId, entityType));
-  for (const entity of registry.entities.values()) if (inModule(moduleId, entity.id)) sections.push(entitySection(moduleId, entity, entity.type ? registry.entityTypes.get(entity.type) : undefined));
+  for (const faction of registry.factions.values()) if (inModule(moduleId, faction.id)) sections.push(factionSection(moduleId, faction));
+  for (const event of registry.events.values()) if (inModule(moduleId, event.id)) sections.push(eventSection(moduleId, event));
+  for (const action of registry.actions.values()) if (inModule(moduleId, action.id)) sections.push(actionSection(moduleId, action));
+  for (const entity of registry.entities.values()) if (inModule(moduleId, entity.id)) sections.push(entitySection(moduleId, entity));
   for (const location of registry.locations.values()) if (inModule(moduleId, location.id)) sections.push(locationSection(moduleId, location));
   for (const recipe of registry.recipes.values()) if (inModule(moduleId, recipe.id)) sections.push(recipeSection(moduleId, recipe));
   for (const resource of registry.resources.values()) if (inModule(moduleId, resource.id)) sections.push(resourceSection(moduleId, resource));

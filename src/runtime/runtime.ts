@@ -3,7 +3,6 @@ import {
   actionVisible,
   fightBatch,
   findActionOwner,
-  findActiveAction,
   FightOutcome,
   inputLimit,
   outcomeResults,
@@ -20,6 +19,8 @@ import {
   captureResourceRates,
   clampResources,
   clearActorDeltas,
+  emptyPoolNow,
+  eventsFor,
   getDelta,
   newSegment,
   Segment,
@@ -27,17 +28,27 @@ import {
 } from './effects';
 import {
   ActiveAction,
+  actorEntity,
+  armedAction,
   damageTarget,
   enterEncounter,
   IMPLICIT_TARGET_FULL,
   logSwing,
   newCadence,
+  FIGHT_SCOPED,
+  isFightScoped,
+  opposes,
   Participant,
   participants,
+  leaveFight,
   playerCadence,
+  retaliation,
+  seatOf,
+  sideOf,
   targetLevel,
 } from './encounter';
-import { Action } from '../content/entity';
+import { applyRespawns, downOne, isStanding, nextRespawn, standing } from './population';
+import { Action, declaredId } from '../content/entity';
 import { actionKind } from '../grammar/action';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { isPoint } from '../grammar/range';
@@ -72,7 +83,7 @@ export type { Modal, ModalFrame, ModalOption } from './modals';
 function drainedAPool(segment: Segment): boolean {
   const { state, registry } = segment;
   for (const resource of registry.resources.values()) {
-    if (resource.onEmpty.length === 0) continue;
+    if (eventsFor(registry, resource.id, 'on empty').length === 0) continue;
     const delta = getDelta(segment.deltas, PLAYER, resource.id);
     if (delta >= 0) continue;
     if ((state.resources[resource.id] ?? 0) + delta <= 0) return true;
@@ -83,7 +94,7 @@ function drainedAPool(segment: Segment): boolean {
 interface FightParams {
   duration: number; // milliseconds per attempt
   abilityAmount: number; // milli-health subtracted per successful attempt
-  escapeAfter: number; // raw escape-after threshold (Infinity if absent)
+  attempts: number; // what bounds the action (Infinity if absent)
 }
 
 interface DeterministicFightPlan extends FightParams {
@@ -94,8 +105,8 @@ interface DeterministicFightPlan extends FightParams {
 function fightParams(action: Action, state: GameState, registry: Registry): FightParams {
   return {
     duration: attemptDuration(action, state, registry),
-    abilityAmount: hitDamage(action.ability ? statValue(action.ability, state, registry) : 1, 0, registry),
-    escapeAfter: action.escapeAfter ?? Infinity,
+    abilityAmount: hitDamage(action.damage ? statValue(action.damage.left.id, state, registry) : 1, 0, registry),
+    attempts: action.attempts ?? Infinity,
   };
 }
 
@@ -104,8 +115,8 @@ function fightPlan(action: Action, state: GameState, registry: Registry): Determ
   const neededForCompletion = Math.ceil(IMPLICIT_TARGET_FULL / params.abilityAmount);
   return {
     ...params,
-    attemptsToResolve: Math.min(neededForCompletion, params.escapeAfter),
-    outcome: neededForCompletion <= params.escapeAfter ? 'completion' : 'escape',
+    attemptsToResolve: Math.min(neededForCompletion, params.attempts),
+    outcome: neededForCompletion <= params.attempts ? 'completion' : 'unfinished',
   };
 }
 
@@ -123,7 +134,7 @@ function collectDrainSites(results: readonly ActionResult[], registry: Registry,
   for (const result of results) {
     if (result.kind === 'pool') {
       const resource = registry.resources.get(result.resource);
-      if (!resource || resource.onEmpty.length === 0 || result.delta.min >= 0) continue;
+      if (!resource || eventsFor(registry, resource.id, 'on empty').length === 0 || result.delta.min >= 0) continue;
       if (nested || !isPoint(result.delta)) sites.unplannable.add(result.resource);
       else sites.milliPerCompletion.set(result.resource, (sites.milliPerCompletion.get(result.resource) ?? 0) + toMilliUnits(-result.delta.min));
       continue;
@@ -170,7 +181,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): Bou
   if (state.activeAction) {
     const active = state.activeAction;
     const source: BoundarySource = { kind: 'action', ownerRef: active.ownerRef, actionLabel: active.actionLabel };
-    const action = findActiveAction(active, registry);
+    const action = armedAction(state, registry);
     if (!resolvesPerAttempt(action)) {
       const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
       const player = playerCadence(active);
@@ -192,8 +203,10 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): Bou
       }
     }
   }
+  const respawn = nextRespawn(state);
+  if (respawn !== undefined && respawn > state.time && respawn < boundary.at) boundary = { at: respawn, source: { kind: 'requested' } };
   for (const resource of registry.resources.values()) {
-    if (resource.onEmpty.length === 0 || !resource.rate) continue;
+    if (eventsFor(registry, resource.id, 'on empty').length === 0 || !resource.rate) continue;
     const ratePerMinute = statValue(resource.rate, state, registry);
     if (ratePerMinute >= 0) continue;
     const current = state.resources[resource.id] ?? 0;
@@ -248,26 +261,32 @@ function resolveAttempt(participant: Participant, segment: Segment): boolean {
   cadence.progress = 0;
   cadence.attemptsMade++;
 
-  const hit =
-    action.accuracy === undefined ||
-    nextRandom(state) <
-      hitChance(
-        statValue(action.accuracy, state, registry, self),
-        action.evasion ? statValue(action.evasion, state, registry, other) : 0,
-        registry,
-      );
+  // Each half is read off the side it names. Nothing here recovers a side from
+  // who is swinging; the marker is on the page.
+  const half = (field: { side?: 'my' | 'their'; id: string } | undefined, read: typeof statValue, fallback: number): number =>
+    field === undefined ? fallback : read(field.id, state, registry, sideOf(field, self, other));
 
-  const dealt = hit
-    ? hitDamage(
-        action.ability ? sampleStat(action.ability, state, registry, self) : 1,
-        action.dr ? sampleStat(action.dr, state, registry, other) : 0,
-        registry,
-      )
-    : null;
+  const hit = action.accuracy === undefined || nextRandom(state) < hitChance(half(action.accuracy.left, statValue, 0), half(action.accuracy.right, statValue, 0), registry);
+
+  const dealt = hit ? hitDamage(half(action.damage?.left, sampleStat, 1), half(action.damage?.right, sampleStat, 0), registry) : null;
   // A swing is narrated only in a fight: an implicit target is no one to hit.
-  if (action.target) logSwing(state, registry, self, other, dealt);
-  if (dealt === null) return targetLevel(state, registry, action, other) <= 0;
-  return damageTarget(state, registry, action, other, dealt, segment.deltas) <= 0;
+  if (action.depletes) {
+    logSwing(state, registry, self, other, dealt);
+    // Whoever landed the blow is who a `credit:` in the target's handler moves
+    // its results to; the moment supplies the subject, so nothing authored does.
+    segment.causedBy.set(sideOf(action.depletes, self, other), self);
+  }
+  if (dealt === null) return targetLevel(state, registry, action, self, other) <= 0;
+  return damageTarget(state, registry, action, self, other, dealt, segment.deltas) <= 0;
+}
+
+// Whether a repeating fight has anything left to swing at. Asked here as well
+// as at a boundary, because a segment that felled the last of a population and
+// stood a fresh one up out of nothing would depend on where the span was cut.
+function standsAgain(state: GameState, registry: Registry, action: Action, targetId: string): boolean {
+  if (!action.depletes || isFightScoped(targetId)) return true;
+  const location = registry.locations.get(state.location);
+  return !location || isStanding(state, registry, location, targetId);
 }
 
 // An event queue, not a tick: each participant swings on its own clock.
@@ -281,11 +300,11 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       return;
     }
 
-    const roster = participants(state, registry, action);
+    const roster = participants(state, registry);
     let next: Participant | undefined;
     let nextAt = Infinity;
     for (const participant of roster) {
-      const duration = attemptDuration(participant.action, state, registry, participant.self);
+      const duration = attemptDuration(participant.action, state, registry, participant.self, participant.other);
       if (duration <= 0) {
         throw new RuntimeError(`action ${active.ownerRef}.${participant.action.label} resolved a non-positive attempt duration (${duration}) — give it a positive time: or a rate: that reads positive`);
       }
@@ -296,6 +315,14 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         next = participant;
         nextAt = at;
       }
+    }
+
+    // Nobody is swinging, so there is no fight: every seat's own gates have
+    // closed and leaving the action armed would stall it forever.
+    if (roster.length === 0) {
+      endAction(state);
+      advanceTime(state, segEnd - state.time);
+      return;
     }
 
     if (!next || nextAt > segEnd) {
@@ -311,16 +338,22 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
 
     const depleted = resolveAttempt(next, segment);
 
-    // Only the player's swing decides the fight; a retaliation is a damage source.
-    if (next.self !== PLAYER) {
-      // Unless it empties a pool, which must settle at the instant it ran out.
-      if (depleted || state.time > segEnd) return;
-      continue;
+    // A copy whose pool ran out has left the world, whoever landed the blow:
+    // its own handlers run at the instant it ran out, and its place records
+    // that it is down. The player's own pool settles with the segment instead,
+    // because it is the one the save carries.
+    const struck = depleted && next.action.depletes ? sideOf(next.action.depletes, next.self, next.other) : undefined;
+    if (struck !== undefined && struck !== PLAYER) {
+      emptyPoolNow(segment, struck, next.action.depletes!.id, next.self);
+      downOne(state, registry, state.location, struck);
     }
 
+    // The fight is measured on what the armed action targets, not on who
+    // swung: an ally's killing blow ends it exactly as the player's does.
+    const armedTarget = active.roster?.[PLAYER]?.target;
     let fightOutcome: FightOutcome | null = null;
-    if (depleted) fightOutcome = 'completion';
-    else if (playerCadence(active).attemptsMade >= (action.escapeAfter ?? Infinity)) fightOutcome = 'escape';
+    if (depleted && (struck === undefined ? next.self === PLAYER : struck === armedTarget)) fightOutcome = 'completion';
+    else if (next.self === PLAYER && playerCadence(active).attemptsMade >= (action.attempts ?? Infinity)) fightOutcome = 'unfinished';
 
     if (fightOutcome) {
       const batch = fightBatch(action, 1, fightOutcome);
@@ -329,10 +362,10 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         endAction(state);
         return;
       }
-      if (active.repeating) {
-        if (action.target) {
-          clearActorDeltas(segment.deltas, next.other);
-          enterEncounter(active, next.other, state, registry);
+      if (active.repeating && standsAgain(state, registry, action, armedTarget ?? next.other)) {
+        if (action.depletes) {
+          clearActorDeltas(segment.deltas, armedTarget ?? next.other);
+          enterEncounter(active, armedTarget ?? next.other, state, registry, PLAYER);
         } else active.implicitTarget = IMPLICIT_TARGET_FULL;
         playerCadence(active).attemptsMade = 0;
       } else {
@@ -340,6 +373,9 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         endAction(state);
         return;
       }
+    } else if (struck !== undefined && struck !== PLAYER) {
+      // Somebody else went down. The fight goes on without them.
+      leaveFight(active, struck);
     }
 
     if (state.time > segEnd || drainedAPool(segment)) return;
@@ -355,7 +391,7 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
   if (!state.activeAction) {
     advanceTime(state, segEnd - start);
   } else {
-    const action = findActiveAction(state.activeAction, registry);
+    const action = armedAction(state, registry);
     if (resolvesPerAttempt(action)) {
       resolveStochasticSegment(segment, action, segEnd);
     } else {
@@ -366,12 +402,16 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
 
   // Over the time actually consumed: a segment can stop short of segEnd.
   const elapsed = state.time - start;
-  if (elapsed > 0 || segment.deltas.size > 0) settlePools(state, registry, snapshots, Math.max(0, elapsed), segment.deltas);
+  if (elapsed > 0 || segment.deltas.size > 0) settlePools(state, registry, snapshots, Math.max(0, elapsed), segment.deltas, segment.causedBy);
 }
 
 function applyDueBoundaries(state: GameState, registry: Registry, at: number): void {
   for (;;) {
-    let changed = false;
+    let changed = applyRespawns(state);
+    if (fightLeftItsLocation(state, registry)) {
+      endAction(state);
+      changed = true;
+    }
 
     for (const key of Object.keys(state.activeBuffs)) {
       if (state.activeBuffs[key].expiresAt <= at) {
@@ -381,7 +421,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
     }
 
     if (state.activeAction) {
-      const action = findActiveAction(state.activeAction, registry);
+      const action = armedAction(state, registry);
       if (!actionStillValid(action, state.activeAction, state)) {
         endAction(state);
         changed = true;
@@ -402,9 +442,74 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
 
     if (!changed) {
       clampResources(state, registry);
+      openAggression(state, registry);
       return;
     }
   }
+}
+
+// A fight is bounded by its location: an aggressive entity disengages when its
+// target leaves and does not follow, so travelling out is how a fight is broken
+// off and no authored leash exists. It is the TARGET's presence that bounds it,
+// never a participant's: an ally joins from wherever it is, and a fight-scoped
+// copy stands nowhere at all.
+function fightLeftItsLocation(state: GameState, registry: Registry): boolean {
+  const active = state.activeAction;
+  const location = registry.locations.get(state.location);
+  const target = active?.roster?.[PLAYER]?.target;
+  if (!active?.actors || !location || target === undefined || isFightScoped(target) || !active.actors[target]) return false;
+  return !isStanding(state, registry, location, target);
+}
+
+// An aggressive entity opens the fight itself against any hostile entity in its
+// location; everything else waits to be attacked. What the player answers with
+// is its own retaliation, which is the rule every other participant follows.
+function openAggression(state: GameState, registry: Registry): void {
+  if (state.activeAction) return;
+  const location = registry.locations.get(state.location);
+  if (!location) return;
+  for (const entry of standing(state, registry, location)) {
+    const entity = registry.entities.get(entry.entity);
+    if (!entity?.aggressive || !opposes(registry, entry.entity, PLAYER)) continue;
+    if (!retaliation(state, registry, entry.entity, PLAYER)) continue;
+    const answer = retaliation(state, registry, PLAYER, entry.entity);
+    if (!answer) continue;
+    armFight(state, registry, answer.id, answer.action, entry.entity);
+    return;
+  }
+}
+
+// Your side is you and your `allies:`; their side is your target and its
+// `allies:`. A count mints fight-scoped copies that vanish with the fight; a
+// bare name is the one that already exists, joining from wherever it is.
+function joinAllies(active: ActiveAction, state: GameState, registry: Registry, sideOwner: string, against: string): void {
+  for (const ally of actorEntity(registry, sideOwner)?.allies ?? []) {
+    if (ally.count === undefined) {
+      enterEncounter(active, ally.entity, state, registry, against);
+      continue;
+    }
+    for (let copy = 1; copy <= ally.count; copy++) enterEncounter(active, `${ally.entity}${FIGHT_SCOPED}${copy}`, state, registry, against);
+  }
+}
+
+// A two-sided action brought by the player and applied to what it names. The one
+// path a fight starts down, whether the player armed it or an aggressor opened
+// it.
+export function armFight(state: GameState, registry: Registry, actionId: string, action: Action, targetId: string): ActiveAction {
+  const active: ActiveAction = {
+    ownerRef: `action.${actionId}`,
+    actionLabel: action.label,
+    repeating: actionKind(action) === 'continuous',
+    implicitTarget: IMPLICIT_TARGET_FULL,
+    // First in, so the player wins a tie between cadences due at the same instant.
+    cadences: { [PLAYER]: newCadence() },
+    roster: { [PLAYER]: seatOf(actionId, action, targetId) },
+  };
+  state.activeAction = active;
+  enterEncounter(active, targetId, state, registry, PLAYER);
+  joinAllies(active, state, registry, targetId, PLAYER);
+  joinAllies(active, state, registry, PLAYER, targetId);
+  return active;
 }
 
 // Associative, as resolve.test.ts proves. Two accepted limitations: an
@@ -453,7 +558,7 @@ function grantActionFoodBuff(state: GameState, registry: Registry): void {
   if (!item) return;
   // Eating is the item consuming itself. A repeating action isn't a meal.
   if (active.repeating) return;
-  if (!findActiveAction(active, registry).results.some((r) => r.kind === 'take' && r.item === objId)) return;
+  if (!armedAction(state, registry).results.some((r) => r.kind === 'take' && r.item === objId)) return;
   grantFoodBuff(item, state);
 }
 
@@ -489,9 +594,15 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   }
 
   // First in, so the player wins a tie between cadences due at the same instant.
-  const active: ActiveAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, repeating, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
+  const active: ActiveAction = {
+    ownerRef: `${obj}.${objId}`,
+    actionLabel: actionId,
+    repeating,
+    implicitTarget: IMPLICIT_TARGET_FULL,
+    cadences: { [PLAYER]: newCadence() },
+    roster: { [PLAYER]: { ownerRef: `${obj}.${objId}`, actionLabel: actionId, target: objId } },
+  };
   state.activeAction = active;
-  if (action.target) enterEncounter(active, objId, state, registry);
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
 }
 
@@ -504,6 +615,35 @@ export function actionFirstUnit(obj: string, objId: string, actionId: string, re
   const action = target?.actions?.find((a) => a.label === actionId);
   if (!action) return 0;
   return firstUnitSpan(action, state, registry);
+}
+
+// The two-sided face of `armAction`: an action reached by id and applied to what
+// it names, rather than one offered by the object that owns it.
+export function armFightAction(actionId: string, targetId: string, registry: Registry, state: GameState): ArmResult {
+  // The player's own copy, so an overload of the action the player brings is
+  // what its gates, its inputs and its first unit are read from.
+  const declared = registry.actions.get(actionId);
+  const action = actorEntity(registry, PLAYER)?.actions.find((each) => declaredId(each) === actionId) ?? declared;
+  if (!declared || !action) throw new RuntimeError(`unknown action: ${actionId}`);
+  if (!registry.entities.has(targetId)) throw new RuntimeError(`unknown entity: ${targetId}`);
+  if (!requiresMet(action, state)) throw new RuntimeError(`action requires unmet: ${actionId}`);
+  if (!actionVisible(action, state)) throw new RuntimeError(`action hidden: ${actionId}`);
+
+  const { short: shortfall } = inputLimit(action, state);
+  if (shortfall !== undefined) {
+    if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
+    else state.log.push(`You don't have enough ${registry.items.get(shortfall)?.title ?? shortfall}.`);
+    return { armed: false };
+  }
+
+  armFight(state, registry, actionId, action, targetId);
+  return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
+}
+
+export function useFight(actionId: string, targetId: string, registry: Registry, state: GameState): void {
+  const armed = armFightAction(actionId, targetId, registry, state);
+  if (!armed.armed) return;
+  resolve(state, registry, state.time + armed.firstUnit);
 }
 
 export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
@@ -541,7 +681,7 @@ export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameS
   if (recipe.requiresCapability) {
     const loc = registry.locations.get(state.location);
     if (!loc) return false;
-    const provided = loc.entities.some((entityId) => registry.entities.get(entityId)?.capabilities.includes(recipe.requiresCapability!));
+    const provided = standing(state, registry, loc).some((entry) => registry.entities.get(entry.entity)?.capabilities.includes(recipe.requiresCapability!));
     if (!provided) return false;
   }
   return true;

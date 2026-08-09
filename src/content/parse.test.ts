@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { condition } from '../grammar/condition';
-import { entitySchema } from './entity';
+import { Action, entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
 import { loadModule } from './registry';
@@ -110,8 +110,8 @@ describe('variable', () => {
 
 describe('location: schema-aware line parsing', () => {
   it('parses several fields from one line', () => {
-    const loft = parseOne('# location loft\nx: 0, y: 0, z: 1\nentities: stairs-down, window', locationSchema);
-    expect(loft).toEqual({ id: 'loft', x: 0, y: 0, z: 1, entities: ['stairs-down', 'window'] });
+    const loft = parseOne('# location loft\nx: 0, y: 0, z: 1\nentities: stairs-down, 3 window', locationSchema);
+    expect(loft).toEqual({ id: 'loft', x: 0, y: 0, z: 1, entities: [{ entity: 'stairs-down' }, { count: 3, entity: 'window' }] });
   });
 
   it('keeps commas inside a free-text field while splitting a coordinate line', () => {
@@ -137,7 +137,7 @@ describe('location: schema-aware line parsing', () => {
       y: 0,
       starting: true,
       adjacent: [{ target: 'beach', condition: ref('front-door', 'unlocked') }],
-      entities: ['miki', 'stairs-up', 'front-door', 'dresser', 'bookshelf', 'painting', 'mirror'],
+      entities: ['miki', 'stairs-up', 'front-door', 'dresser', 'bookshelf', 'painting', 'mirror'].map((entity) => ({ entity })),
     });
   });
 
@@ -181,19 +181,19 @@ describe('parser guards', () => {
 describe('entity actions', () => {
   it('parses an inline action and a space-labelled block action', () => {
     const stairs = parseOne('# entity stairs-up\ntitle: Stairs\nascend: relocate: guide-house-upstairs, say: You climb the stairs.', entitySchema);
-    expect(stairs.actions).toEqual([
+    expect(stairs.blocks).toEqual([
       { label: 'ascend', results: [{ kind: 'relocate', location: 'guide-house-upstairs' }, { kind: 'say', text: 'You climb the stairs.' }] },
     ]);
 
     const window = parseOne(['# entity window', 'look through:', '  discover: beach', '  say: Through the window, a bridge.'].join('\n'), entitySchema);
-    expect(window.actions).toEqual([
+    expect(window.blocks).toEqual([
       { label: 'look through', results: [{ kind: 'discover', location: 'beach' }, { kind: 'say', text: 'Through the window, a bridge.' }] },
     ]);
   });
 
   it('parses every result verb, accepting both set forms', () => {
     const source = ['# entity chest', 'loot:', '  set drawers-open', '  unset: sealed', '  give: 12 coins', '  take: 5 cooked-shrimp', '  xp: thieving 4', '  open modal: name-editor'].join('\n');
-    expect(parseOne(source, entitySchema).actions?.[0].results).toEqual([
+    expect(parseOne(source, entitySchema).blocks?.[0].results).toEqual([
       { kind: 'set', variable: 'drawers-open' },
       { kind: 'unset', variable: 'sealed' },
       { kind: 'give', item: 'coins', amount: point(12) },
@@ -205,7 +205,7 @@ describe('entity actions', () => {
 
   it('parses add: with and without an explicit amount, defaulting to 1', () => {
     const source = ['# entity chest', 'loot:', '  add: rats-killed', '  add: coins-found 5'].join('\n');
-    expect(parseOne(source, entitySchema).actions?.[0].results).toEqual([
+    expect(parseOne(source, entitySchema).blocks?.[0].results).toEqual([
       { kind: 'add', variable: 'rats-killed', amount: 1 },
       { kind: 'add', variable: 'coins-found', amount: 5 },
     ]);
@@ -213,24 +213,24 @@ describe('entity actions', () => {
 
   it('defaults an entity title from its id and hydrates empty actions', () => {
     const miki = parseOne('# entity miki\nexamine: A tall man.', entitySchema);
-    expect(miki.actions).toBeUndefined();
+    expect(miki.blocks).toBeUndefined();
     const hydrated = hydrateSection(miki, entitySchema);
     expect(hydrated.title).toBe('Miki');
-    expect(hydrated.actions).toEqual([]);
+    expect(hydrated.blocks).toEqual([]);
   });
 });
 
 describe('entity action modifiers', () => {
   it('parses requires, hidden if, bare tags and on success, treating require as requires', () => {
-    const source = ['# entity front-door', 'pick lock:', '  requires: lockpick', '  hidden if: unlocked', '  retaliates', '  xp: thieving 4', '  on success:', '    set: unlocked', '    say: The lock clicks.'].join('\n');
+    const source = ['# entity front-door', 'pick lock:', '  requires: lockpick', '  hidden if: unlocked', '  instant', '  xp: thieving 4', '  on success:', '    set: unlocked', '    say: The lock clicks.'].join('\n');
     const door = parseOne(source, entitySchema);
-    expect(door.actions).toEqual([
+    expect(door.blocks).toEqual([
       {
         label: 'pick lock',
         requires: ref('lockpick'),
         hiddenIf: ref('unlocked'),
-        tags: [{ kind: 'keyword', value: 'retaliates' }],
-        retaliates: true,
+        kind: 'instant',
+        tags: [{ kind: 'keyword', value: 'instant' }],
         results: [{ kind: 'xp', skill: 'thieving', amount: point(4) }],
         onSuccess: [{ kind: 'set', variable: 'unlocked' }, { kind: 'say', text: 'The lock clicks.' }],
       },
@@ -251,17 +251,15 @@ describe('entity action modifiers', () => {
     ['hidden if: a', 'hidden if'],
     ['on success: say: a', 'on success'],
     ['on failure: say: a', 'on failure'],
-    ['on escape: say: a', 'on escape'],
+    ['on unfinished: say: a', 'on unfinished'],
     ['time: 1', 'time'],
     ['rate: quickness', 'rate'],
     ['accuracy: aim', 'accuracy'],
-    ['evasion: dodge', 'evasion'],
-    ['ability: might', 'ability'],
-    ['target: health', 'target'],
-    ['dr: armour', 'dr'],
-    ['escape after 3', 'escape after'],
+    ['damage: might', 'damage'],
+    ['depletes: health', 'depletes'],
+    ['attempts: 3', 'attempts'],
   ])('rejects %s written twice', (line, written) => {
-    expect(parseOne(`# entity chest\nopen:\n  ${line}\n  say: hi`, entitySchema).actions).toHaveLength(1);
+    expect(parseOne(`# entity chest\nopen:\n  ${line}\n  say: hi`, entitySchema).blocks).toHaveLength(1);
     expect(() => parseOne(`# entity chest\nopen:\n  ${line}\n  ${line}\n  say: hi`, entitySchema)).toThrow(`action "open": ${written} is defined more than once`);
   });
 
@@ -271,7 +269,7 @@ describe('entity action modifiers', () => {
 
   it('parses on failure inline and as a block, and rejects it defined more than once', () => {
     const inline = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure: say: Not enough shrimp.', entitySchema);
-    expect(inline.actions).toEqual([
+    expect(inline.blocks).toEqual([
       {
         label: 'open',
         results: [{ kind: 'take', item: 'cooked-shrimp', amount: 5 }],
@@ -280,7 +278,7 @@ describe('entity action modifiers', () => {
     ]);
 
     const block = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure:\n    say: Not enough shrimp.\n    set: chest-jammed', entitySchema);
-    expect(block.actions?.[0].onFailure).toEqual([{ kind: 'say', text: 'Not enough shrimp.' }, { kind: 'set', variable: 'chest-jammed' }]);
+    expect((block.blocks?.[0] as Action).onFailure).toEqual([{ kind: 'say', text: 'Not enough shrimp.' }, { kind: 'set', variable: 'chest-jammed' }]);
 
     expect(() => parseOne('# entity chest\nopen:\n  on failure:\n    say: a\n  on failure:\n    say: b', entitySchema)).toThrow(/on failure is defined more than once/);
   });
@@ -294,7 +292,7 @@ describe('entity action modifiers', () => {
 // table is the pair, and every combination it has no meaning for is a load
 // error rather than a silent default the runtime has to guess at.
 describe('action kinds and their cadence', () => {
-  const parseAction = (...lines: string[]) => parseOne(['# entity forge', 'work:', ...lines.map((line) => `  ${line}`)].join('\n'), entitySchema).actions![0];
+  const parseAction = (...lines: string[]) => parseOne(['# entity forge', 'work:', ...lines.map((line) => `  ${line}`)].join('\n'), entitySchema).blocks![0] as Action;
 
   it('makes an untagged action a duration, and lifts the two written kinds off their tags', () => {
     expect(parseAction('say: hi').kind).toBeUndefined();
@@ -305,7 +303,7 @@ describe('action kinds and their cadence', () => {
   it('keeps both cadence spellings, a stat rate apart from a literal one', () => {
     expect(parseAction('time: 2.5', 'say: hi')).toMatchObject({ time: 2.5 });
     expect(parseAction('rate: 15', 'say: hi')).toMatchObject({ rate: 15 });
-    expect(parseAction('rate: quickness', 'say: hi')).toMatchObject({ rate: 'quickness' });
+    expect(parseAction('rate: quickness', 'say: hi')).toMatchObject({ rate: { id: 'quickness' } });
   });
 
   // A tag list is the one place an action takes a free-form word, so it is the
@@ -314,17 +312,16 @@ describe('action kinds and their cadence', () => {
   it.each([
     [['once'], /tag "once" was never implemented/],
     [['repeating'], /tag "repeating" was renamed — write `continuous`/],
-    [['instnt'], /unknown tag "instnt" — an action's bare tags are instant, continuous, retaliates/],
+    [['instnt'], /unknown tag "instnt" — an action's bare tags are instant, continuous/],
     [['4s'], /a duration clause paces nothing on an action/],
   ])('refuses the bare tag %s rather than keeping a word nothing reads', (lines, message) => {
     expect(() => parseAction(...lines, 'say: hi')).toThrow(message);
   });
 
-  it('keeps the tags an action does read: the two kinds, retaliates, and a stat bonus', () => {
-    expect(parseAction('continuous', 'time: 2', 'retaliates', '+2 attack', 'say: hi')).toMatchObject({
+  it('keeps the tags an action does read: the two kinds and a stat bonus', () => {
+    expect(parseAction('continuous', 'time: 2', '+2 attack', 'say: hi')).toMatchObject({
       kind: 'continuous',
-      retaliates: true,
-      tags: [{ kind: 'keyword', value: 'continuous' }, { kind: 'keyword', value: 'retaliates' }, { kind: 'stat-bonus', statId: 'attack' }],
+      tags: [{ kind: 'keyword', value: 'continuous' }, { kind: 'stat-bonus', statId: 'attack' }],
     });
   });
 
@@ -339,7 +336,7 @@ describe('action kinds and their cadence', () => {
   it.each([
     [['rate:'], /action "work": rate: expected an id/],
     [['time: abc'], /action "work": time: expected a number/],
-    [['accuracy:'], /action "work": accuracy: expected an id/],
+    [['depletes:'], /action "work": depletes: expected an id/],
   ])('names the field and the action when a value will not read: %s', (lines, message) => {
     expect(() => parseAction(...lines, 'say: hi')).toThrow(message);
   });
@@ -535,7 +532,7 @@ describe('a sub-parser must consume the whole line, like the section engine does
     expect(load('# stat attack', '# entity gull', 'peck:', '  accuracy: attack typo', '  say: hi')).toThrow(/unexpected content after an action field/);
     // The number parsers stop where they stop; what follows used to be dropped.
     expect(load('# entity gull', 'peck:', '  time: 1e3', '  say: hi')).toThrow(/unexpected content after an action field: "e3"/);
-    expect(load('# entity gull', 'peck:', '  escape after 3 times', '  say: hi')).toThrow(/unexpected content after an action field: "times"/);
+    expect(load('# entity gull', 'peck:', '  attempts: 3 times', '  say: hi')).toThrow(/unexpected content after an action field: "times"/);
   });
 
   it('refuses trailing garbage in a dialogue condition or effect', () => {
@@ -550,7 +547,7 @@ describe('a sub-parser must consume the whole line, like the section engine does
   });
 
   it('still accepts every field written correctly', () => {
-    expect(load('# flag a', '# flag b', '# item coin', '# stat attack', '# entity gull', 'peck:', '  requires: a and not b', '  time: 1.5', '  accuracy: attack', '  escape after 3', '  give: 1 coin, say: Hi')).not.toThrow();
+    expect(load('# flag a', '# flag b', '# item coin', '# stat attack', '# entity gull', 'peck:', '  requires: a and not b', '  time: 1.5', '  accuracy: attack', '  attempts: 3', '  give: 1 coin, say: Hi')).not.toThrow();
   });
 });
 

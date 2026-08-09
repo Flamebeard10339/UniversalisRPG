@@ -31,7 +31,7 @@ function loaded(): Registry {
   return loadModule(MODULE);
 }
 
-const striking = (): ActiveAction => ({ ownerRef: 'entity.dummy', actionLabel: 'strike', repeating: false, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } });
+const striking = (): ActiveAction => ({ ownerRef: 'entity.dummy', actionLabel: 'strike', repeating: false, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.dummy', actionLabel: 'strike', target: 'dummy' } } });
 
 function withStrike(): GameState {
   const state = createGameState('nowhere');

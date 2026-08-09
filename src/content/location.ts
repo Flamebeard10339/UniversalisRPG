@@ -21,6 +21,15 @@ export interface Edge {
   condition?: Condition;
 }
 
+// How many of a type stand here. Absent is one, so every line that shipped
+// before counts existed reads the same.
+export interface Population {
+  count?: number;
+  entity: string;
+}
+
+export const populationCount = (entry: Population): number => entry.count ?? 1;
+
 export interface Location {
   id: string;
   x: number;
@@ -28,7 +37,7 @@ export interface Location {
   z: number;
   title: string;
   examine?: string;
-  entities: string[];
+  entities: Population[];
   adjacent: Edge[];
   flags: string[];
   starting: boolean;
@@ -36,6 +45,17 @@ export interface Location {
   // Actions the location itself can do, as opposed to something standing in it.
   actions: Action[];
 }
+
+const population: Parser<Population> = {
+  parse(cursor) {
+    const start = cursor.pos;
+    const count = cursor.take(/\d+(?![\w-])/);
+    if (count === null) return { entity: id.parse(cursor) };
+    if (Number(count) === 0) throw new DslError('a count of 0 puts nothing here, so leave the entry out', { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
+    cursor.take(/[ \t]+/);
+    return { count: Number(count), entity: id.parse(cursor) };
+  },
+};
 
 const edge: Parser<Edge> = {
   parse(cursor) {
@@ -109,7 +129,7 @@ export const locationSchema: SectionSchema<Location, 'starting', 'actions'> = {
     z: { parser: number, default: () => 0 },
     title: { parser: text, default: (self) => humanize(self.id) },
     examine: { parser: text },
-    entities: { parser: list(id), default: () => [] },
+    entities: { parser: list(population), default: () => [] },
     adjacent: { parser: list(edge), default: () => [] },
     flags: { parser: list(id), default: () => [] },
     relative: { parser: relative },
