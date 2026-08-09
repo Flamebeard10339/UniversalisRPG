@@ -286,3 +286,114 @@ doctor and the byte check all pass.
   touch, and both green when npm test is run on its own (2121 of 2121, twice, once under the same
   four concurrent gate commands merge-ready launches). Recorded as a recurrence of the existing
   flake record, not as a defect of this branch.
+
+### Pass 3 — 2026-08-09
+
+- base: `6d6815f04182e1c1ecdf25f1ffb534a1dd78d0ff`
+- head: `08f01e5bf7dbb9b776aa4b54f1ad343d36aaa4e4`
+- proof 1: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer, which is
+  still open. Re-read the dispatcher cold rather than taking passes 1 and 2 on trust:
+  scripts/play-cli.ts still decides by a chain of string tests, 18 of them by
+  `grep -c "trimmed === '\|trimmed.startsWith('" scripts/play-cli.ts`, split across
+  handleGameplayCommand (line 437) and handleCommand (line 545). No table exists below ui:
+  `grep -rn "COMMANDS\|commands: *Record\|Record<string, *{[^}]*handler" src/` returns nothing.
+  Re-runnable as those two greps.
+- proof 2: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer.
+  HELP_LINES is still the hand-written array at scripts/play-cli.ts:52 and handleGameplayCommand
+  returns it verbatim at scripts/play-cli.ts:445. Re-runnable as
+  `grep -n HELP_LINES scripts/play-cli.ts`, which prints exactly those two lines. c2 is the one
+  clause a player is supposed to see change, and the scripted transcripts this pass ran on both
+  trees print the same help block.
+- proof 3: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer, and
+  correctly so, because the shared surface c3 speaks about does not exist yet. The negative half
+  holds and is re-runnable: `grep -rn "\[time: \|progressBar\|MINIMAL_STAGES" src/` is empty, and
+  every piece of terminal vocabulary is in the driver — MINIMAL_STAGES at scripts/play-cli.ts:98,
+  progressBar at :579, the check and warning glyphs at :508 and :509. What this branch moved down
+  it moved as numbers: PlayAction publishes progress as a 0-to-1 fraction and completion as a unit
+  count, and liveTick does the glyph work above them.
+- proof 4: unmet — The publication half is now met and proved; the guard half is defeated, so the clause
+  as worded fails. PUBLICATION: I hand-built an 11-entry manifest at
+  C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass3-mutations.json aimed at the
+  publication lines of sessionStatus rather than at any test, and ran it. All 11 KILLED, 0
+  survived, each re-run at its own file with the mutant still applied: c4-xp, c4-equipment,
+  c4-stats and c4-discovered — the four kinds pass 1 and pass 2 independently measured as
+  SURVIVED against the whole suite — are each killed by a named test in the new
+  "what the engine publishes" block of src/runtime/session.test.ts; c4-inventory by 4 tests,
+  c4-flags by 2, control-player by 1, c4-action by 11 across scripts/play-cli.test.ts and
+  src/runtime/session.test.ts. So all six kinds c4 names by name now have something watching them,
+  reproduced independently of the implementer's own run. GUARD, the routes that are closed: on a
+  session from startSession, Reflect.ownKeys is ['registry'], getOwnPropertySymbols is [], the
+  prototype is Object.prototype, JSON.parse(JSON.stringify(session)) carries only registry, and
+  the module exports no INTERNALS binding — pass 2's getOwnPropertySymbols cast now has nothing to
+  find. Both halves of that seal are under test and both mutations killed
+  (c4-handle-carries-no-state, c4-handle-refuses-a-forgery). A hostile Registry handed to
+  adoptRegistry, proxied to record every argument any of its members receives, was never handed
+  the live state. GUARD, the route that is open: c4 says a driver cannot reach GameState rather
+  than merely being observed not to, and a driver holding nothing but a PlaySession still can. The
+  registry the handle publishes is live and its maps are writable, so a driver can put a ParsedSave
+  of its own into session.registry.saves and then call the exported applyDirective with
+  {kind:'load'}; loadSave assigns the scalar save fields by reference
+  (src/runtime/save.ts:237, `target[field] = diff[field]`), and player, activeAction, modals and
+  instances are all scalar fields. Measured through npm run inspect on this head, scripts kept at
+  C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass3-attack2.js and
+  ...-attack3c.js: after the load, mutating the object the driver still holds sets
+  sessionStatus(session).player.name to 'MUTATED-OUT-OF-BAND'; sets action.attempts to 4242 and
+  action.completion to 999 without the engine running; and pushing a frame onto the array it
+  handed in opens a character-creation modal and takes the choice list from 1 to 0. The same
+  route writes arbitrary inventory, flags and time, and serializeSession(session) reads the whole
+  state back out as a save string. This is not an exotic hostile shape: session.test.ts's own
+  primed() helper (src/runtime/session.test.ts:13) and play-cli's buildCreateTest
+  (scripts/play-cli.ts:307) both write to registry.saves, because there is no other way for a
+  driver to load a save. Two smaller notes for the next pass rather than findings. First, runTest
+  is exported taking a raw GameState and mints a PlaySession over it through the same sessionOver,
+  so startSession is not the only door the handle comes out of — that leaks nothing, because the
+  caller already owns the state, but it means "the guard acts where a driver obtains its session"
+  has a second entrance. Second, the exhaustiveness test's closing loop asserts only that each
+  published field's key is present in view(); the classification Record above it is the part that
+  does the work, and the three value tests are the part that proves the values.
+- proof 5: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer. No
+  module below ui holds the command set, so the effects-as-data rule has nothing yet to apply to.
+  Checked that this branch's own additions do not stand in its way by reading them: adoptRegistry,
+  serializeSession, sessionStatus, runSessionTest and publishAction each take everything they use
+  as an argument and reach for no file, clock or subprocess. npm run layer-check passes inside
+  merge-ready, so nothing in src/runtime imports scripts.
+- proof 6: unmet — Not attempted on this branch; owed by the-command-set-lives-below-the-ui-layer.
+  liveTick is still exported from scripts/play-cli.ts:603, above ui, where a second driver cannot
+  call it. Re-runnable as `grep -rn "export function liveTick" scripts/ src/`, which names that
+  one line. The direction of travel is still not purely toward c6 and this branch moved it
+  further: on top of the previous: PlayView parameter pass 2 recorded, LiveTickResult now also
+  carries the view the tick produced and runLiveAction threads it forward in a `latest` local
+  (scripts/play-cli.ts:679-686). Whatever eventually moves down has to take that threading with it
+  or drop it. The arithmetic did leave the driver — cycleDuration is gone and the bar, pools and
+  clock come from the PlayView that wait() returns — so what c6 has left to move is the
+  wait-and-decide.
+- proof 7: unmet — Not attempted on this branch; owed by layer-check-reads-every-source-file.
+  scripts/layer-check.ts is not in this diff and read cold makes no partition assertion: it loops
+  `for (const layer of LAYERS) for (const file of sourceFiles(ROOTS[layer]))` at
+  scripts/layer-check.ts:14-16 and reports only on the imports it finds, so a file belonging to no
+  root is never visited and never named. ROOTS at scripts/lib/layers.ts:9 is src/grammar,
+  src/content, src/runtime, src/ui and scripts; `ls src/ui` does not exist and src/main.tsx does,
+  under none of them, so the second driver's own entry point is read by no rule.
+- proof 8: unmet — Pass 1's and pass 2's measurements all reproduce and I am not disputing any of them:
+  no file under content/ is in the diff, so no `# save` fixture was regenerated, every shipped
+  `# test` runs unchanged, and merge-ready's npm test leg is green at 2121. What neither pass
+  covered is a state the engine cannot produce but a `# save` can, and this branch made that state
+  fatal. publishAction reads active.cadences[PLAYER].progress unguarded at
+  src/runtime/session.ts:315, and sessionStatus calls it on every view(). On the merge base
+  nothing on the view path touched cadences for an untargeted action: encounterView returns null
+  before reaching them, and cycleDuration only ran inside liveTick. Reproduction, both trees driven
+  with the same bytes: content at
+  C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass3-content2.dsl, whose one
+  `# save` body is {"version":7,"activeAction":{"ownerRef":"entity.rock","actionLabel":"mine",
+  "cadences":{},"implicitTarget":1000}}, and the six-line input at
+  ...-pass3-transcript-input.txt (/look, /load midaction, /look, /state, /inventory, /quit) piped
+  into `npx tsx scripts/play-cli.ts <that dsl> --no-modportal local=<a temp file>`. The merge base
+  6d6815f0, checked out into its own worktree, loads it and prints the whole transcript through
+  /quit. This head dies on the /look after the load with an uncaught TypeError, "Cannot read
+  properties of undefined (reading 'progress')", at publishAction. That save is not input the
+  engine already rejects: checkSave accepts it (activeAction is validated as isObject only) and
+  pruneStateForRegistry's activeActionProblem accepts it, which is why the base plays it. So a
+  scripted REPL session's transcript is not the same before and after this branch, which is what
+  c8 says it is. One line fixes it and the finding says so. Performance was checked as well and is
+  not a regression: 2000 view() calls over content/tutorial-island.dsl measured 25ms on this head
+  against 21ms on the merge base, through npm run inspect on both trees.
