@@ -124,16 +124,18 @@ aggressive
 faction: player
 ```
 
-An entity belongs to one or more factions and defaults to `world`. **Two entities are hostile when
-they share no faction.** An `aggressive` entity opens the fight itself against any hostile entity in
-its location; everything else waits to be attacked. A neutral that nobody attacks is one that joins
-every faction, and an ally is one that joins yours.
+**Two entities are hostile when they share no faction.** An `aggressive` entity opens the fight
+itself against any hostile entity in its location; everything else waits to be attacked.
 
-Membership is a bitmask at runtime, so the check is one `and` and an entity is in several factions
-for free. It is authored as declared names rather than as numbers: `faction: 3` is unreadable on the
-page, which is the whole thing this grammar is for, and an undeclared name is a load error the way
-every other reference is — otherwise `faction: vermni` silently invents a faction hostile to
-everyone.
+`faction:` takes one or more declared names. Each declaration takes a bit, so membership is a mask
+and the check is one `and`: `world` is the first bit and the default, `player` the second, and
+`faction: world, player` is 3 — the neutral nobody attacks, because it shares a bit with everyone.
+An entity that says nothing is `world`, which is why almost nothing needs the line: rats do not
+fight rats, and only the player and its allies declare anything.
+
+The names are authored and the bits are compiled. `faction: 3` on a page is unreadable, which is the
+thing this grammar exists for, and an undeclared name is a load error the way every other reference
+is — otherwise `faction: vermni` silently invents a faction hostile to everyone.
 
 **A fight is bounded by its location.** An aggressive entity keeps swinging while its target is in
 the room and disengages when the target leaves; it does not follow. Travelling out is therefore how
@@ -468,8 +470,7 @@ draft of this design put the killer's rewards in an unmarked `on death:` block o
 victim's own consequences in an unmarked `on death:` block on the player. That is the original defect
 one level up: same block name, opposite recipient, decided by which entity you were reading.
 
-**Where it does not hold.** Three places, named against this proposal rather than only against
-today's:
+**Where it does not hold.** Two places, named against this proposal rather than only against today's:
 
 1. `attempts: 20` does not say whose attempts. It cannot mean the other side's, because a count is
    not a stat and there is no second one to confuse it with, but the reader is relying on that
@@ -501,27 +502,22 @@ if the player ran the rat's action, the rat would decide how the player fights.
 
 Alternatives that lost:
 
-- **The entity keeps a `fight:` block and the swing moves to a shared move.** The engagement block
-  would be authored per foe, so a hundred enemies is a hundred near-identical copies of `xp:` and
-  `hidden if:` — the duplication this branch exists to remove, relocated.
-- **Interactions own everything, and entities own no actions.** The refactor record proposes this.
-  It breaks `<obj>.<objId>.<actionId>` addressing for ovens and doors, which CLAUDE.md makes
-  first-class for anything an object can do, and it is aimed at the wrong half — the defect is that
-  entity-owned actions are *sometimes* about the entity and sometimes about its victim, not that
-  entities own actions.
-- **`# entitytype` survives, restricting actions to permitted entity types.** A list of types is a
-  second place that has to be edited whenever a species is added, and CLAUDE.md forbids systems that
-  must be manually kept in sync. The pool an action names is the same restriction, derived.
-- **Factions written as numbers.** `faction: 1` and `faction: 3` are the runtime representation
-  written down. They are unreadable on the page, and a mistyped digit is a valid faction, so the
-  names are authored and the bits are compiled.
-- **`on escape:` renamed to `on failure:`, the obvious word.** It is occupied by a different moment
-  and repointing it silently is this document's own defect. Renaming *that* field instead — freeing
-  the good word for this one — is the better end state and is filed as its own record, because it
-  reaches into non-combat grammar this branch does not own.
-- **`auto-retaliate` as an authored field.** Considered and dropped: nothing that can retaliate ever
-  wants not to, and the one apparent counterexample, a tree, has no `uses:` and so cannot. A field
-  with no counterexample is one nobody will ever write.
+- **The entity keeps a `fight:` block and the swing moves to a shared move.** A hundred enemies is a
+  hundred near-identical copies of `xp:` and `hidden if:` — this branch's duplication, relocated.
+- **Interactions own everything, and entities own no actions.** The refactor record proposes it. It
+  breaks `<obj>.<objId>.<actionId>` for ovens and doors, and it is aimed at the wrong half: the
+  defect is that entity-owned actions are *sometimes* about the entity, not that entities own them.
+- **`# entitytype` survives, restricting actions to permitted entity types.** A type list is a second
+  place to edit per species; CLAUDE.md forbids what must be kept in sync by hand. The pool an action
+  names is the same restriction, derived.
+- **Factions written as numbers.** `faction: 3` is the runtime representation written down:
+  unreadable, and a mistyped digit is a valid faction. Names are authored, bits are compiled.
+- **`on escape:` renamed to the obvious word, `on failure:`.** Occupied by a different moment, and
+  repointing it silently is this document's own defect. Renaming *that* one instead is the better end
+  state and is filed separately, reaching into grammar this branch does not own.
+- **`auto-retaliate` as an authored field.** Nothing that can retaliate wants not to, and the one
+  apparent counterexample — a tree — has no `uses:` and so cannot. A field with no counterexample is
+  one nobody will write.
 
 ## The three questions the substrate is waiting on
 
@@ -559,9 +555,7 @@ If that turns out to bite, it is a change to one field's home and not to the mod
 | implicit target pool (no `target:`) | Kept unchanged for one-sided actions. A two-sided action must write `depletes:`, because a side-naming action with nothing to deplete is not a contest. |
 | `accuracy` / `evasion` | One contest line: `accuracy: my accuracy vs their evasion`. Both field names disappear; neither behaviour does. |
 | `ability` / `dr` | One contest line: `damage: my attack vs their defense`. Same. |
-| `rate:` naming a stat read live | Kept, written `rate: my attack-rate`. The comment at `src/runtime/stats.ts:69` about reading against whoever is swinging becomes the word `my`. |
-| `rate:` as a literal | Kept, unmarked — a literal has no side. |
-| `time:` | Kept, unmarked. |
+| `rate:` naming a stat read live | Kept, written `rate: my attack-rate`. The comment at `src/runtime/stats.ts:69` about reading against whoever is swinging becomes the word `my`. A literal `rate:` and `time:` are kept unmarked, a literal having no side. |
 | `# entitytype` action templates | **Replaced** by `# action` + `uses:`, which is strictly more expressive: `uses:` is a list, so an entity composes several actions instead of inheriting one type. |
 | `on success:` / `on failure:` on a fight | **Replaced** by event handlers. A fight's outcome is a participant's death, which is an event on that participant, and putting the reward there is what lets the same rewards fire however the rat died. Non-combat actions keep both blocks unchanged. |
 | `on empty:` / `on full:` on `# resource` | **Moved** to entity handlers via `# event`. This is what stops them being writable only in the player's voice. |
@@ -631,34 +625,20 @@ unchanged; this proposal adds no second spelling for anything they already do.
 
 ## Queued work
 
-**`combat-events`** — compatible; requires re-planning; no ruling of its overturned.
+**`combat-events`** — compatible; requires re-planning; **it stands, behind the refactor.**
 
-Its four recorded rulings survive intact and this document reopens none of them: thorns stays a
-persistent effect (and reads better here — a passive enemy is one carrying no `uses:`, rather than
-one lacking a `retaliates` action), rage stays a resource, the chance mechanism stays `droptables`',
-and the event vocabulary stays closed. `# event` binds a *name* to a resource and a trigger from that
-vocabulary; it does not add triggers, so it is a naming layer and not a second vocabulary.
-
-Three things it must re-plan:
-
-1. **Its host exists here and does not exist today.** Its lead example is a weapon that poisons its
-   target, scoped by declaring `on hit:` on an action. Today the swing is `fight:` on the foe, so the
-   only thing an author can scope a hook to is *this rat*. A `# action` referenced by `uses:` is the
-   per-weapon host it was written for.
-2. **`on hit:` / `on hit self:` must both be marked.** One unmarked block whose recipient is the
-   struck actor and one marked block whose recipient is the swinger is this branch's defect in
-   miniature. Under the vocabulary here they are `on hit them:` and `on hit me:`. The mechanism and
-   the scope argument behind keeping both are untouched.
-3. **Two clauses dissolve.** "A hook on an action that cannot swing is a load error", tested by
-   `resolvesPerAttempt` over `accuracy:`/`target:`, has nothing to range over once those fields leave
-   actions — a hook lives on a two-sided action and a two-sided action always swings. And its
-   depletion clause is written in terms of "a retaliation that empties a pool", a word deleted here.
-
-**Position: it stands, re-planned behind the refactor.** Landing first means authoring hooks onto
-blocks that are about to move, and its own weapon example does not work until the move happens.
-Against: it lengthens a chain already waiting on `skill-levels-xp-events`. `docs/specs/combat-events.md`
-now carries this as a note at its head, so whoever picks it up reads it before planning rather than
-after.
+Its four recorded rulings survive and this document reopens none: thorns stays a persistent effect
+(and reads better here — a passive enemy is one carrying no `uses:`, rather than one lacking a
+`retaliates` action), rage stays a resource, the chance mechanism stays `droptables`', and the event
+vocabulary stays closed, because `# event` binds a *name* to a trigger from it rather than adding
+one. Three things rest on the grammar this replaces: its host (a weapon that poisons its target is
+not authorable today, since the swing is `fight:` on the foe and a hook can only be scoped to *this
+rat*), the unmarked recipient of `on hit:` beside the marked `on hit self:`, and two clauses that
+dissolve — the `resolvesPerAttempt` load error, once `accuracy:`/`target:` leave actions, and a
+depletion clause written in terms of "a retaliation". The long form is a note at the head of
+`docs/specs/combat-events.md`, so whoever picks it up reads it before planning rather than after.
+Ordering it first would mean authoring hooks onto blocks about to move; against that, it lengthens a
+chain already waiting on `skill-levels-xp-events`.
 
 **`buffs-generalized`** — compatible, and partly done for it. Its deliverable is buffs "applying to
 any entity rather than the player alone"; the `statRange` gate that makes them player-only is deleted
