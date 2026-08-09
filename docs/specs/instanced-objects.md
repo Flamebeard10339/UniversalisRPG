@@ -7,9 +7,9 @@ restored, and pruned when its template goes away. Two consumers need exactly tha
 each other. `items-mods-and-crafting` c11 needs it for items — instancing is lazy, so
 `inventory[itemId]` keeps counting stacks until a cluster jewel is slotted into one and that single
 item leaves the stack, carrying its plane, its allocations and its experience.
-`full-refactor-of-enemies-and-combat` needs it for spawned things — the player as an instance,
-enemies spawned per fight, a felled tree that regrows, a location holding five rats each on its own
-respawn clock. The payloads differ; the machinery does not, which is why building it twice would put
+`full-refactor-of-enemies-and-combat` needs it for entities that carry state outliving a fight: an
+entity declaring `skills:` is durably instanced, which in shipped content is the player and nothing
+else. The payloads differ; the machinery does not, which is why building it twice would put
 two instance tables in `GameState`, two prune rules and two save migrations — the thing CLAUDE.md
 forbids outright. This branch ships the substrate and no consumer, so nothing a player can see
 changes when it merges.
@@ -103,6 +103,17 @@ build half of it.
   instance, and where a respawn timer is written. Those answers change what a payload holds — which
   the substrate does not read — and whether ids appear in the language. That is a small enough
   surface that this branch is blocked on the document rather than on the refactor that consumes it.
+  **That document merged on 2026-08-09 and the gate is lifted**; its answers are recorded under
+  `## Open questions` below, which is now a settled list rather than a delegated one.
+- **The combat consumer is smaller than this spec first forecast, and the correction is recorded rather
+  than absorbed.** The Deliverable paragraph originally named four spawned things — the player, enemies
+  spawned per fight, a regrowing tree and five rats on their own respawn clocks. Under the settled
+  grammar three of the four are not instances: `allies:` spawns are fight-scoped and vanish with the
+  fight the way `ActiveAction.actors` already does, and a location's respawn deficit is a fact about the
+  location rather than about any rat. What is left is one durable consumer here, the player. **No clause
+  changes**, because no clause names a consumer — c1 through c10 are properties of the table, and they
+  are the reason the correction is cheap. c11 is the clause that would have caught this had the document
+  landed later, and it is being discharged early by this paragraph rather than deleted.
 - **This branch registers `object instancing` as a concept over `src/runtime/instances.ts`.** It is a
   durable capability rather than a branch output: after it lands, "who owns instancing?" is a query
   with one answer, which is the condition under which the second consumer cannot quietly build a
@@ -118,19 +129,26 @@ build half of it.
 
 ## Open questions
 
-Delegated, in the order they will be met:
+Three of the four this spec carried were delegated to `combat-encounter-grammar` and are answered by
+the document it merged on 2026-08-09. They are kept here with their answers rather than deleted,
+because a reader arriving at this spec needs the answer more than the history of the question.
 
-- Whether instance ids are visible to authors. `combat-encounter-grammar` c3(a) settles it: if an
-  author addresses an individual spawned rat by a written name, ids are part of the language and this
-  branch stores what it is handed; if not, they stay runtime-internal. The substrate is the same
-  either way, which is why this branch is not blocked on the answer — but the worker reads the
-  document before writing the module.
-- The id mechanism. c4 names the two properties it must have and deliberately names no mechanism; a
-  counter carried in `GameState` is the obvious candidate and is not a requirement.
-- Whether an instance whose payload empties collapses back into a stack. c3 says nothing carrying
-  nothing is an instance; whether the substrate enforces that eagerly or offers the operation and
-  lets the consumer call it is the worker's call, and the honest default is to offer it.
-- Where a spawned thing's location lives. A rat has to be somewhere, and whether that is a field in
-  its payload, a field on location state, or an index the substrate keeps is a call for whoever reads
-  `full-refactor-of-enemies-and-combat`'s needs. This branch stores instances; it does not decide who
-  points at them, and c5 only requires that whoever does, does it by id.
+- **Are instance ids visible to authors?** **No, in any written form.** A location holds a count,
+  `allies:` holds counts of types, and no syntax anywhere names one instance. Ids are minted by the
+  runtime, never written down and never parsed, so this branch stores an identity that no grammar has
+  to round-trip.
+- **What makes something an instance, in the grammar?** **An entity declaring `skills:`**, because
+  skill experience is per-individual and outlives any one fight. An entity without it is a template and
+  the pools it carries in a fight are fight-scoped. That is c3's laziness rule with an authored tell,
+  which is worth more than the rule alone: an author can see from the block whether a thing is
+  instanced.
+- **Where does a spawned thing's location live?** **Not here.** A location's `entities:` count and the
+  respawn deficit under it are location state, owned by `full-refactor-of-enemies-and-combat`, and a
+  fight-scoped participant is not in this table at all. This branch stores instances and does not
+  decide who points at them; c5 only requires that whoever does, does it by id.
+- **The id mechanism**, still delegated to the worker. c4 names the two properties it must have —
+  survives a save round trip, draws no randomness — and deliberately names no mechanism; a counter
+  carried in `GameState` is the obvious candidate and is not a requirement.
+- **Whether an instance whose payload empties collapses back into a stack**, still delegated. c3 says
+  nothing carrying nothing is an instance; whether the substrate enforces that eagerly or offers the
+  operation and lets the consumer call it is the worker's call, and the honest default is to offer it.
