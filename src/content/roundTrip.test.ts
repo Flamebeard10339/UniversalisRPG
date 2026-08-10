@@ -40,6 +40,7 @@ describe('roundTripModule', () => {
     '',
     '# item bramble-mail',
     '+4-7 vigor, +2 vigor per rage',
+    'on hit: 1 in 4: drain: 3 rage from them',
     'when hit: drain: 2 rage from them',
     '',
     '# entity berserker',
@@ -65,6 +66,8 @@ describe('roundTripModule', () => {
 
   it.each([
     ['  restore: 1 base.rage to me\n', 'entities', 'berserker'],
+    ['when hit:\n  restore: 1 base.rage\n', 'entities', 'berserker'],
+    ['on hit:\n  1 in 4:\n    drain: 3 base.rage from them\n', 'items', 'bramble-mail'],
     ['when hit:\n  drain: 2 base.rage from them\n', 'items', 'bramble-mail'],
   ])('reports a hook the reload lost, so dropping one cannot read as clean: %s', (printedForm, where, id) => {
     const result = roundTripModule(loadModule(CARRIERS), { info }, (printed) => {

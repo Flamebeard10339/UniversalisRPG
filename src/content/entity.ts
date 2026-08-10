@@ -128,7 +128,8 @@ export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'>
     respawnAfter: { parser: duration, keyword: 'respawn after' },
     hiddenIf: { parser: condition, keyword: 'hidden if' },
     // Claimed as fields, so `on hit:` is a hook before the label dispatch below
-    // can read it as an `on <event>:` handler or as an action named "on hit".
+    // can read it as an `on <event>:` handler; `reservedEventIds` is what stops
+    // an event from being declared with a name only the hook could answer.
     ...HOOK_FIELDS,
   },
   keywords: ['aggressive'],

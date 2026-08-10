@@ -162,6 +162,10 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         }
         if (op !== undefined && !isListParser(fields[name].parser)) throw new DslError(`${kind} field ${key} is not a list, so it cannot take ${op}`, keySpan);
 
+        // A field written both ways would otherwise keep the inline half and
+        // drop the block without a word, which is the silent loss the two
+        // hand-written copies of this rule inside the result readers exist for.
+        if (!cursor.done && line.children.length > 0) throw new DslError(`${kind} field ${key} is written inline and as a block; give it one`, keySpan);
         const value = !cursor.done ? fields[name].parser.parse(cursor) : line.children.length > 0 ? parseBlock(fields[name].parser, line.children, line.span) : undefined;
         // an empty value with no block is unspecified: leave the field absent
         if (value === undefined) continue;

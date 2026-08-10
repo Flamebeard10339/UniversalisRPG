@@ -23,9 +23,6 @@ export const itemSchema: SectionSchema<Item, never, 'actions'> = {
     examine: { parser: text, default: (self) => `This is ${article(self.title)} ${self.title}.` },
     slot: { parser: id },
     tags: { parser: list(tagClause), default: () => [] },
-    // The first labelled blocks an item holds that are not actions, and the
-    // reason the pair is a spread: an item carries a hook because it carries a
-    // character modifier, exactly as it carries `+4-7 attack`.
     ...HOOK_FIELDS,
   },
   clauses: 'tags',

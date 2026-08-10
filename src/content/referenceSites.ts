@@ -142,9 +142,12 @@ export function visitTags(list: unknown, where: string, visit: Visit): void {
 }
 
 // The two blocks a character modifier carries, walked wherever one is carried.
+// Through `listMembers` because a hook is a list field: `+on hit:` in a patch
+// module holds the operations until merge resolves them, and resolution runs
+// first.
 function hooks(carrier: HookCarrier, where: string, visit: Visit): void {
-  results(carrier.onHit, `${where} on hit:`, visit);
-  results(carrier.whenHit, `${where} when hit:`, visit);
+  results(listMembers<ActionResult>(carrier.onHit), `${where} on hit:`, visit);
+  results(listMembers<ActionResult>(carrier.whenHit), `${where} when hit:`, visit);
 }
 
 // A side marker says which participant a name is read off; the name itself

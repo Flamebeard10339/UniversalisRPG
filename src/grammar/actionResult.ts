@@ -80,14 +80,12 @@ const MOVES = { from: 'takes its amount away from a party', to: 'gives its amoun
 
 function parseParty(verb: 'drain' | 'restore', cursor: Cursor): Party | undefined {
   const start = cursor.pos;
+  // Peeked whole, so nothing is consumed unless a phrase opens: what follows may
+  // be nothing, or a typo the caller's end-of-line demand describes better than
+  // a party reader could.
+  if (cursor.peek(/[ \t]+(?:from|to)(?![\w-])/) === null) return undefined;
   cursor.take(/[ \t]+/);
-  const preposition = cursor.take(/(?:from|to)(?![\w-])/) as 'from' | 'to' | null;
-  // Rewound rather than refused: what follows may be nothing, or a typo that the
-  // caller's end-of-line demand describes better than a party reader could.
-  if (preposition === null) {
-    cursor.pos = start;
-    return undefined;
-  }
+  const preposition = cursor.take(/from|to/) as 'from' | 'to';
   cursor.take(/[ \t]+/);
   const span = { start: cursor.abs(start), end: cursor.abs(cursor.src.length) };
   const party = cursor.take(/(?:me|them)(?![\w-])/) as Party | null;
@@ -122,7 +120,11 @@ function wrapperBody(cursor: Cursor, line: RawLine | null, what: string, span: S
     return inline;
   }
   if (line === null || line.children.length === 0) throw new DslError(`${what} has an empty body`, span);
-  return resultBlock(line.children);
+  // The unchecked reader: a wrapper's body is part of the list its opener
+  // belongs to, and `refuseParty` at that list's entry point already walks into
+  // it. Reading it through the checked one would refuse a party phrase inside a
+  // hook's own `1 in 20:`.
+  return readResultBlock(line.children);
 }
 
 const WEIGHT = /\d+x(?![\w-])/;
@@ -287,7 +289,7 @@ export function startsResult(cursor: Cursor): boolean {
   return cursor.peek(LEAF_RESULT) !== null || cursor.peek(RANGED_SELECTOR) !== null || wrapperAt(cursor) !== null;
 }
 
-export function parseResultLine(line: RawLine): ActionResult[] {
+function readResultLine(line: RawLine): ActionResult[] {
   const cursor = new Cursor(line.text, 0, line.span.start);
   const results = parseResults(cursor, line);
   requireEnd(cursor, 'a result');
@@ -299,7 +301,31 @@ export function parseResultLine(line: RawLine): ActionResult[] {
   return results;
 }
 
+// A party names one of two, so it reads only where the moment identifies the
+// other. Every other result list in the language has a single actor, and a
+// phrase there would be applied to that actor — the opposite of what it says.
+function firstParty(results: readonly ActionResult[]): Extract<ActionResult, { kind: 'pool' }> | undefined {
+  for (const result of results) {
+    if (result.kind === 'pool' && result.party !== undefined) return result;
+    for (const nested of nestedResults(result)) {
+      const found = firstParty(nested);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+function refuseParty(results: ActionResult[], span: Span): ActionResult[] {
+  const found = firstParty(results);
+  if (found === undefined) return results;
+  throw new DslError(`\`${found.delta.max < 0 ? 'from' : 'to'} ${found.party}\` names one of two parties, so it reads only inside \`on hit:\` or \`when hit:\`, where the moment identifies the other`, span);
+}
+
+export const parseResultLine = (line: RawLine): ActionResult[] => refuseParty(readResultLine(line), line.span);
+
 export const resultBlock = (lines: readonly RawLine[]): ActionResult[] => lines.flatMap(parseResultLine);
+
+const readResultBlock = (lines: readonly RawLine[]): ActionResult[] => lines.flatMap(readResultLine);
 
 export const actionResult: Parser<ActionResult> = {
   parse: parseResult,
@@ -309,6 +335,17 @@ export const actionResult: Parser<ActionResult> = {
 // groups read blocks through the child-aware reader rather than line by line.
 export const resultList: ListParser<ActionResult> = {
   element: actionResult,
-  parse: (cursor) => parseResults(cursor, null),
+  parse: (cursor) => {
+    const start = cursor.pos;
+    return refuseParty(parseResults(cursor, null), { start: cursor.abs(start), end: cursor.abs(cursor.src.length) });
+  },
   parseBlock: (lines) => resultBlock(lines),
+};
+
+// The one list a party phrase reads in, which is what makes the refusal above a
+// rule about where rather than a rule about which verb.
+export const hookResultList: ListParser<ActionResult> = {
+  element: actionResult,
+  parse: (cursor) => parseResults(cursor, null),
+  parseBlock: readResultBlock,
 };

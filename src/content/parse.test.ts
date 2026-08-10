@@ -3,7 +3,7 @@ import { condition } from '../grammar/condition';
 import { Action, entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
-import { loadModule } from './registry';
+import { loadModule, loadUniverse } from './registry';
 import { parseModule } from './module';
 import { Cursor, DslError } from '../grammar/parser';
 import { point } from '../grammar/range';
@@ -95,6 +95,30 @@ describe('the two carriers of a hook', () => {
 
   it('names the field an author was one letter from, rather than reading the typo as an action', () => {
     expect(() => parseOne('# item blade\non hi: restore: 1 rage', itemSchema)).toThrow('unknown item field: on hi, one letter from on hit');
+  });
+
+  // A hook is a list field, so the section engine accepts `+`/`-` on it and
+  // holds the operations until merge. Resolution runs first and must read them.
+  it('resolves a hook written as an edit, on a carrier that has none to edit yet', () => {
+    const module = '# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# entity rat\n+on hit: restore: 1 rage\n\n# item mail\n-when hit: restore: 1 rage\n';
+    expect(loadModule(module).entities.get('rat')!.onHit).toEqual([{ kind: 'pool', resource: 'rage', delta: point(1) }]);
+    expect(loadModule(module).items.get('mail')!.whenHit).toEqual([]);
+  });
+
+  it('appends to the hook a patch module overlays rather than replacing it', () => {
+    const base = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# entity rat\non hit: restore: 1 rage\n' };
+    const patch = { name: 'patch', text: '# info patch\nversion: 1.0.0\ndependencies:\n  base\n\n# entity base.rat\n+on hit: drain: 2 base.rage from them\n' };
+    expect(loadUniverse([base, patch]).entities.get('base.rat')!.onHit).toEqual([
+      { kind: 'pool', resource: 'base.rage', delta: point(1) },
+      { kind: 'pool', resource: 'base.rage', delta: { min: -2, max: -2 }, party: 'them' },
+    ]);
+  });
+
+  // An entity answers an event by writing `on <its name>:`, and one of those
+  // labels is now a hook. Refused where the name is bound.
+  it('refuses an event whose name only a hook block could answer', () => {
+    expect(() => loadModule('# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# event hit\nresource: rage\ntrigger: on empty\n')).toThrow('which is a hook block');
+    expect(() => loadModule('# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# event spent\nresource: rage\ntrigger: on empty\n')).not.toThrow();
   });
 });
 
@@ -217,6 +241,13 @@ describe('parser guards', () => {
     expect(dock.relative).toEqual({ direction: 'east', of: 'bridge' });
     expect(dock.x).toBeUndefined();
     expect(() => parseOne('# location dock\nx: 0, y: 0\neast of bridge', locationSchema)).toThrow(/cannot both be set/);
+  });
+
+  // Both halves used to load with the block dropped and nothing said, which is
+  // what the result readers each carry their own copy of this rule to prevent.
+  it('rejects a field written inline and as a block, rather than keeping the inline half', () => {
+    expect(() => parseOne('# entity rat\nstats: vigor 3\n  attack 4', entitySchema)).toThrow('entity field stats is written inline and as a block; give it one');
+    expect(() => parseOne('# item blade\non hit: restore: 1 rage\n  restore: 5 rage', itemSchema)).toThrow('item field on hit is written inline and as a block; give it one');
   });
 
   it('rejects a field defined twice', () => {

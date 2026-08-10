@@ -2,6 +2,7 @@ import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { point } from '../grammar/range';
 import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields } from '../grammar/action';
 import { Condition } from '../grammar/condition';
+import { HOOK_LABELS } from '../grammar/hook';
 import { Dialogue } from './dialogue';
 import { DropTable } from './dropTable';
 import { ActionDeclaration } from './action';
@@ -229,6 +230,12 @@ function applySection(registry: Registry, section: ModuleSection): void {
       const event = hydrateSection(section.value as Authored<GameEvent>, eventSchema);
       if (!event.resource) throw new DslError(`# event ${event.id} requires a resource: to watch`);
       if (!event.trigger) throw new DslError(`# event ${event.id} requires a trigger:`);
+      // An entity answers an event by writing `on <its name>:`, and a hook has
+      // claimed one of those labels. Refused where the name is bound, because
+      // the entity that would have handled it never sees a problem — it gets a
+      // hook, and the event goes unhandled with nothing to say so.
+      const answered = event.id.split('.').pop()!;
+      if (HOOK_LABELS.includes(`on ${answered}`)) throw new DslError(`# event ${event.id}: an entity would answer this by writing \`on ${answered}:\`, which is a hook block — name the event something an entity can handle`);
       registry.events.set(event.id, event);
       break;
     }

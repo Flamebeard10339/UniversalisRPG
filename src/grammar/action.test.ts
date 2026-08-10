@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Action, actionBody, assembledActionProblem, isTwoSided } from './action';
+import { ActionResult, hookResultList } from './actionResult';
 import { Cursor } from './parser';
 import { splitSections } from './structure';
 
@@ -24,6 +25,27 @@ const refusal = (body: string, label = 'swing'): string => {
     return (error as Error).message;
   }
   throw new Error('expected the load path to refuse this action');
+};
+
+// The same lines read as a hook's body rather than as an action's, which is the
+// one list a party phrase reads in.
+function hook(body: string): ActionResult[] {
+  const indented = body
+    .trim()
+    .split('\n')
+    .map((line) => `  ${line}`)
+    .join('\n');
+  const [section] = splitSections(`# probe p\non hit:\n${indented}\n`);
+  return hookResultList.parseBlock(section.body[0].children);
+}
+
+const hookRefusal = (body: string): string => {
+  try {
+    hook(body);
+  } catch (error) {
+    return (error as Error).message;
+  }
+  throw new Error('expected the load path to refuse this hook body');
 };
 
 const MELEE = `
@@ -159,7 +181,7 @@ describe('a hook is carried by a character, not by a verb', () => {
 // nesting and reads as one sentence.
 describe('which party a drain: or restore: moves its amount between', () => {
   it('reads the phrase where English puts it, and leaves an unmarked result the carrier\'s', () => {
-    expect(parse('drain: 3 health from them\nrestore: 5 rage to me\nrestore: 1 rage').results).toEqual([
+    expect(hook('drain: 3 health from them\nrestore: 5 rage to me\nrestore: 1 rage')).toEqual([
       { kind: 'pool', resource: 'health', delta: { min: -3, max: -3 }, party: 'them' },
       { kind: 'pool', resource: 'rage', delta: { min: 5, max: 5 }, party: 'me' },
       { kind: 'pool', resource: 'rage', delta: { min: 1, max: 1 } },
@@ -167,7 +189,7 @@ describe('which party a drain: or restore: moves its amount between', () => {
   });
 
   it('reads a ranged amount, a wrapper body and a comma list without the phrase swallowing what follows', () => {
-    expect(parse('1 in 4: drain: 2-5 health from them, say: It burns.').results).toEqual([
+    expect(hook('1 in 4: drain: 2-5 health from them, say: It burns.')).toEqual([
       {
         kind: 'chance',
         numerator: 1,
@@ -181,18 +203,27 @@ describe('which party a drain: or restore: moves its amount between', () => {
   });
 
   it('takes the preposition from the verb rather than from the author, and refuses the wrong one naming the right one', () => {
-    expect(refusal('drain: 3 health to them')).toContain('written `from them` rather than `to them`');
-    expect(refusal('restore: 1 rage from me')).toContain('written `to me` rather than `from me`');
+    expect(hookRefusal('drain: 3 health to them')).toContain('written `from them` rather than `to them`');
+    expect(hookRefusal('restore: 1 rage from me')).toContain('written `to me` rather than `from me`');
   });
 
   it('names both parties when the phrase opens and then names neither', () => {
-    expect(refusal('drain: 3 health from us')).toContain('`from me` for the character this is read off');
+    expect(hookRefusal('drain: 3 health from us')).toContain('`from me` for the character this is read off');
   });
 
-  // Rewound rather than refused: the end-of-line demand describes a typo after
-  // the resource better than a party reader could.
+  // Nothing is consumed unless a phrase opens, so the end-of-line demand
+  // describes a typo after the resource better than a party reader could.
   it('leaves a word that is not a preposition to the end-of-line demand', () => {
-    expect(refusal('drain: 3 health twice')).toContain('unexpected content after a result');
+    expect(hookRefusal('drain: 3 health twice')).toContain('unexpected content after a result');
+  });
+
+  // A moment with one actor identifies no other, and an unrefused phrase there
+  // would be applied to the one actor — the opposite of what it says.
+  it('refuses the phrase in a result list that is not a hook, at any depth', () => {
+    expect(refusal('drain: 3 health from them')).toContain('reads only inside `on hit:` or `when hit:`');
+    expect(refusal('on success:\n  1 in 4:\n    restore: 2 rage to me')).toContain('reads only inside `on hit:` or `when hit:`');
+    // Unmarked is untouched by the rule: it names no party to be wrong about.
+    expect(parse('drain: 3 health').results).toEqual([{ kind: 'pool', resource: 'health', delta: { min: -3, max: -3 } }]);
   });
 });
 

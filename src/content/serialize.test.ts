@@ -48,6 +48,7 @@ eat: take: 1 snack, say: You eat it.
 # item bramble-mail
 title: Bramble Mail
 +4-7 vigor, +2 vigor per stamina
+on hit: 1 in 4: drain: 3 stamina from them
 when hit: drain: 2 stamina from them
 polish: say: You buff it.
 
@@ -177,6 +178,7 @@ describe('serializeRegistryModule', () => {
     // The one carrier whose labelled blocks were all actions until now, so its
     // hook and its action have to come back as two different things.
     const mail = roundTrip.items.get('base.bramble-mail');
+    expect(mail?.onHit).toEqual([{ kind: 'chance', numerator: 1, denominator: 4, results: [{ kind: 'pool', resource: 'base.stamina', delta: { min: -3, max: -3 }, party: 'them' }] }]);
     expect(mail?.whenHit).toEqual([{ kind: 'pool', resource: 'base.stamina', delta: { min: -2, max: -2 }, party: 'them' }]);
     expect(mail?.actions.map((each) => each.label)).toEqual(['polish']);
     expect(roundTrip.entities.get('base.npc')?.whenHit).toEqual([{ kind: 'pool', resource: 'base.stamina', delta: { min: 1, max: 1 } }]);

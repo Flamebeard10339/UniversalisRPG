@@ -1,4 +1,4 @@
-import { ActionResult, resultList } from './actionResult';
+import { ActionResult, hookResultList } from './actionResult';
 import { Field } from './section';
 
 // The two moments a character can answer, read off the character carrying them.
@@ -13,8 +13,8 @@ export interface HookCarrier {
 // a character modifier, so a new carrier joins by spreading this rather than by
 // growing a second spelling of the same two blocks.
 export const HOOK_FIELDS: { [K in keyof Required<HookCarrier>]: Field<ActionResult[] | undefined, unknown> } = {
-  onHit: { parser: resultList, keyword: 'on hit' },
-  whenHit: { parser: resultList, keyword: 'when hit' },
+  onHit: { parser: hookResultList, keyword: 'on hit' },
+  whenHit: { parser: hookResultList, keyword: 'when hit' },
 };
 
 export const HOOK_LABELS: readonly string[] = Object.values(HOOK_FIELDS).map((field) => field.keyword!);
