@@ -203,3 +203,121 @@ and additionally tree ok pass and base ok pass. All six legs the clause names ar
 legs that report FAIL are `spec skill-levels-xp-events` (1 open member) and `clauses
 skill-levels-xp-events` (no recorded audit pass); neither is named by the clause and both are what
 this pass and the member's closure discharge.
+
+### Pass 2 — 2026-08-10
+
+- base: `86a4096ec7eff3a6739e6677f93e4b916c710413`
+- head: `f1ff0136739176f092816d175d9aa51c5bc86c14`
+- proof 1: met — Manifest audit-skill-levels-xp-events-pass2-mutations.json at head f1ff013.
+c1-ratio-doubles-every-ten (RATIO 2**(1/10) -> 2**(1/20)) KILLED by src/runtime/skills.test.ts >
+the xp curve > costs 1000 for the first level and doubles that cost every ten levels, re-run at
+its own file with the mutation still applied. c1-geometric-sum-not-a-flat-block (the geometric
+sum replaced by a floored ten-level block schedule) KILLED by src/runtime/skills.test.ts > the xp
+curve > rises on every level rather than resting flat inside a ten-level block. The anchoring test
+"rounds a threshold up, so a level never costs less than the curve prices it" compares against
+hardcoded literals [1000, 2072, 3221, 4452, 12067, 13933, 41799, 97530, 402058, 14253179], not
+against anything derived from xpForLevel, so it can fail; the other curve tests derive their
+expectation from xpForLevel and are consistency checks resting on that one.
+- proof 2: met — c2-closed-form-log-is-the-guess (Math.log2 -> Math.log10 in the single guess
+expression) KILLED by src/runtime/skills.test.ts > the xp curve > agrees with the accumulated curve
+at every level, not only at its thresholds, re-run at its own file with the mutation still applied.
+Read directly, src/runtime/skills.ts is 20 lines and holds no table and no block lookup: the whole
+inverse is one Math.log2 call, and the only loop is the integer correction c3 requires. Measured
+cost of the whole read on shipped content: `npm run inspect` over content/tutorial-island.dsl ran
+200,000 statValue('tutorial-island.attack') calls in 25 ms (0.125 us each) with the player's three
+skills on the sheet, so "it stays arithmetic" holds at the call site as well as in the source.
+- proof 3: met — c3-integer-correction-decides-the-level (the `while (level > 1 && xpForLevel(level) >
+total) level -= 1;` line deleted) KILLED by src/runtime/skills.test.ts > the xp curve > decides a
+level by integer comparison at thresholds across several ten-level spans.
+c3-thresholds-round-up-to-whole-xp (Math.ceil dropped from xpForLevel) KILLED by "rounds a
+threshold up, so a level never costs less than the curve prices it". The end of the domain pass 1
+filed as a survivor is now dead: c3-negative-total-is-no-progress (`const total = Math.max(0, xp);`
+-> `const total = xp;`) KILLED by "takes any negative total as no progress, including one past
+where the curve stops being real" — the repair replaced a case that could not distinguish clamped
+from unclamped (skillLevel(-1) answers 1 either way) with totals past -1000/(r-1), where the
+unclamped form takes log2 of a non-positive argument and returns NaN. The upper end is now stated
+by a test that walks to wherever Number.isSafeInteger stops holding and asserts it got past level
+390, which is where T(n) exceeds 2^53 and T(n)-1 === T(n) in float; that is nine orders of
+magnitude past any attainable total, and COUNT_RANGE in src/grammar/values.ts (/\d+(?:-\d+)?/)
+means an `xp:` result cannot be authored negative either.
+- proof 4: met — `git diff --name-only 86a4096..f1ff013` names no fixture, no `.dsl`, and neither
+src/runtime/save.ts nor src/runtime/state.ts; the only `.json` touched is docs/audits/systems.json.
+The two files f1ff013 added to the range beyond pass 1's head are src/content/entity.ts and
+src/content/skill.ts, neither of which is a save surface. Mutation c4-level-is-derived-not-stored
+(skillLevel(xp[skillId] ?? 0) -> the constant 1) KILLED by src/runtime/skills.test.ts > a skill
+level feeding the stat it names > folds a flat grant through the added channel, once per level, so
+the derivation is load-bearing on every evaluation rather than at a write. The one shape change
+f1ff013 makes to loaded content — deduping an entity's `skills:` list — is not a save field:
+`grep -rn "\.skills\b" src scripts --include=*.ts` shows exactly two readers, src/content/
+serialize.ts:328 and src/runtime/stats.ts:43, and save.ts:47 keys `xp` by skill id, not by the
+entity's list. Full suite green under `npm run tasks -- merge-ready` at f1ff013.
+- proof 5: met — Both halves now hold, and the clause is still falsifiable after the amendment.
+Authored shape: c5-authored-shape-carries-no-stat-of-its-own (BARE_AMOUNT loosened to
+`^${AMOUNT}(?:[ \t]+[a-z][a-z0-9-]*)?$`, so `per-level: +1 attack` would parse) KILLED by
+src/runtime/skills.test.ts > a skill level feeding the stat it names > refuses a grant that names a
+stat, since stat-id is where the stat is named. So the shipped spelling the amended clause names is
+defended by a test that a mutation can break, not merely described. Magnitudes:
+c5-flat-grant-scales-with-the-level (scaleRange(bonus.amount, times) -> bonus.amount) KILLED by
+"folds a flat grant through the added channel, once per level"; c5-percent-lands-in-increased-not-
+added (percent routed into `added`) KILLED by "folds a percent grant through the increased channel,
+once per level". Channels: StatFold at src/runtime/stats.ts:18 has exactly two fields, `added` and
+`increased`, the same two foldStatBonuses wrote before this branch, and foldBonus is the single
+writer both authored and skill-derived bonuses now go through. Independently, `npm run inspect`
+folded the two spellings the clause names on a base-10 stat: `per-level: +1` at level 1 gives 11,
+and `per-level: +1%` at level 30 gives 13 (10 x 1.30) — flat times the level in `added`, percent
+times the level in `increased`.
+I re-derived the amendment rather than accepting it. The Decisions entry's one falsifiable claim is
+that naming the stat once in `stat-id` makes the runtime's read of it load-bearing, and that the
+mutation "now kills five tests": run with `tests` scoped to the whole file and no named test,
+dropping `skill['stat-id'] !== statId` from the fold predicate fails 5 of 16 tests in
+src/runtime/skills.test.ts. The claim is exact. The counterfactual half — that a clause carrying
+its own statId would have made `stat-id` a provable no-op — cannot be re-run at this head, but it
+follows from the code: nothing outside foldSkillLevels reads `stat-id`, so a fold selecting on the
+clause's own statId would leave `stat-id` read by the reference checker alone, and c7 would have
+been met in name only. The amended clause is not a transcript: it still fixes both magnitudes, both
+channels, the ban on a third, and a concrete authored spelling, and all four are killed by
+mutations above.
+- proof 6: met — c6-skill-sheet-is-read-off-the-actor (actorEntity(registry, actorId) -> PLAYER inside
+foldSkillLevels) and c6-xp-store-is-not-shared-with-every-actor (`xp: stored ? state.xp : {}` ->
+`xp: state.xp`) both KILLED by src/runtime/skills.test.ts > a skill level feeding the stat it names
+> reads the level off the actor being evaluated, not off the player, each re-run at its own file
+with the mutation still applied. Structurally the call is at src/runtime/stats.ts:64, outside
+ownStores, and takes actorId and the xp map as separate parameters, so deleting the `actorId ===
+PLAYER` gate in ownStores needs no edit to foldSkillLevels. Stated precisely, because the evidence
+does not say more than this: the *sheet* is actor-keyed (the rat's own `skills:` decides what it
+folds), while the *store* the xp comes from is still gated on PLAYER at src/runtime/stats.ts:36-37.
+c4 explicitly reserves where the xp total lives to whoever makes the player an entity, so the
+remaining gate is the one c4 permits, not one c6 forbids — and it is one line inside ownStores,
+beside the buff and equipment stores it already gates, not a special case inside the fold.
+- proof 7: met — The comment is gone and the claim it made is false: `git show f1ff013 -- src/content/
+skill.ts` and the a9e43a6 diff show both the "Nothing reads it yet" lines removed, and mutation
+c7-stat-id-selects-which-stat-is-raised (dropping `skill['stat-id'] !== statId` from the fold
+predicate) fails 5 of 16 tests in src/runtime/skills.test.ts. c7-a-skill-with-no-stat-id-grants-
+nothing (the registry guard at src/content/registry.ts:257 deleted) KILLED by "refuses a grant with
+no stat-id to raise". I re-ran the orphaning paths at this head with `npm run inspect`, including
+one pass 1 did not: `# remove skill.s` while an entity lists it throws "# entity player skills:
+names an unknown skill: s"; `# remove stat.a.atk` under a per-level skill naming it throws "# skill
+a.s stat-id: names an unknown stat: a.atk"; and a later module adding `per-level:` to a skill with
+no `stat-id` throws "# skill a.s: per-level: needs a stat-id: to raise". That last one also settles
+the over-strictness question the guard raises: because applySection runs after the whole merge pass
+(src/content/registry.ts:889-901), a skill may be authored with `per-level:` in one module and
+given its `stat-id:` in another and still loads — I ran that case and it produces a skill with both
+fields. The guard is enforced where the value is assembled, not where it is written.
+- proof 8: met — c8-level-up-touches-nothing-but-the-stat (a `state.time += 1;` write inserted into
+statRange immediately before foldSkillLevels) KILLED by src/runtime/skills.test.ts > crossing a
+level threshold > moves the stat the skill names and leaves the rest of the state alone, re-run at
+its own file with the mutation still applied — that test compares a structuredClone of the whole
+state minus `xp` across the level-up, so any write anywhere in state fails it. The branch's own
+fixture crosses a threshold on `brawling`, whose stat feeds no resource, so I ran the case it
+avoids at this head with `npm run inspect`: a `grit` skill with `per-level: +5` on `max-stamina`,
+which is a resource's own `max`, with `rate: regen`. Crossing the level-4 threshold via
+applyResultsNow moved statValue('max-stamina') from 35 to 40 while state.resources.stamina stayed
+at 25000 milli-units, state.resourceRateRemainders stayed {}, state.log stayed [] and state.time
+stayed 0. The ceiling moved, the current value did not, and nothing else was written.
+- proof 9: met — `npm run tasks -- merge-ready` at f1ff013: tsc ok pass, npm test ok pass, layer-check
+ok pass, audit-status ok pass, doctor ok pass (17 warnings, none of which fail the leg), bytes ok
+pass, and additionally tree ok pass (nothing uncommitted) and base ok pass (main has not moved past
+the merge base). All six legs the clause names are green. The two legs reporting FAIL are `spec
+skill-levels-xp-events` (1 open member) and `clauses skill-levels-xp-events` (c5 outstanding from
+pass 1); neither is named by the clause, and both are what this pass and the member's closure
+discharge.

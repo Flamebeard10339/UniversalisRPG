@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule, Registry } from '../content/registry';
-import { applyResultsNow, createGameState, GameState, initResources, PLAYER, statValue } from './runtime';
+import { applyResultsNow, createGameState, GameState, initResources, PLAYER, statRange, statValue } from './runtime';
 import { point } from '../grammar/range';
 import { skillLevel, xpForLevel } from './skills';
 
@@ -16,6 +16,12 @@ base: 50
 # stat max-stamina
 base: 20
 
+# stat haggle
+base: 10
+
+# stat grudge-power
+base: 10
+
 # resource stamina
 max: max-stamina
 rate: dodge
@@ -30,10 +36,18 @@ per-level: +2%
 
 # skill lore
 
+# skill haggling
+stat-id: haggle
+per-level: +2-5
+
+# skill grudge
+stat-id: grudge-power
+per-level: -3%
+
 # entity player
 title: You
 stats: attack 10
-skills: brawling, footwork
+skills: brawling, footwork, haggling, grudge
 
 # entity rat
 stats: attack 3
@@ -129,6 +143,12 @@ describe('a skill level feeding the stat it names', () => {
     const registry = loaded();
     expect(statValue('dodge', withXp({}), registry)).toBeCloseTo(51);
     expect(statValue('dodge', withXp({ footwork: xpForLevel(11) }), registry)).toBeCloseTo(50 * 1.22);
+  });
+
+  it('scales a ranged grant as a range and a negative one downward', () => {
+    const registry = loaded();
+    expect(statRange('haggle', withXp({ haggling: xpForLevel(4) }), registry)).toEqual({ min: 18, max: 30 });
+    expect(statValue('grudge-power', withXp({ grudge: xpForLevel(5) }), registry)).toBeCloseTo(8.5);
   });
 
   it('reads the level off the actor being evaluated, not off the player', () => {

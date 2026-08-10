@@ -118,8 +118,6 @@ export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'>
       hydrate: (parsed) => Object.fromEntries(parsed as [string, Range][]),
       default: () => ({}),
     },
-    // Listing a skill twice says nothing a single listing does not, so the
-    // second is dropped here rather than counted by whoever reads the sheet.
     skills: { parser: list(id), hydrate: (parsed) => [...new Set(parsed as string[])], default: () => [] },
     equipmentSlots: { parser: list(id), keyword: 'equipment-slots', default: () => [] },
     flags: { parser: list(id), default: () => [] },
