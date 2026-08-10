@@ -752,3 +752,61 @@ argument-free entries, startsWith-with-a-space for /dsl and /local, bare startsW
 it would mean building the hand-maintained second copy that c1 exists to delete. I accept the tightening on its merits
 rather than on the implementer's say-so. The enumeration in the event note is the part that is wrong, and this record is
 where that correction belongs. Plus /help, which the clause already excepts.
+
+### Pass 8 — 2026-08-10
+
+- base: `cdffb14b3d87d2dbbf25d7bbc6ed3cf9ae819bf2`
+- head: `d4f341ca5aae3409bcb2d83bf31152d51523831f`
+- proof 1: unknown
+- proof 2: unknown
+- proof 3: unknown
+- proof 4: unknown
+- proof 5: unknown
+- proof 6: unknown
+- proof 7: met — Re-derived cold on this tree at d4f341c, after main (cdffb14, carrying
+layer-check-reads-every-source-file) merged in at 90ef11d; passes 5 and 6 graded this
+unmet correctly, because the code was not here then.
+.
+Every source file under src/ and scripts/ is now enumerated. `SOURCE_TREES = ['src',
+'scripts']` (scripts/lib/layers.ts:22) feeds `sweptFiles` (layers.ts:74), which draws
+from `trackedFiles()` rather than a walk of its own, so this rule and audit-status
+disagree about no file. Measured: `npm run layer-check` prints "205 module(s) swept
+under src and scripts, 204 read" and `git ls-files src scripts | grep -E
+'\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$' | wc -l` is 205 — the sweep is the whole tracked
+module set, exactly. The one swept-but-unread file is src/vite-env.d.ts, the sole
+OUTSIDE_STACK entry (layers.ts:33-35), matched by exact path against a written reason;
+that is the same declared-exemption shape audit-status's `unowned` list has, not a hole,
+and layers.test.ts:95 pins that a directory cannot be exempted through it.
+.
+A file belonging to no declared root fails the run naming it. Exercised through the
+production composition with only the enumeration faked, so the decision under test is
+the shipped one: `npm run inspect -- -` with a body calling
+`runLayerCheck({ tracked: () => [...trackedFiles(), 'src/zzStray.ts'], exists, read })`
+returns exitCode 1, "206 module(s) swept ... 204 read", and err naming "  src/zzStray.ts";
+`runLayerCheck()` with the real effects on the same tree returns exitCode 0 and
+"Every module belongs to a layer, and every import points downward." The partition
+assertion is `unlayeredFiles` (layers.ts:78) reaching the exit code through
+`layerCheckOutput` (layers.ts:136-142). `npm run layer-check` is on the CI leg
+(.github/workflows/test.yml:36), so the failure is a gate rather than a print.
+.
+The clause's named example is closed: `ROOTS.ui` is `['src/ui', 'src/main.tsx']`
+(layers.ts:14) and `layerOf('src/main.tsx')` returns 'ui', so the second driver's entry
+point is read by a rule. A root that names a file is matched by name and not by prefix —
+`claims` (layers.ts:55) branches on `namesFile` and compares `withoutExtension(root) ===
+withoutExtension(file)`, so `layerOf('src/main/thing.ts')` is null rather than 'ui',
+which is the extension-stripping defect a sibling finding named and this closes.
+`layerOf` also survives a Windows separator: `layerOf(String.raw`src\main.tsx`)` is 'ui',
+via `posix()` in sourceFiles.ts:4.
+.
+Mutation-tested with my own manifest, seven mutations on the lines this clause is about,
+all scoped to scripts/lib/layers.test.ts: dropping 'src/main.tsx' from ROOTS.ui; dropping
+'src' from SOURCE_TREES; making `unlayeredFiles` collect nothing; loosening the
+unlayered guard to `length > 1` so exactly one orphan passes; dropping the file's name
+from the failure line; returning exitCode 0 from the failing branch; and making a file
+root claim the directory of the same name. 7 killed, 0 survived, 0 unstable, 0 errored,
+tree gained and lost nothing. The suite notices every part of what this clause claims.
+.
+Clauses 1-8 other than 7 are graded unknown deliberately: this is a single-clause
+follow-up over a changed tree, and the standings passes 5 and 6 recorded for them are
+not disturbed.
+- proof 8: unknown
