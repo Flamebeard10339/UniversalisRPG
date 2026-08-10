@@ -3,7 +3,7 @@ import { ActionResult, DropRow, nestedResults } from '../grammar/actionResult';
 import { Condition, Reference } from '../grammar/condition';
 import { formatDependency, formatVersion, Version } from '../grammar/dependency';
 import { isPoint, Range, scaleRange } from '../grammar/range';
-import { TagClause } from '../grammar/tagClause';
+import { BonusAmount, TagClause } from '../grammar/tagClause';
 import { Produced, Quantified } from '../grammar/values';
 import { Dialogue, TextSegment } from './dialogue';
 import { DropTable } from './dropTable';
@@ -149,15 +149,15 @@ function duration(seconds: number): string {
   return minutes > 0 ? `${minutes}m${left}s` : `${left}s`;
 }
 
-function statBonus(value: Extract<TagClause, { kind: 'stat-bonus' }>): string {
+function bonusAmount(value: BonusAmount): string {
   if (value.percent) {
     const sign = value.amount < 0 ? '-' : '+';
-    return `${sign}${n(Math.abs(value.amount))}% ${value.statId}`;
+    return `${sign}${n(Math.abs(value.amount))}%`;
   }
   const sign = value.amount.min < 0 || value.amount.max < 0 ? '-' : '+';
   const lo = Math.min(Math.abs(value.amount.min), Math.abs(value.amount.max));
   const hi = Math.max(Math.abs(value.amount.min), Math.abs(value.amount.max));
-  return lo === hi ? `${sign}${n(lo)} ${value.statId}` : `${sign}${n(lo)}-${n(hi)} ${value.statId}`;
+  return lo === hi ? `${sign}${n(lo)}` : `${sign}${n(lo)}-${n(hi)}`;
 }
 
 function tag(value: TagClause): string {
@@ -167,7 +167,7 @@ function tag(value: TagClause): string {
     case 'duration':
       return duration(value.seconds);
     case 'stat-bonus':
-      return statBonus(value);
+      return `${bonusAmount(value)} ${value.statId}`;
   }
 }
 
@@ -434,7 +434,11 @@ export function serializeRegistryModule(registry: Registry, options: SerializeMo
   const moduleId = options.info.id;
   const sections: string[] = [];
   for (const stat of registry.stats.values()) if (inModule(moduleId, stat.id)) sections.push([`# stat ${moduleLocalId(moduleId, stat.id)}`, `title: ${stat.title}`, `base: ${range(stat.base)}`].join('\n'));
-  for (const skill of registry.skills.values()) if (inModule(moduleId, skill.id)) sections.push([`# skill ${moduleLocalId(moduleId, skill.id)}`, `title: ${skill.title}`, ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : [])].join('\n'));
+  for (const skill of registry.skills.values())
+    if (inModule(moduleId, skill.id))
+      sections.push(
+        [`# skill ${moduleLocalId(moduleId, skill.id)}`, `title: ${skill.title}`, ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : []), ...(skill['per-level'] ? [`per-level: ${bonusAmount(skill['per-level'])}`] : [])].join('\n'),
+      );
   for (const item of registry.items.values()) if (inModule(moduleId, item.id)) sections.push(itemSection(moduleId, item));
   for (const faction of registry.factions.values()) if (inModule(moduleId, faction.id)) sections.push(factionSection(moduleId, faction));
   for (const event of registry.events.values()) if (inModule(moduleId, event.id)) sections.push(eventSection(moduleId, event));

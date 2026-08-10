@@ -1,35 +1,36 @@
 import { DslError, Parser, Span } from './parser';
 import { Range } from './range';
 
-// A percent bonus never takes a range, so the two are separate members.
-export type TagClause =
-  | { kind: 'keyword'; value: string }
-  | { kind: 'stat-bonus'; statId: string; percent: false; amount: Range }
-  | { kind: 'stat-bonus'; statId: string; percent: true; amount: number }
-  | { kind: 'duration'; seconds: number };
+// How much a bonus is worth and which channel it lands in. A percent bonus never
+// takes a range, so the two are separate members.
+export type BonusAmount = { percent: false; amount: Range } | { percent: true; amount: number };
+
+export type TagClause = { kind: 'keyword'; value: string } | ({ kind: 'stat-bonus'; statId: string } & BonusAmount) | { kind: 'duration'; seconds: number };
 
 const SECONDS_PER_MINUTE = 60;
 
+const AMOUNT = String.raw`(?<sign>[+-])(?<lo>\d+)(?:-(?<hi>\d+))?(?<percent>%?)`;
+
 const DURATION = /^(?:(?<minutes>\d+)m)?(?:(?<seconds>\d+)s)?$/;
-const STAT_BONUS = /^(?<sign>[+-])(?<lo>\d+)(?:-(?<hi>\d+))?(?<percent>%?)[ \t]+(?<stat>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
+const STAT_BONUS = new RegExp(`^${AMOUNT}[ \\t]+(?<stat>[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*)$`);
+const BARE_AMOUNT = new RegExp(`^${AMOUNT}$`);
 const KEYWORD = /^[a-z][a-z0-9-]*$/;
 
-function parseStatBonus(groups: Record<string, string | undefined>, raw: string, span: Span): TagClause {
-  const statId = groups.stat!;
+function parseAmount(groups: Record<string, string | undefined>, raw: string, span: Span): BonusAmount {
   // The sign leads the whole clause: `-3-6 dr` is between -6 and -3.
   const sign = groups.sign === '-' ? -1 : 1;
   const lo = Number(groups.lo);
 
   if (groups.percent === '%') {
     if (groups.hi !== undefined) throw new DslError(`a percent stat bonus cannot be a range: ${JSON.stringify(raw)}`, span);
-    return { kind: 'stat-bonus', statId, percent: true, amount: sign * lo };
+    return { percent: true, amount: sign * lo };
   }
 
-  if (groups.hi === undefined) return { kind: 'stat-bonus', statId, percent: false, amount: { min: sign * lo, max: sign * lo } };
+  if (groups.hi === undefined) return { percent: false, amount: { min: sign * lo, max: sign * lo } };
 
   const hi = Number(groups.hi);
   if (hi < lo) throw new DslError(`a stat bonus range must ascend in magnitude, got ${JSON.stringify(raw)}`, span);
-  return { kind: 'stat-bonus', statId, percent: false, amount: { min: Math.min(sign * lo, sign * hi), max: Math.max(sign * lo, sign * hi) } };
+  return { percent: false, amount: { min: Math.min(sign * lo, sign * hi), max: Math.max(sign * lo, sign * hi) } };
 }
 
 function parseClause(raw: string, span: Span): TagClause {
@@ -42,7 +43,7 @@ function parseClause(raw: string, span: Span): TagClause {
   }
 
   const bonus = STAT_BONUS.exec(raw)?.groups;
-  if (bonus) return parseStatBonus(bonus, raw, span);
+  if (bonus) return { kind: 'stat-bonus', statId: bonus.stat!, ...parseAmount(bonus, raw, span) };
 
   if (KEYWORD.test(raw)) return { kind: 'keyword', value: raw };
 
@@ -54,5 +55,17 @@ export const tagClause: Parser<TagClause> = {
     const start = cursor.pos;
     const raw = (cursor.take(/[^,\n]+/) ?? '').trim();
     return parseClause(raw, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
+  },
+};
+
+// The same magnitude without the stat, for a field that names its stat itself.
+export const bonusAmount: Parser<BonusAmount> = {
+  parse(cursor) {
+    const start = cursor.pos;
+    const raw = (cursor.take(/[^,\n]+/) ?? '').trim();
+    const span = { start: cursor.abs(start), end: cursor.abs(cursor.pos) };
+    const groups = BARE_AMOUNT.exec(raw)?.groups;
+    if (!groups) throw new DslError(`expected a bonus like +1 or +1%, got ${JSON.stringify(raw)}`, span);
+    return parseAmount(groups, raw, span);
   },
 };
