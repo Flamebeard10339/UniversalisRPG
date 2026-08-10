@@ -138,6 +138,12 @@ function typoOf(key: string, known: readonly string[]): string | undefined {
   return known.find((field) => withinOneEdit(field, key));
 }
 
+// An indented block hangs off the whole line, so the one key that ends the line
+// is the only one that could take it — and a key that read its value inline
+// would drop it without a word. Asked after the value is read, because what
+// remains on the line is what says whether another key follows.
+const claimsTheBlock = (cursor: Cursor, line: RawLine): boolean => line.children.length > 0 && cursor.rest().replace(/[ \t,]+$/, '') === '';
+
 function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, keywords: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
 
@@ -162,7 +168,9 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         }
         if (op !== undefined && !isListParser(fields[name].parser)) throw new DslError(`${kind} field ${key} is not a list, so it cannot take ${op}`, keySpan);
 
-        const value = !cursor.done ? fields[name].parser.parse(cursor) : line.children.length > 0 ? parseBlock(fields[name].parser, line.children, line.span) : undefined;
+        const inline = !cursor.done;
+        const value = inline ? fields[name].parser.parse(cursor) : line.children.length > 0 ? parseBlock(fields[name].parser, line.children, line.span) : undefined;
+        if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} field ${key} is written inline and as a block; give it one`, keySpan);
         // an empty value with no block is unspecified: leave the field absent
         if (value === undefined) continue;
         if (op === undefined) authored[name] = value;
@@ -174,7 +182,9 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
       } else if (op === '-') {
         ((authored[entries!.into] ??= []) as object[]).push({ label: key, removed: true });
       } else {
-        const body = cursor.done ? entries!.body.parseBlock(line.children, key) : entries!.body.parse(cursor, key);
+        const inline = !cursor.done;
+        const body = inline ? entries!.body.parse(cursor, key) : entries!.body.parseBlock(line.children, key);
+        if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} ${key}: is written inline and as a block; give it one`, keySpan);
         ((authored[entries!.into] ??= []) as object[]).push({ label: key, ...body });
       }
     } else if (labelsBareField) {

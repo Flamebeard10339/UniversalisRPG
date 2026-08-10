@@ -2,6 +2,7 @@ import { Action, Contest, Sided } from '../grammar/action';
 import { ActionResult, DropRow, nestedResults } from '../grammar/actionResult';
 import { Condition, Reference } from '../grammar/condition';
 import { formatDependency, formatVersion, Version } from '../grammar/dependency';
+import { HookCarrier } from '../grammar/hook';
 import { isPoint, Range, scaleRange } from '../grammar/range';
 import { BonusAmount, TagClause } from '../grammar/tagClause';
 import { Produced, Quantified } from '../grammar/values';
@@ -91,7 +92,10 @@ function result(value: ActionResult): string {
       // Taking abs of each bound instead inverted a restore's range — a
       // symmetric operation on a point, which is why nothing saw it.
       const magnitude = value.delta.max < 0 ? scaleRange(value.delta, -1) : value.delta;
-      return `${value.delta.max < 0 ? 'drain' : 'restore'}: ${range(magnitude)} ${value.resource}`;
+      // The preposition follows the verb, so it is re-derived from the sign
+      // rather than held: two fields agreeing by convention can disagree.
+      const party = value.party === undefined ? '' : ` ${value.delta.max < 0 ? 'from' : 'to'} ${value.party}`;
+      return `${value.delta.max < 0 ? 'drain' : 'restore'}: ${range(magnitude)} ${value.resource}${party}`;
     }
     case 'roll':
       return `roll: ${value.table}`;
@@ -167,7 +171,7 @@ function tag(value: TagClause): string {
     case 'duration':
       return duration(value.seconds);
     case 'stat-bonus':
-      return `${bonusAmount(value)} ${value.statId}`;
+      return `${bonusAmount(value)} ${value.statId}${value.per === undefined ? '' : ` per ${value.per}`}`;
   }
 }
 
@@ -184,6 +188,13 @@ function block(lines: Lines, label: string, values: readonly string[]): void {
 function resultBlock(lines: Lines, label: string, values: readonly ActionResult[] | undefined, childSpaces = 2): void {
   if (!values || values.length === 0) return;
   lines.push(`${label}:`, ...indented(values.flatMap(resultLines), childSpaces));
+}
+
+// Printed by every carrier, so a kind that joins the gather prints its hooks by
+// calling this rather than by growing its own copy of the two labels.
+function hookLines(lines: Lines, carrier: HookCarrier): void {
+  resultBlock(lines, 'on hit', carrier.onHit);
+  resultBlock(lines, 'when hit', carrier.whenHit);
 }
 
 const sided = (value: Sided): string => (value.side === undefined ? value.id : `${value.side} ${value.id}`);
@@ -297,6 +308,7 @@ function itemSection(moduleId: string, item: Item): string {
   titled(lines, item);
   if (item.slot) lines.push(`slot: ${item.slot}`);
   if (item.tags && item.tags.length > 0) lines.push(item.tags.map(tag).join(', '));
+  hookLines(lines, item);
   for (const action of item.actions ?? []) lines.push(...actionLines(action));
   return lines.join('\n');
 }
@@ -331,6 +343,7 @@ function entitySection(moduleId: string, entity: Entity): string {
   if (entity.faction.length > 0) lines.push(`faction: ${entity.faction.join(', ')}`);
   if (entity.allies.length > 0) lines.push(`allies: ${entity.allies.map((ally) => (ally.count === undefined ? ally.entity : `${n(ally.count)} ${ally.entity}`)).join(', ')}`);
   block(lines, 'flags', entity.flags);
+  hookLines(lines, entity);
   // As authored: `actions` and `handlers` are what the linker made of these, and
   // printing those instead would write an entity's inherited actions into it.
   for (const authored of entity.blocks) lines.push(...actionLines(authored));

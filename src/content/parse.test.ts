@@ -3,7 +3,7 @@ import { condition } from '../grammar/condition';
 import { Action, entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
-import { loadModule } from './registry';
+import { loadModule, loadUniverse } from './registry';
 import { parseModule } from './module';
 import { Cursor, DslError } from '../grammar/parser';
 import { point } from '../grammar/range';
@@ -36,8 +36,102 @@ describe('items and tag clauses', () => {
     ]);
   });
 
+  // The counter is the resource's level here; a buff's stack count and a stat
+  // join the same shape rather than growing a second multiplier.
+  it('parses a counter-scaled stat bonus beside the flat and percent forms', () => {
+    const blade = parseOne('# item blade\n+4-7 attack, +2 attack per rage, +10% attack per rage', itemSchema);
+    expect(blade.tags).toEqual([
+      { kind: 'stat-bonus', statId: 'attack', amount: { min: 4, max: 7 }, percent: false },
+      { kind: 'stat-bonus', statId: 'attack', amount: point(2), percent: false, per: 'rage' },
+      { kind: 'stat-bonus', statId: 'attack', amount: 10, percent: true, per: 'rage' },
+    ]);
+  });
+
+  it('resolves the counter as a resource, so a bonus scaled by nothing is a load error', () => {
+    const source = (counter: string) => `# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# item blade\n+2 attack per ${counter}\n`;
+    expect(loadModule(source('rage')).items.get('blade')!.tags).toEqual([{ kind: 'stat-bonus', statId: 'attack', amount: point(2), percent: false, per: 'rage' }]);
+    expect(() => loadModule(source('fury'))).toThrow(/resource/);
+  });
+
   it('rejects a labelled tags: with a message naming it as a bare field, not a tag-clause parse error', () => {
     expect(() => parseOne('# item cooked-shrimp\nexamine: A simple meal.\ntags: food', itemSchema)).toThrow("item field tags must be written bare, without a 'tags:' label");
+  });
+});
+
+// A hook is carried by the same things that carry `+4-7 attack`: an entity's own
+// block and an equipped item. Neither block names a side, an action or a weapon.
+describe('the two carriers of a hook', () => {
+  const DRAIN_THEM = { kind: 'pool', resource: 'health', delta: { min: -2, max: -2 }, party: 'them' };
+
+  it('reads on hit: on an entity as a hook rather than as an action or an on <event>: handler', () => {
+    const berserker = parseOne(
+      ['# entity berserker', 'uses: melee-combat', 'on hit:', '  restore: 1 rage', '  1 in 20:', '    drain: 4 health from them', 'when hit: drain: 2 health from them', 'on death: say: It falls.'].join('\n'),
+      entitySchema,
+    );
+    expect(berserker.onHit).toEqual([
+      { kind: 'pool', resource: 'rage', delta: point(1) },
+      { kind: 'chance', numerator: 1, denominator: 20, results: [{ kind: 'pool', resource: 'health', delta: { min: -4, max: -4 }, party: 'them' }] },
+    ]);
+    expect(berserker.whenHit).toEqual([DRAIN_THEM]);
+    // `on death:` is still the handler it was; `on hit:` no longer joins it as a
+    // handler for an event named "hit", which is what claiming the label costs.
+    expect(berserker.blocks).toEqual([{ label: 'on death', event: 'death', results: [{ kind: 'say', text: 'It falls.' }] }]);
+  });
+
+  it('reads both on an item, whose labelled blocks were actions until now', () => {
+    const blade = parseOne(['# item venomous-blade', 'slot: mainhand', '+4-7 attack', 'on hit: 1 in 4: drain: 3 health from them', 'when hit: drain: 2 health from them', 'swing: say: You swing it.'].join('\n'), itemSchema);
+    expect(blade.onHit).toEqual([{ kind: 'chance', numerator: 1, denominator: 4, results: [{ kind: 'pool', resource: 'health', delta: { min: -3, max: -3 }, party: 'them' }] }]);
+    expect(blade.whenHit).toEqual([DRAIN_THEM]);
+    expect(blade.actions?.map((action) => action.label)).toEqual(['swing']);
+  });
+
+  it('refuses a hook on a section that carries no character modifier', () => {
+    expect(() => parseOne('# location camp\nx: 0, y: 0\non hit: drain: 2 health from them', locationSchema)).toThrow('write it on the `# entity` or `# item` that carries it');
+  });
+
+  it('refuses each defined more than once, the way any field of a section is', () => {
+    expect(() => parseOne('# entity rat\non hit: restore: 1 rage\non hit: restore: 2 rage', entitySchema)).toThrow('entity field on hit is defined more than once');
+  });
+
+  it('names the field an author was one letter from, rather than reading the typo as an action', () => {
+    expect(() => parseOne('# item blade\non hi: restore: 1 rage', itemSchema)).toThrow('unknown item field: on hi, one letter from on hit');
+  });
+
+  // A hook is a list field, so the section engine accepts `+`/`-` on it and
+  // holds the operations until merge. Resolution runs first and must read them.
+  it('resolves a hook written as an edit, on a carrier that has none to edit yet', () => {
+    const module = '# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# entity rat\n+on hit: restore: 1 rage\n\n# item mail\n-when hit: restore: 1 rage\n';
+    expect(loadModule(module).entities.get('rat')!.onHit).toEqual([{ kind: 'pool', resource: 'rage', delta: point(1) }]);
+    expect(loadModule(module).items.get('mail')!.whenHit).toEqual([]);
+  });
+
+  it('appends to the hook a patch module overlays rather than replacing it', () => {
+    const base = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# entity rat\non hit: restore: 1 rage\n' };
+    const patch = { name: 'patch', text: '# info patch\nversion: 1.0.0\ndependencies:\n  base\n\n# entity base.rat\n+on hit: drain: 2 base.rage from them\n' };
+    expect(loadUniverse([base, patch]).entities.get('base.rat')!.onHit).toEqual([
+      { kind: 'pool', resource: 'base.rage', delta: point(1) },
+      { kind: 'pool', resource: 'base.rage', delta: { min: -2, max: -2 }, party: 'them' },
+    ]);
+  });
+
+  // A hook is a result list rather than a labelled block, so what a reference
+  // that went away with an optional module costs is the whole hook — and only
+  // that one.
+  it('drops the hook whose reference went away, and leaves the other standing', () => {
+    const source = {
+      name: 'base',
+      text: ['# info base', 'version: 1.0.0', 'dependencies:', '  ?extra', '', '# stat attack', 'base: 5', '', '# resource rage', 'max: attack', 'display: minimal', '', '# entity rat', 'on hit: roll: extra.spoils', 'when hit: restore: 1 rage'].join('\n'),
+    };
+    const rat = loadUniverse([source]).entities.get('base.rat')!;
+    expect(rat.onHit).toEqual([]);
+    expect(rat.whenHit).toEqual([{ kind: 'pool', resource: 'base.rage', delta: point(1) }]);
+  });
+
+  // An entity answers an event by writing `on <its name>:`, and one of those
+  // labels is now a hook. Refused where the name is bound.
+  it('refuses an event whose name only a hook block could answer', () => {
+    expect(() => loadModule('# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# event hit\nresource: rage\ntrigger: on empty\n')).toThrow('which is a hook block');
+    expect(() => loadModule('# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# event spent\nresource: rage\ntrigger: on empty\n')).not.toThrow();
   });
 });
 
@@ -160,6 +254,24 @@ describe('parser guards', () => {
     expect(dock.relative).toEqual({ direction: 'east', of: 'bridge' });
     expect(dock.x).toBeUndefined();
     expect(() => parseOne('# location dock\nx: 0, y: 0\neast of bridge', locationSchema)).toThrow(/cannot both be set/);
+  });
+
+  // Both halves used to load with the block dropped and nothing said, which is
+  // what the result readers each carry their own copy of this rule to prevent.
+  it('rejects a key written inline and as a block, rather than keeping the inline half', () => {
+    expect(() => parseOne('# entity rat\nstats: vigor 3\n  attack 4', entitySchema)).toThrow('entity field stats is written inline and as a block; give it one');
+    expect(() => parseOne('# item blade\non hit: restore: 1 rage\n  restore: 5 rage', itemSchema)).toThrow('item field on hit is written inline and as a block; give it one');
+    // The labelled-block route, two lines down from the declared-field one and
+    // the same silence.
+    expect(() => parseOne('# entity rat\nswing: say: a\n  say: b', entitySchema)).toThrow('entity swing: is written inline and as a block; give it one');
+  });
+
+  // The block hangs off the whole line, so only the key that ends the line could
+  // have taken it. Asking `is anything left on this line` instead refuses a
+  // comma list whose last key is the one with the block.
+  it('leaves a comma line whose last key takes the block alone', () => {
+    const camp = parseOne('# location camp\ny: 0, x: 1, adjacent:\n  grove', locationSchema);
+    expect(camp).toMatchObject({ x: 1, y: 0, adjacent: [{ target: 'grove' }] });
   });
 
   it('rejects a field defined twice', () => {

@@ -25,6 +25,58 @@ describe('roundTripModule', () => {
     expect(result.printed).toContain('# item bread');
   });
 
+  // Both blocks on both carriers, in one module, because what the round trip
+  // proves is that a hook survives the only form the serializer can print.
+  const CARRIERS = [
+    '# info base',
+    'version: 1.0.0',
+    '',
+    '# stat vigor',
+    'base: 10',
+    '',
+    '# resource rage',
+    'max: vigor',
+    'display: minimal',
+    '',
+    '# item bramble-mail',
+    '+4-7 vigor, +2 vigor per rage',
+    'on hit: 1 in 4: drain: 3 rage from them',
+    'when hit: drain: 2 rage from them',
+    '',
+    '# entity berserker',
+    'stats: vigor 3',
+    'on hit:',
+    '  restore: 1 rage to me',
+    '  1 in 20:',
+    '    drain: 4 rage from them',
+    'when hit: restore: 1 rage',
+  ].join('\n');
+
+  it('carries both hook blocks, on both carriers, through serialize and reload', () => {
+    const result = roundTripModule(loadModule(CARRIERS), { info }, reloadAlone);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.differences).toEqual([]);
+    expect(result.printed).toContain('drain: 4 base.rage from them');
+    // Unmarked is the carrier's, and `to me` is kept as written rather than
+    // normalized away, so the reload returns the author's words.
+    expect(result.printed).toContain('restore: 1 base.rage to me');
+    expect(result.printed).toContain('restore: 1 base.rage\n');
+    expect(result.printed).toContain('+2 base.vigor per base.rage');
+  });
+
+  it.each([
+    ['  restore: 1 base.rage to me\n', 'entities', 'berserker'],
+    ['when hit:\n  restore: 1 base.rage\n', 'entities', 'berserker'],
+    ['on hit:\n  1 in 4:\n    drain: 3 base.rage from them\n', 'items', 'bramble-mail'],
+    ['when hit:\n  drain: 2 base.rage from them\n', 'items', 'bramble-mail'],
+  ])('reports a hook the reload lost, so dropping one cannot read as clean: %s', (printedForm, where, id) => {
+    const result = roundTripModule(loadModule(CARRIERS), { info }, (printed) => {
+      expect(printed).toContain(printedForm);
+      return reloadAlone(printed.replace(printedForm, ''));
+    });
+    expect(result.differences).toEqual([`  ${where}: changed base.${id}`]);
+  });
+
   it('names what the reloaded registry lost, so a dropped section cannot read as clean', () => {
     const result = roundTripModule(loadModule(BASE), { info }, (printed) => reloadAlone(without(printed, '# item bread')));
     expect(result.differences).toEqual(['  items: missing base.bread']);
@@ -148,6 +200,19 @@ describe('roundTripUniverse', () => {
     // The patched value is carried by base's own serialization, since that is
     // where the merged registry holds it.
     expect(result.sources.find((source) => source.name === 'base')?.text).toContain('Toast');
+  });
+
+  // The serializer prints neither an absent hook nor an emptied one, so a reload
+  // can return only one of them. They are one value — empty — and this is what
+  // says so: a patch that removes a base entity's only hook result round-trips.
+  it('carries a hook a patch module emptied', () => {
+    const base = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# stat vigor\nbase: 10\n\n# resource rage\nmax: vigor\ndisplay: minimal\n\n# entity rat\nstats: vigor 3\non hit: restore: 1 rage\nwhen hit: restore: 2 rage\n' };
+    const patch = { name: 'patch', text: '# info patch\nversion: 1.0.0\ndependencies:\n  base\n\n# entity base.rat\n-on hit: restore: 1 base.rage\n-when hit: restore: 2 base.rage\n' };
+    const loaded = loadUniverseWithDiagnostics([base, patch]);
+    expect(loaded.registry.entities.get('base.rat')).toMatchObject({ onHit: [], whenHit: [] });
+    const result = trip([base, patch]);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.differences).toEqual([]);
   });
 
   it('still reports a real loss, so the reframing did not make it blind', () => {

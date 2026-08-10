@@ -1,6 +1,7 @@
 import { Action, actionBody } from '../grammar/action';
 import { ActionResult, resultBlock, resultList } from '../grammar/actionResult';
 import { Condition, condition } from '../grammar/condition';
+import { HOOK_FIELDS, HookCarrier } from '../grammar/hook';
 import { list } from '../grammar/list';
 import { DslError, Parser } from '../grammar/parser';
 import { Range, range } from '../grammar/range';
@@ -39,7 +40,7 @@ export type EntityBlock = Action | HandlerBlock;
 // What an entity's body says before `uses:` is resolved against the actions it
 // names. `blocks` holds every labelled block as authored — an inline action, an
 // overload of an action this entity uses, or an `on <event>:` handler.
-export interface AuthoredEntity {
+export interface AuthoredEntity extends HookCarrier {
   id: string;
   title: string;
   examine?: string;
@@ -126,6 +127,9 @@ export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'>
     allies: { parser: list(ally), default: () => [] },
     respawnAfter: { parser: duration, keyword: 'respawn after' },
     hiddenIf: { parser: condition, keyword: 'hidden if' },
+    // Claimed as fields, so `on hit:` is a hook before the label dispatch below
+    // can read it as an `on <event>:` handler.
+    ...HOOK_FIELDS,
   },
   keywords: ['aggressive'],
   entries: { into: 'blocks', body: entityBlock },

@@ -58,6 +58,7 @@
         "src/grammar/actionResult.ts",
         "src/grammar/condition.ts",
         "src/grammar/dependency.ts",
+        "src/grammar/hook.ts",
         "src/grammar/list.ts",
         "src/grammar/parser.ts",
         "src/grammar/range.test.ts",
@@ -126,6 +127,13 @@
             "src/grammar/action.ts"
           ],
           "note": "produced by combat-grammar-sides-and-attempts"
+        },
+        {
+          "name": "combat hook grammar",
+          "paths": [
+            "src/grammar/hook.ts"
+          ],
+          "note": "produced by combat-hook-grammar"
         }
       ]
     },

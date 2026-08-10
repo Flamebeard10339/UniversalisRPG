@@ -1,7 +1,8 @@
 import { ActionResult, parseResultLine, resultList, startsResult } from './actionResult';
 import { Condition, condition } from './condition';
+import { HOOK_FIELD_REFUSALS, hookLabelProblem } from './hook';
 import { list } from './list';
-import { Cursor, DslError, requireEnd } from './parser';
+import { Cursor, DslError, requireEnd, Span } from './parser';
 import { EntryBody } from './section';
 import { RawLine } from './structure';
 import { TagClause, tagClause } from './tagClause';
@@ -169,6 +170,9 @@ const RETIRED_ACTION_FIELDS: readonly { label: RegExp; message: string }[] = [
   { label: /target:[ \t]*/, message: 'target: was retired — write `depletes: their <pool>` for the pool a landed hit reduces' },
   { label: /escape after[ \t]+/, message: 'escape after was retired — write `attempts: N`, which bounds the action at N of the performer\'s attempts' },
   { label: /on escape:[ \t]*/, message: 'on escape: was retired — write `on unfinished:`, which runs when `attempts:` ran out before the action completed' },
+  // A hook is a field of nothing: it belongs to the character, so an action's
+  // body is the one place it cannot be written.
+  ...HOOK_FIELD_REFUSALS,
 ];
 
 // One field per line, and the whole line: `requireEnd` is what the generic
@@ -299,9 +303,22 @@ function resolveKind(action: Omit<Action, 'label'>, label: string, lines: RawLin
   return tagged[0];
 }
 
+// A section whose labelled blocks are actions takes any unclaimed label, so a
+// hook written on one is an action named `on hit` unless the label is read here.
+// The carriers intercept the two labels as fields before an action body sees
+// them; everything else reaches this and is refused.
+function refuseHookLabel(label: string, span: Span | undefined): void {
+  const problem = hookLabelProblem(label);
+  if (problem !== undefined) throw new DslError(problem, span);
+}
+
 export const actionBody: EntryBody = {
-  parse: (cursor) => ({ results: results.parse(cursor) }),
+  parse: (cursor, label) => {
+    refuseHookLabel(label, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.src.length) });
+    return { results: results.parse(cursor) };
+  },
   parseBlock: (lines, label) => {
+    refuseHookLabel(label, lines[0]?.span);
     const action: Omit<Action, 'label'> = { results: [] };
     for (const line of lines) parseActionLine(line, action, label);
     const kind = resolveKind(action, label, lines);
