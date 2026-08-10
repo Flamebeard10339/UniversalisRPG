@@ -501,3 +501,123 @@ doctor and the byte check all pass.
   destroyed the shared node_modules for every worktree. Filed as a recurrence rather than worked
   around. The delta I would have been measuring is one commit and two source lines, both of which
   are covered above by narrower measurements.
+
+### Pass 5 — 2026-08-10
+
+- base: `e90fd17d1f0966be7af6ddcecac83de2021c2a54`
+- head: `640445db6289d7d3c855a3075093df2360259d15`
+- proof 1: met — The table exists and is the only definition. COMMANDS at src/runtime/command.ts:472 carries 19 entries,
+each naming name, aliases, match, arg (an ArgKind), argHint, summary, parse and run, and the three formic spellings
+are entries in it rather than branches around it: '<N>' (match choice), '<enter>' (match blank) and '<directive>'
+(match directive). Dispatch is a lookup: BY_TOKEN at :660 for the slash forms and byMatch at :664 for the other
+three; parseLine at :704 does nothing else. Mutation, aimed at those two lines rather than at any test:
+C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass5-mutations.json. c1-token-split (dispatch stops
+splitting the leading token) KILLED by 28 named tests, re-run at both files with the mutant still applied;
+c1-alias-lookup (the table's aliases stop reaching BY_TOKEN) KILLED by 4; c1-modal-number-precedence KILLED by 2.
+No driver holds a command: read scripts/play-cli.ts whole, the only command-shaped strings in it are the three
+STARTUP_LINES argv notes and the argv flags parseCliArgs reads. No driver filters the table:
+scripts/play-cli.test.ts pins the rendered help at exactly 1 + COMMANDS.length + startup lines.
+"Adding a command is editing the table and nothing else" is proved rather than read. I added one entry to COMMANDS
+(name '/zzprobe', alias '/zzp', arg 'id', parse requireId, run said(...)) and changed no other file, then piped
+/help, /zzprobe hello, /zzp world and a bare /zzprobe into the unmodified scripts/play-cli.ts: it printed
+"  /zzprobe, /zzp <x> audit probe added by editing the table alone" in help, answered "zzprobe saw hello" and
+"zzprobe saw world" through the alias, and refused the missing id with "Error: /zzprobe requires an id". Reverted;
+git diff over src/runtime/command.ts is empty. Re-runnable by repeating that edit.
+Recorded and not counted against this grade: the '<N>' entry has a second handler the table does not name, because
+in live mode the driver calls beginLive rather than the entry's own run. Filed as a finding.
+- proof 2: met — HELP_LINES is gone: `grep -rn "HELP_LINES" src/ scripts/` returns nothing, where pass 4 found it at
+scripts/play-cli.ts:52 and :445. /help is the table read out — helpEntries at src/runtime/command.ts:676 is
+COMMANDS.map, the '/help' entry's run returns those entries as data, and scripts/play-cli.ts:143 formatHelp is the
+only thing that turns an entry into a line. Mutation: c2-help-summaries (helpEntries stops reading spec.summary)
+KILLED by 2 named tests; c2-help-drops-formic (helpEntries filters to match === 'name', dropping <N>, <enter> and
+<directive> — the driver filtering the table by another name) KILLED by 3, both re-run at their own files with the
+mutant still applied. Measured from the player's side too: my own scripted session run on the merge-base driver and
+on this head prints a different help block, which is what this clause says a player should see change, and the new
+block lists every one of the 19 entries.
+The one thing /help prints that is not a table entry: the driver appends three STARTUP_LINES describing argv
+(<a.dsl,b.dsl>, local=, modportal=). I judged that against the clause rather than accepting the implementer's
+argument for it. They are not commands, no command is documented there, a second driver has no argv and prints
+none of them, and scripts/play-cli.test.ts pins that the driver adds exactly those and nothing else. The clause's
+property — a command added to the table is documented by that edit alone — holds, and the /zzprobe probe under c1
+demonstrates it end to end.
+- proof 3: met — Nothing below the driver produces terminal vocabulary. `grep -rn "\[time: |progressBar|MINIMAL_STAGES|
+█|░|▁|✓|⚠" src/` matches exactly one line in the whole tree, src/runtime/command.test.ts:184, which is the test's
+own list of the glyphs it forbids. CommandOutput at src/runtime/command.ts:38 carries structure, not rendering: a
+message with a tone of plain|ok|warn|error, the PlayView itself, a PlayStatus, PlayChoice[], CommandHelp[], source
+lines and authored DSL blocks. LiveProgress at :758 carries label, active, time, progress, pools, implicit and the
+view — every number, no line. The whole terminal vocabulary is in the driver: TONE_PREFIX at scripts/play-cli.ts:139
+turns tone into ✓/⚠/Error:, MINIMAL_STAGES at :47, fullBar at :58, formatChoices' "  N) " at :38, progressBar at
+:182 and "[time: Ns]" at :116 and :189.
+Mutation, aimed at the one line where the engine could have kept a glyph: c3-glyph-below-the-driver (the engine
+emits the ✓/⚠ the driver already adds) KILLED by 3 named tests; c3-tone-collapsed (both verdicts become tone plain,
+so the distinction stops crossing the boundary as data) KILLED by 3. Both re-run at their own files with the mutant
+still applied.
+- proof 4: met — Not this branch's work, and I say so rather than inheriting the grade silently: c4 was met on the
+earlier branch at 8573d95 and `git diff --name-only e90fd17..640445d -- src/runtime/session.ts src/runtime/save.ts
+src/runtime/encounter.ts` is empty, so every attack pass 4 ran is being asked of bytes this diff does not change.
+What I checked on this head rather than assuming: formatInventory (scripts/play-cli.ts:120) and formatState (:128)
+each take a PlayStatus and nothing else; the driver's only other reads of the session are through view(),
+sessionStatus(), serializeSession() and startSession(); `npx tsc --noEmit` passes, so no file names session.state.
+The new module below ui does not open a route either — src/runtime/command.ts reaches state only through session.ts's
+published functions. The one route pass 4 named as open and not claimed by this grade, writing a ParsedSave into
+session.registry.saves and loading it, is still open and still used by buildCreateTest at command.ts:410; that is
+in-process-module-api-pass3-the-sealed-surface-has-no-way-to and it is unchanged here.
+- proof 5: met — The surface sits below ui and reaches for nothing. src/runtime/command.ts imports only ../grammar/parser,
+../content/{registry,universe,localChanges,test,typed,saveSection} and ./{runtime,modals,session} — nothing from
+scripts. `npm run layer-check` passes (876 cross-file imports, 5 layers, every import downward). Stronger than the
+clause asks and re-runnable in one command: `grep -rn "from 'node:" src/` returns nothing at all, so no file under
+src reads a file, a clock or a subprocess.
+Each effect arrives as an argument. The local-changes file: AuthoringContext (command.ts:62) carries localSource and
+an optional writeLocalChanges callback, and the driver is the only thing that touches the disk
+(writeLocalChanges at scripts/play-cli.ts:353). The content sources: baseSources on the same context. The wall clock:
+LiveRun.tick takes elapsedMs, and the only Date.now() in the repository's play path is scripts/play-cli.ts:221 inside
+runLiveAction. The tests exercise the decision — the authoring block at src/runtime/command.test.ts:820 hands a fake
+writer that pushes into an array, and asserts /dsl still loads and prunes when no writer is supplied at all.
+Mutation: c5-clock-argument-ignored (the speed dial the driver hands in stops reaching the tick) KILLED by 3 named
+tests, re-run at its own file with the mutant still applied.
+- proof 6: met — liveTick no longer lives above ui, and nothing else does either: `grep -rn "liveTick" src/ scripts/`
+returns nothing, where pass 4 found it at scripts/play-cli.ts:603. The clock is beginLive (src/runtime/command.ts:809),
+LiveRun.tick and LiveRun.end (:828-846), and tickOnce (:786) is where elapsed real time becomes simulated time,
+where the in-flight action is judged still active, and where progress is reported. The driver supplies the
+milliseconds and renders the answer: scripts/play-cli.ts:256-263 measures the interval and calls formatLive.
+Behavioural parity measured rather than argued, and independently of the implementer's own run. I put the merge
+base's scripts/play-cli.ts back into the tree beside the unchanged src/ (this diff adds no file under src except
+command.ts, so the base driver is exact) and drove both clocks in one process through npm run inspect over eight
+action shapes: an instant action, a repeating action run to its first output, three cancellations at different tick
+counts (repeating, one-shot, untargeted-countdown), a fight run to the end, a fight cancelled at 8x speed, and a run
+of zero-millisecond ticks. For each I compared the rendered live lines, the recorder history and the final sim-time.
+All eight IDENTICAL. Script kept at
+C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass5-live.js.
+Mutation: c6-active-decision (the tick that finishes an action keeps reporting active) KILLED by 3 named tests, and
+c5-clock-argument-ignored KILLED by 3, both re-run at their own files with the mutant still applied.
+The two lines of the clock that nothing watches, filed as findings rather than left in this verdict: the
+!action.targeted guard on LiveProgress.implicit (:802) and the elapsed subtraction in end() (:841) each SURVIVED the
+whole 2241-test suite. The clause's own words — one implementation, below ui, driver supplies ms and renders — hold
+and are proved; those two are proof gaps inside it.
+- proof 7: unmet — Not this branch's work; owed by layer-check-reads-every-source-file, still open. Checked cold rather
+than inherited from pass 4: `git diff --name-only e90fd17..640445d -- scripts/layer-check.ts scripts/lib/layers.ts`
+is empty, `npm run layer-check` prints "876 cross-file imports checked across 5 layers" and "Every import points
+downward" and names no file, and ROOTS at scripts/lib/layers.ts:9 is still src/grammar, src/content, src/runtime,
+src/ui and scripts. `ls src/ui` does not exist and src/main.tsx does, under none of those roots, so the second
+driver's own entry point is read by no rule. The partition assertion the clause asks for was never written.
+- proof 8: unmet — The transcript half fails, on ten lines and beyond /help. I built the merge-base side rather than
+trusting before.txt: `git show e90fd17:scripts/play-cli.ts` placed back in the tree as a second entry point beside
+the unchanged src/ (exact, because this diff adds no file under src except command.ts and changes none), then drove
+both with the same 30 bytes-for-bytes input. Fixtures and both transcripts kept at
+C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass5-transcript-input.txt,
+...-pass5-base.out and ...-pass5-head.out; the delta is ...-pass5-delta.txt.
+Loosened, and undisclosed: /look junk, /state junk, /inventory junk, /inv extra words, /cancel junk and /quit junk
+were "Error: unknown command: ..." on the merge base and now perform the command with the argument discarded. The
+worst of those is /quit junk, which now ends the session where the base refused the line. Cause: the table declares
+arg: 'none' and parse: nothing (src/runtime/command.ts:187) throws the rest of the line away instead of refusing it,
+so the declared argument shape is not the thing that decides. Reproduced below the CLI as well, through
+npm run inspect on runLine directly. Filed as a finding.
+Tightened, and disclosed by the implementer as deliberate: /speed2, /testfoo, /loadaux2.zero, /expectaux2.zero and
+/create-testabc acted on the base (the base prefix-matched) and are "unknown command" now. I am not disputing that
+half; the branch's own event note names it and the argument for it is sound. It is still a transcript divergence,
+and c8's words are absolute.
+The rest of the clause holds. `git diff --name-only e90fd17..640445d -- content/` is empty, so no # save fixture was
+regenerated and every shipped # test runs unchanged; merge-ready's npm test leg is green at 2241 on the first run.
+The live half is identical over the eight shapes recorded under c6, including the recorder history a live run
+produces. One line in `nothing` and one in directiveFrom('/cancel', ...) close the loosened half; nothing about the
+seam needs redoing.
