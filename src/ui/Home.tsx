@@ -59,14 +59,21 @@ function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: 
   );
 }
 
+const NEAR_BOTTOM_PX = 32;
+
 export function Home({ snapshot, onChoose }: { snapshot: DriverSnapshot; onChoose: (position: number) => void }): JSX.Element {
   const view = snapshot.view;
-  const foot = useRef<HTMLDivElement>(null);
+  const column = useRef<HTMLDivElement>(null);
+  const following = useRef(true);
   const entries = snapshot.transcript.entries;
 
+  // After every render, not only after a new line: the action sheet coming back
+  // when a modal closes shortens this column, and a scroll position taken
+  // before that leaves the newest line under the fold.
   useEffect(() => {
-    foot.current?.scrollIntoView({ block: 'end' });
-  }, [entries.length]);
+    const scroller = column.current;
+    if (scroller && following.current) scroller.scrollTop = scroller.scrollHeight;
+  });
 
   return (
     <>
@@ -87,12 +94,18 @@ export function Home({ snapshot, onChoose }: { snapshot: DriverSnapshot; onChoos
         </header>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div
+        ref={column}
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+        onScroll={(event) => {
+          const scroller = event.currentTarget;
+          following.current = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= NEAR_BOTTOM_PX;
+        }}
+      >
         <div className="mx-auto flex max-w-2xl flex-col gap-2">
           {entries.map((entry) => (
             <Line key={entry.id} entry={entry} />
           ))}
-          <div ref={foot} />
         </div>
       </div>
 

@@ -20,6 +20,7 @@
   --color-danger-text: #ffe4e6;
   --color-success: #34d399;
   --color-warning: #fbbf24;
+  --color-scrim: rgb(11 16 32 / 0.72);
   background: var(--color-background);
   color: var(--color-text);
   font-family:

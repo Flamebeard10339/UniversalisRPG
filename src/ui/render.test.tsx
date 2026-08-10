@@ -73,6 +73,29 @@ describe('what the shell puts on the screen', () => {
     expect(seen).toBeGreaterThan(20);
   });
 
+  // The clause above only refuses what should not be there, so a shell that
+  // drew nothing at all would satisfy it. These two say what must be there.
+  it('draws every choice the engine is offering', () => {
+    const driver = createDriver(SHIPPED_SOURCES);
+
+    const runs = readable(renderToStaticMarkup(<App driver={driver} />));
+
+    for (const choice of driver.snapshot().view!.choices) expect(runs).toContain(choice.label);
+  });
+
+  it('draws the modal the engine is asking for, and stops once it is answered', () => {
+    const driver = createDriver(SHIPPED_SOURCES);
+    driver.choose(position(driver, 'talk:tutorial-island.miki'));
+    const menu = driver.snapshot().view!.modals[0].options[0];
+
+    const asked = readable(renderToStaticMarkup(<App driver={driver} />));
+    for (const value of menu.values!) expect(asked).toContain(value);
+
+    driver.answer(menu.key, menu.values![0]);
+    const answered = readable(renderToStaticMarkup(<App driver={driver} />));
+    for (const value of menu.values!) expect(answered).not.toContain(value);
+  });
+
   it('renders a modal it has never heard of from the option alone', () => {
     const unheard = { key: 'heading', label: 'Which way from here', values: ['widdershins', 'deosil'] };
 

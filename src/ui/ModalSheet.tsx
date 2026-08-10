@@ -10,7 +10,7 @@ export function ModalSheet({ option, onAnswer }: { option: Option; onAnswer: (ke
   const [typed, setTyped] = useState('');
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-background px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-8">
+    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-8">
       <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
         <p className="mb-3 text-xs uppercase tracking-wide text-text-subtle">{option.label}</p>
         {option.values ? (

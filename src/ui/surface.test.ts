@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, posix, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -14,17 +14,17 @@ const SOURCES: Array<{ file: string; text: string }> = [
   { file: 'src/main.tsx', path: resolve(here, '..', 'main.tsx') },
 ].map(({ file, path }) => ({ file, text: readFileSync(path, 'utf8') }));
 
-const IMPORTS = /\bfrom\s*'([^']+)'/g;
+// Any quoted path into the runtime, whatever brought it in. Matching `from`
+// and one quote style would be matching a coding habit: a dynamic import in
+// backticks reaches exactly as far and reads nothing like an import.
+const REACHES = /['"`][^'"`]*\/runtime\/([\w.-]+)['"`]/g;
 
-function reaches(source: { file: string; text: string }): string[] {
-  const from = posix.dirname(source.file);
-  return [...source.text.matchAll(IMPORTS)]
-    .map(([, specifier]) => (specifier.startsWith('.') ? posix.normalize(posix.join(from, specifier)) : specifier))
-    .filter((target) => target.startsWith('src/runtime/'));
+function reaches(source: { text: string }): string[] {
+  return [...source.text.matchAll(REACHES)].map(([, module]) => module);
 }
 
 // What the runtime publishes for a driver to render and dispatch through.
-const PLAY_SURFACE = ['src/runtime/session', 'src/runtime/command'];
+const PLAY_SURFACE = ['session', 'command'];
 
 // Neither is written under src/ui, which is the point; naming them here is how
 // the absence is checked.

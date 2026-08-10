@@ -20,6 +20,7 @@ export default {
         'danger-text': 'var(--color-danger-text)',
         success: 'var(--color-success)',
         warning: 'var(--color-warning)',
+        scrim: 'var(--color-scrim)',
       },
     },
   },
