@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkLayers, layerCheckOutput, layerOf, importedPaths, MODULE_EXTENSIONS, OUTSIDE_STACK, ROOTS, SOURCE_TREES, sweptFiles, pointsUpward, unlayeredFiles } from './layers';
+import { checkLayers, layerCheckOutput, layerOf, importedPaths, MODULE_EXTENSIONS, OUTSIDE_STACK, ROOTS, runLayerCheck, SOURCE_TREES, sweptFiles, pointsUpward, unlayeredFiles } from './layers';
 import { trackedFiles } from './sourceFiles';
 import { covers } from './systems';
 
@@ -51,15 +51,24 @@ describe('layerOf', () => {
     expect(layerOf('src/main')).toBe('ui');
     expect(layerOf('src/runtime/save.js')).toBe('runtime');
   });
+
+  it('lets a root that names a file claim that file and nothing under a directory of the same name', () => {
+    expect(layerOf('src/main/deep/nested.ts')).toBeNull();
+    expect(layerOf('src/mainly.ts')).toBeNull();
+  });
 });
 
 describe('sweptFiles', () => {
   it('takes every module under a source tree and nothing else', () => {
-    expect(sweptFiles(['src/main.tsx', 'src/legacy.js', 'scripts/lib/git.ts', 'src/index.css', 'content/isle.dsl', 'docs/workflow.md', 'vite.config.ts'])).toEqual([
+    expect(sweptFiles(['src/main.tsx', 'src/legacy.js', 'scripts/lib/git.ts', 'src/index.css', 'content/isle.dsl', 'docs/workflow.md', 'vite.config.ts'], () => true)).toEqual([
       'src/main.tsx',
       'src/legacy.js',
       'scripts/lib/git.ts',
     ]);
+  });
+
+  it('passes over a file the index still lists and the working tree no longer holds', () => {
+    expect(sweptFiles(['src/main.tsx', 'src/grammar/renamed.ts'], (file) => file !== 'src/grammar/renamed.ts')).toEqual(['src/main.tsx']);
   });
 
   it('reaches into every declared tree, and holds the tree it has', () => {
@@ -106,6 +115,7 @@ describe('checkLayers', () => {
 
   it('reports an upward import, counts every edge it resolved, and partitions what it swept', () => {
     expect(checkLayers(Object.keys(sources), (file) => sources[file])).toEqual({
+      read: 2,
       edges: 2,
       violations: [{ from: 'src/grammar/a.ts', to: 'src/content/registry' }],
       unlayered: ['src/stray.ts'],
@@ -127,14 +137,20 @@ describe('checkLayers', () => {
 });
 
 describe('layerCheckOutput', () => {
-  const clean = { edges: 7, violations: [], unlayered: [] };
+  const clean = { read: 2, edges: 7, violations: [], unlayered: [] };
 
-  it('passes a clean report, and says how much it read', () => {
-    const { out, err, exitCode } = layerCheckOutput(['a.ts', 'b.ts'], clean);
+  it('passes a clean report, and counts what it read apart from what it swept', () => {
+    const { out, err, exitCode } = layerCheckOutput(['a.ts', 'b.ts', 'src/vite-env.d.ts'], clean);
     expect(exitCode).toBe(0);
     expect(err).toEqual([]);
-    expect(out[0]).toContain('2 module(s) read under src and scripts; 7 cross-file imports');
+    expect(out[0]).toContain('3 module(s) swept under src and scripts, 2 read; 7 cross-file imports');
     expect(out[out.length - 1]).toBe('Every module belongs to a layer, and every import points downward.');
+  });
+
+  it('fails a sweep that found nothing, which is a broken enumeration rather than a clean tree', () => {
+    const { err, exitCode } = layerCheckOutput([], { read: 0, edges: 0, violations: [], unlayered: [] });
+    expect(exitCode).toBe(1);
+    expect(err.join('\n')).toContain('no modules at all');
   });
 
   it('fails the run on a module belonging to no root, and names it', () => {
@@ -148,6 +164,31 @@ describe('layerCheckOutput', () => {
     const { err, exitCode } = layerCheckOutput(['a.ts'], { ...clean, violations: [{ from: 'src/grammar/a.ts', to: 'src/runtime/b' }] });
     expect(exitCode).toBe(1);
     expect(err).toContain('  src/grammar/a.ts -> src/runtime/b');
+  });
+});
+
+describe('runLayerCheck', () => {
+  const tree: Record<string, string> = {
+    'src/grammar/a.ts': '',
+    'src/content/b.ts': "import { a } from '../grammar/a';",
+    'scripts/c.ts': "import { b } from '../src/content/b';",
+  };
+
+  it('feeds the sweep to the check and the check to the report, over the enumeration it is given', () => {
+    const { out, exitCode } = runLayerCheck({ tracked: () => [...Object.keys(tree), 'docs/workflow.md'], exists: () => true, read: (file) => tree[file] });
+    expect(exitCode).toBe(0);
+    expect(out[0]).toContain('3 module(s) swept under src and scripts, 3 read; 2 cross-file imports');
+  });
+
+  it('fails when the enumeration it is handed comes back empty, rather than reporting a clean tree', () => {
+    const { exitCode } = runLayerCheck({ tracked: () => [], exists: () => true, read: () => '' });
+    expect(exitCode).toBe(1);
+  });
+
+  it('carries an upward import all the way to the exit code', () => {
+    const { exitCode, err } = runLayerCheck({ tracked: () => ['src/grammar/a.ts'], exists: () => true, read: () => "import { c } from '../../scripts/c';" });
+    expect(exitCode).toBe(1);
+    expect(err).toContain('  src/grammar/a.ts -> scripts/c');
   });
 });
 

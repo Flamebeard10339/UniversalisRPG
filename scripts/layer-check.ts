@@ -1,9 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { checkLayers, layerCheckOutput, sweptFiles } from './lib/layers';
-import { trackedFiles } from './lib/sourceFiles';
+import { runLayerCheck } from './lib/layers';
 
-const files = sweptFiles(trackedFiles());
-const { out, err, exitCode } = layerCheckOutput(files, checkLayers(files, (file) => readFileSync(file, 'utf8')));
+const { out, err, exitCode } = runLayerCheck();
 
 for (const line of out) console.log(line);
 for (const line of err) console.error(line);
