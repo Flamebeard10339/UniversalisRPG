@@ -32,34 +32,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: var(--color-background);
-}
-
-:root[data-font-size="tiny"] {
-  font-size: 12px;
-}
-
-:root[data-font-size="small"] {
-  font-size: 14px;
-}
-
-:root[data-font-size="normal"] {
-  font-size: 16px;
-}
-
-:root[data-font-size="large"] {
-  font-size: 18px;
-}
-
-:root[data-font-size="huge"] {
-  font-size: 20px;
-}
-
-:root[data-theme="light"] {
-  color-scheme: light;
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
+  overscroll-behavior: none;
 }
 
 button,
