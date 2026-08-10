@@ -42,6 +42,26 @@ export function clampIndex(index: number, count: number): number {
   return Math.min(count - 1, Math.max(0, index));
 }
 
+export interface Release {
+  dx: number;
+  width: number;
+  velocity: number;
+  // The browser took the gesture rather than the player ending it.
+  taken: boolean;
+}
+
+// The whole of what a release decides, so the component holds none of it. A
+// taken gesture lands where it started: only a release the player made picks a
+// pane.
+export function landingIndex(release: Release, index: number, count: number): number {
+  const step = release.taken ? 0 : settleStep(release.dx, release.width, release.velocity);
+  return clampIndex(index + step, count);
+}
+
+// Far enough to have been a drag, which is what makes the click that follows
+// it not a choice being made.
+export const wasDragged = (dx: number): boolean => Math.abs(dx) >= AXIS_SLOP_PX;
+
 // Speed is measured over a window rather than between two events, because a
 // pointer reporting at 1000Hz gives a 1ms gap over three pixels and that reads
 // as a flick. A finger that stopped before letting go threw nothing, however

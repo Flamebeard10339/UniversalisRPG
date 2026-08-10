@@ -1,16 +1,27 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
+// Every module beneath src/ui, not every module directly inside it: a rule
+// that stops at the top level exempts the whole of src/ui/tabs/ from all four
+// of the rules below at once, and a directory is how this layer will grow.
+function modulesUnder(directory: string, prefix: string): Array<{ file: string; path: string }> {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return modulesUnder(path, `${prefix}/${entry.name}`);
+    if (!/\.tsx?$/.test(entry.name) || entry.name.includes('.test.')) return [];
+    return [{ file: `${prefix}/${entry.name}`, path }];
+  });
+}
+
 // The whole driver, entry point included: a door left out of the rule is a
 // door with no rule on it.
 const SOURCES: Array<{ file: string; text: string }> = [
-  ...readdirSync(here)
-    .filter((name) => /\.tsx?$/.test(name) && !name.includes('.test.'))
-    .map((name) => ({ file: `src/ui/${name}`, path: join(here, name) })),
+  ...modulesUnder(here, 'src/ui'),
   { file: 'src/main.tsx', path: resolve(here, '..', 'main.tsx') },
 ].map(({ file, path }) => ({ file, text: readFileSync(path, 'utf8') }));
 
@@ -34,6 +45,19 @@ describe('the rules the driver is held to', () => {
   it('reads the tree it is a rule about', () => {
     expect(SOURCES.map((source) => source.file)).toContain('src/main.tsx');
     expect(SOURCES.length).toBeGreaterThan(6);
+  });
+
+  it('descends, so a module in a directory is held to every rule below', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ui-sweep-'));
+    mkdirSync(join(root, 'tabs'));
+    writeFileSync(join(root, 'tabs', 'Map.tsx'), '');
+    writeFileSync(join(root, 'top.ts'), '');
+    writeFileSync(join(root, 'top.test.ts'), '');
+
+    const found = modulesUnder(root, 'src/ui').map((module) => module.file);
+
+    rmSync(root, { recursive: true, force: true });
+    expect(found.sort()).toEqual(['src/ui/tabs/Map.tsx', 'src/ui/top.ts']);
   });
 
   it('reaches the runtime only through the play surface', () => {

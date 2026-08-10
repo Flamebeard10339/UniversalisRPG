@@ -36,6 +36,13 @@ function published(view: PlayView): string[] {
 
 const TAB_LABELS = TABS.map((tab) => tab.label);
 
+// The nav is the one region whose words this layer owns, so it is taken out by
+// where it is rather than by what it says. Skipping the five labels wherever
+// they appeared let a narration header the clause does enumerate be replaced
+// with the word Character and pass.
+const NAV = /<nav[\s\S]*?<\/nav>/g;
+const asking = (html: string): boolean => html.includes('role="dialog"');
+
 function position(driver: Driver, choiceId: string): number {
   const at = driver.snapshot().view!.choices.findIndex((choice) => choice.id === choiceId);
   if (at < 0) throw new Error(`no such choice: ${choiceId}`);
@@ -52,10 +59,12 @@ describe('what the shell puts on the screen', () => {
 
     const step = (): void => {
       for (const line of published(driver.snapshot().view!)) engine.add(line);
-      const runs = readable(renderToStaticMarkup(<App driver={driver} />));
+      const html = renderToStaticMarkup(<App driver={driver} />);
+      expect(readable(html.match(NAV)?.join('') ?? '')).toEqual(TAB_LABELS);
+
+      const runs = readable(html.replace(NAV, ''));
       seen += runs.length;
       for (const run of runs) {
-        if (TAB_LABELS.includes(run)) continue;
         expect([...engine], `"${run}" is on the screen and no engine value produced it`).toContain(run);
       }
     };
@@ -88,12 +97,16 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, 'talk:tutorial-island.miki'));
     const menu = driver.snapshot().view!.modals[0].options[0];
 
-    const asked = readable(renderToStaticMarkup(<App driver={driver} />));
-    for (const value of menu.values!) expect(asked).toContain(value);
+    const asked = renderToStaticMarkup(<App driver={driver} />);
+    expect(asking(asked)).toBe(true);
+    for (const value of menu.values!) expect(readable(asked)).toContain(value);
 
     driver.answer(menu.key, menu.values![0]);
-    const answered = readable(renderToStaticMarkup(<App driver={driver} />));
-    for (const value of menu.values!) expect(answered).not.toContain(value);
+    const answered = renderToStaticMarkup(<App driver={driver} />);
+
+    // The sheet itself, not merely the words that were on it: a shell holding
+    // an answered modal up passes a check that only looks for its options.
+    expect(asking(answered)).toBe(false);
   });
 
   it('renders a modal it has never heard of from the option alone', () => {

@@ -6,9 +6,10 @@ export interface Tab {
 }
 
 // The nav's own vocabulary. These five names are the whole of what the player
-// reads under src/ui that no engine value produced, and surface.test.ts holds
-// them to that. Home sits in the middle because it is where a thumb rests and
-// because it puts every other tab one pane away from it.
+// reads under src/ui that no engine value produced: render.test.tsx takes the
+// nav out of the screen by where it is and requires an engine value for
+// everything left. Home sits in the middle because it is where a thumb rests
+// and because it puts every other tab one pane away from it.
 export const TABS: readonly Tab[] = [
   { id: 'map', label: 'Map' },
   { id: 'character', label: 'Character' },

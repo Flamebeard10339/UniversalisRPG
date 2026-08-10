@@ -10,7 +10,7 @@ export function ModalSheet({ option, onAnswer }: { option: Option; onAnswer: (ke
   const [typed, setTyped] = useState('');
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-8">
+    <div role="dialog" aria-modal className="fixed inset-0 z-50 flex flex-col justify-end bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-8">
       <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
         <p className="mb-3 text-xs uppercase tracking-wide text-text-subtle">{option.label}</p>
         {option.values ? (
@@ -35,7 +35,7 @@ export function ModalSheet({ option, onAnswer }: { option: Option; onAnswer: (ke
             }}
           >
             <input
-              className="min-h-[48px] flex-1 rounded-xl border border-border bg-panel px-3 text-text outline-none focus:border-accent"
+              className="min-h-[48px] flex-1 select-text rounded-xl border border-border bg-panel px-3 text-text outline-none focus:border-accent"
               value={typed}
               autoFocus
               onChange={(event) => setTyped(event.target.value)}

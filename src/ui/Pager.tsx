@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
-import { AXIS_SLOP_PX, clampIndex, dragAxis, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, settleStep, type Axis, type Motion } from './gesture';
+import { dragAxis, landingIndex, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, wasDragged, type Axis, type Motion } from './gesture';
 
 const SETTLE_MS = 220;
 const SETTLE_EASING = `transform ${SETTLE_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1)`;
@@ -62,8 +62,6 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
     return true;
   };
 
-  // A gesture the browser took away lands nowhere: it goes back where it
-  // started. Only a release the player made decides a pane.
   const end = (at: number, taken: boolean): void => {
     const dragging = drag.current;
     drag.current = null;
@@ -71,9 +69,8 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
     const node = strip.current;
     if (!dragging || dragging.axis !== 'x' || !node) return;
 
-    dragged.current = Math.abs(dragging.dx) >= AXIS_SLOP_PX;
-    const step = taken ? 0 : settleStep(dragging.dx, dragging.width, releaseVelocity(dragging.motion, at));
-    const landing = clampIndex(index + step, panes.length);
+    dragged.current = wasDragged(dragging.dx);
+    const landing = landingIndex({ dx: dragging.dx, width: dragging.width, velocity: releaseVelocity(dragging.motion, at), taken }, index, panes.length);
     node.style.transition = SETTLE_EASING;
     node.style.transform = restingAt(landing);
     if (landing !== index) onIndex(landing);

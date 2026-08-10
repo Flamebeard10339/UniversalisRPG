@@ -6,6 +6,7 @@ import {
   EDGE_RESISTANCE,
   FLICK_MIN_PX,
   FLICK_PX_PER_MS,
+  landingIndex,
   motionFrom,
   pagerOffset,
   releaseVelocity,
@@ -13,6 +14,7 @@ import {
   settleStep,
   STILL_MS,
   VELOCITY_WINDOW_MS,
+  wasDragged,
 } from './gesture';
 import { OPENING_TAB, TABS } from './tabs';
 
@@ -93,6 +95,30 @@ describe('how fast the drag was going', () => {
 
     expect(releaseVelocity(moving, 1000 + STILL_MS)).toBe(-1.4);
     expect(releaseVelocity(moving, 1000 + STILL_MS + 1)).toBe(0);
+  });
+});
+
+describe('what a release lands on', () => {
+  const release = { dx: -WIDTH * 0.4, width: WIDTH, velocity: 0, taken: false };
+
+  it('moves a pane for a release the player made', () => {
+    expect(landingIndex(release, 2, 5)).toBe(3);
+    expect(landingIndex({ ...release, dx: WIDTH * 0.4 }, 2, 5)).toBe(1);
+  });
+
+  it('goes back where it started when the browser took the gesture', () => {
+    expect(landingIndex({ ...release, taken: true }, 2, 5)).toBe(2);
+  });
+
+  it('stops at the ends', () => {
+    expect(landingIndex(release, 4, 5)).toBe(4);
+    expect(landingIndex({ ...release, dx: WIDTH * 0.4 }, 0, 5)).toBe(0);
+  });
+
+  it('calls a drag long enough to have been one, and a twitch not', () => {
+    expect(wasDragged(AXIS_SLOP_PX)).toBe(true);
+    expect(wasDragged(-AXIS_SLOP_PX)).toBe(true);
+    expect(wasDragged(AXIS_SLOP_PX - 1)).toBe(false);
   });
 });
 
