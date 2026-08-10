@@ -501,3 +501,24 @@ doctor and the byte check all pass.
   destroyed the shared node_modules for every worktree. Filed as a recurrence rather than worked
   around. The delta I would have been measuring is one commit and two source lines, both of which
   are covered above by narrower measurements.
+
+### Pass 5 — 2026-08-10
+
+- base: `e90fd17d1f0966be7af6ddcecac83de2021c2a54`
+- head: `a896e4b9b9149c69b80fbdb2b7c17a2cfdabbd3f`
+- proof 1: unknown
+- proof 2: unknown
+- proof 3: unknown
+- proof 4: unknown
+- proof 5: unknown
+- proof 6: unknown
+- proof 7: met — Graded on a7fb584 (head a896e4b, store-only on top), re-derived from the code rather than from the triage note. All three verbs hold and every measurement below re-runs.
+NAMES AN UNPLACED MODULE AND FAILS THE RUN, end to end through the real gate: `mkdir -p src/main && printf "export const y = 2;\n" > src/main/nested.ts && git add -N src/main/nested.ts && npm run layer-check` prints "204 module(s) swept under src and scripts, 202 read", then "1 module(s) belong to no declared root, so no import of theirs is read in either direction:  src/main/nested.ts", exit 1. `git rm --cached` it and the run returns to "203 swept, 202 read", exit 0. The same shape with a bare `src/zzStray.ts` was measured in pass 6 and still holds.
+READS EVERY (tracked, present) MODULE UNDER src/ AND scripts/: 203 swept over eight module extensions, against the two the sweep had before this branch; 202 read, the one difference being src/vite-env.d.ts, which is declared in OUTSIDE_STACK against a reason. Swept and read are now separate numbers in the run's own summary, so the sentence is no stronger than the measurement behind it.
+src/main.tsx IS LAYERED IN BOTH DIRECTIONS, which is the half c7 says makes c5 and gui-rebuild's import rule enforceable: layerOf('src/main.tsx') and layerOf('src/main') are both 'ui' (`npm run inspect`, body `(await import('./lib/layers.ts')).layerOf(...)`), and the test "catches a layer below ui reaching the browser driver's entry point" drives checkLayers(['src/runtime/boot.ts'], () => "import { root } from '../main';") to a violation. A root that names a file claims that file under either spelling and nothing beneath a directory of the same name — verified by the live run above, where src/main/nested.ts is unplaced rather than silently ui.
+NOT A PROOF OF ITS OWN SHAPE. Two hand-built manifests, aimed at the decision lines and not at any test. C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass6-mutations.json: 7 killed, 0 survived (the sweep's tree bound, its extension bound, unlayered detection, the wiring of unlayeredFiles into LayerReport, the exit code, the per-file naming, the root matching). C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass6b-mutations.json: 5 of the 8 killed — the exists filter, the file-root-is-a-name rule, namesFile itself, the opened counter, and the empty-sweep guard — each by a named test in scripts/lib/layers.test.ts, each re-run at its own file with the mutant still applied. Detection and formatting are killed by different named tests, so layerCheckOutput is not asserting its own structure back at itself.
+NO CROSS-SYSTEM EFFECT: `git grep -n "layerOf\|ROOTS\|sweptFiles\|LayerReport"` shows layerOf and ROOTS used only inside layers.ts and its test; architecture.ts imports importedPaths alone, which this branch does not touch, so `tasks where` and `tasks system` answer exactly as before. Deleting sourceFiles() broke no consumer — audit-status.ts, mergeReady.ts, workPrompt.ts and architecture.ts all use trackedFiles and are untouched.
+REGRESSION, stated rather than left silent. The branch replaced a readdir walk with the git index. One consequence was a crash and is fixed (a tracked file absent from the working tree: `mv src/main.tsx` aside now reports "202 swept, 201 read" at exit 0, where on 55024a5 it died with an uncaught ENOENT at layer-check.ts:6). The other stands and is ruled, not overlooked: an untracked src/grammar/zzAuditStray.ts importing ../runtime/session still passes at exit 0, and staging it with `git add -N` turns the same file into "1 import(s) point upward", exit 1. I agree with that ruling — layer-check is a merge gate over what the repository contains, CI reads the committed tree, and the alternative measured in the other direction under the readdir walk. It is recorded on the-layer-sweep-is-the-git-index-so-an-untracked-source-file with a trigger.
+WHAT THIS GRADE DOES NOT CLAIM, so the next pass need not rediscover it: the default effects object runLayerCheck() actually runs in production is watched by nothing. See the finding below.
+GATE: `npm run tasks -- merge-ready` on a896e4b is green on tsc, npm test (2233), layer-check, audit-status, doctor, bytes, tree, base and spec; its only failing leg was this clause.
+- proof 8: unknown
