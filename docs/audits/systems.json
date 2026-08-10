@@ -337,6 +337,7 @@
         "src/ui/FloatingText.tsx",
         "src/ui/Home.tsx",
         "src/ui/ModalSheet.tsx",
+        "src/ui/Pager.tsx",
         "src/ui/TabBar.tsx",
         "src/ui/driver.test.ts",
         "src/ui/driver.ts",
@@ -393,7 +394,8 @@
             "src/ui/tabs.ts",
             "src/ui/transcript.ts",
             "src/ui/format.ts",
-            "src/ui/gesture.ts"
+            "src/ui/gesture.ts",
+            "src/ui/Pager.tsx"
           ],
           "note": "produced by the-gui-shell-and-the-play-surface; the chat-log surface, action sheet and five-tab nav the-map-and-character-tabs and the four Settings/Edit records land in"
         }

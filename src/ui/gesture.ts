@@ -1,15 +1,68 @@
-// A swipe has to be long enough to be meant and sideways enough not to be the
-// narration column being scrolled. Both numbers are what a thumb on a phone
-// produces, and neither is derivable from anything else here.
-export const SWIPE_MIN_PX = 56;
-export const SWIPE_SIDEWAYS = 1.6;
+// A drag is one axis or the other, decided once it has travelled far enough to
+// have a direction at all. Below the slop a touch is a tap with a shaky thumb.
+export const AXIS_SLOP_PX = 8;
 
-// Which way through the tabs a drag of this shape means, or 0 for one that
-// means nothing. Swiping left brings the next tab in, the way a page does.
-// A drag that left text behind it was a selection whatever pointer made it,
-// which is the one case a sideways drag means something else.
-export function swipeStep(dx: number, dy: number, selected = ''): -1 | 0 | 1 {
-  if (selected.trim() !== '') return 0;
-  if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * SWIPE_SIDEWAYS) return 0;
+// How far across a pane a drag has to get before releasing lands on the next
+// one, and how fast and how far a short drag has to have gone to count anyway.
+// All three are what a thumb produces, and none is derivable from anything
+// else here. 0.6 px/ms is a flick rather than a slow drag let go while moving.
+export const SETTLE_RATIO = 0.25;
+export const FLICK_PX_PER_MS = 0.6;
+export const FLICK_MIN_PX = 24;
+
+// A drag past the first or last pane still moves, and moves less, because a
+// surface that does not answer at all reads as a surface that is broken.
+export const EDGE_RESISTANCE = 0.35;
+
+export type Axis = 'x' | 'y';
+
+export function dragAxis(dx: number, dy: number): Axis | null {
+  if (Math.abs(dx) < AXIS_SLOP_PX && Math.abs(dy) < AXIS_SLOP_PX) return null;
+  return Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+}
+
+// How far the strip actually moves for a drag of dx, which is all of it in the
+// middle and a fraction of it at either end.
+export function pagerOffset(dx: number, index: number, count: number): number {
+  const heldAtStart = index === 0 && dx > 0;
+  const heldAtEnd = index === count - 1 && dx < 0;
+  return heldAtStart || heldAtEnd ? dx * EDGE_RESISTANCE : dx;
+}
+
+// Which pane a release lands on, relative to the one it started from: far
+// enough across, or moving fast enough in the direction it was let go.
+export function settleStep(dx: number, width: number, velocity: number): -1 | 0 | 1 {
+  if (Math.abs(dx) < AXIS_SLOP_PX) return 0;
+  const flicked = Math.abs(velocity) >= FLICK_PX_PER_MS && Math.abs(dx) >= FLICK_MIN_PX && Math.sign(velocity) === Math.sign(dx);
+  if (!flicked && Math.abs(dx) < width * SETTLE_RATIO) return 0;
   return dx < 0 ? 1 : -1;
+}
+
+export function clampIndex(index: number, count: number): number {
+  return Math.min(count - 1, Math.max(0, index));
+}
+
+// Speed is measured over a window rather than between two events, because a
+// pointer reporting at 1000Hz gives a 1ms gap over three pixels and that reads
+// as a flick. A finger that stopped before letting go threw nothing, however
+// fast it was travelling before it stopped.
+export const VELOCITY_WINDOW_MS = 40;
+export const STILL_MS = 120;
+
+export interface Motion {
+  x: number;
+  at: number;
+  velocity: number;
+}
+
+export const motionFrom = (x: number, at: number): Motion => ({ x, at, velocity: 0 });
+
+export function sampleVelocity(motion: Motion, x: number, at: number): Motion {
+  const span = at - motion.at;
+  if (span < VELOCITY_WINDOW_MS) return motion;
+  return { x, at, velocity: (x - motion.x) / span };
+}
+
+export function releaseVelocity(motion: Motion, at: number): number {
+  return at - motion.at > STILL_MS ? 0 : motion.velocity;
 }
