@@ -1,37 +1,24 @@
 import { readFileSync } from 'node:fs';
-import { relative } from 'node:path';
-import { importedPaths, LAYERS, layerOf, pointsUpward, ROOTS } from './lib/layers';
-import { posix, sourceFiles } from './lib/sourceFiles';
+import { checkLayers, LAYERS, SOURCE_TREES } from './lib/layers';
+import { sourceFiles } from './lib/sourceFiles';
 
-interface Violation {
-  from: string;
-  to: string;
-}
+const files = SOURCE_TREES.flatMap((tree) => sourceFiles(tree));
+const { edges, violations, unlayered } = checkLayers(files, (file) => readFileSync(file, 'utf8'));
 
-const violations: Violation[] = [];
-let edges = 0;
-
-for (const layer of LAYERS) {
-  for (const file of sourceFiles(ROOTS[layer])) {
-    for (const target of importedPaths(file, readFileSync(file, 'utf8'))) {
-      const targetLayer = layerOf(target);
-      if (targetLayer === null) continue;
-      edges++;
-      if (pointsUpward(layer, targetLayer)) violations.push({ from: posix(relative(process.cwd(), file)), to: target });
-    }
-  }
-}
-
-for (const violation of violations) console.error(`${violation.from} -> ${violation.to}`);
-
-console.log(`${edges} cross-file imports checked across ${LAYERS.length} layers (${LAYERS.join(' < ')}).`);
+console.log(`${files.length} source file(s) read under ${SOURCE_TREES.join(' and ')}; ${edges} cross-file imports checked across ${LAYERS.length} layers (${LAYERS.join(' < ')}).`);
 
 if (violations.length > 0) {
-  console.error(
-    `\n${violations.length} import(s) point upward. A layer may import the layers below it and itself, never above.\n` +
-      `Fix the import, or move the code: a file that needs something from above usually holds two layers' work.`,
-  );
-  process.exit(1);
+  console.error(`\n${violations.length} import(s) point upward. A layer may import the layers below it and itself, never above:`);
+  for (const violation of violations) console.error(`  ${violation.from} -> ${violation.to}`);
+  console.error('Fix the import, or move the code: a file that needs something from above usually holds two layers’ work.');
 }
 
-console.log('Every import points downward.');
+if (unlayered.length > 0) {
+  console.error(`\n${unlayered.length} source file(s) belong to no declared root, so no import of theirs is read in either direction:`);
+  for (const file of unlayered) console.error(`  ${file}`);
+  console.error('Put each under a layer root in ROOTS, or name it in OUTSIDE_STACK to declare it deliberately outside the stack (scripts/lib/layers.ts).');
+}
+
+if (violations.length + unlayered.length > 0) process.exit(1);
+
+console.log('Every source file belongs to a layer, and every import points downward.');
