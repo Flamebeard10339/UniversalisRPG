@@ -249,3 +249,117 @@ a counter-scaled bonus are both things a passive or an item grants a character.
 - **Can a `say:` inside a hook name who it is about?** Inherited unchanged from
   `combat-encounter-grammar`: the log is one second-person channel, so a hook's `say:` is in the
   player's voice whoever swung. Decided by whoever gives the log a subject.
+
+## Audit passes
+
+### Pass 1 — 2026-08-10
+
+- base: `402b310dac65bed22fa4d7ea1e7006a22a378b74`
+- head: `b8327e0e6949c3abe4849f53c37628a75e506e38`
+- proof 1: met — Both blocks parse on both carriers and on nothing else, and both survive the round trip.
+  Structural: HOOK_FIELDS (src/grammar/hook.ts:15) is spread into exactly two schemas, entitySchema
+  (src/content/entity.ts:132) and itemSchema (src/content/item.ts:29), and referenceSites.visitSection
+  calls hooks() only in the 'entity' and 'item' arms (src/content/referenceSites.ts:275,287), so no other
+  kind can hold one. Every other section reaches either the actionBody refusal (location, and an action
+  block anywhere) or the generic "unknown <kind> field" error. Neither block names a side, an action or a
+  weapon: HookCarrier is two ActionResult[] and nothing else.
+  Tests: src/content/parse.test.ts "the two carriers of a hook" (entity reads on hit:/when hit: as hooks
+  while on death: stays a handler; item reads both while swing: stays an action; location refused);
+  src/content/roundTrip.test.ts "carries both hook blocks, on both carriers, through serialize and reload"
+  plus its it.each sibling that deletes a printed hook and demands the diff report it, which is what stops
+  a dropped hook reading as clean; src/content/serialize.test.ts asserts the reloaded item's whenHit and
+  that its actions list is still only ['polish'].
+  Mutation (manifest C:\Users\yonat\AppData\Local\Temp\mutations-combat-events-pass1.json and
+  ...-pass1-mutations-c3c4.json): deleting the on-hit print in serialize.ts:196, deleting the HOOK_FIELDS
+  spread from item.ts:29, and deleting it from entity.ts:132 were each KILLED by the named round-trip
+  test, re-run at its own file with the mutant still applied.
+  Not covered: an item's on hit: is the one of the four carrier-by-block pairs no round-trip or serializer
+  fixture exercises — finding "an item's on hit: is the one carrier-and-block pair no round trip covers".
+- proof 2: unknown — Not attempted by this branch and not verified by me. No reader of onHit or whenHit exists
+  anywhere in src/runtime (grep -rn "onHit\|whenHit" src/runtime returns nothing), so there is no gather to
+  compare against the sources statRange folds, and no equip/unequip behaviour to observe. Discharged by
+  combat-hook-firing, which is open. Recorded unknown rather than unmet because no implementation was
+  reviewed, not because one was reviewed and failed.
+- proof 3: met — A hook on an action is refused on all three routes an action body can be reached by, with a
+  message that names the carrier. src/grammar/hook.ts:22 holds the one sentence ("write it on the
+  `# entity` or `# item` that carries it, because an action is the verb and is shared by everyone who
+  performs it"); hookLabelProblem is asked from actionBody.parse and actionBody.parseBlock
+  (src/grammar/action.ts:317,321), and HOOK_FIELD_REFUSALS joins RETIRED_ACTION_FIELDS (action.ts:175) so
+  the labels are also refused written as fields inside an action body. A section-level `# action` reaches
+  the same code: src/content/action.ts:22 parses it with actionBody.parseBlock. The retired four-block
+  spellings on hit self: and on hit them: are refused by name on both routes
+  (src/grammar/hook.ts:26-29).
+  Tests: src/grammar/action.test.ts "a hook is carried by a character, not by a verb" (six cases across
+  the field route, the block-label route and the retired names); src/content/parse.test.ts "refuses a hook
+  on a section that carries no character modifier" drives the same refusal through a real
+  locationSchema parse.
+  Mutation: deleting refuseHookLabel from parseBlock (KILLED, 4 named tests), deleting it from parse
+  (KILLED, 2 named tests), and deleting the HOOK_FIELD_REFUSALS spread (KILLED, 4 named tests), each
+  re-run at src/grammar/action.test.ts with the mutant still applied.
+- proof 4: met — The phrase reads where English puts it and the preposition follows the verb.
+  src/grammar/actionResult.ts:78-95 reads a trailing `from`/`to` plus `me`/`them` after the resource,
+  rewinds when neither preposition follows, refuses an opened phrase that names neither party, and refuses
+  the wrong preposition naming the right one (PREPOSITION = { drain: 'from', restore: 'to' }); an unmarked
+  result carries no `party` key at all (parsePool returns the bare pool), which is what makes "unmarked is
+  mine" a representation rather than a default someone has to remember. The serializer re-derives the
+  preposition from the sign rather than holding a second field (src/content/serialize.ts:97).
+  Tests: src/grammar/action.test.ts "which party a drain: or restore: moves its amount between", five
+  cases including the ranged amount inside a wrapper with a comma list after it.
+  Mutation: 4 of the 5 aimed lines KILLED by their own named tests — dropping the party from the result
+  (`return pool`), unbounding the party reader so it swallows the rest of the line, hardcoding the verb
+  handed to parseParty, and disabling the "names a party" refusal; plus the serializer's party clause,
+  KILLED by the round-trip test. One SURVIVED: the `cursor.pos = start` rewind at actionResult.ts:87 is
+  unobservable because requireEnd re-skips whitespace — filed as its own finding.
+  Not proven here, and not provable at this layer: the clause's last sentence ("`me` is always the
+  carrying character and `them` the other party the moment identifies") is a runtime resolution claim, and
+  nothing in src/runtime reads `party` yet. Two things follow, both filed as findings: the phrase is
+  currently accepted on every drain:/restore: in the language including one-sided actions where no other
+  party exists, and today the runtime applies such a result to the actor regardless of what was written.
+- proof 5: met — A hook body is the same resultList an action's result groups use (src/grammar/hook.ts:16-17),
+  so every droptables selector nests inside one unchanged and this branch adds none of its own — the diff
+  of src/grammar/actionResult.ts adds the Party type and parseParty and touches no wrapper.
+  Re-runnable: npm run probe -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass1-c5.dsl
+  --round-trip reports "round-trips clean" for an item whose on hit: holds `1 in 20:`, `vigor vs vigor:`,
+  `if calm:` and a `one of:` table with a `nothing` row, and whose when hit: holds an inline `1 in 4:`.
+  src/content/parse.test.ts and roundTrip.test.ts both carry the `1 in 20:` nesting as well.
+  Untested, because no hook fires yet: the draw discipline these selectors bring at runtime. The clause
+  says that half is already shipped and not restated here, so it is not this branch's to prove.
+- proof 6: unknown — Not attempted by this branch and not verified by me. Nothing fires a hook: no reader of
+  onHit or whenHit exists in src/runtime, and resolveAttempt is untouched by this diff. Discharged by
+  combat-hook-firing, which is open.
+- proof 7: unknown — Not attempted by this branch and not verified by me. Nothing fires a hook, so there is no
+  firing path whose termination could be argued or tested. Discharged by combat-hook-firing, which is open.
+- proof 8: unknown — Not attempted by this branch and not verified by me. No firing order exists to observe;
+  src/runtime is untouched by this diff. Discharged by combat-hook-firing, which is open.
+- proof 9: unknown — Not attempted by this branch and not verified by me. The depletion verdict is untouched;
+  src/runtime is untouched by this diff. Discharged by combat-hook-firing, which is open.
+- proof 10: unmet — Half of it is shipped and the other half is missing in a way that is silent rather than
+  loud, which is why this is unmet rather than unknown. Shipped: `+N <stat> per <counter>` parses beside
+  the flat and percent forms (src/grammar/tagClause.ts:700 STAT_BONUS gains an optional `per` group),
+  resolves its counter as a resource (src/content/referenceSites.ts:visitTags puts `per` as kind
+  'resource', so `+2 attack per fury` with no such resource is a load error), and prints back namespaced
+  (`+2 base.vigor per base.rage`), all covered by src/content/parse.test.ts and the round trip.
+  Missing: nothing folds it. src/runtime/stats.ts:29 is still
+  `for (const tag of tags) if (tag.kind === 'stat-bonus' && tag.statId === statId) foldBonus(tag, fold, 1)`
+  — the counter is never read, and that line is the one that folds an equipped item's tags. So
+  `+2 attack per rage` on an item grants a flat +2 at every rage value, including zero. Before this branch
+  that clause was a load error, so the change for that input is from refused to silently wrong. The clause
+  also asks for a grep of src/runtime/stats.ts finding one function scaling a BonusAmount by a count: that
+  part holds, foldBonus is still the only one. Discharged by combat-hook-firing; filed as a finding so the
+  interim state is not invisible.
+- proof 11: met — Verified and currently true, but vacuously so — say so to the next pass rather than treating
+  it as settled. `grep -rniE "poison|thorns|rage|vigor|accelerated" src/runtime/` returns nothing outside
+  identifiers of its own (hitChance, hitDamage), and `git diff --stat 402b310..b8327e0 -- content/` is
+  empty, so this branch ships no content and no shipped fixture can stand in for a primitive. It is clean
+  because src/runtime is untouched by this diff, not because a resolver was written and kept general. The
+  clause is discharged by combat-hook-firing, and the same two commands must be re-run against that slice
+  before this grade means anything.
+
+### Pass 2 — 2026-08-10
+
+- base: `402b310dac65bed22fa4d7ea1e7006a22a378b74`
+- head: `b8327e0e6949c3abe4849f53c37628a75e506e38`
+- No independent measurement. The pass-1 auditor re-ran `tasks audit --args-from` on the same file to
+  read output it had truncated, and the command appended a second, identical pass and a duplicate of each
+  of its eight findings; the duplicates are declined. Every standing and every word of evidence here is
+  pass 1 above. Recorded as an occurrence of `tasks-audit-args-from-is-not-idempotent-a-second-run-of-the-`.
