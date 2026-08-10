@@ -100,12 +100,13 @@ Proof:
   reached rather than the struck one alone. A target finished off by a hook ends the fight exactly
   as one finished by the swing does; a swinger felled by the character it struck leaves the fight at
   that instant, and ends it if it was the player or the armed action's target.
-- [c10] A stat bonus can be scaled by a counter. `+N <stat> per <counter>` reads a counter's current
-  value and contributes through the existing `added` and `increased` channels, alongside the flat
-  and percent forms `tagClause` already parses, read for the character the stat is being read for
-  rather than for the player. This branch defines the shape with a resource's level as its first
-  counter; `buffs-generalized` adds a buff's stack count and `per-grammar-dependent-stats` adds a
-  stat, as further counters of the one shape rather than as second spellings of it.
+- [c10] A stat bonus can be scaled by a counter, through the multiplier that already exists.
+  `+N <stat> per <counter>` parses beside the flat and percent forms `tagClause` holds and folds
+  through `foldBonus`, which `skill-levels-xp-events` shipped and which `statRange` already calls
+  with a skill's level as its `times`. This branch adds a resource's level as a second counter
+  source and no second multiplier: a grep of `src/runtime/stats.ts` finds one function scaling a
+  `BonusAmount` by a count, not two. `buffs-generalized` adds a buff's stack count and
+  `per-grammar-dependent-stats` a stat, the same way.
 - [c11] No identifier anywhere in `src/runtime` is named for any fixture `archetype-mods` composes —
   poison, rage, thorns or accelerated vigor — and no branch in the resolver exists for any of them.
   `content/` is untouched by this branch, so no shipped fixture can stand in for a primitive that
@@ -207,10 +208,19 @@ a counter-scaled bonus are both things a passive or an item grants a character.
   "buff engine" and its deliverable is already "applying to any entity rather than the player
   alone". This branch is ordered before it, so the timed modifier poison needs arrives after — and
   the gather it defines is where a buff joins as a carrier when it does.
-- **One `per <counter>` shape, several counter sources.** Rage needs a bonus that reads a pool's
-  level, vigor a stack count, and `per-grammar-dependent-stats` a stat. The shape is defined here
-  and the other two extend its counters; that record already says so in its own evidence and claims
-  only the resolution point and its cycle guard.
+- **One counter multiplier, several counter sources — and it is already shipped.**
+  `skill-levels-xp-events` merged on 2026-08-09 with `foldBonus(bonus, fold, times)` and
+  `# skill`'s `per-level:`, which is a stat bonus scaled by a level. That is this shape's runtime
+  half, built before this branch reached it, so what remains here is the authored spelling and a
+  second source for `times`. Building a second multiplier would be the duplication this branch's own
+  decision was written to prevent.
+- **`per-level:` and `+N <stat> per <counter>` are two positions, not two spellings.** `per-level:`
+  sits on `# skill` and is the *declaration*: what one level of melee is worth, said once by the
+  thing that defines melee. `+2 attack per rage` sits on an item, a passive or an entity and is the
+  *grant*: what this carrier gives, said by the carrier. A skill cannot express the second — a
+  passive that scales off rage is nothing melee knows about — and a carrier should not have to
+  restate what a level is worth. They meet at `foldBonus`, which is the test that they are one
+  mechanism: if this branch writes a second scaling function, they were two after all.
 - **Fixtures are content, not code.** They exist to prove the primitives compose. A mechanism whose
   tests pass while the resolver has grown a branch named after one of them has failed at the thing
   it was built for, which is why their absence from `src/runtime` is a clause.
