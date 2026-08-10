@@ -12,6 +12,9 @@ import {
   releaseVelocity,
   sampleVelocity,
   settleStep,
+  SPLIT_MAX,
+  SPLIT_MIN,
+  splitFrom,
   STILL_MS,
   VELOCITY_WINDOW_MS,
   wasDragged,
@@ -119,6 +122,22 @@ describe('what a release lands on', () => {
     expect(wasDragged(AXIS_SLOP_PX)).toBe(true);
     expect(wasDragged(-AXIS_SLOP_PX)).toBe(true);
     expect(wasDragged(AXIS_SLOP_PX - 1)).toBe(false);
+  });
+});
+
+describe('where the player put the split', () => {
+  it('moves with the drag, as a fraction of the surface it divides', () => {
+    expect(splitFrom(0.5, 100, 400)).toBe(0.75);
+    expect(splitFrom(0.5, -100, 400)).toBe(0.25);
+  });
+
+  it('leaves both sides something to hold', () => {
+    expect(splitFrom(0.5, 1000, 400)).toBe(SPLIT_MAX);
+    expect(splitFrom(0.5, -1000, 400)).toBe(SPLIT_MIN);
+  });
+
+  it('stays where it was when there is no surface to measure against', () => {
+    expect(splitFrom(0.4, 100, 0)).toBe(0.4);
   });
 });
 

@@ -21,6 +21,7 @@
   --color-success: #34d399;
   --color-warning: #fbbf24;
   --color-scrim: rgb(11 16 32 / 0.72);
+  --color-flash: rgb(103 232 249 / 0.22);
   background: var(--color-background);
   color: var(--color-text);
   font-family:
@@ -41,4 +42,48 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+@keyframes arrived {
+  from {
+    background-color: var(--color-flash);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@keyframes risen {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes darkened {
+  from {
+    background-color: transparent;
+  }
+}
+
+.arrived {
+  animation: arrived 260ms ease-out;
+}
+
+.risen {
+  animation: risen 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.darkened {
+  animation: darkened 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arrived,
+  .risen,
+  .darkened {
+    animation: none;
+  }
 }

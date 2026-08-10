@@ -62,6 +62,17 @@ export function landingIndex(release: Release, index: number, count: number): nu
 // it not a choice being made.
 export const wasDragged = (dx: number): boolean => Math.abs(dx) >= AXIS_SLOP_PX;
 
+// How much of the play surface the narration gets. Half by default, and never
+// so little of either that the other has nothing to hold.
+export const SPLIT_DEFAULT = 0.5;
+export const SPLIT_MIN = 0.15;
+export const SPLIT_MAX = 0.85;
+
+export function splitFrom(start: number, dy: number, height: number): number {
+  if (height <= 0) return start;
+  return Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, start + dy / height));
+}
+
 // Speed is measured over a window rather than between two events, because a
 // pointer reporting at 1000Hz gives a 1ms gap over three pixels and that reads
 // as a flick. A finger that stopped before letting go threw nothing, however
