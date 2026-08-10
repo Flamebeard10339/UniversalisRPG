@@ -19,16 +19,37 @@ the one who landed it or the one it landed on:
 # item venomous-blade
 slot: mainhand
 +4-7 attack
-on hit:
-  1 in 4:
-    them:
-      drain: 3 health
+on hit: 1 in 4: them: drain: 3 health
+
+# item bramble-mail
+slot: body
+when hit: them: drain: 2 health
 ```
 
 Everything in a hook is read from the character carrying it. `on hit:` is *I landed one*, `when hit:`
 is *one landed on me*, and an unmarked result lands on me — the carrier is the perspective, which is
 what makes the block readable off the page you are already looking at. `them:` is the one marked
 exception, for the results that must reach the other party.
+
+Those are one line each because every wrapper in this language already takes an inline body and they
+chain, which `on death: 1 in 4: credit: drain: 3 health` parses today. A hook block and `them:` are
+both ordinary members of that grammar and inherit it; neither needs an inline spelling of its own.
+The multi-result form indents the same way anything else does:
+
+```
+# entity berserker
+stats: max-health 40, max-rage 10, attack 6
+uses: melee-combat
++2 attack per rage
+on hit:
+  restore: 1 rage
+  1 in 20:
+    them: drain: 4 health
+```
+
+`# entity` and `# item` are the two carriers that exist. The same two blocks on `# passive`, which
+`archetype-mods` and `items-mods-and-crafting` own between them, is that record's line to write and
+this branch's gather to already accept.
 
 The enabling change beneath it is small and specific. `resolveAttempt` already holds both parties as
 `self` and `other`, `result-application-seam` has already given result application a subject, and
@@ -112,10 +133,10 @@ is ordered behind `buffs-generalized`, which owns the timed-modifier and stackin
 
 | fixture | what it needs | whose |
 | --- | --- | --- |
-| poison | `on hit:` with `them:` and a timed debuff on the struck character | here, then `buffs-generalized` |
+| poison | `on hit: them:` and a timed debuff on the struck character | here, then `buffs-generalized` |
 | rage | a resource with a constant drain, `on hit:` restoring it, `+N <stat> per rage` | here |
 | accelerated vigor | `1 in 20:` inside `on hit:`, a stacking buff, `+N% <stat> per stack` | here, then `buffs-generalized` |
-| thorns | `when hit:` draining `them:` | here |
+| thorns | `when hit: them: drain: N health` on the carrier | here |
 
 Rage and accelerated vigor are both kept because they are not the same mechanism wearing two names:
 a resource has a ceiling and a rate that regeneration can push against, and a stack count has
@@ -153,6 +174,12 @@ a counter-scaled bonus are both things a passive or an item grants a character.
   left standing. `credit:` was named for the one moment it served — rewards to a killer — and the
   same wrapper now carries poison to a target and thorns to an attacker, where "credit" reads as the
   opposite of what happens. No shipped content uses the word; four test fixtures do.
+- **`them:` gets no inline spelling of its own, because it already has one.** `wrapperBody` reads an
+  inline body wherever a wrapper is written, and wrappers chain, so `when hit: them: drain: 2 health`
+  is one line with nothing added. A prefix form on the pool name — `drain: 3 their health`, matching
+  `depletes: their health` — was considered and lost: it is shorter still, but it reaches only the
+  results that name a pool, so `xp:`, `give:` and `roll:` would keep the wrapper and the language
+  would carry two ways to say one thing. One spelling that fits on a line beats two that fit better.
 - **An unmarked result lands on the carrier.** Neither default covers every fixture: rage restores
   the carrier's pool and poison drains the target's, both under `on hit:`. Defaulting to the carrier
   is what "read from the character with the effect" means, and it puts the marker on the sentence
