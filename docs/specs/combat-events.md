@@ -363,3 +363,105 @@ a counter-scaled bonus are both things a passive or an item grants a character.
   read output it had truncated, and the command appended a second, identical pass and a duplicate of each
   of its eight findings; the duplicates are declined. Every standing and every word of evidence here is
   pass 1 above. Recorded as an occurrence of `tasks-audit-args-from-is-not-idempotent-a-second-run-of-the-`.
+
+### Pass 3 — 2026-08-10
+
+- base: `402b310dac65bed22fa4d7ea1e7006a22a378b74`
+- head: `6757444f062f9b23dcc6a52e10a95514ecfd183c`
+- proof 1: met — Both blocks parse on both carriers and on nothing else, and a non-empty hook survives the round trip.
+ Re-runnable: npm run mutate -- C:\Users\yonat\AppData\Local\Temp\mutations-combat-events-pass3.json, aimed at the
+ four lines this clause is about rather than at pass 1's. KILLED, each re-run at its own file with the mutant still
+ applied: the HOOK_FIELDS spread in src/content/entity.ts (roundTrip "carries both hook blocks, on both carriers,
+ through serialize and reload"); the when-hit half of hookLines in src/content/serialize.ts:197 (same test — pass 1
+ only broke the on-hit half); listMembers in the hooks() walk at src/content/referenceSites.ts:102 (parse.test
+ "resolves a hook written as an edit, on a carrier that has none to edit yet", the pass-1 crash fix); and the
+ inline-and-block refusal at src/grammar/section.ts:168 (parse.test "rejects a field written inline and as a block").
+ Structural, re-checked independently of pass 1: HOOK_FIELDS is spread into entitySchema and itemSchema only, and
+ referenceSites.visitSection calls hooks() only in the 'entity' and 'item' arms. Probed acceptance rather than
+ assumed it: npm run probe -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass3-b.dsl --round-trip
+ round-trips clean for an item carrying both blocks with a nested 1 in 20:, a one of: table with party phrases in
+ its rows, and a comma list inside an inline 1 in 4:.
+ The exception, filed as a finding and not covered by any test: a hook whose list is EMPTIED rather than absent does
+ not survive the round trip. Reproduce with
+ npm run probe -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass3-mods\base.dsl C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass3-mods\patch.dsl --round-trip
+ — a patch module removing the only entry of a base entity's on hit: leaves onHit: [], the serializer's
+ length guard prints nothing, the reload yields undefined, and roundTripModule reports "entities: changed
+ base.berserker". The branch's own parse.test asserts [] is the outcome of `-when hit:` and no round-trip covers it.
+- proof 2: unknown — Nobody has looked because there is nothing to look at: git diff --stat 402b310..6757444 -- src/runtime/
+ is empty, and grep -rn "onHit\|whenHit" src/runtime returns nothing. No gather exists to compare against the
+ sources statRange folds and no equip/unequip behaviour to observe. Discharged by combat-hook-firing, which is open
+ and not started. Recorded unknown rather than unmet because no implementation was reviewed, not because one failed.
+- proof 3: met — A hook label is refused on every route an action body is reached by, with a message naming the carrier.
+ Re-runnable: the manifest entry "c3 a hook label is refused on the block route a real section reaches" deletes
+ refuseHookLabel from actionBody.parseBlock (src/grammar/action.ts:322) — KILLED by four named tests in
+ src/grammar/action.test.ts, re-run at that file with the mutant still applied. Independent of the test suite:
+ npm run probe -- - --each over C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass3-c.txt refuses
+ `on hit:` on a # location with "write it on the `# entity` or `# item` that carries it"; the same refusal reaches a
+ section-level # action through content/action.ts's actionBody.parseBlock, and HOOK_FIELD_REFUSALS joins
+ RETIRED_ACTION_FIELDS so the labels are refused written as fields inside an action body too. The retired four-block
+ spellings `on hit self:` and `on hit them:` are refused by name on both routes (src/grammar/hook.ts:26-29).
+ The `on hit` label is also refused as an event NAME where the name is bound (src/content/registry.ts:235) — the
+ manifest entry "c1 an event a hook label would answer is refused where the name is bound" was KILLED by
+ parse.test "refuses an event whose name only a hook block could answer". Noted, not filed: that refusal is on the
+ event's local name only, so `# event hit` is refused globally even though another module could still answer it as
+ `on <module>.hit:`; a defensible narrowing, but it is a name the language no longer allows anyone to declare.
+- proof 4: met — The phrase reads where English puts it, the preposition follows the verb, and the phrase is refused
+ everywhere the moment identifies no second party.
+ Re-runnable: three manifest entries. "c4 the party phrase is refused at the line entry point" (deleting refuseParty
+ from parseResultLine, src/grammar/actionResult.ts:324) and "c4 the preposition follows the verb" (disabling the
+ `preposition !== wanted` check) were both KILLED by their own named tests in src/grammar/action.test.ts, re-run at
+ that file with the mutant still applied.
+ Verified independently of the tests, because a refusal rule is proved by where it does NOT fire as much as by where
+ it does. npm run probe -- - --each over C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass3-g.txt,
+ -h.txt and -i.txt refuses the phrase on every non-hook route in the language: a # droptable section body, a
+ `one of:` row inside one, a dialogue choice effect, a # location action, an entity `on <event>:` handler in both
+ the block and the inline form, an action's `on success:` in both forms, and inside a `credit:` nested in one.
+ -b.dsl accepts it on every hook route: inline, block, inside `1 in 20:`, inside a `one of:` row, in a comma list,
+ and through a patch module's `+on hit:`. I could not find a bypass.
+ Two things the grade does not cover, both filed. First, the SECOND copy of the refusal — resultList.parse at
+ src/grammar/actionResult.ts:340, which is the only guard on every inline result list — SURVIVED its mutation
+ against the whole 2208-test suite. Second, a `roll:` into a # droptable from inside a hook cannot carry a party at
+ all, and the refusal message tells the author it "reads only inside `on hit:` or `when hit:`" when the table's body
+ is reached from inside exactly that. The clause's last sentence — that `me` is the carrying character and `them`
+ the party the moment identifies — remains a runtime claim nothing in src/runtime reads yet.
+- proof 5: met — A hook body is read by hookResultList, whose parse and parseBlock are the same parseResults and the same
+ per-line reader every other result list uses (src/grammar/actionResult.ts:347-351); the only difference is that it
+ does not run refuseParty. The diff of src/grammar/actionResult.ts adds the Party type, parseParty, firstParty and
+ refuseParty and touches no wrapper, no selector and no draw.
+ Re-runnable: npm run probe -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass3-b.dsl --round-trip
+ reports "round-trips clean" for an item whose on hit: holds `1 in 20:` and a `one of:` table with a `nothing` row,
+ and whose when hit: is an inline `1 in 4:` followed by a comma list. Untested because nothing fires yet: the draw
+ discipline at runtime, which the clause says is already shipped and not restated here.
+- proof 6: unknown — Nothing fires a hook. src/runtime is untouched by this diff (git diff --stat 402b310..6757444 --
+ src/runtime/ is empty) and resolveAttempt is unchanged, so there is no trigger whose landed/missed condition could
+ be observed. Discharged by combat-hook-firing, which is open.
+- proof 7: unknown — Nothing fires a hook, so there is no firing path whose termination could be argued or tested.
+ src/runtime is untouched by this diff. Discharged by combat-hook-firing, which is open.
+- proof 8: unknown — No firing order exists to observe; src/runtime is untouched by this diff. Discharged by
+ combat-hook-firing, which is open.
+- proof 9: unknown — The depletion verdict is untouched; src/runtime is untouched by this diff. Discharged by
+ combat-hook-firing, which is open.
+- proof 10: unmet — Re-confirmed independently, and it is worse on one axis than pass 1 recorded.
+ The shipped half holds and is now mutation-proved: "c10 the counter is resolved as a resource" (disabling the
+ `per` reference site at src/content/referenceSites.ts:137) was KILLED by parse.test "resolves the counter as a
+ resource, so a bonus scaled by nothing is a load error", and "c10 the counter survives the serializer" (deleting
+ the ` per <counter>` clause from src/content/serialize.ts:174) was KILLED by the round-trip test. So it parses,
+ resolves and prints back namespaced.
+ The missing half: src/runtime/stats.ts:29 is still
+ for (const tag of tags) if (tag.kind === 'stat-bonus' && tag.statId === statId) foldBonus(tag, fold, 1)
+ — `tag.per` is never read, so `+2 attack per rage` on an equipped item grants a flat +2 at every rage value
+ including zero, where before this branch it was a load error. The clause's own grep test does hold: foldBonus is
+ still the only function scaling a BonusAmount by a count (grep -n "foldBonus" src/runtime/stats.ts finds one
+ definition and two call sites, both passing a count).
+ What pass 1 did not record: the clause names the carriers as an entity, an item, a passive or a buff, and the
+ spec's own Deliverable prints `+2 attack per rage` on a `# entity berserker`. That does not load at all —
+ npm run probe -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass3-a.dsl reports
+ 'unexpected content: "+2 attack per rage"', because entitySchema has no clauses field and an entity has never been
+ able to carry a stat bonus. The authored spelling therefore reaches one of the two carriers the clause names.
+ Filed as a finding. Discharged by combat-hook-firing plus whatever gives an entity a tag-clause field.
+- proof 11: met — Verified and currently true, and still vacuously so — say so to the next pass rather than treating it
+ as settled. grep -rniE "poison|thorns|rage|vigor|accelerated" src/runtime/ returns matches only inside DSL fixture
+ text embedded in src/runtime/*.test.ts (enemy-pool.test.ts, resolve.test.ts) — no identifier, no resolver branch.
+ git diff --stat 402b310..6757444 -- src/runtime/ content/ is empty, so this branch ships no content and touches no
+ resolver. It is clean because src/runtime is untouched, not because a resolver was written and kept general; the
+ same two commands must be re-run against combat-hook-firing before this grade means anything there.
