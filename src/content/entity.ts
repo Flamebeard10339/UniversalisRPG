@@ -118,7 +118,7 @@ export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'>
       hydrate: (parsed) => Object.fromEntries(parsed as [string, Range][]),
       default: () => ({}),
     },
-    skills: { parser: list(id), default: () => [] },
+    skills: { parser: list(id), hydrate: (parsed) => [...new Set(parsed as string[])], default: () => [] },
     equipmentSlots: { parser: list(id), keyword: 'equipment-slots', default: () => [] },
     flags: { parser: list(id), default: () => [] },
     uses: { parser: list(id), default: () => [] },

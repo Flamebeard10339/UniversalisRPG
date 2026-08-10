@@ -20,6 +20,18 @@ base: 10
 # skill focus
 stat-id: vigor
 
+# skill grit
+stat-id: vigor
+per-level: +2%
+
+# skill haggling
+stat-id: vigor
+per-level: +2-5
+
+# skill grudge
+stat-id: vigor
+per-level: -3%
+
 # flag levered
 
 # item ore
@@ -145,6 +157,9 @@ describe('serializeRegistryModule', () => {
     expect(printed).toContain('# info base');
     expect(printed).toContain('# entity npc');
     expect(printed).toContain('# action haul');
+    expect(printed).toContain('per-level: +2%');
+    expect(printed).toContain('per-level: +2-5');
+    expect(printed).toContain('per-level: -3%');
     expect(printed).toContain('use: entity.base.npc.cheer');
     const npcAction = (label: string) => roundTrip.entities.get('base.npc')?.actions.find((each) => each.label === label);
     expect(npcAction('haul')).toMatchObject({ kind: 'continuous', rate: 12 });

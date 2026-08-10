@@ -323,17 +323,38 @@ base: 10
 skill:
   title: text, defaults to the id humanized
   stat-id: text, no default (stays absent if unset)
+  per-level: a bonus with no stat — `+1`, `-2`, `+3-6`, `+1%` — no default
 ```
 
 ```
 # skill thieving
 stat-id: attack
+per-level: +1
+
+# skill footwork
+stat-id: evasion
+per-level: +2%
 
 # skill mining
 ```
 
-`mining` above ends up with an undefined `stat-id` after hydration — unlike
-`title`, this field simply has no default.
+A skill's xp total buys levels on a curve that costs 1000 xp for the first and
+doubles that cost every ten levels, so level 11 costs 2000 and level 21 costs
+4000, with no flat stretch in between. The level is always a whole number and
+is derived from the total, never stored.
+
+`per-level` is what one level is worth to `stat-id`, and the grant is that times
+the level: `thieving` at level 30 is `+30 attack`, `footwork` at level 30 is
+`+60% evasion`. The two land in the same channels an item's or an action's tag
+clauses do — flat adds before percentages multiply — so a level is not a
+modifier of its own. The stat is named once, by `stat-id`, which is why the
+bonus carries no name; `per-level: +1 attack` is a load error, and so is a
+`per-level` with no `stat-id` to raise.
+
+Only the actors listing the skill in their `skills:` get any of it, so
+`thieving` above raises the attack of whoever trained it and nobody else.
+`mining` sets neither field, so it ends up with an undefined `stat-id` after
+hydration and grants nothing — unlike `title`, this field has no default.
 
 ### variable
 

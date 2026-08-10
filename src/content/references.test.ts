@@ -304,7 +304,7 @@ describe('the slot vocabulary is what entities declare', () => {
 });
 
 describe('a skill names the stat it raises', () => {
-  it('checks stat-id like any other reference, though nothing reads it yet', () => {
+  it('checks stat-id like any other reference', () => {
     expect(loading('stat-id: attack', 'stat-id: attak')).toThrow(/# skill brawling stat-id: names an unknown stat: attak/);
   });
 });

@@ -165,6 +165,8 @@
         "src/runtime/save.ts",
         "src/runtime/session.test.ts",
         "src/runtime/session.ts",
+        "src/runtime/skills.test.ts",
+        "src/runtime/skills.ts",
         "src/runtime/stat.test.ts",
         "src/runtime/state.ts",
         "src/runtime/stats.ts",
@@ -225,6 +227,14 @@
             "src/runtime/instances.ts"
           ],
           "note": "produced by instanced-objects: the one instance table, its ids, its payload kinds and its prune"
+        },
+        {
+          "name": "skill level curve",
+          "paths": [
+            "src/runtime/skills.ts",
+            "src/runtime/stats.ts"
+          ],
+          "note": "produced by skill-levels-xp-events"
         }
       ]
     },
