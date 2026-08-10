@@ -20,12 +20,13 @@ const restingAt = (index: number): string => `translate3d(${-index * 100}%, 0, 0
 
 // Panes side by side, moved under the finger and settled on release.
 //
-// The rest of the gesture is read from the window rather than from this
-// element. Pointer capture was the obvious way and is the wrong one: the only
-// pane with a scrolling child is the only pane a drag kept dying on, because
-// asking a scroller's ancestor to capture a pointer the scroller is also
-// interested in is a fight, and the scroller wins. Nothing can take a window
-// listener away.
+// Driven by mouse and touch events rather than by pointer events, which is the
+// whole reason this works over the narration column. A pointer stream is
+// cancellable, and a browser cancels it the moment it decides a scrollable
+// element under the finger is being scrolled — so the two panes with a
+// scrolling child were the two a drag kept dying on while the header above
+// them dragged perfectly. A mouse stream is never cancelled, and a touch move
+// can be refused, which is what stops the scroll instead of losing to it.
 //
 // The transform is written straight to the node rather than held in state: a
 // dragging finger produces a move event a frame, and the narration column has
@@ -40,21 +41,30 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
     if (node) node.style.transform = restingAt(index);
   }, [index]);
 
-  const move = (event: PointerEvent): void => {
+  const begin = (x: number, y: number, at: number, width: number, release: () => void): void => {
+    dragged.current = false;
+    drag.current = { x, y, axis: null, dx: 0, motion: motionFrom(x, at), width, release };
+    if (strip.current) strip.current.style.transition = 'none';
+  };
+
+  // True once the drag is this pager's, which is when a touch move has to be
+  // refused so the column beneath it does not scroll as well.
+  const moveTo = (x: number, y: number, at: number): boolean => {
     const dragging = drag.current;
-    if (!dragging) return;
-    const dx = event.clientX - dragging.x;
-    dragging.axis = dragging.axis ?? dragAxis(dx, event.clientY - dragging.y);
-    if (dragging.axis !== 'x') return;
+    if (!dragging) return false;
+    const dx = x - dragging.x;
+    dragging.axis = dragging.axis ?? dragAxis(dx, y - dragging.y);
+    if (dragging.axis !== 'x') return false;
 
     dragging.dx = dx;
-    dragging.motion = sampleVelocity(dragging.motion, event.clientX, event.timeStamp);
+    dragging.motion = sampleVelocity(dragging.motion, x, at);
     if (strip.current) strip.current.style.transform = `translate3d(calc(${-index * 100}% + ${pagerOffset(dx, index, panes.length)}px), 0, 0)`;
+    return true;
   };
 
   // A gesture the browser took away lands nowhere: it goes back where it
   // started. Only a release the player made decides a pane.
-  const end = (event: PointerEvent, taken: boolean): void => {
+  const end = (at: number, taken: boolean): void => {
     const dragging = drag.current;
     drag.current = null;
     dragging?.release();
@@ -62,7 +72,7 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
     if (!dragging || dragging.axis !== 'x' || !node) return;
 
     dragged.current = Math.abs(dragging.dx) >= AXIS_SLOP_PX;
-    const step = taken ? 0 : settleStep(dragging.dx, dragging.width, releaseVelocity(dragging.motion, event.timeStamp));
+    const step = taken ? 0 : settleStep(dragging.dx, dragging.width, releaseVelocity(dragging.motion, at));
     const landing = clampIndex(index + step, panes.length);
     node.style.transition = SETTLE_EASING;
     node.style.transform = restingAt(landing);
@@ -73,28 +83,37 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
     <div
       className="relative min-h-0 flex-1 overflow-hidden"
       style={{ touchAction: 'pan-y' }}
-      onPointerDown={(event) => {
-        if (!event.isPrimary) return;
-        dragged.current = false;
-        const up = (native: PointerEvent): void => end(native, false);
-        const cancel = (native: PointerEvent): void => end(native, true);
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
-        window.addEventListener('pointercancel', cancel);
-        drag.current = {
-          x: event.clientX,
-          y: event.clientY,
-          axis: null,
-          dx: 0,
-          motion: motionFrom(event.clientX, event.timeStamp),
-          width: event.currentTarget.clientWidth,
-          release: () => {
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
-            window.removeEventListener('pointercancel', cancel);
-          },
+      onMouseDown={(event) => {
+        if (event.button !== 0) return;
+        const move = (native: MouseEvent): void => void moveTo(native.clientX, native.clientY, native.timeStamp);
+        const up = (native: MouseEvent): void => end(native.timeStamp, false);
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
+        begin(event.clientX, event.clientY, event.timeStamp, event.currentTarget.clientWidth, () => {
+          window.removeEventListener('mousemove', move);
+          window.removeEventListener('mouseup', up);
+        });
+      }}
+      onTouchStart={(event) => {
+        const first = event.touches[0];
+        if (!first || event.touches.length > 1) return;
+        const move = (native: TouchEvent): void => {
+          const touch = native.touches[0];
+          if (!touch) return;
+          // Refusing the move is what keeps the browser from scrolling the
+          // column as well, and what keeps it from taking the gesture.
+          if (moveTo(touch.clientX, touch.clientY, native.timeStamp) && native.cancelable) native.preventDefault();
         };
-        if (strip.current) strip.current.style.transition = 'none';
+        const up = (native: TouchEvent): void => end(native.timeStamp, false);
+        const cancel = (native: TouchEvent): void => end(native.timeStamp, true);
+        window.addEventListener('touchmove', move, { passive: false });
+        window.addEventListener('touchend', up);
+        window.addEventListener('touchcancel', cancel);
+        begin(first.clientX, first.clientY, event.timeStamp, event.currentTarget.clientWidth, () => {
+          window.removeEventListener('touchmove', move);
+          window.removeEventListener('touchend', up);
+          window.removeEventListener('touchcancel', cancel);
+        });
       }}
       // A drag that ended over a choice is not a choice being made.
       onClickCapture={(event) => {
