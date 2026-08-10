@@ -336,6 +336,8 @@
         "src/ui/App.tsx",
         "src/ui/FloatingText.tsx",
         "src/ui/Home.tsx",
+        "src/ui/LiveSheet.tsx",
+        "src/ui/Meter.tsx",
         "src/ui/ModalSheet.tsx",
         "src/ui/Pager.tsx",
         "src/ui/Splitter.tsx",
@@ -348,6 +350,8 @@
         "src/ui/format.ts",
         "src/ui/gesture.test.ts",
         "src/ui/gesture.ts",
+        "src/ui/live.test.ts",
+        "src/ui/live.ts",
         "src/ui/render.test.tsx",
         "src/ui/shippedContent.test.ts",
         "src/ui/shippedContent.ts",
@@ -403,6 +407,14 @@
             "src/ui/choices.ts"
           ],
           "note": "produced by the-gui-shell-and-the-play-surface; the chat-log surface, action sheet and five-tab nav the-map-and-character-tabs and the four Settings/Edit records land in"
+        },
+        {
+          "name": "the GUI's real-time clock",
+          "paths": [
+            "src/ui/live.ts",
+            "src/ui/LiveSheet.tsx"
+          ],
+          "note": "produced by the-gui-runs-in-real-time for gui-rebuild c5; elapsed wall-clock milliseconds into the LiveRun the command surface arms, and the run's own report rendered back. Whatever else wants a live surface -- combat, a cadence-driven encounter -- ticks through this rather than starting a timer of its own"
         }
       ]
     },
