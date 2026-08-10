@@ -20,6 +20,8 @@
   --color-danger-text: #ffe4e6;
   --color-success: #34d399;
   --color-warning: #fbbf24;
+  --color-scrim: rgb(11 16 32 / 0.72);
+  --color-flash: rgb(103 232 249 / 0.22);
   background: var(--color-background);
   color: var(--color-text);
   font-family:
@@ -32,34 +34,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: var(--color-background);
-}
-
-:root[data-font-size="tiny"] {
-  font-size: 12px;
-}
-
-:root[data-font-size="small"] {
-  font-size: 14px;
-}
-
-:root[data-font-size="normal"] {
-  font-size: 16px;
-}
-
-:root[data-font-size="large"] {
-  font-size: 18px;
-}
-
-:root[data-font-size="huge"] {
-  font-size: 20px;
-}
-
-:root[data-theme="light"] {
-  color-scheme: light;
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
+  overscroll-behavior: none;
 }
 
 button,
@@ -67,4 +42,48 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+@keyframes arrived {
+  from {
+    background-color: var(--color-flash);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@keyframes risen {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes darkened {
+  from {
+    background-color: transparent;
+  }
+}
+
+.arrived {
+  animation: arrived 260ms ease-out;
+}
+
+.risen {
+  animation: risen 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.darkened {
+  animation: darkened 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arrived,
+  .risen,
+  .darkened {
+    animation: none;
+  }
 }

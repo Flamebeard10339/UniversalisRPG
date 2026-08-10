@@ -333,13 +333,78 @@
         "public/favicon.svg",
         "src/index.css",
         "src/main.tsx",
+        "src/ui/App.tsx",
+        "src/ui/FloatingText.tsx",
+        "src/ui/Home.tsx",
+        "src/ui/ModalSheet.tsx",
+        "src/ui/Pager.tsx",
+        "src/ui/Splitter.tsx",
+        "src/ui/TabBar.tsx",
+        "src/ui/choices.test.ts",
+        "src/ui/choices.ts",
+        "src/ui/driver.test.ts",
+        "src/ui/driver.ts",
+        "src/ui/format.test.ts",
+        "src/ui/format.ts",
+        "src/ui/gesture.test.ts",
+        "src/ui/gesture.ts",
+        "src/ui/render.test.tsx",
+        "src/ui/shippedContent.test.ts",
+        "src/ui/shippedContent.ts",
+        "src/ui/surface.test.ts",
+        "src/ui/tabs.ts",
+        "src/ui/transcript.test.ts",
+        "src/ui/transcript.ts",
+        "src/ui/transient.test.ts",
+        "src/ui/transient.ts",
         "src/vite-env.d.ts",
         "tailwind.config.js"
       ],
       "lastAudit": "f8c8c8d",
       "lastAuditDoc": "docs/audits/user-interface-2026-07-30.md",
-      "note": "src/ui still does not exist, so coverage stays structurally limited until the GUI rebuild. The 2026-07-30 pass verified 060dd3e closed UI-H1 (the attic exclude), UI-M1 (270 to 70 lines of CSS, 16.57 to 6.98 kB), UI-M2 (public/content/) and UI-M3 (twelve unimported dependencies, reactflow included), and that 73a73f3's partition closed the 2026-07-28 orphan list — public/, postcss.config.js, tailwind.config.js and src/vite-env.d.ts are members now, which is why this system had a window at all. M1 is the one file of that sweep left standing: public/changelog.txt has no reader by the same grep that condemned public/content/, ships to itch.io and into the APK, and advertises the deleted legacy GUI's features under version 0.1.0. Its lows are the inherited remainder — 14 unused colour properties and seven data-theme/data-font-size rules nothing sets, a Tailwind glob sweeping three layers below this one, and a theme-color hand-copied from the stylesheet.",
-      "concepts": []
+      "note": "src/ui exists as of the-gui-shell-and-the-play-surface: a session container over the play surface, a chat-log Home with the action sheet, a five-tab nav, a modal rendered from the published option, and the shipped DSL bundled by the build. That branch's audit pass is recorded against the spec — `npm run tasks -- spec show gui-rebuild` — and the system sweep below predates it. The 2026-07-30 pass verified 060dd3e closed UI-H1 (the attic exclude), UI-M1 (270 to 70 lines of CSS), UI-M2 (public/content/) and UI-M3 (twelve unimported dependencies, reactflow included), and that 73a73f3's partition closed the 2026-07-28 orphan list. M1 is the one file of that sweep left standing: public/changelog.txt has no reader by the same grep that condemned public/content/, ships to itch.io and into the APK, and advertises the deleted legacy GUI's features under version 0.1.0. Of its lows, L1 (14 unused colour properties) and L2 (a Tailwind glob sweeping three layers below this one) are closed by that branch — the palette is answered by use and the glob is narrowed to src/ui and src/main.tsx; L3 (a theme-color hand-copied from the stylesheet) is still open.",
+      "concepts": [
+        {
+          "name": "the GUI's session container",
+          "paths": [
+            "src/ui/driver.ts"
+          ],
+          "note": "produced by the-gui-shell-and-the-play-surface; the one context every GUI dispatch goes through, and what gui-rebuild c1 replays against"
+        },
+        {
+          "name": "bundled shipped content",
+          "paths": [
+            "src/ui/shippedContent.ts"
+          ],
+          "note": "produced by the-gui-shell-and-the-play-surface for gui-rebuild c8; the route the DSL takes to the browser, in place of the public/content/ an audit deleted"
+        },
+        {
+          "name": "transient text over the play surface",
+          "paths": [
+            "src/ui/transient.ts",
+            "src/ui/FloatingText.tsx"
+          ],
+          "note": "produced by the-gui-shell-and-the-play-surface for gui-rebuild c10; floating-text-for-xp-events is the first producer that will use it"
+        },
+        {
+          "name": "the GUI shell",
+          "paths": [
+            "src/main.tsx",
+            "src/ui/App.tsx",
+            "src/ui/Home.tsx",
+            "src/ui/TabBar.tsx",
+            "src/ui/ModalSheet.tsx",
+            "src/ui/tabs.ts",
+            "src/ui/transcript.ts",
+            "src/ui/format.ts",
+            "src/ui/gesture.ts",
+            "src/ui/Pager.tsx",
+            "src/ui/Splitter.tsx",
+            "src/ui/choices.ts"
+          ],
+          "note": "produced by the-gui-shell-and-the-play-surface; the chat-log surface, action sheet and five-tab nav the-map-and-character-tabs and the four Settings/Edit records land in"
+        }
+      ]
     },
     {
       "name": "Task system",

@@ -1,25 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
+import { App } from './ui/App';
+import { createDriver } from './ui/driver';
+import { SHIPPED_SOURCES } from './ui/shippedContent';
 
-function PlaceholderRoot() {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        width: '100vw',
-      }}
-    >
-      Universalis — text-adventure GUI pending
-    </div>
-  );
-}
+const driver = createDriver(SHIPPED_SOURCES);
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <PlaceholderRoot />
+    <App driver={driver} />
   </React.StrictMode>,
 );
