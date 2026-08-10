@@ -621,3 +621,112 @@ regenerated and every shipped # test runs unchanged; merge-ready's npm test leg 
 The live half is identical over the eight shapes recorded under c6, including the recorder history a live run
 produces. One line in `nothing` and one in directiveFrom('/cancel', ...) close the loosened half; nothing about the
 seam needs redoing.
+
+### Pass 6 — 2026-08-10
+
+- base: `e90fd17d1f0966be7af6ddcecac83de2021c2a54`
+- head: `a3bc22c945255478d1fdacad4d651d868b6aa161`
+- proof 1: met — The table is the only definition and dispatch is a lookup in it. COMMANDS at src/runtime/command.ts:487
+carries 19 entries; BY_TOKEN (:666) is built from name+aliases of the match==='name' entries and byMatch (:670) resolves
+the three formic spellings; parseLine (:710) does nothing else. The driver holds no command path at all now: grepping
+scripts/ for isChoiceLine, beginLive, COMMANDS, findCommand, parseLine and runCommand names play-cli.test.ts and the
+unrelated taskStore/tasks files and nothing in scripts/play-cli.ts, whose loop is runLine, print, drive-if-live
+(scripts/play-cli.ts:427-429). Mutation aimed at the dispatch rule rather than at any test, manifest at
+C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass6-mutations.json:
+c1-prefix-dispatch-beside-the-table (putting a second rule beside the lookup, the merge base's trimmed.startsWith chain
+as a fallback) is KILLED by "takes a command to be a whole token, so no name can shadow a longer one", re-run at its own
+file with the mutant still applied. c1-arghint-default-is-not-empty (the define() default changing from '' to '<x>', one
+edit that reaches every entry) is KILLED by 2 named tests. Recorded and NOT counted against this grade, because the
+behaviour is right today: the field the clause calls "its argument shape" (arg) decides nothing, because acceptance is
+keyed on argHint. Filed as a finding.
+- proof 2: met — Help is the table read out. helpEntries at src/runtime/command.ts:682 is COMMANDS.map and formatHelp
+(scripts/play-cli.ts:141) is the only thing that turns an entry into a line; grep -rn "HELP_LINES" src/ scripts/ returns
+nothing. Measured from the player's side against the merge base rather than by reading: I put git show
+e90fd17:scripts/play-cli.ts back into the tree beside the unchanged src/ (exact, because this diff touches only
+src/runtime/command.ts and command.test.ts under src/) and ran the same 54-line input through both. Transcripts at
+C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass6-base.out and ...-pass6-head.out: the help block is
+the one thing a player sees change, and the new block lists all 19 entries, including <enter> and <directive>, which the
+base's hand-written list documented inconsistently (<directive> was there, <enter> was not, and submit-modal: had a line
+of its own that is now the <directive> summary). Mutation aimed at the entry field pass 5 did not break:
+c2-help-drops-aliases (helpEntries stops reading spec.aliases, so /inv and /q go undocumented) is KILLED by 3 named
+tests in src/runtime/command.test.ts, re-run at their own files with the mutant still applied.
+- proof 3: met — Nothing below the driver produces terminal vocabulary. CommandOutput (src/runtime/command.ts:38) and
+LiveProgress (:765) carry structure and numbers; TONE_PREFIX (scripts/play-cli.ts:137), MINIMAL_STAGES (:45), fullBar
+(:56), formatChoices' two-space N-paren (:41), progressBar (:180) and the bracketed time (:114, :187) are all in the
+driver. Mutation aimed at the other end of the tone channel than pass 5 took: c3-engine-error-loses-its-tone (refused()
+returning tone 'plain' instead of 'error', so a RuntimeError stops crossing the boundary as data and the driver prints
+no "Error: " prefix) is KILLED by "/test <id> reports PASSED or FAILED and shows the world the replay left", re-run at
+its own file with the mutant still applied. The rendering identity is measured rather than argued: two further scripted
+sessions, an authoring/modal/action session and a modal-answered session driving the shipped # tests and # saves, are
+byte-identical between the merge-base driver and this one. Inputs at
+C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass6-transcript-input2.txt and ...-input3.txt.
+- proof 4: met — Not this branch's work, and I say so rather than inheriting it: git diff --name-only e90fd17..HEAD -- src/
+names only src/runtime/command.ts and src/runtime/command.test.ts, so every attack pass 4 ran is being asked of bytes
+this diff does not change. Checked on this head rather than assumed: formatInventory (scripts/play-cli.ts:118) and
+formatState (:126) each take a PlayStatus and nothing else; the driver's only reads of the session are view(),
+serializeSession() and startSession(); npx tsc --noEmit passes inside merge-ready, so no file names session.state; and
+the new module below ui opens no route, because src/runtime/command.ts reaches state only through session.ts's published
+functions. The one route pass 4 named as open and did not claim is still open and still used by buildCreateTest
+(command.ts:425-427), writing a ParsedSave into session.registry.saves; that is
+in-process-module-api-pass3-the-sealed-surface-has-no-way-to, unchanged here.
+- proof 5: met — src/runtime/command.ts imports only ../grammar/parser, ../content/registry, universe, localChanges, test,
+typed and saveSection, and ./runtime, modals and session: nothing from scripts. npm run layer-check passes at 876
+cross-file imports across 5 layers, every import downward. Each effect arrives as an argument: AuthoringContext
+(command.ts:64) carries baseSources, localSource and an optional writeLocalChanges callback, and the only disk write is
+scripts/play-cli.ts:351; the clock arrives as LiveRun.tick(elapsedMs) and the only Date.now() on the play path is
+scripts/play-cli.ts:219. Mutation aimed at the content-sources argument rather than at the clock, which is where pass 5
+aimed: c5-content-sources-not-taken-as-an-argument (commitLocalChanges loading only the local source instead of
+[...authoring.baseSources, localSource], so the surface authors against a universe of its own rather than the one handed
+in) is KILLED by 6 named tests in the "local DSL authoring takes its file as an argument" block, re-run at their own
+files with the mutant still applied.
+- proof 6: met — grep -rn "liveTick" src/ scripts/ returns nothing; the clock is driveChoice (src/runtime/command.ts:825),
+tickOnce (:791) and LiveRun.tick/end (:840-857), and the driver supplies the milliseconds and renders the answer
+(scripts/play-cli.ts:254-261). Behavioural parity re-measured independently of pass 5 and of the implementer, and
+through the route the triage rewrote: the script at
+C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass6-live.js drives the merge base's own liveTick and
+main-loop logic (its play-cli restored into the tree) against this head's <N>-entry plus CommandResult.live route, in
+one process, over nine action shapes: an instant choice, a relocating instant choice, a continuous action run 6 ticks,
+the same cancelled after 3, the same at 8x, a run armed after 10 simulated seconds were already on the clock, a targeted
+fight run 30 ticks, that fight cancelled after 4, and a one-shot 4s pick-lock run to completion. For each I compared the
+rendered live lines, the end-of-run output, the recorder history, the final sim-time and the whole final PlayView. All
+nine IDENTICAL. Mutations: c6-elapsed-measured-from-zero (final.time - started losing its subtraction, which is pass 5's
+finding) is KILLED by "measures the wait it records from where the run began, not from the clock";
+c6-implicit-countdown-ignores-the-target (dropping the !action.targeted guard, pass 5's other finding) is KILLED by
+"publishes no completion countdown for a run whittling a named pool down"; both re-run at their own files with the
+mutant still applied. Both pass-5 proof gaps are genuinely closed. One survivor,
+c6-tick-labels-from-the-view-that-ended-it, is an equivalent mutant and not a proof gap: tickOnce assigns ctx.view = next
+after reading the label and driveChoice threads latest from the same value, so previous and ctx.view are the same object
+at every call. That redundancy is filed as a low finding rather than counted against this grade.
+- proof 7: unmet — Not this branch's work; owed by layer-check-reads-every-source-file, still open. Checked cold rather than
+inherited: git diff --name-only e90fd17..HEAD -- scripts/layer-check.ts scripts/lib/layers.ts is empty, npm run
+layer-check prints "876 cross-file imports checked across 5 layers" and "Every import points downward" and names no
+file, and ROOTS at scripts/lib/layers.ts:9 is still src/grammar, src/content, src/runtime, src/ui and scripts. ls src/
+is content, grammar, index.css, main.tsx, runtime, vite-env.d.ts: src/ui does not exist, and main.tsx, index.css and
+vite-env.d.ts belong to no declared root, so the second driver's own entry point is read by no rule. The partition
+assertion the clause asks for was never written.
+- proof 8: deferred — Checked, it fails as literally worded, and the goal holds without it, so deferred rather than unmet, with
+the residual named so that nobody tries to close it by re-encoding the merge base. WHAT HOLDS: git diff --name-only
+e90fd17..HEAD -- content/ is empty, so no # save fixture was regenerated and every shipped # test runs unchanged;
+merge-ready's npm test leg is green at 2247 on the first run. WHAT I RE-MEASURED, with the merge base's play-cli
+restored into the tree beside the unchanged src/ and driven with the same bytes as this head. Session A, 54 lines aimed
+at argument shapes: input at
+C:\Users\yonat\AppData\Local\Temp\audit-in-process-module-api-pass6-transcript-input.txt, outputs ...-pass6-base.out and
+...-pass6-head.out. Session B, authoring: /dsl staging and replacing, /local list, show, delete and clear, a modal, an
+action, /create-valid-test and /create-test; transcript AND the written local-changes file byte-identical. Session C:
+the character-creation modal answered by free text and then by number, /load miki-route-start, /test miki-route-full,
+/expect miki-route-end, /assert, /test dresser-trinket; byte-identical. Live: nine action shapes, identical, see c6.
+PASS 5'S LOOSENING IS GENUINELY CLOSED, and verified against the base rather than against the fix's own test: /look junk,
+/state junk, /inventory junk, /inv junk, /quit junk, /cancel junk, /help junk and /q junk are all "Error: unknown
+command: ..." on both trees now, and /quit junk ends nothing. Mutation c8-argument-thrown-away-again, removing the whole
+guard at command.ts:722, is KILLED by "gives a command no argument it does not declare, over every entry that declares
+none"; c8-create-test-without-a-start-save is KILLED by "says so rather than throwing when the session began without a
+start save". WHAT STILL DIVERGES, and why I accept it: every run-on spelling of the eight commands the merge base
+matched by bare prefix. My session found seven, not the three the branch's event note discloses: /speedxyz, /testfoo,
+/loadfoo, /expectfoo, /assertfoo, /create-testfoo and /create-valid-testfoo. The note's "each an error on both trees" is
+false for one of them: on the merge base /create-testfoo CREATED a test named 'foo' and wrote a # save foo-start into
+the registry, and /assertfoo ran a real assertion. A typo performing a state-writing command is worse than the uniform
+"unknown command" this branch gives it; the base's rule was per-command and inconsistent (=== for /cancel and the six
+argument-free entries, startsWith-with-a-space for /dsl and /local, bare startsWith for the other six); and reproducing
+it would mean building the hand-maintained second copy that c1 exists to delete. I accept the tightening on its merits
+rather than on the implementer's say-so. The enumeration in the event note is the part that is wrong, and this record is
+where that correction belongs. Plus /help, which the clause already excepts.
