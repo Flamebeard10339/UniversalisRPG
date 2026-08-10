@@ -6,8 +6,6 @@ export interface Skill {
   id: string;
   title: string;
   'stat-id'?: string;
-  // What one level of the skill is worth to `stat-id`, so the whole grant is
-  // `per-level × level`.
   'per-level'?: BonusAmount;
 }
 

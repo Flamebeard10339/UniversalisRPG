@@ -37,7 +37,7 @@ skills: brawling, footwork
 
 # entity rat
 stats: attack 3
-skills: brawling
+skills: brawling, brawling
 
 # entity mannequin
 stats: attack 3
@@ -97,8 +97,23 @@ describe('the xp curve', () => {
     }
   });
 
-  it('takes a negative total as no progress rather than as a level below one', () => {
-    expect(skillLevel(-1)).toBe(1);
+  // -1000/(r - 1) is where the logarithm's argument turns non-positive, so a
+  // total short of it is the first one an unclamped curve answers with a
+  // negative level or a NaN rather than with a small one.
+  it('takes any negative total as no progress, including one past where the curve stops being real', () => {
+    expect([-1, -13000, -13929, -20000, -1e9].map(skillLevel)).toEqual([1, 1, 1, 1, 1]);
+  });
+
+  it('holds the threshold guarantee across every level a threshold is an exact integer for', () => {
+    let level = 2;
+    for (; Number.isSafeInteger(xpForLevel(level)); level += 1) {
+      expect(skillLevel(xpForLevel(level))).toBe(level);
+      expect(skillLevel(xpForLevel(level) - 1)).toBe(level - 1);
+    }
+    // The exact domain is nine orders of magnitude past any reachable total —
+    // an `xp:` result cannot even be authored negative — so it is stated here
+    // rather than defended in the arithmetic.
+    expect(level).toBeGreaterThan(390);
   });
 });
 
@@ -121,7 +136,9 @@ describe('a skill level feeding the stat it names', () => {
     const state = withXp({ brawling: xpForLevel(30) });
     expect(statValue('attack', state, registry, PLAYER)).toBe(10 + 30);
     // The rat has `brawling` and no xp of its own, so it is a level-1 brawler
-    // however far the player has come.
+    // however far the player has come — and listing it twice does not make it
+    // two brawlers.
+    expect(registry.entities.get('rat')!.skills).toEqual(['brawling']);
     expect(statValue('attack', state, registry, 'rat')).toBe(3 + 1);
     expect(statValue('attack', state, registry, 'mannequin')).toBe(3);
   });
