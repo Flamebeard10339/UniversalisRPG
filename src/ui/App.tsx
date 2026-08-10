@@ -2,7 +2,7 @@ import { useRef, useState, useSyncExternalStore } from 'react';
 import { askedOption } from '../runtime/command';
 import type { Driver } from './driver';
 import { FloatingText } from './FloatingText';
-import { swipes, swipeStep } from './gesture';
+import { swipeStep } from './gesture';
 import { Home } from './Home';
 import { ModalSheet } from './ModalSheet';
 import { TabBar } from './TabBar';
@@ -19,13 +19,16 @@ export function App({ driver }: { driver: Driver }): JSX.Element {
       <main
         className="relative flex min-h-0 flex-1 flex-col"
         onPointerDown={(event) => {
-          from.current = swipes(event.pointerType) ? { x: event.clientX, y: event.clientY } : null;
+          from.current = { x: event.clientX, y: event.clientY };
+        }}
+        onPointerCancel={() => {
+          from.current = null;
         }}
         onPointerUp={(event) => {
           const start = from.current;
           from.current = null;
           if (!start) return;
-          const step = swipeStep(event.clientX - start.x, event.clientY - start.y);
+          const step = swipeStep(event.clientX - start.x, event.clientY - start.y, window.getSelection()?.toString() ?? '');
           if (step !== 0) setTab((current) => tabAfter(current, step));
         }}
       >

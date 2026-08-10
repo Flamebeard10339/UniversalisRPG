@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { swipeStep, swipes, SWIPE_MIN_PX } from './gesture';
+import { swipeStep, SWIPE_MIN_PX } from './gesture';
 import { tabAfter, TABS } from './tabs';
 
 describe('a swipe across the surface', () => {
@@ -14,10 +14,9 @@ describe('a swipe across the surface', () => {
     expect(swipeStep(0, -300)).toBe(0);
   });
 
-  it('is a touch gesture, because a mouse drag over a column of text is a selection', () => {
-    expect(swipes('touch')).toBe(true);
-    expect(swipes('pen')).toBe(true);
-    expect(swipes('mouse')).toBe(false);
+  it('means nothing when the drag left text selected behind it', () => {
+    expect(swipeStep(-120, 0, 'A cluttered but cozy cottage')).toBe(0);
+    expect(swipeStep(-120, 0, '   ')).toBe(1);
   });
 });
 
