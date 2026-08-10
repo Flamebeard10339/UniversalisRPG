@@ -1,85 +1,116 @@
 # combat-events
 
-> **This spec needs another planning session before it is worked.** `combat-encounter-grammar`
-> settled the encounter grammar on 2026-08-09 (`docs/combat/encounter-grammar.md`) and three things
-> below rest on the grammar it replaces. None of this branch's recorded decisions is overturned —
-> thorns stays a persistent effect, rage stays a resource, the chance mechanism stays `droptables`',
-> the event vocabulary stays closed — and the mechanism survives whole. What has to be re-planned:
->
-> 1. **The host.** This spec's lead example is a weapon that poisons its target, scoped by declaring
->    `on hit:` on an action. Under today's grammar the swing is `fight:` on the foe, so the only
->    thing an author can actually scope a hook to is *this rat*, not this weapon. The new grammar's
->    top-level `# action`, referenced by an entity's `uses:`, is the per-weapon host this was written
->    for — so the scope argument for keeping action-declared and actor-carried hooks both gets
->    stronger, and the branch should be ordered after `full-refactor-of-enemies-and-combat` rather
->    than authoring hooks onto blocks that are about to move.
-> 2. **`on hit:` / `on hit self:` must both be marked.** One unmarked block whose results land on the
->    struck actor and one marked block whose results land on the swinger is exactly the defect
->    `combat-encounter-grammar` exists to remove, one level up: the recipient is a rule in another
->    file rather than a fact on the page. Under that grammar's `my`/`their` vocabulary they are
->    `on hit them:` and `on hit me:`.
-> 3. **Two clauses dissolve rather than move.** "A hook on an action that cannot swing is a load
->    error", tested by `resolvesPerAttempt` over `accuracy:`/`target:`, has nothing to range over
->    once those fields leave actions — a hook lives on a two-sided action and a two-sided action
->    always swings. And the depletion clause is written in terms of "a retaliation that empties a
->    pool"; `retaliates` is deleted and retaliation becomes unconditional, so that clause needs
->    restating in terms of any participant's swing.
->
-> The requirement recorded against this record on 2026-08-07 — that a persistent effect's results
-> must be able to name the other party in the moment — is supplied by the new grammar rather than
-> left open: `my` and `their` are how a two-sided moment names its parties.
+Re-planned 2026-08-09 against the grammar `full-refactor-of-enemies-and-combat` shipped, and
+corrected the same day after the first re-plan hung hooks off `# action`. That was wrong and the
+sword is why: equipping a blade that poisons cannot mean the wearer now performs a different attack.
+An `# action` is the **verb** — what damage is applied, and to which pool, which is what tells
+woodcutting from melee from ranged. An effect is never a verb. Both recorded decisions that rested
+on the action host are overturned by name below.
 
 ## Deliverable
 
-The runtime gains the strategies; the DSL keeps the shapes and the names. An action can declare
-effects that fire when one of its swings lands, and an actor can carry an effect that fires on a
-named event regardless of what swung, and either composes with the chance wrappers `droptables`
-ships. No archetype effect is a feature of this branch — each is a fixture `archetype-mods`
-assembles in the DSL out of primitives, and the runtime must not contain any of their names. The
-enabling change beneath both triggers is small and specific:
-`resolveAttempt` already holds both parties to a swing as `self` and `other`, and
-`result-application-seam` has already given result application a subject and an observation point,
-so what remains is when to fire, who it lands on, and what a load error rejects.
+A hook is a character modifier. It is carried by the same things that carry `+4-7 attack` — an
+entity's own block, an equipped item, and later an allocated passive or an active buff — it arrives
+and departs with its carrier, and the runtime gathers it from the same sources `statRange` already
+folds a stat bonus from. There are two of them, because a character in a two-sided swing is either
+the one who landed it or the one it landed on:
+
+```
+# item venomous-blade
+slot: mainhand
++4-7 attack
+on hit: 1 in 4: them: drain: 3 health
+
+# item bramble-mail
+slot: body
+when hit: them: drain: 2 health
+```
+
+Everything in a hook is read from the character carrying it. `on hit:` is *I landed one*, `when hit:`
+is *one landed on me*, and an unmarked result lands on me — the carrier is the perspective, which is
+what makes the block readable off the page you are already looking at. `them:` is the one marked
+exception, for the results that must reach the other party.
+
+Those are one line each because every wrapper in this language already takes an inline body and they
+chain, which `on death: 1 in 4: credit: drain: 3 health` parses today. A hook block and `them:` are
+both ordinary members of that grammar and inherit it; neither needs an inline spelling of its own.
+The multi-result form indents the same way anything else does:
+
+```
+# entity berserker
+stats: max-health 40, max-rage 10, attack 6
+uses: melee-combat
++2 attack per rage
+on hit:
+  restore: 1 rage
+  1 in 20:
+    them: drain: 4 health
+```
+
+`# entity` and `# item` are the two carriers that exist. The same two blocks on `# passive`, which
+`archetype-mods` and `items-mods-and-crafting` own between them, is that record's line to write and
+this branch's gather to already accept.
+
+The enabling change beneath it is small and specific. `resolveAttempt` already holds both parties as
+`self` and `other`, `result-application-seam` has already given result application a subject, and
+`statRange` already walks every source a character's modifiers come from. What remains is when to
+fire, what the gather returns, what a load error rejects, and when depletion is decided.
+
+No archetype effect is a feature of this branch. Each is a fixture `archetype-mods` assembles in the
+DSL out of these primitives, the runtime must not contain any of their names, and this branch ships
+no content.
 
 Proof:
 
-- `on hit:` and `on hit self:` are one moment with two recipients. Both fire when a swing of the
-  declaring action lands; `on hit:` applies its results to the actor that was struck, and
-  `on hit self:` applies them to the actor that swung. A weapon that poisons its target and a
-  weapon that feeds its wielder are the same trigger, differing only in which of the two parties
-  the results land on, so they are two block names rather than a result-level target.
-- A persistent effect fires on a named event rather than on an action. It is carried by an actor,
-  it names one event from the `skill-levels-xp-events` vocabulary, and it applies to whichever party
-  that event's moment identifies — so an actor that never swings still has one, which an
-  action-declared hook cannot give it.
-- A hook's body is an ordinary result list, so it inherits `droptables`' selectors unchanged and this
-  branch adds no chance mechanism of its own. A 5%-on-hit effect is `1 in 20:` wrapping the body
-  inside `on hit self:`, a gear-scaled one is `<stat> vs <stat>:`, and a state-gated one is
-  `if <condition>:`. The draw discipline that comes with them — a certainty drawing nothing, a
-  wrapper drawing once for its body, and a stochastic group sampling per application rather than
-  being multiplied by a batch count — is already shipped and is not restated here.
-- A stat bonus can be scaled by a counter. `+N <stat> per <counter>` reads a counter's current value
-  and contributes through the existing `added` and `increased` channels, alongside the flat and
-  percent forms `tagClause` already parses. This branch defines the shape with a resource's level as
-  its first counter; `buffs-generalized` adds a buff's stack count as a second source of the same
-  shape, not as a second spelling.
-- Hooks and persistent effects fire on a landed swing only. A swing that misses fires neither, and
-  neither does any moment that is not a resolved swing.
-- Firing never recurses. Only a resolved swing fires a hook or a persistent effect, and a pool
-  change produced by a result is not a swing, so two actors that both damage each other on being
-  struck terminate by construction rather than by a depth counter.
-- Depletion is decided after a swing's effects have applied. A target finished off by a poison tick
-  ends the fight exactly as one finished by the swing itself does, and an effect that empties a pool
-  ends the segment at that instant, the way a retaliation that empties one already does.
-- Firing order within one swing is fixed and stated: damage is applied, the swing is logged, then
-  the swinging actor's `on hit:` and `on hit self:`, then any persistent effects the moment matches,
-  in a stated order. Two effects that write one pool compose deterministically.
-- A hook on an action that cannot swing is a load error. `resolvesPerAttempt` is the test — an
-  action with neither `accuracy:` nor `target:` never rolls a hit — so an `instant` action carrying
-  `on hit:` is rejected by name at load rather than silently never firing. This is what the action
-  kind taxonomy was a prerequisite for.
-- No identifier anywhere in `src/runtime` is named for any fixture `archetype-mods` composes —
+- [c1] Two blocks, two carriers, no side vocabulary. `on hit:` and `when hit:` are result blocks the
+  load path accepts on an `# entity` and on an `# item`, and on nothing else. Neither block names a
+  side, an action or a weapon — a character with two ways to swing writes one `on hit:` for both,
+  because what a hook is about is the character and not the verb. Both survive a serialize/reload
+  round trip on both carriers.
+  proof: vitest src/grammar/action.test.ts src/content/roundTrip.test.ts
+- [c2] Two verbs, one perspective, gathered the way a stat bonus is. `on hit:` fires when a
+  two-sided swing by the carrying character lands and `when hit:` when one lands on it, both read
+  from the carrier. A hook on an item reaches its wearer when equipped and stops reaching them when
+  unequipped, exactly as that item's `+4-7 attack` does, because the gather walks the sources
+  `statRange` folds rather than a list of its own — so a passive or a buff becomes a carrier by
+  joining that list and not by a second mechanism.
+- [c3] A hook block on an `# action` is a load error. An action is the verb, shared by everyone who
+  performs it, so a hook on `melee-combat` would fire for every entity in the game that swings. The
+  error names the carrier to write it on instead, and `on hit self:` and `on hit them:` are refused
+  by name beside it.
+- [c4] Results land on the carrier unless marked, and `them:` is the one marker. It applies its
+  results to the other party the moment identifies — the struck party under `on hit:`, the swinger
+  under `when hit:`, the killer in an `on death:` handler. It is the shipped `credit:` renamed and
+  widened to the whole of what it always meant: `credit:` named an intent where the rest of the
+  grammar names a side, and one word for "the other party" is what stops the language having two.
+- [c5] A hook body is an ordinary result list, so it inherits `droptables`' selectors unchanged and
+  this branch adds no chance mechanism of its own. A 5%-on-hit effect is `1 in 20:` wrapping the
+  body, a gear-scaled one is `<stat> vs <stat>:`, and a state-gated one is `if <condition>:`. The
+  draw discipline that comes with them is already shipped and is not restated here.
+- [c6] Hooks fire on a landed swing only. A swing that misses fires neither block, and no moment
+  that is not a resolved two-sided swing fires either.
+- [c7] Firing never recurses. Only a resolved swing fires a hook, and a pool change produced by a
+  hook's results is not a swing, so two characters that each carry a `when hit:` that damages
+  `them:` terminate by construction rather than by a depth counter.
+- [c8] Firing order within one swing is fixed and stated: damage is applied, the swing is logged,
+  then the swinging character's `on hit:`, then the struck character's `when hit:` — and within each
+  character, its carriers in the order the gather returns them, which is the order `statRange`
+  already folds. Two hooks that write one pool compose deterministically.
+- [c9] Depletion is decided after the swing's hooks have applied, and over every actor a hook
+  reached rather than the struck one alone. A target finished off by a hook ends the fight exactly
+  as one finished by the swing does; a swinger felled by the character it struck leaves the fight at
+  that instant, and ends it if it was the player or the armed action's target.
+- [c10] A stat bonus can be scaled by a counter, through the multiplier that already exists.
+  `+N <stat> per <counter>` parses beside the flat and percent forms `tagClause` holds and folds
+  through `foldBonus`, which `skill-levels-xp-events` shipped and which `statRange` already calls
+  with a skill's level as its `times`. This branch adds a resource's level as a second counter
+  source and no second multiplier: a grep of `src/runtime/stats.ts` finds one function scaling a
+  `BonusAmount` by a count, not two. `buffs-generalized` adds a buff's stack count and
+  `per-grammar-dependent-stats` a stat, the same way.
+- [c11] No identifier anywhere in `src/runtime` is named for any fixture `archetype-mods` composes —
   poison, rage, thorns or accelerated vigor — and no branch in the resolver exists for any of them.
+  `content/` is untouched by this branch, so no shipped fixture can stand in for a primitive that
+  did not generalize.
 
 ### Primitives
 
@@ -87,73 +118,124 @@ What this branch owes, named. Each is a strategy the runtime implements and the 
 
 | primitive | what it is |
 | --- | --- |
-| `on hit:` | results applied to the **struck** actor when a swing of the declaring action lands |
-| `on hit self:` | results applied to the **swinging** actor at that same instant |
-| persistent effect | an effect carried by an actor, fired by a named event rather than by an action |
-| `+N <stat> per <counter>` | a stat bonus whose size reads a counter; a resource's level here, a buff's stack count in `buffs-generalized` |
+| `on hit:` | results fired when a two-sided swing by the carrying character lands |
+| `when hit:` | results fired when a two-sided swing lands on the carrying character |
+| `them:` | result wrapper: apply to the other party this moment identifies. Renames `credit:` |
+| `+N <stat> per <counter>` | a stat bonus whose size reads a counter; a resource's level here |
+
+Carried by an `# entity` block or an equipped `# item`, gathered by the same walk that folds a stat
+bonus, so `# passive` and a buff join as carriers without a second mechanism.
 
 ### Fixtures belong to `archetype-mods`
 
 No archetype effect is this branch's. `archetype-mods` owns them as authored content — "authoring
 all three is the test that the engine generalized rather than growing three special cases" — and it
-is ordered behind `buffs-generalized`, which owns the timed-modifier and stacking halves. This
-branch owes the primitives above and the constraint that the runtime never names any fixture; it
-ships none of them.
+is ordered behind `buffs-generalized`, which owns the timed-modifier and stacking halves.
 
 | fixture | what it needs | whose |
 | --- | --- | --- |
-| poison | `on hit:` and a timed debuff carried by the struck actor | here, then `buffs-generalized` |
-| rage | a resource with a constant drain, `on hit self:` granting it, `+N <stat> per rage` | here |
-| accelerated vigor | `1 in 20:` inside `on hit self:`, a stacking buff, `+N% <stat> per stack` | here, then `buffs-generalized` |
-| thorns | a persistent effect on `damage-taken` | here |
+| poison | `on hit: them:` and a timed debuff on the struck character | here, then `buffs-generalized` |
+| rage | a resource with a constant drain, `on hit:` restoring it, `+N <stat> per rage` | here |
+| accelerated vigor | `1 in 20:` inside `on hit:`, a stacking buff, `+N% <stat> per stack` | here, then `buffs-generalized` |
+| thorns | `when hit: them: drain: N health` on the carrier | here |
 
 Rage and accelerated vigor are both kept because they are not the same mechanism wearing two names:
 a resource has a ceiling and a rate that regeneration can push against, and a stack count has
 neither. That is two counters behind one `per <counter>` shape, which is why the shape is defined
-once here rather than once per fixture.
+once here rather than once per fixture — and why it belongs in this branch at all, since a hook and
+a counter-scaled bonus are both things a passive or an item grants a character.
 
 ## Decisions
 
-- **`when hit:` is dropped; thorns is a persistent effect.** An earlier draft had a symmetric
-  `when hit:` pair beside `on hit:`. Thorns decomposes as a stat plus an effect fired by
-  `damage-taken`, which is carried by the actor rather than declared on an action — and that is what
-  a passive enemy with no `retaliates` action needs, which the action-declared form could never give
-  it. Keeping both would be two mechanisms for one moment.
-- **Action-declared and actor-carried are both kept, because their scopes differ.** `on hit:` is
-  scoped to one action — *this weapon* poisons — while a persistent effect fires for any swing that
-  produces its event. Collapsing them would cost the ability to say "only this attack does this".
-- **This branch consumes the event vocabulary and does not extend it.** `skill-levels-xp-events`
-  defines the past-tense event names; a persistent effect names one of them. If an effect wants an
-  event that does not exist, the name is added to that closed list by amending it, not by this
-  branch growing a second vocabulary.
-- **The buff engine is not built here.** `buffs-generalized` holds an exact `produces` claim on
-  "buff engine" and its deliverable is already "applying to any entity rather than the player
-  alone". An earlier draft of this spec claimed that scope; it was removed rather than duplicated,
-  and this branch is ordered before it, so the timed modifier poison needs arrives after.
-- **Rage is a resource and accelerated vigor is a stack, and both are kept.** `archetype-mods`
-  originally modelled rage as a stacking self-buff. A resource carries a ceiling and a rate that a
-  regeneration effect can push against, which a stack count cannot, so rage becomes the resource and
-  a separate chance-gated stacking buff takes over the job of exercising stacking rules. The two are
-  different mechanisms, not one described twice, and `archetype-mods` is amended to say so.
-- **One `per <counter>` shape, two counter sources.** Rage needs a bonus that reads a pool's level
-  and vigor needs one that reads a stack count. Spelling those separately would be the same
-  mechanism authored twice, so the shape is defined here and `buffs-generalized` extends its counters
-  rather than adding a parallel form.
+- **An `# action` is not a carrier, and hooks are not scoped to one.** This overturns the recorded
+  decision that "action-declared and actor-carried are both kept, because their scopes differ", and
+  with it the first re-plan's four block names. A sword that poisons is a character modifier: equip
+  it and your swings poison, exactly as equipping it raises your attack. It cannot mean you now
+  perform a different action, because you do not choose a verb by choosing a weapon. The scope that
+  decision was defending — *only this attack does this* — is not one anything in the game wants, and
+  under one shared `melee-combat` a hook on the action would fire for every entity that swings.
+- **`# action` keeps the job it is for.** It says what damage is applied and to which pool, which is
+  what distinguishes woodcutting from melee from ranged, and `uses:` says which of those a character
+  can bring. That is the verb, and it is unchanged by this branch.
+- **Two verbs, not four blocks.** The first re-plan had `on hit them:`, `on hit me:`,
+  `on struck them:` and `on struck me:` — the cross product of two moments and two recipients, which
+  is a distinction on every block for a redirect that most hooks do not want. Once every hook is
+  read from the character carrying it, the moment is `on hit:` or `when hit:` and nothing else, and
+  the recipient is a wrapper inside the body for the minority that need it.
+- **`when hit:` is not dropped after all.** An earlier draft dropped it as "two mechanisms for one
+  moment" and routed thorns through an event instead. That reasoning was about an *action*-declared
+  pair; a character-carried `when hit:` is one mechanism with `on hit:`, not a second, and it is
+  what a thing that swings nothing at all needs in order to answer being hit.
+- **The actor-carried half is not a handler on a `# event`.** The vocabulary that draft meant to
+  consume never arrived — `skill-levels-xp-events` shipped the curve alone and left the closed set
+  to `xp-from-events` — and the `# event` that did ship binds a name to a pool crossing a threshold,
+  which a landed swing is not. `# event` and `on empty:` are untouched here.
+- **`credit:` becomes `them:`.** One word for the other party, and the filed finding
+  `credit-names-an-intent-where-the-grammar-elsewhere-names-a-s` is closed by this branch rather than
+  left standing. `credit:` was named for the one moment it served — rewards to a killer — and the
+  same wrapper now carries poison to a target and thorns to an attacker, where "credit" reads as the
+  opposite of what happens. No shipped content uses the word; four test fixtures do.
+- **`them:` gets no inline spelling of its own, because it already has one.** `wrapperBody` reads an
+  inline body wherever a wrapper is written, and wrappers chain, so `when hit: them: drain: 2 health`
+  is one line with nothing added. A prefix form on the pool name — `drain: 3 their health`, matching
+  `depletes: their health` — was considered and lost: it is shorter still, but it reaches only the
+  results that name a pool, so `xp:`, `give:` and `roll:` would keep the wrapper and the language
+  would carry two ways to say one thing. One spelling that fits on a line beats two that fit better.
+- **An unmarked result lands on the carrier.** Neither default covers every fixture: rage restores
+  the carrier's pool and poison drains the target's, both under `on hit:`. Defaulting to the carrier
+  is what "read from the character with the effect" means, and it puts the marker on the sentence
+  that reaches outside the block rather than on the one that does not.
+- **The load error survives, with a different subject.** It was "a hook on an action that cannot
+  swing"; it is now "a hook on an action at all". `isTwoSided` is not the test and neither is
+  `resolvesPerAttempt` — the rule is that an action is not a carrier, and it is enforced where an
+  action's fields are read.
+- **Depletion is restated over characters, not over retaliations.** The earlier clause was written
+  as "the way a retaliation that empties a pool already does"; `retaliates` is deleted and
+  retaliation is unconditional. A hook can empty the pool of a character that was not struck — a
+  `when hit:` that drains `them:` is exactly that — so the verdict is taken over every actor the
+  swing's effects reached.
+- **This branch ships no content.** Every fixture belongs to `archetype-mods`, and a hook can be
+  proven end to end from an inline fixture in a runtime test, which is what the shipped combat tests
+  already do.
 - **The chance mechanism is `droptables`', not this branch's.** An earlier draft gave the hooks a
   percentage of their own, reasoning that a gate on individual results would roll per result and
   make a two-result hook fire half of itself. `droptables` had already answered that: a wrapper
-  wraps a result *body* and draws once for it, and it applies wherever the DSL takes a result list —
-  which a hook body is. Three clauses were removed rather than duplicated, including two that
-  restated draw discipline `droptables` already proves.
-- **Fixtures are content, not code.** They exist to prove the primitives compose. A mechanism whose
-  tests pass while the resolver has grown a branch named after one of them has failed at the thing
-  it was built for, which is why their absence from `src/runtime` is a clause.
+  wraps a result *body* and draws once for it, and it applies wherever the DSL takes a result list.
 - **Hooks fire on swings, not on damage.** Defining the trigger as a resolved swing rather than as a
   pool decreasing is what makes recursion impossible without a guard. The alternative needs a depth
   limit, and a depth limit is a number someone has to defend.
+- **The buff engine is not built here.** `buffs-generalized` holds an exact `produces` claim on
+  "buff engine" and its deliverable is already "applying to any entity rather than the player
+  alone". This branch is ordered before it, so the timed modifier poison needs arrives after — and
+  the gather it defines is where a buff joins as a carrier when it does.
+- **One counter multiplier, several counter sources — and it is already shipped.**
+  `skill-levels-xp-events` merged on 2026-08-09 with `foldBonus(bonus, fold, times)` and
+  `# skill`'s `per-level:`, which is a stat bonus scaled by a level. That is this shape's runtime
+  half, built before this branch reached it, so what remains here is the authored spelling and a
+  second source for `times`. Building a second multiplier would be the duplication this branch's own
+  decision was written to prevent.
+- **`per-level:` and `+N <stat> per <counter>` are two positions, not two spellings.** `per-level:`
+  sits on `# skill` and is the *declaration*: what one level of melee is worth, said once by the
+  thing that defines melee. `+2 attack per rage` sits on an item, a passive or an entity and is the
+  *grant*: what this carrier gives, said by the carrier. A skill cannot express the second — a
+  passive that scales off rage is nothing melee knows about — and a carrier should not have to
+  restate what a level is worth. They meet at `foldBonus`, which is the test that they are one
+  mechanism: if this branch writes a second scaling function, they were two after all.
+- **Fixtures are content, not code.** They exist to prove the primitives compose. A mechanism whose
+  tests pass while the resolver has grown a branch named after one of them has failed at the thing
+  it was built for, which is why their absence from `src/runtime` is a clause.
 
 ## Open questions
 
-- Whether a persistent effect is carried by an entity, by an equipped item, or by both is not
-  settled. Thorns reads naturally as an entity's property and a thorns *aura granted by armour*
-  reads naturally as an item's; the fixture needs only the first.
+- **Does an unequipped item's hook reach anyone?** No, by the rule that a hook arrives the way its
+  carrier's stat bonuses do — and `statRange` already reads equipped items only, and only for the
+  player, because `ownStores` still gates buffs and equipment to `PLAYER`. That gate is
+  `buffs-generalized`', named here because it now bounds hooks as well as bonuses: until it goes, a
+  rat cannot wear a poisoned blade. Nothing this branch owes needs it to.
+- **Do misses get hooks?** `on miss:` is the obvious counterpart and no fixture needs one.
+  `xp-from-events` names `missed` and `evaded` among its eight moments, so it is the record that
+  will first want them — and if it does, they are more verbs of this shape rather than a second
+  mechanism. Decided there.
+- **Can a `say:` inside a hook name who it is about?** Inherited unchanged from
+  `combat-encounter-grammar`: the log is one second-person channel, so a hook's `say:` is in the
+  player's voice whoever swung. Decided by whoever gives the log a subject.
