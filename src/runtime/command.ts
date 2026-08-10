@@ -598,10 +598,10 @@ export const COMMANDS: readonly CommandSpec[] = [
   }),
   define({
     name: '/cancel',
-    arg: 'directive',
+    arg: 'none',
     summary: 'cancel the in-flight spannable action, if any',
-    parse: directiveFrom('/cancel', () => 'cancel'),
-    run: runDirective,
+    parse: nothing,
+    run: (ctx) => runDirective(ctx, { kind: 'cancel' }),
   }),
   define({
     name: '/dsl',
@@ -719,7 +719,7 @@ export function parseLine(ctx: CommandContext, line: string): ParsedCommand | Co
     // The argument a command declares is the whole argument it takes, so a line
     // carrying one it does not names no command rather than quietly performing
     // this one: `/quit junk` is a typo, not a way to end the session.
-    if (rest !== '' && spec.argHint === '') return { problem: `unknown command: ${trimmed}` };
+    if (rest !== '' && spec.arg === 'none') return { problem: `unknown command: ${trimmed}` };
     return against(spec, rest, ctx);
   }
 
@@ -778,6 +778,12 @@ export interface LiveRun {
   end(cancelled: boolean): CommandResult;
 }
 
+// What a finished run reports, however it finished: no progress to make, no
+// target to narrate, and the world as the last tick left it.
+function finished(label: string, current: PlayView): LiveProgress {
+  return { label, active: false, time: current.time, progress: 1, pools: [], implicit: null, view: current };
+}
+
 function livePools(status: PlayStatus): LivePool[] {
   if (!status.encounter) return [];
   return [
@@ -794,7 +800,7 @@ function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number): L
   ctx.view = next;
 
   const action = next.action;
-  if (!action) return { label, active: false, time: next.time, progress: 1, pools: [], implicit: null, view: next };
+  if (!action) return finished(label, next);
 
   // Report the run's own countdown only when there is no real target to narrate.
   const counting = action.attempts > 0 || action.completion < 1;
@@ -836,24 +842,37 @@ function driveChoice(ctx: CommandContext, index: number): CommandResult {
 
   const started = opening.time;
   let latest = opening;
+  // A run ends once, whichever way it ends. The driver that owns the timer and
+  // the keypress cannot make both arrive first, so the run refuses the second
+  // rather than recording the wait twice or advancing the world after the
+  // player stopped it.
+  let over: LiveProgress | null = null;
+  let closed: CommandResult | null = null;
 
   const live: LiveRun = {
     tick(elapsedMs) {
+      if (over) return over;
       const progress = tickOnce(ctx, latest, elapsedMs);
       latest = progress.view;
+      if (!progress.active) over = progress;
       return progress;
     },
     end(cancelled) {
+      if (closed) return closed;
+      const label = latest.action?.label ?? 'action';
       const output: CommandOutput[] = [];
       if (cancelled) {
         applyDirective(ctx.session, { kind: 'cancel' });
         output.push(message('plain', 'Stopped.'));
       }
       const final = view(ctx.session);
+      latest = final;
+      over = finished(label, final);
       const elapsed = final.time - started;
       const recorded = [...(elapsed > 0 ? [`wait: ${formatElapsed(elapsed)}`] : []), ...(cancelled ? ['cancel'] : [])];
       output.push({ kind: 'view', view: final, reread: false });
-      return settle(ctx, { view: final, output, quit: false, recorded });
+      closed = settle(ctx, { view: final, output, quit: false, recorded });
+      return closed;
     },
   };
   return { view: opening, output: [], quit: false, recorded: [`begin: ${recordedForChoice(choice).replace(': ', ' ')}`], live };

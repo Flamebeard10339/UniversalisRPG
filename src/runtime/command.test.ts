@@ -130,9 +130,18 @@ describe('the command table is the one definition of the command set', () => {
     }
   });
 
+  it('spells out in help exactly the argument its shape declares, so neither can drift from the other', () => {
+    for (const spec of COMMANDS) {
+      if (spec.match !== 'name') continue;
+      // The rule that refuses `/quit junk` reads `arg`, and this is what keeps
+      // `argHint` -- the half a player reads -- honest about the same thing.
+      expect(spec.arg === 'none', spec.name).toBe(spec.argHint === '');
+    }
+  });
+
   it('gives a command no argument it does not declare, over every entry that declares none', () => {
     const { ctx, session } = fixture(SAVE_MODULE);
-    const argumentless = COMMANDS.filter((spec) => spec.match === 'name' && spec.argHint === '');
+    const argumentless = COMMANDS.filter((spec) => spec.match === 'name' && spec.arg === 'none');
     expect(argumentless.map((spec) => spec.name)).toEqual(['/look', '/inventory', '/state', '/cancel', '/help', '/quit']);
 
     for (const spec of argumentless) {
@@ -627,6 +636,9 @@ title: Bench
 sit:
   instant
   say: You rest a moment.
+
+# save fresh
+{"version":${SAVE_VERSION}}
 `;
 
 // One foe, one two-sided action, deterministic rolls: a run with a named pool
@@ -858,6 +870,46 @@ ring:
     // A fight has a target to narrate, so the run's own countdown is absent
     // rather than merely outranked by the driver that prints one of the two.
     for (const each of progress) expect(each.implicit).toBeNull();
+  });
+
+  it('ends once, however it ends: a second end records nothing and a later tick moves nothing', () => {
+    const { ctx, recorder, started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
+    started.live!.tick(1000);
+
+    const first = started.live!.end(true);
+    const history = [...recorder.history];
+    expect(history).toEqual(['begin: use entity.oven.roast', 'wait: 1', 'cancel']);
+
+    // The driver owns a timer and a keypress and cannot make both arrive first.
+    expect(started.live!.end(true)).toBe(first);
+    expect(started.live!.end(false)).toBe(first);
+    expect(recorder.history).toEqual(history);
+
+    const after = started.live!.tick(5000);
+    expect(after.active).toBe(false);
+    expect(after.time).toBe(1);
+    expect(sessionStatus(ctx.session).time).toBe(1);
+  });
+
+  it('stays finished once the action completes on its own, without a driver watching active', () => {
+    const { started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
+    expect(started.live!.tick(4000).active).toBe(false);
+
+    const again = started.live!.tick(4000);
+    expect(again.active).toBe(false);
+    expect(again.time).toBe(4);
+    expect(again.label).toBe('strike');
+  });
+
+  it('names the action it is driving from its own last tick, not from state another command can move', () => {
+    const { ctx, started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
+    started.live!.tick(1000);
+    // A second driver can run a command mid-run, and `/load` is the one that
+    // takes the in-flight action out of the view the context carries. The run
+    // still knows what it was driving, because it kept its own record.
+    runLine(ctx, '/load fresh');
+    expect(ctx.view.action).toBeNull();
+    expect(started.live!.tick(3000)).toMatchObject({ active: false, label: 'strike' });
   });
 
   it('isChoiceLine names the choice a line picks, and nothing else', () => {
