@@ -1,0 +1,959 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { createGameState } from './runtime';
+import { loadModule } from '../content/registry';
+import { initialLocalChangesModule } from '../content/localChanges';
+import type { ModuleSource } from '../content/universe';
+import { SAVE_VERSION } from './save';
+import { runTest, serializeSession, sessionStatus, startSession, view, type PlaySession } from './session';
+import {
+  beginLive,
+  COMMANDS,
+  findCommand,
+  helpEntries,
+  isChoiceLine,
+  newContext,
+  parseLine,
+  runCommand,
+  runLine,
+  type AuthoringContext,
+  type CommandContext,
+  type CommandOutput,
+  type CommandResult,
+  type Recorder,
+} from './command';
+
+const source = readFileSync('content/tutorial-island.dsl', 'utf8');
+
+// tutorial-island.dsl has no `# save` section, so /load and /expect need their own.
+const SAVE_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  chest
+
+# item gold
+title: Gold
+
+# entity chest
+open:
+  give: 1 gold
+
+# save empty
+{"version":${SAVE_VERSION}}
+
+# test always-passes
+assert: time >= 0
+
+# test always-fails
+assert: time < 0
+`;
+
+// Unaliased on purpose: no entity offers a free relocate to `ruins`, so the edge
+// surfaces as a genuine kind: 'travel' choice, which tutorial-island never has.
+const TRAVEL_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+adjacent:
+  ruins
+
+# location ruins
+x: 1, y: 0
+`;
+
+interface Fixture {
+  session: PlaySession;
+  recorder: Recorder;
+  ctx: CommandContext;
+}
+
+function fixture(text: string, authoring?: AuthoringContext): Fixture {
+  const session = startSession(loadModule(text));
+  const recorder: Recorder = { history: [], startSave: serializeSession(session) };
+  return { session, recorder, ctx: newContext(session, view(session), { recorder, authoring }) };
+}
+
+function messages(result: CommandResult): Array<Extract<CommandOutput, { kind: 'message' }>> {
+  return result.output.filter((out) => out.kind === 'message');
+}
+
+function errors(result: CommandResult): string[] {
+  return messages(result).filter((out) => out.tone === 'error').map((out) => out.text);
+}
+
+function tones(result: CommandResult): string[] {
+  return messages(result).map((out) => out.tone);
+}
+
+function statusOf(result: CommandResult): Extract<CommandOutput, { kind: 'status' }> {
+  const found = result.output.find((out) => out.kind === 'status');
+  if (!found) throw new Error(`no status in ${JSON.stringify(result.output.map((out) => out.kind))}`);
+  return found;
+}
+
+function kinds(result: CommandResult): string[] {
+  return result.output.map((out) => out.kind);
+}
+
+function choiceIndex(ctx: CommandContext, id: string): string {
+  const index = ctx.view.choices.findIndex((choice) => choice.id === id);
+  expect(index, id).toBeGreaterThanOrEqual(0);
+  return String(index + 1);
+}
+
+describe('the command table is the one definition of the command set', () => {
+  it('names every command once, and every spelling reaches its own entry', () => {
+    const names = COMMANDS.map((spec) => spec.name);
+    expect(new Set(names).size).toBe(names.length);
+
+    for (const spec of COMMANDS) {
+      if (spec.match !== 'name') continue;
+      for (const spelling of [spec.name, ...spec.aliases]) {
+        expect(findCommand(spelling), spelling).toBe(spec);
+      }
+    }
+  });
+
+  it('dispatches a typed line by looking the leading token up, aliases included', () => {
+    const { ctx } = fixture(SAVE_MODULE);
+    for (const spec of COMMANDS) {
+      if (spec.match !== 'name') continue;
+      for (const spelling of [spec.name, ...spec.aliases]) {
+        const parsed = parseLine(ctx, `${spelling} always-passes`);
+        // A parse may refuse the argument; what it may never do is reach a
+        // different entry than the one the token names.
+        if ('problem' in parsed) expect(parsed.problem, spelling).toContain(spec.name.startsWith('/') ? spec.name.slice(1) : spec.name);
+        else expect(parsed.spec, spelling).toBe(spec);
+      }
+    }
+  });
+
+  it('routes a blank line, a directive and a choice number to their own entries rather than to a name', () => {
+    const { ctx } = fixture(TRAVEL_MODULE);
+    const forms = [
+      ['', 'blank'],
+      ['travel: ruins', 'directive'],
+      [choiceIndex(ctx, 'travel:ruins'), 'choice'],
+    ] as const;
+    for (const [line, match] of forms) {
+      const parsed = parseLine(ctx, line);
+      expect('problem' in parsed, line).toBe(false);
+      if ('problem' in parsed) continue;
+      expect(parsed.spec.match, line).toBe(match);
+    }
+  });
+
+  it('a driver holding typed arguments dispatches without going near the parser', () => {
+    const { ctx, session } = fixture(SAVE_MODULE);
+    const speed = findCommand('/speed')!;
+    expect(speed.arg).toBe('number');
+    runCommand(ctx, speed, 7);
+    expect(ctx.live.speed).toBe(7);
+
+    const test = findCommand('/test')!;
+    expect(test.arg).toBe('id');
+    expect(messages(runCommand(ctx, test, 'always-passes'))[0].text).toBe(`Test 'always-passes' PASSED`);
+    expect(sessionStatus(session).time).toBe(0);
+  });
+});
+
+describe('help is the table read out', () => {
+  it('publishes one entry per command, in table order, with the table’s own words', () => {
+    const { ctx } = fixture(SAVE_MODULE);
+    const help = runLine(ctx, '/help').output[0];
+    expect(help.kind).toBe('help');
+    if (help.kind !== 'help') return;
+
+    expect(help.entries).toEqual(
+      COMMANDS.map((spec) => ({ name: spec.name, aliases: spec.aliases, argHint: spec.argHint, summary: spec.summary })),
+    );
+    expect(helpEntries().map((entry) => entry.name)).toEqual(COMMANDS.map((spec) => spec.name));
+  });
+
+  it('documents every command a player can type, so no spelling is undocumented', () => {
+    const documented = new Set(helpEntries().flatMap((entry) => [entry.name, ...entry.aliases]));
+    for (const spec of COMMANDS) {
+      for (const spelling of [spec.name, ...spec.aliases]) expect(documented.has(spelling), spelling).toBe(true);
+    }
+  });
+});
+
+describe('a command result says what happened, not how it looks', () => {
+  const TERMINAL = ['█', '░', '▁', '▂', '[time:', '✓', '⚠', '[#', '[-'];
+
+  function spoken(result: CommandResult): string[] {
+    return result.output.flatMap((out) => {
+      switch (out.kind) {
+        case 'message':
+          return [out.text, ...(out.detail ?? [])];
+        case 'source':
+          return out.lines;
+        case 'authored':
+          return out.blocks.flat();
+        case 'help':
+          return out.entries.flatMap((entry) => [entry.name, entry.argHint, entry.summary]);
+        default:
+          return [];
+      }
+    });
+  }
+
+  it('emits no bar glyph, no clock suffix and no check or warning mark, over every command', () => {
+    const { ctx } = fixture(SAVE_MODULE);
+    const lines = [
+      '/help', '/state', '/inventory', '/look', '', '/speed 2', '/speed 0', '/wait 3',
+      '/assert time >= 0', '/assert time < 0', '/expect empty', '/load empty', '/load nope',
+      '/test always-passes', '/test always-fails', '/cancel', 'use: entity.chest.open',
+      '/create-test made', '/bogus', '99', '/quit',
+    ];
+    for (const line of lines) {
+      for (const text of spoken(runLine(ctx, line))) {
+        for (const glyph of TERMINAL) expect(text, `${line} -> ${text}`).not.toContain(glyph);
+      }
+    }
+  });
+
+  it('says a match and a mismatch by tone rather than by mark', () => {
+    const { ctx } = fixture(SAVE_MODULE);
+    expect(tones(runLine(ctx, '/assert time >= 0'))).toEqual(['ok']);
+    expect(messages(runLine(ctx, '/assert time >= 0'))[0].text).toBe('time >= 0 matches');
+    expect(tones(runLine(ctx, '/assert time < 0'))).toEqual(['warn']);
+    expect(messages(runLine(ctx, '/assert time < 0'))[0].text).toBe('time < 0');
+    expect(tones(runLine(ctx, '/expect empty'))).toEqual(['ok']);
+  });
+
+  it('hands the resulting view back rather than a rendering of it', () => {
+    const { ctx } = fixture(source);
+    const result = runLine(ctx, '/wait 30');
+    expect(kinds(result)).toEqual(['view']);
+    expect(result.view?.time).toBe(30);
+    const shown = result.output[0];
+    expect(shown.kind === 'view' && shown.view).toBe(result.view);
+  });
+});
+
+describe('the commands a player plays with', () => {
+  it('applies a numeric choice, mutating state and returning its narration', () => {
+    const { ctx } = fixture(source);
+    const result = runLine(ctx, choiceIndex(ctx, 'talk:tutorial-island.miki'));
+
+    expect(result.quit).toBe(false);
+    expect(result.view?.modals.map((modal) => modal.name)).toEqual(['dialogue']);
+    expect(result.view?.said.some((line) => line.includes('Greetings, adventurer!'))).toBe(true);
+  });
+
+  it('/wait <seconds> advances the returned view.time by that amount', () => {
+    const { ctx } = fixture(source);
+    const before = ctx.view.time;
+    const result = runLine(ctx, '/wait 30');
+    expect(result.quit).toBe(false);
+    expect(result.view?.time).toBe(before + 30);
+  });
+
+  it('/state reports the current status without advancing it, and produces no view', () => {
+    const { ctx, session } = fixture(source);
+    runLine(ctx, '/wait 42');
+
+    const result = runLine(ctx, '/state');
+    expect(result.view).toBeUndefined();
+    expect(statusOf(result).status.time).toBe(42);
+    expect(sessionStatus(session).time).toBe(42);
+  });
+
+  it('/inventory publishes what is carried, worn and learned', () => {
+    const { ctx } = fixture(`
+# skill smithing
+
+# location forge
+x: 0, y: 0
+starting
+
+# item gauntlet
+title: Gauntlet
+slot: hand
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"gauntlet":1},"xp":{"smithing":5}}
+`);
+
+    const bare = runLine(ctx, '/inventory').output[0];
+    expect(bare.kind === 'inventory' && bare.status.inventory).toEqual({});
+    expect(bare.kind === 'inventory' && bare.status.equipment).toEqual({});
+
+    runLine(ctx, '/load stocked');
+    runLine(ctx, 'equip: gauntlet');
+    const carried = runLine(ctx, '/inv').output[0];
+    expect(carried.kind).toBe('inventory');
+    if (carried.kind !== 'inventory') return;
+    expect(carried.status.inventory).toEqual({ gauntlet: 1 });
+    expect(carried.status.xp).toEqual({ smithing: 5 });
+    expect(carried.status.equipment).toEqual({ hand: 'gauntlet' });
+  });
+
+  it('a blank line re-lists the choices without touching the world', () => {
+    const { ctx, session } = fixture(source);
+    const result = runLine(ctx, '');
+    const listed = result.output[0];
+    expect(listed.kind === 'choices' && listed.choices).toEqual(ctx.view.choices);
+    expect(result.view).toBeUndefined();
+    expect(sessionStatus(session).time).toBe(0);
+  });
+
+  it('/look asks for the location description again', () => {
+    const { ctx } = fixture(source);
+    const result = runLine(ctx, '/look');
+    const shown = result.output[0];
+    expect(shown.kind === 'view' && shown.reread).toBe(true);
+    expect(result.view).toBe(ctx.view);
+  });
+
+  it('reports a friendly error for an out-of-range choice number, without throwing or quitting', () => {
+    const { ctx } = fixture(source);
+    const result = runLine(ctx, String(ctx.view.choices.length + 10));
+    expect(result.quit).toBe(false);
+    expect(result.view).toBeUndefined();
+    expect(errors(result)).toEqual([`invalid choice: ${JSON.stringify(String(ctx.view.choices.length + 10))}`]);
+  });
+
+  it('reports a friendly error for an unknown slash command, without throwing or quitting', () => {
+    const { ctx } = fixture(source);
+    const result = runLine(ctx, '/bogus');
+    expect(result.quit).toBe(false);
+    expect(result.view).toBeUndefined();
+    expect(errors(result)).toEqual(['unknown command: /bogus']);
+  });
+
+  it('/quit and /q both signal quit with the final status', () => {
+    for (const spelling of ['/quit', '/q']) {
+      const { ctx } = fixture(source);
+      const result = runLine(ctx, spelling);
+      expect(result.quit, spelling).toBe(true);
+      expect(statusOf(result).status.location.id).toBe('tutorial-island.guide-house');
+    }
+  });
+
+  it('/speed <n> turns the live dial and rejects a non-positive or unreadable one', () => {
+    const { ctx } = fixture(source);
+
+    expect(errors(runLine(ctx, '/speed 4'))).toEqual([]);
+    expect(ctx.live.speed).toBe(4);
+
+    expect(errors(runLine(ctx, '/speed 0'))).toEqual(['/speed requires a positive number, got "0"']);
+    expect(errors(runLine(ctx, '/speed nope'))).toEqual(['/speed requires a positive number, got "nope"']);
+    expect(errors(runLine(ctx, '/speed'))).toEqual(['/speed requires a positive number, got ""']);
+    expect(ctx.live.speed).toBe(4);
+  });
+
+  it('a typed travel: directive moves the player and records the canonical form', () => {
+    const { ctx } = fixture(source);
+    const result = runLine(ctx, 'travel: basement');
+    expect(result.view?.location.id).toBe('tutorial-island.basement');
+    expect(result.recorded).toEqual(['travel: tutorial-island.basement']);
+  });
+
+  it('a numbered choice records the same canonical directive its typed twin does', () => {
+    const { ctx, recorder } = fixture(TRAVEL_MODULE);
+    const result = runLine(ctx, choiceIndex(ctx, 'travel:ruins'));
+    expect(result.recorded).toEqual(['travel: ruins']);
+    expect(recorder.history).toEqual(['travel: ruins']);
+    expect(result.view?.location.id).toBe('ruins');
+  });
+
+  it('carries the command’s view forward, so the next command reads the world it left', () => {
+    const { ctx } = fixture(TRAVEL_MODULE);
+    runLine(ctx, choiceIndex(ctx, 'travel:ruins'));
+    expect(ctx.view.location.id).toBe('ruins');
+  });
+});
+
+describe('/test, /load, /expect, /assert, /cancel', () => {
+  it('/load <id> loads a save by id, erroring cleanly (not throwing) on an unknown one', () => {
+    const { ctx } = fixture(SAVE_MODULE);
+    runLine(ctx, '/wait 99'); // diverge, so we can observe /load resetting it
+
+    const ok = runLine(ctx, '/load empty');
+    expect(ok.recorded).toEqual(['load: empty']);
+    expect(ok.view?.time).toBe(0);
+
+    expect(errors(runLine(ctx, '/load badsave'))).toEqual(['typed directive load: names an unknown save: badsave']);
+  });
+
+  it('/expect <id> confirms a match and warns on a mismatch, recording neither', () => {
+    const { ctx } = fixture(SAVE_MODULE);
+    const match = runLine(ctx, '/expect empty');
+    expect(tones(match)).toEqual(['ok']);
+    expect(match.recorded).toEqual([]);
+
+    runLine(ctx, 'use: entity.chest.open'); // diverge from the empty save
+    expect(tones(runLine(ctx, '/expect empty'))).toEqual(['warn']);
+  });
+
+  it('/test <id> reports PASSED or FAILED and shows the world the replay left', () => {
+    const { ctx } = fixture(SAVE_MODULE);
+    const pass = runLine(ctx, '/test always-passes');
+    expect(messages(pass)[0].text).toBe(`Test 'always-passes' PASSED`);
+    expect(kinds(pass)).toEqual(['message', 'view']);
+
+    const fail = runLine(ctx, '/test always-fails');
+    expect(messages(fail)[0].text).toBe(`Test 'always-fails' FAILED: time < 0`);
+
+    expect(errors(runLine(ctx, '/test'))).toEqual(['/test requires an id']);
+    expect(errors(runLine(ctx, '/test nosuch'))).toEqual(['unknown test: nosuch']);
+  });
+
+  it('/cancel clears an in-flight spannable action and records "cancel"', () => {
+    const { ctx } = fixture(LIVE_MODULE);
+    runLine(ctx, 'begin: use entity.oven.roast');
+    expect(ctx.view.action).not.toBeNull();
+
+    const result = runLine(ctx, '/cancel');
+    expect(result.view?.action).toBeNull();
+    expect(result.recorded).toEqual(['cancel']);
+  });
+});
+
+// A mirror that opens the shipped multi-field modal and a sage whose menu is
+// the other shape one comes in, plus a `# test` that crosses both.
+const MODAL_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  mirror
+  sage
+
+# flag greeted
+
+# entity mirror
+look in: open modal: character-creation
+
+# entity sage
+title: Sage
+
+# dialogue sage-talk
+owner = sage
+
+node greeting:
+  when: not greeted
+  set: greeted
+  -> Ask the way.
+  -> Say nothing.
+
+# save fresh
+{"version":${SAVE_VERSION}}
+
+# test crosses-a-modal
+load: fresh
+use: entity.mirror.look in
+submit-modal: name=Rowan
+submit-modal: race=Elf
+`;
+
+// A dialogue whose own effect raises a second modal underneath it, so the
+// driver has two open at once and has to pick which it is asking about.
+const STACKED_MODAL_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  sage
+
+# flag greeted
+
+# entity sage
+title: Sage
+
+# dialogue sage-talk
+owner = sage
+
+node greeting:
+  when: not greeted
+  set: greeted
+  open modal: character-creation
+  -> Ask about the mirror.
+`;
+
+describe('a modal is driven by its published name and options', () => {
+  it('publishes the open modal and the option it is waiting on', () => {
+    const { ctx } = fixture(MODAL_MODULE);
+
+    const opened = runLine(ctx, 'use: entity.mirror.look in');
+    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation']);
+    expect(opened.view?.modals[0].options.map((option) => option.key)).toEqual(['name', 'race']);
+    expect(opened.view?.modals[0].options[0].values).toBeNull();
+
+    const named = runLine(ctx, 'submit-modal: name=Rowan');
+    expect(named.view?.modals[0].options.map((option) => option.key)).toEqual(['race']);
+    expect(named.view?.modals[0].options[0].values).toEqual(['Human', 'Elf', 'Dwarf', 'Orc']);
+  });
+
+  it('answers a listed value by number and records the canonical submit-modal: line either way', () => {
+    const { ctx, recorder } = fixture(MODAL_MODULE);
+
+    const opened = runLine(ctx, 'talk: sage');
+    expect(opened.view?.modals[0].options[0].values).toEqual(['Ask the way.', 'Say nothing.']);
+
+    // The second value, not the first: a driver that answered by position but
+    // always handed back the head of the list would pass on `1` alone.
+    const answered = runLine(ctx, '2');
+    expect(answered.recorded).toEqual(['submit-modal: choice=Say nothing.']);
+    expect(answered.view?.modals).toEqual([]);
+    expect(recorder.history).toEqual(['talk: sage', 'submit-modal: choice=Say nothing.']);
+  });
+
+  it('asks for the top of the stack, not the bottom, when one modal sits over another', () => {
+    const { ctx } = fixture(STACKED_MODAL_MODULE);
+
+    const opened = runLine(ctx, 'talk: sage');
+    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
+
+    // The dialogue is on top, so its menu is what a number answers — the bottom
+    // modal's first option is free text and takes no number at all.
+    const answered = runLine(ctx, '1');
+    expect(answered.recorded).toEqual(['submit-modal: choice=Ask about the mirror.']);
+    expect(answered.view?.modals.map((modal) => modal.name)).toEqual(['character-creation']);
+  });
+
+  it('refuses a bare line while a modal is open instead of taking it as the field being asked for', () => {
+    const { ctx, session, recorder } = fixture(MODAL_MODULE);
+
+    runLine(ctx, 'use: entity.mirror.look in');
+    // The line the old prompt would have swallowed as the name.
+    expect(errors(runLine(ctx, 'Rowan'))).toEqual(['invalid choice: "Rowan"']);
+    expect(statusOf(runLine(ctx, '/state')).status.location.id).toBe('camp');
+
+    const still = sessionStatus(session);
+    expect(still.player).toEqual({ name: '', race: '' });
+    expect(still.modals.map((modal) => modal.name)).toEqual(['character-creation']);
+    expect(recorder.history).toEqual(['use: entity.mirror.look in']);
+  });
+
+  it('never takes a line as a modal field: a command after a /test that crossed a modal is still a command', () => {
+    const { ctx } = fixture(MODAL_MODULE);
+
+    const replayed = runLine(ctx, '/test crosses-a-modal');
+    expect(messages(replayed)[0].text).toBe(`Test 'crosses-a-modal' PASSED`);
+    expect(replayed.view?.modals).toEqual([]);
+
+    // The two lines that used to be eaten as the name and the race.
+    expect(statusOf(runLine(ctx, '/state')).status.location.id).toBe('camp');
+    expect(kinds(runLine(ctx, '/inventory'))).toEqual(['inventory']);
+  });
+
+  it('emits a replayable # test from a session that crossed a modal, with no hand-editing', () => {
+    const { ctx } = fixture(MODAL_MODULE);
+
+    runLine(ctx, 'use: entity.mirror.look in');
+    runLine(ctx, 'submit-modal: name=Rowan');
+    const done = runLine(ctx, 'submit-modal: race=Elf');
+    expect(done.view?.player).toEqual({ name: 'Rowan', race: 'Elf' });
+
+    const created = runLine(ctx, '/create-valid-test crossed');
+    const blocks = created.output.find((out) => out.kind === 'authored');
+    expect(blocks?.kind).toBe('authored');
+    if (blocks?.kind !== 'authored') return;
+    expect(blocks.blocks[blocks.blocks.length - 1]).toContain('submit-modal: name=Rowan');
+    expect(blocks.blocks[blocks.blocks.length - 1]).toContain('submit-modal: race=Elf');
+
+    const pasted = `${MODAL_MODULE}\n${blocks.blocks.map((block) => block.join('\n')).join('\n\n')}\n`;
+    expect(runTest('crossed', loadModule(pasted), createGameState())).toEqual({ passed: true });
+  });
+});
+
+// `oven.roast` repeats and never self-completes; `anvil.strike` completes after
+// its single attempt. Both shapes a live run's loop has to end for.
+const LIVE_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  oven
+  anvil
+  bench
+
+# item roasted-chestnut
+examine: Split and steaming.
+
+# item ingot
+examine: A dull grey bar.
+
+# entity oven
+roast:
+  continuous
+  time: 4
+  give: 1 roasted-chestnut
+
+# entity anvil
+strike:
+  time: 3
+  give: 1 ingot
+
+# entity bench
+title: Bench
+sit:
+  instant
+  say: You rest a moment.
+`;
+
+describe('the live clock', () => {
+  function liveFixture(text: string, choiceId: string, speed = 1) {
+    const session = startSession(loadModule(text));
+    const recorder: Recorder = { history: [], startSave: serializeSession(session) };
+    const ctx = newContext(session, view(session), { recorder, speed });
+    const index = ctx.view.choices.findIndex((choice) => choice.id === choiceId) + 1;
+    expect(index).toBeGreaterThan(0);
+    return { ctx, recorder, started: beginLive(ctx, index) };
+  }
+
+  it('advances sim-time by exactly elapsedMs/1000 * the speed dial for one tick', () => {
+    const { started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast', 2);
+    const progress = started.run!.tick(500); // 0.5s real * 2x = 1 sim-second
+    expect(progress.time).toBe(1);
+    expect(progress.view.time).toBe(1);
+    expect(progress.active).toBe(true);
+  });
+
+  it('reads the dial /speed turns, rather than a copy taken when the run began', () => {
+    const { ctx, started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
+    expect(started.run!.tick(1000).time).toBe(1);
+    runLine(ctx, '/speed 4');
+    expect(started.run!.tick(1000).time).toBe(5);
+  });
+
+  it('a repeating action stays active across many ticks and eventually produces output', () => {
+    const { started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
+
+    // 25 ticks of 200ms at 1x = 5 simulated seconds, clearing the 4s cycle.
+    let last = started.run!.tick(200);
+    for (let i = 1; i < 25; i++) {
+      last = started.run!.tick(200);
+      expect(last.active).toBe(true); // repeating: never self-completes
+    }
+    expect(last.time).toBe(5);
+    expect(last.view.inventory['roasted-chestnut']).toBe(1);
+    expect(last.view.action).not.toBeNull();
+  });
+
+  it('reports active: false once a non-repeating spannable action completes on its own', () => {
+    const { started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
+    expect(started.run).not.toBeNull();
+
+    expect(started.run!.tick(1000).active).toBe(true); // 1s of 3
+    expect(started.run!.tick(1000).active).toBe(true); // 2s of 3
+
+    const done = started.run!.tick(2000); // crosses the 3s completion boundary
+    expect(done.active).toBe(false);
+    expect(done.view.action).toBeNull();
+    expect(done.view.inventory.ingot).toBe(1);
+  });
+
+  it('names the action a tick finishes from the tick before, since the view that ends it has none', () => {
+    const { started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
+    started.run!.tick(2000);
+    expect(started.run!.tick(2000)).toMatchObject({ active: false, label: 'strike' });
+  });
+
+  it('publishes progress and the run’s own countdown as numbers, with no target to narrate', () => {
+    const TAPPING_MODULE = `
+# stat tap
+base: 0.2
+
+# stat taps-per-minute
+base: 60
+
+# location camp
+x: 0, y: 0
+starting
+entities:
+  bell
+
+# entity bell
+title: Bell
+ring:
+  continuous
+  rate: taps-per-minute
+  damage: tap
+`;
+    const { started } = liveFixture(TAPPING_MODULE, 'use:entity.bell.ring');
+    const counted = [started.run!.tick(1000), started.run!.tick(1000)].map((progress) => progress.implicit);
+    expect(counted).toEqual([
+      { attempts: 1, completion: 0.8 },
+      { attempts: 2, completion: 0.6 },
+    ]);
+    expect(started.run!.tick(1000).pools).toEqual([]);
+  });
+
+  it('records the begin, the elapsed wait and the cancel, so a live run replays as directives', () => {
+    const { recorder, started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
+    expect(recorder.history).toEqual(['begin: use entity.oven.roast']);
+
+    started.run!.tick(3500);
+    const ended = started.run!.end(true);
+    expect(ended.view?.action).toBeNull();
+    expect(recorder.history).toEqual(['begin: use entity.oven.roast', 'wait: 3.5', 'cancel']);
+    expect(messages(ended).map((out) => out.text)).toEqual(['Stopped.']);
+  });
+
+  it('records a completed run without a cancel, and nothing at all for an instant choice', () => {
+    const { recorder, started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
+    started.run!.tick(4000);
+    started.run!.end(false);
+    expect(recorder.history).toEqual(['begin: use entity.anvil.strike', 'wait: 4']);
+
+    const instant = liveFixture(LIVE_MODULE, 'use:entity.bench.sit');
+    expect(instant.started.run).toBeNull();
+    expect(instant.recorder.history).toEqual(['use: entity.bench.sit']);
+    expect(instant.ctx.view.said).toContain('You rest a moment.');
+  });
+
+  it('refuses a choice number no view offers instead of driving nothing', () => {
+    const session = startSession(loadModule(LIVE_MODULE));
+    const ctx = newContext(session, view(session));
+    const started = beginLive(ctx, 99);
+    expect(started.run).toBeNull();
+    expect(errors(started.result)).toEqual(['invalid choice: "99"']);
+  });
+
+  it('isChoiceLine names the choice a line picks, and nothing else', () => {
+    const { ctx } = fixture(TRAVEL_MODULE);
+    expect(isChoiceLine(ctx.view, '1')).toBe(1);
+    expect(isChoiceLine(ctx.view, ' 1 ')).toBe(1);
+    expect(isChoiceLine(ctx.view, '')).toBeNull();
+    expect(isChoiceLine(ctx.view, '0')).toBeNull();
+    expect(isChoiceLine(ctx.view, String(ctx.view.choices.length + 1))).toBeNull();
+    expect(isChoiceLine(ctx.view, '/quit')).toBeNull();
+  });
+});
+
+describe('the recorder: /create-test and /create-valid-test', () => {
+  function recorded(): Fixture {
+    const made = fixture(TRAVEL_MODULE);
+    runLine(made.ctx, choiceIndex(made.ctx, 'travel:ruins'));
+    runLine(made.ctx, 'wait: 1');
+    return made;
+  }
+
+  function authoredBlocks(result: CommandResult): string[][] {
+    const found = result.output.find((out) => out.kind === 'authored');
+    if (found?.kind !== 'authored') throw new Error('no authored blocks');
+    return found.blocks;
+  }
+
+  it('a numbered choice and a typed directive both land in recorder.history in canonical form', () => {
+    expect(recorded().recorder.history).toEqual(['travel: ruins', 'wait: 1']);
+  });
+
+  it('/create-test emits a # test prepended with load: <id>-start and a matching # save, and registers both', () => {
+    const { ctx, session } = recorded();
+    const result = runLine(ctx, '/create-test foo');
+
+    expect(messages(result)[0].text).toBe(`Created test 'foo' (2 steps).`);
+    expect(authoredBlocks(result)).toEqual([
+      ['# save foo-start', `{"version":${SAVE_VERSION}}`],
+      ['# test foo', 'load: foo-start', 'travel: ruins', 'wait: 1'],
+    ]);
+    expect(session.registry.tests.has('foo')).toBe(true);
+    expect(session.registry.saves.has('foo-start')).toBe(true);
+  });
+
+  it('/create-test on an id that already exists errors instead of overwriting', () => {
+    const { ctx } = recorded();
+    runLine(ctx, '/create-test foo');
+    expect(errors(runLine(ctx, '/create-test foo'))).toEqual([`test 'foo' already exists`]);
+  });
+
+  it('/create-valid-test appends expect: <id>-end and its # save; the record -> emit -> reload -> replay round trip passes', () => {
+    const { ctx, session } = recorded();
+    const result = runLine(ctx, '/create-valid-test bar');
+    const blocks = authoredBlocks(result);
+
+    expect(blocks[1][0]).toBe('# save bar-end');
+    expect(blocks[blocks.length - 1]).toContain('expect: bar-end');
+    expect(session.registry.tests.has('bar')).toBe(true);
+
+    // The correctness gate: paste the emitted blocks into a brand-new module,
+    // sharing no state with the recording session, and replay them.
+    const pasted = `${TRAVEL_MODULE}\n${blocks.map((block) => block.join('\n')).join('\n\n')}\n`;
+    expect(runTest('bar', loadModule(pasted), createGameState()).passed).toBe(true);
+  });
+
+  it('does not prepend a second load:/-start save when the history already begins with load:', () => {
+    const { ctx } = fixture(TRAVEL_MODULE);
+    ctx.recorder.history.push('load: someplace');
+    runLine(ctx, choiceIndex(ctx, 'travel:ruins'));
+
+    const blocks = authoredBlocks(runLine(ctx, '/create-test baz'));
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toEqual(['# test baz', 'load: someplace', 'travel: ruins']);
+  });
+
+  it('/create-test with nothing recorded yet, or with no id, errors', () => {
+    const { ctx, session } = fixture(TRAVEL_MODULE);
+    expect(errors(runLine(ctx, '/create-test empty'))).toEqual(['nothing recorded yet']);
+    expect(session.registry.tests.has('empty')).toBe(false);
+    expect(errors(runLine(ctx, '/create-test'))).toEqual(['/create-test requires an id']);
+    expect(errors(runLine(ctx, '/create-valid-test'))).toEqual(['/create-valid-test requires an id']);
+  });
+});
+
+const AUTHORING_MODULE = `
+# info base
+version: 1.0.0
+
+# location camp
+x: 0, y: 0
+starting
+entities:
+  chest
+
+# entity chest
+title: Chest
+open:
+  say: Empty.
+
+# item coin
+title: Coin
+`;
+
+describe('local DSL authoring takes its file as an argument, never reaching for one', () => {
+  function authoringFixture() {
+    const baseSources: ModuleSource[] = [{ name: 'base', text: AUTHORING_MODULE }];
+    const writes: string[] = [];
+    const authoring: AuthoringContext = {
+      baseSources,
+      dependencies: ['base'],
+      localSource: { name: 'local-changes', text: initialLocalChangesModule(['base']) },
+      writeLocalChanges: (text) => writes.push(text),
+    };
+    return { ...fixture(AUTHORING_MODULE, authoring), authoring, writes };
+  }
+
+  it('/dsl stages a section, hands it to the writer it was given, reloads it, and /local can show/delete it', () => {
+    const { ctx, session, authoring, writes } = authoringFixture();
+
+    const created = runLine(ctx, '/dsl item gem title: Gem | examine: Cut bright.');
+    expect(messages(created)[0].text).toBe('Staged # item gem in local-changes.');
+    expect(writes).toHaveLength(1);
+    expect(authoring.localSource.text).toContain('# item gem');
+    expect(authoring.localSource.text).toContain('dependencies:');
+    expect(session.registry.items.get('local-changes.gem')?.title).toBe('Gem');
+
+    const listed = runLine(ctx, '/local').output[0];
+    expect(listed.kind === 'source' && listed.lines).toEqual(['# item gem']);
+
+    const shown = runLine(ctx, '/local show').output[0];
+    expect(shown.kind).toBe('source');
+    if (shown.kind === 'source') {
+      expect(shown.lines).toContain('# info local-changes');
+      expect(shown.lines).toContain('# item gem');
+    }
+
+    const removed = runLine(ctx, '/local delete item gem');
+    expect(messages(removed)[0].text).toBe('Deleted local # item gem.');
+    expect(session.registry.items.has('local-changes.gem')).toBe(false);
+    expect(messages(runLine(ctx, '/local'))[0].text).toBe('No local changes staged.');
+  });
+
+  it('writes nothing anywhere when the authoring context supplies no writer', () => {
+    const { ctx, session, authoring } = authoringFixture();
+    delete authoring.writeLocalChanges;
+    const created = runLine(ctx, '/dsl item gem title: Gem');
+    expect(errors(created)).toEqual([]);
+    expect(session.registry.items.get('local-changes.gem')?.title).toBe('Gem');
+  });
+
+  it('/dsl edits existing content by staging a field-granular patch', () => {
+    const { ctx, session } = authoringFixture();
+
+    const edited = runLine(ctx, '/dsl entity base.chest title: Treasure Chest');
+    expect(messages(edited)[0].text).toBe('Staged # entity base.chest in local-changes.');
+    const chest = session.registry.entities.get('base.chest')!;
+    expect(chest.title).toBe('Treasure Chest');
+    expect(chest.actions.map((action) => action.label)).toEqual(['open']);
+  });
+
+  it('/dsl rejects invalid local changes without writing or mutating the live registry', () => {
+    const { ctx, session, authoring, writes } = authoringFixture();
+    const before = authoring.localSource.text;
+
+    const rejected = runLine(ctx, '/dsl entity base.chest open: |   give: missing-item');
+    const failure = messages(rejected)[0];
+    expect(failure.tone).toBe('error');
+    expect(failure.text).toBe('local changes did not load.');
+    expect(failure.detail?.some((line) => line.includes('missing-item'))).toBe(true);
+    expect(writes).toEqual([]);
+    expect(authoring.localSource.text).toBe(before);
+    expect(session.registry.entities.get('base.chest')?.actions[0].results).toEqual([{ kind: 'say', text: 'Empty.' }]);
+  });
+
+  it('/local clear reloads and prunes stale state from removed local content', () => {
+    const { ctx } = authoringFixture();
+
+    runLine(ctx, '/dsl item gem title: Gem');
+    runLine(ctx, `/dsl save carried {"version":${SAVE_VERSION},"inventory":{"local-changes.gem":1}}`);
+    runLine(ctx, '/load local-changes.carried');
+    expect(ctx.view.inventory['local-changes.gem']).toBe(1);
+
+    const cleared = runLine(ctx, '/local clear');
+    expect(messages(cleared)[0].text).toBe('Cleared local-changes.');
+    expect(cleared.view?.said.some((line) => line.includes('Removed inventory local-changes.gem'))).toBe(true);
+    expect(cleared.view?.inventory['local-changes.gem']).toBeUndefined();
+  });
+
+  it('/dsl can author every DSL section kind that local-changes is allowed to own', () => {
+    const { ctx, session } = authoringFixture();
+    const commands = [
+      '/dsl stat vigor base: 10',
+      '/dsl skill focus stat-id: local-changes.vigor',
+      '/dsl item token title: Token',
+      '/dsl item ore title: Ore',
+      '/dsl item ingot title: Ingot',
+      '/dsl item temporary title: Temporary',
+      '/dsl entity npc title: NPC | cheer: say: Hello.',
+      '/dsl location grove x: 1, y: 0 | entities: local-changes.npc',
+      '/dsl flag levered',
+      '/dsl variable local-knob value: 2',
+      '/dsl resource stamina max: local-changes.vigor',
+      '/dsl recipe smelt in: local-changes.ore | out: local-changes.ingot',
+      '/dsl dialogue npc-chat owner = local-changes.npc | node greet: |   Hello there.',
+      `/dsl save blank {"version":${SAVE_VERSION}}`,
+      '/dsl test smoke assert: time >= 0',
+      '/dsl remove item.local-changes.temporary',
+    ];
+
+    for (const command of commands) expect(errors(runLine(ctx, command)), command).toEqual([]);
+
+    const registry = session.registry;
+    expect(registry.stats.get('local-changes.vigor')?.base).toEqual({ min: 10, max: 10 });
+    expect(registry.skills.get('local-changes.focus')?.['stat-id']).toBe('local-changes.vigor');
+    expect(registry.items.get('local-changes.token')?.title).toBe('Token');
+    expect(registry.entities.get('local-changes.npc')?.actions).toEqual([{ label: 'cheer', results: [{ kind: 'say', text: 'Hello.' }] }]);
+    expect(registry.locations.get('local-changes.grove')).toMatchObject({ x: 1, y: 0, entities: [{ entity: 'local-changes.npc' }] });
+    expect(registry.flags.has('local-changes.levered')).toBe(true);
+    expect(registry.variables.get('local-knob')?.value).toBe(2);
+    expect(registry.resources.get('local-changes.stamina')?.max).toBe('local-changes.vigor');
+    expect(registry.recipes.get('local-changes.smelt')).toMatchObject({ in: [{ item: 'local-changes.ore' }], out: [{ item: 'local-changes.ingot' }] });
+    expect(registry.dialogues.get('local-changes.npc-chat')?.owner).toBe('local-changes.npc');
+    expect(registry.saves.get('local-changes.blank')).toEqual({ version: SAVE_VERSION, diff: {} });
+    expect(registry.tests.get('local-changes.smoke')?.directives).toMatchObject([{ kind: 'assert', condition: { operator: '>=' } }]);
+    expect(registry.items.has('local-changes.temporary')).toBe(false);
+
+    expect(runLine(ctx, '/load local-changes.blank').recorded).toEqual(['load: local-changes.blank']);
+  });
+
+  it('reports the malformed and the unknown by name', () => {
+    const { ctx } = authoringFixture();
+    expect(errors(runLine(ctx, '/dsl'))).toEqual(['/dsl requires <kind> <id> [body]']);
+    expect(errors(runLine(ctx, '/dsl item'))).toEqual(['/dsl requires <kind> <id> [body]']);
+    expect(errors(runLine(ctx, '/local bogus'))).toEqual(['unknown /local command: bogus']);
+    expect(errors(runLine(ctx, '/local delete item nosuch'))).toEqual(['no local # item nosuch is staged.']);
+  });
+
+  it('reports local authoring commands as unavailable when no authoring context is provided', () => {
+    const { ctx } = fixture(AUTHORING_MODULE);
+    expect(errors(runLine(ctx, '/dsl item gem'))).toEqual(['local authoring is unavailable.']);
+    expect(errors(runLine(ctx, '/local'))).toEqual(['local authoring is unavailable.']);
+  });
+});

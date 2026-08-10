@@ -1,0 +1,848 @@
+import { DslError } from '../grammar/parser';
+import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../content/registry';
+import { type ModuleSource } from '../content/universe';
+import {
+  clearLocalSections,
+  deleteLocalSection,
+  LOCAL_CHANGES_MODULE_ID,
+  localSectionHeadings,
+  upsertLocalSection,
+} from '../content/localChanges';
+import { parseDirectiveLine, type Directive } from '../content/test';
+import { resolveDirective } from '../content/typed';
+import { type ParsedSave } from '../content/saveSection';
+import { describeCondition, RuntimeError } from './runtime';
+import { type Modal, type ModalOption } from './modals';
+import {
+  adoptRegistry,
+  apply,
+  applyDirective,
+  beginAction,
+  choiceToDirective,
+  runSessionTest,
+  serializeSession,
+  sessionStatus,
+  view,
+  wait,
+  type PlayChoice,
+  type PlaySession,
+  type PlayStatus,
+  type PlayView,
+} from './session';
+
+export type MessageTone = 'plain' | 'ok' | 'warn' | 'error';
+
+// What a command did, in the engine's own words. A driver decides how each of
+// these looks; nothing here carries a glyph, a bar, a number list or a clock
+// suffix, because the same result is rendered by a terminal and by a screen.
+export type CommandOutput =
+  | { kind: 'message'; tone: MessageTone; text: string; detail?: string[] }
+  | { kind: 'view'; view: PlayView; reread: boolean }
+  | { kind: 'status'; status: PlayStatus }
+  | { kind: 'inventory'; status: PlayStatus }
+  | { kind: 'choices'; choices: PlayChoice[] }
+  | { kind: 'help'; entries: CommandHelp[] }
+  | { kind: 'source'; lines: string[] }
+  | { kind: 'authored'; blocks: string[][] };
+
+export interface CommandResult {
+  view?: PlayView;
+  output: CommandOutput[];
+  quit: boolean;
+  // The colon-form directives just performed, in order; empty for read-only commands.
+  recorded: string[];
+}
+
+// `startSave` is taken before the first command, so a replay starts where this did.
+export interface Recorder {
+  history: string[];
+  startSave: string;
+}
+
+export interface AuthoringContext {
+  baseSources: ModuleSource[];
+  dependencies: string[];
+  localSource: ModuleSource;
+  writeLocalChanges?: (text: string) => void;
+}
+
+// Sim-seconds per real-second in live mode, which `/speed` turns and the live
+// clock reads. Mutable because it is a dial the player holds.
+export interface LiveSettings {
+  speed: number;
+}
+
+export interface CommandContext {
+  readonly session: PlaySession;
+  view: PlayView;
+  readonly recorder: Recorder;
+  readonly live: LiveSettings;
+  readonly authoring?: AuthoringContext;
+}
+
+export function newContext(
+  session: PlaySession,
+  current: PlayView,
+  options: { recorder?: Recorder; authoring?: AuthoringContext; speed?: number } = {},
+): CommandContext {
+  return {
+    session,
+    view: current,
+    recorder: options.recorder ?? { history: [], startSave: '' },
+    live: { speed: options.speed ?? 1 },
+    authoring: options.authoring,
+  };
+}
+
+export interface LocalDelete {
+  op: 'delete';
+  kind: string;
+  id: string;
+}
+
+export type LocalOp = { op: 'list' } | { op: 'show' } | { op: 'clear' } | LocalDelete;
+
+export interface SectionArg {
+  kind: string;
+  id: string;
+  body: string;
+}
+
+// The argument shapes a command takes. A driver holding one of these dispatches
+// through `runCommand` without going near the line parser.
+interface ArgTypes {
+  none: undefined;
+  number: number;
+  id: string;
+  directive: Directive;
+  section: SectionArg;
+  local: LocalOp;
+  choice: number;
+}
+
+export type ArgKind = keyof ArgTypes;
+
+// How the parser recognises a line as this command: by its leading token, by
+// being empty, by parsing as a directive, or by being a choice number.
+export type CommandMatch = 'name' | 'blank' | 'directive' | 'choice';
+
+export interface CommandHelp {
+  name: string;
+  aliases: readonly string[];
+  argHint: string;
+  summary: string;
+}
+
+export interface CommandProblem {
+  problem: string;
+}
+
+export interface CommandSpec<K extends ArgKind = ArgKind> {
+  readonly name: string;
+  readonly aliases: readonly string[];
+  readonly match: CommandMatch;
+  readonly arg: K;
+  readonly argHint: string;
+  readonly summary: string;
+  parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
+  run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
+}
+
+function define<K extends ArgKind>(spec: {
+  name: string;
+  aliases?: readonly string[];
+  match?: CommandMatch;
+  arg: K;
+  argHint?: string;
+  summary: string;
+  parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
+  run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
+}): CommandSpec {
+  return { aliases: [], match: 'name', argHint: '', ...spec };
+}
+
+function isProblem(value: unknown): value is CommandProblem {
+  return typeof value === 'object' && value !== null && 'problem' in value;
+}
+
+function message(tone: MessageTone, text: string, detail?: string[]): CommandOutput {
+  return detail ? { kind: 'message', tone, text, detail } : { kind: 'message', tone, text };
+}
+
+function said(tone: MessageTone, text: string): CommandResult {
+  return { output: [message(tone, text)], quit: false, recorded: [] };
+}
+
+function shown(next: PlayView, before: CommandOutput[] = []): CommandResult {
+  return { view: next, output: [...before, { kind: 'view', view: next, reread: false }], quit: false, recorded: [] };
+}
+
+// Every route out of the engine that a player can provoke rather than a bug:
+// one message, and the session left where it was.
+function refused(error: unknown): CommandResult {
+  if (error instanceof RuntimeError) return said('error', error.message);
+  throw error;
+}
+
+function nothing(): undefined {
+  return undefined;
+}
+
+// --- the recorded spelling of what was done -------------------------------
+
+function beginInnerText(inner: Extract<Directive, { kind: 'use' | 'use-on' | 'travel' | 'craft' }>): string {
+  return canonicalDirective(inner).replace(': ', ' ');
+}
+
+export function canonicalDirective(directive: Directive): string {
+  switch (directive.kind) {
+    case 'talk':
+      return `talk: ${directive.entity}`;
+    case 'choose':
+      return `choose: ${directive.text}`;
+    case 'use':
+      return `use: ${directive.obj}.${directive.objId}.${directive.actionId}`;
+    case 'use-on':
+      return `use: ${directive.action} on ${directive.target}`;
+    case 'travel':
+      return `travel: ${directive.location}`;
+    case 'craft':
+      return `craft: ${directive.recipe}`;
+    case 'begin':
+      return `begin: ${beginInnerText(directive.inner)}`;
+    case 'load':
+      return `load: ${directive.save}`;
+    case 'cancel':
+      return 'cancel';
+    case 'wait':
+      return `wait: ${directive.seconds}`;
+    case 'equip':
+      return `equip: ${directive.item}`;
+    case 'unequip':
+      return `unequip: ${directive.slot}`;
+    case 'submit-modal':
+      return `submit-modal: ${directive.key}=${directive.value}`;
+    // Exhaustive, so widening Directive is a type error here rather than a
+    // throw at the moment a player picks the new kind. These three are
+    // authored, never recorded, so they never reach this.
+    case 'run':
+    case 'expect':
+    case 'assert':
+      throw new RuntimeError(`canonicalDirective: ${directive.kind}: is authored, not recorded`);
+  }
+}
+
+// One mapping, so a numbered choice and its typed equivalent record identically.
+function recordedForChoice(choice: PlayChoice): string {
+  return canonicalDirective(choiceToDirective(choice));
+}
+
+function formatElapsed(seconds: number): string {
+  return Number(seconds.toFixed(3)).toString();
+}
+
+// --- the handlers several spellings share ---------------------------------
+
+// The one place PASSED/FAILED is decided, so both entry points cannot drift.
+function runNamedTest(ctx: CommandContext, testId: string): CommandResult {
+  try {
+    const result = runSessionTest(ctx.session, testId);
+    const next = view(ctx.session);
+    const verdict = result.passed ? `Test '${testId}' PASSED` : `Test '${testId}' FAILED: ${result.failure}`;
+    return shown(next, [message('plain', verdict)]);
+  } catch (error) {
+    return refused(error);
+  }
+}
+
+function runDirective(ctx: CommandContext, directive: Directive): CommandResult {
+  if (directive.kind === 'run') return runNamedTest(ctx, directive.test);
+
+  if (directive.kind === 'assert' || directive.kind === 'expect') {
+    const label = directive.kind === 'expect' ? directive.save : describeCondition(directive.condition);
+    try {
+      const result = applyDirective(ctx.session, directive);
+      return result.failure ? said('warn', result.failure) : said('ok', `${label} matches`);
+    } catch (error) {
+      return refused(error);
+    }
+  }
+
+  try {
+    applyDirective(ctx.session, directive);
+    const next = view(ctx.session);
+    return { ...shown(next), recorded: [canonicalDirective(directive)] };
+  } catch (error) {
+    return refused(error);
+  }
+}
+
+// --- local DSL authoring --------------------------------------------------
+
+function commandBodyLines(body: string): string[] {
+  if (body.trim() === '') return [];
+  return body
+    .split('|')
+    .map((line) => line.replace(/^[ \t]/, '').trimEnd())
+    .filter((line) => line.trim() !== '');
+}
+
+function localSectionSource(section: SectionArg): string {
+  return [`# ${section.kind} ${section.id}`, ...commandBodyLines(section.body)].join('\n') + '\n';
+}
+
+function localDiagnosticsFor(authoring: AuthoringContext, diagnostics: ReturnType<typeof loadUniverseWithDiagnostics>['diagnostics']): string[] {
+  return diagnostics
+    .filter((diagnostic) => diagnostic.sourceName === authoring.localSource.name || diagnostic.moduleId === LOCAL_CHANGES_MODULE_ID)
+    .map((diagnostic) => formatModuleDiagnostic(diagnostic));
+}
+
+function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, text: string, note: string): CommandResult {
+  const loaded = loadUniverseWithDiagnostics([...authoring.baseSources, { ...authoring.localSource, text }]);
+  const localStatus = loaded.modules.find((module) => module.sourceName === authoring.localSource.name || module.moduleId === LOCAL_CHANGES_MODULE_ID);
+  const diagnostics = localDiagnosticsFor(authoring, loaded.diagnostics);
+  if (diagnostics.length > 0 || localStatus?.loaded !== true) {
+    return { output: [message('error', 'local changes did not load.', diagnostics)], quit: false, recorded: [] };
+  }
+
+  try {
+    authoring.writeLocalChanges?.(text);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return said('error', `could not write local changes: ${detail}`);
+  }
+
+  authoring.localSource.text = text;
+  adoptRegistry(ctx.session, loaded.registry);
+
+  try {
+    return shown(view(ctx.session), [message('plain', note)]);
+  } catch (error) {
+    if (error instanceof RuntimeError) {
+      return { output: [message('plain', note), message('error', error.message)], quit: false, recorded: [] };
+    }
+    throw error;
+  }
+}
+
+const UNAVAILABLE = 'local authoring is unavailable.';
+
+function runSectionEdit(ctx: CommandContext, section: SectionArg): CommandResult {
+  const authoring = ctx.authoring;
+  if (!authoring) return said('error', UNAVAILABLE);
+  try {
+    const edit = upsertLocalSection(authoring.localSource.text, authoring.dependencies, localSectionSource(section));
+    const verb = edit.replaced ? 'Replaced' : 'Staged';
+    return commitLocalChanges(ctx, authoring, edit.text, `${verb} # ${edit.section.kind} ${edit.section.id} in ${LOCAL_CHANGES_MODULE_ID}.`);
+  } catch (error) {
+    if (error instanceof DslError) return said('error', error.message);
+    throw error;
+  }
+}
+
+function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
+  const authoring = ctx.authoring;
+  if (!authoring) return said('error', UNAVAILABLE);
+
+  switch (op.op) {
+    case 'list':
+      try {
+        const headings = localSectionHeadings(authoring.localSource.text);
+        return headings.length > 0
+          ? { output: [{ kind: 'source', lines: headings }], quit: false, recorded: [] }
+          : said('plain', 'No local changes staged.');
+      } catch (error) {
+        if (error instanceof DslError) return said('error', error.message);
+        throw error;
+      }
+    case 'show':
+      return { output: [{ kind: 'source', lines: authoring.localSource.text.trimEnd().split('\n') }], quit: false, recorded: [] };
+    case 'clear':
+      return commitLocalChanges(ctx, authoring, clearLocalSections(authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
+    case 'delete':
+      try {
+        const next = deleteLocalSection(authoring.localSource.text, authoring.dependencies, op.kind, op.id);
+        if (!next.deleted) return said('error', `no local # ${op.kind} ${op.id} is staged.`);
+        return commitLocalChanges(ctx, authoring, next.text, `Deleted local # ${op.kind} ${op.id}.`);
+      } catch (error) {
+        if (error instanceof DslError) return said('error', error.message);
+        throw error;
+      }
+  }
+}
+
+// --- the recorder's own commands ------------------------------------------
+
+function savedGameFromSerialized(serialized: string): ParsedSave {
+  const { version, ...diff } = JSON.parse(serialized) as { version: number } & Record<string, unknown>;
+  return { version, diff };
+}
+
+// Never throws: a failure comes back as an error message.
+function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean }): CommandResult {
+  const { recorder, session } = ctx;
+  if (recorder.history.length === 0) return said('error', 'nothing recorded yet');
+
+  const startSaveId = `${id}-start`;
+  const endSaveId = `${id}-end`;
+  const first = recorder.history[0];
+  const usesStartSave = !(first.startsWith('load:') || first.startsWith('load '));
+
+  const idTaken =
+    session.registry.tests.has(id) ||
+    (usesStartSave && session.registry.saves.has(startSaveId)) ||
+    (opts.valid && session.registry.saves.has(endSaveId));
+  if (idTaken) return said('error', `test '${id}' already exists`);
+
+  const lines = [...recorder.history];
+  if (usesStartSave) lines.unshift(`load: ${startSaveId}`);
+  if (opts.valid) lines.push(`expect: ${endSaveId}`);
+
+  const directives: Directive[] = [];
+  for (const directiveLine of lines) {
+    const directive = parseDirectiveLine(directiveLine);
+    if (!directive) return said('error', `internal: recorded line does not parse: ${directiveLine}`);
+    directives.push(directive);
+  }
+
+  const endSaveSerialized = opts.valid ? serializeSession(session) : undefined;
+
+  if (usesStartSave) session.registry.saves.set(startSaveId, savedGameFromSerialized(recorder.startSave));
+  if (endSaveSerialized !== undefined) session.registry.saves.set(endSaveId, savedGameFromSerialized(endSaveSerialized));
+  session.registry.tests.set(id, { id, directives });
+
+  const blocks: string[][] = [];
+  if (usesStartSave) blocks.push([`# save ${startSaveId}`, recorder.startSave]);
+  if (endSaveSerialized !== undefined) blocks.push([`# save ${endSaveId}`, endSaveSerialized]);
+  blocks.push([`# test ${id}`, ...lines]);
+
+  return {
+    output: [message('plain', `Created test '${id}' (${recorder.history.length} steps).`), { kind: 'authored', blocks }],
+    quit: false,
+    recorded: [],
+  };
+}
+
+// --- argument parsers -----------------------------------------------------
+
+function requireId(name: string): (rest: string) => string | CommandProblem {
+  return (rest) => (rest === '' ? { problem: `${name} requires an id` } : rest);
+}
+
+// A directive spelling: the slash form is sugar over a colon-form line, so both
+// reach the same handler and record identically.
+function directiveFrom(name: string, text: (rest: string) => string): (rest: string, ctx: CommandContext) => Directive | CommandProblem {
+  return (rest, ctx) => {
+    const parsed = parseDirective(text(rest), ctx);
+    if (isProblem(parsed)) return parsed;
+    if (!parsed) return { problem: `unknown command: ${rest === '' ? name : `${name} ${rest}`}` };
+    return parsed;
+  };
+}
+
+function parseDirective(line: string, ctx: CommandContext): Directive | null | CommandProblem {
+  try {
+    const typed = parseDirectiveLine(line);
+    return typed && resolveDirective(typed, ctx.session.registry);
+  } catch (error) {
+    if (error instanceof RuntimeError || error instanceof DslError) return { problem: error.message };
+    throw error;
+  }
+}
+
+// The one option a driver is waiting on: the first unanswered of the topmost
+// modal, since the ones beneath it are covered over until that is cleared.
+export function askedOption(modals: Modal[]): ModalOption | undefined {
+  return modals[modals.length - 1]?.options[0];
+}
+
+// A number picks one of a listed value, and nothing else a modal is shown
+// answers it: an option taking free text is answered by the directive itself,
+// so no line is ever consumed as a field it was not typed as.
+function numberedModalAnswer(current: PlayView, trimmed: string): string | null {
+  const asking = askedOption(current.modals);
+  if (!asking?.values) return null;
+  const index = Number(trimmed);
+  if (!Number.isInteger(index) || index < 1 || index > asking.values.length) return null;
+  return `submit-modal: ${asking.key}=${asking.values[index - 1]}`;
+}
+
+// --- the table ------------------------------------------------------------
+
+export const COMMANDS: readonly CommandSpec[] = [
+  define({
+    name: '<N>',
+    match: 'choice',
+    arg: 'choice',
+    summary: 'choose option N',
+    parse: (rest, ctx) => {
+      const index = isChoiceLine(ctx.view, rest);
+      return index ?? { problem: `invalid choice: ${JSON.stringify(rest)}` };
+    },
+    run: (ctx, index) => {
+      const choice = ctx.view.choices[index - 1];
+      if (!choice) return said('error', `invalid choice: ${JSON.stringify(String(index))}`);
+      try {
+        const next = apply(ctx.session, choice.id);
+        return { ...shown(next), recorded: [recordedForChoice(choice)] };
+      } catch (error) {
+        return refused(error);
+      }
+    },
+  }),
+  define({
+    name: '<enter>',
+    match: 'blank',
+    arg: 'none',
+    summary: 'list the current choices',
+    parse: nothing,
+    run: (ctx) => ({ output: [{ kind: 'choices', choices: ctx.view.choices }], quit: false, recorded: [] }),
+  }),
+  define({
+    name: '<directive>',
+    match: 'directive',
+    arg: 'directive',
+    summary: 'any raw directive line (talk:/use:/travel:/craft:/begin:/submit-modal:/…)',
+    parse: (rest, ctx) => {
+      const parsed = parseDirective(rest, ctx);
+      if (isProblem(parsed)) return parsed;
+      if (!parsed) return { problem: `not a directive: ${rest}` };
+      return parsed;
+    },
+    run: runDirective,
+  }),
+  define({
+    name: '/look',
+    arg: 'none',
+    summary: 're-read the current location description',
+    parse: nothing,
+    run: (ctx) => ({ view: ctx.view, output: [{ kind: 'view', view: ctx.view, reread: true }], quit: false, recorded: [] }),
+  }),
+  define({
+    name: '/inventory',
+    aliases: ['/inv'],
+    arg: 'none',
+    summary: 'show your inventory and skill xp',
+    parse: nothing,
+    run: (ctx) => ({ output: [{ kind: 'inventory', status: sessionStatus(ctx.session) }], quit: false, recorded: [] }),
+  }),
+  define({
+    name: '/wait',
+    arg: 'directive',
+    argHint: '<s>',
+    summary: 'advance simulated time by <s> seconds',
+    parse: directiveFrom('/wait', (rest) => `wait: ${rest}`),
+    run: runDirective,
+  }),
+  define({
+    name: '/speed',
+    arg: 'number',
+    argHint: '<n>',
+    summary: 'set the live-mode time multiplier (default 1)',
+    parse: (rest) => {
+      const multiplier = Number(rest);
+      if (rest === '' || Number.isNaN(multiplier) || multiplier <= 0) {
+        return { problem: `/speed requires a positive number, got ${JSON.stringify(rest)}` };
+      }
+      return multiplier;
+    },
+    run: (ctx, multiplier) => {
+      ctx.live.speed = multiplier;
+      return said('plain', `Speed set to ${multiplier}x.`);
+    },
+  }),
+  define({
+    name: '/state',
+    arg: 'none',
+    summary: 'show location, elapsed sim-time, flags, inventory, xp',
+    parse: nothing,
+    run: (ctx) => ({ output: [{ kind: 'status', status: sessionStatus(ctx.session) }], quit: false, recorded: [] }),
+  }),
+  define({
+    name: '/test',
+    arg: 'id',
+    argHint: '<id>',
+    summary: 'run a # test by id and report PASSED/FAILED',
+    parse: requireId('/test'),
+    run: runNamedTest,
+  }),
+  define({
+    name: '/load',
+    arg: 'directive',
+    argHint: '<id>',
+    summary: 'load a # save by id',
+    parse: directiveFrom('/load', (rest) => `load: ${rest}`),
+    run: runDirective,
+  }),
+  define({
+    name: '/expect',
+    arg: 'directive',
+    argHint: '<id>',
+    summary: 'assert current state matches a # save by id',
+    parse: directiveFrom('/expect', (rest) => `expect: ${rest}`),
+    run: runDirective,
+  }),
+  define({
+    name: '/assert',
+    arg: 'directive',
+    argHint: '<c>',
+    summary: 'assert a condition against current state',
+    parse: directiveFrom('/assert', (rest) => `assert: ${rest}`),
+    run: runDirective,
+  }),
+  define({
+    name: '/cancel',
+    arg: 'directive',
+    summary: 'cancel the in-flight spannable action, if any',
+    parse: directiveFrom('/cancel', () => 'cancel'),
+    run: runDirective,
+  }),
+  define({
+    name: '/dsl',
+    arg: 'section',
+    argHint: '<kind> <id> [body]',
+    summary: 'stage or replace one local DSL section; use | for new lines',
+    parse: (rest) => {
+      const match = /^(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?(?:[ \t]+(?<body>.*))?$/.exec(rest)?.groups;
+      if (!match?.kind || !match.id) return { problem: '/dsl requires <kind> <id> [body]' };
+      return { kind: match.kind, id: match.id, body: match.body ?? '' };
+    },
+    run: runSectionEdit,
+  }),
+  define({
+    name: '/local',
+    arg: 'local',
+    argHint: '[show | delete <kind> <id> | clear]',
+    summary: 'list, print, delete or clear staged local changes',
+    parse: (rest) => {
+      if (rest === '' || rest === 'list') return { op: 'list' };
+      if (rest === 'show' || rest === 'export') return { op: 'show' };
+      if (rest === 'clear') return { op: 'clear' };
+      const remove = /^delete[ \t]+(?<kind>[a-z][a-z0-9-]*)[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/.exec(rest)?.groups;
+      if (remove) return { op: 'delete', kind: remove.kind, id: remove.id };
+      return { problem: `unknown /local command: ${rest}` };
+    },
+    run: runLocal,
+  }),
+  define({
+    name: '/create-test',
+    arg: 'id',
+    argHint: '<id>',
+    summary: 'emit a # test from what you just did in this session',
+    parse: requireId('/create-test'),
+    run: (ctx, id) => buildCreateTest(ctx, id, { valid: false }),
+  }),
+  define({
+    name: '/create-valid-test',
+    arg: 'id',
+    argHint: '<id>',
+    summary: 'same, plus a # save + expect: regression assertion',
+    parse: requireId('/create-valid-test'),
+    run: (ctx, id) => buildCreateTest(ctx, id, { valid: true }),
+  }),
+  define({
+    name: '/help',
+    arg: 'none',
+    summary: 'show this help',
+    parse: nothing,
+    run: () => ({ output: [{ kind: 'help', entries: helpEntries() }], quit: false, recorded: [] }),
+  }),
+  define({
+    name: '/quit',
+    aliases: ['/q'],
+    arg: 'none',
+    summary: 'show final state and exit',
+    parse: nothing,
+    run: (ctx) => ({ output: [{ kind: 'status', status: sessionStatus(ctx.session) }], quit: true, recorded: [] }),
+  }),
+];
+
+const BY_TOKEN = new Map<string, CommandSpec>(
+  COMMANDS.filter((spec) => spec.match === 'name').flatMap((spec) => [spec.name, ...spec.aliases].map((token) => [token, spec] as const)),
+);
+
+function byMatch(match: CommandMatch): CommandSpec {
+  const spec = COMMANDS.find((each) => each.match === match);
+  if (!spec) throw new RuntimeError(`no command matches by ${match}`);
+  return spec;
+}
+
+const CHOICE = byMatch('choice');
+const BLANK = byMatch('blank');
+const DIRECTIVE = byMatch('directive');
+
+// Help is this table read out, so a command added above is documented by that
+// edit and no other.
+export function helpEntries(): CommandHelp[] {
+  return COMMANDS.map((spec) => ({ name: spec.name, aliases: spec.aliases, argHint: spec.argHint, summary: spec.summary }));
+}
+
+export function findCommand(token: string): CommandSpec | undefined {
+  return BY_TOKEN.get(token);
+}
+
+// --- parse and dispatch ---------------------------------------------------
+
+export interface ParsedCommand {
+  spec: CommandSpec;
+  arg: ArgTypes[ArgKind];
+}
+
+export function isChoiceLine(current: PlayView, line: string): number | null {
+  const trimmed = line.trim();
+  if (trimmed === '') return null;
+  const index = Number(trimmed);
+  if (!Number.isInteger(index) || index < 1 || index > current.choices.length) return null;
+  return index;
+}
+
+function against(spec: CommandSpec, rest: string, ctx: CommandContext): ParsedCommand | CommandProblem {
+  const arg = spec.parse(rest, ctx);
+  return isProblem(arg) ? arg : { spec, arg };
+}
+
+export function parseLine(ctx: CommandContext, line: string): ParsedCommand | CommandProblem {
+  const trimmed = line.trim();
+  if (trimmed === '') return against(BLANK, '', ctx);
+
+  if (trimmed.startsWith('/')) {
+    const token = /^\S+/.exec(trimmed)![0];
+    const spec = findCommand(token);
+    if (!spec) return { problem: `unknown command: ${trimmed}` };
+    return against(spec, trimmed.slice(token.length).trim(), ctx);
+  }
+
+  // A number answers the modal being shown before it answers the world, which
+  // is withdrawn while one is open.
+  const answer = numberedModalAnswer(ctx.view, trimmed);
+  const directive = parseDirective(answer ?? trimmed, ctx);
+  if (isProblem(directive)) return directive;
+  if (directive) return { spec: DIRECTIVE, arg: directive };
+
+  return against(CHOICE, trimmed, ctx);
+}
+
+// Applies what a command's result says happened: the recorder gains its lines
+// and the context's view moves to the one the command produced.
+function settle(ctx: CommandContext, result: CommandResult): CommandResult {
+  ctx.recorder.history.push(...result.recorded);
+  if (result.view) ctx.view = result.view;
+  return result;
+}
+
+export function runCommand(ctx: CommandContext, spec: CommandSpec, arg: ArgTypes[ArgKind]): CommandResult {
+  return settle(ctx, spec.run(ctx, arg));
+}
+
+// What a driver with a typed line calls: parse it, then dispatch what came out.
+export function runLine(ctx: CommandContext, line: string): CommandResult {
+  const parsed = parseLine(ctx, line);
+  if (isProblem(parsed)) return said('error', parsed.problem);
+  return runCommand(ctx, parsed.spec, parsed.arg);
+}
+
+// --- the live clock -------------------------------------------------------
+
+export interface LivePool {
+  title: string;
+  current: number;
+  max: number;
+}
+
+// One tick's answer: how far the action got, what it is whittling down, and
+// whether it is still going. Every number, no rendering.
+export interface LiveProgress {
+  label: string;
+  active: boolean;
+  time: number;
+  progress: number;
+  pools: LivePool[];
+  // Set only when the run's own completion countdown is what there is to report.
+  implicit: { attempts: number; completion: number } | null;
+  view: PlayView;
+}
+
+export interface LiveRun {
+  tick(elapsedMs: number): LiveProgress;
+  end(cancelled: boolean): CommandResult;
+}
+
+export interface LiveStart {
+  result: CommandResult;
+  // Null when the choice had nothing to drive: an instant action is done.
+  run: LiveRun | null;
+}
+
+function livePools(status: PlayStatus): LivePool[] {
+  if (!status.encounter) return [];
+  return [
+    ...status.resources.filter((resource) => resource.display === 'full').map((resource) => ({ title: resource.title, current: resource.current, max: resource.max })),
+    ...status.encounter.foes.map((foe) => ({ title: foe.title, current: foe.current, max: foe.max })),
+  ];
+}
+
+// `previous` names the action being driven, which is gone from the view the
+// tick that finishes it hands back.
+function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number): LiveProgress {
+  const label = previous.action?.label ?? 'action';
+  const next = wait(ctx.session, (elapsedMs / 1000) * ctx.live.speed);
+  ctx.view = next;
+
+  const action = next.action;
+  if (!action) return { label, active: false, time: next.time, progress: 1, pools: [], implicit: null, view: next };
+
+  // Report the run's own countdown only when there is no real target to narrate.
+  const counting = action.attempts > 0 || action.completion < 1;
+  return {
+    label,
+    active: true,
+    time: next.time,
+    progress: action.progress,
+    pools: livePools(next),
+    implicit: !action.targeted && counting ? { attempts: action.attempts, completion: action.completion } : null,
+    view: next,
+  };
+}
+
+// Arms a choice for live play. What comes back drives itself: the driver
+// supplies elapsed milliseconds and renders what each tick answers.
+export function beginLive(ctx: CommandContext, index: number): LiveStart {
+  const choice = ctx.view.choices[index - 1];
+  if (!choice) return { result: said('error', `invalid choice: ${JSON.stringify(String(index))}`), run: null };
+
+  let opening: PlayView;
+  try {
+    opening = beginAction(ctx.session, choice.id);
+  } catch (error) {
+    return { result: refused(error), run: null };
+  }
+
+  if (!opening.action) {
+    return { result: settle(ctx, { ...shown(opening), recorded: [recordedForChoice(choice)] }), run: null };
+  }
+
+  const started = opening.time;
+  let latest = opening;
+  settle(ctx, { view: opening, output: [], quit: false, recorded: [`begin: ${recordedForChoice(choice).replace(': ', ' ')}`] });
+
+  const run: LiveRun = {
+    tick(elapsedMs) {
+      const progress = tickOnce(ctx, latest, elapsedMs);
+      latest = progress.view;
+      return progress;
+    },
+    end(cancelled) {
+      const output: CommandOutput[] = [];
+      if (cancelled) {
+        applyDirective(ctx.session, { kind: 'cancel' });
+        output.push(message('plain', 'Stopped.'));
+      }
+      const final = view(ctx.session);
+      const elapsed = final.time - started;
+      const recorded = [...(elapsed > 0 ? [`wait: ${formatElapsed(elapsed)}`] : []), ...(cancelled ? ['cancel'] : [])];
+      output.push({ kind: 'view', view: final, reread: false });
+      return settle(ctx, { view: final, output, quit: false, recorded });
+    },
+  };
+  return { result: { output: [], quit: false, recorded: [] }, run };
+}
