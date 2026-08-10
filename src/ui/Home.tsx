@@ -3,8 +3,10 @@ import type { MessageTone } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { groupOffers } from './choices';
 import type { DriverSnapshot } from './driver';
-import { fillPercent, formatClock, tidy } from './format';
+import { formatClock } from './format';
 import { SPLIT_DEFAULT, splitFrom } from './gesture';
+import { LiveSheet } from './LiveSheet';
+import { Meter } from './Meter';
 import { Splitter } from './Splitter';
 import type { LogEntry, LogKind } from './transcript';
 
@@ -27,20 +29,6 @@ const KIND_CLASS: Record<LogKind, string> = {
 function Line({ entry }: { entry: LogEntry }): JSX.Element {
   const tone = entry.kind === 'message' ? TONE_CLASS[entry.tone] : '';
   return <p className={`arrived -mx-1 whitespace-pre-wrap break-words rounded px-1 leading-relaxed ${KIND_CLASS[entry.kind]} ${tone}`}>{entry.text}</p>;
-}
-
-function Meter({ resource }: { resource: PlayView['resources'][number] }): JSX.Element {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="w-20 shrink-0 truncate text-xs text-text-subtle">{resource.title}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-panel">
-        <div className="h-full bg-accent transition-[width] duration-200" style={{ width: `${fillPercent(resource.current, resource.max)}%` }} />
-      </div>
-      <span className="w-16 shrink-0 text-right text-xs tabular-nums text-text-subtle">
-        {resource.display === 'full' ? `${tidy(resource.current)}/${tidy(resource.max)}` : ''}
-      </span>
-    </div>
-  );
 }
 
 // Grouped under whatever offers them, so an offer with an owner and one without
@@ -71,8 +59,9 @@ function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: 
 
 const NEAR_BOTTOM_PX = 32;
 
-export function Home({ snapshot, onChoose }: { snapshot: DriverSnapshot; onChoose: (position: number) => void }): JSX.Element {
+export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapshot; onChoose: (position: number) => void; onCancel: () => void }): JSX.Element {
   const view = snapshot.view;
+  const live = snapshot.live;
   const surface = useRef<HTMLDivElement>(null);
   const column = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -101,7 +90,7 @@ export function Home({ snapshot, onChoose }: { snapshot: DriverSnapshot; onChoos
           ) : null}
           <div className="mt-2 flex flex-col gap-1.5">
             {view.resources.map((resource) => (
-              <Meter key={resource.id} resource={resource} />
+              <Meter key={resource.id} title={resource.title} current={resource.current} max={resource.max} readout={resource.display === 'full'} />
             ))}
           </div>
         </header>
@@ -124,7 +113,10 @@ export function Home({ snapshot, onChoose }: { snapshot: DriverSnapshot; onChoos
           </div>
         </div>
 
-        {view && view.choices.length > 0 ? (
+        {/* A run holds the sheet while it lasts: the world's choices resolve
+            against a world the next tick is about to move, so the only control
+            the player is offered is the one that stops it. */}
+        {live || (view && view.choices.length > 0) ? (
           <>
             <Splitter
               onGrab={() => void (held.current = split)}
@@ -134,7 +126,7 @@ export function Home({ snapshot, onChoose }: { snapshot: DriverSnapshot; onChoos
                 it, so a room offering five actions and one offering two do not
                 move everything else on the way past. */}
             <div className="min-h-0 overflow-y-auto border-t border-border bg-surface-raised" style={{ flexGrow: 1 - split, flexBasis: 0 }}>
-              <Sheet choices={view.choices} onChoose={onChoose} />
+              {live ? <LiveSheet progress={live} onCancel={onCancel} /> : <Sheet choices={view!.choices} onChoose={onChoose} />}
             </div>
           </>
         ) : null}

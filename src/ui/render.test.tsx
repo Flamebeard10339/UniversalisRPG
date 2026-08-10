@@ -1,11 +1,21 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import type { PlayView } from '../runtime/session';
+import { loadUniverseWithDiagnostics } from '../content/registry';
+import { newContext, runLine } from '../runtime/command';
+import { startSession, view, type PlayView } from '../runtime/session';
 import { App } from './App';
 import { createDriver, type Driver } from './driver';
+import type { Ticker } from './live';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { TABS } from './tabs';
+
+// A run that is under way and going nowhere, which is what a test about what
+// is drawn wants: no timer, and the same frame however long the test takes.
+const noTicks: Ticker = () => () => undefined;
+
+const ROAST = 'use:entity.tutorial-island.oven.roast chestnuts';
+const TALK = 'talk:tutorial-island.miki';
 
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'", '&#39;': "'" };
 
@@ -36,6 +46,16 @@ function published(view: PlayView): string[] {
 
 const TAB_LABELS = TABS.map((tab) => tab.label);
 
+// The engine speaks in messages as well as in views, and a driver logs both.
+// Taken by stopping a run against a session of its own, because typing the
+// words here would be this test composing the prose it exists to refuse.
+function whatStoppingSays(): string[] {
+  const session = startSession(loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry);
+  const opening = view(session);
+  const armed = runLine(newContext(session, opening, { driving: true }), String(opening.choices.findIndex((choice) => choice.id === ROAST) + 1));
+  return armed.live!.end(true).output.flatMap((output) => (output.kind === 'message' ? [output.text] : []));
+}
+
 // The nav is the one region whose words this layer owns, so it is taken out by
 // where it is rather than by what it says. Skipping the five labels wherever
 // they appeared let a narration header the clause does enumerate be replaced
@@ -53,8 +73,8 @@ describe('what the shell puts on the screen', () => {
   // The engine's own words are gathered as it publishes them, so this is a
   // comparison against the engine and not against the log that renders it.
   it('renders nothing a player can read that the engine did not publish', () => {
-    const driver = createDriver(SHIPPED_SOURCES);
-    const engine = new Set<string>();
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const engine = new Set<string>(whatStoppingSays());
     let seen = 0;
 
     const step = (): void => {
@@ -70,11 +90,14 @@ describe('what the shell puts on the screen', () => {
     };
 
     step();
-    driver.choose(position(driver, 'talk:tutorial-island.miki'));
+    driver.choose(position(driver, TALK));
     step();
     const menu = driver.snapshot().view!.modals[0].options[0];
     driver.answer(menu.key, menu.values![1]);
     step();
+    driver.choose(position(driver, ROAST));
+    step();
+    driver.cancel();
     driver.choose(position(driver, 'use:entity.tutorial-island.mirror.look in'));
     step();
 
@@ -90,6 +113,26 @@ describe('what the shell puts on the screen', () => {
     const runs = readable(renderToStaticMarkup(<App driver={driver} />));
 
     for (const choice of driver.snapshot().view!.choices) expect(runs).toContain(choice.label);
+  });
+
+  it('draws the run in place of the choices while it lasts, and hands them back when it stops', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const idle = driver.snapshot().view!.choices;
+    const running = idle.find((choice) => choice.id === ROAST)!.label;
+    const other = idle.find((choice) => choice.id === TALK)!.label;
+
+    driver.choose(position(driver, ROAST));
+    const under = readable(renderToStaticMarkup(<App driver={driver} />).replace(NAV, ''));
+
+    expect(under).toContain(running);
+    // The world's choices resolve against a world the next tick is about to
+    // move, so none of them is on the screen while one is under way.
+    expect(under).not.toContain(other);
+
+    driver.cancel();
+    const stopped = readable(renderToStaticMarkup(<App driver={driver} />).replace(NAV, ''));
+
+    expect(stopped).toContain(other);
   });
 
   it('draws the modal the engine is asking for, and stops once it is answered', () => {

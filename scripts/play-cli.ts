@@ -10,6 +10,7 @@ import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './li
 import { serializeSession, startSession, view, type PlayChoice, type PlayStatus, type PlayView } from '../src/runtime/session';
 import {
   askedOption,
+  LIVE_TICK_MS,
   newContext,
   runLine,
   type AuthoringContext,
@@ -190,8 +191,6 @@ export function formatLive(progress: LiveProgress): string {
   const counting = progress.implicit ? ` hits:${progress.implicit.attempts} completion:${progress.implicit.completion.toFixed(1)}` : '';
   return `${progress.label}... ${progressBar(progress.progress)}${pools || counting}  ${clock}`;
 }
-
-const LIVE_TICK_MS = 200;
 
 type LineResult = IteratorResult<string>;
 

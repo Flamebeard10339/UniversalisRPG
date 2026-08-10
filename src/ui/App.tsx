@@ -13,7 +13,7 @@ export function App({ driver }: { driver: Driver }): JSX.Element {
   const [at, setAt] = useState(OPENING_TAB);
   const asking = snapshot.view ? askedOption(snapshot.view.modals) : undefined;
 
-  const panes = TABS.map((tab) => (tab.id === 'home' ? <Home snapshot={snapshot} onChoose={driver.choose} /> : null));
+  const panes = TABS.map((tab) => (tab.id === 'home' ? <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} /> : null));
 
   return (
     <div className="flex h-[100dvh] select-none flex-col overflow-hidden bg-background text-text">

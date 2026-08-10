@@ -37,6 +37,23 @@ function reaches(source: { text: string }): string[] {
 // What the runtime publishes for a driver to render and dispatch through.
 const PLAY_SURFACE = ['session', 'command'];
 
+// A named import off the play surface, and whether the statement brought it in
+// as a type. A type is a shape to render; a value is a thing to call.
+const BROUGHT_IN = /import\s+(type\s+)?\{([^}]*)\}\s*from\s*['"`][^'"`]*\/runtime\/[\w.-]+['"`]/g;
+
+function calls(source: { text: string }): string[] {
+  return [...source.text.matchAll(BROUGHT_IN)].flatMap(([, typeOnly, names]) =>
+    typeOnly ? [] : names.split(',').map((name) => name.trim()).filter((name) => name !== '' && !name.startsWith('type ')),
+  );
+}
+
+// Everything src/ui takes off the play surface as a value: the entries a
+// driver dispatches through, and the cadence both drivers tick at. Nothing
+// that moves the world itself — `wait`, `beginAction`, `cancelAction` and
+// `apply` are each one import away and each absent, so time advances here only
+// by handing elapsed milliseconds to the run the command surface armed.
+const DISPATCHES = ['askedOption', 'LIVE_TICK_MS', 'newContext', 'runLine', 'serializeSession', 'startSession', 'view'];
+
 // Neither is written under src/ui, which is the point; naming them here is how
 // the absence is checked.
 const MODAL_IDS = ['character-creation', 'dialogue'];
@@ -63,6 +80,14 @@ describe('the rules the driver is held to', () => {
   it('reaches the runtime only through the play surface', () => {
     for (const source of SOURCES) {
       for (const target of reaches(source)) expect(PLAY_SURFACE, `${source.file} reaches ${target}`).toContain(target);
+    }
+  });
+
+  it('brings in only what a driver dispatches through, so it cannot advance a clock of its own', () => {
+    for (const source of SOURCES) {
+      for (const name of calls(source)) expect(DISPATCHES, `${source.file} brings in ${name}`).toContain(name);
+      // A namespace import reaches every one of them and names none.
+      expect(source.text, source.file).not.toMatch(/import\s+\*\s+as\s+\w+\s+from\s*['"`][^'"`]*\/runtime\//);
     }
   });
 
