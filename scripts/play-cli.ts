@@ -10,8 +10,6 @@ import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './li
 import { serializeSession, startSession, view, type PlayChoice, type PlayStatus, type PlayView } from '../src/runtime/session';
 import {
   askedOption,
-  beginLive,
-  isChoiceLine,
   newContext,
   runLine,
   type AuthoringContext,
@@ -409,7 +407,7 @@ async function main(): Promise<void> {
     }
     throw err;
   }
-  const ctx: CommandContext = newContext(session, opening, { recorder, authoring });
+  const ctx: CommandContext = newContext(session, opening, { recorder, authoring, driving: liveMode });
   console.log(formatView(opening).join('\n'));
   console.log('\nType /help for commands (/state and /inventory show your progress).');
 
@@ -426,19 +424,11 @@ async function main(): Promise<void> {
 
       console.log('');
 
-      const choice = liveMode ? isChoiceLine(ctx.view, line) : null;
-      let quit = false;
-      if (choice !== null) {
-        const started = beginLive(ctx, choice);
-        print(formatResult(started.result));
-        if (started.run) await runLiveAction(started.run, rl);
-      } else {
-        const result = runLine(ctx, line);
-        print(formatResult(result));
-        quit = result.quit;
-      }
+      const result = runLine(ctx, line);
+      print(formatResult(result));
+      if (result.live) await runLiveAction(result.live, rl);
 
-      if (quit) break;
+      if (result.quit) break;
       process.stdout.write('> ');
     }
   } finally {

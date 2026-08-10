@@ -7,7 +7,6 @@ import type { ModuleSource } from '../content/universe';
 import { SAVE_VERSION } from './save';
 import { runTest, serializeSession, sessionStatus, startSession, view, type PlaySession } from './session';
 import {
-  beginLive,
   COMMANDS,
   findCommand,
   helpEntries,
@@ -121,13 +120,46 @@ describe('the command table is the one definition of the command set', () => {
     for (const spec of COMMANDS) {
       if (spec.match !== 'name') continue;
       for (const spelling of [spec.name, ...spec.aliases]) {
-        const parsed = parseLine(ctx, `${spelling} always-passes`);
+        const line = spec.argHint === '' ? spelling : `${spelling} always-passes`;
+        const parsed = parseLine(ctx, line);
         // A parse may refuse the argument; what it may never do is reach a
         // different entry than the one the token names.
-        if ('problem' in parsed) expect(parsed.problem, spelling).toContain(spec.name.startsWith('/') ? spec.name.slice(1) : spec.name);
-        else expect(parsed.spec, spelling).toBe(spec);
+        if ('problem' in parsed) expect(parsed.problem, line).toContain(spec.name.slice(1));
+        else expect(parsed.spec, line).toBe(spec);
       }
     }
+  });
+
+  it('gives a command no argument it does not declare, over every entry that declares none', () => {
+    const { ctx, session } = fixture(SAVE_MODULE);
+    const argumentless = COMMANDS.filter((spec) => spec.match === 'name' && spec.argHint === '');
+    expect(argumentless.map((spec) => spec.name)).toEqual(['/look', '/inventory', '/state', '/cancel', '/help', '/quit']);
+
+    for (const spec of argumentless) {
+      for (const spelling of [spec.name, ...spec.aliases]) {
+        const result = runLine(ctx, `${spelling} junk`);
+        // Refused as a line, not performed with the argument thrown away: the
+        // merge base refused every one of these and `/quit junk` ended nothing.
+        expect(errors(result), spelling).toEqual([`unknown command: ${spelling} junk`]);
+        expect(result.quit, spelling).toBe(false);
+        expect(result.output, spelling).toHaveLength(1);
+      }
+    }
+    expect(sessionStatus(session).time).toBe(0);
+    expect(runLine(ctx, '/quit').quit).toBe(true);
+  });
+
+  it('takes a command to be a whole token, so no name can shadow a longer one', () => {
+    const { ctx, session } = fixture(SAVE_MODULE);
+    // The merge base tested `/create-test` with startsWith and had to try
+    // `/create-valid-test` first to stay reachable. A token cannot shadow, so
+    // the two entries need no order between them -- and the run-on spellings
+    // that ordering made meaningful name no command at all.
+    for (const line of ['/create-valid-testfoo', '/speedxyz', '/loadempty', '/testalways-passes']) {
+      expect(errors(runLine(ctx, line)), line).toEqual([`unknown command: ${line}`]);
+    }
+    expect(sessionStatus(session).time).toBe(0);
+    expect(errors(runLine(ctx, '/test always-passes'))).toEqual([]);
   });
 
   it('routes a blank line, a directive and a choice number to their own entries rather than to a name', () => {
@@ -597,19 +629,79 @@ sit:
   say: You rest a moment.
 `;
 
+// One foe, one two-sided action, deterministic rolls: a run with a named pool
+// to whittle down rather than a completion of its own.
+const FIGHT_MODULE = `
+# stat attack
+base: 6
+
+# stat defense
+base: 0
+
+# stat accuracy
+base: 100
+
+# stat evasion
+base: 0
+
+# stat attack-rate
+base: 60
+
+# stat max-health
+base: 30
+
+# stat regeneration
+
+# resource health
+rate: regeneration
+max: max-health
+display: full
+
+# faction world
+
+# faction player
+
+# action swing
+title: Swing
+rate: my attack-rate
+accuracy: my accuracy vs their evasion
+damage: my attack vs their defense
+depletes: their health
+
+# location camp
+x: 0, y: 0
+starting
+entities:
+  rat
+
+# entity player
+title: You
+faction: player
+stats: max-health 30, attack 6, defense 0, attack-rate 60, accuracy 100, evasion 0
+uses: swing
+
+# entity rat
+title: Rat
+faction: world
+stats: max-health 12, attack 0, defense 0, attack-rate 6, accuracy 0, evasion 0
+uses: swing
+`;
+
 describe('the live clock', () => {
+  // Driven through the table, not around it: a live run is what the `<N>` entry
+  // does when the driver says it can advance one.
   function liveFixture(text: string, choiceId: string, speed = 1) {
     const session = startSession(loadModule(text));
     const recorder: Recorder = { history: [], startSave: serializeSession(session) };
-    const ctx = newContext(session, view(session), { recorder, speed });
+    const ctx = newContext(session, view(session), { recorder, speed, driving: true });
     const index = ctx.view.choices.findIndex((choice) => choice.id === choiceId) + 1;
     expect(index).toBeGreaterThan(0);
-    return { ctx, recorder, started: beginLive(ctx, index) };
+    return { ctx, recorder, started: runLine(ctx, String(index)) };
   }
 
   it('advances sim-time by exactly elapsedMs/1000 * the speed dial for one tick', () => {
     const { started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast', 2);
-    const progress = started.run!.tick(500); // 0.5s real * 2x = 1 sim-second
+    const progress = started.live!.tick(500); // 0.5s real * 2x = 1 sim-second
     expect(progress.time).toBe(1);
     expect(progress.view.time).toBe(1);
     expect(progress.active).toBe(true);
@@ -617,18 +709,18 @@ describe('the live clock', () => {
 
   it('reads the dial /speed turns, rather than a copy taken when the run began', () => {
     const { ctx, started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
-    expect(started.run!.tick(1000).time).toBe(1);
+    expect(started.live!.tick(1000).time).toBe(1);
     runLine(ctx, '/speed 4');
-    expect(started.run!.tick(1000).time).toBe(5);
+    expect(started.live!.tick(1000).time).toBe(5);
   });
 
   it('a repeating action stays active across many ticks and eventually produces output', () => {
     const { started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
 
     // 25 ticks of 200ms at 1x = 5 simulated seconds, clearing the 4s cycle.
-    let last = started.run!.tick(200);
+    let last = started.live!.tick(200);
     for (let i = 1; i < 25; i++) {
-      last = started.run!.tick(200);
+      last = started.live!.tick(200);
       expect(last.active).toBe(true); // repeating: never self-completes
     }
     expect(last.time).toBe(5);
@@ -638,12 +730,12 @@ describe('the live clock', () => {
 
   it('reports active: false once a non-repeating spannable action completes on its own', () => {
     const { started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
-    expect(started.run).not.toBeNull();
+    expect(started.live).toBeDefined();
 
-    expect(started.run!.tick(1000).active).toBe(true); // 1s of 3
-    expect(started.run!.tick(1000).active).toBe(true); // 2s of 3
+    expect(started.live!.tick(1000).active).toBe(true); // 1s of 3
+    expect(started.live!.tick(1000).active).toBe(true); // 2s of 3
 
-    const done = started.run!.tick(2000); // crosses the 3s completion boundary
+    const done = started.live!.tick(2000); // crosses the 3s completion boundary
     expect(done.active).toBe(false);
     expect(done.view.action).toBeNull();
     expect(done.view.inventory.ingot).toBe(1);
@@ -651,8 +743,8 @@ describe('the live clock', () => {
 
   it('names the action a tick finishes from the tick before, since the view that ends it has none', () => {
     const { started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
-    started.run!.tick(2000);
-    expect(started.run!.tick(2000)).toMatchObject({ active: false, label: 'strike' });
+    started.live!.tick(2000);
+    expect(started.live!.tick(2000)).toMatchObject({ active: false, label: 'strike' });
   });
 
   it('publishes progress and the run’s own countdown as numbers, with no target to narrate', () => {
@@ -677,20 +769,20 @@ ring:
   damage: tap
 `;
     const { started } = liveFixture(TAPPING_MODULE, 'use:entity.bell.ring');
-    const counted = [started.run!.tick(1000), started.run!.tick(1000)].map((progress) => progress.implicit);
+    const counted = [started.live!.tick(1000), started.live!.tick(1000)].map((progress) => progress.implicit);
     expect(counted).toEqual([
       { attempts: 1, completion: 0.8 },
       { attempts: 2, completion: 0.6 },
     ]);
-    expect(started.run!.tick(1000).pools).toEqual([]);
+    expect(started.live!.tick(1000).pools).toEqual([]);
   });
 
   it('records the begin, the elapsed wait and the cancel, so a live run replays as directives', () => {
     const { recorder, started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
     expect(recorder.history).toEqual(['begin: use entity.oven.roast']);
 
-    started.run!.tick(3500);
-    const ended = started.run!.end(true);
+    started.live!.tick(3500);
+    const ended = started.live!.end(true);
     expect(ended.view?.action).toBeNull();
     expect(recorder.history).toEqual(['begin: use entity.oven.roast', 'wait: 3.5', 'cancel']);
     expect(messages(ended).map((out) => out.text)).toEqual(['Stopped.']);
@@ -698,22 +790,74 @@ ring:
 
   it('records a completed run without a cancel, and nothing at all for an instant choice', () => {
     const { recorder, started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
-    started.run!.tick(4000);
-    started.run!.end(false);
+    started.live!.tick(4000);
+    started.live!.end(false);
     expect(recorder.history).toEqual(['begin: use entity.anvil.strike', 'wait: 4']);
 
     const instant = liveFixture(LIVE_MODULE, 'use:entity.bench.sit');
-    expect(instant.started.run).toBeNull();
+    expect(instant.started.live).toBeUndefined();
     expect(instant.recorder.history).toEqual(['use: entity.bench.sit']);
     expect(instant.ctx.view.said).toContain('You rest a moment.');
   });
 
-  it('refuses a choice number no view offers instead of driving nothing', () => {
+  it('refuses a choice number no view offers, whether it arrives as a line or as an argument', () => {
     const session = startSession(loadModule(LIVE_MODULE));
-    const ctx = newContext(session, view(session));
-    const started = beginLive(ctx, 99);
-    expect(started.run).toBeNull();
-    expect(errors(started.result)).toEqual(['invalid choice: "99"']);
+    const ctx = newContext(session, view(session), { driving: true });
+    const typed = runLine(ctx, '99');
+    expect(typed.live).toBeUndefined();
+    expect(errors(typed)).toEqual(['invalid choice: "99"']);
+
+    const choice = COMMANDS.find((spec) => spec.match === 'choice')!;
+    const dispatched = runCommand(ctx, choice, 99);
+    expect(dispatched.live).toBeUndefined();
+    expect(errors(dispatched)).toEqual(['invalid choice: "99"']);
+  });
+
+  it('the same entry resolves the choice instantly when the driver cannot advance a run', () => {
+    const session = startSession(loadModule(LIVE_MODULE));
+    const recorder: Recorder = { history: [], startSave: serializeSession(session) };
+    const ctx = newContext(session, view(session), { recorder });
+    const index = ctx.view.choices.findIndex((choice) => choice.id === 'use:entity.anvil.strike') + 1;
+
+    const result = runLine(ctx, String(index));
+    expect(result.live).toBeUndefined();
+    expect(recorder.history).toEqual(['use: entity.anvil.strike']);
+    expect(result.view?.inventory.ingot).toBe(1);
+  });
+
+  it('measures the wait it records from where the run began, not from the clock', () => {
+    const { ctx, recorder, started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
+    started.live!.end(false);
+    expect(recorder.history).toEqual(['begin: use entity.oven.roast']);
+
+    // Ten seconds already on the clock before the second run is armed, which is
+    // the difference between the elapsed time and the reading.
+    runLine(ctx, '/wait 10');
+    const index = ctx.view.choices.findIndex((choice) => choice.id === 'use:entity.anvil.strike') + 1;
+    const second = runLine(ctx, String(index));
+    second.live!.tick(2000);
+    second.live!.end(true);
+    expect(recorder.history).toEqual([
+      'begin: use entity.oven.roast',
+      'wait: 10',
+      'begin: use entity.anvil.strike',
+      'wait: 2',
+      'cancel',
+    ]);
+  });
+
+  it('publishes no completion countdown for a run whittling a named pool down', () => {
+    const { started } = liveFixture(FIGHT_MODULE, 'fight:swing:rat');
+    // Two ticks, because the first lands no blow: a run that has swung is where
+    // an untargeted one would start counting, so it is the tick that discriminates.
+    const progress = [started.live!.tick(900), started.live!.tick(900)];
+    expect(progress[1].pools).toEqual([
+      { title: 'Health', current: 30, max: 30 },
+      { title: 'Rat', current: 6, max: 12 },
+    ]);
+    // A fight has a target to narrate, so the run's own countdown is absent
+    // rather than merely outranked by the driver that prints one of the two.
+    for (const each of progress) expect(each.implicit).toBeNull();
   });
 
   it('isChoiceLine names the choice a line picks, and nothing else', () => {
@@ -787,6 +931,22 @@ describe('the recorder: /create-test and /create-valid-test', () => {
     const blocks = authoredBlocks(runLine(ctx, '/create-test baz'));
     expect(blocks).toHaveLength(1);
     expect(blocks[0]).toEqual(['# test baz', 'load: someplace', 'travel: ruins']);
+  });
+
+  it('says so rather than throwing when the session began without a start save', () => {
+    // What newContext hands a driver that keeps no recorder of its own: an
+    // empty start save, which is not a save and is not JSON either.
+    const session = startSession(loadModule(TRAVEL_MODULE));
+    const ctx = newContext(session, view(session));
+    runLine(ctx, choiceIndex(ctx, 'travel:ruins'));
+
+    for (const command of ['/create-test unsaved', '/create-valid-test unsaved']) {
+      const result = runLine(ctx, command);
+      expect(errors(result), command).toEqual(['no start save was taken when this session began']);
+    }
+    expect(session.registry.tests.has('unsaved')).toBe(false);
+    expect(session.registry.saves.has('unsaved-start')).toBe(false);
+    expect(session.registry.saves.has('unsaved-end')).toBe(false);
   });
 
   it('/create-test with nothing recorded yet, or with no id, errors', () => {

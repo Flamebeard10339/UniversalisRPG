@@ -51,6 +51,8 @@ export interface CommandResult {
   quit: boolean;
   // The colon-form directives just performed, in order; empty for read-only commands.
   recorded: string[];
+  // Set when the command armed something for a driver to advance in real time.
+  live?: LiveRun;
 }
 
 // `startSave` is taken before the first command, so a replay starts where this did.
@@ -70,6 +72,9 @@ export interface AuthoringContext {
 // clock reads. Mutable because it is a dial the player holds.
 export interface LiveSettings {
   speed: number;
+  // Whether this driver can advance a run in real time and let the player stop
+  // it. A driver that cannot resolves a choice instead of arming it.
+  driving: boolean;
 }
 
 export interface CommandContext {
@@ -83,13 +88,13 @@ export interface CommandContext {
 export function newContext(
   session: PlaySession,
   current: PlayView,
-  options: { recorder?: Recorder; authoring?: AuthoringContext; speed?: number } = {},
+  options: { recorder?: Recorder; authoring?: AuthoringContext; speed?: number; driving?: boolean } = {},
 ): CommandContext {
   return {
     session,
     view: current,
     recorder: options.recorder ?? { history: [], startSave: '' },
-    live: { speed: options.speed ?? 1 },
+    live: { speed: options.speed ?? 1, driving: options.driving ?? false },
     authoring: options.authoring,
   };
 }
@@ -373,9 +378,13 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
 
 // --- the recorder's own commands ------------------------------------------
 
-function savedGameFromSerialized(serialized: string): ParsedSave {
-  const { version, ...diff } = JSON.parse(serialized) as { version: number } & Record<string, unknown>;
-  return { version, diff };
+function savedGameFromSerialized(serialized: string): ParsedSave | null {
+  try {
+    const { version, ...diff } = JSON.parse(serialized) as { version: number } & Record<string, unknown>;
+    return { version, diff };
+  } catch {
+    return null;
+  }
 }
 
 // Never throws: a failure comes back as an error message.
@@ -387,6 +396,11 @@ function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean
   const endSaveId = `${id}-end`;
   const first = recorder.history[0];
   const usesStartSave = !(first.startsWith('load:') || first.startsWith('load '));
+
+  // Taken before anything is written, because a recorder given no start save is
+  // a driver that never took one, and half an emission is worse than none.
+  const startSave = usesStartSave ? savedGameFromSerialized(recorder.startSave) : null;
+  if (usesStartSave && !startSave) return said('error', 'no start save was taken when this session began');
 
   const idTaken =
     session.registry.tests.has(id) ||
@@ -406,9 +420,10 @@ function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean
   }
 
   const endSaveSerialized = opts.valid ? serializeSession(session) : undefined;
+  const endSave = endSaveSerialized === undefined ? null : savedGameFromSerialized(endSaveSerialized);
 
-  if (usesStartSave) session.registry.saves.set(startSaveId, savedGameFromSerialized(recorder.startSave));
-  if (endSaveSerialized !== undefined) session.registry.saves.set(endSaveId, savedGameFromSerialized(endSaveSerialized));
+  if (startSave) session.registry.saves.set(startSaveId, startSave);
+  if (endSave) session.registry.saves.set(endSaveId, endSave);
   session.registry.tests.set(id, { id, directives });
 
   const blocks: string[][] = [];
@@ -479,16 +494,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       const index = isChoiceLine(ctx.view, rest);
       return index ?? { problem: `invalid choice: ${JSON.stringify(rest)}` };
     },
-    run: (ctx, index) => {
-      const choice = ctx.view.choices[index - 1];
-      if (!choice) return said('error', `invalid choice: ${JSON.stringify(String(index))}`);
-      try {
-        const next = apply(ctx.session, choice.id);
-        return { ...shown(next), recorded: [recordedForChoice(choice)] };
-      } catch (error) {
-        return refused(error);
-      }
-    },
+    run: (ctx, index) => (ctx.live.driving ? driveChoice(ctx, index) : applyChoice(ctx, index)),
   }),
   define({
     name: '<enter>',
@@ -709,7 +715,12 @@ export function parseLine(ctx: CommandContext, line: string): ParsedCommand | Co
     const token = /^\S+/.exec(trimmed)![0];
     const spec = findCommand(token);
     if (!spec) return { problem: `unknown command: ${trimmed}` };
-    return against(spec, trimmed.slice(token.length).trim(), ctx);
+    const rest = trimmed.slice(token.length).trim();
+    // The argument a command declares is the whole argument it takes, so a line
+    // carrying one it does not names no command rather than quietly performing
+    // this one: `/quit junk` is a typo, not a way to end the session.
+    if (rest !== '' && spec.argHint === '') return { problem: `unknown command: ${trimmed}` };
+    return against(spec, rest, ctx);
   }
 
   // A number answers the modal being shown before it answers the world, which
@@ -767,12 +778,6 @@ export interface LiveRun {
   end(cancelled: boolean): CommandResult;
 }
 
-export interface LiveStart {
-  result: CommandResult;
-  // Null when the choice had nothing to drive: an instant action is done.
-  run: LiveRun | null;
-}
-
 function livePools(status: PlayStatus): LivePool[] {
   if (!status.encounter) return [];
   return [
@@ -804,28 +809,35 @@ function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number): L
   };
 }
 
-// Arms a choice for live play. What comes back drives itself: the driver
-// supplies elapsed milliseconds and renders what each tick answers.
-export function beginLive(ctx: CommandContext, index: number): LiveStart {
+function applyChoice(ctx: CommandContext, index: number): CommandResult {
   const choice = ctx.view.choices[index - 1];
-  if (!choice) return { result: said('error', `invalid choice: ${JSON.stringify(String(index))}`), run: null };
+  if (!choice) return said('error', `invalid choice: ${JSON.stringify(String(index))}`);
+  try {
+    return { ...shown(apply(ctx.session, choice.id)), recorded: [recordedForChoice(choice)] };
+  } catch (error) {
+    return refused(error);
+  }
+}
+
+// Arms the same choice instead of resolving it, and hands back a run the driver
+// advances with elapsed milliseconds. An instant action arms nothing, which is
+// not a failure: beginning it is doing it, and it records as itself.
+function driveChoice(ctx: CommandContext, index: number): CommandResult {
+  const choice = ctx.view.choices[index - 1];
+  if (!choice) return said('error', `invalid choice: ${JSON.stringify(String(index))}`);
 
   let opening: PlayView;
   try {
     opening = beginAction(ctx.session, choice.id);
   } catch (error) {
-    return { result: refused(error), run: null };
+    return refused(error);
   }
-
-  if (!opening.action) {
-    return { result: settle(ctx, { ...shown(opening), recorded: [recordedForChoice(choice)] }), run: null };
-  }
+  if (!opening.action) return { ...shown(opening), recorded: [recordedForChoice(choice)] };
 
   const started = opening.time;
   let latest = opening;
-  settle(ctx, { view: opening, output: [], quit: false, recorded: [`begin: ${recordedForChoice(choice).replace(': ', ' ')}`] });
 
-  const run: LiveRun = {
+  const live: LiveRun = {
     tick(elapsedMs) {
       const progress = tickOnce(ctx, latest, elapsedMs);
       latest = progress.view;
@@ -844,5 +856,5 @@ export function beginLive(ctx: CommandContext, index: number): LiveStart {
       return settle(ctx, { view: final, output, quit: false, recorded });
     },
   };
-  return { result: { output: [], quit: false, recorded: [] }, run };
+  return { view: opening, output: [], quit: false, recorded: [`begin: ${recordedForChoice(choice).replace(': ', ' ')}`], live };
 }

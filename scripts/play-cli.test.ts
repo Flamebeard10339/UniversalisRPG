@@ -5,15 +5,23 @@ import { describe, expect, it } from 'vitest';
 import { loadModule } from '../src/content/registry';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { serializeSession, startSession, view } from '../src/runtime/session';
-import { beginLive, COMMANDS, newContext, runLine, type CommandContext, type Recorder } from '../src/runtime/command';
+import { COMMANDS, newContext, runLine, type CommandContext, type Recorder } from '../src/runtime/command';
 import { formatLive, formatOutput, formatResult, loadModportalSources } from './play-cli';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
-function driver(text: string, speed = 1): CommandContext {
+function driver(text: string, speed = 1, driving = false): CommandContext {
   const session = startSession(loadModule(text));
   const recorder: Recorder = { history: [], startSave: serializeSession(session) };
-  return newContext(session, view(session), { recorder, speed });
+  return newContext(session, view(session), { recorder, speed, driving });
+}
+
+function armed(ctx: CommandContext, choiceId: string) {
+  const index = ctx.view.choices.findIndex((choice) => choice.id === choiceId) + 1;
+  expect(index, choiceId).toBeGreaterThan(0);
+  const result = runLine(ctx, String(index));
+  expect(result.live, choiceId).toBeDefined();
+  return result;
 }
 
 describe('play-cli renders what a command result says happened', () => {
@@ -146,13 +154,10 @@ ring:
 
 describe('play-cli renders the live clock', () => {
   function liveLines(choiceId: string, ticks: number, elapsedMs: number, speed = 1): string[] {
-    const ctx = driver(LIVE_MODULE, speed);
-    const index = ctx.view.choices.findIndex((choice) => choice.id === choiceId) + 1;
-    expect(index).toBeGreaterThan(0);
-    const started = beginLive(ctx, index);
+    const started = armed(driver(LIVE_MODULE, speed, true), choiceId);
     const lines: string[] = [];
     for (let i = 0; i < ticks; i++) {
-      const progress = started.run!.tick(elapsedMs);
+      const progress = started.live!.tick(elapsedMs);
       lines.push(formatLive(progress));
       if (!progress.active) break;
     }
@@ -242,12 +247,10 @@ title: Rat
 faction: world
 stats: max-health 12, attack 0, defense 0, attack-rate 6, accuracy 0, evasion 0
 uses: swing
-`);
-    const index = ctx.view.choices.findIndex((choice) => choice.id === 'fight:swing:rat') + 1;
-    expect(index).toBeGreaterThan(0);
-    const started = beginLive(ctx, index);
-    expect(formatLive(started.run!.tick(900))).toBe('Swing... [##################--] Health 30/30 Rat 12/12  [time: 0.9s]');
-    expect(formatLive(started.run!.tick(900))).toBe('Swing... [################----] Health 30/30 Rat 6/12  [time: 1.8s]');
+`, 1, true);
+    const started = armed(ctx, 'fight:swing:rat');
+    expect(formatLive(started.live!.tick(900))).toBe('Swing... [##################--] Health 30/30 Rat 12/12  [time: 0.9s]');
+    expect(formatLive(started.live!.tick(900))).toBe('Swing... [################----] Health 30/30 Rat 6/12  [time: 1.8s]');
   });
 
   it('prefers the pools to the countdown when a run has both, so a fight is never narrated as a tally', () => {
@@ -265,13 +268,11 @@ uses: swing
   });
 
   it('prints the stop and the world it left when a run is cancelled', () => {
-    const ctx = driver(LIVE_MODULE);
-    const index = ctx.view.choices.findIndex((choice) => choice.id === 'use:entity.oven.roast') + 1;
-    const started = beginLive(ctx, index);
-    expect(formatResult(started.result)).toEqual([]);
+    const started = armed(driver(LIVE_MODULE, 1, true), 'use:entity.oven.roast');
+    expect(formatResult(started)).toEqual([]);
 
-    started.run!.tick(1000);
-    const lines = formatResult(started.run!.end(true));
+    started.live!.tick(1000);
+    const lines = formatResult(started.live!.end(true));
     expect(lines[0]).toBe('Stopped.');
     expect(lines[lines.length - 1]).toBe('[time: 1s]');
   });
