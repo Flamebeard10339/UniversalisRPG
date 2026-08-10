@@ -133,6 +133,69 @@ describe('the table over an assembled action', () => {
   });
 });
 
+// An action is the verb, shared by everyone who performs it, so a hook on one
+// would fire for every character in the game that swings it. A carrier claims
+// the two labels as fields before an action body can see them; every section
+// that does not reaches one of the two refusals below.
+describe('a hook is carried by a character, not by a verb', () => {
+  const CARRIER = 'write it on the `# entity` or `# item` that carries it';
+
+  it.each([['on hit'], ['when hit']])('refuses %s: written as a field inside an action body', (written) => {
+    expect(refusal(`${written}: drain: 3 health from them`)).toContain(CARRIER);
+  });
+
+  it.each([['on hit'], ['when hit']])('refuses %s: written as the label of an action block, as a section that is no carrier writes one', (written) => {
+    expect(refusal('drain: 3 health from them', written)).toContain(CARRIER);
+    expect(() => actionBody.parse(new Cursor('drain: 3 health from them', 0, 0), written)).toThrow(CARRIER);
+  });
+
+  it.each([['on hit self'], ['on hit them']])('refuses the four-block spelling %s: by name, on both routes', (written) => {
+    expect(refusal(`${written}: drain: 3 health`)).toContain(`${written}: was never implemented`);
+    expect(refusal('drain: 3 health', written)).toContain(`${written}: was never implemented`);
+  });
+});
+
+// The party is a phrase on the result that moves the amount, which costs no
+// nesting and reads as one sentence.
+describe('which party a drain: or restore: moves its amount between', () => {
+  it('reads the phrase where English puts it, and leaves an unmarked result the carrier\'s', () => {
+    expect(parse('drain: 3 health from them\nrestore: 5 rage to me\nrestore: 1 rage').results).toEqual([
+      { kind: 'pool', resource: 'health', delta: { min: -3, max: -3 }, party: 'them' },
+      { kind: 'pool', resource: 'rage', delta: { min: 5, max: 5 }, party: 'me' },
+      { kind: 'pool', resource: 'rage', delta: { min: 1, max: 1 } },
+    ]);
+  });
+
+  it('reads a ranged amount, a wrapper body and a comma list without the phrase swallowing what follows', () => {
+    expect(parse('1 in 4: drain: 2-5 health from them, say: It burns.').results).toEqual([
+      {
+        kind: 'chance',
+        numerator: 1,
+        denominator: 4,
+        results: [
+          { kind: 'pool', resource: 'health', delta: { min: -5, max: -2 }, party: 'them' },
+          { kind: 'say', text: 'It burns.' },
+        ],
+      },
+    ]);
+  });
+
+  it('takes the preposition from the verb rather than from the author, and refuses the wrong one naming the right one', () => {
+    expect(refusal('drain: 3 health to them')).toContain('written `from them` rather than `to them`');
+    expect(refusal('restore: 1 rage from me')).toContain('written `to me` rather than `from me`');
+  });
+
+  it('names both parties when the phrase opens and then names neither', () => {
+    expect(refusal('drain: 3 health from us')).toContain('`from me` for the character this is read off');
+  });
+
+  // Rewound rather than refused: the end-of-line demand describes a typo after
+  // the resource better than a party reader could.
+  it('leaves a word that is not a preposition to the end-of-line demand', () => {
+    expect(refusal('drain: 3 health twice')).toContain('unexpected content after a result');
+  });
+});
+
 describe('credit:', () => {
   it('reads as an ordinary result wrapper, composing with the chance wrappers', () => {
     expect(parse('credit:\n  xp: melee 4-6\n  1 in 3:\n    roll: trinket').results).toEqual([

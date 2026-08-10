@@ -36,8 +36,65 @@ describe('items and tag clauses', () => {
     ]);
   });
 
+  // The counter is the resource's level here; a buff's stack count and a stat
+  // join the same shape rather than growing a second multiplier.
+  it('parses a counter-scaled stat bonus beside the flat and percent forms', () => {
+    const blade = parseOne('# item blade\n+4-7 attack, +2 attack per rage, +10% attack per rage', itemSchema);
+    expect(blade.tags).toEqual([
+      { kind: 'stat-bonus', statId: 'attack', amount: { min: 4, max: 7 }, percent: false },
+      { kind: 'stat-bonus', statId: 'attack', amount: point(2), percent: false, per: 'rage' },
+      { kind: 'stat-bonus', statId: 'attack', amount: 10, percent: true, per: 'rage' },
+    ]);
+  });
+
+  it('resolves the counter as a resource, so a bonus scaled by nothing is a load error', () => {
+    const source = (counter: string) => `# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# item blade\n+2 attack per ${counter}\n`;
+    expect(loadModule(source('rage')).items.get('blade')!.tags).toEqual([{ kind: 'stat-bonus', statId: 'attack', amount: point(2), percent: false, per: 'rage' }]);
+    expect(() => loadModule(source('fury'))).toThrow(/resource/);
+  });
+
   it('rejects a labelled tags: with a message naming it as a bare field, not a tag-clause parse error', () => {
     expect(() => parseOne('# item cooked-shrimp\nexamine: A simple meal.\ntags: food', itemSchema)).toThrow("item field tags must be written bare, without a 'tags:' label");
+  });
+});
+
+// A hook is carried by the same things that carry `+4-7 attack`: an entity's own
+// block and an equipped item. Neither block names a side, an action or a weapon.
+describe('the two carriers of a hook', () => {
+  const DRAIN_THEM = { kind: 'pool', resource: 'health', delta: { min: -2, max: -2 }, party: 'them' };
+
+  it('reads on hit: on an entity as a hook rather than as an action or an on <event>: handler', () => {
+    const berserker = parseOne(
+      ['# entity berserker', 'uses: melee-combat', 'on hit:', '  restore: 1 rage', '  1 in 20:', '    drain: 4 health from them', 'when hit: drain: 2 health from them', 'on death: say: It falls.'].join('\n'),
+      entitySchema,
+    );
+    expect(berserker.onHit).toEqual([
+      { kind: 'pool', resource: 'rage', delta: point(1) },
+      { kind: 'chance', numerator: 1, denominator: 20, results: [{ kind: 'pool', resource: 'health', delta: { min: -4, max: -4 }, party: 'them' }] },
+    ]);
+    expect(berserker.whenHit).toEqual([DRAIN_THEM]);
+    // `on death:` is still the handler it was; `on hit:` no longer joins it as a
+    // handler for an event named "hit", which is what claiming the label costs.
+    expect(berserker.blocks).toEqual([{ label: 'on death', event: 'death', results: [{ kind: 'say', text: 'It falls.' }] }]);
+  });
+
+  it('reads both on an item, whose labelled blocks were actions until now', () => {
+    const blade = parseOne(['# item venomous-blade', 'slot: mainhand', '+4-7 attack', 'on hit: 1 in 4: drain: 3 health from them', 'when hit: drain: 2 health from them', 'swing: say: You swing it.'].join('\n'), itemSchema);
+    expect(blade.onHit).toEqual([{ kind: 'chance', numerator: 1, denominator: 4, results: [{ kind: 'pool', resource: 'health', delta: { min: -3, max: -3 }, party: 'them' }] }]);
+    expect(blade.whenHit).toEqual([DRAIN_THEM]);
+    expect(blade.actions?.map((action) => action.label)).toEqual(['swing']);
+  });
+
+  it('refuses a hook on a section that carries no character modifier', () => {
+    expect(() => parseOne('# location camp\nx: 0, y: 0\non hit: drain: 2 health from them', locationSchema)).toThrow('write it on the `# entity` or `# item` that carries it');
+  });
+
+  it('refuses each defined more than once, the way any field of a section is', () => {
+    expect(() => parseOne('# entity rat\non hit: restore: 1 rage\non hit: restore: 2 rage', entitySchema)).toThrow('entity field on hit is defined more than once');
+  });
+
+  it('names the field an author was one letter from, rather than reading the typo as an action', () => {
+    expect(() => parseOne('# item blade\non hi: restore: 1 rage', itemSchema)).toThrow('unknown item field: on hi, one letter from on hit');
   });
 });
 

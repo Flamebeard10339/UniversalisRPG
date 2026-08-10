@@ -25,6 +25,55 @@ describe('roundTripModule', () => {
     expect(result.printed).toContain('# item bread');
   });
 
+  // Both blocks on both carriers, in one module, because what the round trip
+  // proves is that a hook survives the only form the serializer can print.
+  const CARRIERS = [
+    '# info base',
+    'version: 1.0.0',
+    '',
+    '# stat vigor',
+    'base: 10',
+    '',
+    '# resource rage',
+    'max: vigor',
+    'display: minimal',
+    '',
+    '# item bramble-mail',
+    '+4-7 vigor, +2 vigor per rage',
+    'when hit: drain: 2 rage from them',
+    '',
+    '# entity berserker',
+    'stats: vigor 3',
+    'on hit:',
+    '  restore: 1 rage to me',
+    '  1 in 20:',
+    '    drain: 4 rage from them',
+    'when hit: restore: 1 rage',
+  ].join('\n');
+
+  it('carries both hook blocks, on both carriers, through serialize and reload', () => {
+    const result = roundTripModule(loadModule(CARRIERS), { info }, reloadAlone);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.differences).toEqual([]);
+    expect(result.printed).toContain('drain: 4 base.rage from them');
+    // Unmarked is the carrier's, and `to me` is kept as written rather than
+    // normalized away, so the reload returns the author's words.
+    expect(result.printed).toContain('restore: 1 base.rage to me');
+    expect(result.printed).toContain('restore: 1 base.rage\n');
+    expect(result.printed).toContain('+2 base.vigor per base.rage');
+  });
+
+  it.each([
+    ['  restore: 1 base.rage to me\n', 'entities', 'berserker'],
+    ['when hit:\n  drain: 2 base.rage from them\n', 'items', 'bramble-mail'],
+  ])('reports a hook the reload lost, so dropping one cannot read as clean: %s', (printedForm, where, id) => {
+    const result = roundTripModule(loadModule(CARRIERS), { info }, (printed) => {
+      expect(printed).toContain(printedForm);
+      return reloadAlone(printed.replace(printedForm, ''));
+    });
+    expect(result.differences).toEqual([`  ${where}: changed base.${id}`]);
+  });
+
   it('names what the reloaded registry lost, so a dropped section cannot read as clean', () => {
     const result = roundTripModule(loadModule(BASE), { info }, (printed) => reloadAlone(without(printed, '# item bread')));
     expect(result.differences).toEqual(['  items: missing base.bread']);

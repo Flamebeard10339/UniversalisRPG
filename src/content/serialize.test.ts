@@ -45,6 +45,12 @@ title: Snack
 food, +2 vigor, 30s
 eat: take: 1 snack, say: You eat it.
 
+# item bramble-mail
+title: Bramble Mail
++4-7 vigor, +2 vigor per stamina
+when hit: drain: 2 stamina from them
+polish: say: You buff it.
+
 # action haul
 title: haul
 continuous
@@ -76,6 +82,11 @@ swing:
   continuous
   rate: vigor
   give: 1 ore
+on hit:
+  restore: 1 stamina to me
+  1 in 20:
+    drain: 4 stamina from them
+when hit: restore: 1 stamina
 
 # location camp
 x: 0, y: 0
@@ -161,6 +172,14 @@ describe('serializeRegistryModule', () => {
     expect(printed).toContain('per-level: +2-5');
     expect(printed).toContain('per-level: -3%');
     expect(printed).toContain('use: entity.base.npc.cheer');
+    expect(printed).toContain('+2 base.vigor per base.stamina');
+    expect(printed).toContain('drain: 4 base.stamina from them');
+    // The one carrier whose labelled blocks were all actions until now, so its
+    // hook and its action have to come back as two different things.
+    const mail = roundTrip.items.get('base.bramble-mail');
+    expect(mail?.whenHit).toEqual([{ kind: 'pool', resource: 'base.stamina', delta: { min: -2, max: -2 }, party: 'them' }]);
+    expect(mail?.actions.map((each) => each.label)).toEqual(['polish']);
+    expect(roundTrip.entities.get('base.npc')?.whenHit).toEqual([{ kind: 'pool', resource: 'base.stamina', delta: { min: 1, max: 1 } }]);
     const npcAction = (label: string) => roundTrip.entities.get('base.npc')?.actions.find((each) => each.label === label);
     expect(npcAction('haul')).toMatchObject({ kind: 'continuous', rate: 12 });
     expect(npcAction('cheer')?.onSuccess).toEqual([{ kind: 'say', text: 'Hello.' }]);
