@@ -379,6 +379,20 @@
             "src/ui/FloatingText.tsx"
           ],
           "note": "produced by the-gui-shell-and-the-play-surface for gui-rebuild c10; floating-text-for-xp-events is the first producer that will use it"
+        },
+        {
+          "name": "the GUI shell",
+          "paths": [
+            "src/main.tsx",
+            "src/ui/App.tsx",
+            "src/ui/Home.tsx",
+            "src/ui/TabBar.tsx",
+            "src/ui/ModalSheet.tsx",
+            "src/ui/tabs.ts",
+            "src/ui/transcript.ts",
+            "src/ui/format.ts"
+          ],
+          "note": "produced by the-gui-shell-and-the-play-surface; the chat-log surface, action sheet and five-tab nav the-map-and-character-tabs and the four Settings/Edit records land in"
         }
       ]
     },
