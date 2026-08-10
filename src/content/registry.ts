@@ -18,7 +18,7 @@ import { DslError, Span } from '../grammar/parser';
 import { Namespace } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
 import { registryCapabilities, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
-import { ReferenceKind, Visit, visitAction, visitSection } from './referenceSites';
+import { ReferenceKind, Visit, visitAction, visitResults, visitSection, visitTags } from './referenceSites';
 import { Removal } from './removal';
 import { declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { Resource, resourceSchema } from './resource';
@@ -380,6 +380,13 @@ function pruneActions(actions: Action[], where: string, visit: Visit): Action[] 
   return actions.filter((action) => referencesLoaded(() => visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit)));
 }
 
+// A hook is a result list rather than a labelled block, so a dangling reference
+// inside one costs the whole hook — the verdict pruneBlocks reaches per block.
+function pruneHook(hook: ActionResult[] | undefined, where: string, visit: Visit): ActionResult[] | undefined {
+  if (hook === undefined) return undefined;
+  return referencesLoaded(() => visitResults(hook, where, visit)) ? hook : undefined;
+}
+
 // A handler's event name is a reference the label carries, so a block survives
 // only if what it names survives — the same rule its results already follow.
 function pruneBlocks(blocks: EntityBlock[], where: string, visit: Visit): EntityBlock[] {
@@ -423,23 +430,31 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
       const uses = entity.uses.filter((used) => referencesLoaded(() => visit('action', used, `# entity ${id} uses:`)));
       const faction = entity.faction.filter((named) => referencesLoaded(() => visit('faction', named, `# entity ${id} faction:`)));
       const allies = entity.allies.filter((entry) => referencesLoaded(() => visit('entity', entry.entity, `# entity ${id} allies:`)));
+      const onHit = pruneHook(entity.onHit, `# entity ${id} on hit:`, visit);
+      const whenHit = pruneHook(entity.whenHit, `# entity ${id} when hit:`, visit);
       if (
         Object.keys(stats).length !== Object.keys(entity.stats).length ||
         blocks.length !== entity.blocks.length ||
         uses.length !== entity.uses.length ||
         faction.length !== entity.faction.length ||
-        allies.length !== entity.allies.length
+        allies.length !== entity.allies.length ||
+        onHit !== entity.onHit ||
+        whenHit !== entity.whenHit
       ) {
-        registry.entities.set(id, { ...entity, stats, blocks, uses, faction, allies });
+        registry.entities.set(id, { ...entity, stats, blocks, uses, faction, allies, onHit, whenHit });
         changed = true;
       }
     }
 
     for (const [id, item] of registry.items) {
-      const tags = item.tags.filter((tag) => tag.kind !== 'stat-bonus' || referencesLoaded(() => visit('stat', tag.statId, `# item ${id} tag`)));
+      // Through the shared walk, so a clause that grows a second reference —
+      // `per` did — is pruned by the rule that resolves it rather than by a copy.
+      const tags = item.tags.filter((tag) => referencesLoaded(() => visitTags([tag], `# item ${id}`, visit)));
       const actions = pruneActions(item.actions, `# item ${id}`, visit);
-      if (tags.length !== item.tags.length || actions.length !== item.actions.length) {
-        registry.items.set(id, { ...item, tags, actions });
+      const onHit = pruneHook(item.onHit, `# item ${id} on hit:`, visit);
+      const whenHit = pruneHook(item.whenHit, `# item ${id} when hit:`, visit);
+      if (tags.length !== item.tags.length || actions.length !== item.actions.length || onHit !== item.onHit || whenHit !== item.whenHit) {
+        registry.items.set(id, { ...item, tags, actions, onHit, whenHit });
         changed = true;
       }
     }

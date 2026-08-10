@@ -1,6 +1,7 @@
 import { Action, Sided } from '../grammar/action';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { Condition, isEngineRoot, Reference, VISITS, visitedNode } from '../grammar/condition';
+import { HookCarrier } from '../grammar/hook';
 import { Dialogue, TextSegment } from './dialogue';
 import { Directive } from './test';
 import { Ally, EntityBlock, isHandlerBlock } from './entity';
@@ -80,6 +81,10 @@ function condition(value: Condition | undefined, where: string, visit: Visit): v
   }
 }
 
+export function visitResults(list: ActionResult[] | undefined, where: string, visit: Visit): void {
+  results(list, where, visit);
+}
+
 function results(list: ActionResult[] | undefined, where: string, visit: Visit): void {
   for (const result of list ?? []) {
     // A wrapper's body is an ordinary result list, so every site inside one is
@@ -126,8 +131,20 @@ function results(list: ActionResult[] | undefined, where: string, visit: Visit):
   }
 }
 
-function tags(list: unknown, where: string, visit: Visit): void {
-  for (const tag of listMembers<TagClause>(list)) if (tag.kind === 'stat-bonus') put(tag, 'statId', 'stat', `${where} tag`, visit);
+// A counter is what a `per` names, and this branch's counter is a resource's
+// level. A second source joins by resolving here, not by a second walk.
+export function visitTags(list: unknown, where: string, visit: Visit): void {
+  for (const tag of listMembers<TagClause>(list)) {
+    if (tag.kind !== 'stat-bonus') continue;
+    put(tag, 'statId', 'stat', `${where} tag`, visit);
+    if (tag.per !== undefined) put(tag, 'per', 'resource', `${where} tag per`, visit);
+  }
+}
+
+// The two blocks a character modifier carries, walked wherever one is carried.
+function hooks(carrier: HookCarrier, where: string, visit: Visit): void {
+  results(carrier.onHit, `${where} on hit:`, visit);
+  results(carrier.whenHit, `${where} when hit:`, visit);
 }
 
 // A side marker says which participant a name is read off; the name itself
@@ -148,7 +165,7 @@ function sidedNames(action: Action): { held: Sided; kind: ReferenceKind; written
 
 export function visitAction(action: Action, where: string, visit: Visit): void {
   for (const site of sidedNames(action)) put(site.held, 'id', site.kind, `${where} ${site.written}:`, visit);
-  tags(action.tags, where, visit);
+  visitTags(action.tags, where, visit);
   condition(action.requires, `${where} requires:`, visit);
   condition(action.hiddenIf, `${where} hidden if:`, visit);
   for (const group of [action.results, action.onSuccess, action.onFailure, action.onUnfinished]) results(group, where, visit);
@@ -255,6 +272,7 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       // A block is an action unless its label names an event, which is the one
       // label shape whose name is a reference rather than a title.
       blocks(section.blocks, where, visit);
+      hooks(section as HookCarrier, where, visit);
       return;
     }
     case 'action':
@@ -266,8 +284,9 @@ export function visitSection(kind: string, value: object, where: string, visit: 
     case 'faction':
       return;
     case 'item':
-      tags(section.tags, where, visit);
+      visitTags(section.tags, where, visit);
       actions(section.actions, where, visit);
+      hooks(section as HookCarrier, where, visit);
       return;
     case 'location':
       for (const entry of listMembers<Population>(section.entities)) put(entry, 'entity', 'entity', `${where} entities:`, visit);
