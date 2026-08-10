@@ -7,6 +7,14 @@ An `# action` is the **verb** — what damage is applied, and to which pool, whi
 woodcutting from melee from ranged. An effect is never a verb. Both recorded decisions that rested
 on the action host are overturned by name below.
 
+## Goal
+
+A character can carry an effect that fires when a swing lands, and `archetype-mods` can author
+poison, rage, thorns and accelerated vigor out of what this leaves behind without the runtime
+knowing any of their names. The two blocks, their carriers and the party a result moves between are
+what that costs; a counter-scaled stat bonus rides along because a passive that grants one is the
+same kind of thing as a passive that grants a hook.
+
 ## Deliverable
 
 A hook is a character modifier. It is carried by the same things that carry `+4-7 attack` — an

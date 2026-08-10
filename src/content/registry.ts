@@ -389,9 +389,8 @@ function pruneActions(actions: Action[], where: string, visit: Visit): Action[] 
 
 // A hook is a result list rather than a labelled block, so a dangling reference
 // inside one costs the whole hook — the verdict pruneBlocks reaches per block.
-function pruneHook(hook: ActionResult[] | undefined, where: string, visit: Visit): ActionResult[] | undefined {
-  if (hook === undefined) return undefined;
-  return referencesLoaded(() => visitResults(hook, where, visit)) ? hook : undefined;
+function pruneHook(hook: ActionResult[], where: string, visit: Visit): ActionResult[] {
+  return referencesLoaded(() => visitResults(hook, where, visit)) ? hook : [];
 }
 
 // A handler's event name is a reference the label carries, so a block survives

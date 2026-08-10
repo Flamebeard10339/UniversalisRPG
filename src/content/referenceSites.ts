@@ -1,7 +1,6 @@
 import { Action, Sided } from '../grammar/action';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { Condition, isEngineRoot, Reference, VISITS, visitedNode } from '../grammar/condition';
-import { HookCarrier } from '../grammar/hook';
 import { Dialogue, TextSegment } from './dialogue';
 import { Directive } from './test';
 import { Ally, EntityBlock, isHandlerBlock } from './entity';
@@ -145,7 +144,7 @@ export function visitTags(list: unknown, where: string, visit: Visit): void {
 // Through `listMembers` because a hook is a list field: `+on hit:` in a patch
 // module holds the operations until merge resolves them, and resolution runs
 // first.
-function hooks(carrier: HookCarrier, where: string, visit: Visit): void {
+function hooks(carrier: Loose, where: string, visit: Visit): void {
   results(listMembers<ActionResult>(carrier.onHit), `${where} on hit:`, visit);
   results(listMembers<ActionResult>(carrier.whenHit), `${where} when hit:`, visit);
 }
@@ -275,7 +274,7 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       // A block is an action unless its label names an event, which is the one
       // label shape whose name is a reference rather than a title.
       blocks(section.blocks, where, visit);
-      hooks(section as HookCarrier, where, visit);
+      hooks(section, where, visit);
       return;
     }
     case 'action':
@@ -289,7 +288,7 @@ export function visitSection(kind: string, value: object, where: string, visit: 
     case 'item':
       visitTags(section.tags, where, visit);
       actions(section.actions, where, visit);
-      hooks(section as HookCarrier, where, visit);
+      hooks(section, where, visit);
       return;
     case 'location':
       for (const entry of listMembers<Population>(section.entities)) put(entry, 'entity', 'entity', `${where} entities:`, visit);

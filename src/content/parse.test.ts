@@ -114,6 +114,19 @@ describe('the two carriers of a hook', () => {
     ]);
   });
 
+  // A hook is a result list rather than a labelled block, so what a reference
+  // that went away with an optional module costs is the whole hook — and only
+  // that one.
+  it('drops the hook whose reference went away, and leaves the other standing', () => {
+    const source = {
+      name: 'base',
+      text: ['# info base', 'version: 1.0.0', 'dependencies:', '  ?extra', '', '# stat attack', 'base: 5', '', '# resource rage', 'max: attack', 'display: minimal', '', '# entity rat', 'on hit: roll: extra.spoils', 'when hit: restore: 1 rage'].join('\n'),
+    };
+    const rat = loadUniverse([source]).entities.get('base.rat')!;
+    expect(rat.onHit).toEqual([]);
+    expect(rat.whenHit).toEqual([{ kind: 'pool', resource: 'base.rage', delta: point(1) }]);
+  });
+
   // An entity answers an event by writing `on <its name>:`, and one of those
   // labels is now a hook. Refused where the name is bound.
   it('refuses an event whose name only a hook block could answer', () => {
@@ -245,9 +258,20 @@ describe('parser guards', () => {
 
   // Both halves used to load with the block dropped and nothing said, which is
   // what the result readers each carry their own copy of this rule to prevent.
-  it('rejects a field written inline and as a block, rather than keeping the inline half', () => {
+  it('rejects a key written inline and as a block, rather than keeping the inline half', () => {
     expect(() => parseOne('# entity rat\nstats: vigor 3\n  attack 4', entitySchema)).toThrow('entity field stats is written inline and as a block; give it one');
     expect(() => parseOne('# item blade\non hit: restore: 1 rage\n  restore: 5 rage', itemSchema)).toThrow('item field on hit is written inline and as a block; give it one');
+    // The labelled-block route, two lines down from the declared-field one and
+    // the same silence.
+    expect(() => parseOne('# entity rat\nswing: say: a\n  say: b', entitySchema)).toThrow('entity swing: is written inline and as a block; give it one');
+  });
+
+  // The block hangs off the whole line, so only the key that ends the line could
+  // have taken it. Asking `is anything left on this line` instead refuses a
+  // comma list whose last key is the one with the block.
+  it('leaves a comma line whose last key takes the block alone', () => {
+    const camp = parseOne('# location camp\ny: 0, x: 1, adjacent:\n  grove', locationSchema);
+    expect(camp).toMatchObject({ x: 1, y: 0, adjacent: [{ target: 'grove' }] });
   });
 
   it('rejects a field defined twice', () => {

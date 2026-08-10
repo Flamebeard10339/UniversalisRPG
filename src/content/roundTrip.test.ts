@@ -202,6 +202,19 @@ describe('roundTripUniverse', () => {
     expect(result.sources.find((source) => source.name === 'base')?.text).toContain('Toast');
   });
 
+  // The serializer prints neither an absent hook nor an emptied one, so a reload
+  // can return only one of them. They are one value — empty — and this is what
+  // says so: a patch that removes a base entity's only hook result round-trips.
+  it('carries a hook a patch module emptied', () => {
+    const base = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# stat vigor\nbase: 10\n\n# resource rage\nmax: vigor\ndisplay: minimal\n\n# entity rat\nstats: vigor 3\non hit: restore: 1 rage\nwhen hit: restore: 2 rage\n' };
+    const patch = { name: 'patch', text: '# info patch\nversion: 1.0.0\ndependencies:\n  base\n\n# entity base.rat\n-on hit: restore: 1 base.rage\n-when hit: restore: 2 base.rage\n' };
+    const loaded = loadUniverseWithDiagnostics([base, patch]);
+    expect(loaded.registry.entities.get('base.rat')).toMatchObject({ onHit: [], whenHit: [] });
+    const result = trip([base, patch]);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.differences).toEqual([]);
+  });
+
   it('still reports a real loss, so the reframing did not make it blind', () => {
     const loaded = loadUniverseWithDiagnostics([BASE_TWO]);
     const result = roundTripUniverse(loaded.registry, parseUniverse([BASE_TWO]), reloading((printed) => printed.map((source) => ({ ...source, text: source.text.split('\n\n').filter((section) => !section.startsWith('# item rope')).join('\n\n') }))));

@@ -5,16 +5,18 @@ import { Field } from './section';
 // Neither names a side, an action or a weapon: a carrier with two ways to swing
 // writes one `on hit:` for both.
 export interface HookCarrier {
-  onHit?: ActionResult[];
-  whenHit?: ActionResult[];
+  onHit: ActionResult[];
+  whenHit: ActionResult[];
 }
 
 // The pair as section fields, spread into the schema of every kind that carries
 // a character modifier, so a new carrier joins by spreading this rather than by
-// growing a second spelling of the same two blocks.
-export const HOOK_FIELDS: { [K in keyof Required<HookCarrier>]: Field<ActionResult[] | undefined, unknown> } = {
-  onHit: { parser: hookResultList, keyword: 'on hit' },
-  whenHit: { parser: hookResultList, keyword: 'when hit' },
+// growing a second spelling of the same two blocks. Empty rather than absent,
+// because the serializer prints neither and a reload could only return one of
+// them — a hook a patch module emptied would not survive its own round trip.
+export const HOOK_FIELDS: { [K in keyof HookCarrier]: Field<ActionResult[], unknown> } = {
+  onHit: { parser: hookResultList, keyword: 'on hit', default: () => [] },
+  whenHit: { parser: hookResultList, keyword: 'when hit', default: () => [] },
 };
 
 export const HOOK_LABELS: readonly string[] = Object.values(HOOK_FIELDS).map((field) => field.keyword!);

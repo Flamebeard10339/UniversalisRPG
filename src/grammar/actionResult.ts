@@ -318,7 +318,10 @@ function firstParty(results: readonly ActionResult[]): Extract<ActionResult, { k
 function refuseParty(results: ActionResult[], span: Span): ActionResult[] {
   const found = firstParty(results);
   if (found === undefined) return results;
-  throw new DslError(`\`${found.delta.max < 0 ? 'from' : 'to'} ${found.party}\` names one of two parties, so it reads only inside \`on hit:\` or \`when hit:\`, where the moment identifies the other`, span);
+  throw new DslError(
+    `\`${found.delta.max < 0 ? 'from' : 'to'} ${found.party}\` names one of two parties, so it reads only inside \`on hit:\` or \`when hit:\` — a list reached from anywhere else, a \`# droptable\` a hook rolls among them, has one actor and no other to name`,
+    span,
+  );
 }
 
 export const parseResultLine = (line: RawLine): ActionResult[] => refuseParty(readResultLine(line), line.span);

@@ -222,6 +222,9 @@ describe('which party a drain: or restore: moves its amount between', () => {
   it('refuses the phrase in a result list that is not a hook, at any depth', () => {
     expect(refusal('drain: 3 health from them')).toContain('reads only inside `on hit:` or `when hit:`');
     expect(refusal('on success:\n  1 in 4:\n    restore: 2 rage to me')).toContain('reads only inside `on hit:` or `when hit:`');
+    // The inline route into a result group, which is a second reader and not a
+    // second rule: `on success: <results>` never reaches the per-line one.
+    expect(refusal('on success: drain: 3 health from them')).toContain('reads only inside `on hit:` or `when hit:`');
     // Unmarked is untouched by the rule: it names no party to be wrong about.
     expect(parse('drain: 3 health').results).toEqual([{ kind: 'pool', resource: 'health', delta: { min: -3, max: -3 } }]);
   });
