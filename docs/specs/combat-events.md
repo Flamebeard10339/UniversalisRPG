@@ -19,22 +19,23 @@ the one who landed it or the one it landed on:
 # item venomous-blade
 slot: mainhand
 +4-7 attack
-on hit: 1 in 4: them: drain: 3 health
+on hit: 1 in 4: drain: 3 health from them
 
 # item bramble-mail
 slot: body
-when hit: them: drain: 2 health
+when hit: drain: 2 health from them
 ```
 
 Everything in a hook is read from the character carrying it. `on hit:` is *I landed one*, `when hit:`
-is *one landed on me*, and an unmarked result lands on me — the carrier is the perspective, which is
-what makes the block readable off the page you are already looking at. `them:` is the one marked
-exception, for the results that must reach the other party.
+is *one landed on me*, and the party a result moves something between is written where English puts
+it — `from them`, `to me` — rather than as a level of nesting above it. An unmarked result is mine,
+because the carrier is the perspective, which is what makes the block readable off the page you are
+already looking at.
 
-Those are one line each because every wrapper in this language already takes an inline body and they
-chain, which `on death: 1 in 4: credit: drain: 3 health` parses today. A hook block and `them:` are
-both ordinary members of that grammar and inherit it; neither needs an inline spelling of its own.
-The multi-result form indents the same way anything else does:
+Each of those is one line because every wrapper in this language already takes an inline body and
+wrappers chain, which `on death: 1 in 4: credit: drain: 3 health` parses today. A hook block inherits
+that; it needs no inline spelling of its own. The multi-result form indents the same way anything
+else does:
 
 ```
 # entity berserker
@@ -44,7 +45,7 @@ uses: melee-combat
 on hit:
   restore: 1 rage
   1 in 20:
-    them: drain: 4 health
+    drain: 4 health from them
 ```
 
 `# entity` and `# item` are the two carriers that exist. The same two blocks on `# passive`, which
@@ -78,11 +79,13 @@ Proof:
   performs it, so a hook on `melee-combat` would fire for every entity in the game that swings. The
   error names the carrier to write it on instead, and `on hit self:` and `on hit them:` are refused
   by name beside it.
-- [c4] Results land on the carrier unless marked, and `them:` is the one marker. It applies its
-  results to the other party the moment identifies — the struck party under `on hit:`, the swinger
-  under `when hit:`, the killer in an `on death:` handler. It is the shipped `credit:` renamed and
-  widened to the whole of what it always meant: `credit:` named an intent where the rest of the
-  grammar names a side, and one word for "the other party" is what stops the language having two.
+- [c4] A result that moves something between two parties says which one, in the place English puts
+  it. `drain:` and `restore:` take a trailing `from them` / `from me` / `to them` / `to me`, so
+  `drain: 3 health from them` is one sentence and one line. The preposition follows the verb and is
+  not a choice — `drain … from`, `restore … to` — and the wrong one is refused naming the right one.
+  Unmarked is mine: `restore: 1 rage` on a carrier restores that carrier's. `me` is always the
+  carrying character and `them` the other party the moment identifies, in both blocks, which is what
+  makes one rule serve `on hit:` and `when hit:` alike.
 - [c5] A hook body is an ordinary result list, so it inherits `droptables`' selectors unchanged and
   this branch adds no chance mechanism of its own. A 5%-on-hit effect is `1 in 20:` wrapping the
   body, a gear-scaled one is `<stat> vs <stat>:`, and a state-gated one is `if <condition>:`. The
@@ -90,8 +93,8 @@ Proof:
 - [c6] Hooks fire on a landed swing only. A swing that misses fires neither block, and no moment
   that is not a resolved two-sided swing fires either.
 - [c7] Firing never recurses. Only a resolved swing fires a hook, and a pool change produced by a
-  hook's results is not a swing, so two characters that each carry a `when hit:` that damages
-  `them:` terminate by construction rather than by a depth counter.
+  hook's results is not a swing, so two characters that each carry a `when hit:` draining
+  `from them` terminate by construction rather than by a depth counter.
 - [c8] Firing order within one swing is fixed and stated: damage is applied, the swing is logged,
   then the swinging character's `on hit:`, then the struck character's `when hit:` — and within each
   character, its carriers in the order the gather returns them, which is the order `statRange`
@@ -120,7 +123,7 @@ What this branch owes, named. Each is a strategy the runtime implements and the 
 | --- | --- |
 | `on hit:` | results fired when a two-sided swing by the carrying character lands |
 | `when hit:` | results fired when a two-sided swing lands on the carrying character |
-| `them:` | result wrapper: apply to the other party this moment identifies. Renames `credit:` |
+| `from them` / `to me` | which party a `drain:` or `restore:` moves its amount between; unmarked is me |
 | `+N <stat> per <counter>` | a stat bonus whose size reads a counter; a resource's level here |
 
 Carried by an `# entity` block or an equipped `# item`, gathered by the same walk that folds a stat
@@ -134,10 +137,10 @@ is ordered behind `buffs-generalized`, which owns the timed-modifier and stackin
 
 | fixture | what it needs | whose |
 | --- | --- | --- |
-| poison | `on hit: them:` and a timed debuff on the struck character | here, then `buffs-generalized` |
+| poison | `on hit:` and a timed debuff on the struck character | here, then `buffs-generalized` |
 | rage | a resource with a constant drain, `on hit:` restoring it, `+N <stat> per rage` | here |
 | accelerated vigor | `1 in 20:` inside `on hit:`, a stacking buff, `+N% <stat> per stack` | here, then `buffs-generalized` |
-| thorns | `when hit: them: drain: N health` on the carrier | here |
+| thorns | `when hit: drain: N health from them` on the carrier | here |
 
 Rage and accelerated vigor are both kept because they are not the same mechanism wearing two names:
 a resource has a ceiling and a rate that regeneration can push against, and a stack count has
@@ -170,21 +173,28 @@ a counter-scaled bonus are both things a passive or an item grants a character.
   consume never arrived — `skill-levels-xp-events` shipped the curve alone and left the closed set
   to `xp-from-events` — and the `# event` that did ship binds a name to a pool crossing a threshold,
   which a landed swing is not. `# event` and `on empty:` are untouched here.
-- **`credit:` becomes `them:`.** One word for the other party, and the filed finding
-  `credit-names-an-intent-where-the-grammar-elsewhere-names-a-s` is closed by this branch rather than
-  left standing. `credit:` was named for the one moment it served — rewards to a killer — and the
-  same wrapper now carries poison to a target and thorns to an attacker, where "credit" reads as the
-  opposite of what happens. No shipped content uses the word; four test fixtures do.
-- **`them:` gets no inline spelling of its own, because it already has one.** `wrapperBody` reads an
-  inline body wherever a wrapper is written, and wrappers chain, so `when hit: them: drain: 2 health`
-  is one line with nothing added. A prefix form on the pool name — `drain: 3 their health`, matching
-  `depletes: their health` — was considered and lost: it is shorter still, but it reaches only the
-  results that name a pool, so `xp:`, `give:` and `roll:` would keep the wrapper and the language
-  would carry two ways to say one thing. One spelling that fits on a line beats two that fit better.
-- **An unmarked result lands on the carrier.** Neither default covers every fixture: rage restores
-  the carrier's pool and poison drains the target's, both under `on hit:`. Defaulting to the carrier
-  is what "read from the character with the effect" means, and it puts the marker on the sentence
-  that reaches outside the block rather than on the one that does not.
+- **`credit:` is untouched, and the wrapper idea is dropped.** An earlier pass of this re-plan made
+  the redirect a result wrapper — `them:` — renamed from `credit:` and widened. That is a level of
+  nesting for one word: `on hit: 1 in 4: them: drain: 3 health` is four colons deep and reads as
+  structure rather than as a sentence. Putting the party on the result that moves the amount costs
+  no nesting and reads as English. `credit:` keeps its own job — moving a whole body of rewards to a
+  killer, including `roll:`, which names a table rather than anything with a side — and the finding
+  `credit-names-an-intent-where-the-grammar-elsewhere-names-a-s` stays open rather than being closed
+  here. Whoever retires it will do so by giving `xp:`, `give:` and `roll:` the same trailing phrase,
+  which is a change this branch's fixtures do not need and should not pay for.
+- **The party is a phrase on the result, not a marker on the pool name.** `drain: 3 their health`
+  was the other candidate, matching `depletes: their health` on an action exactly. It loses on
+  reading: `depletes: their health` names a pool and `drain: 3 health from them` moves an amount,
+  and English puts the party after the thing moved. `from them` also extends to `give:`, `take:` and
+  `xp:` unchanged, where a marker glued to a pool name would not reach `roll:` at all.
+- **The suffix is on `drain:` and `restore:` and no further.** They are what this branch's fixtures
+  move — poison and thorns take from the other party, rage restores the carrier's own. `give:`,
+  `take:` and `xp:` have the same shape available and no fixture here needs one, so they do not get
+  it now; adding a phrase nothing writes is how a grammar grows forms nobody can find.
+- **An unmarked result is the carrier's.** Neither default covers every fixture: rage restores the
+  carrier's pool and poison drains the target's, both under `on hit:`. Defaulting to the carrier is
+  what "read from the character with the effect" means, and it puts the phrase on the sentence that
+  reaches outside the block rather than on the one that does not.
 - **The load error survives, with a different subject.** It was "a hook on an action that cannot
   swing"; it is now "a hook on an action at all". `isTwoSided` is not the test and neither is
   `resolvesPerAttempt` — the rule is that an action is not a carrier, and it is enforced where an
@@ -192,7 +202,7 @@ a counter-scaled bonus are both things a passive or an item grants a character.
 - **Depletion is restated over characters, not over retaliations.** The earlier clause was written
   as "the way a retaliation that empties a pool already does"; `retaliates` is deleted and
   retaliation is unconditional. A hook can empty the pool of a character that was not struck — a
-  `when hit:` that drains `them:` is exactly that — so the verdict is taken over every actor the
+  `when hit:` draining `from them` is exactly that — so the verdict is taken over every actor the
   swing's effects reached.
 - **This branch ships no content.** Every fixture belongs to `archetype-mods`, and a hook can be
   proven end to end from an inline fixture in a runtime test, which is what the shipped combat tests
