@@ -142,6 +142,8 @@
       "paths": [
         "src/runtime/actions.ts",
         "src/runtime/cadence.test.ts",
+        "src/runtime/command.test.ts",
+        "src/runtime/command.ts",
         "src/runtime/conditions.ts",
         "src/runtime/contest.test.ts",
         "src/runtime/dialogue-runtime.ts",
@@ -243,6 +245,13 @@
             "src/runtime/stats.ts"
           ],
           "note": "produced by skill-levels-xp-events"
+        },
+        {
+          "name": "the play command surface",
+          "paths": [
+            "src/runtime/command.ts"
+          ],
+          "note": "produced by the-command-set-lives-below-the-ui-layer"
         }
       ]
     },
