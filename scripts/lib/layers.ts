@@ -18,14 +18,12 @@ export const ROOTS: Record<Layer, readonly string[]> = {
 // What the sweep enumerates, as against what the roots claim. A file is in the
 // stack's world by being a module under one of these, and the roots then decide
 // which layer it is; the two being separate is what lets a file belong to no
-// root and still be seen. Every root lies under one of these, which is a test
-// rather than a rule anyone has to remember.
+// root and still be seen.
 export const SOURCE_TREES: readonly string[] = ['src', 'scripts'];
 
-// What the loader would treat as a module. Wider than the tree currently holds:
-// a `.js` module dropped into `src/` is source that imports, and a sweep that
-// reads only what is there today is a sweep that stops being a partition the
-// first time someone adds a file.
+// What the loader would treat as a module — deliberately wider than the tree
+// currently holds, since a sweep that knows only the extensions already present
+// stops being a partition the first time someone adds a file.
 export const MODULE_EXTENSIONS: readonly string[] = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
 
 // Swept modules deliberately not part of the layered stack, each against the
@@ -50,11 +48,9 @@ const withoutExtension = (path: string): string => {
   return extension === undefined ? path : path.slice(0, -extension.length);
 };
 
-// A root naming a file claims that file and no more. Both spellings of it
-// resolve, because `tsconfig.json` sets no `allowImportingTsExtensions` and so
-// `../main` is the only spelling a source file can write for `src/main.tsx` —
-// but the extensionless form is a name, not a directory prefix, and treating it
-// as one would let a whole `src/main/` tree inherit a layer it never declared.
+// Both spellings of a file root resolve, because `tsconfig.json` sets no
+// `allowImportingTsExtensions`: `../main` is the only spelling a source file can
+// write for `src/main.tsx`. The extensionless form is a name, not a prefix.
 const namesFile = (root: string): boolean => MODULE_EXTENSIONS.some((extension) => root.endsWith(extension));
 const claims = (root: string, file: string): boolean => (namesFile(root) ? withoutExtension(root) === withoutExtension(file) : covers(root, file));
 
@@ -72,18 +68,13 @@ export function importedPaths(fromFile: string, source: string): string[] {
 }
 
 // Which of the repository's files the layer rule owes an answer about. Drawn
-// from the tracked set rather than from a walk of its own, so that the rule and
-// `audit-status` — the partition c7 is modelled on — disagree about no file.
-// Tracked *and* present, for the reason `repoSourceTree` gives: the index still
-// lists a file deleted or renamed in the working tree, and a rule that reads
-// what is not there dies on an ordinary intermediate state instead of reporting.
+// from the tracked set rather than from a walk of its own, so that this rule and
+// `audit-status` disagree about no file — and tracked *and* present, because the
+// index still lists one deleted or renamed in the working tree.
 export function sweptFiles(tracked: readonly string[], exists: (file: string) => boolean = existsSync): string[] {
   return tracked.map(posix).filter((file) => SOURCE_TREES.some((tree) => covers(tree, file)) && MODULE_EXTENSIONS.some((extension) => file.endsWith(extension)) && exists(file));
 }
 
-// Swept modules belonging to no layer and declared outside none: the file the
-// layer rule reads in neither direction, and cannot report on because it never
-// visited it.
 export function unlayeredFiles(files: readonly string[], outside: Readonly<Record<string, string>> = OUTSIDE_STACK): string[] {
   return files.map(posix).filter((file) => layerOf(file) === null && outside[file] === undefined);
 }
@@ -94,9 +85,8 @@ export interface Violation {
 }
 
 export interface LayerReport {
-  // Files actually opened, which is fewer than were swept whenever one of them
-  // belongs to no layer: a claim of what was read has to be the count of what
-  // was read, or the run reports coverage it did not have.
+  // Files opened, which is fewer than were swept whenever one belongs to no
+  // layer — a count of the sweep would report coverage the run did not have.
   read: number;
   edges: number;
   violations: Violation[];
@@ -129,17 +119,12 @@ export interface LayerCheckOutput {
   exitCode: number;
 }
 
-// What the run says and what it exits with, decided here rather than in the
-// runner: the three things c7 promises — that every module was read, that an
-// unplaced one fails the run, and that it is named — are only assertable where
-// a test can reach them, and above this there is nothing left but the console.
+// What the run says and what it exits with. Above this there is nothing left
+// but the console, which is what makes the exit code assertable.
 export function layerCheckOutput(files: readonly string[], report: LayerReport): LayerCheckOutput {
   const out = [`${files.length} module(s) swept under ${SOURCE_TREES.join(' and ')}, ${report.read} read; ${report.edges} cross-file imports checked across ${LAYERS.length} layers (${LAYERS.join(' < ')}).`];
   const err: string[] = [];
 
-  // A sweep that found nothing is a broken sweep, not a clean tree, and the two
-  // are otherwise the same green run — which is the whole failure mode a
-  // partition assertion exists to prevent.
   if (files.length === 0) err.push('\nThe sweep found no modules at all. That is a broken enumeration, not a clean tree: this repository has source under every declared tree.');
 
   if (report.violations.length > 0) {
@@ -165,8 +150,7 @@ export interface LayerCheckEffects {
 }
 
 // The composition, here rather than in the runner: which enumeration feeds the
-// sweep is a decision, and left above this it was four lines no test could
-// reach — an empty sweep and a discarded exit code both survived the suite.
+// sweep is a decision, and a decision above this line is one no test can reach.
 export function runLayerCheck(effects: LayerCheckEffects = { tracked: trackedFiles, exists: existsSync, read: (file) => readFileSync(file, 'utf8') }): LayerCheckOutput {
   const files = sweptFiles(effects.tracked(), effects.exists);
   return layerCheckOutput(files, checkLayers(files, effects.read));

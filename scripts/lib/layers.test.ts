@@ -190,6 +190,17 @@ describe('runLayerCheck', () => {
     expect(exitCode).toBe(1);
     expect(err).toContain('  src/grammar/a.ts -> scripts/c');
   });
+
+  // Called with no argument, which every case above replaces: the effects it
+  // reaches for on its own are the ones the gate actually runs on.
+  it('reaches this repository through its own effects, and finds the tree there', () => {
+    const { out, exitCode } = runLayerCheck();
+    const [, sweptCount, readCount, edgeCount] = /^(\d+) module\(s\) swept under src and scripts, (\d+) read; (\d+) cross-file/.exec(out[0]) ?? [];
+    expect(exitCode).toBe(0);
+    expect(Number(sweptCount)).toBe(swept.length);
+    expect(Number(readCount)).toBe(swept.length - Object.keys(OUTSIDE_STACK).length);
+    expect(Number(edgeCount)).toBeGreaterThan(500);
+  });
 });
 
 describe('MODULE_EXTENSIONS', () => {
