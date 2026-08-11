@@ -78,10 +78,15 @@ function whatStoppingSays(): string[] {
 const NAV = /<nav[\s\S]*?<\/nav>/g;
 const asking = (html: string): boolean => html.includes('role="dialog"');
 
-// The map's rows, each as its own runs. <li> is drawn nowhere else under
-// src/ui, so this is the map's markup and not the screen's.
-function places(html: string): string[][] {
-  return [...html.matchAll(/<li[\s\S]*?<\/li>/g)].map(([row]) => readable(row));
+// The map's nodes, each as the place it stands for and the runs inside it.
+// data-place is written by MapPane and nothing else, so this reads the map's
+// own markup rather than guessing at it from class names.
+function places(html: string): Array<{ id: string; runs: string[]; disabled: boolean }> {
+  return [...html.matchAll(/<button([^>]*data-place="([^"]*)"[^>]*)>([\s\S]*?)<\/button>/g)].map(([, attributes, id, inner]) => ({
+    id,
+    runs: readable(inner),
+    disabled: attributes.includes('disabled'),
+  }));
 }
 
 function position(driver: Driver, choiceId: string): number {
@@ -184,26 +189,40 @@ describe('what the shell puts on the screen', () => {
     for (const choice of driver.snapshot().view!.choices) expect(runs).toContain(choice.label);
   });
 
-  it('draws the discovered places and how they connect, on the layer the map is', () => {
+  it('draws the discovered places where they are, with the roads between them', () => {
     const driver = createDriver([SURVEYED]);
     driver.choose(position(driver, LOOK_OUT));
     const found = driver.snapshot().view!.discovered;
-    const named = (id: string): string => found.find((place) => place.id === id)!.title;
 
-    const drawn = places(renderToStaticMarkup(<App driver={driver} />));
+    const html = renderToStaticMarkup(<App driver={driver} />);
+    const drawn = places(html);
 
-    // Row by row rather than anywhere on the screen: every one of these titles
-    // is also on Home's transcript or in the location banner, so a map drawing
-    // nothing at all would pass a check that only asks whether the words are
-    // somewhere.
+    // By node rather than by words on the screen: every one of these titles is
+    // also on Home's transcript or in the location banner, so a map drawing
+    // nothing would pass a check that only asks whether the words are somewhere.
     expect(found.map((place) => place.id).sort()).toEqual(['surveyed.overlook', 'surveyed.workshop']);
-    expect(drawn).toHaveLength(found.length);
     for (const place of found) {
-      const row = drawn.find((runs) => runs[0] === place.title);
-      expect(row, `${place.title} has no row of its own on the map`).toBeDefined();
-      expect(place.adjacent.length).toBeGreaterThan(0);
-      for (const target of place.adjacent) expect(row).toContain(named(target));
+      const node = drawn.find((entry) => entry.id === place.id);
+      expect(node, `${place.title} has no node on the map`).toBeDefined();
+      expect(node!.runs).toContain(place.title);
     }
+    // The road between them, drawn once for the pair rather than once per end.
+    expect(html.match(/<line/g) ?? []).toHaveLength(1);
+  });
+
+  it('sets off for a place when it is tapped, through the choice the engine published', () => {
+    const driver = createDriver([SURVEYED]);
+    driver.choose(position(driver, LOOK_OUT));
+    const html = renderToStaticMarkup(<App driver={driver} />);
+
+    const overlook = places(html).find((entry) => entry.id === 'surveyed.overlook')!;
+    const workshop = places(html).find((entry) => entry.id === 'surveyed.workshop')!;
+
+    // The one the engine is offering a way to is the one that can be tapped;
+    // the one the player is already standing in is not.
+    expect(driver.snapshot().view!.choices.some((choice) => choice.id === 'travel:surveyed.overlook')).toBe(true);
+    expect(overlook.disabled).toBe(false);
+    expect(workshop.disabled).toBe(true);
   });
 
   it('draws what the player is carrying, and what they are made of, on the sheet', () => {

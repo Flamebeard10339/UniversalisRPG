@@ -422,7 +422,7 @@
             "src/ui/Ledger.tsx",
             "src/ui/sheet.ts"
           ],
-          "note": "produced by the-map-and-character-tabs for gui-rebuild c7: the discovered places read outward from where the player stands with the roads between them, and the four published dictionaries as rows. Both read the play surface only, and the-view-publishes-the-map-a-driver-draws is what put the titles and the adjacency there"
+          "note": "produced by the-map-and-character-tabs for gui-rebuild c7 and rebuilt by the-map-draws-the-world-where-it-is: the discovered places drawn where they are, one z-plane at a time with whatever is adjacent to the player off it, panned within its own bounds, tapped to set off; and the four published dictionaries as rows. Both read the play surface only. the-view-publishes-the-map-a-driver-draws put the titles and the adjacency on the view, and the-view-publishes-where-a-place-is-and-whether-its-roads-ar put the coordinates, the passability and leadsTo there"
         },
         {
           "name": "the GUI's real-time clock",

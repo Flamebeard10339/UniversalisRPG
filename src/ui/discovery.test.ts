@@ -1,64 +1,175 @@
 import { describe, expect, it } from 'vitest';
-import { mapRows, newlyFound, type Place } from './discovery';
+import type { PlayView } from '../runtime/session';
+import { bounds, clampPan, CLIMB_NUDGE, drawnAt, newlyFound, sheetAt, waysOut, type Place } from './discovery';
 
-const place = (id: string, ...adjacent: string[]): Place => ({ id, title: id.toUpperCase(), adjacent });
+const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
+  id,
+  title: id.toUpperCase(),
+  x,
+  y,
+  z,
+  adjacent: adjacent.map((to) => ({ to, open: true })),
+});
 
-// Deliberately not in walking order, so a test that passes by luck of the
-// registry's ordering fails here.
-const KNOWN: Place[] = [place('shore', 'camp'), place('summit', 'ridge'), place('camp', 'shore', 'ridge'), place('ridge', 'camp', 'summit')];
+// A house with a floor above and a cellar below, both stacked on the same x and
+// y as the hall, and a beach one unit east of it.
+const HOUSE: Place[] = [
+  place('hall', 0, 0, 0, 'landing', 'cellar', 'beach'),
+  place('landing', 0, 0, 1, 'hall'),
+  place('cellar', 0, 0, -1, 'hall'),
+  place('beach', 1, 0, 0, 'hall'),
+  place('cove', 2, 0, 0, 'beach'),
+];
 
-describe('the map, read outward from where the player is', () => {
-  it('puts where the player is standing first', () => {
-    expect(mapRows(KNOWN, 'camp')[0].place.id).toBe('camp');
-    expect(mapRows(KNOWN, 'camp')[0].here).toBe(true);
+describe('one plane of the map', () => {
+  it('draws what stands on the plane being looked at', () => {
+    const ids = sheetAt(HOUSE, 'hall', 0).nodes.map((node) => node.place.id);
+
+    expect(ids).toContain('hall');
+    expect(ids).toContain('beach');
+    expect(ids).toContain('cove');
   });
 
-  it('orders by how many roads away, not by how the registry happened to list them', () => {
-    expect(mapRows(KNOWN, 'shore').map((row) => row.place.id)).toEqual(['shore', 'camp', 'ridge', 'summit']);
-    expect(mapRows(KNOWN, 'shore').map((row) => row.distance)).toEqual([0, 1, 2, 3]);
+  it('draws a place off the plane only when the player could step to it from here', () => {
+    // Both are at z 1: the landing is adjacent to the hall and the attic is not.
+    const withAttic = [...HOUSE, place('attic', 5, 5, 1, 'landing')];
+
+    const ids = sheetAt(withAttic, 'hall', 0).nodes.map((node) => node.place.id);
+
+    expect(ids).toContain('landing');
+    expect(ids).toContain('cellar');
+    expect(ids).not.toContain('attic');
   });
 
-  it('keeps a place no road reaches, at the end, rather than dropping it', () => {
-    const stranded = [...KNOWN, place('vault')];
+  it('keeps the player on the map even when they are standing off the plane', () => {
+    const sheet = sheetAt(HOUSE, 'cellar', 0);
 
-    const rows = mapRows(stranded, 'camp');
-
-    expect(rows.map((row) => row.place.id)).toContain('vault');
-    expect(rows[rows.length - 1].place.id).toBe('vault');
-    expect(rows[rows.length - 1].distance).toBeNull();
+    expect(sheet.nodes.filter((node) => node.here).map((node) => node.place.id)).toEqual(['cellar']);
   });
 
-  it('draws every discovered place even when the player is somewhere it has never heard of', () => {
-    const rows = mapRows(KNOWN, 'nowhere');
+  it('nudges a place off the plane so it is not drawn under the stairs down to it', () => {
+    const sheet = sheetAt(HOUSE, 'hall', 0);
+    const at = (id: string): { x: number; y: number } => sheet.nodes.find((node) => node.place.id === id)!.at;
 
-    expect(rows.map((row) => row.place.id).sort()).toEqual(['camp', 'ridge', 'shore', 'summit']);
-    expect(rows.every((row) => row.distance === null)).toBe(true);
-    expect(rows.some((row) => row.here)).toBe(false);
+    // All three are authored at (0, 0), which is why the hall would otherwise
+    // have two places hidden underneath it.
+    expect(at('hall')).toEqual({ x: 0, y: 0 });
+    expect(at('landing')).toEqual({ x: CLIMB_NUDGE, y: -CLIMB_NUDGE });
+    expect(at('cellar')).toEqual({ x: -CLIMB_NUDGE, y: CLIMB_NUDGE });
   });
 
-  it('marks exactly one place as the one the player is in', () => {
-    expect(mapRows(KNOWN, 'ridge').filter((row) => row.here)).toHaveLength(1);
+  it('says how far off the plane each place is, so height can be read as well as drawn', () => {
+    const climbs = Object.fromEntries(sheetAt(HOUSE, 'hall', 0).nodes.map((node) => [node.place.id, node.climb]));
+
+    expect(climbs).toMatchObject({ hall: 0, landing: 1, cellar: -1, beach: 0 });
   });
 
-  it('has nothing to draw before anything has been found', () => {
-    expect(mapRows([], 'camp')).toEqual([]);
+  it('offers every plane the world has, in order, however the places were listed', () => {
+    expect(sheetAt(HOUSE, 'hall', 0).planes).toEqual([-1, 0, 1]);
+  });
+
+  it('draws a road once even though both ends name each other', () => {
+    const roads = sheetAt(HOUSE, 'hall', 0).roads.map((road) => [road.from.place.id, road.to.place.id].sort().join('-'));
+
+    expect(roads.filter((road) => road === 'beach-hall')).toHaveLength(1);
+  });
+
+  it('draws a one-way road, which no second end will draw for it', () => {
+    const oneWay = [place('cliff', 0, 0, 0, 'ledge'), place('ledge', 1, 0, 0)];
+
+    expect(sheetAt(oneWay, 'cliff', 0).roads).toHaveLength(1);
+  });
+
+  it('leaves out a road to somewhere this plane is not drawing', () => {
+    const roads = sheetAt(HOUSE, 'beach', 0).roads.flatMap((road) => [road.from.place.id, road.to.place.id]);
+
+    // Standing on the beach, the landing and cellar are two rooms away and off
+    // the plane, so neither they nor the roads to them are drawn.
+    expect(roads).not.toContain('landing');
+    expect(roads).not.toContain('cellar');
+  });
+
+  it('carries whether each road can be walked right now', () => {
+    const shut: Place[] = [{ ...place('hall', 0, 0, 0), adjacent: [{ to: 'vault', open: false }] }, place('vault', 1, 0, 0, 'hall')];
+
+    expect(sheetAt(shut, 'hall', 0).roads.map((road) => road.open)).toEqual([false]);
+  });
+});
+
+describe('how far the map can be pushed around', () => {
+  it('gives back the room everything drawn takes up', () => {
+    expect(bounds(sheetAt(HOUSE, 'hall', 0).nodes)).toEqual({ minX: -CLIMB_NUDGE, minY: -CLIMB_NUDGE, maxX: 2, maxY: CLIMB_NUDGE });
+  });
+
+  it('is a point when there is nothing drawn, so a caller still has a centre', () => {
+    expect(bounds([])).toEqual({ minX: 0, minY: 0, maxX: 0, maxY: 0 });
+  });
+
+  it('holds a pan to the slack there actually is', () => {
+    expect(clampPan(500, 1000, 400)).toBe(300);
+    expect(clampPan(-500, 1000, 400)).toBe(-300);
+    expect(clampPan(100, 1000, 400)).toBe(100);
+  });
+
+  it('refuses to move a map that already fits, so it cannot be pushed off the screen', () => {
+    expect(clampPan(200, 300, 400)).toBe(0);
+    expect(clampPan(-200, 300, 400)).toBe(0);
+  });
+
+  it('holds still before anything has been measured', () => {
+    expect(clampPan(50, 0, 0)).toBe(0);
   });
 });
 
 describe('what the world just gave up', () => {
   it('names only what was not there before', () => {
-    expect(newlyFound([place('camp')], [place('camp'), place('ridge')])).toEqual(['ridge']);
+    expect(newlyFound([place('hall', 0, 0, 0)], HOUSE)).toEqual(['landing', 'cellar', 'beach', 'cove']);
   });
 
   it('says nothing when the same places come round again', () => {
-    expect(newlyFound(KNOWN, KNOWN)).toEqual([]);
+    expect(newlyFound(HOUSE, HOUSE)).toEqual([]);
   });
 
   it('says nothing for a place that left, since only an arrival is acknowledged', () => {
-    expect(newlyFound(KNOWN, [place('camp')])).toEqual([]);
+    expect(newlyFound(HOUSE, [place('hall', 0, 0, 0)])).toEqual([]);
+  });
+});
+
+describe('where a place is drawn', () => {
+  it('is where it is, on its own plane', () => {
+    expect(drawnAt(place('beach', 3, 4, 0), 0)).toEqual({ x: 3, y: 4 });
   });
 
-  it('names every arrival when several land at once', () => {
-    expect(newlyFound([], [place('camp'), place('ridge')])).toEqual(['camp', 'ridge']);
+  it('moves the same distance however many planes away it is, since only up or down is read', () => {
+    expect(drawnAt(place('spire', 0, 0, 9), 0)).toEqual(drawnAt(place('spire', 0, 0, 1), 0));
+  });
+});
+
+describe('which offer is the way to a place', () => {
+  const offer = (id: string, leadsTo?: string): PlayView['choices'][number] => ({ id, kind: leadsTo ? 'travel' : 'action', label: id, leadsTo });
+
+  it('answers with the position a driver dispatches it at, counting from one', () => {
+    const ways = waysOut([offer('look'), offer('travel:beach', 'beach'), offer('travel:cove', 'cove')]);
+
+    expect(ways.get('beach')).toBe(2);
+    expect(ways.get('cove')).toBe(3);
+  });
+
+  it('takes a staircase, which publishes an action and not a travel', () => {
+    const stairs: PlayView['choices'][number] = { id: 'use:entity.stairs.ascend', kind: 'action', label: 'ascend', leadsTo: 'landing' };
+
+    expect(waysOut([stairs]).get('landing')).toBe(1);
+  });
+
+  it('leaves out an offer that goes nowhere, so it can never be dispatched by a tap on a place', () => {
+    const ways = waysOut([offer('roast chestnuts'), offer('talk to miki')]);
+
+    expect([...ways.keys()]).toEqual([]);
+  });
+
+  it('keeps the first of two ways to one place, which is the order the engine offered them', () => {
+    const ways = waysOut([offer('a'), offer('travel:beach', 'beach'), offer('use:entity.path.walk', 'beach')]);
+
+    expect(ways.get('beach')).toBe(2);
   });
 });

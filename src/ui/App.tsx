@@ -42,7 +42,7 @@ export function App({ driver }: { driver: Driver }): JSX.Element {
 
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') return subpage.id === 'home' ? <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} /> : null;
-    if (layer.id === 'map') return <MapPane view={view} arrivals={arrivals} generation={generation} />;
+    if (layer.id === 'map') return <MapPane view={view} arrivals={arrivals} generation={generation} onChoose={driver.choose} />;
     if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? {})} />;
     if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? {})} />;
     if (subpage.id === 'equipment') return <Ledger entries={named(view?.equipment ?? {})} />;

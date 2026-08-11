@@ -50,9 +50,11 @@ Proof:
   affordance requires hover, a right-click or a keyboard, and no layer or subpage is reachable only
   by a gesture.
 - [c7] Every destination is one move from Home and each renders what it owes. Home is the narrative
-  log and the action sheet. Map renders the locations the player has discovered and how they
-  connect, and acknowledges a newly discovered one. Character renders the published inventory,
-  equipment, skills and stats.
+  log and the action sheet. Map draws the discovered locations where they actually are — each at
+  its own published position, with the roads between them — and acknowledges a newly discovered one.
+  It pans under a finger and cannot be panned away from what it is drawing. It shows one z-plane at
+  a time, plus whatever sits off that plane and is adjacent to the player, and it cycles between the
+  planes. Character renders the published inventory, equipment, skills and stats.
   Settings and Edit are frames with no body — `gui-dev-mode-toggle-banner-and-editing-gate`,
   `mod-portal-gui`, `gui-locale-editor-missing-toggle-and-language-dropdown` and `edit-mode-memory`
   own their contents, and this branch owes them somewhere to land, not the landing.
@@ -135,9 +137,12 @@ The game becomes playable by a person on a phone, as a driver of the same surfac
   table is reachable either way. A console is what `single-dev-mode` will gate and what
   `quest-journal` will add `/quests` to, so building it before either exists may be premature —
   left to the worker with the frame in front of it.
-- How the map draws. A graph of discovered locations is a layout problem with no settled answer
-  here, and a list grouped by connection satisfies c7. `reactflow` was removed as an unimported
-  dependency (UI-M3) and is not to be reintroduced without a reason written down.
+- ~~How the map draws.~~ Settled by the author 2026-08-11: a spatial graph, each place at its own
+  `x, y, z`, not a list. Still no library — the positions are authored and the roads are straight
+  lines between them, so `reactflow` stays removed (UI-M3) and the drawing is plain SVG. What the
+  ruling adds beyond drawing — walking to a place by tapping it, and lighting the route up on the
+  way — is `travel-reaches-anywhere-the-roads-do`, because it is an engine capability both drivers
+  owe and not a thing a renderer may do on its own.
 - Whether the tutorial route is playable end to end when this merges. `starting-zone` is separately
   blocked, so `first-playtest` may still wait; that is a content question, not this branch's.
 

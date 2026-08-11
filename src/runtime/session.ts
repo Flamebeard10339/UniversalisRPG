@@ -24,6 +24,11 @@ export interface PlayChoice {
   kind: PlayChoiceKind;
   label: string;
   detail?: string;
+  // Where taking it puts the player, when taking it does nothing else. A map
+  // needs to know which of the offers on the table is the way to a place, and
+  // an entity that aliases a road -- a staircase, a door -- publishes an action
+  // and not a travel, so the id cannot be read for it.
+  leadsTo?: string;
 }
 
 export interface PlayAction {
@@ -52,7 +57,7 @@ export interface PlayStatus {
   xp: Record<string, number>;
   stats: Record<string, number>;
   flags: Record<string, boolean | number>;
-  discovered: Array<{ id: string; title: string; adjacent: string[] }>;
+  discovered: Array<{ id: string; title: string; x: number; y: number; z: number; adjacent: Array<{ to: string; open: boolean }> }>;
   player: { name: string; race: string };
   action: PlayAction | null;
 }
@@ -109,13 +114,18 @@ function availableActions(owner: Actable, state: GameState): Action[] {
   return (owner.actions ?? []).filter((action) => actionAvailable(action, state));
 }
 
-// Pure movement — results only relocate — so it aliases a travel edge.
-function isFreeTravelAction(action: Action, target: string): boolean {
-  const relocatesToTarget = action.results.some((r) => r.kind === 'relocate' && r.location === target);
-  if (!relocatesToTarget) return false;
+// Where pure movement — results only relocate — would put the player, which is
+// what makes an action an alias for a road rather than a thing done in a room.
+function movesTo(action: Action): string | undefined {
   const onlyMovement = action.results.every((r) => r.kind === 'relocate' || r.kind === 'say');
   const noBranches = !action.onSuccess && !action.onFailure && !action.onUnfinished;
-  return onlyMovement && noBranches;
+  if (!onlyMovement || !noBranches) return undefined;
+  const relocate = action.results.find((r) => r.kind === 'relocate');
+  return relocate?.kind === 'relocate' ? relocate.location : undefined;
+}
+
+function isFreeTravelAction(action: Action, target: string): boolean {
+  return movesTo(action) === target;
 }
 
 function entityAliasesTravelTo(location: Location, target: string, registry: Registry, state: GameState): boolean {
@@ -170,7 +180,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
       choices.push({ id: `talk:${entityId}`, kind: 'talk', label: `Talk to ${entity.title}` });
     }
     for (const action of availableActions(entity, state)) {
-      choices.push({ id: `use:entity.${entityId}.${action.label}`, kind: 'action', label: action.label, detail: entity.title });
+      choices.push({ id: `use:entity.${entityId}.${action.label}`, kind: 'action', label: action.label, detail: entity.title, leadsTo: movesTo(action) });
     }
   }
 
@@ -211,7 +221,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     // Both are the same move, so showing the edge as well duplicates the option.
     if (entityAliasesTravelTo(location, edge.target, registry, state)) continue;
     const target = registry.locations.get(edge.target);
-    choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: `Travel to ${target?.title ?? edge.target}` });
+    choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: `Travel to ${target?.title ?? edge.target}`, leadsTo: edge.target });
   }
 
   return choices;
@@ -343,7 +353,14 @@ function publishDiscovered(state: GameState, registry: Registry): PlayStatus['di
   return found.map((each) => ({
     id: each.id,
     title: each.title,
-    adjacent: each.adjacent.map((edge) => edge.target).filter((target) => known.has(target)),
+    x: each.x,
+    y: each.y,
+    z: each.z,
+    // A road the player cannot walk today is still a road they know about, so a
+    // shut way is published rather than withheld and says that it is shut.
+    adjacent: each.adjacent
+      .filter((edge) => known.has(edge.target))
+      .map((edge) => ({ to: edge.target, open: !edge.condition || evaluateCondition(edge.condition, state) })),
   }));
 }
 
