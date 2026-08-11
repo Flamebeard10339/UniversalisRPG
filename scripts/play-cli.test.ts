@@ -53,7 +53,7 @@ x: 0, y: 0
 starting
 
 # save empty
-{"version":${SAVE_VERSION}}
+{"version":${SAVE_VERSION},"flags":{"camp.discovered":true}}
 `);
     expect(formatResult(runLine(ctx, '/assert time >= 0'))).toEqual(['✓ time >= 0 matches']);
     expect(formatResult(runLine(ctx, '/assert time < 0'))).toEqual(['⚠ time < 0']);
@@ -74,7 +74,9 @@ starting
     expect(formatResult(runLine(ctx, '/state'))).toEqual([
       'Location: tutorial-island.guide-house',
       'Elapsed simulated time: 7s',
-      'Flags: {}',
+      // Every place the player could walk to from the guide house, which is
+      // what discovery now means; the beach is behind the locked front door.
+      'Flags: {"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true}',
       'Inventory: {}',
       'XP: {}',
       'Health: ██████████ 30/30',

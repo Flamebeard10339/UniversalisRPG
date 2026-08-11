@@ -3,6 +3,7 @@ import { DISCOVERED, Location } from '../content/location';
 import {
   actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, useTravel } from './runtime';
 import { parseOwnerRef } from './actions';
+import { spreadDiscovery } from './effects';
 import { armedAction, hasPool, playerCadence } from './encounter';
 import { declaredId } from '../content/entity';
 import { isTwoSided } from '../grammar/action';
@@ -254,6 +255,7 @@ export function startSession(registry: Registry): PlaySession {
   // Said here rather than at the first `view()`, where it surfaced as
   // "unknown location: " and named nothing an author could act on.
   if (!state.location) throw new RuntimeError('no # location is marked starting, so a new game has nowhere to begin');
+  spreadDiscovery(state, registry);
   return sessionOver(registry, state);
 }
 
@@ -267,6 +269,9 @@ export function adoptRegistry(session: PlaySession, registry: Registry): void {
   for (const warning of warnings) state.log.push(warning.message);
   internals.logCursor = Math.max(0, state.log.length - warnings.length);
   initResources(state, registry);
+  // The roads may have moved: an edge the old registry did not have is a place
+  // the player can now walk to.
+  spreadDiscovery(state, registry);
 }
 
 export function serializeSession(session: PlaySession): string {
@@ -503,6 +508,9 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
       const saved = registry.saves.get(directive.save);
       if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
       const warnings = loadSave(state, saved, registry);
+      // A save replaces the location and every flag at once, which is both of
+      // discovery's inputs arriving without passing through a result.
+      spreadDiscovery(state, registry);
       own(session).logCursor = Math.max(0, state.log.length - warnings.length);
       return {};
     }

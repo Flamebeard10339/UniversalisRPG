@@ -43,7 +43,7 @@ open:
   give: 1 gold
 
 # save empty
-{"version":${SAVE_VERSION}}
+{"version":${SAVE_VERSION},"flags":{"camp.discovered":true}}
 
 # test always-passes
 assert: time >= 0
@@ -950,7 +950,7 @@ describe('the recorder: /create-test and /create-valid-test', () => {
 
     expect(messages(result)[0].text).toBe(`Created test 'foo' (2 steps).`);
     expect(authoredBlocks(result)).toEqual([
-      ['# save foo-start', `{"version":${SAVE_VERSION}}`],
+      ['# save foo-start', `{"version":${SAVE_VERSION},"flags":{"camp.discovered":true,"ruins.discovered":true}}`],
       ['# test foo', 'load: foo-start', 'travel: ruins', 'wait: 1'],
     ]);
     expect(session.registry.tests.has('foo')).toBe(true);

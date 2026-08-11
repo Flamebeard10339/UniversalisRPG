@@ -586,20 +586,30 @@ starting
 title: The Forge
 adjacent:
   overlook
-  cellar
+  vault while hatch.unlocked
 entities:
   window
   bench
+  hatch
 
 # location overlook
 x: 1, y: 0
 adjacent:
   forge
+  ridge
 
-# location cellar
+# location ridge
+x: 2, y: 0
+adjacent:
+  overlook
+
+# location vault
 x: 0, y: 1
 adjacent:
   forge
+
+# location shipwreck
+x: 9, y: 9
 
 # item ore
 examine: Streaked with red.
@@ -613,8 +623,12 @@ slot: hand
 +3 might
 
 # entity window
-look through: discover: overlook
-look back: discover: forge
+look through: discover: shipwreck
+
+# entity hatch
+flags: unlocked
+unlock:
+  set: unlocked
 
 # entity bench
 stations: bench
@@ -627,6 +641,9 @@ skill: smithing 5
 
 # save stocked
 {"version":${SAVE_VERSION},"inventory":{"ore":1,"gauntlet":1}}
+
+# save at-the-overlook
+{"version":${SAVE_VERSION},"location":"overlook"}
 `;
 
 describe('what the engine publishes', () => {
@@ -656,19 +673,62 @@ describe('what the engine publishes', () => {
     expect(forged.inventory).toEqual({ ingot: 1, gauntlet: 1 });
   });
 
-  it('carries the locations discovery has revealed, and nothing it has not', () => {
+  it('carries where the player is standing and everywhere they could walk to', () => {
     const session = startSession(loadModule(PUBLISHED_MODULE));
 
-    expect(view(session).discovered).toEqual([]);
+    const opening = view(session);
+
+    // The forge because the player is in it, the overlook because a road leads
+    // there. Not the vault, whose road is shut; not the shipwreck, which no
+    // road reaches at all.
+    expect(opening.discovered.map((place) => place.id).sort()).toEqual(['forge', 'overlook']);
+  });
+
+  it('fills the map in as the player walks, from wherever they are standing now', () => {
+    const session = startSession(loadModule(PUBLISHED_MODULE));
+
+    // The ridge is two roads out, so nothing about it is knowable from the
+    // forge; arriving at the overlook is what puts it on the map.
+    expect(view(session).discovered.map((place) => place.id)).not.toContain('ridge');
+
+    const walked = apply(session, 'travel:overlook');
+
+    expect(walked.discovered.map((place) => place.id).sort()).toEqual(['forge', 'overlook', 'ridge']);
+  });
+
+  it('works out what a save should have known, since a save carries both its inputs at once', () => {
+    const session = startSession(loadModule(PUBLISHED_MODULE));
+
+    // Written before any of this existed: it names a location and no discovery
+    // at all, and loading it must not leave the player somewhere with a blank
+    // map they cannot fill in without walking back the way they came.
+    applyDirective(session, { kind: 'load', save: 'at-the-overlook' });
+
+    expect(view(session).discovered.map((place) => place.id).sort()).toEqual(['forge', 'overlook', 'ridge']);
+  });
+
+  it('reveals what a way was shutting the moment it opens, without leaving the room', () => {
+    const session = startSession(loadModule(PUBLISHED_MODULE));
+
+    const opened = apply(session, 'use:entity.hatch.unlock');
+
+    expect(opened.location.id).toBe('forge');
+    expect(opened.discovered.map((place) => place.id)).toContain('vault');
+  });
+
+  it('still takes a place it was told about from somewhere else', () => {
+    const session = startSession(loadModule(PUBLISHED_MODULE));
 
     const told = apply(session, 'use:entity.window.look through');
-    expect(told.discovered.map((place) => place.id)).toEqual(['overlook']);
-    expect(told.flags).toEqual({ 'overlook.discovered': true });
+
+    // No road runs to it from anywhere the player has stood, so this one can
+    // only have arrived by being scouted.
+    expect(told.discovered.map((place) => place.id)).toContain('shipwreck');
+    expect(told.flags['shipwreck.discovered']).toBe(true);
   });
 
   it('names each discovered place with the word its author wrote', () => {
     const session = startSession(loadModule(PUBLISHED_MODULE));
-    apply(session, 'use:entity.window.look back');
 
     const found = view(session).discovered.find((place) => place.id === 'forge');
 
@@ -677,14 +737,15 @@ describe('what the engine publishes', () => {
 
   it('carries how the discovered places connect, which is the other half of a map', () => {
     const session = startSession(loadModule(PUBLISHED_MODULE));
-    const alone = apply(session, 'use:entity.window.look back').discovered;
-    const paired = apply(session, 'use:entity.window.look through').discovered;
+    const before = view(session).discovered;
+
+    const opened = apply(session, 'use:entity.hatch.unlock');
 
     // Adjacency to a place the player has not found would draw the shape of
     // what is still hidden, so an edge arrives only once both ends have.
-    expect(alone.find((place) => place.id === 'forge')?.adjacent).toEqual([]);
-    expect(paired.find((place) => place.id === 'forge')?.adjacent).toEqual(['overlook']);
-    expect(paired.find((place) => place.id === 'overlook')?.adjacent).toEqual(['forge']);
+    expect(before.find((place) => place.id === 'forge')?.adjacent).toEqual(['overlook']);
+    expect(opened.discovered.find((place) => place.id === 'forge')?.adjacent).toEqual(['overlook', 'vault']);
+    expect(opened.discovered.find((place) => place.id === 'vault')?.adjacent).toEqual(['forge']);
   });
 });
 
