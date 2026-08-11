@@ -1,6 +1,12 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampZoom, midpoint, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, waysOut, zoomByWheel, type Node, type Point } from './discovery';
+import { bounds, clampZoom, drawnBox, midpoint, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, waysOut, zoomByWheel, type Node, type Point, type Size } from './discovery';
+
+// The map draws its own working out — the box a pan is held against — for
+// whoever is building the map. Read once, off the address, because a debug
+// surface that can be reached from inside the game is a debug surface that has
+// to be designed.
+const DEBUGGING = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
 
 // Where a place is drawn, in unscaled pixels: the zoom is applied to the whole
 // sheet at once, so nothing here has to know about it.
@@ -53,11 +59,13 @@ export function MapPane({
   onChoose: (position: number) => void;
 }): JSX.Element {
   const frame = useRef<HTMLDivElement>(null);
+  const bubbles = useRef<Array<HTMLElement | null>>([]);
   const gesture = useRef<Grab | Pinch | null>(null);
   const release = useRef<() => void>(() => undefined);
   const [plane, setPlane] = useState<number | null>(null);
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
+  const [bubble, setBubble] = useState<Size>({ width: 0, height: 0 });
 
   const discovered = view?.discovered ?? [];
   const here = view?.location.id ?? '';
@@ -71,9 +79,28 @@ export function MapPane({
   // now, and the map says so by not being tappable rather than by saying why.
   const travels = waysOut(view?.choices ?? []);
 
+  // How big a place is drawn is a rendered fact — a title truncated at eight
+  // characters' worth is narrower than one that fills the cap — so it is
+  // measured rather than restated here. offsetWidth is the laid-out width and
+  // ignores the transform above it, which is the unscaled figure the box wants.
+  // Every render, because a longer title is a re-render and not a resize; the
+  // setter hands back what it held when nothing moved, so this settles at once.
+  useLayoutEffect(() => {
+    const drawn = bubbles.current.slice(0, sheet.nodes.length);
+    setBubble((were) => {
+      const now = {
+        width: Math.max(0, ...drawn.map((node) => node?.offsetWidth ?? 0)),
+        height: Math.max(0, ...drawn.map((node) => node?.offsetHeight ?? 0)),
+      };
+      return now.width === were.width && now.height === were.height ? were : now;
+    });
+  });
+
+  const drawn = drawnBox(box, bubble);
+
   // A pan that was legal at one zoom, or on a busier plane, is not legal now, so
   // it is re-held against what is being drawn rather than only as it is moved.
-  const held = settled(pan, scale, box).pan;
+  const held = settled(pan, scale, box, bubble).pan;
 
   // From the middle of the window, which is what the pan is an offset from.
   const fromCentre = (x: number, y: number): Point => {
@@ -83,7 +110,7 @@ export function MapPane({
   };
 
   const settle = (next: Point, zoom: number): void => {
-    const rest = settled(next, zoom, box);
+    const rest = settled(next, zoom, box, bubble);
     setScale(rest.scale);
     setPan(rest.pan);
   };
@@ -201,13 +228,22 @@ export function MapPane({
           ))}
         </svg>
 
-        {sheet.nodes.map((node) => {
+        {DEBUGGING ? (
+          <div data-debug="drawn-box" className="pointer-events-none absolute border-2 border-dashed border-accent/60" style={drawn}>
+            <span className="absolute left-0 top-0 -translate-y-full whitespace-nowrap bg-accent px-1 text-[10px] tabular-nums text-accent-text">
+              {Math.round(drawn.width)}×{Math.round(drawn.height)} · bubble {bubble.width}×{bubble.height} · ×{scale.toFixed(2)}
+            </span>
+          </div>
+        ) : null}
+
+        {sheet.nodes.map((node, at) => {
           const spot = pixels(node);
           const position = travels.get(node.place.id);
           const arrived = arrivals.includes(node.place.id);
           return (
             <button
               key={`${node.place.id}-${arrived ? generation : 0}`}
+              ref={(element) => void (bubbles.current[at] = element)}
               type="button"
               data-place={node.place.id}
               disabled={position === undefined}

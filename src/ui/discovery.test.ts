@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, midpoint, newlyFound, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
+import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, drawnBox, midpoint, newlyFound, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -236,27 +236,39 @@ describe('the two fingers', () => {
 
 describe('where the map comes to rest', () => {
   const BOX = { minX: 0, minY: 0, maxX: 4, maxY: 0 };
+  const BUBBLE = { width: 150, height: 34 };
+  const NO_BUBBLE = { width: 0, height: 0 };
+
+  it('grows the box a place stands in by the bubble drawn around it', () => {
+    expect(drawnBox(BOX, BUBBLE)).toEqual({ left: -75, top: -17, width: 4 * PER_UNIT + 150, height: 34 });
+  });
 
   it('hands back the zoom it was asked for', () => {
-    expect(settled({ x: 0, y: 0 }, 1.75, BOX).scale).toBe(1.75);
+    expect(settled({ x: 0, y: 0 }, 1.75, BOX, BUBBLE).scale).toBe(1.75);
   });
 
   it('holds the pan to the slack the new zoom leaves, not the slack the old one did', () => {
     // Zooming in makes the sheet wider, so there is further to pan, and a pan
     // clamped against the smaller sheet could never reach the new edges.
-    const close = settled({ x: 9999, y: 0 }, 2, BOX).pan.x;
-    const far = settled({ x: 9999, y: 0 }, 1, BOX).pan.x;
+    const close = settled({ x: 9999, y: 0 }, 2, BOX, BUBBLE).pan.x;
+    const far = settled({ x: 9999, y: 0 }, 1, BOX, BUBBLE).pan.x;
 
     expect(close).toBeGreaterThan(far);
   });
 
-  it('stops with the outermost place under the middle of the window', () => {
-    expect(settled({ x: 9999, y: 0 }, 1, BOX).pan.x).toBe((4 * PER_UNIT) / 2);
+  it('stops with the outer edge of the last bubble under the middle of the window', () => {
+    expect(settled({ x: 9999, y: 0 }, 1, BOX, BUBBLE).pan.x).toBe((4 * PER_UNIT + 150) / 2);
+  });
+
+  it('still leaves a lone place room to be dragged off centre by its own width', () => {
+    const alone = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+
+    expect(settled({ x: 500, y: 500 }, 1, alone, BUBBLE).pan).toEqual({ x: 75, y: 17 });
   });
 
   it('refuses to move a sheet with nowhere to go, however far the gesture went', () => {
-    const tiny = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    const alone = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
-    expect(settled({ x: 500, y: 500 }, 1, tiny).pan).toEqual({ x: 0, y: 0 });
+    expect(settled({ x: 500, y: 500 }, 1, alone, NO_BUBBLE).pan).toEqual({ x: 0, y: 0 });
   });
 });

@@ -141,13 +141,38 @@ export function clampPan(offset: number, reach: number): number {
 // house" into a gap a thumb can aim between.
 export const PER_UNIT = 104;
 
+export interface Size {
+  width: number;
+  height: number;
+}
+
+export interface Frame {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+// The room the sheet takes up, in unscaled pixels. A box spans the points
+// places stand on, and a place is drawn as a bubble around its point, so one
+// whole bubble is half a bubble at each end — which is the half that was still
+// on screen when a pan measured from the points alone stopped.
+export function drawnBox(box: Box, bubble: Size): Frame {
+  return {
+    left: box.minX * PER_UNIT - bubble.width / 2,
+    top: box.minY * PER_UNIT - bubble.height / 2,
+    width: (box.maxX - box.minX) * PER_UNIT + bubble.width,
+    height: (box.maxY - box.minY) * PER_UNIT + bubble.height,
+  };
+}
+
 // Where the map comes to rest after a gesture: the zoom it asked for, and the
 // pan held to the slack that zoom leaves. One zoom goes in and both come out,
 // because clamping a new pan against the room the old zoom took is how a
 // zoomed-in map ends up unable to reach its own edges.
-export function settled(pan: Point, zoom: number, box: Box): { pan: Point; scale: number } {
-  const reach = { x: (box.maxX - box.minX) * PER_UNIT * zoom, y: (box.maxY - box.minY) * PER_UNIT * zoom };
-  return { scale: zoom, pan: { x: clampPan(pan.x, reach.x), y: clampPan(pan.y, reach.y) } };
+export function settled(pan: Point, zoom: number, box: Box, bubble: Size): { pan: Point; scale: number } {
+  const drawn = drawnBox(box, bubble);
+  return { scale: zoom, pan: { x: clampPan(pan.x, drawn.width * zoom), y: clampPan(pan.y, drawn.height * zoom) } };
 }
 
 // Which places arrived between one view and the next. The map's own reading of
