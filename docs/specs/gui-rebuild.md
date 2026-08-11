@@ -36,14 +36,23 @@ Proof:
   simulated time from real elapsed time, shows its progress and can be cancelled; the same action
   begun through the REPL's `--live` reaches the same state over the same elapsed span. Nothing under
   `src/ui` schedules `resolve` or `wait` on a clock of its own.
-- [c6] The layout is designed at a phone, and the claim is measured rather than asserted. At
-  375×812 nothing in the tutorial route scrolls the page horizontally, every interactive control's
-  touch target is at least 44 CSS pixels on its shorter side, the controls used every turn — the
-  action sheet and the tab bar — sit in the bottom third, and no affordance requires hover, a
-  right-click or a keyboard.
-- [c7] The five tabs are one nav and each is one tap away. Home is the narrative log and the action
-  sheet. Map renders the locations the player has discovered and how they connect, and acknowledges
-  a newly discovered one. Character renders the published inventory, equipment, skills and stats.
+- [c6] The layout is a two-dimensional navigation model designed at a phone, and the claim is
+  measured rather than asserted. Vertical movement changes context — Map above, Home in the middle
+  and where the app opens, Character below — and the boundary between two layers is one shared
+  banner rather than two: the location banner is Map's bottom edge and Home's top edge, the
+  character-status banner is Home's bottom edge and Character's top edge, and each banner is also
+  the handle that swipes or taps to the layer it borders, which is why Map needs no top banner and
+  Character no bottom handle. Horizontal movement changes subpage within a layer, through a tab bar
+  fixed at the bottom whose entries are the current layer's; a layer re-entered opens on the subpage
+  it was left on. Measured at 375×812: nothing in the tutorial route scrolls the page horizontally,
+  every interactive control's touch target is at least 44 CSS pixels on its shorter side, the
+  controls used every turn — the action sheet and the tab bar — sit in the bottom third, no
+  affordance requires hover, a right-click or a keyboard, and no layer or subpage is reachable only
+  by a gesture.
+- [c7] Every destination is one move from Home and each renders what it owes. Home is the narrative
+  log and the action sheet. Map renders the locations the player has discovered and how they
+  connect, and acknowledges a newly discovered one. Character renders the published inventory,
+  equipment, skills and stats.
   Settings and Edit are frames with no body — `gui-dev-mode-toggle-banner-and-editing-gate`,
   `mod-portal-gui`, `gui-locale-editor-missing-toggle-and-language-dropdown` and `edit-mode-memory`
   own their contents, and this branch owes them somewhere to land, not the landing.
@@ -72,6 +81,20 @@ The game becomes playable by a person on a phone, as a driver of the same surfac
   scrolls above them; the tab bar is the only other chrome. The alternative considered was five peer
   full-screen panels — the legacy GUI's shape — which puts the play surface behind a tab and reads
   as a desktop app scaled down.
+- **The nav is two-dimensional, and the banners are the vertical handles.** Settled by the author
+  2026-08-11, superseding the nav half of the decision above; the chat log with the action sheet in
+  thumb reach is unchanged, and Home is still where the app opens. Five peer tabs made every screen
+  a sibling of every other and spent Home's scarcest resource, vertical space, on a header and a tab
+  bar that each said something about a different subject. Three vertical layers with shared banners
+  spend it once: the banner a player reads to know where they are is the same pixels they touch to
+  go there, so the location strip pays for the Map and the status strip pays for the Character
+  sheet. The tab bar survives because a fixed thumb target is worth keeping, but it stops being a
+  five-way global switch and becomes the current layer's own — Edit and Settings are Home's
+  neighbours, not the world's. Per-layer memory of the last subpage is part of the ruling, not a
+  refinement of it: a model where leaving Character loses the player's place in Inventory is a
+  worse model, not the same one unpolished. The example labels the author gave — Local/Region/World,
+  Edit/Home/Settings, Stats/Equipment/Inventory — are illustrations of the shape, not a fixed
+  vocabulary.
 - **The GUI is a driver, not a second engine, and the drift proof is executable.** The author's
   requirement is that the two play methods cannot drift in capability or function and that the GUI
   cannot alter state directly. The structural half is the prerequisite's — one command table,
