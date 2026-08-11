@@ -1,23 +1,53 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { askedOption } from '../runtime/command';
 import type { Driver } from './driver';
 import { FloatingText } from './FloatingText';
 import { Home } from './Home';
+import { Ledger } from './Ledger';
 import { LocationBanner } from './LocationBanner';
+import { MapPane } from './MapPane';
+import { newlyFound, type Place } from './discovery';
 import { ModalSheet } from './ModalSheet';
 import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpage } from './nav';
 import { Pager } from './Pager';
+import { counted, named } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
 import { VStack } from './VStack';
 
+// What the world just gave up, and a count of how many times it has. The count
+// is what re-keys the flash: the same place discovered again after a load is a
+// new acknowledgement, and a React key that never changes plays no animation.
+// The opening view seeds the comparison, so the places a session starts knowing
+// do not all arrive at once on the first frame.
+function useArrivals(discovered: readonly Place[]): { arrivals: readonly string[]; generation: number } {
+  const seen = useRef(discovered);
+  const [found, setFound] = useState<{ arrivals: readonly string[]; generation: number }>({ arrivals: [], generation: 0 });
+
+  useEffect(() => {
+    const arrived = newlyFound(seen.current, discovered);
+    seen.current = discovered;
+    if (arrived.length > 0) setFound((held) => ({ arrivals: arrived, generation: held.generation + 1 }));
+  }, [discovered]);
+
+  return found;
+}
+
 export function App({ driver }: { driver: Driver }): JSX.Element {
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
   const [where, setWhere] = useState(OPENING);
-  const asking = snapshot.view ? askedOption(snapshot.view.modals) : undefined;
+  const view = snapshot.view;
+  const asking = view ? askedOption(view.modals) : undefined;
+  const { arrivals, generation } = useArrivals(view?.discovered ?? []);
 
-  const pane = (layer: Layer, subpage: Subpage): JSX.Element | null =>
-    layer.id === 'home' && subpage.id === 'home' ? <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} /> : null;
+  const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
+    if (layer.id === 'home') return subpage.id === 'home' ? <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} /> : null;
+    if (layer.id === 'map') return <MapPane view={view} arrivals={arrivals} generation={generation} />;
+    if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? {})} />;
+    if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? {})} />;
+    if (subpage.id === 'equipment') return <Ledger entries={named(view?.equipment ?? {})} />;
+    return <Ledger entries={counted(view?.inventory ?? {})} />;
+  };
 
   const bodies = LAYERS.map((layer, at) => (
     <Pager
@@ -34,7 +64,13 @@ export function App({ driver }: { driver: Driver }): JSX.Element {
         <VStack
           layer={where.layer}
           onLayer={(layer) => setWhere((held) => toLayer(held, layer))}
-          banners={[<LocationBanner key="location" view={snapshot.view} />, <StatusBanner key="status" view={snapshot.view} />]}
+          banners={[
+            // Re-keyed on a discovery, so the banner that is the handle to the
+            // Map plays the same arrival the Map's own row does. That is the
+            // acknowledgement a player standing on Home gets.
+            <LocationBanner key={`location-${generation}`} view={view} flash={generation > 0} />,
+            <StatusBanner key="status" view={view} />,
+          ]}
           bodies={bodies}
         />
         <FloatingText channel={driver.transient} />

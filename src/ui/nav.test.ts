@@ -81,17 +81,20 @@ describe('the page each layer was left on', () => {
   });
 
   it('remembers each layer separately, so one page is never mistaken for another', () => {
-    const moved = toSubpage(toSubpage(OPENING, 0, 2), HOME_LAYER, 0);
+    const character = LAYERS.findIndex((layer) => layer.id === 'character');
+    const moved = toSubpage(toSubpage(OPENING, character, 2), HOME_LAYER, 0);
 
-    expect(subpageOf(toLayer(moved, 0))).toBe(2);
+    expect(subpageOf(toLayer(moved, character))).toBe(2);
     expect(subpageOf(toLayer(moved, HOME_LAYER))).toBe(0);
   });
 
   it('moves a page without moving the layer the player is standing on', () => {
-    const moved = toSubpage(OPENING, 0, 2);
+    const character = LAYERS.findIndex((layer) => layer.id === 'character');
+    const moved = toSubpage(OPENING, character, 2);
 
     expect(moved.layer).toBe(OPENING.layer);
     expect(subpageOf(moved)).toBe(subpageOf(OPENING));
+    expect(moved.subpage[character]).toBe(2);
   });
 
   it('stops at each end of a layer rather than running past it', () => {

@@ -24,11 +24,12 @@ export const LAYERS: readonly Layer[] = [
   {
     id: 'map',
     opens: 0,
-    subpages: [
-      { id: 'local', label: 'Local' },
-      { id: 'region', label: 'Region' },
-      { id: 'world', label: 'World' },
-    ],
+    // One page: the engine publishes the discovered places and the roads
+    // between them, and nothing that would fill a second scale. Local, Region
+    // and World were the author's illustration of the shape, and two of the
+    // three would have opened empty for as long as the content model has no
+    // region in it.
+    subpages: [{ id: 'map', label: 'Map' }],
   },
   {
     id: 'home',
@@ -42,8 +43,12 @@ export const LAYERS: readonly Layer[] = [
   {
     id: 'character',
     opens: 0,
+    // Four, because the clause names four things and the view publishes each
+    // of them separately. Folding skills into stats would be this layer
+    // deciding that a skill is a kind of stat, which is the engine's to say.
     subpages: [
       { id: 'stats', label: 'Stats' },
+      { id: 'skills', label: 'Skills' },
       { id: 'equipment', label: 'Equipment' },
       { id: 'inventory', label: 'Inventory' },
     ],

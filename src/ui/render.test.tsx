@@ -43,6 +43,15 @@ function published(view: PlayView): string[] {
     ...view.choices.flatMap((choice) => [choice.label, choice.detail ?? '']),
     ...view.resources.map((resource) => resource.title),
     ...view.modals.flatMap((modal) => modal.options.flatMap((option) => [option.label, ...(option.values ?? [])])),
+    // The map and the character sheet. The four dictionaries publish keys and
+    // not titles, so a key is what the engine gave and a key is what the sheet
+    // may draw; the-view-publishes-ids-where-the-content-wrote-titles is where
+    // that is being answered, and this line moves when it is.
+    ...view.discovered.flatMap((place) => [place.id, place.title]),
+    ...Object.keys(view.inventory),
+    ...Object.keys(view.xp),
+    ...Object.keys(view.stats),
+    ...Object.entries(view.equipment).flat(),
     ...view.said,
   ];
 }
@@ -69,11 +78,65 @@ function whatStoppingSays(): string[] {
 const NAV = /<nav[\s\S]*?<\/nav>/g;
 const asking = (html: string): boolean => html.includes('role="dialog"');
 
+// The map's rows, each as its own runs. <li> is drawn nowhere else under
+// src/ui, so this is the map's markup and not the screen's.
+function places(html: string): string[][] {
+  return [...html.matchAll(/<li[\s\S]*?<\/li>/g)].map(([row]) => readable(row));
+}
+
 function position(driver: Driver, choiceId: string): number {
   const at = driver.snapshot().view!.choices.findIndex((choice) => choice.id === choiceId);
   if (at < 0) throw new Error(`no such choice: ${choiceId}`);
   return at + 1;
 }
+
+// Two places that join up, a way to discover both, and something to carry: the
+// shipped content never runs `discover:` in play, so a map drawn over it has
+// nothing on it. Filed as its own question; this fixture is what lets the two
+// panes be tested without waiting on the answer.
+const SURVEYED = {
+  name: 'surveyed',
+  text: [
+    '# info surveyed',
+    'version: 1.0.0',
+    '',
+    '# stat might',
+    'base: 4',
+    '',
+    '# skill surveying',
+    '',
+    '# location workshop',
+    'x: 0, y: 0',
+    'starting',
+    'title: The Workshop',
+    'examine: A bench and a lathe.',
+    'adjacent:',
+    '  overlook',
+    'entities:',
+    '  window',
+    '',
+    '# location overlook',
+    'x: 1, y: 0',
+    'title: The Overlook',
+    'examine: A long view over the valley.',
+    'adjacent:',
+    '  workshop',
+    '',
+    '# item ore',
+    'examine: Streaked with red.',
+    '',
+    '# entity window',
+    'title: Window',
+    'look out:',
+    '  discover: workshop',
+    '  discover: overlook',
+    '  give: 1 ore',
+    '  xp: surveying 3',
+    '',
+  ].join('\n'),
+};
+
+const LOOK_OUT = 'use:entity.surveyed.window.look out';
 
 describe('what the shell puts on the screen', () => {
   // The engine's own words are gathered as it publishes them, so this is a
@@ -119,6 +182,46 @@ describe('what the shell puts on the screen', () => {
     const runs = readable(renderToStaticMarkup(<App driver={driver} />));
 
     for (const choice of driver.snapshot().view!.choices) expect(runs).toContain(choice.label);
+  });
+
+  it('draws the discovered places and how they connect, on the layer the map is', () => {
+    const driver = createDriver([SURVEYED]);
+    driver.choose(position(driver, LOOK_OUT));
+    const found = driver.snapshot().view!.discovered;
+    const named = (id: string): string => found.find((place) => place.id === id)!.title;
+
+    const drawn = places(renderToStaticMarkup(<App driver={driver} />));
+
+    // Row by row rather than anywhere on the screen: every one of these titles
+    // is also on Home's transcript or in the location banner, so a map drawing
+    // nothing at all would pass a check that only asks whether the words are
+    // somewhere.
+    expect(found.map((place) => place.id).sort()).toEqual(['surveyed.overlook', 'surveyed.workshop']);
+    expect(drawn).toHaveLength(found.length);
+    for (const place of found) {
+      const row = drawn.find((runs) => runs[0] === place.title);
+      expect(row, `${place.title} has no row of its own on the map`).toBeDefined();
+      expect(place.adjacent.length).toBeGreaterThan(0);
+      for (const target of place.adjacent) expect(row).toContain(named(target));
+    }
+  });
+
+  it('draws what the player is carrying, and what they are made of, on the sheet', () => {
+    const driver = createDriver([SURVEYED]);
+    driver.choose(position(driver, LOOK_OUT));
+    const view = driver.snapshot().view!;
+
+    const runs = readable(renderToStaticMarkup(<App driver={driver} />).replace(NAV, ''));
+
+    expect(Object.keys(view.stats)).toContain('surveyed.might');
+    expect(Object.keys(view.inventory)).toContain('surveyed.ore');
+    for (const stat of Object.keys(view.stats)) expect(runs).toContain(stat);
+    for (const item of Object.keys(view.inventory)) expect(runs).toContain(item);
+    for (const skill of Object.keys(view.xp)) expect(runs).toContain(skill);
+    for (const [slot, item] of Object.entries(view.equipment)) {
+      expect(runs).toContain(slot);
+      expect(runs).toContain(item);
+    }
   });
 
   it('draws the run above the choices, which it does not withdraw', () => {

@@ -336,8 +336,10 @@
         "src/ui/App.tsx",
         "src/ui/FloatingText.tsx",
         "src/ui/Home.tsx",
+        "src/ui/Ledger.tsx",
         "src/ui/LiveSheet.tsx",
         "src/ui/LocationBanner.tsx",
+        "src/ui/MapPane.tsx",
         "src/ui/Meter.tsx",
         "src/ui/ModalSheet.tsx",
         "src/ui/Pager.tsx",
@@ -347,6 +349,8 @@
         "src/ui/VStack.tsx",
         "src/ui/choices.test.ts",
         "src/ui/choices.ts",
+        "src/ui/discovery.test.ts",
+        "src/ui/discovery.ts",
         "src/ui/driver.test.ts",
         "src/ui/driver.ts",
         "src/ui/format.test.ts",
@@ -356,6 +360,8 @@
         "src/ui/nav.test.ts",
         "src/ui/nav.ts",
         "src/ui/render.test.tsx",
+        "src/ui/sheet.test.ts",
+        "src/ui/sheet.ts",
         "src/ui/shippedContent.test.ts",
         "src/ui/shippedContent.ts",
         "src/ui/surface.test.ts",
@@ -407,6 +413,16 @@
             "src/ui/choices.ts"
           ],
           "note": "produced by the-gui-shell-and-the-play-surface; the chat-log surface and the action sheet. The nav it shipped with was a five-tab one and is now a separate concept, because the-nav-becomes-three-vertical-layers-around-home made it a thing with its own model rather than a strip along the bottom of this one"
+        },
+        {
+          "name": "the map and the character sheet",
+          "paths": [
+            "src/ui/MapPane.tsx",
+            "src/ui/discovery.ts",
+            "src/ui/Ledger.tsx",
+            "src/ui/sheet.ts"
+          ],
+          "note": "produced by the-map-and-character-tabs for gui-rebuild c7: the discovered places read outward from where the player stands with the roads between them, and the four published dictionaries as rows. Both read the play surface only, and the-view-publishes-the-map-a-driver-draws is what put the titles and the adjacency there"
         },
         {
           "name": "the GUI's real-time clock",
