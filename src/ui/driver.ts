@@ -135,7 +135,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  return {
+  const driver: Driver = {
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -147,4 +147,10 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     answer: (key, value) => send(`submit-modal: ${key}=${value}`),
     cancel: () => close(true),
   };
+
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    void import('./testHarness').then(({ installTestHarness }) => installTestHarness(driver));
+  }
+
+  return driver;
 }

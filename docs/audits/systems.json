@@ -365,6 +365,8 @@
         "src/ui/shippedContent.test.ts",
         "src/ui/shippedContent.ts",
         "src/ui/surface.test.ts",
+        "src/ui/testHarness.test.ts",
+        "src/ui/testHarness.ts",
         "src/ui/transcript.test.ts",
         "src/ui/transcript.ts",
         "src/ui/transient.test.ts",
@@ -441,6 +443,13 @@
             "src/ui/StatusBanner.tsx"
           ],
           "note": "produced by the-nav-becomes-three-vertical-layers-around-home for gui-rebuild c6: three vertical layers joined by two shared banners that are also the handles, and a bottom bar carrying the current layer's pages. the-map-and-character-tabs fills the Map and Character bodies it leaves empty"
+        },
+        {
+          "name": "browser test harness",
+          "paths": [
+            "src/ui/driver.ts"
+          ],
+          "note": "produced by the-agent-harness-returns-to-the-gui; dev-only window.__test batched driver actions and structured state in src/ui/testHarness.ts, installed from the GUI session container"
         }
       ]
     },
