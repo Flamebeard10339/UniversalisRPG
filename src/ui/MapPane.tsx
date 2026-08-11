@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
 import { bounds, clampZoom, midpoint, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, waysOut, zoomByWheel, type Node, type Point } from './discovery';
 
@@ -58,7 +58,6 @@ export function MapPane({
   const [plane, setPlane] = useState<number | null>(null);
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
-  const [window_, setWindow] = useState({ width: 0, height: 0 });
 
   const discovered = view?.discovered ?? [];
   const here = view?.location.id ?? '';
@@ -72,19 +71,9 @@ export function MapPane({
   // now, and the map says so by not being tappable rather than by saying why.
   const travels = waysOut(view?.choices ?? []);
 
-  useEffect(() => {
-    const node = frame.current;
-    if (!node) return;
-    const read = (): void => setWindow({ width: node.clientWidth, height: node.clientHeight });
-    read();
-    const observer = new ResizeObserver(read);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
   // A pan that was legal at one zoom, or on a busier plane, is not legal now, so
   // it is re-held against what is being drawn rather than only as it is moved.
-  const held = settled(pan, scale, box, window_).pan;
+  const held = settled(pan, scale, box).pan;
 
   // From the middle of the window, which is what the pan is an offset from.
   const fromCentre = (x: number, y: number): Point => {
@@ -94,7 +83,7 @@ export function MapPane({
   };
 
   const settle = (next: Point, zoom: number): void => {
-    const rest = settled(next, zoom, box, window_);
+    const rest = settled(next, zoom, box);
     setScale(rest.scale);
     setPan(rest.pan);
   };
@@ -201,7 +190,10 @@ export function MapPane({
     >
       <div
         className="absolute left-1/2 top-1/2 origin-top-left"
-        style={{ transform: `translate3d(${held.x - centre.x * scale}px, ${held.y - centre.y * scale}px, 0) scale(${scale})` }}
+        // A 2D translate, not a translate3d: the 3D one puts the sheet on its
+        // own compositor layer, and a layer is rastered once and then scaled as
+        // a picture, so every label went soft the moment the map was zoomed in.
+        style={{ transform: `translate(${held.x - centre.x * scale}px, ${held.y - centre.y * scale}px) scale(${scale})` }}
       >
         <svg className="pointer-events-none absolute overflow-visible" width={1} height={1}>
           {sheet.roads.map((road) => (

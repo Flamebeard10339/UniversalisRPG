@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, midpoint, newlyFound, panAfterZoom, settled, sheetAt, spanBetween, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
+import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, midpoint, newlyFound, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -105,19 +105,18 @@ describe('how far the map can be pushed around', () => {
     expect(bounds([])).toEqual({ minX: 0, minY: 0, maxX: 0, maxY: 0 });
   });
 
-  it('holds a pan to the slack there actually is', () => {
-    expect(clampPan(500, 1000, 400)).toBe(300);
-    expect(clampPan(-500, 1000, 400)).toBe(-300);
-    expect(clampPan(100, 1000, 400)).toBe(100);
+  it('lets the furthest place be dragged to the middle, and no further', () => {
+    expect(clampPan(900, 1000)).toBe(500);
+    expect(clampPan(-900, 1000)).toBe(-500);
+    expect(clampPan(100, 1000)).toBe(100);
   });
 
-  it('refuses to move a map that already fits, so it cannot be pushed off the screen', () => {
-    expect(clampPan(200, 300, 400)).toBe(0);
-    expect(clampPan(-200, 300, 400)).toBe(0);
+  it('still moves a map narrower than the window, which is most of them zoomed in', () => {
+    expect(clampPan(200, 300)).toBe(150);
   });
 
-  it('holds still before anything has been measured', () => {
-    expect(clampPan(50, 0, 0)).toBe(0);
+  it('holds still when there is one place and nowhere to pan to', () => {
+    expect(clampPan(50, 0)).toBe(0);
   });
 });
 
@@ -237,24 +236,27 @@ describe('the two fingers', () => {
 
 describe('where the map comes to rest', () => {
   const BOX = { minX: 0, minY: 0, maxX: 4, maxY: 0 };
-  const WINDOW = { width: 300, height: 600 };
 
   it('hands back the zoom it was asked for', () => {
-    expect(settled({ x: 0, y: 0 }, 1.75, BOX, WINDOW).scale).toBe(1.75);
+    expect(settled({ x: 0, y: 0 }, 1.75, BOX).scale).toBe(1.75);
   });
 
   it('holds the pan to the slack the new zoom leaves, not the slack the old one did', () => {
     // Zooming in makes the sheet wider, so there is further to pan, and a pan
     // clamped against the smaller sheet could never reach the new edges.
-    const close = settled({ x: 9999, y: 0 }, 2, BOX, WINDOW).pan.x;
-    const far = settled({ x: 9999, y: 0 }, 1, BOX, WINDOW).pan.x;
+    const close = settled({ x: 9999, y: 0 }, 2, BOX).pan.x;
+    const far = settled({ x: 9999, y: 0 }, 1, BOX).pan.x;
 
     expect(close).toBeGreaterThan(far);
   });
 
-  it('refuses to move a sheet that fits, however far the gesture went', () => {
+  it('stops with the outermost place under the middle of the window', () => {
+    expect(settled({ x: 9999, y: 0 }, 1, BOX).pan.x).toBe((4 * PER_UNIT) / 2);
+  });
+
+  it('refuses to move a sheet with nowhere to go, however far the gesture went', () => {
     const tiny = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
-    expect(settled({ x: 500, y: 500 }, 1, tiny, WINDOW).pan).toEqual({ x: 0, y: 0 });
+    expect(settled({ x: 500, y: 500 }, 1, tiny).pan).toEqual({ x: 0, y: 0 });
   });
 });

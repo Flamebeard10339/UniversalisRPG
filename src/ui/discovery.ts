@@ -125,37 +125,29 @@ export const spanBetween = (a: Point, b: Point): number => Math.hypot(a.x - b.x,
 
 export const midpoint = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
-// Panned as far as there is something to pan to and no further, so the player
-// cannot drag the world off the screen and be left looking at nothing. Anything
-// that already fits has no slack at all and stays where it is.
-export function clampPan(offset: number, span: number, window: number): number {
-  const slack = Math.max(0, (span - window) / 2);
-  if (slack === 0) return 0;
+// Panned until the furthest place reaches the middle of the window, and no
+// further. Half a screen of nothing is a map being read at its edge; a whole
+// one is a map the player has lost. Measured against the sheet alone and not
+// against the window, because a map that is mostly gap between places is
+// narrower than the window long after the player has zoomed all the way in, and
+// asking it to cover the window is what left it barely able to move.
+export function clampPan(offset: number, reach: number): number {
+  const slack = reach / 2;
   return Math.min(slack, Math.max(-slack, offset));
 }
 
 // One authored unit of the world, in CSS pixels, before any zoom. The tutorial
 // island's places sit a unit apart, so this is what turns "east of the guide
-// house" into a gap a thumb can aim between. The margin is the room left around
-// the outermost place so it is not flush against the edge.
+// house" into a gap a thumb can aim between.
 export const PER_UNIT = 104;
-export const MARGIN = 64;
-
-export interface Size {
-  width: number;
-  height: number;
-}
 
 // Where the map comes to rest after a gesture: the zoom it asked for, and the
 // pan held to the slack that zoom leaves. One zoom goes in and both come out,
 // because clamping a new pan against the room the old zoom took is how a
 // zoomed-in map ends up unable to reach its own edges.
-export function settled(pan: Point, zoom: number, box: Box, window: Size): { pan: Point; scale: number } {
-  const room = {
-    width: (box.maxX - box.minX) * PER_UNIT * zoom + MARGIN * 2,
-    height: (box.maxY - box.minY) * PER_UNIT * zoom + MARGIN * 2,
-  };
-  return { scale: zoom, pan: { x: clampPan(pan.x, room.width, window.width), y: clampPan(pan.y, room.height, window.height) } };
+export function settled(pan: Point, zoom: number, box: Box): { pan: Point; scale: number } {
+  const reach = { x: (box.maxX - box.minX) * PER_UNIT * zoom, y: (box.maxY - box.minY) * PER_UNIT * zoom };
+  return { scale: zoom, pan: { x: clampPan(pan.x, reach.x), y: clampPan(pan.y, reach.y) } };
 }
 
 // Which places arrived between one view and the next. The map's own reading of
