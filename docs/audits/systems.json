@@ -160,6 +160,8 @@
         "src/runtime/instances.test.ts",
         "src/runtime/instances.ts",
         "src/runtime/integration.test.ts",
+        "src/runtime/journey.test.ts",
+        "src/runtime/journey.ts",
         "src/runtime/location.test.ts",
         "src/runtime/modals.test.ts",
         "src/runtime/modals.ts",
@@ -252,6 +254,13 @@
             "src/runtime/command.ts"
           ],
           "note": "produced by the-command-set-lives-below-the-ui-layer"
+        },
+        {
+          "name": "multi-leg travel",
+          "paths": [
+            "src/runtime/journey.ts"
+          ],
+          "note": "produced by travel-reaches-anywhere-the-roads-do"
         }
       ]
     },
@@ -331,9 +340,11 @@
         "postcss.config.js",
         "public/changelog.txt",
         "public/favicon.svg",
+        "scripts/drift.test.ts",
         "src/index.css",
         "src/main.tsx",
         "src/ui/App.tsx",
+        "src/ui/Console.tsx",
         "src/ui/FloatingText.tsx",
         "src/ui/Home.tsx",
         "src/ui/Ledger.tsx",
@@ -349,6 +360,8 @@
         "src/ui/VStack.tsx",
         "src/ui/choices.test.ts",
         "src/ui/choices.ts",
+        "src/ui/consoleLine.test.ts",
+        "src/ui/consoleLine.ts",
         "src/ui/discovery.test.ts",
         "src/ui/discovery.ts",
         "src/ui/driver.test.ts",
@@ -357,8 +370,10 @@
         "src/ui/format.ts",
         "src/ui/gesture.test.ts",
         "src/ui/gesture.ts",
+        "src/ui/labels.ts",
         "src/ui/nav.test.ts",
         "src/ui/nav.ts",
+        "src/ui/phone.test.tsx",
         "src/ui/render.test.tsx",
         "src/ui/sheet.test.ts",
         "src/ui/sheet.ts",
