@@ -25,6 +25,7 @@ import {
   newSegment,
   Segment,
   settlePools,
+  spreadDiscovery,
 } from './effects';
 import {
   ActiveAction,
@@ -667,6 +668,9 @@ export function armTravel(origin: string, dest: string, registry: Registry, stat
 export function useTravel(origin: string, dest: string, registry: Registry, state: GameState): void {
   if (!origin) {
     state.location = dest;
+    // Placed rather than walked, and standing somewhere is what discovers it:
+    // a journey reaches this through `relocate:`, which spreads on its own.
+    spreadDiscovery(state, registry);
     return;
   }
   const { label } = travelAction(origin, dest, registry);

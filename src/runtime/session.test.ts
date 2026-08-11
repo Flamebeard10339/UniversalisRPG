@@ -656,8 +656,16 @@ skill: smithing 5
 # save stocked
 {"version":${SAVE_VERSION},"inventory":{"ore":1,"gauntlet":1}}
 
+# entity ledger
+forget:
+  unset: forge.discovered
+  unset: overlook.discovered
+
 # save at-the-overlook
 {"version":${SAVE_VERSION},"location":"overlook"}
+
+# test placed-at-the-forge
+travel: forge
 `;
 
 describe('what the engine publishes', () => {
@@ -708,6 +716,35 @@ describe('what the engine publishes', () => {
     const walked = apply(session, 'travel:overlook');
 
     expect(walked.discovered.map((place) => place.id).sort()).toEqual(['forge', 'overlook', 'ridge']);
+  });
+
+  // Arriving is what discovers, so being put down somewhere is arriving too.
+  // A `# test` opens with no location, which makes its first travel: the one
+  // arrival in the engine that reaches no relocate: to spread from.
+  it('discovers where a player was put down, and not only where they walked to', () => {
+    const registry = loadModule(PUBLISHED_MODULE);
+    const state = createGameState();
+
+    expect(runTest('placed-at-the-forge', registry, state)).toEqual({ passed: true });
+
+    expect(state.flags['forge.discovered']).toBe(true);
+    expect(state.flags['overlook.discovered']).toBe(true);
+    // The vault's road is shut and the shipwreck has none, so neither is
+    // reachable from where the player was put and neither is discovered.
+    expect(state.flags['vault.discovered']).toBeUndefined();
+    expect(state.flags['shipwreck.discovered']).toBeUndefined();
+  });
+
+  // Discovery is monotone with respect to position: a place the player can
+  // reach is discovered, and no result may hide it. The unset lands and is
+  // recomputed within the same application, which is the rule holding rather
+  // than the result failing.
+  it('cannot be hidden from a player who can reach it, whatever a result asks', () => {
+    const session = startSession(loadModule(PUBLISHED_MODULE));
+
+    applyDirective(session, { kind: 'use', obj: 'entity', objId: 'ledger', actionId: 'forget' });
+
+    expect(view(session).discovered.map((place) => place.id).sort()).toEqual(['forge', 'overlook']);
   });
 
   it('works out what a save should have known, since a save carries both its inputs at once', () => {
