@@ -862,6 +862,7 @@ describe('what the engine withholds', () => {
       modals: 'published',
       player: 'published',
       activeAction: 'published',
+      journey: 'published',
       // `said` is this drained, so the array itself never leaves the engine.
       log: 'withheld',
       // Bookkeeping the engine reasons with and no driver renders. Each stays

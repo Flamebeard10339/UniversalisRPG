@@ -3,6 +3,7 @@ import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import type { ActiveAction } from './encounter';
 import { createInstanceTable, type InstanceTable } from './instances';
 import type { Populations } from './population';
+import type { Journey } from './journey';
 import type { ModalFrame } from './modals';
 
 export class RuntimeError extends Error {}
@@ -29,6 +30,9 @@ export interface GameState extends RngCursor {
   log: string[];
   time: number;
   activeAction: ActiveAction | null;
+  // The walk under way, and null when the player is not on one. journey.ts owns
+  // the route; runtime.ts owns arming each leg off it.
+  journey: Journey | null;
   activeBuffs: Record<string, ActiveBuff>;
   resources: PoolLevels;
   resourceRateRemainders: Record<string, number>;
@@ -44,7 +48,7 @@ export interface GameState extends RngCursor {
 }
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, journey: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
 }
 
 // The one seam through which simulated time advances; nothing reads a real clock.
@@ -55,5 +59,12 @@ export function advanceTime(state: GameState, milliseconds: number): void {
 }
 
 export function endAction(state: GameState): void {
+  state.activeAction = null;
+}
+
+// Stopped, however it was stopped: the leg ends and the walk ends with it, so
+// nothing arms the next one.
+export function endJourney(state: GameState): void {
+  state.journey = null;
   state.activeAction = null;
 }

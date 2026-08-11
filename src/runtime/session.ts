@@ -1,9 +1,11 @@
 import { Action } from '../content/entity';
 import { DISCOVERED, Location } from '../content/location';
 import {
-  actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, useTravel } from './runtime';
+  actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
+import { endJourney } from './state';
 import { parseOwnerRef } from './actions';
 import { spreadDiscovery } from './effects';
+import { reachable, type Journey } from './journey';
 import { armedAction, hasPool, playerCadence } from './encounter';
 import { declaredId } from '../content/entity';
 import { isTwoSided } from '../grammar/action';
@@ -29,6 +31,10 @@ export interface PlayChoice {
   // an entity that aliases a road -- a staircase, a door -- publishes an action
   // and not a travel, so the id cannot be read for it.
   leadsTo?: string;
+  // How many roads away the place it leads to is, on a travel. One is next
+  // door; more is a walk the engine will queue the legs of. A driver reads it
+  // to tell what belongs to the room from what belongs to the map.
+  legs?: number;
 }
 
 export interface PlayAction {
@@ -58,6 +64,10 @@ export interface PlayStatus {
   stats: Record<string, number>;
   flags: Record<string, boolean | number>;
   discovered: Array<{ id: string; title: string; x: number; y: number; z: number; adjacent: Array<{ to: string; open: boolean }> }>;
+  // The walk under way: where it is going and which places it has still to
+  // cross, in the order it will cross them. A driver lights the route up off
+  // this rather than working the route out for itself.
+  journey: Journey | null;
   player: { name: string; race: string };
   action: PlayAction | null;
 }
@@ -221,7 +231,27 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     // Both are the same move, so showing the edge as well duplicates the option.
     if (entityAliasesTravelTo(location, edge.target, registry, state)) continue;
     const target = registry.locations.get(edge.target);
-    choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: `Travel to ${target?.title ?? edge.target}`, leadsTo: edge.target });
+    choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: `Travel to ${target?.title ?? edge.target}`, leadsTo: edge.target, legs: 1 });
+  }
+
+  return choices;
+}
+
+// Everywhere else the roads reach, offered on the same terms as next door: the
+// engine finds the route and walks the legs, so setting off for the far side of
+// the island is one choice and not a driver's queue of them. Listed after the
+// room's own offers, because what is in reach of a hand comes before what is a
+// walk away.
+function journeyChoices(session: PlaySession, local: PlayChoice[]): PlayChoice[] {
+  const { registry } = session;
+  const state = stateOf(session);
+  const already = new Set(local.flatMap((choice) => (choice.leadsTo === undefined ? [] : [choice.leadsTo])));
+  const choices: PlayChoice[] = [];
+
+  for (const [target, legs] of reachable(state.location, registry, state)) {
+    if (already.has(target)) continue;
+    const place = registry.locations.get(target);
+    choices.push({ id: `travel:${target}`, kind: 'travel', label: `Travel to ${place?.title ?? target}`, leadsTo: target, legs });
   }
 
   return choices;
@@ -231,7 +261,8 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 // is answered; the modal publishes its own options through `view`.
 function computeChoices(session: PlaySession): PlayChoice[] {
   if (stateOf(session).modals.length > 0) return [];
-  return locationChoices(session);
+  const local = locationChoices(session);
+  return [...local, ...journeyChoices(session, local)];
 }
 
 // The single converter, so there is no second switch over choice kinds.
@@ -338,6 +369,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     stats: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, statValue(stat.id, state, registry)])),
     flags: { ...state.flags },
     discovered: publishDiscovered(state, registry),
+    journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,
     player: { ...state.player },
     action: publishAction(state, registry),
   };
@@ -409,7 +441,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'use-on':
       return armFightAction(directive.action, directive.target, registry, state);
     case 'travel':
-      return state.location ? armTravel(state.location, directive.location, registry, state) : null;
+      return state.location ? armJourney(directive.location, registry, state) : null;
     default:
       return null;
   }
@@ -513,8 +545,7 @@ function performDirective(session: PlaySession, directive: Directive): { failure
       useFight(directive.action, directive.target, registry, state);
       return {};
     case 'travel':
-      if (!registry.locations.has(directive.location)) throw new RuntimeError(`unknown location: ${directive.location}`);
-      useTravel(state.location, directive.location, registry, state);
+      walkTo(directive.location, registry, state);
       return {};
     case 'craft':
       craft(directive.recipe, registry, state);
@@ -543,8 +574,9 @@ function performDirective(session: PlaySession, directive: Directive): { failure
       return {};
     }
     case 'cancel':
-      // View-free because a test's state may have no resolvable location.
-      endAction(state);
+      // View-free because a test's state may have no resolvable location. The
+      // walk goes with the leg: stopping is stopping, not pausing.
+      endJourney(state);
       return {};
     case 'wait':
       resolve(state, registry, state.time + secondsToMs(directive.seconds));

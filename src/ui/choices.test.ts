@@ -27,4 +27,16 @@ describe('the offers on the sheet', () => {
   it('has nothing to group when the engine is offering nothing', () => {
     expect(groupOffers([])).toEqual([]);
   });
+
+  it('leaves out the places that are a walk away, and keeps the one next door', () => {
+    const near: PlayView['choices'][number] = { id: 'travel:yard', kind: 'travel', label: 'Travel to Yard', leadsTo: 'yard', legs: 1 };
+    const far: PlayView['choices'][number] = { id: 'travel:ford', kind: 'travel', label: 'Travel to Ford', leadsTo: 'ford', legs: 3 };
+
+    const groups = groupOffers([choice('a', 'Talk to Miki'), near, far]);
+
+    expect(groups.flatMap((group) => group.offers.map((offer) => offer.id))).toEqual(['a', 'travel:yard']);
+    // The position is still the engine's, so the sheet dispatches the right
+    // line however many offers it left off it.
+    expect(groups[0].offers.map((offer) => offer.position)).toEqual([1, 2]);
+  });
 });

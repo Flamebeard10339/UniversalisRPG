@@ -19,6 +19,7 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
       resources: [{ id: 'energy', title: 'Energy', current: 3, max: 5, display: 'full' }],
       encounter: null,
       modals: [],
+      journey: null,
       inventory: {},
       equipment: {},
       xp: {},

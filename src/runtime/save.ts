@@ -50,6 +50,7 @@ const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   equipped: { shape: 'record', holds: (value) => typeof value === 'string', prune: 'pruned by a rule of its own' },
   activeBuffs: { shape: 'record', holds: isObject, prune: 'pruned by a rule of its own' },
   activeAction: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
+  journey: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
   instances: { shape: 'scalar', holds: isInstanceTable, prune: 'pruned by a rule of its own' },
   populations: { shape: 'scalar', holds: isPopulations, prune: 'pruned by a rule of its own' },
   time: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
@@ -175,6 +176,17 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
 
   for (const { name, reason } of pruneModals(state, registry)) {
     addWarning(warnings, `modals.${name}`, name, `Closed modal ${name} because ${reason}.`);
+  }
+
+  // A walk whose destination or any of whose legs has gone is a walk to
+  // nowhere; there is no half of it worth keeping, so the whole of it goes.
+  const journey = state.journey;
+  if (journey) {
+    const lost = [journey.to, ...journey.legs].find((place) => !registry.locations.has(place));
+    if (lost !== undefined) {
+      state.journey = null;
+      addWarning(warnings, 'journey', journey.to, `Stopped the journey to ${journey.to} because location ${lost} is not loaded.`);
+    }
   }
 
   const activeProblem = activeActionProblem(state, registry);
