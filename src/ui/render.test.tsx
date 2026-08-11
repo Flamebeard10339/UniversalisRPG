@@ -83,12 +83,13 @@ const asking = (html: string): boolean => html.includes('role="dialog"');
 // The map's nodes, each as the place it stands for, where it was put and the
 // runs inside it. data-place is written by MapPane and nothing else, so this
 // reads the map's own markup rather than guessing at it from class names.
-function places(html: string): Array<{ id: string; runs: string[]; disabled: boolean; flashing: boolean; left: number; top: number }> {
+function places(html: string): Array<{ id: string; runs: string[]; disabled: boolean; walk?: string; flashing: boolean; left: number; top: number }> {
   const offset = (attributes: string, edge: string): number => Number(attributes.match(new RegExp(`${edge}:\\s*(-?[\\d.]+)`))?.[1] ?? NaN);
   return [...html.matchAll(/<button([^>]*data-place="([^"]*)"[^>]*)>([\s\S]*?)<\/button>/g)].map(([, attributes, id, inner]) => ({
     id,
     runs: readable(inner),
     disabled: attributes.includes('disabled'),
+    walk: attributes.match(/data-walk="([^"]*)"/)?.[1],
     flashing: /\barrived\b/.test(attributes),
     left: offset(attributes, 'left'),
     top: offset(attributes, 'top'),
@@ -101,9 +102,9 @@ function position(driver: Driver, choiceId: string): number {
   return at + 1;
 }
 
-// Two places that join up, a way to discover both, and something to carry, so
-// the map and the sheet are driven by a fixture whose whole content is what
-// each of them is asked about rather than by whatever the tutorial holds.
+// A line of three places with a fourth off to the side, a way to find them all,
+// and something to carry: a walk has a middle to draw and the map has a road it
+// is not taking, and neither depends on what the tutorial happens to hold.
 const SURVEYED = {
   name: 'surveyed',
   text: [
@@ -122,6 +123,7 @@ const SURVEYED = {
     'examine: A bench and a lathe.',
     'adjacent:',
     '  overlook',
+    '  shed',
     'entities:',
     '  window',
     '',
@@ -129,6 +131,21 @@ const SURVEYED = {
     'x: 1, y: 0',
     'title: The Overlook',
     'examine: A long view over the valley.',
+    'adjacent:',
+    '  workshop',
+    '  cove',
+    '',
+    '# location cove',
+    'x: 2, y: 0',
+    'title: The Cove',
+    'examine: Shingle and a drawn-up boat.',
+    'adjacent:',
+    '  overlook',
+    '',
+    '# location shed',
+    'x: 0, y: 1',
+    'title: The Shed',
+    'examine: Rakes, and a smell of creosote.',
     'adjacent:',
     '  workshop',
     '',
@@ -140,6 +157,8 @@ const SURVEYED = {
     'look out:',
     '  discover: workshop',
     '  discover: overlook',
+    '  discover: cove',
+    '  discover: shed',
     '  give: 1 ore',
     '  xp: surveying 3',
     '',
@@ -204,14 +223,14 @@ describe('what the shell puts on the screen', () => {
     // By node rather than by words on the screen: every one of these titles is
     // also on Home's transcript or in the location banner, so a map drawing
     // nothing would pass a check that only asks whether the words are somewhere.
-    expect(found.map((place) => place.id).sort()).toEqual(['surveyed.overlook', 'surveyed.workshop']);
+    expect(found.map((place) => place.id).sort()).toEqual(['surveyed.cove', 'surveyed.overlook', 'surveyed.shed', 'surveyed.workshop']);
     for (const place of found) {
       const node = drawn.find((entry) => entry.id === place.id);
       expect(node, `${place.title} has no node on the map`).toBeDefined();
       expect(node!.runs).toContain(place.title);
     }
-    // The road between them, drawn once for the pair rather than once per end.
-    expect(html.match(/<line/g) ?? []).toHaveLength(1);
+    // One road per pair rather than one per end, and the fixture has three.
+    expect(html.match(/<line/g) ?? []).toHaveLength(3);
   });
 
   // The clause above finds a node per place and reads the title in it, which a
@@ -240,6 +259,39 @@ describe('what the shell puts on the screen', () => {
 
     expect(drawn.find((entry) => entry.id === 'surveyed.overlook')!.flashing).toBe(true);
     expect(drawn.find((entry) => entry.id === 'surveyed.workshop')!.flashing).toBe(false);
+  });
+
+  it('lights the walk up: where it ends, what it still has to cross, and the roads between', () => {
+    const driver = createDriver([SURVEYED], { ticker: noTicks });
+    driver.choose(position(driver, LOOK_OUT));
+    // Walked the long way round, so the route has a middle to draw and the map
+    // has a road it is not taking.
+    driver.choose(position(driver, 'travel:surveyed.cove'));
+    const view = driver.snapshot().view!;
+
+    const html = renderToStaticMarkup(<MapPane view={view} arrivals={[]} generation={0} onChoose={() => undefined} />);
+
+    expect(view.journey).toEqual({ to: 'surveyed.cove', legs: ['surveyed.overlook', 'surveyed.cove'] });
+    expect(places(html).map((node) => [node.id, node.walk])).toEqual([
+      ['surveyed.workshop', undefined],
+      ['surveyed.overlook', 'crossing'],
+      ['surveyed.cove', 'going'],
+      ['surveyed.shed', undefined],
+    ]);
+    // Two roads on the map and one of them is not on the walk.
+    expect(html.match(/<line/g) ?? []).toHaveLength(3);
+    expect(html.match(/data-walk="road"/g) ?? []).toHaveLength(2);
+  });
+
+  it('lights nothing up when nobody is walking', () => {
+    const driver = createDriver([SURVEYED]);
+    driver.choose(position(driver, LOOK_OUT));
+
+    const html = renderToStaticMarkup(<MapPane view={driver.snapshot().view!} arrivals={[]} generation={0} onChoose={() => undefined} />);
+
+    expect(driver.snapshot().view!.journey).toBeNull();
+    expect(places(html).every((node) => node.walk === undefined)).toBe(true);
+    expect(html).not.toContain('data-walk="road"');
   });
 
   it('sets off for a place when it is tapped, through the choice the engine published', () => {

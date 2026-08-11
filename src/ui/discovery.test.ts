@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, drawnBox, midpoint, newlyFound, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, tapTarget, TOUCH_FLOOR, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
+import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, drawnBox, midpoint, newlyFound, panAfterZoom, PER_UNIT, settled, sheetAt, onWalk, spanBetween, tapTarget, TOUCH_FLOOR, walkLine, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -270,6 +270,35 @@ describe('where the map comes to rest', () => {
     const alone = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
     expect(settled({ x: 500, y: 500 }, 1, alone, NO_BUBBLE).pan).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('the walk under way', () => {
+  const journey = { to: 'd', legs: ['b', 'c', 'd'] };
+
+  it('runs from where the player is standing to where they are going', () => {
+    expect(walkLine('a', journey)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('is nothing at all when nobody is walking', () => {
+    expect(walkLine('a', null)).toEqual([]);
+    expect(walkLine('a', { to: 'd', legs: [] })).toEqual([]);
+  });
+
+  it('takes the road between two places it crosses in a row, either way round', () => {
+    const line = walkLine('a', journey);
+
+    expect(onWalk(line, 'a', 'b')).toBe(true);
+    expect(onWalk(line, 'c', 'b')).toBe(true);
+    expect(onWalk(line, 'c', 'd')).toBe(true);
+  });
+
+  it('leaves the roads it does not take, including a short cut between two places on it', () => {
+    const line = walkLine('a', journey);
+
+    expect(onWalk(line, 'a', 'c')).toBe(false);
+    expect(onWalk(line, 'b', 'elsewhere')).toBe(false);
+    expect(onWalk([], 'a', 'b')).toBe(false);
   });
 });
 

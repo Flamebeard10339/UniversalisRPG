@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampZoom, drawnBox, midpoint, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, tapTarget, waysOut, zoomByWheel, type Node, type Point, type Size } from './discovery';
+import { bounds, clampZoom, drawnBox, midpoint, onWalk, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, tapTarget, walkLine, waysOut, zoomByWheel, type Node, type Point, type Size } from './discovery';
 
 // The map draws its own working out — the box a pan is held against — for
 // whoever is building the map. Read once, off the address, because a debug
@@ -30,7 +30,7 @@ interface Pinch {
   scale: number;
 }
 
-function Road({ from, to, open }: { from: Node; to: Node; open: boolean }): JSX.Element {
+function Road({ from, to, open, walking }: { from: Node; to: Node; open: boolean; walking: boolean }): JSX.Element {
   const a = pixels(from);
   const b = pixels(to);
   return (
@@ -39,8 +39,9 @@ function Road({ from, to, open }: { from: Node; to: Node; open: boolean }): JSX.
       y1={a.top}
       x2={b.left}
       y2={b.top}
-      className={open ? 'stroke-accent' : 'stroke-text-subtle'}
-      strokeWidth={open ? 3 : 2}
+      data-walk={walking ? 'road' : undefined}
+      className={walking ? 'stroke-accent-strong' : open ? 'stroke-accent' : 'stroke-text-subtle'}
+      strokeWidth={walking ? 7 : open ? 3 : 2}
       strokeDasharray={open ? undefined : '4 5'}
       strokeLinecap="round"
     />
@@ -78,6 +79,11 @@ export function MapPane({
   // A place with no way out to it is somewhere the player cannot set off for
   // now, and the map says so by not being tappable rather than by saying why.
   const travels = waysOut(view?.choices ?? []);
+
+  // The walk under way, as the engine published it, with the place the player
+  // is standing in at the head so a road on it is a pair of neighbours.
+  const walk = walkLine(here, view?.journey ?? null);
+  const going = walk[walk.length - 1];
 
   // How big a place is drawn is a rendered fact — a title truncated at eight
   // characters' worth is narrower than one that fills the cap — so it is
@@ -226,7 +232,7 @@ export function MapPane({
       >
         <svg className="pointer-events-none absolute overflow-visible" width={1} height={1}>
           {sheet.roads.map((road) => (
-            <Road key={`${road.from.place.id}>${road.to.place.id}`} from={road.from} to={road.to} open={road.open} />
+            <Road key={`${road.from.place.id}>${road.to.place.id}`} from={road.from} to={road.to} open={road.open} walking={onWalk(walk, road.from.place.id, road.to.place.id)} />
           ))}
         </svg>
 
@@ -242,12 +248,15 @@ export function MapPane({
           const spot = pixels(node);
           const position = travels.get(node.place.id);
           const arrived = arrivals.includes(node.place.id);
+          // Where the walk ends, somewhere it still has to cross, or neither.
+          const walking = node.place.id === going ? 'going' : walk.includes(node.place.id) && !node.here ? 'crossing' : undefined;
           return (
             <button
               key={`${node.place.id}-${arrived ? generation : 0}`}
               ref={(element) => void (bubbles.current[at] = element)}
               type="button"
               data-place={node.place.id}
+              data-walk={walking}
               disabled={position === undefined}
               onClick={() => {
                 if (dragged() || position === undefined) return;
@@ -256,6 +265,8 @@ export function MapPane({
               style={{ left: spot.left, top: spot.top }}
               className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-3 py-2 text-xs ${arrived ? 'arrived' : ''} ${
                 node.here ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-panel'
+              } ${walking === 'going' ? 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong' : ''} ${
+                walking === 'crossing' ? 'border-accent text-accent' : ''
               } ${node.climb !== 0 ? 'opacity-70' : ''} ${position === undefined ? 'text-text-subtle' : ''}`}
             >
               {/* Inside the control, so what it covers is what the control

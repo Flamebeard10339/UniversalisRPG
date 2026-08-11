@@ -185,6 +185,23 @@ export function settled(pan: Point, zoom: number, box: Box, bubble: Size): { pan
   return { scale: zoom, pan: { x: clampPan(pan.x, drawn.width * zoom), y: clampPan(pan.y, drawn.height * zoom) } };
 }
 
+// The line a walk takes, from where the player is standing to where they are
+// going. The engine publishes the legs still to cross and not the place they
+// are leaving, so the player's own place is put at the head of it — which is
+// what makes a road on the route a pair of neighbours in one list, and what
+// keeps the map from working the route out for itself.
+export function walkLine(here: string, journey: PlayView['journey']): string[] {
+  if (!journey || journey.legs.length === 0) return [];
+  return [here, ...journey.legs];
+}
+
+// Whether the road between two places is one the walk will take. Either way
+// round, because a road is drawn once for the pair and neither end is its own.
+export function onWalk(line: readonly string[], from: string, to: string): boolean {
+  const at = line.indexOf(from);
+  return at >= 0 && (line[at + 1] === to || line[at - 1] === to);
+}
+
 // Which places arrived between one view and the next. The map's own reading of
 // the same event the engine already published, so nothing has to be remembered
 // beyond the last list.
