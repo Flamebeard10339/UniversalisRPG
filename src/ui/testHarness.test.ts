@@ -42,6 +42,7 @@ function driver(current: DriverSnapshot, calls: string[] = []): Driver {
     choose: (position) => void calls.push(`choose:${position}`),
     answer: (key, value) => void calls.push(`answer:${key}=${value}`),
     cancel: () => void calls.push('cancel'),
+    serialized: () => null,
   };
 }
 

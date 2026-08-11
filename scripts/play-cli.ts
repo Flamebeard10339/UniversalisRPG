@@ -395,6 +395,31 @@ export function loadModportalSources(dir: string): ModportalLoadResult {
   return { sources, warnings };
 }
 
+export interface Repl {
+  context: CommandContext;
+  // Written to stderr by main, because a disabled module is not part of the
+  // game being played.
+  diagnostics: string[];
+  opening: string[];
+}
+
+// Everything between having the sources and taking the first line: load the
+// universe, start a session, take the opening view, and build the one context
+// every line afterwards goes through. Lifted out of main so that the drift
+// proof drives the REPL rather than a second copy of it — a copy is what made
+// the previous cross-driver comparison measure only one of the two drivers.
+export function openRepl(sources: readonly ModuleSource[], options: { authoring?: AuthoringContext; driving?: boolean } = {}): Repl {
+  const loaded = loadUniverseWithDiagnostics(sources);
+  const session = startSession(loaded.registry);
+  const recorder: Recorder = { history: [], startSave: serializeSession(session) };
+  const opening = view(session);
+  return {
+    context: newContext(session, opening, { recorder, authoring: options.authoring, driving: options.driving }),
+    diagnostics: loaded.diagnostics.map((each) => `Disabled module: ${formatModuleDiagnostic(each)}`),
+    opening: formatView(opening),
+  };
+}
+
 async function main(): Promise<void> {
   const args = parseCliArgs(process.argv.slice(2));
   // Nobody to press a key on a non-TTY run, and a repeating action would tick
@@ -410,10 +435,6 @@ async function main(): Promise<void> {
   const localText = existsSync(localPath) ? readFileSync(localPath, 'utf8') : initialLocalChangesModule(dependencies);
   const localSource: ModuleSource = { name: sourceName(args.localFile), text: localText };
   const sources = existsSync(localPath) ? [...baseSources, localSource] : baseSources;
-  const loaded = loadUniverseWithDiagnostics(sources);
-  for (const each of loaded.diagnostics) console.error(`Disabled module: ${formatModuleDiagnostic(each)}`);
-  const session = startSession(loaded.registry);
-  const recorder: Recorder = { history: [], startSave: serializeSession(session) };
   const authoring: AuthoringContext = {
     baseSources,
     dependencies,
@@ -421,9 +442,9 @@ async function main(): Promise<void> {
     writeLocalChanges: (text) => writeLocalChanges(args.localFile, text),
   };
 
-  let opening: PlayView;
+  let repl: Repl;
   try {
-    opening = view(session);
+    repl = openRepl(sources, { authoring, driving: liveMode });
   } catch (err) {
     if (err instanceof RuntimeError) {
       console.error(`Error: ${err.message}`);
@@ -431,8 +452,9 @@ async function main(): Promise<void> {
     }
     throw err;
   }
-  const ctx: CommandContext = newContext(session, opening, { recorder, authoring, driving: liveMode });
-  console.log(formatView(opening).join('\n'));
+  for (const each of repl.diagnostics) console.error(each);
+  const ctx = repl.context;
+  console.log(repl.opening.join('\n'));
   console.log('\nType /help for commands (/state and /inventory show your progress).');
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });

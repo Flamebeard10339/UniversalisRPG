@@ -22,6 +22,10 @@ export interface Driver {
   choose(position: number): void;
   answer(key: string, value: string): void;
   cancel(): void;
+  // What a save of this session would write, and null when there is no session
+  // to save. The bytes are the whole of what the two drivers are compared on,
+  // because a view is what a driver was told and this is what it is standing in.
+  serialized(): string | null;
 }
 
 export interface DriverOptions {
@@ -146,6 +150,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     choose: (position) => send(String(position)),
     answer: (key, value) => send(`submit-modal: ${key}=${value}`),
     cancel: () => close(true),
+    serialized: () => (context ? serializeSession(context.session) : null),
   };
 
   if (import.meta.env.DEV && typeof window !== 'undefined') {
