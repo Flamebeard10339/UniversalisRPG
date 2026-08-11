@@ -14,6 +14,11 @@ export const FLICK_MIN_PX = 24;
 // surface that does not answer at all reads as a surface that is broken.
 export const EDGE_RESISTANCE = 0.35;
 
+// How a released strip finishes travelling, on either axis. One figure, so the
+// horizontal pages and the vertical layers settle as one surface.
+export const SETTLE_MS = 220;
+export const SETTLE_EASING = `transform ${SETTLE_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1)`;
+
 export type Axis = 'x' | 'y';
 
 export function dragAxis(dx: number, dy: number): Axis | null {

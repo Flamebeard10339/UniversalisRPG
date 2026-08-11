@@ -3,10 +3,8 @@ import type { MessageTone } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { groupOffers } from './choices';
 import type { DriverSnapshot } from './driver';
-import { formatClock } from './format';
 import { SPLIT_DEFAULT, splitFrom } from './gesture';
 import { LiveSheet } from './LiveSheet';
-import { Meter } from './Meter';
 import { Splitter } from './Splitter';
 import type { LogEntry, LogKind } from './transcript';
 
@@ -79,23 +77,6 @@ export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapsho
 
   return (
     <>
-      {view ? (
-        <header className="shrink-0 border-b border-border bg-surface px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-          <div className="flex items-baseline justify-between gap-3">
-            <h1 className="truncate text-base font-semibold">{view.location.title}</h1>
-            <span className="shrink-0 text-xs tabular-nums text-text-subtle">{formatClock(view.time)}</span>
-          </div>
-          {view.entities.length > 0 ? (
-            <p className="mt-0.5 truncate text-xs text-text-subtle">{view.entities.map((entity) => entity.title).join(' · ')}</p>
-          ) : null}
-          <div className="mt-2 flex flex-col gap-1.5">
-            {view.resources.map((resource) => (
-              <Meter key={resource.id} title={resource.title} current={resource.current} max={resource.max} readout={resource.display === 'full'} />
-            ))}
-          </div>
-        </header>
-      ) : null}
-
       <div ref={surface} className="flex min-h-0 flex-1 flex-col">
         <div
           ref={column}

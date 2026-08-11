@@ -337,11 +337,14 @@
         "src/ui/FloatingText.tsx",
         "src/ui/Home.tsx",
         "src/ui/LiveSheet.tsx",
+        "src/ui/LocationBanner.tsx",
         "src/ui/Meter.tsx",
         "src/ui/ModalSheet.tsx",
         "src/ui/Pager.tsx",
         "src/ui/Splitter.tsx",
+        "src/ui/StatusBanner.tsx",
         "src/ui/TabBar.tsx",
+        "src/ui/VStack.tsx",
         "src/ui/choices.test.ts",
         "src/ui/choices.ts",
         "src/ui/driver.test.ts",
@@ -350,11 +353,12 @@
         "src/ui/format.ts",
         "src/ui/gesture.test.ts",
         "src/ui/gesture.ts",
+        "src/ui/nav.test.ts",
+        "src/ui/nav.ts",
         "src/ui/render.test.tsx",
         "src/ui/shippedContent.test.ts",
         "src/ui/shippedContent.ts",
         "src/ui/surface.test.ts",
-        "src/ui/tabs.ts",
         "src/ui/transcript.test.ts",
         "src/ui/transcript.ts",
         "src/ui/transient.test.ts",
@@ -394,9 +398,7 @@
             "src/main.tsx",
             "src/ui/App.tsx",
             "src/ui/Home.tsx",
-            "src/ui/TabBar.tsx",
             "src/ui/ModalSheet.tsx",
-            "src/ui/tabs.ts",
             "src/ui/transcript.ts",
             "src/ui/format.ts",
             "src/ui/gesture.ts",
@@ -404,7 +406,7 @@
             "src/ui/Splitter.tsx",
             "src/ui/choices.ts"
           ],
-          "note": "produced by the-gui-shell-and-the-play-surface; the chat-log surface, action sheet and five-tab nav the-map-and-character-tabs and the four Settings/Edit records land in"
+          "note": "produced by the-gui-shell-and-the-play-surface; the chat-log surface and the action sheet. The nav it shipped with was a five-tab one and is now a separate concept, because the-nav-becomes-three-vertical-layers-around-home made it a thing with its own model rather than a strip along the bottom of this one"
         },
         {
           "name": "the GUI's real-time clock",
@@ -412,6 +414,17 @@
             "src/ui/LiveSheet.tsx"
           ],
           "note": "produced by the-gui-runs-in-real-time for gui-rebuild c5; the run the command surface armed, rendered as the player sees it. The ticker that feeds it elapsed milliseconds moved down to src/runtime/command.ts on pass 3, so both drivers read one cadence and one elapsed rule rather than two that happen to agree"
+        },
+        {
+          "name": "the two-dimensional nav",
+          "paths": [
+            "src/ui/nav.ts",
+            "src/ui/VStack.tsx",
+            "src/ui/TabBar.tsx",
+            "src/ui/LocationBanner.tsx",
+            "src/ui/StatusBanner.tsx"
+          ],
+          "note": "produced by the-nav-becomes-three-vertical-layers-around-home for gui-rebuild c6: three vertical layers joined by two shared banners that are also the handles, and a bottom bar carrying the current layer's pages. the-map-and-character-tabs fills the Map and Character bodies it leaves empty"
         }
       ]
     },

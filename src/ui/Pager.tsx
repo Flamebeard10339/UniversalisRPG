@@ -1,8 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
-import { dragAxis, landingIndex, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, wasDragged, type Axis, type Motion } from './gesture';
-
-const SETTLE_MS = 220;
-const SETTLE_EASING = `transform ${SETTLE_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1)`;
+import { dragAxis, landingIndex, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, SETTLE_EASING, wasDragged, type Axis, type Motion } from './gesture';
 
 interface Drag {
   x: number;

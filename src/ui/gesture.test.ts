@@ -19,7 +19,6 @@ import {
   VELOCITY_WINDOW_MS,
   wasDragged,
 } from './gesture';
-import { OPENING_TAB, TABS } from './tabs';
 
 const WIDTH = 400;
 
@@ -70,8 +69,8 @@ describe('where a release lands', () => {
   });
 
   it('stops at each end rather than wrapping the whole strip on one gesture', () => {
-    expect(clampIndex(-1, TABS.length)).toBe(0);
-    expect(clampIndex(TABS.length, TABS.length)).toBe(TABS.length - 1);
+    expect(clampIndex(-1, 5)).toBe(0);
+    expect(clampIndex(5, 5)).toBe(4);
   });
 });
 
@@ -138,12 +137,5 @@ describe('where the player put the split', () => {
 
   it('stays where it was when there is no surface to measure against', () => {
     expect(splitFrom(0.4, 100, 0)).toBe(0.4);
-  });
-});
-
-describe('the tab order', () => {
-  it('opens on Home with two panes either side of it', () => {
-    expect(TABS.map((tab) => tab.id)).toEqual(['map', 'character', 'home', 'settings', 'edit']);
-    expect(OPENING_TAB).toBe(2);
   });
 });

@@ -1,9 +1,12 @@
-import { TABS } from './tabs';
+import type { Subpage } from './nav';
 
-export function TabBar({ active, onSelect }: { active: number; onSelect: (index: number) => void }): JSX.Element {
+// Fixed where a thumb rests, and carrying the current layer's pages rather than
+// every destination in the app: the layers are reached by the banners, so this
+// bar answers one question and the banners answer the other.
+export function TabBar({ tabs, active, onSelect }: { tabs: readonly Subpage[]; active: number; onSelect: (index: number) => void }): JSX.Element {
   return (
     <nav className="flex shrink-0 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]">
-      {TABS.map((tab, at) => (
+      {tabs.map((tab, at) => (
         <button
           key={tab.id}
           type="button"

@@ -7,7 +7,7 @@ import { App } from './App';
 import { createDriver, type Driver } from './driver';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
-import { TABS } from './tabs';
+import { HOME_LAYER, LAYERS } from './nav';
 
 // A run that is under way and going nowhere, which is what a test about what
 // is drawn wants: no timer, and the same frame however long the test takes.
@@ -47,7 +47,10 @@ function published(view: PlayView): string[] {
   ];
 }
 
-const TAB_LABELS = TABS.map((tab) => tab.label);
+// The nav's words, and only the layer's own: the bar carries the current
+// layer's pages, so what the screen may say changes as the player moves and
+// this is what it may say where the shell opens.
+const TAB_LABELS = LAYERS[HOME_LAYER].subpages.map((subpage) => subpage.label);
 
 // The engine speaks in messages as well as in views, and a driver logs both.
 // Taken by stopping a run against a session of its own, because typing the
@@ -60,9 +63,9 @@ function whatStoppingSays(): string[] {
 }
 
 // The nav is the one region whose words this layer owns, so it is taken out by
-// where it is rather than by what it says. Skipping the five labels wherever
-// they appeared let a narration header the clause does enumerate be replaced
-// with the word Character and pass.
+// where it is rather than by what it says. Skipping the labels wherever they
+// appeared let a narration header the clause does enumerate be replaced with
+// one of them and pass.
 const NAV = /<nav[\s\S]*?<\/nav>/g;
 const asking = (html: string): boolean => html.includes('role="dialog"');
 
