@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampPan, CLIMB_NUDGE, drawnAt, newlyFound, sheetAt, waysOut, type Place } from './discovery';
+import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, midpoint, newlyFound, panAfterZoom, settled, sheetAt, spanBetween, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -171,5 +171,90 @@ describe('which offer is the way to a place', () => {
     const ways = waysOut([offer('a'), offer('travel:beach', 'beach'), offer('use:entity.path.walk', 'beach')]);
 
     expect(ways.get('beach')).toBe(2);
+  });
+});
+
+describe('how far in and out the map goes', () => {
+  it('stops at each end rather than zooming to nothing or to one room', () => {
+    expect(clampZoom(99)).toBe(ZOOM_MAX);
+    expect(clampZoom(0)).toBe(ZOOM_MIN);
+    expect(clampZoom(1.5)).toBe(1.5);
+  });
+
+  it('reads a wheel as a fraction of where it is, so one notch means the same at every zoom', () => {
+    const out = zoomByWheel(1, 120);
+    const back = zoomByWheel(out, -120);
+
+    expect(out).toBeLessThan(1);
+    expect(back).toBeCloseTo(1, 10);
+    // The property a fixed step per notch would fail: the same notch moves a
+    // zoomed-in map by the same proportion, not by the same number of pixels.
+    expect(zoomByWheel(2, 120) / 2).toBeCloseTo(out, 10);
+  });
+
+  it('zooms in when the wheel goes the way a page scrolls up', () => {
+    expect(zoomByWheel(1, -120)).toBeGreaterThan(1);
+  });
+
+  it('will not be wheeled past either end', () => {
+    expect(zoomByWheel(ZOOM_MAX, -10_000)).toBe(ZOOM_MAX);
+    expect(zoomByWheel(ZOOM_MIN, 10_000)).toBe(ZOOM_MIN);
+  });
+});
+
+describe('what stays put while the map is zoomed', () => {
+  it('keeps the point under the pointer under the pointer', () => {
+    // A world point 200px right of the middle at rest is 400 away at 2x, so the
+    // map has to give back the 200 it gained for the pointer to still be on it.
+    expect(panAfterZoom(0, 200, 1, 2)).toBe(-200);
+  });
+
+  it('leaves the middle of the window alone, since it is the point zoom is about', () => {
+    expect(panAfterZoom(0, 0, 1, 3)).toBe(0);
+  });
+
+  it('undoes itself when the zoom is undone', () => {
+    const there = panAfterZoom(40, 130, 1, 2.5);
+
+    expect(panAfterZoom(there, 130, 2.5, 1)).toBeCloseTo(40, 10);
+  });
+
+  it('holds still rather than dividing by a zoom of nothing', () => {
+    expect(panAfterZoom(40, 130, 0, 2)).toBe(40);
+  });
+});
+
+describe('the two fingers', () => {
+  it('measures how far apart they are, whichever way round they are', () => {
+    expect(spanBetween({ x: 0, y: 0 }, { x: 3, y: 4 })).toBe(5);
+    expect(spanBetween({ x: 3, y: 4 }, { x: 0, y: 0 })).toBe(5);
+  });
+
+  it('takes the point between them as what the pinch is about', () => {
+    expect(midpoint({ x: -10, y: 4 }, { x: 30, y: 8 })).toEqual({ x: 10, y: 6 });
+  });
+});
+
+describe('where the map comes to rest', () => {
+  const BOX = { minX: 0, minY: 0, maxX: 4, maxY: 0 };
+  const WINDOW = { width: 300, height: 600 };
+
+  it('hands back the zoom it was asked for', () => {
+    expect(settled({ x: 0, y: 0 }, 1.75, BOX, WINDOW).scale).toBe(1.75);
+  });
+
+  it('holds the pan to the slack the new zoom leaves, not the slack the old one did', () => {
+    // Zooming in makes the sheet wider, so there is further to pan, and a pan
+    // clamped against the smaller sheet could never reach the new edges.
+    const close = settled({ x: 9999, y: 0 }, 2, BOX, WINDOW).pan.x;
+    const far = settled({ x: 9999, y: 0 }, 1, BOX, WINDOW).pan.x;
+
+    expect(close).toBeGreaterThan(far);
+  });
+
+  it('refuses to move a sheet that fits, however far the gesture went', () => {
+    const tiny = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+
+    expect(settled({ x: 500, y: 500 }, 1, tiny, WINDOW).pan).toEqual({ x: 0, y: 0 });
   });
 });

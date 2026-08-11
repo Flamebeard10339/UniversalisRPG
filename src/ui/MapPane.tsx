@@ -1,15 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampPan, sheetAt, waysOut, type Node } from './discovery';
+import { bounds, clampZoom, midpoint, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, waysOut, zoomByWheel, type Node, type Point } from './discovery';
 
-// One authored unit of the world, in CSS pixels. The tutorial island's places
-// sit a unit apart, so this is what turns "east of the guide house" into a gap a
-// thumb can aim between.
-const PER_UNIT = 104;
-const MARGIN = 64;
-
-// Where a place is drawn, in pixels, before the pan is applied.
+// Where a place is drawn, in unscaled pixels: the zoom is applied to the whole
+// sheet at once, so nothing here has to know about it.
 const pixels = (node: Node): { left: number; top: number } => ({ left: node.at.x * PER_UNIT, top: node.at.y * PER_UNIT });
+
+// A drag moves the map; a pinch moves and scales it. Both are held from where
+// they started rather than accumulated frame by frame, so a gesture that
+// wanders and comes back lands where it set off.
+interface Grab {
+  kind: 'pan';
+  from: Point;
+  pan: Point;
+  moved: boolean;
+}
+
+interface Pinch {
+  kind: 'pinch';
+  span: number;
+  focal: Point;
+  pan: Point;
+  scale: number;
+}
 
 function Road({ from, to, open }: { from: Node; to: Node; open: boolean }): JSX.Element {
   const a = pixels(from);
@@ -40,18 +53,19 @@ export function MapPane({
   onChoose: (position: number) => void;
 }): JSX.Element {
   const frame = useRef<HTMLDivElement>(null);
-  const grab = useRef<{ x: number; y: number; from: { x: number; y: number }; moved: boolean; release: () => void } | null>(null);
+  const gesture = useRef<Grab | Pinch | null>(null);
+  const release = useRef<() => void>(() => undefined);
   const [plane, setPlane] = useState<number | null>(null);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
+  const [scale, setScale] = useState(1);
   const [window_, setWindow] = useState({ width: 0, height: 0 });
 
   const discovered = view?.discovered ?? [];
   const here = view?.location.id ?? '';
   const standing = discovered.find((place) => place.id === here);
-  const sheet = sheetAt(discovered, here, plane ?? standing?.z ?? 0);
   const at = plane ?? standing?.z ?? 0;
+  const sheet = sheetAt(discovered, here, at);
   const box = bounds(sheet.nodes);
-  const span = { width: (box.maxX - box.minX) * PER_UNIT + MARGIN * 2, height: (box.maxY - box.minY) * PER_UNIT + MARGIN * 2 };
   const centre = { x: ((box.minX + box.maxX) / 2) * PER_UNIT, y: ((box.minY + box.maxY) / 2) * PER_UNIT };
 
   // A place with no way out to it is somewhere the player cannot set off for
@@ -68,70 +82,126 @@ export function MapPane({
     return () => observer.disconnect();
   }, []);
 
-  // A pan that was legal on a crowded plane is not legal on an empty one, so it
-  // is re-clamped against whatever is being drawn now rather than only as it is
-  // dragged.
-  const held = { x: clampPan(pan.x, span.width, window_.width), y: clampPan(pan.y, span.height, window_.height) };
+  // A pan that was legal at one zoom, or on a busier plane, is not legal now, so
+  // it is re-held against what is being drawn rather than only as it is moved.
+  const held = settled(pan, scale, box, window_).pan;
 
-  const begin = (x: number, y: number, release: () => void): void => {
-    grab.current = { x, y, from: held, moved: false, release };
+  // From the middle of the window, which is what the pan is an offset from.
+  const fromCentre = (x: number, y: number): Point => {
+    const rect = frame.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return { x: x - (rect.left + rect.width / 2), y: y - (rect.top + rect.height / 2) };
   };
 
-  const moveTo = (x: number, y: number): void => {
-    const grabbed = grab.current;
-    if (!grabbed) return;
-    const next = { x: grabbed.from.x + (x - grabbed.x), y: grabbed.from.y + (y - grabbed.y) };
-    grabbed.moved = grabbed.moved || Math.abs(next.x - grabbed.from.x) > 6 || Math.abs(next.y - grabbed.from.y) > 6;
-    setPan({ x: clampPan(next.x, span.width, window_.width), y: clampPan(next.y, span.height, window_.height) });
+  const settle = (next: Point, zoom: number): void => {
+    const rest = settled(next, zoom, box, window_);
+    setScale(rest.scale);
+    setPan(rest.pan);
+  };
+
+  // React's TouchList and the DOM's differ only in being iterable, and both
+  // arrive here — one from the handler, one from the window listener.
+  const touchPoints = (touches: { length: number; [index: number]: { clientX: number; clientY: number } }): Point[] =>
+    Array.from({ length: Math.min(2, touches.length) }, (_, at) => fromCentre(touches[at].clientX, touches[at].clientY));
+
+  const beginPinch = (points: Point[]): void => {
+    gesture.current = { kind: 'pinch', span: spanBetween(points[0], points[1]), focal: midpoint(points[0], points[1]), pan: held, scale };
+  };
+
+  const movePinch = (points: Point[]): void => {
+    const pinching = gesture.current;
+    if (pinching?.kind !== 'pinch' || pinching.span === 0) return;
+    const zoom = clampZoom((pinching.scale * spanBetween(points[0], points[1])) / pinching.span);
+    const focal = midpoint(points[0], points[1]);
+    // Zoomed about where the fingers were, then carried along with wherever
+    // they have drifted to since.
+    settle(
+      {
+        x: panAfterZoom(pinching.pan.x, pinching.focal.x, pinching.scale, zoom) + (focal.x - pinching.focal.x),
+        y: panAfterZoom(pinching.pan.y, pinching.focal.y, pinching.scale, zoom) + (focal.y - pinching.focal.y),
+      },
+      zoom,
+    );
+  };
+
+  const beginPan = (point: Point): void => {
+    gesture.current = { kind: 'pan', from: point, pan: held, moved: false };
+  };
+
+  const movePan = (point: Point): void => {
+    const grabbed = gesture.current;
+    if (grabbed?.kind !== 'pan') return;
+    const next = { x: grabbed.pan.x + (point.x - grabbed.from.x), y: grabbed.pan.y + (point.y - grabbed.from.y) };
+    grabbed.moved = grabbed.moved || Math.abs(next.x - grabbed.pan.x) > 6 || Math.abs(next.y - grabbed.pan.y) > 6;
+    settle(next, scale);
   };
 
   const end = (): void => {
-    grab.current?.release();
-    grab.current = null;
+    release.current();
+    release.current = () => undefined;
+    gesture.current = null;
   };
 
-  const dragged = (): boolean => grab.current?.moved ?? false;
+  const dragged = (): boolean => gesture.current?.kind === 'pan' && gesture.current.moved;
 
   return (
     <div
       ref={frame}
       className="relative min-h-0 flex-1 touch-none overflow-hidden"
-      // Kept from the pagers either side: a drag over the map is the map being
-      // moved, not the page being turned or the layer being changed.
+      // Kept from the pagers either side: a gesture over the map is the map
+      // being moved, not the page being turned or the layer being changed.
+      onWheel={(event) => {
+        const zoom = zoomByWheel(scale, event.deltaY);
+        const focal = fromCentre(event.clientX, event.clientY);
+        settle({ x: panAfterZoom(held.x, focal.x, scale, zoom), y: panAfterZoom(held.y, focal.y, scale, zoom) }, zoom);
+      }}
       onMouseDown={(event) => {
         if (event.button !== 0) return;
         event.stopPropagation();
-        const move = (native: MouseEvent): void => moveTo(native.clientX, native.clientY);
+        const move = (native: MouseEvent): void => movePan(fromCentre(native.clientX, native.clientY));
         window.addEventListener('mousemove', move);
         window.addEventListener('mouseup', end);
-        begin(event.clientX, event.clientY, () => {
+        release.current = () => {
           window.removeEventListener('mousemove', move);
           window.removeEventListener('mouseup', end);
-        });
+        };
+        beginPan(fromCentre(event.clientX, event.clientY));
       }}
       onTouchStart={(event) => {
-        const first = event.touches[0];
-        if (!first || event.touches.length > 1) return;
+        if (event.touches.length === 0) return;
         event.stopPropagation();
         const move = (native: TouchEvent): void => {
-          const touch = native.touches[0];
-          if (!touch) return;
-          moveTo(touch.clientX, touch.clientY);
+          const moved = touchPoints(native.touches);
+          if (moved.length >= 2) movePinch(moved);
+          else if (moved.length === 1) movePan(moved[0]);
           if (native.cancelable) native.preventDefault();
         };
+        // A second finger landing turns a drag into a pinch, and one lifting
+        // turns it back, each starting again from wherever the map has got to.
+        const restart = (native: TouchEvent): void => {
+          if (native.touches.length === 0) return end();
+          const now = touchPoints(native.touches);
+          if (now.length >= 2) beginPinch(now);
+          else beginPan(now[0]);
+        };
         window.addEventListener('touchmove', move, { passive: false });
-        window.addEventListener('touchend', end);
+        window.addEventListener('touchstart', restart);
+        window.addEventListener('touchend', restart);
         window.addEventListener('touchcancel', end);
-        begin(first.clientX, first.clientY, () => {
+        release.current = () => {
           window.removeEventListener('touchmove', move);
-          window.removeEventListener('touchend', end);
+          window.removeEventListener('touchstart', restart);
+          window.removeEventListener('touchend', restart);
           window.removeEventListener('touchcancel', end);
-        });
+        };
+        const points = touchPoints(event.touches);
+        if (points.length >= 2) beginPinch(points);
+        else beginPan(points[0]);
       }}
     >
       <div
-        className="absolute left-1/2 top-1/2"
-        style={{ transform: `translate3d(${held.x - centre.x}px, ${held.y - centre.y}px, 0)` }}
+        className="absolute left-1/2 top-1/2 origin-top-left"
+        style={{ transform: `translate3d(${held.x - centre.x * scale}px, ${held.y - centre.y * scale}px, 0) scale(${scale})` }}
       >
         <svg className="pointer-events-none absolute overflow-visible" width={1} height={1}>
           {sheet.roads.map((road) => (

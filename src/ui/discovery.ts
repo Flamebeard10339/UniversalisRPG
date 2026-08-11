@@ -98,6 +98,33 @@ export function bounds(nodes: readonly Node[]): Box {
   return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
 }
 
+// How far in and out the map can be taken. Far enough out that a walked-over
+// island fits, far enough in that a place is a comfortable target, and no
+// further either way: a map zoomed to nothing is a map the player has lost.
+export const ZOOM_MIN = 0.4;
+export const ZOOM_MAX = 3;
+
+export const clampZoom = (scale: number): number => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
+
+// A wheel notch is a fraction of the zoom rather than a fixed step, so zooming
+// out and back in again lands where it started.
+export const WHEEL_RATE = 0.0015;
+
+export const zoomByWheel = (scale: number, deltaY: number): number => clampZoom(scale * Math.exp(-deltaY * WHEEL_RATE));
+
+// Where the map has to sit for the point under the pointer -- or between the
+// fingers -- to still be under it once the zoom has changed. Everything is
+// measured from the middle of the window, which is what the pan is an offset
+// from.
+export function panAfterZoom(pan: number, focal: number, from: number, to: number): number {
+  if (from === 0) return pan;
+  return focal - (focal - pan) * (to / from);
+}
+
+export const spanBetween = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
+
+export const midpoint = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
 // Panned as far as there is something to pan to and no further, so the player
 // cannot drag the world off the screen and be left looking at nothing. Anything
 // that already fits has no slack at all and stays where it is.
@@ -105,6 +132,30 @@ export function clampPan(offset: number, span: number, window: number): number {
   const slack = Math.max(0, (span - window) / 2);
   if (slack === 0) return 0;
   return Math.min(slack, Math.max(-slack, offset));
+}
+
+// One authored unit of the world, in CSS pixels, before any zoom. The tutorial
+// island's places sit a unit apart, so this is what turns "east of the guide
+// house" into a gap a thumb can aim between. The margin is the room left around
+// the outermost place so it is not flush against the edge.
+export const PER_UNIT = 104;
+export const MARGIN = 64;
+
+export interface Size {
+  width: number;
+  height: number;
+}
+
+// Where the map comes to rest after a gesture: the zoom it asked for, and the
+// pan held to the slack that zoom leaves. One zoom goes in and both come out,
+// because clamping a new pan against the room the old zoom took is how a
+// zoomed-in map ends up unable to reach its own edges.
+export function settled(pan: Point, zoom: number, box: Box, window: Size): { pan: Point; scale: number } {
+  const room = {
+    width: (box.maxX - box.minX) * PER_UNIT * zoom + MARGIN * 2,
+    height: (box.maxY - box.minY) * PER_UNIT * zoom + MARGIN * 2,
+  };
+  return { scale: zoom, pan: { x: clampPan(pan.x, room.width, window.width), y: clampPan(pan.y, room.height, window.height) } };
 }
 
 // Which places arrived between one view and the next. The map's own reading of
