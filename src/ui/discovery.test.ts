@@ -139,8 +139,20 @@ describe('where a place is drawn', () => {
     expect(drawnAt(place('beach', 3, 4, 0), 0)).toEqual({ x: 3, y: 4 });
   });
 
-  it('moves the same distance however many planes away it is, since only up or down is read', () => {
-    expect(drawnAt(place('spire', 0, 0, 9), 0)).toEqual(drawnAt(place('spire', 0, 0, 1), 0));
+  it('moves one nudge per floor, so two places over each other do not land on one point', () => {
+    expect(drawnAt(place('landing', 0, 0, 1), 0)).toEqual({ x: CLIMB_NUDGE, y: -CLIMB_NUDGE });
+    expect(drawnAt(place('spire', 0, 0, 3), 0)).toEqual({ x: 3 * CLIMB_NUDGE, y: -3 * CLIMB_NUDGE });
+  });
+
+  // The author's report: standing in the hall and looking at the floor above,
+  // the hall is one floor down and the cellar is two, and a nudge that read
+  // only which way drew the hall underneath the cellar.
+  it('draws no two places of a sheet on the same point, from any plane the sheet offers', () => {
+    for (const plane of sheetAt(HOUSE, 'hall', 0).planes) {
+      const points = sheetAt(HOUSE, 'hall', plane).nodes.map((node) => `${node.at.x},${node.at.y}`);
+
+      expect(new Set(points).size, `on plane ${plane}`).toBe(points.length);
+    }
   });
 });
 

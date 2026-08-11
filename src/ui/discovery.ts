@@ -33,12 +33,15 @@ export interface Sheet {
 // drawing it where it is would put it exactly under the room the player is
 // standing in. Nudged along the diagonal instead, up for a floor above and down
 // for one below, which is the direction a player already reads as height.
+//
+// One nudge per floor and not one per direction: looking at the landing puts
+// the guide house one floor down and the cellar two, and a nudge that read only
+// which way drew the second under the first.
 export const CLIMB_NUDGE = 0.42;
 
 export function drawnAt(place: Place, plane: number): Point {
   const climb = place.z - plane;
-  if (climb === 0) return { x: place.x, y: place.y };
-  return { x: place.x + Math.sign(climb) * CLIMB_NUDGE, y: place.y - Math.sign(climb) * CLIMB_NUDGE };
+  return { x: place.x + climb * CLIMB_NUDGE, y: place.y - climb * CLIMB_NUDGE };
 }
 
 // What is drawn on one z-plane: everything standing on it, plus anywhere off it
