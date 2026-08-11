@@ -3,6 +3,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+// The names read off the definitions rather than copied from them, so a modal
+// added to the runtime is checked from the day it exists. This file reaches
+// past the play surface the rules below hold the driver to, which is allowed
+// of a test and of nothing else here: SOURCES excludes it.
+import { MODAL_NAMES } from '../runtime/modals';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -59,9 +64,6 @@ const DISPATCHES = ['askedOption', 'createTicker', 'LIVE_TICK_MS', 'newContext',
 // only by handing elapsed milliseconds to the run the command surface armed.
 const MOVES_THE_WORLD = /\b(wait|apply|applyDirective|beginAction|cancelAction|submitModal)\s*\(/;
 
-// Neither is written under src/ui, which is the point; naming them here is how
-// the absence is checked.
-const MODAL_IDS = ['character-creation', 'dialogue'];
 
 describe('the rules the driver is held to', () => {
   it('reads the tree it is a rule about', () => {
@@ -105,8 +107,9 @@ describe('the rules the driver is held to', () => {
   });
 
   it('names no modal, so it cannot be rendering one it knows', () => {
+    expect(MODAL_NAMES.length).toBeGreaterThan(0);
     for (const source of SOURCES) {
-      for (const id of MODAL_IDS) expect(source.text, `${source.file} names the modal ${id}`).not.toContain(`'${id}'`);
+      for (const id of MODAL_NAMES) expect(source.text, `${source.file} names the modal ${id}`).not.toContain(`'${id}'`);
     }
   });
 

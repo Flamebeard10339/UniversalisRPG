@@ -66,6 +66,10 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
   },
 };
 
+// The keys of DEFINITIONS as a value, so a rule about the whole set of modals
+// is read off the definitions rather than off a copy of their names.
+export const MODAL_NAMES: readonly ModalName[] = Object.keys(DEFINITIONS) as ModalName[];
+
 // The one cast that opens the modal stack for writing, and the one that opens a
 // frame's answers: everything outside this module holds both as readonly, which
 // is what leaves open and close with a single implementation each.
@@ -181,7 +185,11 @@ function frameProblem(frame: ModalFrame, state: GameState, registry: Registry): 
   }
   // Answering the last option is what closes a modal, so a frame that reaches
   // here already complete was never one this engine put down: it publishes no
-  // option, withdraws the world, and nothing can clear it.
+  // option, withdraws the world, and nothing can clear it. An option that
+  // accepts nothing is the same frame reached from the other side — no answer
+  // satisfies it, so answering can never be what takes the frame down.
+  const unanswerable = options.find((option) => option.values?.length === 0);
+  if (unanswerable) return `it asks for ${unanswerable.key} and nothing answers it`;
   if (options.every((option) => option.key in frame.answers)) return 'it was saved with every option already answered';
   return null;
 }

@@ -9,7 +9,7 @@ import { declaredId } from '../content/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
-import { answerModal, dialogueFrame, Modal, openModal, publishModal, topModal } from './modals';
+import { answerModal, dialogueFrame, Modal, openModal, pruneModals, publishModal, topModal } from './modals';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
 import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
@@ -455,6 +455,7 @@ export function cancelAction(session: PlaySession): PlayView {
 // answering can still answer it. One pair or the whole form, either way.
 export function submitModal(session: PlaySession, answers: Record<string, string>): PlayView {
   answerModal(stateOf(session), session.registry, answers);
+  pruneModals(stateOf(session), session.registry);
   return view(session);
 }
 
@@ -471,9 +472,19 @@ function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'use-on' | 'trave
   }
 }
 
+// A move of the world can leave a frame standing that no answer takes down, so
+// every entry point that moves it settles the stack before a driver reads it.
+// This is that seam and `submitModal` is the other; nothing else here mutates
+// with a modal up, because a modal withdraws the choices the rest work from.
+export function applyDirective(session: PlaySession, directive: Directive): { failure?: string } {
+  const outcome = performDirective(session, directive);
+  pruneModals(stateOf(session), session.registry);
+  return outcome;
+}
+
 // `run:` is excluded: it recurses into another test, which only runTest can do
 // with its cyclic-run detection.
-export function applyDirective(session: PlaySession, directive: Directive): { failure?: string } {
+function performDirective(session: PlaySession, directive: Directive): { failure?: string } {
   const { registry } = session;
   const state = stateOf(session);
 
