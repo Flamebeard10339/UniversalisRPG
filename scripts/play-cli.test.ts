@@ -6,7 +6,7 @@ import { loadModule } from '../src/content/registry';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { serializeSession, startSession, view } from '../src/runtime/session';
 import { COMMANDS, newContext, runLine, type CommandContext, type Recorder } from '../src/runtime/command';
-import { formatLive, formatOutput, formatResult, loadModportalSources } from './play-cli';
+import { formatLive, formatOutput, formatResult, formatTick, loadModportalSources } from './play-cli';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -113,7 +113,8 @@ starting
 
 // `oven.roast` repeats and never self-completes; `anvil.strike` completes after
 // its single attempt; `bell.ring` whittles its own completion down instead of a
-// foe's pool. Every branch of the live line.
+// foe's pool. `kiln.fire` is the one that speaks when it lands. Every branch of
+// the live line.
 const LIVE_MODULE = `
 # stat tap
 base: 0.2
@@ -128,6 +129,7 @@ entities:
   oven
   anvil
   bell
+  kiln
 
 # item roasted-chestnut
 
@@ -143,6 +145,12 @@ roast:
 strike:
   time: 3
   give: 1 ingot
+
+# entity kiln
+fire:
+  time: 2
+  on success:
+    say: The kiln settles with a crack.
 
 # entity bell
 title: Bell
@@ -183,6 +191,39 @@ describe('play-cli renders the live clock', () => {
       'ring... [--------------------] hits:3 completion:0.4  [time: 3.0s]',
       'ring... [--------------------] hits:4 completion:0.2  [time: 4.0s]',
     ]);
+  });
+
+  // The say a completion produces rides on the view that tick hands back and
+  // is drained from every view after it, so the bar is the only thing between
+  // the world speaking and nobody hearing it.
+  it('prints what the world said as a tick passed, above the bar and not over it', () => {
+    const started = armed(driver(LIVE_MODULE, 1, true), 'use:entity.kiln.fire');
+
+    const before = formatTick(started.live!.tick(1000));
+    const landing = formatTick(started.live!.tick(1000));
+
+    expect(before).toEqual(['fire... [##########----------]  [time: 1.0s]']);
+    expect(landing).toEqual(['The kiln settles with a crack.', 'fire: done.  [time: 2.0s]']);
+  });
+
+  it('leaves nothing for the closing result to print, which is why the tick must', () => {
+    const started = armed(driver(LIVE_MODULE, 1, true), 'use:entity.kiln.fire');
+    started.live!.tick(2000);
+
+    const closing = formatResult(started.live!.end(false));
+
+    expect(closing).not.toContain('The kiln settles with a crack.');
+  });
+
+  // Whatever the world says as an action is armed — a take gate refusing, a
+  // relocation — is on the view and in no output, so a caller that formats the
+  // result alone prints none of it. runLiveAction takes that list as a
+  // parameter for want of a way to test the readline loop it prints inside.
+  it('reports no output at all when it arms, so the arming view is the only place a say is', () => {
+    const started = armed(driver(LIVE_MODULE, 1, true), 'use:entity.kiln.fire');
+
+    expect(started.output).toEqual([]);
+    expect(formatResult(started)).toEqual([]);
   });
 
   it('scales elapsed real time by the speed dial before it draws anything', () => {

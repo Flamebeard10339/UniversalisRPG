@@ -192,6 +192,15 @@ export function formatLive(progress: LiveProgress): string {
   return `${progress.label}... ${progressBar(progress.progress)}${pools || counting}  ${clock}`;
 }
 
+// What one tick puts on the terminal: whatever the world said as it passed, on
+// lines of its own, and the bar under them. A say produced by a run rides on
+// the view its tick hands back and is drained from every view after it, so a
+// driver that does not print it here never prints it at all — run.end reads a
+// view with nothing left on it.
+export function formatTick(progress: LiveProgress): string[] {
+  return [...progress.view.said, formatLive(progress)];
+}
+
 type LineResult = IteratorResult<string>;
 
 function print(lines: string[]): void {
@@ -205,7 +214,7 @@ function print(lines: string[]): void {
 // and input.resume() — the non-obvious one, since attaching a `data` listener only
 // auto-flows a stream for the FIRST listener and readline already installed one.
 // Ctrl-C raises no SIGINT in raw mode, so it is honoured explicitly below.
-function runLiveAction(run: LiveRun, rl: ReturnType<typeof createInterface>): Promise<void> {
+function runLiveAction(run: LiveRun, armed: readonly string[], rl: ReturnType<typeof createInterface>): Promise<void> {
   return new Promise<void>((resolvePromise) => {
     const input = process.stdin;
     const isTTY = Boolean(input.isTTY);
@@ -213,6 +222,9 @@ function runLiveAction(run: LiveRun, rl: ReturnType<typeof createInterface>): Pr
     rl.pause();
     if (isTTY) input.setRawMode(true);
     input.resume();
+    // Arming reports no output of its own; what the world said as the action
+    // began rides on the view it handed back.
+    print([...armed]);
     process.stdout.write('(press any key to stop)\n');
 
     let lastTick = Date.now();
@@ -255,7 +267,9 @@ function runLiveAction(run: LiveRun, rl: ReturnType<typeof createInterface>): Pr
       const elapsedMs = now - lastTick;
       lastTick = now;
       const progress = run.tick(elapsedMs);
-      process.stdout.write(`\r\x1b[K${formatLive(progress)}`);
+      // The said lines scroll away above the bar; the \r-cleared line is the
+      // last one written, which is the bar, so the next tick redraws it in place.
+      process.stdout.write(`\r\x1b[K${formatTick(progress).join('\n')}`);
       if (!progress.active) finish();
     }, LIVE_TICK_MS);
   });
@@ -425,7 +439,7 @@ async function main(): Promise<void> {
 
       const result = runLine(ctx, line);
       print(formatResult(result));
-      if (result.live) await runLiveAction(result.live, rl);
+      if (result.live) await runLiveAction(result.live, result.view?.said ?? [], rl);
 
       if (result.quit) break;
       process.stdout.write('> ');
