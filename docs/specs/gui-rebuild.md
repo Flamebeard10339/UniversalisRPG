@@ -46,9 +46,10 @@ Proof:
   fixed at the bottom whose entries are the current layer's; a layer re-entered opens on the subpage
   it was left on. Measured at 375×812: nothing in the tutorial route scrolls the page horizontally,
   every interactive control's touch target is at least 44 CSS pixels on its shorter side, the
-  controls used every turn — the action sheet and the tab bar — sit in the bottom third, no
-  affordance requires hover, a right-click or a keyboard, and no layer or subpage is reachable only
-  by a gesture.
+  controls used every turn are in thumb reach — the tab bar sits in the bottom third and the action
+  sheet takes the bottom half of the play surface, so nothing the player touches every turn is above
+  the halfway line — no affordance requires hover, a right-click or a keyboard, and no layer or
+  subpage is reachable only by a gesture.
 - [c7] Every destination is one move from Home and each renders what it owes. Home is the narrative
   log and the action sheet. Map draws the discovered locations where they actually are — each at
   its own published position, with the roads between them — and acknowledges a newly discovered one.

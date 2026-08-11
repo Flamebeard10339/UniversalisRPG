@@ -97,6 +97,7 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
                 // it, which is the only thing a banner is allowed to say.
                 <button
                   key={`banner-${at}`}
+                  data-boundary={at}
                   ref={(node) => void (strips.current[at] = node)}
                   type="button"
                   className="block w-full shrink-0 touch-none text-left"

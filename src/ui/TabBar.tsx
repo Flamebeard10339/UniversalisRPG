@@ -10,6 +10,7 @@ export function TabBar({ tabs, active, onSelect }: { tabs: readonly Subpage[]; a
       {tabs.map((tab, at) => (
         <button
           key={tab.id}
+          data-subpage={tab.id}
           type="button"
           onClick={() => onSelect(at)}
           className={`min-h-[52px] flex-1 px-1 text-xs ${at === active ? 'font-semibold text-accent' : 'text-text-subtle'}`}
