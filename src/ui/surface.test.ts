@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 // past the play surface the rules below hold the driver to, which is allowed
 // of a test and of nothing else here: SOURCES excludes it.
 import { MODAL_NAMES } from '../runtime/modals';
+import { TOUCH_FLOOR } from './discovery';
 import { LABELS } from './labels';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -57,6 +58,36 @@ function calls(source: { text: string }): string[] {
 // driver dispatches through, the cadence both drivers tick at, and the ticker
 // that turns two clock readings into an elapsed span.
 const DISPATCHES = ['askedOption', 'createTicker', 'LIVE_TICK_MS', 'newContext', 'runLine', 'serializeSession', 'startSession', 'view'];
+
+// The stylesheet the floor is set in, read as text: it is one rule over four
+// element names, so this is the whole of what holds a control that declares
+// nothing — which, after this branch, is most of them.
+const STYLESHEET = readFileSync(resolve(here, '..', 'index.css'), 'utf8');
+
+// Every control in the tree, as the attributes it was written with. Brace-aware
+// rather than a regex to the first `>`, because an onClick with an arrow in it
+// puts a `>` inside the tag and a scan that stops there stops mid-handler.
+function controls(text: string): string[] {
+  const found: string[] = [];
+  for (const opening of text.matchAll(/<(?:button|input|select|textarea)\b/g)) {
+    let depth = 0;
+    let at = opening.index + opening[0].length;
+    while (at < text.length) {
+      const char = text[at];
+      if (char === '{') depth += 1;
+      else if (char === '}') depth -= 1;
+      else if (char === '>' && depth === 0) break;
+      at += 1;
+    }
+    found.push(text.slice(opening.index, at));
+  }
+  return found;
+}
+
+// A Tailwind arbitrary size in pixels, whichever axis and whichever bound it
+// sets. A control may ask for more room than the floor and may not ask for
+// less, so the check is on the number and not on which utility carries it.
+const SIZED = /\b(?:min-|max-)?[hw]-\[(\d+(?:\.\d+)?)px\]/g;
 
 // The other half of the same rule, and the half that does not depend on how a
 // name arrived. The allowlist above reads `import { x } from`; this reads the
@@ -129,6 +160,40 @@ describe('the rules the driver is held to', () => {
         expect(source.text, `${source.file} writes the word ${word} rather than reading it`).not.toContain(`>${word}<`);
       }
     }
+  });
+
+  // c6's floor, held where it is set rather than once per component. The two
+  // together are the whole rule: the stylesheet gives every control the floor
+  // by being a control, and nothing in the tree takes it back.
+  it('floors every control in the stylesheet, on both axes', () => {
+    const rule = STYLESHEET.match(/button,\s*input,\s*select,\s*textarea\s*\{([^}]*)\}/);
+    expect(rule, 'no rule in src/index.css covers the four control elements').not.toBeNull();
+
+    for (const axis of ['min-height', 'min-width']) {
+      const floor = rule![1].match(new RegExp(`${axis}:\\s*(\\d+)px`));
+      expect(floor, `the control rule sets no ${axis}`).not.toBeNull();
+      expect(Number(floor![1]), axis).toBeGreaterThanOrEqual(TOUCH_FLOOR);
+    }
+  });
+
+  it('lets no control in the tree ask for less room than the floor', () => {
+    let checked = 0;
+    for (const source of SOURCES) {
+      for (const control of controls(source.text)) {
+        checked += 1;
+        for (const [utility, size] of control.matchAll(SIZED)) {
+          expect(Number(size), `${source.file} sizes a control ${utility}`).toBeGreaterThanOrEqual(TOUCH_FLOOR);
+        }
+      }
+    }
+    // A scanner that found nothing would pass every line above.
+    expect(checked).toBeGreaterThan(6);
+  });
+
+  it('reads a control whole, however much of a handler sits inside its tag', () => {
+    const written = '<button onClick={() => (a > b ? x : y)} className="h-[12px]">go</button>';
+
+    expect(controls(written)).toEqual(['<button onClick={() => (a > b ? x : y)} className="h-[12px]"']);
   });
 
   it('asks nothing of a network or a filesystem', () => {

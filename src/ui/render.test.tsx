@@ -4,7 +4,9 @@ import { loadUniverseWithDiagnostics } from '../content/registry';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
 import { App } from './App';
+import { PER_UNIT } from './discovery';
 import { createDriver, type Driver } from './driver';
+import { MapPane } from './MapPane';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { LABELS } from './labels';
@@ -45,8 +47,7 @@ function published(view: PlayView): string[] {
     ...view.modals.flatMap((modal) => modal.options.flatMap((option) => [option.label, ...(option.values ?? [])])),
     // The map and the character sheet. The four dictionaries publish keys and
     // not titles, so a key is what the engine gave and a key is what the sheet
-    // may draw; the-view-publishes-ids-where-the-content-wrote-titles is where
-    // that is being answered, and this line moves when it is.
+    // may draw.
     ...view.discovered.flatMap((place) => [place.id, place.title]),
     ...Object.keys(view.inventory),
     ...Object.keys(view.xp),
@@ -79,14 +80,18 @@ function whatStoppingSays(): string[] {
 
 const asking = (html: string): boolean => html.includes('role="dialog"');
 
-// The map's nodes, each as the place it stands for and the runs inside it.
-// data-place is written by MapPane and nothing else, so this reads the map's
-// own markup rather than guessing at it from class names.
-function places(html: string): Array<{ id: string; runs: string[]; disabled: boolean }> {
+// The map's nodes, each as the place it stands for, where it was put and the
+// runs inside it. data-place is written by MapPane and nothing else, so this
+// reads the map's own markup rather than guessing at it from class names.
+function places(html: string): Array<{ id: string; runs: string[]; disabled: boolean; flashing: boolean; left: number; top: number }> {
+  const offset = (attributes: string, edge: string): number => Number(attributes.match(new RegExp(`${edge}:\\s*(-?[\\d.]+)`))?.[1] ?? NaN);
   return [...html.matchAll(/<button([^>]*data-place="([^"]*)"[^>]*)>([\s\S]*?)<\/button>/g)].map(([, attributes, id, inner]) => ({
     id,
     runs: readable(inner),
     disabled: attributes.includes('disabled'),
+    flashing: /\barrived\b/.test(attributes),
+    left: offset(attributes, 'left'),
+    top: offset(attributes, 'top'),
   }));
 }
 
@@ -96,10 +101,9 @@ function position(driver: Driver, choiceId: string): number {
   return at + 1;
 }
 
-// Two places that join up, a way to discover both, and something to carry: the
-// shipped content never runs `discover:` in play, so a map drawn over it has
-// nothing on it. Filed as its own question; this fixture is what lets the two
-// panes be tested without waiting on the answer.
+// Two places that join up, a way to discover both, and something to carry, so
+// the map and the sheet are driven by a fixture whose whole content is what
+// each of them is asked about rather than by whatever the tutorial holds.
 const SURVEYED = {
   name: 'surveyed',
   text: [
@@ -208,6 +212,34 @@ describe('what the shell puts on the screen', () => {
     }
     // The road between them, drawn once for the pair rather than once per end.
     expect(html.match(/<line/g) ?? []).toHaveLength(1);
+  });
+
+  // The clause above finds a node per place and reads the title in it, which a
+  // map that stacked every place on the origin would still pass.
+  it('puts them as far apart as the engine put them, a unit of world at a time', () => {
+    const driver = createDriver([SURVEYED]);
+    driver.choose(position(driver, LOOK_OUT));
+    const found = driver.snapshot().view!.discovered;
+
+    const drawn = places(renderToStaticMarkup(<App driver={driver} />));
+
+    const [first, second] = found.map((place) => ({ place, node: drawn.find((entry) => entry.id === place.id)! }));
+    expect(second.place.x - first.place.x).not.toBe(0);
+    expect(second.node.left - first.node.left).toBe((second.place.x - first.place.x) * PER_UNIT);
+    expect(second.node.top - first.node.top).toBe((second.place.y - first.place.y) * PER_UNIT);
+  });
+
+  // Driven at the pane rather than through App, because the arrival is worked
+  // out in an effect and a static render runs none.
+  it('acknowledges the place that has just arrived, and leaves the known one alone', () => {
+    const driver = createDriver([SURVEYED]);
+    driver.choose(position(driver, LOOK_OUT));
+    const view = driver.snapshot().view!;
+
+    const drawn = places(renderToStaticMarkup(<MapPane view={view} arrivals={['surveyed.overlook']} generation={1} onChoose={() => undefined} />));
+
+    expect(drawn.find((entry) => entry.id === 'surveyed.overlook')!.flashing).toBe(true);
+    expect(drawn.find((entry) => entry.id === 'surveyed.workshop')!.flashing).toBe(false);
   });
 
   it('sets off for a place when it is tapped, through the choice the engine published', () => {

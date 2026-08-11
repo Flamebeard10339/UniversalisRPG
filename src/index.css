@@ -37,11 +37,17 @@ body {
   overscroll-behavior: none;
 }
 
+/* The touch floor, set where a control is a control rather than once per
+   component: a floor each component has to remember is one the next component
+   forgets. 44 CSS px on the shorter side is what c6 is measured against, and a
+   component that wants a bigger target still says so. */
 button,
 input,
 select,
 textarea {
   font: inherit;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 /* A scroller with no bar drawn on it. A phone draws none until the finger

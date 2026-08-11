@@ -106,6 +106,16 @@ export const ZOOM_MAX = 3;
 
 export const clampZoom = (scale: number): number => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
 
+// The floor every control is held to, in CSS pixels. The stylesheet applies it
+// to controls that stand still; a place on the map does not, because the sheet
+// it is drawn on is scaled, and a target scaled to ZOOM_MIN is a target a thumb
+// misses. So the map asks how big to draw its tap area for the scale it is at,
+// and the answer grows as the sheet shrinks. Zoomed in, the bubble is already
+// past the floor and the area stays where the bubble is.
+export const TOUCH_FLOOR = 44;
+
+export const tapTarget = (scale: number): number => TOUCH_FLOOR / Math.min(1, scale);
+
 // A wheel notch is a fraction of the zoom rather than a fixed step, so zooming
 // out and back in again lands where it started.
 export const WHEEL_RATE = 0.0015;

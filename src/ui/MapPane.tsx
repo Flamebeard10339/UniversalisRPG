@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampZoom, drawnBox, midpoint, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, waysOut, zoomByWheel, type Node, type Point, type Size } from './discovery';
+import { bounds, clampZoom, drawnBox, midpoint, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, tapTarget, waysOut, zoomByWheel, type Node, type Point, type Size } from './discovery';
 
 // The map draws its own working out — the box a pan is held against — for
 // whoever is building the map. Read once, off the address, because a debug
@@ -83,8 +83,10 @@ export function MapPane({
   // characters' worth is narrower than one that fills the cap — so it is
   // measured rather than restated here. offsetWidth is the laid-out width and
   // ignores the transform above it, which is the unscaled figure the box wants.
-  // Every render, because a longer title is a re-render and not a resize; the
-  // setter hands back what it held when nothing moved, so this settles at once.
+  // Keyed on the titles drawn, because that is the whole of what can change the
+  // answer: a live run publishes ten frames a second and every one of them
+  // would otherwise force a synchronous layout over every bubble on the map.
+  const titles = JSON.stringify(sheet.nodes.map((node) => node.place.title));
   useLayoutEffect(() => {
     const drawn = bubbles.current.slice(0, sheet.nodes.length);
     setBubble((were) => {
@@ -94,7 +96,7 @@ export function MapPane({
       };
       return now.width === were.width && now.height === were.height ? were : now;
     });
-  });
+  }, [titles]);
 
   const drawn = drawnBox(box, bubble);
 
@@ -256,6 +258,9 @@ export function MapPane({
                 node.here ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-panel'
               } ${node.climb !== 0 ? 'opacity-70' : ''} ${position === undefined ? 'text-text-subtle' : ''}`}
             >
+              {/* Inside the control, so what it covers is what the control
+                  answers, and sized against the zoom the sheet is drawn at. */}
+              <span data-tap-target className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: tapTarget(scale), height: tapTarget(scale) }} />
               <span className="block max-w-[8rem] truncate">{node.place.title}</span>
             </button>
           );
@@ -271,7 +276,7 @@ export function MapPane({
               key={floor}
               type="button"
               onClick={() => setPlane(floor)}
-              className={`min-h-[44px] min-w-[44px] px-2 text-xs tabular-nums ${floor === at ? 'bg-accent-strong font-semibold text-accent-text' : 'text-text-subtle'}`}
+              className={`px-2 text-xs tabular-nums ${floor === at ? 'bg-accent-strong font-semibold text-accent-text' : 'text-text-subtle'}`}
             >
               {floor}
             </button>

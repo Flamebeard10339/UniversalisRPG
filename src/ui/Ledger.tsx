@@ -1,10 +1,6 @@
 // A published dictionary, drawn as rows. Stats, skills, equipment and what the
 // player is carrying are four of these and differ only in what the engine put
 // in them, so the sheet is one component and four readings of the view.
-//
-// The names are the engine's keys, because keys are what the view publishes for
-// these four; the-view-publishes-ids-where-the-content-wrote-titles is the open
-// record for the words the content author actually wrote.
 export function Ledger({ entries }: { entries: Array<{ name: string; value: string }> }): JSX.Element {
   return (
     <div className="unbarred min-h-0 flex-1 overflow-y-auto px-4 py-3">

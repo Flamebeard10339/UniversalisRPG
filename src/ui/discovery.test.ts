@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, drawnBox, midpoint, newlyFound, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
+import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, drawnBox, midpoint, newlyFound, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, tapTarget, TOUCH_FLOOR, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -270,5 +270,20 @@ describe('where the map comes to rest', () => {
     const alone = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
     expect(settled({ x: 500, y: 500 }, 1, alone, NO_BUBBLE).pan).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('how big a place is to tap', () => {
+  it('asks for the floor and no more while the sheet is at its own size or bigger', () => {
+    expect(tapTarget(1)).toBe(TOUCH_FLOOR);
+    expect(tapTarget(ZOOM_MAX)).toBe(TOUCH_FLOOR);
+  });
+
+  it('grows as the sheet shrinks, so what reaches the screen is the floor at every zoom', () => {
+    // Drawn inside the scale, so the figure a thumb meets is the product of
+    // the two — which is what fell to 13.6 px when the area was fixed.
+    for (const scale of [ZOOM_MIN, 0.5, 0.75, 1, 2, ZOOM_MAX]) {
+      expect(tapTarget(scale) * scale).toBeGreaterThanOrEqual(TOUCH_FLOOR);
+    }
   });
 });

@@ -21,7 +21,7 @@ export function Console({ onSend }: { onSend: (line: string) => void }): JSX.Ele
       }}
     >
       <input
-        className="min-h-[44px] flex-1 select-text rounded-xl border border-border bg-panel px-3 text-text outline-none focus:border-accent"
+        className="flex-1 select-text rounded-xl border border-border bg-panel px-3 text-text outline-none focus:border-accent"
         aria-label={LABELS.command}
         value={line}
         autoCapitalize="off"
@@ -31,7 +31,7 @@ export function Console({ onSend }: { onSend: (line: string) => void }): JSX.Ele
       />
       <button
         type="submit"
-        className="min-h-[44px] min-w-[44px] shrink-0 rounded-xl bg-accent px-3 text-sm font-medium text-accent-text transition-transform duration-75 active:scale-[0.97]"
+        className="shrink-0 rounded-xl bg-accent px-3 text-sm font-medium text-accent-text transition-transform duration-75 active:scale-[0.97]"
       >
         {LABELS.run}
       </button>

@@ -43,7 +43,7 @@ function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: 
                 key={offer.id}
                 type="button"
                 onClick={() => onChoose(offer.position)}
-                className="min-h-[44px] grow basis-40 rounded-xl border border-border bg-panel px-3 py-2 text-sm font-medium transition-transform duration-75 active:scale-[0.97] active:bg-accent-strong active:text-accent-text"
+                className="grow basis-40 rounded-xl border border-border bg-panel px-3 py-2 text-sm font-medium transition-transform duration-75 active:scale-[0.97] active:bg-accent-strong active:text-accent-text"
               >
                 {offer.label}
               </button>
