@@ -523,3 +523,230 @@ and publishes no note, and src/ui/App.tsx still mounts FloatingText with driver.
 Pass 2's mutation re-runs: "c10 a transient note learns where it came from" adds a moment:'xp' field,
 KILLED by src/ui/transient.test.ts "carries any text at all, and nothing about where it came from".
 The XP instance is still not wired, as the clause requires.
+
+### Pass 4 — 2026-08-11
+
+- base: `c59b0a0d7820ee9ef3afaa2601065d32a2b57279`
+- head: `d992f794822d784b2b49f0effc748e1fc9b81efb`
+- proof 1: unmet — Graded unmet: three sentences, one fixed, two still failing, all measured.
+FIXED and now watched. Pass 3 graded c1 unmet partly on "the same ordered messages": the GUI logged
+the completing tick's view and play-cli printed only the bar, so the engine's say never reached the
+terminal. play-cli's live loop is now the exported driveRun (scripts/play-cli.ts:215) over the shared
+createTicker, and formatTick returns [...progress.view.said, formatLive(progress)]. Manifest
+C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass4-map-nav-and-sheet.json, entry "c1 the REPL
+loses the line the world said as a tick passed", strips the said lines back out: KILLED by
+scripts/play-cli.test.ts "prints what the world said as a tick passed, above the bar and not over it",
+re-run at its own file with the mutation still applied and failing there. The other end, entry "c1 the
+GUI loses the line the world said as a tick passed", removes driver.ts's per-tick logging: KILLED at
+src/ui/driver.test.ts by "closes the run when the action finishes, stops the ticker and gives the
+choices back". Both drivers now speak the same lines.
+STILL FAILS, sentence 1: "one scripted sequence replayed through the REPL's driver and through the
+GUI's leaves byte-identical serialized state". Not written. The nearest thing is src/ui/driver.test.ts
+:211, which builds its REPL side out of newContext/runLine/tick/end inside the test and compares two
+PlayViews, not two serialized states. What changed this pass is that the excuse is gone: driveRun is
+exported and takes its ticker as a parameter, and scripts/ sits above src/ui in the layer order, so a
+test in scripts/ may import both containers and drive them off one script. Nothing does.
+STILL FAILS, sentence 2: "a command added to the shared table is dispatchable from the GUI with no
+edit under src/ui". Re-measured: grep -rn "\.send(" src/ excluding tests returns nothing. The GUI
+dispatches two spellings, "<N>" and "submit-modal: key=value", plus cancel, which is a run control.
+gui-rebuild-pass2-the-gui-can-dispatch-two-spellings-and-has is the open record; not re-filed.
+gui-rebuild-clause-1 is the open undelivered record.
+- proof 2: met — Both rules re-measured on the modules this branch added, and the guard itself is stronger
+than it was on pass 3.
+Structural leg unchanged: GameState lives behind the module-private WeakMap in src/runtime/session.ts
+and is unreachable from src/ui whatever src/ui imports.
+Path rule, manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass4-map-nav-and-sheet.json,
+entry "c2 the map reaches the runtime off the play surface", adds import '../runtime/state' to
+src/ui/MapPane.tsx, the largest module in the diff. KILLED by src/ui/surface.test.ts "reaches the
+runtime only through the play surface", re-run at its own file with the mutation still applied and
+failing there.
+Value rule, entry "c2 the map's pure half brings in something that moves the world", adds
+import { wait } from '../runtime/session' to src/ui/discovery.ts. KILLED by src/ui/surface.test.ts
+"brings in only what a driver dispatches through, so it cannot advance a clock of its own", re-run at
+its own file.
+Two holes earlier passes filed are closed and the closes are executable. Pass 2's subdirectory hole is
+gone: SOURCES is built by a recursive modulesUnder, and src/ui/surface.test.ts "descends, so a module
+in a directory is held to every rule below" proves it against a temporary tree rather than against the
+tree it happens to be run on. Pass 3's dynamic-destructured-import hole is gone: MOVES_THE_WORLD reads
+the call rather than the import, so (await import('../runtime/session')).wait(...) is caught by the one
+spelling that cannot be avoided.
+One thing the next pass should weigh rather than rediscover: MOVES_THE_WORLD is
+/\b(wait|apply|applyDirective|beginAction|cancelAction|submitModal)\s*\(/ over raw text, so any future
+src/ui module that writes fn.apply( or names a local helper apply fails a rule it is not breaking, and
+there is no escape hatch. Not filed, because nothing in the tree trips it today.
+- proof 3: met — Met on the property, and pass 1's exemption finding is now measured closed rather than
+argued closed. The exemption did not vanish, though; it moved, and it grew from five words to nine.
+CLOSED and measured: pass 2's mutant (a) replaced a narration header with one of the nav's own words
+and SURVIVED, because the guard skipped those words by VALUE wherever they appeared. The skip is now
+by REGION -- src/ui/render.test.tsx excises the <nav> element and asserts its runs equal the current
+layer's labels exactly. Manifest audit-gui-rebuild-pass4-map-nav-and-sheet.json, entry "c3 a component
+outside the nav writes one of the nav's own words", replaces src/ui/LocationBanner.tsx's title with the
+literal "Settings": KILLED by src/ui/render.test.tsx "renders nothing a player can read that the engine
+did not publish", re-run at its own file. The identical mutant SURVIVED on pass 2.
+The new prose surface this pass is the same file, and it is held: entry "c3 the new banner writes prose
+of its own" makes the location banner read "You are in {title}". KILLED by the same named test.
+The published set the test compares against widened this pass to include the four dictionaries' keys
+and each place's id, because the character sheet and the map draw keys where a word belongs. That is
+the engine's own published value, so the widening is correct, and the record that owns the words is
+the-view-publishes-ids-where-the-content-wrote-titles, declined by the author 2026-08-11 and triggered
+on reimplement-localization.
+WHAT THE GRADE DOES NOT COVER, and it is measured: the nav region is excised whole and compared against
+LAYERS, which is the structure under test, so the tab labels are outside this clause however they are
+worded. Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass4-nav-prose.json renames Home
+to "Sanctuary of the Ninth Dawn": SURVIVED, escalated
+[render.test.tsx "renders nothing a player can read that the engine did not publish" -> render.test.tsx
+-> whole suite], 0 failed of 2422. c3's last sentence, "there is not one", is false as written and has
+been since the shell shipped; the nav went from five such words to nine this pass. Filed, with the
+fault on the clause rather than on the branch.
+- proof 4: unmet — Unchanged by this branch, and I re-measured both halves rather than carrying pass 3's
+grade forward.
+STILL FAILS, and the failure is Runtime's: git diff c59b0a0..d992f79 -- src/runtime/modals.ts is empty.
+src/runtime/modals.ts:167 still reads if (option.values && !option.values.includes(value)), so an
+option published with values: [] is truthy, accepts nothing, and keeps the modal open with no control
+on the sheet and no answer any driver could give. src/ui/ModalSheet.tsx's values branch is byte-
+identical but for the .unbarred class and the submit control's aria-label. Pass 2's reproduction at
+C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass2-c4probe.ts still applies unchanged.
+gui-rebuild-clause-4 is the open undelivered record.
+HOLDS, re-measured because this branch rewrote App.tsx around it: manifest
+C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass4-carried-forward.json, entry "c4 the shell
+stops drawing the modal the engine is asking for", replaces the ModalSheet render with {null}. KILLED
+by src/ui/render.test.tsx "draws the modal the engine is asking for, and stops once it is answered",
+re-run at its own file with the mutation still applied and failing there.
+HOLDS: no modal id appears as a literal, and the sweep that says so now walks nine more modules --
+MapPane, VStack, nav, discovery, sheet, Ledger, LocationBanner, StatusBanner, Meter -- because
+src/ui/surface.test.ts descends into directories and reads every .ts/.tsx beneath src/ui. None names
+one. The hand-copied MODAL_IDS list is still the open finding
+gui-rebuild-pass1-the-modal-id-check-is-a-hand-copied-list-w.
+New and checked clean: the modal draws over the whole VStack rather than inside a layer, so no layer or
+subpage can hide it, and driver.answer still routes through send, which closes a live run first.
+- proof 5: met — Met, and re-aimed, because pass 3's proof no longer exists. Pass 3 measured this clause at
+src/ui/live.ts and src/ui/live.test.ts; commit b5a2a71 deleted both and moved the ticker down to
+src/runtime/command.ts, so every mutation pass 3 recorded for c5 refuses to apply today. The next pass
+should read pass 3's c5 entry as history and this one as the live proof.
+Advances simulated time from real elapsed time: manifest
+C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass4-map-nav-and-sheet.json, entry "c5 the shared
+ticker advances a run by the interval it asked for", replaces const elapsedMs = now - last with
+everyMs in src/runtime/command.ts. KILLED by src/runtime/command.test.ts "hands over the time that
+actually passed, not the interval it asked for", re-run at its own file with the mutation still applied
+and failing there.
+Through the shared clock: entry "c5 the two drivers tick at cadences that only happen to agree"
+defaults createTicker to 200 rather than LIVE_TICK_MS. KILLED by src/runtime/command.test.ts "ticks at
+the cadence the command surface publishes, so both drivers round the same way", re-run at its own file.
+The REPL half, which pass 3 recorded as an unmeasured SURVIVED and filed: closed. play-cli's live loop
+is the exported driveRun (scripts/play-cli.ts:215), it takes the ticker as a parameter, its default is
+the same createTicker the GUI takes, and scripts/play-cli.test.ts "play-cli drives a live run" has four
+tests over it. Entry "c1 the REPL loses the line the world said as a tick passed" is KILLED there, so
+the loop is watched at its own file for the first time.
+Nothing under src/ui schedules resolve or wait on a clock of its own: the value-rule kill recorded
+under c2 covers it, and MOVES_THE_WORLD now catches the call as well as the import.
+The bar reads the cadence rather than restating it: src/ui/Meter.tsx builds FILL_TRANSITION from
+LIVE_TICK_MS and src/ui/render.test.tsx "moves a bar over exactly one tick of the cadence both drivers
+read" asserts the rendered duration against it, which closes pass 3's finding that the figure was
+spelled a second and third time as a Tailwind duration.
+Bound on the grade, carried from c1 and not re-filed here: the cross-driver equality test at
+src/ui/driver.test.ts:211 still builds its REPL side inside the test rather than driving driveRun.
+- proof 6: unmet — Graded unmet rather than a fourth unknown, because one of the five properties this clause
+says it will be measured on is measurable without a browser, and it fails.
+THE STRUCTURAL HALF HOLDS, and is proven. Manifest
+C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass4-map-nav-and-sheet.json:
+(1) "c6 a banner is a handle in one direction only" makes across() return the boundary whichever layer
+the player is on. KILLED by src/ui/nav.test.ts "crosses a banner to whichever of its two layers the
+player is not on", re-run at its own file.
+(2) "c6 a layer re-entered opens on wherever the player was last, not on its own page" writes the
+subpage into the standing layer's slot. KILLED by src/ui/nav.test.ts "remembers each layer separately,
+so one page is never mistaken for another", re-run at its own file.
+(3) "c6 the shared banner is paid for twice" steps the column down a whole screen per layer. KILLED by
+src/ui/nav.test.ts "steps down by a screen less the banner it crossed, so the banner is not paid for
+twice", re-run at its own file. That is the one-banner-not-two claim, in arithmetic.
+THE MEASURED HALF, property by property, so the next pass knows what was and was not looked at.
+(a) "every interactive control's touch target is at least 44 CSS pixels on its shorter side": MEASURED,
+FAILS. src/ui/MapPane.tsx:255 draws each place as a button with px-3 py-2 text-xs and no min-h or
+min-w. Under tailwindcss 3.4 that is a 16px line box plus 8px of padding each side plus 2px of border:
+34 CSS px tall. The branch's own fixture agrees -- src/ui/discovery.test.ts:239 pins
+BUBBLE = { width: 150, height: 34 }. It is worse under zoom, because the bubbles sit inside the
+scale() transform at src/ui/MapPane.tsx:223, so at ZOOM_MIN (0.4) the target is 13.6 CSS px. It is the
+one control in the tree without a floor: Home's sheet buttons carry min-h-[44px], ModalSheet's buttons,
+input and submit min-h-[48px], TabBar min-h-[52px], LiveSheet's stop min-h-[48px] min-w-[48px], the
+Splitter min-h-[44px], both banners min-h-[48px], and the plane picker in this same file
+min-h-[44px] min-w-[44px]. Re-run: grep -rn "<button" src/ui/*.tsx and read the class list beside each.
+Nothing tests it -- grep for 44, min-h or touch across every test under src/ui returns nothing. Filed.
+(b) "no affordance requires hover, a right-click or a keyboard": checked by reading, holds. Every
+control is a <button> or an <input>; onMouseDown handlers all guard on event.button !== 0.
+(c) "no layer or subpage is reachable only by a gesture": checked by reading, holds. Each banner is a
+<button> whose onClick calls across(), and the tab bar's entries are buttons; the drags in VStack and
+Pager are additions to those taps, not replacements.
+(d) "the controls used every turn sit in the bottom third": checked by reading, holds. The action sheet
+is the bottom pane of Home's split and the tab bar is fixed below the VStack.
+(e) "nothing in the tutorial route scrolls the page horizontally": NOT MEASURED. The root is
+overflow-hidden and the pagers translate rather than scroll, but that is reading, not the measurement
+the clause asks for, and CLAUDE.md's testing procedure is why no browser was driven.
+So: unmet on (a), unknown on (e), holding on the rest. Unmet rather than deferred because the goal is a
+game playable on a phone and this clause is the whole of what makes it one; the fix is a floor on one
+control and a test that holds every control to it.
+- proof 7: met — Pass 3 deferred this because Map and Character were null panes. They are not any more, and
+seven mutations bound the grade with two survivors that are filed rather than swept up.
+All entries in C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass4-map-nav-and-sheet.json.
+"one z-plane at a time, plus whatever sits off that plane and is adjacent to the player": entry "c7 the
+map hides the way out of the room the player is standing in" drops the here/reachable terms from
+sheetAt. KILLED by src/ui/discovery.test.ts "draws a place off the plane only when the player could
+step to it from here", re-run at its own file. It cycles between the planes through the picker at
+src/ui/MapPane.tsx:268, drawn only when the world has more than one.
+"cannot be panned away from what it is drawing": entry "c7 the map can be panned away from what it is
+drawing" removes the clamp. KILLED by src/ui/discovery.test.ts "lets the furthest place be dragged to
+the middle, and no further", re-run at its own file.
+"draws the discovered locations ... with the roads between them", at the component and not only in the
+pure module: entry "c7 the map stops drawing the places the engine published" empties sheet.nodes.
+KILLED by src/ui/render.test.tsx "draws the discovered places where they are, with the roads between
+them", re-run at its own file. That test reads MapPane's own data-place markup and asserts one <line>
+for a mutual pair.
+Tapped to set off, through the engine's own offer: entry "c7 a tap on a place dispatches the offer
+before the one that leads there" takes one off the dispatch position. KILLED by src/ui/discovery.test.ts
+"answers with the position a driver dispatches it at, counting from one", re-run at its own file.
+"Character renders the published inventory, equipment, skills and stats": entry "c7 the character sheet
+stops reading the published stats" hands Ledger an empty list. KILLED by src/ui/render.test.tsx "draws
+what the player is carrying, and what they are made of, on the sheet", re-run at its own file.
+The runtime half the map draws from, three kills at src/runtime/session.test.ts, each re-run at its own
+file: "c7 a place the roads reach is never discovered by walking to it" (killed by "reveals what a way
+was shutting the moment it opens, without leaving the room"), "c7 the map leaks the shape of what has
+not been found" (killed by "carries how the discovered places connect, which is the other half of a
+map"), "c7 every road is drawn as open, whether or not it can be walked" (killed by "says a road is
+shut rather than hiding it, once both of its ends are known").
+Settings and Edit are still null panes beside Home, which is the spec's own Decision.
+TWO SURVIVORS BOUND THIS GRADE, both at whole-suite scope, 0 failed of 2422, both filed:
+"c7 the map draws every place on top of every other" zeroes MapPane's pixels() and nothing notices, so
+"each at its own published position" is proven in drawnAt and unproven in the component that draws it.
+"c7 the map stops acknowledging a place that has just arrived" forces arrived to false and nothing
+notices, so "acknowledges a newly discovered one" has no coverage at all -- newlyFound is tested, and
+the wiring from it to something a player sees is not.
+Read "every destination is one move from Home" as one move per layer: Map and Character are each one
+banner tap, Settings and Edit one tab tap; Character's four subpages are then horizontal, which is what
+c6 settled.
+- proof 8: met — Unchanged by this diff and re-measured rather than assumed. git diff c59b0a0..d992f79 --
+src/ui/shippedContent.ts public/ is empty, and public/content/ is absent from the tree.
+Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass4-carried-forward.json, entry "c8 the
+build stops carrying the shipped DSL", points import.meta.glob at a suffix nothing matches. KILLED by
+src/ui/shippedContent.test.ts "bundles the shipped DSL as text, with no path left for the browser to
+fetch", re-run at its own file with the mutation still applied and failing there.
+The no-network rule now covers nine more modules than it did on pass 3, because src/ui/surface.test.ts
+"asks nothing of a network or a filesystem" is built from a recursive sweep: MapPane, VStack, nav,
+discovery, sheet, Ledger, Meter and both banners are all in it, and none reaches a network or a
+filesystem. MapPane's only host reach is window.location.search, read once at module load for the
+?debug box at src/ui/MapPane.tsx:9.
+- proof 9: deferred — Deferred rather than unmet, for the same reason pass 3 gave and which still holds: a
+dev-only agent harness is not on the path to the goal -- the game is playable on a phone without one --
+and the-agent-harness-returns-to-the-gui [task/open/medium] owns it.
+Checked, and this is the fourth pass to check it: git grep -n "__test" d992f79 -- src/ returns nothing.
+No window.__test, no registration point, no batch entry, and nothing in this range moved it either way.
+Re-run: grep -rn "__test" src/.
+- proof 10: met — Unchanged by this diff and confirmed unchanged: git diff --stat c59b0a0..d992f79 --
+src/ui/transient.ts src/ui/FloatingText.tsx is empty. TransientNote is still {id, text} and nothing
+else, FloatingText still renders channel.notes() with no way to ask what produced any of them, the
+channel still takes its expiry scheduler as a parameter, and src/ui/App.tsx:76 still mounts
+FloatingText with driver.transient inside <main>, so it survived the nav rebuild that moved everything
+around it.
+Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass4-carried-forward.json, entry "c10 a
+transient note learns where it came from", adds a moment: 'xp' field to the note. KILLED by
+src/ui/transient.test.ts "carries any text at all, and nothing about where it came from", re-run at its
+own file with the mutation still applied and failing there.
+The XP instance is still not wired, as the clause requires, and the new clock did not become a second
+channel: src/runtime/command.ts's ticker hands elapsed milliseconds to a run and publishes no note.
