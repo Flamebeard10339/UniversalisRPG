@@ -115,7 +115,7 @@ describe('what the shell puts on the screen', () => {
     for (const choice of driver.snapshot().view!.choices) expect(runs).toContain(choice.label);
   });
 
-  it('draws the run in place of the choices while it lasts, and hands them back when it stops', () => {
+  it('draws the run above the choices, which it does not withdraw', () => {
     const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
     const idle = driver.snapshot().view!.choices;
     const running = idle.find((choice) => choice.id === ROAST)!.label;
@@ -125,14 +125,16 @@ describe('what the shell puts on the screen', () => {
     const under = readable(renderToStaticMarkup(<App driver={driver} />).replace(NAV, ''));
 
     expect(under).toContain(running);
-    // The world's choices resolve against a world the next tick is about to
-    // move, so none of them is on the screen while one is under way.
-    expect(under).not.toContain(other);
+    expect(under).toContain(other);
+    // Above them, and outside the scroller they sit in: the label the run put
+    // on the screen comes before every choice, including its own.
+    expect(under.indexOf(running)).toBeLessThan(under.indexOf(other));
+    expect(under.indexOf(running)).toBeLessThan(under.lastIndexOf(running));
 
     driver.cancel();
     const stopped = readable(renderToStaticMarkup(<App driver={driver} />).replace(NAV, ''));
 
-    expect(stopped).toContain(other);
+    expect(stopped.indexOf(running)).toBe(stopped.lastIndexOf(running));
   });
 
   it('draws the modal the engine is asking for, and stops once it is answered', () => {

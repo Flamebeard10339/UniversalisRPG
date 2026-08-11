@@ -179,18 +179,31 @@ describe('the GUI driver', () => {
     expect(shown(driver).choices.map((choice) => choice.id)).toContain(SPINDLE);
   });
 
-  it('holds the session while a run is under way, the way the REPL holds its prompt', () => {
+  it('replaces the run under way with the next thing dispatched, keeping the time it spent', () => {
     const ticker = handTicker();
     const driver = createDriver([WORKSHOP], { ticker });
     driver.choose(position(driver, SPINDLE));
-    const spoken = texts(driver).length;
+    ticker.advance(1_000);
 
-    driver.choose(1);
+    driver.choose(position(driver, SPINDLE));
+
+    expect(texts(driver)).toContain('Stopped.');
+    // A second run, not the first one carried on: the spent second stands and
+    // the new one starts from nothing.
+    expect(shown(driver).time).toBe(1);
+    expect(driver.snapshot().live).toMatchObject({ active: true, progress: 0 });
+    expect(ticker.stops).toBe(1);
+  });
+
+  it('stops the run under way before a command that is not a choice at all', () => {
+    const ticker = handTicker();
+    const driver = createDriver([WORKSHOP], { ticker });
+    driver.choose(position(driver, SPINDLE));
+
     driver.send('/look');
 
-    expect(shown(driver).time).toBe(0);
-    expect(texts(driver)).toHaveLength(spoken);
-    expect(driver.snapshot().live?.active).toBe(true);
+    expect(driver.snapshot().live).toBeNull();
+    expect(texts(driver)).toContain('Stopped.');
   });
 
   // The clause's own comparison: the same action, the same elapsed span, two

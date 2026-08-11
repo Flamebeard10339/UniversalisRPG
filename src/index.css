@@ -44,6 +44,17 @@ textarea {
   font: inherit;
 }
 
+/* A scroller with no bar drawn on it. A phone draws none until the finger
+   moves; a desktop draws one permanently and steals the width it sits in,
+   which is the layout the author sees and the player never will. */
+.unbarred {
+  scrollbar-width: none;
+}
+
+.unbarred::-webkit-scrollbar {
+  display: none;
+}
+
 @keyframes arrived {
   from {
     background-color: var(--color-flash);

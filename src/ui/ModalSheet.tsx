@@ -14,7 +14,7 @@ export function ModalSheet({ option, onAnswer }: { option: Option; onAnswer: (ke
       <div className="risen mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
         <p className="mb-3 text-xs uppercase tracking-wide text-text-subtle">{option.label}</p>
         {option.values ? (
-          <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto">
+          <div className="unbarred flex max-h-[60vh] flex-col gap-2 overflow-y-auto">
             {option.values.map((value) => (
               <button
                 key={value}

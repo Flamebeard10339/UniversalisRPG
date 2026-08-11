@@ -99,7 +99,7 @@ export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapsho
       <div ref={surface} className="flex min-h-0 flex-1 flex-col">
         <div
           ref={column}
-          className="min-h-0 overflow-y-auto px-4 py-3"
+          className="unbarred min-h-0 overflow-y-auto px-4 py-3"
           style={{ flexGrow: split, flexBasis: 0 }}
           onScroll={(event) => {
             const scroller = event.currentTarget;
@@ -113,9 +113,6 @@ export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapsho
           </div>
         </div>
 
-        {/* A run holds the sheet while it lasts: the world's choices resolve
-            against a world the next tick is about to move, so the only control
-            the player is offered is the one that stops it. */}
         {live || (view && view.choices.length > 0) ? (
           <>
             <Splitter
@@ -125,8 +122,18 @@ export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapsho
             {/* The sheet keeps the height the player gave it and scrolls inside
                 it, so a room offering five actions and one offering two do not
                 move everything else on the way past. */}
-            <div className="min-h-0 overflow-y-auto border-t border-border bg-surface-raised" style={{ flexGrow: 1 - split, flexBasis: 0 }}>
-              {live ? <LiveSheet progress={live} onCancel={onCancel} /> : <Sheet choices={view!.choices} onChoose={onChoose} />}
+            <div className="flex min-h-0 flex-col border-t border-border bg-surface-raised" style={{ flexGrow: 1 - split, flexBasis: 0 }}>
+              {/* A run sits above the choices rather than in place of them, and
+                  outside the scroller, so the control that stops it is reachable
+                  however far down the list the player has gone. */}
+              {live ? (
+                <div className="shrink-0 border-b border-border">
+                  <LiveSheet progress={live} onCancel={onCancel} />
+                </div>
+              ) : null}
+              <div className="unbarred min-h-0 flex-1 overflow-y-auto">
+                {view && view.choices.length > 0 ? <Sheet choices={view.choices} onChoose={onChoose} /> : null}
+              </div>
             </div>
           </>
         ) : null}

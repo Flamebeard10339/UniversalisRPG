@@ -758,7 +758,7 @@ export function runLine(ctx: CommandContext, line: string): CommandResult {
 // tick rounds its own span to whole milliseconds, so two drivers ticking at
 // different cadences reach different states over the same wall-clock span;
 // sharing the figure is what makes them the same run.
-export const LIVE_TICK_MS = 200;
+export const LIVE_TICK_MS = 100;
 
 export interface LivePool {
   title: string;

@@ -112,12 +112,14 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  // A run owns the session while it lasts, the way the REPL's paused readline
-  // owns it: a second dispatch would resolve against a world the next tick is
-  // about to move. The screen offers nothing but the stop control meanwhile,
-  // so this catches a tap already in flight rather than a route of its own.
+  // One run at a time, and a dispatch replaces the one under way rather than
+  // queueing behind it or being refused. The sheet goes on offering the
+  // world's choices while a run lasts, so this is the route every tap takes,
+  // and stopping first is what keeps the next line from resolving against a
+  // world the next tick was about to move.
   const send = (line: string): void => {
-    if (!context || running) return;
+    if (!context) return;
+    if (running) close(true);
     const result = runLine(context, line);
     current = { ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) };
     if (result.live) {

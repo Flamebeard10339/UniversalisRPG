@@ -2,19 +2,19 @@ import type { LiveProgress } from '../runtime/command';
 import { fillPercent } from './format';
 import { Meter } from './Meter';
 
-// Where the choices sit when nothing is running. Everything on it is the run's
+// A run, above the choices it did not withdraw. Everything on it is the run's
 // own report: the label the engine gave the action, its progress, and whatever
 // it is whittling down. The stop control is a glyph rather than a word for the
 // same reason the modal's submit is — a word here would be prose this layer
 // wrote, and no engine value produced it.
 export function LiveSheet({ progress, onCancel }: { progress: LiveProgress; onCancel: () => void }): JSX.Element {
   return (
-    <div className="flex flex-col gap-3 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3">
+    <div className="flex flex-col gap-3 p-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{progress.label}</p>
           <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-panel">
-            <div className="h-full bg-accent transition-[width] duration-200" style={{ width: `${fillPercent(progress.progress, 1)}%` }} />
+            <div className="h-full bg-accent transition-[width] duration-100 ease-linear" style={{ width: `${fillPercent(progress.progress, 1)}%` }} />
           </div>
         </div>
         <button
