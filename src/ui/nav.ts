@@ -1,4 +1,5 @@
 import { clampIndex } from './gesture';
+import type { LabelId } from './labels';
 
 // The nav has two axes. A layer is a context and is reached vertically; a
 // subpage is a page inside one layer and is reached horizontally. Between two
@@ -8,9 +9,10 @@ import { clampIndex } from './gesture';
 
 export type LayerId = 'map' | 'home' | 'character';
 
+// A subpage is named by an id the vocabulary table has a word for, so the word
+// itself is not written here and renaming a page cannot rename what is drawn.
 export interface Subpage {
-  id: string;
-  label: string;
+  id: LabelId;
 }
 
 export interface Layer {
@@ -29,15 +31,15 @@ export const LAYERS: readonly Layer[] = [
     // and World were the author's illustration of the shape, and two of the
     // three would have opened empty for as long as the content model has no
     // region in it.
-    subpages: [{ id: 'map', label: 'Map' }],
+    subpages: [{ id: 'map' }],
   },
   {
     id: 'home',
     opens: 1,
     subpages: [
-      { id: 'edit', label: 'Edit' },
-      { id: 'home', label: 'Home' },
-      { id: 'settings', label: 'Settings' },
+      { id: 'edit' },
+      { id: 'home' },
+      { id: 'settings' },
     ],
   },
   {
@@ -47,10 +49,10 @@ export const LAYERS: readonly Layer[] = [
     // of them separately. Folding skills into stats would be this layer
     // deciding that a skill is a kind of stat, which is the engine's to say.
     subpages: [
-      { id: 'stats', label: 'Stats' },
-      { id: 'skills', label: 'Skills' },
-      { id: 'equipment', label: 'Equipment' },
-      { id: 'inventory', label: 'Inventory' },
+      { id: 'stats' },
+      { id: 'skills' },
+      { id: 'equipment' },
+      { id: 'inventory' },
     ],
   },
 ];

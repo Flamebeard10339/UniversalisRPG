@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { askedOption } from '../runtime/command';
+import { Console } from './Console';
 import type { Driver } from './driver';
 import { FloatingText } from './FloatingText';
 import { Home } from './Home';
@@ -41,7 +42,10 @@ export function App({ driver }: { driver: Driver }): JSX.Element {
   const { arrivals, generation } = useArrivals(view?.discovered ?? []);
 
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
-    if (layer.id === 'home') return subpage.id === 'home' ? <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} /> : null;
+    if (layer.id === 'home') {
+      if (subpage.id === 'home') return <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} />;
+      return subpage.id === 'edit' ? <Console onSend={driver.send} /> : null;
+    }
     if (layer.id === 'map') return <MapPane view={view} arrivals={arrivals} generation={generation} onChoose={driver.choose} />;
     if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? {})} />;
     if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? {})} />;

@@ -1,3 +1,4 @@
+import { LABELS } from './labels';
 import type { Subpage } from './nav';
 
 // Fixed where a thumb rests, and carrying the current layer's pages rather than
@@ -13,7 +14,7 @@ export function TabBar({ tabs, active, onSelect }: { tabs: readonly Subpage[]; a
           onClick={() => onSelect(at)}
           className={`min-h-[52px] flex-1 px-1 text-xs ${at === active ? 'font-semibold text-accent' : 'text-text-subtle'}`}
         >
-          {tab.label}
+          {LABELS[tab.id]}
         </button>
       ))}
     </nav>

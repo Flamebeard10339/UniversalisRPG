@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { LABELS } from './labels';
 import { across, bodyHeights, BOUNDARIES, HOME_LAYER, LAYERS, layerOffsets, layerSpan, OPENING, subpageOf, toLayer, toSubpage } from './nav';
 
 // A phone's worth of room and two banners of different heights, because two
@@ -114,7 +115,7 @@ describe('what the nav owes the rest of the shell', () => {
     for (const layer of LAYERS) {
       expect(layer.subpages.length).toBeGreaterThan(0);
       expect(layer.opens).toBeLessThan(layer.subpages.length);
-      for (const subpage of layer.subpages) expect(subpage.label).not.toBe('');
+      for (const subpage of layer.subpages) expect(LABELS[subpage.id]).toBeTruthy();
     }
   });
 });

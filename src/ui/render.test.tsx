@@ -7,7 +7,7 @@ import { App } from './App';
 import { createDriver, type Driver } from './driver';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
-import { HOME_LAYER, LAYERS } from './nav';
+import { LABELS } from './labels';
 
 // A run that is under way and going nowhere, which is what a test about what
 // is drawn wants: no timer, and the same frame however long the test takes.
@@ -56,10 +56,16 @@ function published(view: PlayView): string[] {
   ];
 }
 
-// The nav's words, and only the layer's own: the bar carries the current
-// layer's pages, so what the screen may say changes as the player moves and
-// this is what it may say where the shell opens.
-const TAB_LABELS = LAYERS[HOME_LAYER].subpages.map((subpage) => subpage.label);
+// The driver's own vocabulary, taken whole rather than by where it is drawn.
+// Excising the <nav> region derived the expectation from the structure under
+// test, so no wording could fail it; a table read as a set makes a word the
+// shell puts on the screen either an engine value or one of these.
+const SHELL_WORDS: readonly string[] = Object.values(LABELS);
+
+// The engine's half of what is drawn, with the shell's own words taken out by
+// what they are rather than by where they sit: excising a region left every
+// other component free to write prose the region test never saw.
+const engineRuns = (html: string): string[] => readable(html).filter((run) => !SHELL_WORDS.includes(run));
 
 // The engine speaks in messages as well as in views, and a driver logs both.
 // Taken by stopping a run against a session of its own, because typing the
@@ -71,11 +77,6 @@ function whatStoppingSays(): string[] {
   return armed.live!.end(true).output.flatMap((output) => (output.kind === 'message' ? [output.text] : []));
 }
 
-// The nav is the one region whose words this layer owns, so it is taken out by
-// where it is rather than by what it says. Skipping the labels wherever they
-// appeared let a narration header the clause does enumerate be replaced with
-// one of them and pass.
-const NAV = /<nav[\s\S]*?<\/nav>/g;
 const asking = (html: string): boolean => html.includes('role="dialog"');
 
 // The map's nodes, each as the place it stands for and the runs inside it.
@@ -154,12 +155,11 @@ describe('what the shell puts on the screen', () => {
     const step = (): void => {
       for (const line of published(driver.snapshot().view!)) engine.add(line);
       const html = renderToStaticMarkup(<App driver={driver} />);
-      expect(readable(html.match(NAV)?.join('') ?? '')).toEqual(TAB_LABELS);
 
-      const runs = readable(html.replace(NAV, ''));
+      const runs = readable(html);
       seen += runs.length;
       for (const run of runs) {
-        expect([...engine], `"${run}" is on the screen and no engine value produced it`).toContain(run);
+        expect([...engine, ...SHELL_WORDS], `"${run}" is on the screen and no engine value produced it`).toContain(run);
       }
     };
 
@@ -230,7 +230,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, LOOK_OUT));
     const view = driver.snapshot().view!;
 
-    const runs = readable(renderToStaticMarkup(<App driver={driver} />).replace(NAV, ''));
+    const runs = engineRuns(renderToStaticMarkup(<App driver={driver} />));
 
     expect(Object.keys(view.stats)).toContain('surveyed.might');
     expect(Object.keys(view.inventory)).toContain('surveyed.ore');
@@ -250,7 +250,7 @@ describe('what the shell puts on the screen', () => {
     const other = idle.find((choice) => choice.id === TALK)!.label;
 
     driver.choose(position(driver, ROAST));
-    const under = readable(renderToStaticMarkup(<App driver={driver} />).replace(NAV, ''));
+    const under = engineRuns(renderToStaticMarkup(<App driver={driver} />));
 
     expect(under).toContain(running);
     expect(under).toContain(other);
@@ -260,9 +260,21 @@ describe('what the shell puts on the screen', () => {
     expect(under.indexOf(running)).toBeLessThan(under.lastIndexOf(running));
 
     driver.cancel();
-    const stopped = readable(renderToStaticMarkup(<App driver={driver} />).replace(NAV, ''));
+    const stopped = engineRuns(renderToStaticMarkup(<App driver={driver} />));
 
     expect(stopped.indexOf(running)).toBe(stopped.lastIndexOf(running));
+  });
+
+  // The field itself is DOM wiring and is not driven here; what this holds is
+  // that the pane carrying it is mounted and named, since a command route the
+  // shell never draws is a route the player does not have.
+  it('draws the command field on Edit, so every line the table takes has somewhere to be typed', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+
+    const html = renderToStaticMarkup(<App driver={driver} />);
+
+    expect(html).toContain(`aria-label="${LABELS.command}"`);
+    expect(readable(html)).toContain(LABELS.run);
   });
 
   it('names its two glyph controls with the engine value each one acts on', () => {

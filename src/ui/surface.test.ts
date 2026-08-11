@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 // past the play surface the rules below hold the driver to, which is allowed
 // of a test and of nothing else here: SOURCES excludes it.
 import { MODAL_NAMES } from '../runtime/modals';
+import { LABELS } from './labels';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -110,6 +111,23 @@ describe('the rules the driver is held to', () => {
     expect(MODAL_NAMES.length).toBeGreaterThan(0);
     for (const source of SOURCES) {
       for (const id of MODAL_NAMES) expect(source.text, `${source.file} names the modal ${id}`).not.toContain(`'${id}'`);
+    }
+  });
+
+  // The other half of the render sweep, which holds every word on the screen to
+  // being an engine value or one of these. That leaves the table itself free to
+  // grow, so this is what keeps a component from writing its own word: the
+  // vocabulary is a table because it lives in exactly one file.
+  it("writes each of the shell's own words in the table and nowhere else", () => {
+    const table = SOURCES.filter((source) => source.file.endsWith('/labels.ts'));
+    expect(table).toHaveLength(1);
+
+    for (const word of Object.values(LABELS)) {
+      for (const source of SOURCES) {
+        if (source === table[0]) continue;
+        expect(source.text, `${source.file} writes the word ${word} rather than reading it`).not.toContain(`'${word}'`);
+        expect(source.text, `${source.file} writes the word ${word} rather than reading it`).not.toContain(`>${word}<`);
+      }
     }
   });
 
