@@ -751,3 +751,218 @@ src/ui/transient.test.ts "carries any text at all, and nothing about where it ca
 own file with the mutation still applied and failing there.
 The XP instance is still not wired, as the clause requires, and the new clock did not become a second
 channel: src/runtime/command.ts's ticker hands elapsed milliseconds to a run and publishes no note.
+
+### Pass 5 — 2026-08-11
+
+- base: `c59b0a0d7820ee9ef3afaa2601065d32a2b57279`
+- head: `df68ee77a3fca0e0dc06b23162c7e9f582b5b89d`
+- proof 1: met — Both sentences pass 4 recorded as still failing are now closed, and the proof is executable.
+The proof is scripts/drift.test.ts, which drives the REPL's own container rather than a copy of it:
+scripts/play-cli.ts now exports openRepl (line 409) and drift.test.ts:21 opens that beside
+createDriver, armed the same way (driving: true on both). inStep compares, per line and not at the
+end, gui.serialized() against serializeSession(repl.context.session) and the GUI's transcript
+against appendOutputs(before, result.output) -- so a divergence that cancels itself out still names
+the line it happened on.
+Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass5-mutations.json.
+"c1 the GUI says something other than what the REPL said" drops message outputs from the GUI's
+transcript append: KILLED by scripts/drift.test.ts "reaches byte-identical state and says the same
+things, over a scripted sequence", re-run at its own file with the mutation still applied and
+failing there.
+"c1 the two drivers are armed differently, so one resolves what the other arms" flips the GUI's
+driving flag to false: KILLED, escalated to the suite, and confirmed at src/ui/driver.test.ts and
+src/ui/render.test.tsx with the mutant still applied.
+Sentence 2, "a command added to the shared table is dispatchable from the GUI with no edit under
+src/ui": the corpus is read off COMMANDS itself (drift.test.ts:62), each entry dispatched bare and
+with an argument, with the three shape-named entries given one line each of that shape -- so a
+command added tomorrow is replayed on the day it exists and nobody edits drift.test.ts or src/ui.
+The player's route in is src/ui/Console.tsx, whose only transform is consoleLine.typed (trim, and
+refuse the empty line). Mutation "c1 the GUI filters a command the shared table defines" adds an
+early return for any line beginning with a slash to driver.send: KILLED by drift.test.ts
+"dispatches every entry in the shared table the way the REPL does", re-run at its own file.
+TWO BOUNDS, neither re-filed as a defect against the property:
+(a) the comparison is at CommandResult.output, which is upstream of play-cli's own printing layer --
+    the exact seam pass 3's lost-narration divergence lived in. scripts/play-cli.test.ts covers the
+    printing separately; nothing joins the two.
+(b) openRepl is called with no authoring context, so the one capability the REPL has and the GUI
+    structurally cannot -- /local, /create-test, the editing half of /dsl -- is removed from the
+    REPL side before the comparison is made. Filed as a finding, fault on the clause.
+- proof 2: met — Both rules re-measured on the two modules this branch added that take input, and the
+structural leg is unchanged: GameState stays behind the module-private WeakMap in
+src/runtime/session.ts and is unreachable from src/ui whatever src/ui imports.
+Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass5-mutations.json.
+Path rule: "c2 the console reaches the runtime off the play surface" adds import '../runtime/state'
+to src/ui/Console.tsx, the module that takes a typed line straight from the player. KILLED by
+src/ui/surface.test.ts "reaches the runtime only through the play surface", re-run at its own file
+with the mutation still applied and failing there.
+Call rule: "c2 the harness moves the world rather than dispatching through it" adds a wait( call to
+src/ui/testHarness.ts, the one new module whose whole job is to let something else drive. KILLED by
+src/ui/surface.test.ts "calls nothing that moves the world, however the name reached it", re-run at
+its own file.
+The sweep is recursive and covers src/main.tsx, so the nine modules this branch added -- Console,
+consoleLine, labels, testHarness, journey's renderer half, phone's fixtures aside -- are all in it.
+- proof 3: met — Met on the property, and the exemption pass 1 found by value and pass 4 found by region
+is now a table with a rule of its own.
+Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass5-mutations.json.
+"c3 a component writes a word of its own outside the vocabulary table" makes src/ui/LocationBanner
+read "You are in {title}": KILLED by src/ui/render.test.tsx "renders nothing a player can read that
+the engine did not publish", re-run at its own file with the mutation still applied and failing
+there. The test now compares against Object.values(LABELS) taken as a set rather than excising the
+<nav> region, so the pass-4 hole -- a word inside the excised region could be reworded freely -- is
+closed by construction: the words are checked wherever they appear and nowhere else may write one.
+"c3 the shell's own vocabulary escapes the one table it lives in" replaces {LABELS.run} in
+src/ui/Console.tsx with the literal 'Run': KILLED by src/ui/surface.test.ts "writes each of the
+shell's own words in the table and nowhere else", re-run at its own file.
+The clause's last sentence, "there is not one", remains false as written -- src/ui/labels.ts holds
+ten words, one more than pass 4 counted, because the console's field and button needed names. That
+is pass 4's finding gui-rebuild-pass4-c3-says-the-player-reads-no-string-the-eng, which this branch
+closed the right way: a stated boundary in one file with an executable rule, rather than a longer
+exclusion list. Not re-filed.
+- proof 4: met — Pass 1 opened this and passes 2, 3 and 4 all reproduced it; it is now closed at the
+seam and watched from every side.
+The fix is in src/runtime/modals.ts:191, frameProblem: an option whose value list is empty is a
+frame no answer can take down, so pruneModals drops it. Both entry points that move the world with a
+stack up now settle it -- src/runtime/session.ts:513 (applyDirective) and :490 (submitModal).
+Pass 2's reproduction re-run unchanged, npm run inspect --
+C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass2-c4probe.ts, over a dialogue whose every
+menu choice is gated off: modals: [], worldChoices: 1, stillOpen: 0. The screen with no control on
+it is gone and the world's choices come back.
+Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass5-mutations.json, three entries,
+each KILLED by src/runtime/modals.test.ts "never leaves a menu standing that offers nothing, however
+it came to offer nothing", each re-run at its own file with the mutation still applied and failing
+there: "c4 an option that accepts nothing is left standing" (the frameProblem test itself), "c4 a
+move of the world leaves the frame it stranded standing" (the prune in applyDirective), "c4
+answering leaves behind a frame no answer takes down" (the prune in submitModal, which is the GUI's
+own route). That one test walks all four ways in -- talked into, emptied under the player while it
+is up, reached by answering the menu above it, and carried in by a save -- which is the neighbour
+hunt rather than the reproduction.
+The other two halves re-measured because the branch rewrote around them: no modal id appears as a
+literal, and src/ui/surface.test.ts:144 now reads MODAL_NAMES off src/runtime/modals.ts:71 rather
+than a hand-copied list, which closes gui-rebuild-pass1-the-modal-id-check-is-a-hand-copied-list-w.
+"draws the modal the engine is asking for, and stops once it is answered" is unchanged and its
+pass-4 kill stands.
+ONE BOUND, unreachable today and recorded rather than filed: beginAction (src/runtime/session.ts:450)
+is the one mutating entry point that does not prune, and it can resolve a zero-unit action whose
+result opens a modal. Unreachable because the only modal a result can open by name is
+character-creation, whose race values are a module constant and never empty.
+- proof 5: met — Unchanged by this range -- git diff d992f79..df68ee7 -- src/runtime/command.ts is empty,
+and re-measured rather than carried on pass 4's word.
+Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass5-carried.json.
+"c5 the shared ticker advances a run by the interval it asked for" replaces const elapsedMs = now -
+last with everyMs in src/runtime/command.ts: KILLED by src/runtime/command.test.ts "hands over the
+time that actually passed, not the interval it asked for", re-run at its own file with the mutation
+still applied and failing there.
+"c5 the two drivers tick at cadences that only happen to agree" defaults createTicker to 200 rather
+than LIVE_TICK_MS: KILLED by src/runtime/command.test.ts "ticks at the cadence the command surface
+publishes, so both drivers round the same way", re-run at its own file.
+Nothing under src/ui schedules resolve or wait on a clock of its own: the call rule recorded under
+c2 covers it, and it now reads the call as well as the import.
+Pass 4's remaining bound is gone rather than carried: the cross-driver comparison no longer builds
+its REPL side inside the test. scripts/drift.test.ts drives openRepl, which is the loop play-cli's
+own main runs. See c1.
+- proof 6: met — Pass 4 graded this unmet on one measurable property and said what the fix was -- "a
+floor on one control and a test that holds every control to it". That is what landed, and it landed
+at the seam rather than on the one control.
+The floor is now set once, in src/index.css:44-51, over button/input/select/textarea: min-height and
+min-width 44px. The one control that cannot take it from a stylesheet is a place on the map, because
+the bubbles sit inside the sheet's scale() transform -- so src/ui/discovery.ts:120 counter-scales the
+tap area, tapTarget(scale) = TOUCH_FLOOR / min(1, scale), and src/ui/MapPane.tsx:274 draws it inside
+the button. Pass 4's reproduction is closed at both ends: 34 CSS px became the floor, and 13.6 px at
+ZOOM_MIN became the floor too.
+Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass5-mutations.json, six entries, all
+KILLED and each re-run at its own file with the mutation still applied and failing there:
+(1) "c6 a control may stand below the touch floor" drops the stylesheet rule to 24px -- KILLED by
+    src/ui/surface.test.ts "floors every control in the stylesheet, on both axes".
+(2) "c6 a component takes the floor back for itself" writes min-h-[20px] on the tab bar -- KILLED by
+    src/ui/surface.test.ts "lets no control in the tree ask for less room than the floor". That is
+    the other half of the same rule: a floor a component may undo is not a floor. Its scanner is
+    brace-aware over the whole opening tag and is itself held by a test.
+(3) "c6 a place on the map loses its floor as the sheet is zoomed out" fixes tapTarget at
+    TOUCH_FLOOR -- KILLED by src/ui/discovery.test.ts "grows as the sheet shrinks, so what reaches
+    the screen is the floor at every zoom", which asserts tapTarget(scale) * scale >= TOUCH_FLOOR
+    across the whole zoom range rather than at one point.
+(4) "c6 the shell lets a child push the page sideways" removes overflow-hidden from the shell root --
+    KILLED by src/ui/phone.test.tsx "clips the shell to the window, so nothing can push the page
+    sideways".
+(5) "c6 an affordance answers only to a hover" adds hover:text-accent to the tab bar -- KILLED by
+    src/ui/phone.test.tsx "offers nothing that answers only to a hover, a right-click or a key".
+(6) "c6 a layer is reachable only by a gesture" renames data-boundary -- KILLED by
+    src/ui/phone.test.tsx "gives every boundary between two layers a control that is tapped rather
+    than swiped". The element carrying it is a real <button> (src/ui/VStack.tsx:100) whose onClick
+    calls across(); the drag is the same control answering a longer press.
+The structural half is unchanged since pass 4 and its three nav.test.ts kills stand.
+Thumb reach: phone.test.tsx puts <nav after </main> in the rendered markup and holds SPLIT_DEFAULT
+<= 0.5, so the narration never takes more than half of what it shares with the choices.
+BOUND ON THE GRADE, and it is what the next pass should read rather than rediscover: every one of
+these is a measurement of the stylesheet's text and of the rendered markup, not of a laid-out
+viewport at 375x812. What a browser would add and this cannot -- a bubble's real hit box under the
+transform, an actual horizontal overflow -- is what the branch's own filed record
+the-browser-harness-reads-every-published-field-but-the-walk is about, and what CLAUDE.md's testing
+procedure hands to the author. Graded met because the clause's own standard is "measured rather than
+asserted", and every property above now fails a test when it stops holding, which asserting does not.
+- proof 7: met — Pass 4's two survivors are closed, and the route highlight the branch added is watched
+at the component that draws it.
+Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass5-mutations.json, three entries.
+"c7 the map draws every place on top of every other" zeroes MapPane's pixels(): KILLED by
+src/ui/render.test.tsx "puts them as far apart as the engine put them, a unit of world at a time",
+re-run at its own file with the mutation still applied and failing there. Pass 4 recorded this as a
+whole-suite survivor.
+"c7 the map stops acknowledging a place that has just arrived" forces arrived to false: KILLED by
+src/ui/render.test.tsx "acknowledges the place that has just arrived, and leaves the known one
+alone", re-run at its own file. Pass 4's second survivor.
+"c7 the map lights up a road the walk is not taking" makes onWalk true for any place on the line:
+KILLED, and confirmed at src/ui/discovery.test.ts "leaves the roads it does not take, including a
+short cut between two places on it".
+Everything pass 4 measured under this clause is untouched by this range and its kills stand.
+Home, Map and Character each render what they owe; Settings is still a frame with no body, which is
+the spec's own Decision. Edit is not: the command console is its body now. That is filed as a
+finding against the clause's wording rather than graded against the branch, because the spec's Open
+questions leave the console to the worker and only c7's Decision says the frame stays empty.
+BOUND, and it is filed as a finding of its own: a travel offer more than one road away is withdrawn
+from Home's action sheet (src/ui/choices.ts:21) and, when its destination is not yet discovered, has
+no bubble on the map either -- so for that class of offer the only route in the whole shell is the
+console. Measured, see the finding.
+- proof 8: met — Unchanged by this range and measured against a real build rather than by reading.
+git diff --stat c59b0a0..df68ee7 -- src/ui/shippedContent.ts public/ is empty and public/content/ is
+absent from the tree; public/ holds changelog.txt and favicon.svg and nothing else.
+Build check, re-runnable: npx vite build produces dist/assets/index-*.js; grep -c guide-house over it
+returns 13, so the DSL text is inside the bundle; dist/ contains no content/ directory.
+Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass5-carried.json, entry "c8 the build
+stops carrying the shipped DSL", points import.meta.glob at a suffix nothing matches: KILLED by
+src/ui/shippedContent.test.ts "bundles the shipped DSL as text, with no path left for the browser to
+fetch", re-run at its own file with the mutation still applied and failing there.
+The no-network rule now sweeps every module beneath src/ui recursively, the branch's five new ones
+included, and none reaches a network or a filesystem.
+- proof 9: unmet — Deferring again is no longer available: the-agent-harness-returns-to-the-gui, which
+passes 3 and 4 deferred to, is closed. So this is graded on its own terms, and it half holds.
+WHAT HOLDS, measured. src/ui/testHarness.ts publishes window.__test with a structured state read and
+a batch that returns one result per step, including a failed step rather than a throw. Manifest
+C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass5-mutations.json, entry "c9 a batch stops
+returning one result per step" drops the success push for one target: KILLED by
+src/ui/testHarness.test.ts "publishes named actions and batches one result per step", re-run at its
+own file with the mutation still applied and failing there. A production build carries no trace of
+it: npx vite build then grep -rl __test dist/ returns nothing, and the bundle is a single index-*.js
+with no testHarness chunk.
+WHAT FAILS. "exposes actions registered by the components that own them". No component registers
+anything. src/ui/testHarness.ts:118-129 sets five actions over the driver and BrowserTestHarness
+exposes no registration point, so nothing a component owns can be reached: an agent driving the GUI
+cannot change layer, cannot change subpage, cannot pan, zoom or change plane on the map. Those are
+exactly the surfaces this branch built, and they are exactly what the harness cannot drive. The
+state read has the matching blind spot -- TestState carries no journey and no encounter, which is
+the branch's own filed record the-browser-harness-reads-every-published-field-but-the-walk.
+So a driving agent can drive the session behind the shell and not the shell. Graded unmet rather
+than met-with-a-bound because the sentence that fails is the one that distinguishes this harness
+from `driver` with a global name.
+Separately measured and filed: the dev gate itself is untested. See the finding.
+- proof 10: met — Unchanged by this range and confirmed unchanged: git diff --stat c59b0a0..df68ee7 --
+src/ui/transient.ts src/ui/FloatingText.tsx is empty. TransientNote is still {id, text} and nothing
+else, src/ui/App.tsx:80 still mounts FloatingText with driver.transient inside <main>, so it survived
+the nav rebuild and the console that landed beside it.
+Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass5-c10.json, entry "c10 a transient
+note learns where it came from", adds moment: 'xp' to the note the channel makes: KILLED by
+src/ui/transient.test.ts "carries any text at all, and nothing about where it came from", re-run at
+its own file with the mutation still applied and failing there.
+Recorded so the next pass does not read it as a survivor: the same mutation aimed at the TransientNote
+interface as an optional field (manifest audit-gui-rebuild-pass5-carried.json) SURVIVED the whole
+suite. That is an equivalent mutant -- an optional field nothing sets changes no behaviour -- not a
+hole. Aim it at the note, not at the type.
+The XP instance is still not wired, as the clause requires.
