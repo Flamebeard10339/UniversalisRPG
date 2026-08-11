@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../content/registry';
-import { newContext, runLine } from '../runtime/command';
+import { newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
 import { createDriver, type Driver } from './driver';
-import type { Ticker } from './live';
 import { SHIPPED_SOURCES } from './shippedContent';
 
 // One spannable action and nothing else, so a test about time is not also a

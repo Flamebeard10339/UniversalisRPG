@@ -10,7 +10,7 @@ import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './li
 import { serializeSession, startSession, view, type PlayChoice, type PlayStatus, type PlayView } from '../src/runtime/session';
 import {
   askedOption,
-  LIVE_TICK_MS,
+  createTicker,
   newContext,
   runLine,
   type AuthoringContext,
@@ -22,6 +22,7 @@ import {
   type LiveRun,
   type MessageTone,
   type Recorder,
+  type Ticker,
 } from '../src/runtime/command';
 import { type Modal } from '../src/runtime/runtime';
 
@@ -207,10 +208,42 @@ function print(lines: string[]): void {
   if (lines.length > 0) console.log(lines.join('\n'));
 }
 
-// Ends when the action completes or the player cancels; only reached on a TTY.
+// The decision half of the live loop, with the terminal kept out of it: tick
+// the run, write what the tick said, and end exactly once however it ends. The
+// timer and the keypress cannot both arrive first, and `settled` is the whole
+// of what stops the second one from ending a run that is already over.
+export function driveRun(
+  run: LiveRun,
+  write: (text: string) => void,
+  ended: (result: CommandResult) => void,
+  ticker: Ticker = createTicker(),
+): (cancelled: boolean) => void {
+  let settled = false;
+  let stopTicking: (() => void) | null = null;
+
+  const stop = (cancelled: boolean): void => {
+    if (settled) return;
+    settled = true;
+    stopTicking?.();
+    ended(run.end(cancelled));
+  };
+
+  stopTicking = ticker((elapsedMs) => {
+    const progress = run.tick(elapsedMs);
+    // The said lines scroll away above the bar; the carriage return clears the
+    // last line written, which is the bar, so it redraws where it was.
+    write(`\r\x1b[K${formatTick(progress).join('\n')}`);
+    if (!progress.active) stop(false);
+  });
+
+  return stop;
+}
+
+// The terminal half. Ends when the action completes or the player cancels;
+// only reached on a TTY.
 //
 // ANY keypress cancels, which needs three things in order: rl.pause() so readline
-// stops fighting the \r-redrawn bar, setRawMode(true) so keys arrive unbuffered,
+// stops fighting the redrawn bar, setRawMode(true) so keys arrive unbuffered,
 // and input.resume() — the non-obvious one, since attaching a `data` listener only
 // auto-flows a stream for the FIRST listener and readline already installed one.
 // Ctrl-C raises no SIGINT in raw mode, so it is honoured explicitly below.
@@ -227,22 +260,15 @@ function runLiveAction(run: LiveRun, armed: readonly string[], rl: ReturnType<ty
     print([...armed]);
     process.stdout.write('(press any key to stop)\n');
 
-    let lastTick = Date.now();
-    let settled = false;
-    let cancelled = false;
-
-    const finish = (): void => {
-      if (settled) return;
-      settled = true;
-      clearInterval(timer);
+    const stop = driveRun(run, (text) => void process.stdout.write(text), (result) => {
       input.off('data', onData);
       input.off('end', onEnd);
       if (isTTY) input.setRawMode(wasRaw);
       process.stdout.write('\n');
-      print(formatResult(run.end(cancelled)));
+      print(formatResult(result));
       rl.resume();
       resolvePromise();
-    };
+    });
 
     const onData = (chunk: Buffer): void => {
       if (isTTY && chunk.length === 1 && chunk[0] === 0x03) {
@@ -251,27 +277,12 @@ function runLiveAction(run: LiveRun, armed: readonly string[], rl: ReturnType<ty
         rl.close();
         process.exit(130);
       }
-      cancelled = true;
-      finish();
+      stop(true);
     };
-    const onEnd = (): void => {
-      cancelled = true;
-      finish();
-    };
+    const onEnd = (): void => void stop(true);
 
     input.on('data', onData);
     input.on('end', onEnd);
-
-    const timer = setInterval(() => {
-      const now = Date.now();
-      const elapsedMs = now - lastTick;
-      lastTick = now;
-      const progress = run.tick(elapsedMs);
-      // The said lines scroll away above the bar; the \r-cleared line is the
-      // last one written, which is the bar, so the next tick redraws it in place.
-      process.stdout.write(`\r\x1b[K${formatTick(progress).join('\n')}`);
-      if (!progress.active) finish();
-    }, LIVE_TICK_MS);
   });
 }
 

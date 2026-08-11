@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { loadModule } from '../src/content/registry';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { serializeSession, startSession, view } from '../src/runtime/session';
-import { COMMANDS, newContext, runLine, type CommandContext, type Recorder } from '../src/runtime/command';
-import { formatLive, formatOutput, formatResult, formatTick, loadModportalSources } from './play-cli';
+import { COMMANDS, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
+import { driveRun, formatLive, formatOutput, formatResult, formatTick, loadModportalSources } from './play-cli';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -379,5 +379,70 @@ describe('play-cli modportal cache loading', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// The loop itself, with the terminal taken out of it. runLiveAction keeps raw
+// mode, the keypress and readline, and has no decision left in it to test.
+describe('play-cli drives a live run', () => {
+  function handTicker(): Ticker & { advance(elapsedMs: number): void; stops: number } {
+    let ticking: ((elapsedMs: number) => void) | null = null;
+    const ticker = ((tick) => {
+      ticking = tick;
+      return () => void (ticker.stops += 1);
+    }) as Ticker & { advance(elapsedMs: number): void; stops: number };
+    ticker.stops = 0;
+    ticker.advance = (elapsedMs) => ticking?.(elapsedMs);
+    return ticker;
+  }
+
+  function driven(choiceId: string) {
+    const ctx = driver(LIVE_MODULE, 1, true);
+    const ticker = handTicker();
+    const written: string[] = [];
+    const closed: CommandResult[] = [];
+    const stop = driveRun(armed(ctx, choiceId).live!, (text) => void written.push(text), (result) => void closed.push(result), ticker);
+    return { ctx, ticker, written, closed, stop };
+  }
+
+  it('advances the run by the elapsed span the ticker hands it, and writes what the tick said', () => {
+    const run = driven('use:entity.kiln.fire');
+
+    run.ticker.advance(1000);
+
+    expect(run.ctx.view.time).toBe(1);
+    expect(run.written).toEqual([`\r\x1b[Kfire... [##########----------]  [time: 1.0s]`]);
+    expect(run.closed).toEqual([]);
+  });
+
+  it('ends itself when the run completes, and stops the ticker it started', () => {
+    const run = driven('use:entity.kiln.fire');
+
+    run.ticker.advance(2000);
+
+    expect(run.ticker.stops).toBe(1);
+    expect(run.closed).toHaveLength(1);
+    expect(run.written[0]).toContain('The kiln settles with a crack.');
+  });
+
+  it('ends once however it ends, so a keypress landing on the closing tick cannot end it twice', () => {
+    const run = driven('use:entity.kiln.fire');
+    run.ticker.advance(2000);
+
+    run.stop(true);
+
+    expect(run.closed).toHaveLength(1);
+    expect(formatResult(run.closed[0])).not.toContain('Stopped.');
+  });
+
+  it('stops the run and the ticker when the player cancels first', () => {
+    const run = driven('use:entity.oven.roast');
+    run.ticker.advance(1000);
+
+    run.stop(true);
+
+    expect(run.ticker.stops).toBe(1);
+    expect(formatResult(run.closed[0])).toContain('Stopped.');
+    expect(run.ctx.view.time).toBe(1);
   });
 });

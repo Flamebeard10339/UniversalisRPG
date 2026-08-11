@@ -48,11 +48,16 @@ function calls(source: { text: string }): string[] {
 }
 
 // Everything src/ui takes off the play surface as a value: the entries a
-// driver dispatches through, and the cadence both drivers tick at. Nothing
-// that moves the world itself — `wait`, `beginAction`, `cancelAction` and
-// `apply` are each one import away and each absent, so time advances here only
-// by handing elapsed milliseconds to the run the command surface armed.
-const DISPATCHES = ['askedOption', 'LIVE_TICK_MS', 'newContext', 'runLine', 'serializeSession', 'startSession', 'view'];
+// driver dispatches through, the cadence both drivers tick at, and the ticker
+// that turns two clock readings into an elapsed span.
+const DISPATCHES = ['askedOption', 'createTicker', 'LIVE_TICK_MS', 'newContext', 'runLine', 'serializeSession', 'startSession', 'view'];
+
+// The other half of the same rule, and the half that does not depend on how a
+// name arrived. The allowlist above reads `import { x } from`; this reads the
+// call, so `(await import('../runtime/session')).wait(…)` is caught by the one
+// spelling that cannot be avoided — using the thing. Time advances in src/ui
+// only by handing elapsed milliseconds to the run the command surface armed.
+const MOVES_THE_WORLD = /\b(wait|apply|applyDirective|beginAction|cancelAction|submitModal)\s*\(/;
 
 // Neither is written under src/ui, which is the point; naming them here is how
 // the absence is checked.
@@ -89,6 +94,10 @@ describe('the rules the driver is held to', () => {
       // A namespace import reaches every one of them and names none.
       expect(source.text, source.file).not.toMatch(/import\s+\*\s+as\s+\w+\s+from\s*['"`][^'"`]*\/runtime\//);
     }
+  });
+
+  it('calls nothing that moves the world, however the name reached it', () => {
+    for (const source of SOURCES) expect(source.text, source.file).not.toMatch(MOVES_THE_WORLD);
   });
 
   it('names no game state, so it can hold none', () => {

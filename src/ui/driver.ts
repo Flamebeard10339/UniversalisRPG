@@ -1,8 +1,7 @@
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
-import { newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine } from '../runtime/command';
+import { createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { serializeSession, startSession, view, type PlayView } from '../runtime/session';
-import { createTicker, type Ticker } from './live';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 import { createTransientChannel, type TransientChannel } from './transient';
 

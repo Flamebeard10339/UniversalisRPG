@@ -5,7 +5,8 @@ type Option = PlayView['modals'][number]['options'][number];
 
 // Everything drawn here comes off the option the engine is asking for, so a
 // modal this file has never heard of is answerable on the same path as one it
-// has. The arrow is the driver's own glyph, the way a terminal owns its prompt.
+// has. The arrow is the driver's own glyph, the way a terminal owns its prompt,
+// and it answers to the option's own label rather than to a word for submitting.
 export function ModalSheet({ option, onAnswer }: { option: Option; onAnswer: (key: string, value: string) => void }): JSX.Element {
   const [typed, setTyped] = useState('');
 
@@ -40,7 +41,7 @@ export function ModalSheet({ option, onAnswer }: { option: Option; onAnswer: (ke
               autoFocus
               onChange={(event) => setTyped(event.target.value)}
             />
-            <button type="submit" className="min-h-[48px] min-w-[48px] rounded-xl bg-accent text-lg text-accent-text transition-transform duration-75 active:scale-[0.97]">
+            <button type="submit" aria-label={option.label} className="min-h-[48px] min-w-[48px] rounded-xl bg-accent text-lg text-accent-text transition-transform duration-75 active:scale-[0.97]">
               ▸
             </button>
           </form>

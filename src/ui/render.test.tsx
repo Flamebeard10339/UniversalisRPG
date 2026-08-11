@@ -1,11 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../content/registry';
-import { newContext, runLine } from '../runtime/command';
+import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
 import { App } from './App';
 import { createDriver, type Driver } from './driver';
-import type { Ticker } from './live';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { TABS } from './tabs';
@@ -22,9 +21,13 @@ const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>
 const JOINER = ' · ';
 
 // Every run of text the markup would put in front of a player, with the
-// separator this layer joins a list of titles with taken back apart.
+// separator this layer joins a list of titles with taken back apart. An
+// aria-label is one of those runs: a control named for a screen reader is
+// prose a player reads, and leaving it out would exempt from the clause the
+// one place a glyph control is allowed to say anything at all.
 function readable(html: string): string[] {
   return html
+    .replace(/aria-label="([^"]*)"/g, '\n$1\n')
     .replace(/<[^>]*>/g, '\n')
     .split('\n')
     .flatMap((run) => run.split(JOINER))
@@ -135,6 +138,24 @@ describe('what the shell puts on the screen', () => {
     const stopped = readable(renderToStaticMarkup(<App driver={driver} />).replace(NAV, ''));
 
     expect(stopped.indexOf(running)).toBe(stopped.lastIndexOf(running));
+  });
+
+  it('names its two glyph controls with the engine value each one acts on', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const running = driver.snapshot().view!.choices.find((choice) => choice.id === ROAST)!.label;
+    driver.choose(position(driver, ROAST));
+
+    expect(renderToStaticMarkup(<App driver={driver} />)).toContain(`aria-label="${running}"`);
+
+    const field = { key: 'name', label: 'Name', values: null };
+    expect(renderToStaticMarkup(<ModalSheet option={field} onAnswer={() => undefined} />)).toContain(`aria-label="${field.label}"`);
+  });
+
+  it('moves a bar over exactly one tick of the cadence both drivers read', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    driver.choose(position(driver, ROAST));
+
+    expect(renderToStaticMarkup(<App driver={driver} />)).toContain(`transition-duration:${LIVE_TICK_MS}ms`);
   });
 
   it('draws the modal the engine is asking for, and stops once it is answered', () => {
