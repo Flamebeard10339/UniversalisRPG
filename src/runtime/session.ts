@@ -51,7 +51,7 @@ export interface PlayStatus {
   xp: Record<string, number>;
   stats: Record<string, number>;
   flags: Record<string, boolean | number>;
-  discovered: string[];
+  discovered: Array<{ id: string; title: string; adjacent: string[] }>;
   player: { name: string; race: string };
   action: PlayAction | null;
 }
@@ -322,10 +322,24 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     xp: { ...state.xp },
     stats: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, statValue(stat.id, state, registry)])),
     flags: { ...state.flags },
-    discovered: [...registry.locations.values()].filter((each) => truthy(state.flags[`${each.id}.${DISCOVERED}`])).map((each) => each.id),
+    discovered: publishDiscovered(state, registry),
     player: { ...state.player },
     action: publishAction(state, registry),
   };
+}
+
+// The map, as far as the player has found it. Adjacency is kept to places that
+// are themselves discovered, so the shape of what has not been found yet is not
+// readable off the edges leading to it. A condition on an edge gates travelling
+// it, not knowing the road is there, so a shut way is still drawn.
+function publishDiscovered(state: GameState, registry: Registry): PlayStatus['discovered'] {
+  const found = [...registry.locations.values()].filter((each) => truthy(state.flags[`${each.id}.${DISCOVERED}`]));
+  const known = new Set(found.map((each) => each.id));
+  return found.map((each) => ({
+    id: each.id,
+    title: each.title,
+    adjacent: each.adjacent.map((edge) => edge.target).filter((target) => known.has(target)),
+  }));
 }
 
 function publishResources(state: GameState, registry: Registry): PlayStatus['resources'] {

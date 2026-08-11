@@ -583,12 +583,23 @@ base: 4
 # location forge
 x: 0, y: 0
 starting
+title: The Forge
+adjacent:
+  overlook
+  cellar
 entities:
   window
   bench
 
 # location overlook
 x: 1, y: 0
+adjacent:
+  forge
+
+# location cellar
+x: 0, y: 1
+adjacent:
+  forge
 
 # item ore
 examine: Streaked with red.
@@ -603,6 +614,7 @@ slot: hand
 
 # entity window
 look through: discover: overlook
+look back: discover: forge
 
 # entity bench
 stations: bench
@@ -650,8 +662,29 @@ describe('what the engine publishes', () => {
     expect(view(session).discovered).toEqual([]);
 
     const told = apply(session, 'use:entity.window.look through');
-    expect(told.discovered).toEqual(['overlook']);
+    expect(told.discovered.map((place) => place.id)).toEqual(['overlook']);
     expect(told.flags).toEqual({ 'overlook.discovered': true });
+  });
+
+  it('names each discovered place with the word its author wrote', () => {
+    const session = startSession(loadModule(PUBLISHED_MODULE));
+    apply(session, 'use:entity.window.look back');
+
+    const found = view(session).discovered.find((place) => place.id === 'forge');
+
+    expect(found?.title).toBe('The Forge');
+  });
+
+  it('carries how the discovered places connect, which is the other half of a map', () => {
+    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const alone = apply(session, 'use:entity.window.look back').discovered;
+    const paired = apply(session, 'use:entity.window.look through').discovered;
+
+    // Adjacency to a place the player has not found would draw the shape of
+    // what is still hidden, so an edge arrives only once both ends have.
+    expect(alone.find((place) => place.id === 'forge')?.adjacent).toEqual([]);
+    expect(paired.find((place) => place.id === 'forge')?.adjacent).toEqual(['overlook']);
+    expect(paired.find((place) => place.id === 'overlook')?.adjacent).toEqual(['forge']);
   });
 });
 
