@@ -327,3 +327,171 @@ them; the channel takes its expiry scheduler as a parameter so its test drives a
 src/ui/transient.test.ts "carries any text at all, and nothing about where it came from", re-run at
 its own file with the mutation still applied and failing there. The XP instance is still not wired,
 as the clause requires.
+
+### Pass 3 — 2026-08-11
+
+- base: `c59b0a0d7820ee9ef3afaa2601065d32a2b57279`
+- head: `f24fc80d6263108f1eed8d1da97823266c5a7ad1`
+- proof 1: unmet — Graded unmet rather than unknown: I looked at both sentences and both fail, measurably.
+Sentence 1, "the same ordered messages": the two session containers now demonstrably disagree, and
+the branch knows it — it filed play-cli-loses-the-narration-a-live-run-produced rather than fixing
+it. Reproduced independently, body at
+C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass3-c1messages.ts, run with npm run inspect -- -
+over a four-second action whose on-success says a line. Both drivers reach the same state; the say
+rides on the completing tick's view and view() drains it behind that read. src/ui/driver.ts advance()
+appends logging(progress.view) every tick, so the GUI's transcript ends
+[place:Workshop, describe:A bench and a lathe., said:A spindle comes off the lathe.].
+scripts/play-cli.ts runLiveAction prints only formatLive(progress), which is label, bar and clock and
+carries no said, and then run.end(false)'s view.said is []. The engine's line never reaches the
+terminal. Manufacturing a per-tick view output is the GUI container's decision, not its renderer's,
+so this is c1's territory and not the renderer exclusion the spec's Decision carves out.
+Sentence 1, "one scripted sequence replayed through both": still not written. The nearest thing,
+src/ui/driver.test.ts:212, compares the GUI driver against newContext/runLine/tick/end written inside
+the test, not against scripts/play-cli.ts, which src/ui may not import. Filed as a finding.
+Sentence 2, "a command added to the shared table is dispatchable from the GUI with no edit under
+src/ui": unchanged since pass 2 and still false. grep for `.send(` across src/ returns exactly one
+hit, src/ui/driver.test.ts:203; no component calls it, so the GUI dispatches two spellings, `<N>` and
+`submit-modal: key=value`, plus the new cancel, which is a run control rather than a command.
+gui-rebuild-pass2-the-gui-can-dispatch-two-spellings-and-has is open against it.
+What this branch did not break: the run does not filter commands. Mutation entry "c1 the GUI refuses
+a dispatch while a run is under way" turns `if (running) close(true)` into `if (running) return` in
+src/ui/driver.ts. KILLED by src/ui/driver.test.ts "stops the run under way before a command that is
+not a choice at all", re-run at its own file. The late reversal is uniform over every dispatch rather
+than special-cased by spelling, so no command is refused; the run under way is.
+- proof 2: met — Both legs re-run, and the second is new this pass because the branch added a file.
+(1) Path rule: src/ui/surface.test.ts "reaches the runtime only through the play surface" now sweeps
+src/ui/live.ts and src/ui/LiveSheet.tsx as well. Mutation manifest
+C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass3-clock-and-run.json, entry "c2 the GUI's
+clock module reaches the runtime off the play surface", adds import "../runtime/state" to the new
+src/ui/live.ts. KILLED by that named test, re-run at its own file with the mutation still applied and
+failing there.
+(2) Value rule, added by this branch: surface.test.ts "brings in only what a driver dispatches
+through, so it cannot advance a clock of its own" holds every named value import off the play surface
+to DISPATCHES. This matters more than it looks, because wait, apply, beginAction and cancelAction are
+all exported from src/runtime/session, which the path rule already allows: the path rule cannot see
+them and this is the only thing that can. Entry "c5 src/ui reaches for the runtime's own wait" adds
+import { wait } from '../runtime/session' to src/ui/live.ts. KILLED by that named test, re-run at its
+own file.
+Structural leg unchanged: GameState stays behind the module-private WeakMap in src/runtime/session.ts
+and is unreachable from src/ui whatever src/ui imports.
+The value rule's own hole is measured and filed rather than left to be rediscovered: it reads only
+`import { x } from`, so a dynamic destructured import reaches wait past it. See the finding.
+- proof 3: met — The diff adds exactly one new prose surface, src/ui/LiveSheet.tsx, and the c3 guard was
+extended to walk it. src/ui/render.test.tsx "renders nothing a player can read that the engine did
+not publish" now arms the tutorial's roast-chestnuts action, renders App with the run on screen, then
+cancels; and whatStoppingSays() takes "Stopped." off a session of its own rather than typing the word
+into the test.
+Mutation entry "c3 the run's sheet writes a label of its own" replaces LiveSheet's {progress.label}
+with the literal "Working on it". KILLED by that named test, re-run at src/ui/render.test.tsx with
+the mutation still applied and failing there.
+Everything else LiveSheet draws is engine-published too: pool titles come off LiveProgress.pools, the
+label off the run.
+Pass 1's two exemptions still stand and this branch enlarges the second rather than closing it: the
+stop control is the glyph U+2715, the implicit-attempt row reads U+00D7 followed by a count, and both
+Meter readouts are digits and a slash, so readable()'s /[A-Za-z]/ filter cannot see any of them. That
+is the pass-1 finding "c3's guard exempts by value what the clause exempts by nothing", not a new one.
+- proof 4: unmet — Unchanged by this branch, and the half that fails is Runtime's. Re-measured what holds.
+Holds, and re-measured because the diff edits src/ui/App.tsx: mutation entry "c4 the shell stops
+drawing the modal the engine is asking for" replaces the ModalSheet render with {null}. KILLED by
+src/ui/render.test.tsx "draws the modal the engine is asking for, and stops once it is answered",
+re-run at its own file.
+Holds: no modal id appears as a literal — src/ui/surface.test.ts "names no modal, so it cannot be
+rendering one it knows" now sweeps src/ui/live.ts and src/ui/LiveSheet.tsx too, and neither names one.
+Still fails, and I checked rather than assuming: pass 2's reproduction is untouched by this diff. The
+only change to src/ui/ModalSheet.tsx is the .unbarred class on the values scroller; the branch of the
+render that draws from option.values is byte-identical, and [] is still truthy, so an option whose
+value list is empty still draws a sheet with no control on it. Nothing in this range touches
+src/runtime/modals.ts or publishModal. gui-rebuild-clause-4 is the open undelivered record.
+New this pass and checked clean: the run and the modal do not fight. A modal asked while a run is
+under way draws over Home, and driver.answer goes through send, which does close(true) before
+runLine, so the run is stopped and the modal is answered by the same tap. The closing path is not
+lost by the addition.
+- proof 5: met — Nine mutations, manifest at
+C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass3-clock-and-run.json; eight killed, one
+survivor which bounds the grade.
+Advances simulated time from real elapsed time: "c5 the GUI advances a run by the interval it asked
+for rather than the time that passed" makes src/ui/live.ts hand over everyMs instead of now - last.
+KILLED by src/ui/live.test.ts "hands over the time that actually passed, not the interval it asked
+for", re-run at its own file.
+Through the shared clock: "c5 the GUI ticks at a cadence of its own rather than the shared one"
+defaults createTicker to 200 instead of LIVE_TICK_MS. KILLED by src/ui/live.test.ts "ticks at the
+cadence the command surface publishes, so both drivers round the same way", re-run at its own file.
+LIVE_TICK_MS is now exported from src/runtime/command.ts beside LiveRun and both drivers import it.
+Arms rather than resolves: "c5 the GUI resolves a spannable action instead of arming it" flips
+driving to false in src/ui/driver.ts. KILLED by src/ui/driver.test.ts "arms a spannable action rather
+than resolving it, and reports the run before any time passes", re-run at its own file.
+Shows its progress: "c5 the run takes the choices away while it lasts" gates the Sheet on !live in
+src/ui/Home.tsx. KILLED by src/ui/render.test.tsx "draws the run above the choices, which it does not
+withdraw", re-run at its own file. That test also fixes the author's late reversal in place: the run
+draws above the world's choices, outside the scroller, and they stay tappable.
+Can be cancelled: "c5 the run cannot be cancelled, only completed" makes driver.cancel call
+close(false). KILLED by src/ui/driver.test.ts "cancels on request, keeping the time already spent and
+saying so in the engine words", re-run at its own file. And "c5 the GUI leaves its timer running
+after the run is over" deletes stopTicking?.() from close: KILLED by src/ui/driver.test.ts "closes the
+run when the action finishes, stops the ticker and gives the choices back", re-run at its own file.
+Nothing under src/ui schedules resolve or wait on a clock of its own: "c5 src/ui reaches for the
+runtime's own wait" adds import { wait } from '../runtime/session' to src/ui/live.ts. KILLED by
+src/ui/surface.test.ts "brings in only what a driver dispatches through, so it cannot advance a clock
+of its own", re-run at its own file. src/ui/live.ts's setInterval is not a clock of its own in the
+clause's sense: it reads elapsed wall time and hands the number to the LiveRun the command surface
+armed, which is the only thing that calls wait.
+The same state over the same elapsed span: src/ui/driver.test.ts "reaches the state the REPL live
+path reaches over the same elapsed span" replays [200, 200, 750, 3000, 200] through both and asserts
+the two PlayViews are equal. I checked what that test can fail on, and it is the GUI wrapper only.
+Its REPL side is newContext/runLine/tick/end written inside the test, not scripts/play-cli.ts, which
+src/ui cannot import. Mutation "c5 the REPL advances its run by the interval it asked for rather than
+the time that passed" replaces play-cli's `const elapsedMs = now - lastTick;` with LIVE_TICK_MS:
+SURVIVED, escalated [scripts/play-cli.test.ts to whole suite], 0 failed of 2340. Filed as a finding.
+The property holds today by reading — scripts/play-cli.ts runLiveAction reads Date.now() twice and
+passes the difference, and ticks on the imported LIVE_TICK_MS — so this is graded met on the
+property, with the REPL half of its proof recorded as absent rather than assumed.
+- proof 6: unknown — Not measured, and this clause's own standard is measured rather than asserted, so
+unknown is the honest grade for a third pass running. CLAUDE.md's rule that a UI feature is tested by
+the author, not by the agent, is why no browser was driven; the author has manually accepted the
+surface, but acceptance is not the 375x812 measurement this clause asks for.
+By reading, the branch did not weaken it. The one new interactive control, LiveSheet's stop, carries
+min-h-[48px] min-w-[48px]; the run sits in the bottom pane above the action sheet, so it is in the
+bottom third with the controls used every turn; and it is a tap with no hover, right-click or
+keyboard path.
+One thing I checked that is not obvious from reading and that the eventual measurement should
+include: LiveSheet is shrink-0 inside the bottom pane, so in an encounter with several pool meters it
+wins the space fight against the choices scroller. At SPLIT_MAX (0.85, src/ui/gesture.ts) the pane is
+roughly 96 CSS px on a 375x812 screen and the sheet is taller than that. The stop control survives it
+— it is in LiveSheet's first row, so it stays at the top of the pane — and only the pool meters below
+it are clipped by the shell's overflow-hidden root. Not filed, because the clause is about touch
+targets, horizontal scroll and affordance kind, and none of those is what this is.
+- proof 7: deferred — Deferred rather than unmet, because the goal — the game becomes playable by a person on
+a phone — holds with Home alone, and the missing half is another open record's.
+Checked: the five tabs are one nav in src/ui/TabBar.tsx and each is one tap and one swipe; Home is
+the narrative log, the action sheet and now the live run above it. Map, Character, Settings and Edit
+are still null panes — src/ui/App.tsx line 16, `TABS.map((tab) => (tab.id === 'home' ? <Home .../> :
+null))` — so the discovered-location graph and the published inventory this clause asks for are not
+drawn. the-map-and-character-tabs [task/open/medium] owns the two that must not stay empty; Settings
+and Edit are empty by the spec's own Decision.
+Re-run by reading src/ui/App.tsx: the clause is met the moment that ternary stops being the whole
+pane map.
+- proof 8: met — Unchanged by this diff and re-measured cheaply. git diff c59b0a0..HEAD touches neither
+src/ui/shippedContent.ts nor public/, and public/content/ is still absent from the tree.
+src/ui/shippedContent.ts still bundles content/*.dsl through import.meta.glob with query '?raw',
+eager. The re-runnable guard now covers the branch's two new modules as well, because
+src/ui/surface.test.ts "asks nothing of a network or a filesystem" sweeps every module under src/ui
+and src/ui/live.ts and src/ui/LiveSheet.tsx are in it — neither reaches a network, and the ticker's
+only effect is setInterval.
+Pass 2's mutation still stands as the kill: "c8 the build stops carrying the shipped DSL" points the
+glob at a suffix nothing matches, KILLED by src/ui/shippedContent.test.ts "bundles the shipped DSL as
+text, with no path left for the browser to fetch".
+- proof 9: deferred — Deferred rather than unmet, because a dev-only agent harness is not on the path to the
+goal — the game is playable on a phone without one — and the-agent-harness-returns-to-the-gui
+[task/open/medium, BLOCKED] owns it.
+Checked, and this is the third pass to check it: grep for __test across src/ returns nothing. No
+window.__test, no registration point, no batch entry. Nothing in this diff moved it either way.
+Re-run: grep -rn "__test" src/.
+- proof 10: met — Unchanged by this diff and confirmed unchanged: git diff c59b0a0..HEAD names neither
+src/ui/transient.ts nor src/ui/FloatingText.tsx. TransientNote is still {id, text} and nothing else,
+FloatingText still renders channel.notes() with no way to ask what produced any of them, and the
+channel still takes its expiry scheduler as a parameter.
+The new clock does not become a second channel: src/ui/live.ts hands elapsed milliseconds to a run
+and publishes no note, and src/ui/App.tsx still mounts FloatingText with driver.transient.
+Pass 2's mutation re-runs: "c10 a transient note learns where it came from" adds a moment:'xp' field,
+KILLED by src/ui/transient.test.ts "carries any text at all, and nothing about where it came from".
+The XP instance is still not wired, as the clause requires.
