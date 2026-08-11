@@ -450,6 +450,15 @@
             "src/ui/driver.ts"
           ],
           "note": "produced by the-agent-harness-returns-to-the-gui; dev-only window.__test batched driver actions and structured state in src/ui/testHarness.ts, installed from the GUI session container"
+        },
+        {
+          "name": "the GUI",
+          "paths": [
+            "src/ui/App.tsx",
+            "src/ui/driver.ts",
+            "src/main.tsx"
+          ],
+          "note": "produced by gui-rebuild: the play surface's second driver, its session container and its shell"
         }
       ]
     },
