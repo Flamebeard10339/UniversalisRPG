@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampZoom, drawnBox, midpoint, onWalk, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, tapTarget, walkLine, waysOut, zoomByWheel, type Node, type Point, type Size } from './discovery';
+import { bounds, clampZoom, drawnBox, mapSurface, midpoint, onWalk, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, tapTarget, walkLine, waysOut, zoomByWheel, type Node, type Point, type Size } from './discovery';
+import { useTestSurface } from './testSurface';
 
 // The map draws its own working out — the box a pan is held against — for
 // whoever is building the map. Read once, off the address, because a debug
@@ -122,6 +123,8 @@ export function MapPane({
     setScale(rest.scale);
     setPan(rest.pan);
   };
+
+  useTestSurface('map', mapSurface({ plane: at, zoom: scale, pan: held, sheet, travels }, { settle, plane: setPlane }));
 
   // React's TouchList and the DOM's differ only in being iterable, and both
   // arrive here — one from the handler, one from the window listener.

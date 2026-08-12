@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LABELS } from './labels';
-import { across, bodyHeights, BOUNDARIES, HOME_LAYER, LAYERS, layerOffsets, layerSpan, OPENING, subpageOf, toLayer, toSubpage } from './nav';
+import { across, bodyHeights, BOUNDARIES, HOME_LAYER, LAYERS, layerNamed, layerOffsets, layerSpan, OPENING, shellState, shellSurface, subpageNamed, subpageOf, toLayer, toSubpage } from './nav';
 
 // A phone's worth of room and two banners of different heights, because two
 // equal ones would let an arithmetic mistake that swaps them pass.
@@ -117,5 +117,52 @@ describe('what the nav owes the rest of the shell', () => {
       expect(layer.opens).toBeLessThan(layer.subpages.length);
       for (const subpage of layer.subpages) expect(LABELS[subpage.id]).toBeTruthy();
     }
+  });
+});
+
+describe('the shell as a driving agent reaches it', () => {
+  it('publishes where it is standing by the names the model uses, not by an index', () => {
+    expect(shellState(OPENING)).toEqual({
+      layer: 'home',
+      subpage: 'home',
+      layers: ['map', 'home', 'character'],
+      subpages: ['edit', 'home', 'settings'],
+    });
+  });
+
+  it('says which pages are on offer, which is the layer being stood on and no other', () => {
+    const character = shellState(toLayer(OPENING, LAYERS.findIndex((layer) => layer.id === 'character')));
+
+    expect(character.subpages).toEqual(['stats', 'skills', 'equipment', 'inventory']);
+  });
+
+  it('moves the layer by name', () => {
+    let moved = OPENING;
+    shellSurface(OPENING, (where) => void (moved = where)).actions!.layer('map');
+
+    expect(shellState(moved).layer).toBe('map');
+  });
+
+  it('moves the page of the layer being stood on, by name', () => {
+    let moved = OPENING;
+    shellSurface(OPENING, (where) => void (moved = where)).actions!.subpage('settings');
+
+    expect(shellState(moved)).toMatchObject({ layer: 'home', subpage: 'settings' });
+  });
+
+  it('refuses a name nothing answers to rather than clamping to a neighbour', () => {
+    expect(() => layerNamed('nowhere')).toThrow('no layer is named nowhere');
+    expect(() => layerNamed(1)).toThrow('no layer is named 1');
+    expect(() => subpageNamed(HOME_LAYER, 'inventory')).toThrow('home has no subpage named inventory');
+  });
+
+  it('remembers a page it was moved to, so re-entering the layer comes back to it', () => {
+    const character = LAYERS.findIndex((layer) => layer.id === 'character');
+    let moved = toLayer(OPENING, character);
+    const surface = shellSurface(moved, (where) => void (moved = where));
+    surface.actions!.subpage('inventory');
+    const left = toLayer(moved, HOME_LAYER);
+
+    expect(shellState(toLayer(left, character)).subpage).toBe('inventory');
   });
 });

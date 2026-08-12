@@ -9,11 +9,12 @@ import { LocationBanner } from './LocationBanner';
 import { MapPane } from './MapPane';
 import { newlyFound, type Place } from './discovery';
 import { ModalSheet } from './ModalSheet';
-import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpage } from './nav';
+import { LAYERS, OPENING, shellSurface, subpageOf, toLayer, toSubpage, type Layer, type Subpage } from './nav';
 import { Pager } from './Pager';
 import { counted, named } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
+import { useTestSurface } from './testSurface';
 import { VStack } from './VStack';
 
 // What the world just gave up, and a count of how many times it has. The count
@@ -41,7 +42,9 @@ export function App({ driver }: { driver: Driver }): JSX.Element {
   const asking = view ? askedOption(view.modals) : undefined;
   const { arrivals, generation } = useArrivals(view?.discovered ?? []);
 
-  const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
+  useTestSurface('shell', shellSurface(where, setWhere));
+
+  const pane =(layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
       if (subpage.id === 'home') return <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} />;
       return subpage.id === 'edit' ? <Console onSend={driver.send} /> : null;

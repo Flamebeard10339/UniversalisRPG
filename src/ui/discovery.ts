@@ -1,4 +1,5 @@
 import type { PlayView } from '../runtime/session';
+import type { TestSurface } from './testSurface';
 
 export type Place = PlayView['discovered'][number];
 
@@ -211,4 +212,83 @@ export function onWalk(line: readonly string[], from: string, to: string): boole
 export function newlyFound(before: readonly Place[], after: readonly Place[]): string[] {
   const known = new Set(before.map((place) => place.id));
   return after.map((place) => place.id).filter((id) => !known.has(id));
+}
+
+// What a driving agent may hand the map, checked before anything moves. A
+// finger cannot pass a map a string or a plane it is not drawing; an agent can,
+// and being told which is a better answer than a map that has quietly gone to
+// NaN.
+export function pointFrom(value: unknown): Point {
+  const { x, y } = (value ?? {}) as { x?: unknown; y?: unknown };
+  if (typeof x !== 'number' || !Number.isFinite(x) || typeof y !== 'number' || !Number.isFinite(y)) throw new Error('a pan is an { x, y } of finite numbers');
+  return { x, y };
+}
+
+// Clamped rather than refused, because the pinch it stands in for is clamped
+// too: asking for more zoom than there is is a legal gesture that ends at the
+// stop.
+export function zoomFrom(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error('a zoom is a finite number');
+  return clampZoom(value);
+}
+
+export function planeFrom(value: unknown, planes: readonly number[]): number {
+  if (typeof value !== 'number' || !planes.includes(value)) throw new Error(`no plane is drawn at ${String(value)}`);
+  return value;
+}
+
+export interface MapPlace {
+  id: string;
+  at: Point;
+  here: boolean;
+  climb: number;
+  // The position a driver dispatches to set off for it, and null where there is
+  // no way out to it — which is the whole of what the bubble's disabled state
+  // says, read as a value instead of off the markup.
+  goes: number | null;
+}
+
+export interface MapState {
+  plane: number;
+  planes: readonly number[];
+  zoom: number;
+  pan: Point;
+  places: MapPlace[];
+}
+
+export interface MapView {
+  plane: number;
+  zoom: number;
+  pan: Point;
+  sheet: Sheet;
+  travels: ReadonlyMap<string, number>;
+}
+
+export interface MapControls {
+  settle(pan: Point, zoom: number): void;
+  plane(at: number): void;
+}
+
+export function mapState(map: MapView): MapState {
+  return {
+    plane: map.plane,
+    planes: map.sheet.planes,
+    zoom: map.zoom,
+    pan: map.pan,
+    places: map.sheet.nodes.map((node) => ({ id: node.place.id, at: node.at, here: node.here, climb: node.climb, goes: map.travels.get(node.place.id) ?? null })),
+  };
+}
+
+// The three things the map holds that the session does not, offered by their
+// own names. Each goes through the same settling a gesture does, so a pan an
+// agent asks for and a pan a finger asks for come to rest in the same place.
+export function mapSurface(map: MapView, controls: MapControls): TestSurface {
+  return {
+    state: () => mapState(map),
+    actions: {
+      pan: (value) => controls.settle(pointFrom(value), map.zoom),
+      zoom: (value) => controls.settle(map.pan, zoomFrom(value)),
+      plane: (value) => controls.plane(planeFrom(value, map.sheet.planes)),
+    },
+  };
 }
