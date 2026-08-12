@@ -29,9 +29,8 @@ export function roadsFrom(from: string, registry: Registry, state: GameState): s
 //
 // A route is walked through places the player has already found and may end in
 // one they have not: stepping into the unknown is how a neighbour is
-// discovered, but routing through the unknown would make the shape of the
-// unfound map readable off a journey, which is exactly what `publishDiscovered`
-// refuses to give away.
+// discovered, and routing through the unknown would make the shape of the
+// unfound map readable off how long a journey took.
 export function routeTo(from: string, to: string, registry: Registry, state: GameState): string[] | null {
   if (from === to || !registry.locations.has(to)) return null;
 
@@ -64,12 +63,10 @@ export function routeTo(from: string, to: string, registry: Registry, state: Gam
 // away it is. What a driver needs to know which places it may set off for, and
 // how far, without walking the graph itself.
 //
-// A place the player has not found is neither crossed nor named. Crossing it
-// would make the shape of the unfound map readable off a journey; naming it
-// would put its title on the choice list, which is what `publishDiscovered`
-// refuses to give away and what a driver drawing the map has no bubble for.
-// Walking into the unknown next door is untouched: a road out of the room the
-// player is standing in is the location's own, and is offered there.
+// A place the player has not found is neither crossed nor named, so nothing of
+// the map they have not walked can be counted or read off what comes back. The
+// road out of the room they are standing in is not this function's to offer, so
+// nothing here narrows the step into the unknown next door.
 export function reachable(from: string, registry: Registry, state: GameState): Map<string, number> {
   const found = new Map<string, number>();
   const seen = new Set([from]);
