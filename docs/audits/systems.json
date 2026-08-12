@@ -26,6 +26,8 @@
         "src/content/faction.ts",
         "src/content/flag.ts",
         "src/content/flags.test.ts",
+        "src/content/hex.test.ts",
+        "src/content/hex.ts",
         "src/content/info.ts",
         "src/content/item.ts",
         "src/content/location.ts",
@@ -44,6 +46,8 @@
         "src/content/resolve.ts",
         "src/content/resource.ts",
         "src/content/saveSection.ts",
+        "src/content/shapes.test.ts",
+        "src/content/shapes.ts",
         "src/content/skill.ts",
         "src/content/stat.ts",
         "src/content/test.test.ts",
@@ -134,6 +138,14 @@
             "src/grammar/hook.ts"
           ],
           "note": "produced by combat-hook-grammar"
+        },
+        {
+          "name": "cluster shape catalogue",
+          "paths": [
+            "src/content/hex.ts",
+            "src/content/shapes.ts"
+          ],
+          "note": "produced by cluster-shape-catalogue: axial hex direction vocabulary and the closed catalogue of cluster-jewel shapes (point, spindle, ring, wheel, double-ring)"
         }
       ]
     },
