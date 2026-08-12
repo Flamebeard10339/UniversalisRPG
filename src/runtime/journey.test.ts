@@ -4,7 +4,7 @@ import { loadUniverseWithDiagnostics, type Registry } from '../content/registry'
 import { parseSaveSection } from '../content/saveSection';
 import { reachable, roadsFrom, routeTo } from './journey';
 import { loadSave } from './save';
-import { apply, beginAction, cancelAction, serializeSession, sessionStatus, startSession, view, wait, type PlaySession, type PlayView } from './session';
+import { apply, applyDirective, beginAction, cancelAction, runTest, serializeSession, sessionStatus, startSession, view, wait, type PlaySession, type PlayView } from './session';
 import { createGameState, type GameState } from './state';
 
 // A line of four, so a route has somewhere to be wrong: the fewest legs, the
@@ -85,6 +85,72 @@ const GATED = [
   'adjacent:',
   '  span',
   '  shallows',
+  '',
+];
+
+// Two places and no road between them, plus the `# test` that asks for the
+// walk anyway: the regression format is where a directive that does nothing
+// has to be heard.
+const ISLANDS = [
+  '# info roads',
+  'version: 1.0.0',
+  '',
+  '# location camp',
+  'x: 0, y: 0',
+  'starting',
+  'title: Camp',
+  'adjacent:',
+  '  shore',
+  '',
+  '# location shore',
+  'x: 1, y: 0',
+  'title: Shore',
+  'adjacent:',
+  '  camp',
+  '',
+  '# location island',
+  'x: 5, y: 0',
+  'title: Island',
+  '',
+  // The first travel: in a `# test` is the placement, so each script stands
+  // somewhere before it asks to walk.
+  '# test swims-for-it',
+  'travel: roads.camp',
+  'travel: roads.island',
+  '',
+  '# test walks-to-the-shore',
+  'travel: roads.camp',
+  'travel: roads.shore',
+  '',
+];
+
+// A road that shuts itself behind the player: arriving at the shore discovers
+// the cove, and the way on is open only while the cove is unknown. So a route
+// worked out from the camp is legal when it is worked out and illegal by the
+// time its second leg is reached.
+const TRAPDOOR = [
+  '# info shut',
+  'version: 1.0.0',
+  '',
+  '# location camp',
+  'x: 0, y: 0',
+  'starting',
+  'title: Camp',
+  'adjacent:',
+  '  shore',
+  '',
+  '# location shore',
+  'x: 1, y: 0',
+  'title: Shore',
+  'adjacent:',
+  '  camp',
+  '  cove while not shut.cove.discovered',
+  '',
+  '# location cove',
+  'x: 2, y: 0',
+  'title: Cove',
+  'adjacent:',
+  '  shore',
   '',
 ];
 
@@ -324,3 +390,40 @@ describe('setting off for somewhere that is not next door', () => {
   });
 });
 
+
+describe('a walk the roads cannot make', () => {
+  it('reports the refusal it showed the player, and leaves the world where it was', () => {
+    const registry = universe(ISLANDS, 'roads');
+    const session = startSession(registry);
+
+    const outcome = applyDirective(session, { kind: 'travel', location: 'roads.island' });
+
+    expect(outcome).toEqual({ failure: 'There is no way from here to Island.' });
+    expect(at(view(session))).toBe('roads.camp');
+  });
+
+  it('fails the `# test` line that asked for it, rather than passing on to the next one', () => {
+    const registry = universe(ISLANDS, 'roads');
+
+    expect(runTest('roads.swims-for-it', registry, createGameState())).toEqual({ passed: false, failure: 'There is no way from here to Island.' });
+  });
+
+  // A walk that crossed a leg and then found the way on shut is not this: the
+  // world moved, and where the player got to is the answer. Only a route that
+  // never existed leaves nothing to report but the refusal.
+  it('says nothing when the walk was made in part, since something happened', () => {
+    const session = startSession(universe(TRAPDOOR, 'shut'));
+
+    const outcome = applyDirective(session, { kind: 'travel', location: 'shut.cove' });
+
+    expect(outcome).toEqual({});
+    expect(at(view(session))).toBe('shut.shore');
+  });
+
+  it('says nothing at all about a walk that was made', () => {
+    const registry = universe(ISLANDS, 'roads');
+
+    expect(applyDirective(startSession(registry), { kind: 'travel', location: 'roads.shore' })).toEqual({});
+    expect(runTest('roads.walks-to-the-shore', registry, createGameState())).toEqual({ passed: true });
+  });
+});

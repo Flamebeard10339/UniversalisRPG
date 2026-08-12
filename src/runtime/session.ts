@@ -544,9 +544,10 @@ function performDirective(session: PlaySession, directive: Directive): { failure
     case 'use-on':
       useFight(directive.action, directive.target, registry, state);
       return {};
-    case 'travel':
-      walkTo(directive.location, registry, state);
-      return {};
+    case 'travel': {
+      const refused = walkTo(directive.location, registry, state);
+      return refused ? { failure: refused } : {};
+    }
     case 'craft':
       craft(directive.recipe, registry, state);
       return {};

@@ -670,11 +670,18 @@ export function armTravel(origin: string, dest: string, registry: Registry, stat
 // Sets off for anywhere the roads reach, which is one leg when the place is
 // next door and a queue of them when it is not. The route is worked out once
 // and held, so a walk crosses the same places it was started for.
+// The one sentence a walk with no route says, so the arming path and the
+// resolving path say the same thing and a caller reading it back reads the
+// sentence the player was shown.
+function noWayTo(dest: string, registry: Registry): string {
+  return `There is no way from here to ${registry.locations.get(dest)?.title ?? dest}.`;
+}
+
 export function armJourney(dest: string, registry: Registry, state: GameState): ArmResult {
   if (!registry.locations.has(dest)) throw new RuntimeError(`unknown location: ${dest}`);
   const route = routeTo(state.location, dest, registry, state);
   if (!route) {
-    state.log.push(`There is no way from here to ${registry.locations.get(dest)?.title ?? dest}.`);
+    state.log.push(noWayTo(dest, registry));
     return { armed: false };
   }
   state.journey = { to: dest, legs: route };
@@ -734,24 +741,30 @@ export function useTravel(origin: string, dest: string, registry: Registry, stat
 // The whole walk, resolved where it stands. The same route the armed walk
 // takes, so a driver that resolves and one that arms cross the same places and
 // spend the same time; the difference between them is who watches it happen.
-export function walkTo(dest: string, registry: Registry, state: GameState): void {
+//
+// Returns the sentence refusing the walk, and nothing when one was made: no
+// route is the one way this leaves the world exactly as it found it, and a
+// caller that can only report what it is told needs telling.
+export function walkTo(dest: string, registry: Registry, state: GameState): string | undefined {
   if (!registry.locations.has(dest)) throw new RuntimeError(`unknown location: ${dest}`);
   if (!state.location) {
     useTravel('', dest, registry, state);
-    return;
+    return undefined;
   }
   const route = routeTo(state.location, dest, registry, state);
   if (!route) {
-    state.log.push(`There is no way from here to ${registry.locations.get(dest)?.title ?? dest}.`);
-    return;
+    const refused = noWayTo(dest, registry);
+    state.log.push(refused);
+    return refused;
   }
   for (const leg of route) {
     const from = state.location;
-    if (!roadsFrom(from, registry, state).includes(leg)) return;
+    if (!roadsFrom(from, registry, state).includes(leg)) return undefined;
     useTravel(from, leg, registry, state);
     // Somewhere along the way the world did something else with the player.
-    if (state.location !== leg) return;
+    if (state.location !== leg) return undefined;
   }
+  return undefined;
 }
 
 export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameState): boolean {
