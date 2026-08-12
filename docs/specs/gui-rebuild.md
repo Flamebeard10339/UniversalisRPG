@@ -982,3 +982,197 @@ interface as an optional field (manifest audit-gui-rebuild-pass5-carried.json) S
 suite. That is an equivalent mutant -- an optional field nothing sets changes no behaviour -- not a
 hole. Aim it at the note, not at the type.
 The XP instance is still not wired, as the clause requires.
+
+### Pass 6 — 2026-08-12
+
+- base: `c59b0a0d7820ee9ef3afaa2601065d32a2b57279`
+- head: `13374c4d97573c9f2d348a6443ac81641cb87d14`
+- proof 1: met — Re-measured, and the one bound pass 5 filed against it is closed rather than carried.
+ The carve-out is now inside the proof instead of removed from it: scripts/drift.test.ts:37
+ builds an AuthoringContext the way play-cli's main builds it and opens the REPL with it, and
+ inStep counts a line as carved only when the GUI says UNAVAILABLE and the REPL did not. The
+ first test names the carved line rather than counting it (expect(carved).toEqual(['/dsl
+ location tutorial-island.guide-house'])) and the bytes are compared on carved lines too; the
+ table sweep asserts carved > 0, which is the assertion that a REPL opened with no authoring
+ context cannot satisfy.
+ Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass6-mutations.json, entry
+ "c1 the drift proof compares two drivers with the REPL's authoring surface off" takes the
+ authoring context back off openRepl: KILLED by scripts/drift.test.ts "reaches byte-identical
+ state and says the same things, over a scripted sequence" and "dispatches every entry in the
+ shared table the way the REPL does", re-run at its own file with the mutation still applied
+ and failing there too. That closes gui-rebuild-pass5-the-drift-proof-opens-the-repl-with-no-aut.
+ Also under this clause, because it is a divergence between what the engine did and what a
+ driver was told: entry "c1 a walk the roads cannot make reports success" drops the failure
+ src/runtime/session.ts:548 now returns from walkTo: KILLED by src/runtime/journey.test.ts
+ "reports the refusal it showed the player, and leaves the world where it was" and "fails the
+ `# test` line that asked for it, rather than passing on to the next one", re-run at its own
+ file. Checked that this does not double-report to the player: src/runtime/command.ts:277
+ runDirective ignores the returned failure and shows the view, which already carries the log
+ line, so only assert/expect and runTest read it.
+- proof 2: met — Both rules re-measured on the one module this range adds under src/ui, and the
+ structural leg is unchanged: GameState stays behind the module-private WeakMap in
+ src/runtime/session.ts and is unreachable from src/ui whatever src/ui imports.
+ Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass6-carried.json.
+ Path rule: "c2 the registration hook reaches the runtime off the play surface" adds
+ import '../runtime/state' to src/ui/testSurface.ts. KILLED by src/ui/surface.test.ts "reaches
+ the runtime only through the play surface", re-run at its own file with the mutation still
+ applied and failing there too.
+ Call rule: "c2 the registration hook moves the world rather than dispatching through it" adds
+ a wait( call to the same file. KILLED by src/ui/surface.test.ts "calls nothing that moves the
+ world, however the name reached it", re-run at its own file.
+ The sweep is recursive and covers src/main.tsx, so testSurface.ts and bundle.test.ts are both
+ in it. Neither the shell surface nor the map surface reaches past the play surface: both take
+ their component's own state and setters as parameters and call nothing.
+- proof 3: met — Met on the property and re-measured, with no new prose surface in this range.
+ Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass6-carried.json, entry
+ "c3 a component writes a word of its own outside the vocabulary table" makes
+ src/ui/LocationBanner.tsx read "You are in {title}": KILLED by src/ui/render.test.tsx "renders
+ nothing a player can read that the engine did not publish", re-run at its own file with the
+ mutation still applied and failing there too.
+ Checked rather than assumed: the five strings this range adds -- "no layer is named", "has no
+ subpage named", "no plane is drawn at", "a zoom is a finite number", "a pan is an { x, y } of
+ finite numbers" -- are thrown to a driving agent and returned in a TestResult.error. None is
+ rendered; src/ui/testHarness.ts:200 puts them in the batch result and nothing in the tree puts
+ a TestResult on the screen. So they are not prose a player reads and this clause does not
+ reach them. They do reach the shipped bundle, which is c9's last sentence and is filed there.
+ The clause's own last sentence, "there is not one", remains false as written because
+ src/ui/labels.ts holds the shell's ten words behind an executable rule. That is pass 4's
+ finding gui-rebuild-pass4-c3-says-the-player-reads-no-string-the-eng, closed the right way by
+ pass 5. Not re-filed.
+- proof 4: met — Unchanged by this range and re-measured rather than carried on pass 5's word.
+ git diff df68ee7..13374c4 -- src/runtime/modals.ts src/ui/ModalSheet.tsx is empty.
+ Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass6-carried.json, entry
+ "c4 an option that accepts nothing is left standing" removes frameProblem's unanswerable test
+ at src/runtime/modals.ts:191: KILLED by src/runtime/modals.test.ts "never leaves a menu
+ standing that offers nothing, however it came to offer nothing", re-run at its own file with
+ the mutation still applied and failing there too.
+ The other two halves are untouched by this range: MODAL_NAMES is still read off
+ src/runtime/modals.ts rather than hand-copied, and pass 4's kill on "draws the modal the
+ engine is asking for, and stops once it is answered" stands.
+- proof 5: met — Unchanged by this range and re-measured. The only edit to src/runtime/command.ts in
+ df68ee7..13374c4 is an export keyword on UNAVAILABLE, which drift.test.ts reads to name the
+ carve-out; nothing about the clock moved.
+ Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass6-carried.json, entry
+ "c5 the shared ticker advances a run by the interval it asked for" replaces
+ const elapsedMs = now - last with everyMs at src/runtime/command.ts:791: KILLED by
+ src/runtime/command.test.ts "hands over the time that actually passed, not the interval it
+ asked for", re-run at its own file with the mutation still applied and failing there too.
+ Nothing under src/ui schedules resolve or wait on a clock of its own: the call rule recorded
+ under c2 covers it and now sweeps testSurface.ts as well, whose only effect is a dynamic
+ import inside a branch the DEV constant folds away.
+- proof 6: met — Unchanged by this range and re-measured rather than carried. git diff
+ df68ee7..13374c4 -- src/index.css src/ui/phone.test.tsx src/ui/VStack.tsx src/ui/TabBar.tsx is
+ empty, and the two components this range edits gained one hook call each and no markup.
+ Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass6-carried.json, entry
+ "c6 a control may stand below the touch floor" drops the stylesheet floor to 24px on both
+ axes: KILLED by src/ui/surface.test.ts "floors every control in the stylesheet, on both axes",
+ re-run at its own file with the mutation still applied and failing there too. The five other
+ kills pass 5 recorded under this clause are untouched by this range and stand.
+ Pass 5's bound is unchanged and is the right one to carry: every one of these measures the
+ stylesheet's text and the rendered markup, not a laid-out viewport at 375x812. What this pass
+ adds to that is small and worth recording -- the browser measurement is now cheaper than it
+ was, because window.__test can put the shell on any layer and the map on any plane in one
+ round trip, which is what the eventual 375x812 sweep would have had to drive by hand.
+ gui-rebuild-pass5-the-phone-sweep-refuses-every-keyboard-han stays open against the sweep's
+ over-strictness and is not re-filed.
+- proof 7: met — Pass 5's bound is closed on the naming side, measured three ways, and what remains
+ is a smaller neighbour that is filed rather than swept up.
+ Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass6-mutations.json, entry
+ "c7 the engine names a place the player has not found" puts src/runtime/journey.ts:86 back the
+ way it was, so reachable names an undiscovered place and merely declines to walk past it:
+ KILLED by four tests at src/runtime/journey.test.ts, led by "names no place the player has not
+ found, however many roads reach it" and "offers only places the player has found, so nothing
+ is named that the map cannot draw", re-run at its own file with the mutation still applied and
+ failing there too.
+ Over the shipped content rather than a fixture: a walk of every location reachable by an offer
+ from a fresh session (body at
+ C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass6-boundary.ts, run with
+ npm run inspect -- -) visits three of the four authored places and finds no choice at any of
+ them whose leadsTo is outside status.discovered. Problems: none.
+ The other side of the boundary holds and I checked it rather than taking the worker's word.
+ routeTo may still end at an undiscovered place, deliberately, but nothing in the shell can
+ name one: locationChoices offers only edges whose condition is true, and spreadDiscovery
+ (src/runtime/effects.ts:169) discovers exactly those targets on arrival, so every legs-1 offer
+ names a place already found; journeyChoices reads reachable, which now names none; and
+ beginAction refuses a choiceId that is not in computeChoices, so the arming path cannot reach
+ one either. What is left for routeTo's carve-out is a content-authored travel: and the
+ console, both of which name the id themselves. src/runtime/journey.test.ts "ends in a place the
+ player has not found, and never crosses one" is where that stays watched.
+ BOUND, filed as a finding of its own: a walk-away offer whose destination is on another
+ z-plane is withdrawn from the action sheet and has no bubble on the plane the player is
+ standing on. Measured live through the branch's own harness at localhost:5173 -- standing at
+ tutorial-island.guide-house-upstairs the view offers "Travel to Basement" at legs 2,
+ src/ui/choices.ts:21 withdraws it, and surfaces.map.places on plane 1 is guide-house and
+ upstairs only; after map.plane -1 the basement bubble appears with goes 3. Two taps rather
+ than one, so it is a route and not a dead end, which is why this is a finding and not a
+ downgrade.
+ Edit carrying the console is now the clause's own text and the author's recorded decision
+ (op: decision, 2026-08-12, docs/events.jsonl), not a branch rewording its promise to match
+ what it built; the four records queued against Edit were each notified. Settings is still the
+ frame with no body.
+- proof 8: met — Stronger this range than it has been, and measured against a build rather than a
+ read. src/ui/bundle.test.ts builds the production bundle in memory with NODE_ENV forced to
+ production and asserts index.html is emitted and that some emitted part contains guide-house,
+ so a build that emitted nothing cannot pass it.
+ Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass6-carried.json, entry
+ "c8 the build stops carrying the shipped DSL" points import.meta.glob at a suffix nothing
+ matches: KILLED by src/ui/bundle.test.ts "carries the content and no trace of the harness that
+ drives it" and by src/ui/shippedContent.test.ts "bundles the shipped DSL as text, with no path
+ left for the browser to fetch", re-run at both files with the mutation still applied and
+ failing there too. public/content/ is still absent from the tree.
+ The cost of the new build test was measured, because CLAUDE.md puts a five-minute wall clock on
+ the suite: npm test is 101 files, 2498 tests, 34 seconds wall clock with the build in it.
+- proof 9: met — Graded on the property, which is true and which I measured through the instrument
+ the clause is about rather than by reading. The sentence pass 5 graded unmet -- "actions
+ registered by the components that own them" -- is now true, and the registration is genuinely
+ the components' rather than relocated to the hook: createSurfaceRegistry starts empty, App.tsx
+ :45 and MapPane.tsx:127 each call useTestSurface with closures over their own React state and
+ setters, the action bodies in nav.ts and discovery.ts take those hands as parameters and hold
+ none of their own, names are namespaced by surface so neither component can shadow the other,
+ and unmount drops the entry.
+ Measured live, and re-runnable in one call: npm run dev, then in the page
+ window.__test.actions() returns
+ [answer, cancel, choice, choose, map.pan, map.plane, map.zoom, send, shell.layer,
+ shell.subpage] and a nine-step batch returns nine results -- shell.layer map, map.plane 1,
+ map.zoom 99 clamped to 3, map.pan {x:40,y:-10}, shell.layer character, shell.subpage inventory
+ all ok with surfaces.shell and surfaces.map moving to match, then shell.layer 'nowhere',
+ map.plane 7 and map.pan 'left' each ok:false carrying the sentence the component refused with.
+ That is a name called and a result read, per step, with nothing scanned off rendered text.
+ Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass6-mutations.json, three
+ kills: "c9 a batch stops returning one result per step" (KILLED by src/ui/testHarness.test.ts
+ "publishes named actions and batches one result per step" and "reports what a component
+ refused rather than throwing out of the batch"); "c9 a surface whose component has gone is
+ still driven" (KILLED by "forgets a surface whose component has gone, rather than driving one
+ that is not there"); "c9 the registration hook stops being gated on the dev constant", which
+ removes testSurface.ts's DEV check (KILLED by src/ui/bundle.test.ts "carries the content and no
+ trace of the harness that drives it" and src/ui/surface.test.ts "reaches the harness only from
+ a branch a production build folds away"). Each re-run at its own file with the mutation still
+ applied and failing there too. That last pair closes
+ gui-rebuild-pass5-the-harness-s-dev-gate-is-untested-so-one-.
+ TWO BOUNDS, both measured, both filed, and neither of them the property:
+ (a) the registration itself is watched by nothing. Entries "c9 the shell stops registering the
+ layer and page it owns" and "c9 the map stops registering the pan, zoom and floor it owns"
+ delete the two useTestSurface calls: both SURVIVED, escalated to the whole suite, 0 failed of
+ 2498. The cause is structural rather than an oversight -- the suite has no DOM environment
+ (no jsdom in devDependencies, vitest's default node environment) and src/ui/render.test.tsx
+ renders through renderToStaticMarkup, so useEffect never runs and no test in the tree can
+ observe a registration. This is why the grade rests on the browser measurement above.
+ (b) "A production build contains no trace of it" is false as written. npx vite build then
+ grep -rlF over dist/ finds "a pan is an", "a zoom is a finite number", "no plane is drawn at",
+ "no layer is named" and "has no subpage named" all inside dist/assets/index-*.js: strings that
+ exist only to answer a driving agent, in functions the release calls on every render because
+ the DEV guard sits inside the hook rather than at the call site. The three names
+ src/ui/bundle.test.ts:52 does check -- __test, installTestHarness, registerTestSurface -- are
+ genuinely absent, so the guard is true and the sentence above it is not.
+- proof 10: met — Unchanged by this range and confirmed unchanged: git diff --stat
+ df68ee7..13374c4 -- src/ui/transient.ts src/ui/FloatingText.tsx src/ui/App.tsx shows App.tsx
+ only, and its two edits are the useTestSurface import and call; FloatingText is still mounted
+ with driver.transient inside <main>.
+ Manifest C:\Users\yonat\AppData\Local\Temp\audit-gui-rebuild-pass6-carried.json, entry
+ "c10 a transient note learns where it came from" adds moment: 'xp' to the note the channel
+ makes: KILLED by src/ui/transient.test.ts "carries any text at all, and nothing about where it
+ came from", re-run at its own file with the mutation still applied and failing there too.
+ Aimed at the note and not at the TransientNote interface, which pass 5 recorded as an
+ equivalent mutant. The XP instance is still not wired, as the clause requires, and the new
+ surface registry did not become a second channel: it publishes state and takes actions and
+ announces nothing.
