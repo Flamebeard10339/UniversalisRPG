@@ -382,6 +382,7 @@
         "src/ui/surface.test.ts",
         "src/ui/testHarness.test.ts",
         "src/ui/testHarness.ts",
+        "src/ui/testSurface.ts",
         "src/ui/transcript.test.ts",
         "src/ui/transcript.ts",
         "src/ui/transient.test.ts",
@@ -462,9 +463,11 @@
         {
           "name": "browser test harness",
           "paths": [
-            "src/ui/driver.ts"
+            "src/ui/driver.ts",
+            "src/ui/testHarness.ts",
+            "src/ui/testSurface.ts"
           ],
-          "note": "produced by the-agent-harness-returns-to-the-gui; dev-only window.__test batched driver actions and structured state in src/ui/testHarness.ts, installed from the GUI session container"
+          "note": "produced by the-agent-harness-returns-to-the-gui and finished by gui-rebuild-clause-9; dev-only window.__test batching the session's own actions and, since c9, the actions each component registers for what only it holds — the nav's layer and page, the map's pan, zoom and floor — through the useTestSurface hook in src/ui/testSurface.ts. Installed from the GUI session container behind the DEV constant a production build folds away, which is what keeps the registry out of the shipped bundle"
         },
         {
           "name": "the GUI",
