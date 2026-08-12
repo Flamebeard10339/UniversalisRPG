@@ -21,6 +21,7 @@ export function Console({ onSend }: { onSend: (line: string) => void }): JSX.Ele
       }}
     >
       <input
+        data-drive="send"
         className="flex-1 select-text rounded-xl border border-border bg-panel px-3 text-text outline-none focus:border-accent"
         aria-label={LABELS.command}
         value={line}
@@ -30,6 +31,7 @@ export function Console({ onSend }: { onSend: (line: string) => void }): JSX.Ele
         onChange={(event) => setLine(event.target.value)}
       />
       <button
+        data-drive="send"
         type="submit"
         className="shrink-0 rounded-xl bg-accent px-3 text-sm font-medium text-accent-text transition-transform duration-75 active:scale-[0.97]"
       >

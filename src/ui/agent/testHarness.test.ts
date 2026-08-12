@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createSurfaceRegistry, installTestHarness, testState } from './testHarness';
-import type { Driver, DriverSnapshot } from './driver';
-import { emptyTranscript } from './transcript';
+import type { Driver, DriverSnapshot } from '../driver';
+import { createTransientChannel, type TransientChannel } from '../transient';
+import { emptyTranscript } from '../transcript';
 
 function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
   return {
@@ -34,11 +35,11 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
   };
 }
 
-function driver(current: DriverSnapshot, calls: string[] = []): Driver {
+function driver(current: DriverSnapshot, calls: string[] = [], transient: TransientChannel = createTransientChannel()): Driver {
   return {
     subscribe: () => () => undefined,
     snapshot: () => current,
-    transient: { announce: () => undefined, notes: () => [], subscribe: () => () => undefined },
+    transient,
     send: (line) => void calls.push(`send:${line}`),
     choose: (position) => void calls.push(`choose:${position}`),
     answer: (key, value) => void calls.push(`answer:${key}=${value}`),
@@ -48,16 +49,28 @@ function driver(current: DriverSnapshot, calls: string[] = []): Driver {
 }
 
 describe('the browser test harness', () => {
-  it('projects the driver snapshot as structured state', () => {
+  it('carries the published view itself, so a field the runtime adds needs no edit here', () => {
+    const held = snapshot();
+
+    // Identity, and not a comparison of fields: a projection that happened to
+    // agree today is the defect this clause exists to prevent, and only the
+    // same object cannot drift from what the runtime publishes.
+    expect(testState(held).view).toBe(held.view);
+  });
+
+  it('works the driver conveniences out beside the view rather than in place of a field of it', () => {
     const state = testState(snapshot());
 
-    expect(state.location).toEqual({ id: 'start', title: 'Start' });
     expect(state.choices.map((choice) => [choice.id, choice.position])).toEqual([
       ['talk:guide', 1],
       ['travel:yard', 2],
     ]);
-    expect(state.resources[0].title).toBe('Energy');
-    expect(state.player?.name).toBe('Miri');
+    // Still readable off the view, which is the half the projection used to
+    // answer and the half it kept losing.
+    expect(state.view?.resources[0].title).toBe('Energy');
+    expect(state.view?.player.name).toBe('Miri');
+    expect(state.view?.journey).toBeNull();
+    expect(state.view?.inventory).toEqual({});
   });
 
   it('publishes named actions and batches one result per step', async () => {
@@ -87,7 +100,7 @@ describe('the browser test harness', () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe('action is not registered: missing');
-    expect(result.state.location?.id).toBe('start');
+    expect(result.state.view?.location.id).toBe('start');
   });
 
   it('reaches what a component registered, by the surface name joined to the action name', async () => {
@@ -157,5 +170,67 @@ describe('the browser test harness', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toBe('choice is not visible: travel:cellar');
     expect(calls).toEqual([]);
+  });
+
+  it('reports a moment that began and ended between two steps, which a read of the state cannot see', async () => {
+    const expiring: Array<() => void> = [];
+    const channel = createTransientChannel({ schedule: (expire) => void expiring.push(expire) });
+    const surfaces = createSurfaceRegistry();
+    surfaces.register('shell', () => ({ actions: { layer: () => void channel.play('note', 'briefer than the settle') } }));
+    const harness = installTestHarness(driver(snapshot(), [], channel), {}, {
+      // The settle outlasts the moment, which is the case a snapshot read gets
+      // wrong: by the time the step returns there is nothing on the screen.
+      settle: async () => void expiring.splice(0).forEach((expire) => expire()),
+      surfaces,
+    });
+
+    const [result] = await harness.batch([{ target: 'shell.layer', value: 'map' }]);
+
+    expect(channel.notes()).toEqual([]);
+    expect(result.played.map((moment) => [moment.kind, moment.subject])).toEqual([['note', 'briefer than the settle']]);
+  });
+
+  it("never reports one step's moments as the next step's", async () => {
+    const channel = createTransientChannel();
+    const surfaces = createSurfaceRegistry();
+    let place = 'first';
+    surfaces.register('shell', () => ({ actions: { layer: () => void channel.play('arrival', place) } }));
+    const harness = installTestHarness(driver(snapshot(), [], channel), {}, { settle: async () => undefined, surfaces });
+
+    const [one] = await harness.batch([{ target: 'shell.layer' }]);
+    place = 'second';
+    const [two] = await harness.batch([{ target: 'shell.layer' }]);
+
+    expect(one.played.map((moment) => moment.subject)).toEqual(['first']);
+    expect(two.played.map((moment) => moment.subject)).toEqual(['second']);
+  });
+
+  it("moves the cursor over a refused step, so its moments are not replayed as the next one's", async () => {
+    const channel = createTransientChannel();
+    const surfaces = createSurfaceRegistry();
+    surfaces.register('map', () => ({
+      actions: {
+        plane: () => {
+          channel.play('arrival', 'got as far as here');
+          throw new Error('no plane is drawn at 4');
+        },
+      },
+    }));
+    const harness = installTestHarness(driver(snapshot(), [], channel), {}, { settle: async () => undefined, surfaces });
+
+    const [refused, after] = await harness.batch([{ target: 'map.plane', value: 4 }, { target: 'cancel' }]);
+
+    expect(refused.played.map((moment) => moment.subject)).toEqual(['got as far as here']);
+    expect(after.played).toEqual([]);
+  });
+
+  it('starts its cursor where the session already is, not at the beginning of it', async () => {
+    const channel = createTransientChannel();
+    channel.play('arrival', 'before the harness was installed');
+    const harness = installTestHarness(driver(snapshot(), [], channel), {}, { settle: async () => undefined });
+
+    const [result] = await harness.batch([{ target: 'cancel' }]);
+
+    expect(result.played).toEqual([]);
   });
 });

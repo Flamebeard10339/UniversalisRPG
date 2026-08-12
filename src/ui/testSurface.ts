@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { AgentSurfaces } from './agentSurfaces';
+import type { AgentSurfaces } from './agent/surfaces';
 
 export type TestAction = (value: unknown) => void | Promise<void>;
 
@@ -30,7 +30,7 @@ export function useTestSurface<Name extends keyof AgentSurfaces>(name: Name, hel
     if (!import.meta.env.DEV) return;
     let drop: (() => void) | null = null;
     let dropped = false;
-    void Promise.all([import('./testHarness'), import('./agentSurfaces')]).then(([{ registerTestSurface }, { SURFACE_BUILDERS }]) => {
+    void Promise.all([import('./agent/testHarness'), import('./agent/surfaces')]).then(([{ registerTestSurface }, { SURFACE_BUILDERS }]) => {
       if (!dropped) drop = registerTestSurface(name, () => SURFACE_BUILDERS[name](latest.current));
     });
     return () => {

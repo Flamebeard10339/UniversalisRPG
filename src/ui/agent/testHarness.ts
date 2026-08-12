@@ -1,8 +1,9 @@
-import { askedOption } from '../runtime/command';
-import type { PlayChoice, PlayView } from '../runtime/session';
-import type { Driver, DriverSnapshot } from './driver';
-import type { TestAction, TestSurface } from './testSurface';
-import type { LogEntry } from './transcript';
+import { askedOption } from '../../runtime/command';
+import type { PlayChoice, PlayView } from '../../runtime/session';
+import type { Driver, DriverSnapshot } from '../driver';
+import type { TestAction, TestSurface } from '../testSurface';
+import type { Moment } from '../transient';
+import type { LogEntry } from '../transcript';
 
 export interface TestCommand {
   target: string;
@@ -13,6 +14,10 @@ export interface TestResult {
   target: string;
   ok: boolean;
   state: TestState;
+  // Every moment that played since the previous step, which is what a read of
+  // the state cannot answer: a moment shorter than the settle between two steps
+  // has begun and ended by the time anything is asked.
+  played: readonly Moment[];
   error?: string;
 }
 
@@ -26,20 +31,25 @@ export interface TestChoice {
 }
 
 export interface TestState {
+  // What the runtime published, whole and as it published it. Not a projection
+  // of it: a field the runtime starts publishing is readable the moment it is
+  // published, because there is no list here for anyone to forget to widen.
+  view: PlayView | null;
+  // What the driver holds around the view, which the view does not carry: the
+  // message that stopped a session opening, the run under way, and what has
+  // been said so far.
   fault: string | null;
-  location: { id: string; title: string } | null;
-  time: number | null;
-  choices: TestChoice[];
-  modal: { name: string; key: string; label: string; values?: string[] } | null;
   live: { label: string; active: boolean; progress: number; time: number } | null;
-  resources: PlayView['resources'];
-  discovered: PlayView['discovered'];
-  player: PlayView['player'] | null;
   transcript: LogEntry[];
   // What the shell holds that the session does not: where the nav is standing,
   // where the map is looking. Keyed by the component that registered it, so a
   // component that is not mounted contributes no key rather than a stale one.
   surfaces: Record<string, unknown>;
+  // What the harness works out, beside the view and never in place of a field
+  // of it: the position each choice is dispatched by, and which of a stack of
+  // modals is the one actually being asked.
+  choices: TestChoice[];
+  modal: { name: string; key: string; label: string; values?: string[] } | null;
 }
 
 export interface BrowserTestHarness {
@@ -137,9 +147,18 @@ export function testState(snapshot: DriverSnapshot, surfaces: Record<string, unk
   const modal = view && option ? view.modals[view.modals.length - 1] : undefined;
 
   return {
+    view,
     fault: snapshot.fault,
-    location: view ? { id: view.location.id, title: view.location.title } : null,
-    time: view?.time ?? null,
+    live: snapshot.live
+      ? {
+          label: snapshot.live.label,
+          active: snapshot.live.active,
+          progress: snapshot.live.progress,
+          time: snapshot.live.time,
+        }
+      : null,
+    transcript: snapshot.transcript.entries.slice(-20),
+    surfaces,
     choices: (view?.choices ?? []).map((choice, at) => ({ ...choice, position: at + 1 })),
     modal:
       modal && option
@@ -150,19 +169,6 @@ export function testState(snapshot: DriverSnapshot, surfaces: Record<string, unk
             values: option.values ? [...option.values] : undefined,
           }
         : null,
-    live: snapshot.live
-      ? {
-          label: snapshot.live.label,
-          active: snapshot.live.active,
-          progress: snapshot.live.progress,
-          time: snapshot.live.time,
-        }
-      : null,
-    resources: view?.resources ?? [],
-    discovered: view?.discovered ?? [],
-    player: view?.player ?? null,
-    transcript: snapshot.transcript.entries.slice(-20),
-    surfaces,
   };
 }
 
@@ -171,6 +177,14 @@ export function installTestHarness(driver: Driver, host: TestHost = globalThis a
   const settle = options.settle ?? (() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
   const surfaces = options.surfaces ?? SURFACES;
   const state = (): TestState => testState(driver.snapshot(), surfaces.state());
+  // Where the last step read up to. Moved on by every step, taken or refused,
+  // so what one step reports is never reported again by the next.
+  let cursor = driver.transient.playedSince(0).cursor;
+  const since = (): readonly Moment[] => {
+    const played = driver.transient.playedSince(cursor);
+    cursor = played.cursor;
+    return played.moments;
+  };
 
   actions.set('send', (value) => driver.send(text(value, 'line')));
   actions.set('choose', (value) => driver.choose(number(value, 'position')));
@@ -189,15 +203,15 @@ export function installTestHarness(driver: Driver, host: TestHost = globalThis a
       for (const command of commands) {
         const action = actions.get(command.target) ?? surfaces.find(command.target);
         if (!action) {
-          results.push({ target: command.target, ok: false, error: `action is not registered: ${command.target}`, state: state() });
+          results.push({ target: command.target, ok: false, error: `action is not registered: ${command.target}`, state: state(), played: since() });
           continue;
         }
         try {
           await action(command.value);
           await settle();
-          results.push({ target: command.target, ok: true, state: state() });
+          results.push({ target: command.target, ok: true, state: state(), played: since() });
         } catch (error) {
-          results.push({ target: command.target, ok: false, error: error instanceof Error ? error.message : String(error), state: state() });
+          results.push({ target: command.target, ok: false, error: error instanceof Error ? error.message : String(error), state: state(), played: since() });
         }
       }
       return results;

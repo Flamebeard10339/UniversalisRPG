@@ -10,6 +10,7 @@ export function TabBar({ tabs, active, onSelect }: { tabs: readonly Subpage[]; a
       {tabs.map((tab, at) => (
         <button
           key={tab.id}
+          data-drive="shell.subpage"
           data-subpage={tab.id}
           type="button"
           onClick={() => onSelect(at)}

@@ -10,6 +10,7 @@ import { MapPane } from './MapPane';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { LABELS } from './labels';
+import { LAYERS, OPENING, toLayer } from './nav';
 
 // A run that is under way and going nowhere, which is what a test about what
 // is drawn wants: no timer, and the same frame however long the test takes.
@@ -79,6 +80,45 @@ function whatStoppingSays(): string[] {
 }
 
 const asking = (html: string): boolean => html.includes('role="dialog"');
+
+// Two floors with a way between them, so the floor strip is drawn at all: it
+// only appears where more than one plane has been found, and it is the whole of
+// what the map draws off the plane it is showing.
+const STOREYS = {
+  name: 'storeys',
+  text: [
+    '# info storeys',
+    'version: 1.0.0',
+    '',
+    '# location hall',
+    'x: 0, y: 0, z: 0',
+    'title: The Hall',
+    'adjacent:',
+    '  landing',
+    '',
+    '# location landing',
+    'x: 0, y: 0, z: 1',
+    'starting',
+    'title: The Landing',
+    'adjacent:',
+    '  hall',
+  ].join('\n'),
+};
+
+// The floor strip, as the map wrote it: which floors it offers and which one it
+// says it is drawing.
+function floors(html: string): { offered: number[]; drawn: number | null } {
+  const strip = [...html.matchAll(/<button([^>]*data-floor="(-?\d+)"[^>]*)>/g)];
+  const drawn = strip.filter(([, attributes]) => attributes.includes('data-drawn'));
+  return { offered: strip.map(([, , floor]) => Number(floor)), drawn: drawn.length === 1 ? Number(drawn[0][2]) : null };
+}
+
+// The transform the sheet is drawn under, which is the whole of what the map
+// draws off its pan and its zoom.
+function drawnAt(html: string): { x: number; y: number; zoom: number } | null {
+  const found = html.match(/translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)\s*scale\(([\d.]+)\)/);
+  return found ? { x: Number(found[1]), y: Number(found[2]), zoom: Number(found[3]) } : null;
+}
 
 // The map's nodes, each as the place it stands for, where it was put and the
 // runs inside it. data-place is written by MapPane and nothing else, so this
@@ -409,5 +449,73 @@ describe('what the shell puts on the screen', () => {
 
     expect(readable(html)).toEqual(['Name']);
     expect(html).toContain('<input');
+  });
+
+  // c5, as the thing that makes it hold rather than as the registration itself:
+  // the map assembles one value, draws from it and hands that same value over,
+  // so every field of it is a field a render test can fail on. Each of these
+  // kills a registration that says something the map is not drawing.
+  describe('draws every field it hands a driving agent', () => {
+    it('says which floor it is showing, and offers the ones it found', () => {
+      const driver = createDriver([STOREYS]);
+      const view = driver.snapshot().view!;
+
+      const strip = floors(renderToStaticMarkup(<MapPane view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+
+      expect(view.discovered.map((place) => place.z).sort()).toEqual([0, 1]);
+      expect(strip.offered.sort()).toEqual([0, 1]);
+      // Standing on the landing, deliberately not the floor a map that had lost
+      // track of which one it was showing would fall back to.
+      expect(view.location.id).toBe('storeys.landing');
+      expect(strip.drawn).toBe(1);
+    });
+
+    it('draws the sheet under the pan and the zoom it reports', () => {
+      const driver = createDriver([SURVEYED]);
+      driver.choose(position(driver, LOOK_OUT));
+      const view = driver.snapshot().view!;
+
+      const under = drawnAt(renderToStaticMarkup(<MapPane view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+
+      // Nothing has been dragged, so the sheet sits centred on what it is
+      // showing at a zoom of 1. Worked out from the places the engine
+      // published rather than written down, so this is the map's own arithmetic
+      // and not a number copied out of one run of it.
+      const xs = view.discovered.map((place) => place.x);
+      const ys = view.discovered.map((place) => place.y);
+      const centre = { x: ((Math.min(...xs) + Math.max(...xs)) / 2) * PER_UNIT, y: ((Math.min(...ys) + Math.max(...ys)) / 2) * PER_UNIT };
+
+      expect(under).toEqual({ x: -centre.x, y: -centre.y, zoom: 1 });
+    });
+
+    it('draws the nav standing where it was opened, so a shell handing over a constant is markup that shows it', () => {
+      const driver = createDriver([SURVEYED]);
+
+      // The character layer, whose tab bar offers four pages where the opening
+      // layer offers three. A shell that handed over the opening rather than
+      // where it is standing would draw the opening layer's tabs.
+      const html = renderToStaticMarkup(<App driver={driver} opening={toLayer(OPENING, 2)} />);
+
+      const tabs = LAYERS[2].subpages.map((subpage) => LABELS[subpage.id]);
+      const bar = html.slice(html.lastIndexOf('<nav'));
+
+      expect(tabs).toHaveLength(4);
+      for (const tab of tabs) expect(bar, `the tab bar does not offer ${tab}`).toContain(tab);
+      for (const tab of LAYERS[OPENING.layer].subpages.map((subpage) => LABELS[subpage.id])) {
+        if (!tabs.includes(tab)) expect(bar, `the tab bar still offers ${tab}`).not.toContain(tab);
+      }
+    });
+
+    it('draws a place for every node on the sheet, and disables the ones it has no way out to', () => {
+      const driver = createDriver([SURVEYED]);
+      driver.choose(position(driver, LOOK_OUT));
+      const view = driver.snapshot().view!;
+
+      const drawn = places(renderToStaticMarkup(<MapPane view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+
+      expect(drawn.map((node) => node.id).sort()).toEqual(view.discovered.map((place) => place.id).sort());
+      // Where the player is standing is the one with no travel out to it.
+      expect(drawn.filter((node) => node.disabled).map((node) => node.id)).toEqual(['surveyed.workshop']);
+    });
   });
 });

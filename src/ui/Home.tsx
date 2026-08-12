@@ -7,6 +7,7 @@ import { SPLIT_DEFAULT, splitFrom } from './gesture';
 import { LiveSheet } from './LiveSheet';
 import { Splitter } from './Splitter';
 import type { LogEntry, LogKind } from './transcript';
+import { useMoment } from './transient';
 
 const TONE_CLASS: Record<MessageTone, string> = {
   plain: 'text-text',
@@ -26,7 +27,8 @@ const KIND_CLASS: Record<LogKind, string> = {
 // A line mounts once, so the flash marks exactly the text that just arrived.
 function Line({ entry }: { entry: LogEntry }): JSX.Element {
   const tone = entry.kind === 'message' ? TONE_CLASS[entry.tone] : '';
-  return <p className={`arrived -mx-1 whitespace-pre-wrap break-words rounded px-1 leading-relaxed ${KIND_CLASS[entry.kind]} ${tone}`}>{entry.text}</p>;
+  const arrived = useMoment('arrival', true, String(entry.id));
+  return <p className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 leading-relaxed ${KIND_CLASS[entry.kind]} ${tone}`}>{entry.text}</p>;
 }
 
 // Grouped under whatever offers them, so an offer with an owner and one without
@@ -41,6 +43,7 @@ function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: 
             {group.offers.map((offer) => (
               <button
                 key={offer.id}
+                data-drive="choose"
                 type="button"
                 onClick={() => onChoose(offer.position)}
                 className="grow basis-40 rounded-xl border border-border bg-panel px-3 py-2 text-sm font-medium transition-transform duration-75 active:scale-[0.97] active:bg-accent-strong active:text-accent-text"

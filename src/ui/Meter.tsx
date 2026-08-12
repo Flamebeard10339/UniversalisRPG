@@ -1,11 +1,5 @@
-import { LIVE_TICK_MS } from '../runtime/command';
 import { fillPercent, tidy } from './format';
-
-// The fill eases linearly over exactly one tick, so a bar the clock moves every
-// tick arrives as the next tick leaves and reads as continuous rather than as
-// steps. Read off the cadence rather than spelled again as a Tailwind duration:
-// the two would have to be changed together, and nothing would say so.
-export const FILL_TRANSITION = { transitionProperty: 'width', transitionTimingFunction: 'linear', transitionDuration: `${LIVE_TICK_MS}ms` };
+import { FILL_TRANSITION } from './transient';
 
 // A named bar with an optional readout. Whatever is being whittled down — a
 // resource on the header, a foe in a run — reads the same way.

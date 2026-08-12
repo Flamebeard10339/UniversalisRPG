@@ -358,8 +358,10 @@
         "src/ui/StatusBanner.tsx",
         "src/ui/TabBar.tsx",
         "src/ui/VStack.tsx",
-        "src/ui/agentSurfaces.test.ts",
-        "src/ui/agentSurfaces.ts",
+        "src/ui/agent/surfaces.test.ts",
+        "src/ui/agent/surfaces.ts",
+        "src/ui/agent/testHarness.test.ts",
+        "src/ui/agent/testHarness.ts",
         "src/ui/bundle.test.ts",
         "src/ui/choices.test.ts",
         "src/ui/choices.ts",
@@ -374,6 +376,7 @@
         "src/ui/gesture.test.ts",
         "src/ui/gesture.ts",
         "src/ui/labels.ts",
+        "src/ui/moments.test.ts",
         "src/ui/nav.test.ts",
         "src/ui/nav.ts",
         "src/ui/phone.test.tsx",
@@ -383,8 +386,6 @@
         "src/ui/shippedContent.test.ts",
         "src/ui/shippedContent.ts",
         "src/ui/surface.test.ts",
-        "src/ui/testHarness.test.ts",
-        "src/ui/testHarness.ts",
         "src/ui/testSurface.ts",
         "src/ui/transcript.test.ts",
         "src/ui/transcript.ts",
@@ -412,12 +413,12 @@
           "note": "produced by the-gui-shell-and-the-play-surface for gui-rebuild c8; the route the DSL takes to the browser, in place of the public/content/ an audit deleted"
         },
         {
-          "name": "transient text over the play surface",
+          "name": "one channel every played moment is begun on",
           "paths": [
             "src/ui/transient.ts",
             "src/ui/FloatingText.tsx"
           ],
-          "note": "produced by the-gui-shell-and-the-play-surface for gui-rebuild c10; floating-text-for-xp-events is the first producer that will use it"
+          "note": "was \"transient text over the play surface\", produced by the-gui-shell-and-the-play-surface for gui-rebuild c10; widened by moments-play-through-one-channel for an-agent-needs-no-screenshot c3, which made a text note one kind of moment on it rather than the only thing it carries. Taken over rather than duplicated: a second channel beside it would be the report that one of them does two jobs"
         },
         {
           "name": "the GUI shell",
@@ -466,12 +467,12 @@
         {
           "name": "browser test harness",
           "paths": [
-            "src/ui/agentSurfaces.ts",
+            "src/ui/agent/surfaces.ts",
             "src/ui/driver.ts",
-            "src/ui/testHarness.ts",
+            "src/ui/agent/testHarness.ts",
             "src/ui/testSurface.ts"
           ],
-          "note": "produced by the-agent-harness-returns-to-the-gui and finished by gui-rebuild-clause-9; dev-only window.__test batching the session's own actions and, since c9, the actions each component registers for what only it holds — the nav's layer and page, the map's pan, zoom and floor — through the useTestSurface hook in src/ui/testSurface.ts, which takes the plain values a component already holds and builds the surface from them in src/ui/agentSurfaces.ts. Installed from the GUI session container behind the DEV constant a production build folds away, and both the registry and the builders are reached only by imports inside that branch, which is what keeps them out of the shipped bundle"
+          "note": "produced by the-agent-harness-returns-to-the-gui and finished by gui-rebuild-clause-9; dev-only window.__test batching the session's own actions and, since c9, the actions each component registers for what only it holds — the nav's layer and page, the map's pan, zoom and floor — through the useTestSurface hook in src/ui/testSurface.ts, which takes the plain values a component already holds and builds the surface from them in src/ui/agent/surfaces.ts. Installed from the GUI session container behind the DEV constant a production build folds away, and both the registry and the builders are reached only by imports inside that branch, which is what keeps them out of the shipped bundle. Since an-agent-needs-no-screenshot c6 the set is derived from src/ui/agent/ and from nothing else, so bundle.test.ts and surface.test.ts read one directory rather than two predicates that disagreed"
         },
         {
           "name": "the GUI",
@@ -481,6 +482,23 @@
             "src/main.tsx"
           ],
           "note": "produced by gui-rebuild: the play surface's second driver, its session container and its shell"
+        },
+        {
+          "name": "the agent-only module boundary",
+          "paths": [
+            "src/ui/agent/testHarness.ts",
+            "src/ui/agent/surfaces.ts",
+            "src/ui/bundle.test.ts",
+            "src/ui/surface.test.ts"
+          ],
+          "note": "produced by agent-only-is-a-directory-both-guards-read for an-agent-needs-no-screenshot c6: src/ui/agent/ is the whole derivation of which modules exist only to be driven, read by bundle.test.ts against the release module graph and by surface.test.ts against the tree, so the two cannot disagree about what the set is"
+        },
+        {
+          "name": "a control declares which harness action drives it",
+          "paths": [
+            "src/ui/surface.test.ts"
+          ],
+          "note": "produced by a-control-names-its-driver-on-its-own-tag for an-agent-needs-no-screenshot c2: every button, input, select and textarea under src/ui carries data-drive naming the action, or none: with a reason; the rule reads the set off the tree with the control scanner and checks the name against what installTestHarness plus the surface builders actually offer"
         }
       ]
     },

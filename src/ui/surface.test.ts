@@ -8,8 +8,11 @@ import { describe, expect, it } from 'vitest';
 // past the play surface the rules below hold the driver to, which is allowed
 // of a test and of nothing else here: SOURCES excludes it.
 import { MODAL_NAMES } from '../runtime/modals';
+import { SURFACE_BUILDERS } from './agent/surfaces';
+import { createSurfaceRegistry, installTestHarness } from './agent/testHarness';
 import { TOUCH_FLOOR } from './discovery';
 import { LABELS } from './labels';
+import { createTransientChannel } from './transient';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -32,12 +35,21 @@ const SOURCES: Array<{ file: string; text: string }> = [
   { file: 'src/main.tsx', path: resolve(here, '..', 'main.tsx') },
 ].map(({ file, path }) => ({ file, text: readFileSync(path, 'utf8') }));
 
-// A module this layer reaches by a dynamic import, which is the seam a DEV
-// branch is folded away at. Read off the tree rather than listed, so the rule
-// below covers a second agent-only module from the day something imports it.
-const DEAD_BRANCH = /\bimport\(\s*['"`]\.\/([\w.-]+)['"`]\s*\)/g;
+// The modules that exist only to be driven, derived from where they are and
+// from nothing else. bundle.test.ts reads the same directory, so the two guards
+// cannot disagree about what the set is, and a third such module is covered the
+// day it is written.
+//
+// The predicate used to be "reached by a dynamic import", which is how a module
+// happened to be brought in rather than what it is: it exempted anything
+// written outside that spelling, and it would have refused the first React.lazy
+// of a pane by demanding it hide behind a constant a production build folds
+// away. A directory refuses neither.
+const AGENT_DIR = 'src/ui/agent/';
 
-const AGENT_ONLY = [...new Set(SOURCES.flatMap((source) => [...source.text.matchAll(DEAD_BRANCH)].map(([, module]) => module)))];
+const AGENT_ONLY = SOURCES.filter((source) => source.file.startsWith(AGENT_DIR));
+
+const SHIPPED = SOURCES.filter((source) => !source.file.startsWith(AGENT_DIR));
 
 // Any quoted path into the runtime, whatever brought it in. Matching `from`
 // and one quote style would be matching a coding habit: a dynamic import in
@@ -95,6 +107,32 @@ function controls(text: string): string[] {
 // sets. A control may ask for more room than the floor and may not ask for
 // less, so the check is on the number and not on which utility carries it.
 const SIZED = /\b(?:min-|max-)?[hw]-\[(\d+(?:\.\d+)?)px\]/g;
+
+// What a control says drives it, written on its own tag. An attribute rather
+// than a table beside the tree, because a table is a second place to remember
+// and the whole point is that a control that declares nothing fails.
+const DRIVEN_BY = /\bdata-drive="([^"]*)"/;
+
+// A control that needs no driving says so here, with why. Nothing in the tree
+// uses this today — every control answers to an action — and it exists so the
+// rule has an answer other than being argued with.
+const NEEDS_NONE = /^none: \S/;
+
+// Everything the harness offers, taken from the harness rather than listed:
+// the actions the driver installs, plus the ones every surface builder makes.
+// A builder is called with a value that answers to anything, because an action
+// map is built the moment the surface is and reads nothing to do it — so this
+// needs to know what the surfaces are called and nothing about what they hold.
+function offered(): string[] {
+  const anything = new Proxy(() => anything, { get: () => anything }) as never;
+  const surfaces = createSurfaceRegistry();
+  for (const name of Object.keys(SURFACE_BUILDERS) as Array<keyof typeof SURFACE_BUILDERS>) {
+    surfaces.register(name, () => SURFACE_BUILDERS[name](anything));
+  }
+  return installTestHarness({ transient: createTransientChannel() } as never, {}, { surfaces }).actions();
+}
+
+const OFFERED = offered();
 
 // The other half of the same rule, and the half that does not depend on how a
 // name arrived. The allowlist above reads `import { x } from`; this reads the
@@ -197,36 +235,88 @@ describe('the rules the driver is held to', () => {
     expect(checked).toBeGreaterThan(6);
   });
 
+  // c2. The set is read off the tree by the same scanner the floor rule uses,
+  // so a component that adds a control and names nothing fails rather than
+  // passing quietly, and the name is checked against what the harness actually
+  // offers, so a control naming an action no surface has fails too.
+  it('offers what the harness offers, read off the harness rather than written down here', () => {
+    expect(OFFERED).toContain('send');
+    expect(OFFERED).toContain('shell.layer');
+    expect(OFFERED).toContain('map.plane');
+  });
+
+  it('names on every control the harness action that drives it, or why it needs none', () => {
+    let named = 0;
+    for (const source of SOURCES) {
+      for (const control of controls(source.text)) {
+        const declared = DRIVEN_BY.exec(control)?.[1];
+
+        expect(declared, `${source.file} renders a control that names no driver: ${control.slice(0, 60)}`).toBeDefined();
+        named += 1;
+        if (NEEDS_NONE.test(declared!)) continue;
+        expect(OFFERED, `${source.file} names the driver ${declared}, which the harness does not offer`).toContain(declared);
+      }
+    }
+    // A scanner that found nothing would pass every control above.
+    expect(named).toBeGreaterThan(6);
+  });
+
   it('reads a control whole, however much of a handler sits inside its tag', () => {
     const written = '<button onClick={() => (a > b ? x : y)} className="h-[12px]">go</button>';
 
     expect(controls(written)).toEqual(['<button onClick={() => (a > b ? x : y)} className="h-[12px]"']);
   });
 
-  it('writes the registration call in every component that holds what an agent has to move', () => {
-    const registering = SOURCES.filter((source) => /\buseTestSurface\s*\(/.test(source.text)).map((source) => source.file);
+  // A registration has two halves and they fail differently. That it does not
+  // lie is held by the seam — each component assembles one value, draws from it
+  // and hands that same value over, so render.test.tsx fails on a lie. That it
+  // exists at all is held here.
+  //
+  // The rule this replaced named App.tsx and MapPane.tsx, which was a list of
+  // two filenames; removing it left the existing half unheld, and deleting a
+  // component's whole call survived all 2523 tests. The set is derived instead:
+  // a builder and a registration are the same surface named twice, so the
+  // builders are what says which registrations must exist.
+  it('registers every surface a builder can make, and none a builder cannot', () => {
+    const registering = SHIPPED.flatMap((source) =>
+      [...source.text.matchAll(/\buseTestSurface\s*\(\s*'([^']+)'/g)].map(([, surface]) => ({ surface, file: source.file })),
+    );
+    const buildable = Object.keys(SURFACE_BUILDERS);
 
-    expect(registering).toContain('src/ui/App.tsx');
-    expect(registering).toContain('src/ui/MapPane.tsx');
+    expect(buildable.length, 'no surface has a builder, so every check below holds vacuously').toBeGreaterThan(0);
+    for (const surface of buildable) {
+      expect(registering.map((one) => one.surface), `nothing under src/ui registers the ${surface} surface`).toContain(surface);
+    }
+    for (const one of registering) {
+      expect(buildable, `${one.file} registers ${one.surface}, which no builder makes`).toContain(one.surface);
+    }
   });
 
-  // c9's last sentence, as the structure that makes it true rather than as the
-  // bundle it makes true — bundle.test.ts builds and reads that. This one names
-  // the files: an agent-only module is reached by an import inside a branch the
-  // DEV constant folds away, so no module may bring one in as a value at the
-  // top.
-  it('reaches every agent-only module only from a branch a production build folds away', () => {
-    expect(AGENT_ONLY, 'nothing in the tree is reached by a dead-branch import').toContain('testHarness');
+  // c6's structural half — bundle.test.ts builds the release and reads the
+  // module graph, which is the other. A module that ships may reach into the
+  // directory only from inside a branch the DEV constant folds away, and never
+  // by bringing one in as a value at the top: that would keep it reachable
+  // however the branch folds.
+  it('reaches the agent directory only from a branch a production build folds away', () => {
+    expect(AGENT_ONLY, 'the agent directory is empty, so every rule below holds vacuously').not.toHaveLength(0);
 
-    for (const module of AGENT_ONLY) {
-      const reaching = SOURCES.filter((source) => !source.file.endsWith(`/${module}.ts`) && source.text.includes(module));
+    const reaching = SHIPPED.filter((source) => source.text.includes('/agent/'));
 
-      expect(reaching.length, `nothing in the tree reaches ${module}`).toBeGreaterThan(0);
-      for (const source of reaching) {
-        expect(source.text, `${source.file} names ${module} with no DEV constant to fold it away`).toContain('import.meta.env.DEV');
-        expect(source.text, `${source.file} brings ${module} in as a value at the top`).not.toMatch(new RegExp(`import\\s+(?!type\\b)[^;]*from\\s*['"\`][^'"\`]*${module}['"\`]`));
-      }
+    expect(reaching.length, 'nothing that ships reaches the agent directory at all').toBeGreaterThan(0);
+    for (const source of reaching) {
+      expect(source.text, `${source.file} reaches the agent directory with no DEV constant to fold it away`).toContain('import.meta.env.DEV');
+      expect(source.text, `${source.file} brings an agent-only module in as a value at the top`).not.toMatch(/import\s+(?!type\b)[^;]*from\s*['"`][^'"`]*\/agent\/[^'"`]*['"`]/);
     }
+  });
+
+  it('asks nothing of a pane that is merely loaded late, because that is not what makes a module agent-only', () => {
+    // The rule the dynamic-import predicate would have failed. Splitting a pane
+    // out for loading is an ordinary thing to want on a phone, and demanding it
+    // sit behind a constant a production build folds away is exactly wrong.
+    const lazily = { file: 'src/ui/Ledger.tsx', text: "const Body = lazy(() => import('./LedgerBody'));" };
+
+    expect(lazily.file.startsWith(AGENT_DIR)).toBe(false);
+    expect(lazily.text).not.toMatch(/\/agent\//);
   });
 
   it('asks nothing of a network or a filesystem', () => {

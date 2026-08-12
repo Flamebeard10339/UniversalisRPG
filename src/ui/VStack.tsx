@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { landingIndex, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, SETTLE_EASING, wasDragged, type Motion } from './gesture';
+import { landingIndex, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, wasDragged, type Motion } from './gesture';
+import { useMomentPlayer } from './transient';
 import { across, bodyHeights, LAYERS, layerOffsets, layerSpan, type Bands } from './nav';
 
 interface Drag {
@@ -26,6 +27,7 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
   const drag = useRef<Drag | null>(null);
   const dragged = useRef(false);
   const [bands, setBands] = useState<Bands>({ height: 0, banners: banners.map(() => 0) });
+  const settle = useMomentPlayer('settle');
 
   const offsets = layerOffsets(bands);
   const heights = bodyHeights(bands);
@@ -77,7 +79,7 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
     if (!dragging || !node) return;
 
     const landing = landingIndex({ dx: dragging.dy, width: layerSpan(offsets, layer, dragging.dy), velocity: releaseVelocity(dragging.motion, at), taken }, layer, LAYERS.length);
-    node.style.transition = SETTLE_EASING;
+    node.style.transition = settle();
     node.style.transform = restingAt(landing);
     if (landing !== layer) onLayer(landing);
   };
@@ -97,6 +99,7 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
                 // it, which is the only thing a banner is allowed to say.
                 <button
                   key={`banner-${at}`}
+                  data-drive="shell.layer"
                   data-boundary={at}
                   ref={(node) => void (strips.current[at] = node)}
                   type="button"

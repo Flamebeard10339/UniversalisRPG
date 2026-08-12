@@ -1,10 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'vite';
 import { describe, expect, it } from 'vitest';
-import * as agentSurfaces from './agentSurfaces';
-import * as harness from './testHarness';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const root = resolve(here, '..', '..');
@@ -78,20 +76,14 @@ function sourcesUnder(directory: string): string[] {
   });
 }
 
-const owning = (module: string): { path: string; text: string } => {
-  const path = resolve(here, `${module}.ts`);
-  return { path: slashed(path), text: readFileSync(path, 'utf8') };
-};
+// Where the modules only a driving agent reaches live. The directory is the
+// whole derivation of the set — a module is agent-only because of where it is —
+// so this test and the source rule under surface.test.ts cannot disagree about
+// what the set is, and a third such module is covered from the day it is
+// written rather than from the day someone remembers to widen a list.
+export const AGENT_DIR = 'src/ui/agent';
 
-// The two modules only a driving agent reaches, each as the file it is, the
-// names it exports and the words it can throw. Every part of that is read off
-// the module itself rather than copied into a list here: what a module gains is
-// checked from the day it is written, where a copy exempts it until someone
-// remembers to widen the copy.
-const OWNERS = [
-  { ...owning('agentSurfaces'), names: Object.keys(agentSurfaces) },
-  { ...owning('testHarness'), names: Object.keys(harness) },
-];
+const OWNERS = sourcesUnder(resolve(here, 'agent')).map((path) => ({ path: slashed(path), text: readFileSync(path, 'utf8') }));
 
 const OWNED = new Set(OWNERS.map((module) => module.path));
 
@@ -104,17 +96,29 @@ const ELSEWHERE = sourcesUnder(resolve(here, '..'))
   .map((path) => readFileSync(path, 'utf8'))
   .join('\n');
 
-const AGENT_ONLY = OWNERS.map((module) => ({
-  path: module.path,
-  names: module.names,
-  says: messages(module.text).filter((message) => !ELSEWHERE.includes(message)),
-}));
+// The exported names are read at run time rather than off a static import: a
+// static one would keep the modules in this test's own graph and, more to the
+// point, would be a list again. Every part of what is checked — the file, the
+// names it exports, the words only it can throw — comes off the module itself.
+const AGENT_ONLY = await Promise.all(
+  OWNERS.map(async (module) => ({
+    path: module.path,
+    names: Object.keys((await import(/* @vite-ignore */ pathToFileURL(module.path).href)) as object),
+    says: messages(module.text).filter((message) => !ELSEWHERE.includes(message)),
+  })),
+);
 
 // The one name a minifier cannot rename, because it is the property the harness
 // is hung off the window by rather than a binding.
 const GLOBAL = '__test';
 
 describe('the bundle a release ships', () => {
+  it('reads the directory it is a rule about, so a run that found nothing would prove nothing', () => {
+    expect(AGENT_ONLY.map((module) => module.path.slice(module.path.indexOf(AGENT_DIR)))).toEqual(
+      expect.arrayContaining([`${AGENT_DIR}/testHarness.ts`, `${AGENT_DIR}/surfaces.ts`]),
+    );
+  });
+
   it('carries the content, and none of the modules only a driving agent reaches', async () => {
     const parts = await shipped();
 
