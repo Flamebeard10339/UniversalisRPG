@@ -3,7 +3,8 @@ import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
 import { actorEntity, participants, sideOf } from './encounter';
 import { Registry } from '../content/registry';
-import { carriesItem, itemTemplate } from './itemInstance';
+import { instancePayloads } from './clusterEffect';
+import { carriesItem, itemInstance, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
 import { skillLevel } from './skills';
 import { ActiveBuff, GameState, PLAYER, RuntimeError } from './state';
@@ -28,6 +29,17 @@ function foldBonus(bonus: BonusAmount, fold: StatFold, times: number): void {
 
 function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatFold): void {
   for (const tag of tags) if (tag.kind === 'stat-bonus' && tag.statId === statId) foldBonus(tag, fold, 1);
+}
+
+// A worn item that was grown adds no channel and no arithmetic (c18): what its
+// cluster effects decided a payload is worth arrives as the same `times` a
+// skill's level arrives as, through the same fold.
+function foldPlanePayloads(registry: Registry, state: GameState, wornId: string, statId: string, fold: StatFold): void {
+  const grown = itemInstance(state, wornId);
+  if (!grown) return;
+  for (const payload of instancePayloads(registry, grown)) {
+    if (payload.statId === statId) foldBonus(payload.bonus, fold, payload.scale);
+  }
 }
 
 // A state holds one store of buffs, one of equipment and one of skill xp, and
@@ -73,6 +85,7 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
     if (!carriesItem(state, wornId)) continue;
     const item = registry.items.get(itemTemplate(state, wornId));
     if (item) foldStatBonuses(item.tags, statId, fold);
+    foldPlanePayloads(registry, state, wornId, statId, fold);
   }
   return scaleRange(fold.added, 1 + fold.increased);
 }

@@ -167,6 +167,8 @@
       "paths": [
         "src/runtime/actions.ts",
         "src/runtime/cadence.test.ts",
+        "src/runtime/clusterEffect.test.ts",
+        "src/runtime/clusterEffect.ts",
         "src/runtime/clusterPlane.test.ts",
         "src/runtime/clusterPlane.ts",
         "src/runtime/command.test.ts",
