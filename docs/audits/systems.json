@@ -492,6 +492,13 @@
             "src/ui/surface.test.ts"
           ],
           "note": "produced by agent-only-is-a-directory-both-guards-read for an-agent-needs-no-screenshot c6: src/ui/agent/ is the whole derivation of which modules exist only to be driven, read by bundle.test.ts against the release module graph and by surface.test.ts against the tree, so the two cannot disagree about what the set is"
+        },
+        {
+          "name": "a control declares which harness action drives it",
+          "paths": [
+            "src/ui/surface.test.ts"
+          ],
+          "note": "produced by a-control-names-its-driver-on-its-own-tag for an-agent-needs-no-screenshot c2: every button, input, select and textarea under src/ui carries data-drive naming the action, or none: with a reason; the rule reads the set off the tree with the control scanner and checks the name against what installTestHarness plus the surface builders actually offer"
         }
       ]
     },
