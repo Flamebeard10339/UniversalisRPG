@@ -27,7 +27,7 @@ const KIND_CLASS: Record<LogKind, string> = {
 // A line mounts once, so the flash marks exactly the text that just arrived.
 function Line({ entry }: { entry: LogEntry }): JSX.Element {
   const tone = entry.kind === 'message' ? TONE_CLASS[entry.tone] : '';
-  const arrived = useMoment('arrival', true, entry.kind);
+  const arrived = useMoment('arrival', true, String(entry.id));
   return <p className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 leading-relaxed ${KIND_CLASS[entry.kind]} ${tone}`}>{entry.text}</p>;
 }
 
