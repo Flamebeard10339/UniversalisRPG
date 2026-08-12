@@ -101,3 +101,62 @@ An agent debugging this GUI never takes a picture.
   harness existing. It has an open question of its own (where it lives and in what format, given
   that `src/ui` may not `fetch`), and this branch already carries two refactors and three
   derivations. Opened separately rather than carried. Ruled 2026-08-12.
+
+## Audit passes
+
+### Pass 1 — 2026-08-12
+
+- base: `5458f5ec05295dc091896f6eb7ebf56b4e5c6086`
+- head: `b04876f803217b3474c18d1d9c953728f51b124f`
+- proof 1: met — Mutation `view,` -> `view: view ? { ...view } : null,` in src/ui/agent/testHarness.ts:150 was KILLED by
+src/ui/agent/testHarness.test.ts "carries the published view itself, so a field the runtime adds needs no edit here",
+re-run at its own file with the mutant still applied. The test asserts identity (toBe), not field agreement, so a
+projection that happened to agree today cannot pass it. testState returns snapshot.view itself; there is no field list
+over the view for anyone to forget to widen. What is derived — choices[].position, the asked modal, the last 20
+transcript entries, surfaces — sits beside the view as its own key and replaces no field of it.
+Re-run: npm run mutate over audit-an-agent-needs-no-screenshot-pass1-mutations.json entry c1-view-is-the-published-object.
+Graded met on the view, which is what the clause names. The residual hand-written list over the driver's `live` is
+filed as a finding below rather than read into this grade.
+- proof 2: met — Two mutations, both KILLED by src/ui/surface.test.ts "names on every control the harness action that
+drives it, or why it needs none": (a) dropping `data-drive="shell.subpage"` from the TabBar button — a control that
+adds itself and declares nothing — and (b) `data-drive="map.plane"` -> `"map.floor"` in MapPane — a control naming an
+action no surface offers. Both halves of the clause therefore bite. The set is read off the tree by the same
+brace-aware `controls()` scanner the touch-floor rule uses, and OFFERED is built by calling installTestHarness with a
+Proxy-fed SURFACE_BUILDERS rather than by listing names, so the check is against what the harness actually offers. All
+10 controls under src/ui carry the attribute; the `none: <reason>` escape exists and nothing uses it.
+Re-run: entries c2-a-control-names-its-driver and c2-the-named-action-must-exist.
+- proof 3: met — Mutation `node.style.transition = settle();` -> `node.style.transition = 'transform 220ms ease';` in
+src/ui/Pager.tsx:73 was KILLED by src/ui/moments.test.ts "is the only module that writes what a moment is made of, so
+one begun elsewhere came from here". The rule has both halves the clause needs: KEYFRAMES is read off src/index.css
+(not off the channel's own table, so a keyframe added and never routed fails), and no module but transient.ts may
+write a moment literal or declare one. transient.ts is the single door — useMoment/useMomentPlayer return the class or
+transition string as the side effect of logging the play, so a component cannot draw one without writing it down.
+The four `transition-transform duration-75 active:scale-[0.97]` sites and Splitter's `group-active:` are feedback bound
+to the control's own press state, which the clause exempts by rule rather than by argument.
+Re-run: entry c3-a-moment-begun-off-the-channel. Two gaps in the derivation are filed as findings below.
+- proof 4: met — Two mutations, both KILLED. (a) `played: since()` -> `played: []` on the taken-step branch of
+installTestHarness (src/ui/agent/testHarness.ts:212) was killed by src/ui/agent/testHarness.test.ts "reports a moment
+that began and ended between two steps, which a read of the state cannot see" — the exact proof the clause names: the
+fixture's settle expires the note, so channel.notes() is empty and only the log can answer. (b) `cursor: nextId - 1`
+-> `cursor` in transient.ts playedSince was killed by "never reports one step's moments as the next step's". Together
+these hold both halves: what played is reported, and it is reported once. The cursor also advances over a refused
+step, and starts where the session already is rather than at its beginning, each with its own test.
+Re-run: entries c4-what-played-is-reported and c4-the-cursor-moves.
+- proof 5: met — The spec's own named mutant no longer survives. `const map = { plane: at, ... }` -> `{ plane: 0, ... }` in
+src/ui/MapPane.tsx — a map registering plane 0 while drawing plane 2 — was KILLED by src/ui/render.test.tsx "says which
+floor it is showing, and offers the ones it found", whose STOREYS fixture deliberately stands the player on the upper
+floor so the mutant cannot pass by falling back to 0. The same seam on the other registering component,
+`const shell = { where, go: setWhere }` -> `{ where: OPENING, ... }` in App.tsx, was KILLED by "draws the nav standing
+where it was opened". Both components assemble one value, render every site from it and hand that same value over, so
+a lie in the registration is a lie in the markup. Held by renderToStaticMarkup, not by a DOM environment, as decided.
+Re-run: entries c5-a-registration-that-lies and c5-the-shell-hands-over-what-it-holds.
+- proof 6: met — Mutation `if (!import.meta.env.DEV) return;` -> `if (globalThis === undefined) return;` in
+src/ui/testSurface.ts:30 — the one seam that ships and reaches in, no longer behind the constant a production build
+folds to false — was KILLED by src/ui/bundle.test.ts "carries the content, and none of the modules only a driving agent
+reaches". That test builds the release in memory under NODE_ENV=production and reads Rollup's own module graph, plus
+the exported names and the error literals only those modules can throw, so it does not depend on names a minifier
+rewrites. The set is derived from src/ui/agent/ in both guards — bundle.test.ts by sourcesUnder(resolve(here,'agent')),
+surface.test.ts by AGENT_DIR = 'src/ui/agent/' — so they cannot disagree, and both assert the directory is non-empty so
+a run that found nothing would prove nothing. surface.test.ts also proves the over-strictness the old predicate had is
+gone: "asks nothing of a pane that is merely loaded late".
+Re-run: entry c6-agent-only-stays-out-of-the-bundle.
