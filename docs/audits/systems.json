@@ -167,6 +167,8 @@
       "paths": [
         "src/runtime/actions.ts",
         "src/runtime/cadence.test.ts",
+        "src/runtime/clusterPlane.test.ts",
+        "src/runtime/clusterPlane.ts",
         "src/runtime/command.test.ts",
         "src/runtime/command.ts",
         "src/runtime/conditions.ts",
@@ -185,6 +187,8 @@
         "src/runtime/instances.test.ts",
         "src/runtime/instances.ts",
         "src/runtime/integration.test.ts",
+        "src/runtime/itemInstance.test.ts",
+        "src/runtime/itemInstance.ts",
         "src/runtime/journey.test.ts",
         "src/runtime/journey.ts",
         "src/runtime/location.test.ts",
@@ -286,6 +290,20 @@
             "src/runtime/journey.ts"
           ],
           "note": "produced by travel-reaches-anywhere-the-roads-do"
+        },
+        {
+          "name": "item cluster plane",
+          "paths": [
+            "src/runtime/clusterPlane.ts"
+          ],
+          "note": "produced by cluster-plane-runtime: the hex plane state model and every rule over it -- placement, determined rotation, one cluster to a hex with blocking, adjacency-gated allocation, and the c21 repair"
+        },
+        {
+          "name": "lazy item instancing",
+          "paths": [
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by cluster-plane-runtime: a stacked item leaves its stack and becomes an instanced-objects payload at the first thing recorded about it, and every verb that grows one routes through growItem"
         }
       ]
     },
