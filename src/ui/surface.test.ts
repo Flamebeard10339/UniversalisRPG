@@ -32,12 +32,21 @@ const SOURCES: Array<{ file: string; text: string }> = [
   { file: 'src/main.tsx', path: resolve(here, '..', 'main.tsx') },
 ].map(({ file, path }) => ({ file, text: readFileSync(path, 'utf8') }));
 
-// A module this layer reaches by a dynamic import, which is the seam a DEV
-// branch is folded away at. Read off the tree rather than listed, so the rule
-// below covers a second agent-only module from the day something imports it.
-const DEAD_BRANCH = /\bimport\(\s*['"`]\.\/([\w.-]+)['"`]\s*\)/g;
+// The modules that exist only to be driven, derived from where they are and
+// from nothing else. bundle.test.ts reads the same directory, so the two guards
+// cannot disagree about what the set is, and a third such module is covered the
+// day it is written.
+//
+// The predicate used to be "reached by a dynamic import", which is how a module
+// happened to be brought in rather than what it is: it exempted anything
+// written outside that spelling, and it would have refused the first React.lazy
+// of a pane by demanding it hide behind a constant a production build folds
+// away. A directory refuses neither.
+const AGENT_DIR = 'src/ui/agent/';
 
-const AGENT_ONLY = [...new Set(SOURCES.flatMap((source) => [...source.text.matchAll(DEAD_BRANCH)].map(([, module]) => module)))];
+const AGENT_ONLY = SOURCES.filter((source) => source.file.startsWith(AGENT_DIR));
+
+const SHIPPED = SOURCES.filter((source) => !source.file.startsWith(AGENT_DIR));
 
 // Any quoted path into the runtime, whatever brought it in. Matching `from`
 // and one quote style would be matching a coding habit: a dynamic import in
@@ -203,30 +212,39 @@ describe('the rules the driver is held to', () => {
     expect(controls(written)).toEqual(['<button onClick={() => (a > b ? x : y)} className="h-[12px]"']);
   });
 
-  it('writes the registration call in every component that holds what an agent has to move', () => {
-    const registering = SOURCES.filter((source) => /\buseTestSurface\s*\(/.test(source.text)).map((source) => source.file);
+  // The registration text-grep that used to sit here is gone. It asserted that
+  // App.tsx and MapPane.tsx contain `useTestSurface(`, which killed deleting
+  // either call and nothing else — a map registering a floor it was not drawing
+  // survived it and the whole suite. What holds that now is the seam: each
+  // component assembles one value, draws from it and hands that same value
+  // over, so a registration that lies is markup that lies and render.test.tsx
+  // fails on it. The two files this named were also a hand-written list.
 
-    expect(registering).toContain('src/ui/App.tsx');
-    expect(registering).toContain('src/ui/MapPane.tsx');
+  // c6's structural half — bundle.test.ts builds the release and reads the
+  // module graph, which is the other. A module that ships may reach into the
+  // directory only from inside a branch the DEV constant folds away, and never
+  // by bringing one in as a value at the top: that would keep it reachable
+  // however the branch folds.
+  it('reaches the agent directory only from a branch a production build folds away', () => {
+    expect(AGENT_ONLY, 'the agent directory is empty, so every rule below holds vacuously').not.toHaveLength(0);
+
+    const reaching = SHIPPED.filter((source) => source.text.includes('/agent/'));
+
+    expect(reaching.length, 'nothing that ships reaches the agent directory at all').toBeGreaterThan(0);
+    for (const source of reaching) {
+      expect(source.text, `${source.file} reaches the agent directory with no DEV constant to fold it away`).toContain('import.meta.env.DEV');
+      expect(source.text, `${source.file} brings an agent-only module in as a value at the top`).not.toMatch(/import\s+(?!type\b)[^;]*from\s*['"`][^'"`]*\/agent\/[^'"`]*['"`]/);
+    }
   });
 
-  // c9's last sentence, as the structure that makes it true rather than as the
-  // bundle it makes true — bundle.test.ts builds and reads that. This one names
-  // the files: an agent-only module is reached by an import inside a branch the
-  // DEV constant folds away, so no module may bring one in as a value at the
-  // top.
-  it('reaches every agent-only module only from a branch a production build folds away', () => {
-    expect(AGENT_ONLY, 'nothing in the tree is reached by a dead-branch import').toContain('testHarness');
+  it('asks nothing of a pane that is merely loaded late, because that is not what makes a module agent-only', () => {
+    // The rule the dynamic-import predicate would have failed. Splitting a pane
+    // out for loading is an ordinary thing to want on a phone, and demanding it
+    // sit behind a constant a production build folds away is exactly wrong.
+    const lazily = { file: 'src/ui/Ledger.tsx', text: "const Body = lazy(() => import('./LedgerBody'));" };
 
-    for (const module of AGENT_ONLY) {
-      const reaching = SOURCES.filter((source) => !source.file.endsWith(`/${module}.ts`) && source.text.includes(module));
-
-      expect(reaching.length, `nothing in the tree reaches ${module}`).toBeGreaterThan(0);
-      for (const source of reaching) {
-        expect(source.text, `${source.file} names ${module} with no DEV constant to fold it away`).toContain('import.meta.env.DEV');
-        expect(source.text, `${source.file} brings ${module} in as a value at the top`).not.toMatch(new RegExp(`import\\s+(?!type\\b)[^;]*from\\s*['"\`][^'"\`]*${module}['"\`]`));
-      }
-    }
+    expect(lazily.file.startsWith(AGENT_DIR)).toBe(false);
+    expect(lazily.text).not.toMatch(/\/agent\//);
   });
 
   it('asks nothing of a network or a filesystem', () => {

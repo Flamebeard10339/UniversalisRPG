@@ -1,8 +1,8 @@
-import { clampZoom, type Point, type Sheet } from './discovery';
-import { clampIndex } from './gesture';
-import type { LabelId } from './labels';
-import { LAYERS, subpageOf, toLayer, toSubpage, type LayerId, type Where } from './nav';
-import type { TestSurface } from './testSurface';
+import { clampZoom, type Point, type Sheet } from '../discovery';
+import { clampIndex } from '../gesture';
+import type { LabelId } from '../labels';
+import { LAYERS, subpageOf, toLayer, toSubpage, type LayerId, type Where } from '../nav';
+import type { TestSurface } from '../testSurface';
 
 // Everything here exists to be driven and nothing here is drawn, so the whole
 // module is reached by one dynamic import inside a branch the DEV constant

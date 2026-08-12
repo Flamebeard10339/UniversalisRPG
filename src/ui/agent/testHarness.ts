@@ -1,9 +1,9 @@
-import { askedOption } from '../runtime/command';
-import type { PlayChoice, PlayView } from '../runtime/session';
-import type { Driver, DriverSnapshot } from './driver';
-import type { TestAction, TestSurface } from './testSurface';
-import type { Moment } from './transient';
-import type { LogEntry } from './transcript';
+import { askedOption } from '../../runtime/command';
+import type { PlayChoice, PlayView } from '../../runtime/session';
+import type { Driver, DriverSnapshot } from '../driver';
+import type { TestAction, TestSurface } from '../testSurface';
+import type { Moment } from '../transient';
+import type { LogEntry } from '../transcript';
 
 export interface TestCommand {
   target: string;

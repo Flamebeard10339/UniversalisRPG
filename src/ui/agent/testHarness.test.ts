@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createSurfaceRegistry, installTestHarness, testState } from './testHarness';
-import type { Driver, DriverSnapshot } from './driver';
-import { createTransientChannel, type TransientChannel } from './transient';
-import { emptyTranscript } from './transcript';
+import type { Driver, DriverSnapshot } from '../driver';
+import { createTransientChannel, type TransientChannel } from '../transient';
+import { emptyTranscript } from '../transcript';
 
 function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
   return {

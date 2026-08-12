@@ -358,8 +358,10 @@
         "src/ui/StatusBanner.tsx",
         "src/ui/TabBar.tsx",
         "src/ui/VStack.tsx",
-        "src/ui/agentSurfaces.test.ts",
-        "src/ui/agentSurfaces.ts",
+        "src/ui/agent/surfaces.test.ts",
+        "src/ui/agent/surfaces.ts",
+        "src/ui/agent/testHarness.test.ts",
+        "src/ui/agent/testHarness.ts",
         "src/ui/bundle.test.ts",
         "src/ui/choices.test.ts",
         "src/ui/choices.ts",
@@ -384,8 +386,6 @@
         "src/ui/shippedContent.test.ts",
         "src/ui/shippedContent.ts",
         "src/ui/surface.test.ts",
-        "src/ui/testHarness.test.ts",
-        "src/ui/testHarness.ts",
         "src/ui/testSurface.ts",
         "src/ui/transcript.test.ts",
         "src/ui/transcript.ts",
@@ -467,12 +467,12 @@
         {
           "name": "browser test harness",
           "paths": [
-            "src/ui/agentSurfaces.ts",
+            "src/ui/agent/surfaces.ts",
             "src/ui/driver.ts",
-            "src/ui/testHarness.ts",
+            "src/ui/agent/testHarness.ts",
             "src/ui/testSurface.ts"
           ],
-          "note": "produced by the-agent-harness-returns-to-the-gui and finished by gui-rebuild-clause-9; dev-only window.__test batching the session's own actions and, since c9, the actions each component registers for what only it holds — the nav's layer and page, the map's pan, zoom and floor — through the useTestSurface hook in src/ui/testSurface.ts, which takes the plain values a component already holds and builds the surface from them in src/ui/agentSurfaces.ts. Installed from the GUI session container behind the DEV constant a production build folds away, and both the registry and the builders are reached only by imports inside that branch, which is what keeps them out of the shipped bundle"
+          "note": "produced by the-agent-harness-returns-to-the-gui and finished by gui-rebuild-clause-9; dev-only window.__test batching the session's own actions and, since c9, the actions each component registers for what only it holds — the nav's layer and page, the map's pan, zoom and floor — through the useTestSurface hook in src/ui/testSurface.ts, which takes the plain values a component already holds and builds the surface from them in src/ui/agent/surfaces.ts. Installed from the GUI session container behind the DEV constant a production build folds away, and both the registry and the builders are reached only by imports inside that branch, which is what keeps them out of the shipped bundle. Since an-agent-needs-no-screenshot c6 the set is derived from src/ui/agent/ and from nothing else, so bundle.test.ts and surface.test.ts read one directory rather than two predicates that disagreed"
         },
         {
           "name": "the GUI",
