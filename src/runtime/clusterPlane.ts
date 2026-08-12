@@ -63,6 +63,18 @@ function parseHexKey(key: string): Hex | undefined {
   return hexKey(hex) === key ? hex : undefined;
 }
 
+// A plane is keyed by string so that it saves. Every walk over one wants the
+// hex back, so the key is read back here rather than at each of them, and a
+// key a hand-edited save left unparseable is skipped the same way everywhere.
+export function planeClusters(plane: Plane): { hex: Hex; cluster: Cluster }[] {
+  const standing: { hex: Hex; cluster: Cluster }[] = [];
+  for (const [key, cluster] of Object.entries(plane)) {
+    const hex = parseHexKey(key);
+    if (hex) standing.push({ hex, cluster });
+  }
+  return standing;
+}
+
 const step = (hex: Hex, direction: Direction): Hex => ({ q: hex.q + NEIGHBOR_DELTA[direction].q, r: hex.r + NEIGHBOR_DELTA[direction].r });
 
 const isDirection = (value: string): value is Direction => (DIRECTIONS as readonly string[]).includes(value);
@@ -225,9 +237,7 @@ const nodeKey = (node: PlaneNode): string => (node.kind === 'slot' ? `${hexKey(n
 
 function allocatedNodes(plane: Plane): PlaneNode[] {
   const nodes: PlaneNode[] = [];
-  for (const [key, cluster] of Object.entries(plane)) {
-    const hex = parseHexKey(key);
-    if (!hex) continue;
+  for (const { hex, cluster } of planeClusters(plane)) {
     for (const position of cluster.allocatedPositions) nodes.push({ hex, kind: 'position', position });
     for (const direction of cluster.allocatedSlots) nodes.push({ hex, kind: 'slot', direction });
   }
@@ -259,13 +269,12 @@ function dropUnplaceable(registry: Registry, plane: Plane, repairs: string[]): b
 
 function dropStranded(registry: Registry, plane: Plane, repairs: string[]): boolean {
   let changed = false;
-  for (const [key, cluster] of Object.entries(plane)) {
-    const hex = parseHexKey(key);
-    if (!hex || cluster.entry === null) continue;
+  for (const { hex, cluster } of planeClusters(plane)) {
+    if (cluster.entry === null) continue;
     const parent = step(hex, opposite(cluster.entry));
     if (slotState(registry, plane, parent, cluster.entry) === 'filled') continue;
-    repairs.push(`dropped the ${cluster.jewel} cluster at ${key}, which entered through a ${cluster.entry} slot of ${hexKey(parent)} that is gone`);
-    delete plane[key];
+    repairs.push(`dropped the ${cluster.jewel} cluster at ${hexKey(hex)}, which entered through a ${cluster.entry} slot of ${hexKey(parent)} that is gone`);
+    delete plane[hexKey(hex)];
     changed = true;
   }
   return changed;
