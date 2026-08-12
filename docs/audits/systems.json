@@ -377,7 +377,7 @@
         "src/ui/gesture.ts",
         "src/ui/labels.ts",
         "src/ui/moments.test.ts",
-      "src/ui/nav.test.ts",
+        "src/ui/nav.test.ts",
         "src/ui/nav.ts",
         "src/ui/phone.test.tsx",
         "src/ui/render.test.tsx",
@@ -482,6 +482,16 @@
             "src/main.tsx"
           ],
           "note": "produced by gui-rebuild: the play surface's second driver, its session container and its shell"
+        },
+        {
+          "name": "the agent-only module boundary",
+          "paths": [
+            "src/ui/agent/testHarness.ts",
+            "src/ui/agent/surfaces.ts",
+            "src/ui/bundle.test.ts",
+            "src/ui/surface.test.ts"
+          ],
+          "note": "produced by agent-only-is-a-directory-both-guards-read for an-agent-needs-no-screenshot c6: src/ui/agent/ is the whole derivation of which modules exist only to be driven, read by bundle.test.ts against the release module graph and by surface.test.ts against the tree, so the two cannot disagree about what the set is"
         }
       ]
     },
