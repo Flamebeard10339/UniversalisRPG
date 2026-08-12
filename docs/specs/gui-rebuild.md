@@ -61,8 +61,10 @@ Proof:
   log and the action sheet. Map draws the discovered locations where they actually are — each at
   its own published position, with the roads between them — and acknowledges a newly discovered one.
   It pans under a finger and cannot be panned away from what it is drawing. It shows one z-plane at
-  a time, plus whatever sits off that plane and is adjacent to the player, and it cycles between the
-  planes. Character renders the published inventory, equipment, skills and stats.
+  a time, plus whatever sits off that plane and is either adjacent to the player or a place the view
+  offers a walk to, and it cycles between the planes. An offer the action sheet withdraws because its
+  destination is elsewhere is one the map draws, or the offer is reachable from neither.
+  Character renders the published inventory, equipment, skills and stats.
   Edit carries the command console: a field that hands any line to the shared table, which is what
   makes c1's second sentence reachable from the GUI at all, and its output lands in Home's log like
   every other engine line. Settings is the frame with no body —
