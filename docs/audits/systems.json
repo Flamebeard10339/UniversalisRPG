@@ -358,6 +358,7 @@
         "src/ui/StatusBanner.tsx",
         "src/ui/TabBar.tsx",
         "src/ui/VStack.tsx",
+        "src/ui/bundle.test.ts",
         "src/ui/choices.test.ts",
         "src/ui/choices.ts",
         "src/ui/consoleLine.test.ts",

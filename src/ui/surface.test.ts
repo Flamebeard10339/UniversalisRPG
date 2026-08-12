@@ -196,6 +196,20 @@ describe('the rules the driver is held to', () => {
     expect(controls(written)).toEqual(['<button onClick={() => (a > b ? x : y)} className="h-[12px]"']);
   });
 
+  // c9's last sentence, as the structure that makes it true rather than as the
+  // bundle it makes true — bundle.test.ts builds and reads that. This one names
+  // the file: the harness is reached by an import inside a branch the DEV
+  // constant folds away, so no module may bring it in as a value at the top.
+  it('reaches the harness only from a branch a production build folds away', () => {
+    const reaching = SOURCES.filter((source) => !source.file.endsWith('/testHarness.ts') && source.text.includes('testHarness'));
+
+    expect(reaching.map((source) => source.file)).toContain('src/ui/driver.ts');
+    for (const source of reaching) {
+      expect(source.text, `${source.file} names the harness with no DEV constant to fold it away`).toContain('import.meta.env.DEV');
+      expect(source.text, `${source.file} brings the harness in as a value at the top`).not.toMatch(/import\s+(?!type\b)[^;]*from\s*['"`][^'"`]*testHarness['"`]/);
+    }
+  });
+
   it('asks nothing of a network or a filesystem', () => {
     for (const source of SOURCES) {
       expect(source.text, source.file).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|public\/content/);
