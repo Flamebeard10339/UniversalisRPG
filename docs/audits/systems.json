@@ -18,6 +18,8 @@
       "paths": [
         "content/tutorial-island.dsl",
         "src/content/action.ts",
+        "src/content/clusterJewel.test.ts",
+        "src/content/clusterJewel.ts",
         "src/content/dialogue.ts",
         "src/content/dropTable.test.ts",
         "src/content/dropTable.ts",
@@ -29,6 +31,7 @@
         "src/content/hex.test.ts",
         "src/content/hex.ts",
         "src/content/info.ts",
+        "src/content/item.test.ts",
         "src/content/item.ts",
         "src/content/location.ts",
         "src/content/merge.test.ts",
@@ -36,6 +39,8 @@
         "src/content/module.ts",
         "src/content/namespace.ts",
         "src/content/parse.test.ts",
+        "src/content/passive.test.ts",
+        "src/content/passive.ts",
         "src/content/recipe.ts",
         "src/content/referenceSites.ts",
         "src/content/references.test.ts",
@@ -146,6 +151,14 @@
             "src/content/shapes.ts"
           ],
           "note": "produced by cluster-shape-catalogue: axial hex direction vocabulary and the closed catalogue of cluster-jewel shapes (point, spindle, ring, wheel, double-ring)"
+        },
+        {
+          "name": "cluster jewel authoring",
+          "paths": [
+            "src/content/passive.ts",
+            "src/content/clusterJewel.ts"
+          ],
+          "note": "produced by cluster-jewel-sections: the # passive and # cluster-jewel section kinds, their load-time validation, and the item fields that reach a cluster jewel from a droppable item"
         }
       ]
     },

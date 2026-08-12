@@ -9,7 +9,7 @@ import { isFieldEdits, listMembers } from '../grammar/section';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
-export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'action' | 'event' | 'faction' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node';
+export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'action' | 'event' | 'faction' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node' | 'passive' | 'cluster-jewel';
 
 // Returns what the id should become. Resolution rewrites it into a namespaced
 // key; validation hands it back and throws if it names nothing.
@@ -289,6 +289,19 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       visitTags(section.tags, where, visit);
       actions(section.actions, where, visit);
       hooks(section, where, visit);
+      put(section, 'clusterJewel', 'cluster-jewel', `${where} cluster-jewel:`, visit);
+      if (section.clusterEffect) put(section.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
+      return;
+    case 'passive':
+      visitTags(section.tags, where, visit);
+      return;
+    case 'cluster-jewel':
+      // Positions are authored as `<position> <passive>` pairs, the same
+      // list-of-pairs shape `# entity stats:` walks above — the key here is a
+      // position number rather than a stat id, so only the value resolves.
+      for (const assignment of listMembers<[number, string]>(section.positions)) {
+        assignment[1] = visit('passive', assignment[1], `${where} passives:`);
+      }
       return;
     case 'location':
       for (const entry of listMembers<Population>(section.entities)) put(entry, 'entity', 'entity', `${where} entities:`, visit);

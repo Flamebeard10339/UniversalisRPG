@@ -4,7 +4,7 @@ import { DslError } from '../grammar/parser';
 // are deliberately absent: a station is a contract between modules that never
 // met, and a tuning variable is a knob the engine reads by name, so `oven` and
 // `min-damage` must mean the same thing in every module that says them.
-export const NAMESPACED_KINDS: readonly string[] = ['stat', 'skill', 'item', 'entity', 'action', 'event', 'faction', 'location', 'recipe', 'resource', 'droptable', 'dialogue', 'test', 'save', 'flag', 'node'];
+export const NAMESPACED_KINDS: readonly string[] = ['stat', 'skill', 'item', 'entity', 'action', 'event', 'faction', 'location', 'recipe', 'resource', 'droptable', 'dialogue', 'test', 'save', 'flag', 'node', 'passive', 'cluster-jewel'];
 
 // A namespace is a prefix of segments; a module without one contributes none,
 // which is the empty case of the same rule rather than an exception to it.
