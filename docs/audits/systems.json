@@ -304,6 +304,13 @@
             "src/runtime/itemInstance.ts"
           ],
           "note": "produced by cluster-plane-runtime: a stacked item leaves its stack and becomes an instanced-objects payload at the first thing recorded about it, and every verb that grows one routes through growItem"
+        },
+        {
+          "name": "instanced item equipping",
+          "paths": [
+            "src/runtime/equipment.ts"
+          ],
+          "note": "produced by a-grown-item-cannot-be-worn-equipped-holds-item-ids-and-stat: an equipped slot holds either spelling, an item id or a live instance id, and equip() reads the slot off the item behind either"
         }
       ]
     },
