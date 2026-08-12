@@ -330,7 +330,7 @@ function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, te
   }
 }
 
-const UNAVAILABLE = 'local authoring is unavailable.';
+export const UNAVAILABLE = 'local authoring is unavailable.';
 
 function runSectionEdit(ctx: CommandContext, section: SectionArg): CommandResult {
   const authoring = ctx.authoring;
@@ -753,6 +753,47 @@ export function runLine(ctx: CommandContext, line: string): CommandResult {
 }
 
 // --- the live clock -------------------------------------------------------
+
+// How often a driver is expected to hand a run its elapsed milliseconds. Each
+// tick rounds its own span to whole milliseconds, so two drivers ticking at
+// different cadences reach different states over the same wall-clock span;
+// sharing the figure is what makes them the same run.
+export const LIVE_TICK_MS = 100;
+
+// Elapsed real milliseconds, handed to whoever is advancing a run. Starting a
+// ticker hands back the way to stop it, so nothing else has to hold a timer id.
+export type Ticker = (tick: (elapsedMs: number) => void) => () => void;
+
+export interface Clock {
+  now(): number;
+  every(ms: number, fire: () => void): () => void;
+}
+
+export const wallClock: Clock = {
+  now: () => Date.now(),
+  every: (ms, fire) => {
+    const timer = setInterval(fire, ms);
+    return () => clearInterval(timer);
+  },
+};
+
+// Elapsed is the distance between two readings of the clock, never the
+// interval that was asked for. A backgrounded tab fires late and a busy
+// terminal fires later still, and a run paid the nominal figure falls behind
+// the wall clock. Both drivers read this rather than each keeping a lastTick
+// of its own, which is what makes "the same elapsed span" one rule and not two
+// that happen to agree.
+export function createTicker(clock: Clock = wallClock, everyMs: number = LIVE_TICK_MS): Ticker {
+  return (tick) => {
+    let last = clock.now();
+    return clock.every(everyMs, () => {
+      const now = clock.now();
+      const elapsedMs = now - last;
+      last = now;
+      tick(elapsedMs);
+    });
+  };
+}
 
 export interface LivePool {
   title: string;

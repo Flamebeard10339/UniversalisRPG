@@ -8,14 +8,17 @@ import { SAVE_VERSION } from './save';
 import { runTest, serializeSession, sessionStatus, startSession, view, type PlaySession } from './session';
 import {
   COMMANDS,
+  createTicker,
   findCommand,
   helpEntries,
   isChoiceLine,
+  LIVE_TICK_MS,
   newContext,
   parseLine,
   runCommand,
   runLine,
   type AuthoringContext,
+  type Clock,
   type CommandContext,
   type CommandOutput,
   type CommandResult,
@@ -40,7 +43,7 @@ open:
   give: 1 gold
 
 # save empty
-{"version":${SAVE_VERSION}}
+{"version":${SAVE_VERSION},"flags":{"camp.discovered":true}}
 
 # test always-passes
 assert: time >= 0
@@ -947,7 +950,7 @@ describe('the recorder: /create-test and /create-valid-test', () => {
 
     expect(messages(result)[0].text).toBe(`Created test 'foo' (2 steps).`);
     expect(authoredBlocks(result)).toEqual([
-      ['# save foo-start', `{"version":${SAVE_VERSION}}`],
+      ['# save foo-start', `{"version":${SAVE_VERSION},"flags":{"camp.discovered":true,"ruins.discovered":true}}`],
       ['# test foo', 'load: foo-start', 'travel: ruins', 'wait: 1'],
     ]);
     expect(session.registry.tests.has('foo')).toBe(true);
@@ -1167,5 +1170,59 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     const { ctx } = fixture(AUTHORING_MODULE);
     expect(errors(runLine(ctx, '/dsl item gem'))).toEqual(['local authoring is unavailable.']);
     expect(errors(runLine(ctx, '/local'))).toEqual(['local authoring is unavailable.']);
+  });
+});
+
+// A clock a test moves by hand, and a timer a test fires by hand: the two are
+// separate because the whole question here is what happens when they disagree.
+function fakeClock(): Clock & { at: number; cadence: number[]; stops: number; fire(): void } {
+  const fires: Array<() => void> = [];
+  return {
+    at: 1_000,
+    cadence: [],
+    stops: 0,
+    now() {
+      return this.at;
+    },
+    every(ms, fire) {
+      this.cadence.push(ms);
+      fires.push(fire);
+      return () => void (this.stops += 1);
+    },
+    fire() {
+      for (const fire of fires) fire();
+    },
+  };
+}
+
+describe('the ticker a live run is advanced by', () => {
+  it('hands over the time that actually passed, not the interval it asked for', () => {
+    const clock = fakeClock();
+    const spans: number[] = [];
+    createTicker(clock, 200)((elapsedMs) => spans.push(elapsedMs));
+
+    clock.at = 1_200;
+    clock.fire();
+    // The tab was backgrounded: one fire, four seconds of wall clock behind it.
+    clock.at = 5_200;
+    clock.fire();
+
+    expect(spans).toEqual([200, 4000]);
+  });
+
+  it('ticks at the cadence the command surface publishes, so both drivers round the same way', () => {
+    const clock = fakeClock();
+    createTicker(clock)(() => undefined);
+
+    expect(clock.cadence).toEqual([LIVE_TICK_MS]);
+  });
+
+  it('stops the timer it started when the run is over', () => {
+    const clock = fakeClock();
+    const stop = createTicker(clock)(() => undefined);
+
+    stop();
+
+    expect(clock.stops).toBe(1);
   });
 });

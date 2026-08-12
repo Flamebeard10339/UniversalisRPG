@@ -1,14 +1,17 @@
 import { Action } from '../content/entity';
 import { DISCOVERED, Location } from '../content/location';
 import {
-  actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armTravel, craft, describeCondition, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, useTravel } from './runtime';
+  actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
+import { endJourney } from './state';
 import { parseOwnerRef } from './actions';
+import { spreadDiscovery } from './effects';
+import { reachable, type Journey } from './journey';
 import { armedAction, hasPool, playerCadence } from './encounter';
 import { declaredId } from '../content/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
-import { answerModal, dialogueFrame, Modal, openModal, publishModal, topModal } from './modals';
+import { answerModal, dialogueFrame, Modal, openModal, pruneModals, publishModal, topModal } from './modals';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
 import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
@@ -23,6 +26,15 @@ export interface PlayChoice {
   kind: PlayChoiceKind;
   label: string;
   detail?: string;
+  // Where taking it puts the player, when taking it does nothing else. A map
+  // needs to know which of the offers on the table is the way to a place, and
+  // an entity that aliases a road -- a staircase, a door -- publishes an action
+  // and not a travel, so the id cannot be read for it.
+  leadsTo?: string;
+  // How many roads away the place it leads to is, on a travel. One is next
+  // door; more is a walk the engine will queue the legs of. A driver reads it
+  // to tell what belongs to the room from what belongs to the map.
+  legs?: number;
 }
 
 export interface PlayAction {
@@ -51,7 +63,11 @@ export interface PlayStatus {
   xp: Record<string, number>;
   stats: Record<string, number>;
   flags: Record<string, boolean | number>;
-  discovered: string[];
+  discovered: Array<{ id: string; title: string; x: number; y: number; z: number; adjacent: Array<{ to: string; open: boolean }> }>;
+  // The walk under way: where it is going and which places it has still to
+  // cross, in the order it will cross them. A driver lights the route up off
+  // this rather than working the route out for itself.
+  journey: Journey | null;
   player: { name: string; race: string };
   action: PlayAction | null;
 }
@@ -108,13 +124,18 @@ function availableActions(owner: Actable, state: GameState): Action[] {
   return (owner.actions ?? []).filter((action) => actionAvailable(action, state));
 }
 
-// Pure movement — results only relocate — so it aliases a travel edge.
-function isFreeTravelAction(action: Action, target: string): boolean {
-  const relocatesToTarget = action.results.some((r) => r.kind === 'relocate' && r.location === target);
-  if (!relocatesToTarget) return false;
+// Where pure movement — results only relocate — would put the player, which is
+// what makes an action an alias for a road rather than a thing done in a room.
+function movesTo(action: Action): string | undefined {
   const onlyMovement = action.results.every((r) => r.kind === 'relocate' || r.kind === 'say');
   const noBranches = !action.onSuccess && !action.onFailure && !action.onUnfinished;
-  return onlyMovement && noBranches;
+  if (!onlyMovement || !noBranches) return undefined;
+  const relocate = action.results.find((r) => r.kind === 'relocate');
+  return relocate?.kind === 'relocate' ? relocate.location : undefined;
+}
+
+function isFreeTravelAction(action: Action, target: string): boolean {
+  return movesTo(action) === target;
 }
 
 function entityAliasesTravelTo(location: Location, target: string, registry: Registry, state: GameState): boolean {
@@ -169,7 +190,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
       choices.push({ id: `talk:${entityId}`, kind: 'talk', label: `Talk to ${entity.title}` });
     }
     for (const action of availableActions(entity, state)) {
-      choices.push({ id: `use:entity.${entityId}.${action.label}`, kind: 'action', label: action.label, detail: entity.title });
+      choices.push({ id: `use:entity.${entityId}.${action.label}`, kind: 'action', label: action.label, detail: entity.title, leadsTo: movesTo(action) });
     }
   }
 
@@ -210,7 +231,27 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     // Both are the same move, so showing the edge as well duplicates the option.
     if (entityAliasesTravelTo(location, edge.target, registry, state)) continue;
     const target = registry.locations.get(edge.target);
-    choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: `Travel to ${target?.title ?? edge.target}` });
+    choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: `Travel to ${target?.title ?? edge.target}`, leadsTo: edge.target, legs: 1 });
+  }
+
+  return choices;
+}
+
+// Everywhere else the roads reach, offered on the same terms as next door: the
+// engine finds the route and walks the legs, so setting off for the far side of
+// the island is one choice and not a driver's queue of them. Listed after the
+// room's own offers, because what is in reach of a hand comes before what is a
+// walk away.
+function journeyChoices(session: PlaySession, local: PlayChoice[]): PlayChoice[] {
+  const { registry } = session;
+  const state = stateOf(session);
+  const already = new Set(local.flatMap((choice) => (choice.leadsTo === undefined ? [] : [choice.leadsTo])));
+  const choices: PlayChoice[] = [];
+
+  for (const [target, legs] of reachable(state.location, registry, state)) {
+    if (already.has(target)) continue;
+    const place = registry.locations.get(target);
+    choices.push({ id: `travel:${target}`, kind: 'travel', label: `Travel to ${place?.title ?? target}`, leadsTo: target, legs });
   }
 
   return choices;
@@ -220,7 +261,8 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 // is answered; the modal publishes its own options through `view`.
 function computeChoices(session: PlaySession): PlayChoice[] {
   if (stateOf(session).modals.length > 0) return [];
-  return locationChoices(session);
+  const local = locationChoices(session);
+  return [...local, ...journeyChoices(session, local)];
 }
 
 // The single converter, so there is no second switch over choice kinds.
@@ -254,6 +296,7 @@ export function startSession(registry: Registry): PlaySession {
   // Said here rather than at the first `view()`, where it surfaced as
   // "unknown location: " and named nothing an author could act on.
   if (!state.location) throw new RuntimeError('no # location is marked starting, so a new game has nowhere to begin');
+  spreadDiscovery(state, registry);
   return sessionOver(registry, state);
 }
 
@@ -267,6 +310,9 @@ export function adoptRegistry(session: PlaySession, registry: Registry): void {
   for (const warning of warnings) state.log.push(warning.message);
   internals.logCursor = Math.max(0, state.log.length - warnings.length);
   initResources(state, registry);
+  // The roads may have moved: an edge the old registry did not have is a place
+  // the player can now walk to.
+  spreadDiscovery(state, registry);
 }
 
 export function serializeSession(session: PlaySession): string {
@@ -322,10 +368,32 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     xp: { ...state.xp },
     stats: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, statValue(stat.id, state, registry)])),
     flags: { ...state.flags },
-    discovered: [...registry.locations.values()].filter((each) => truthy(state.flags[`${each.id}.${DISCOVERED}`])).map((each) => each.id),
+    discovered: publishDiscovered(state, registry),
+    journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,
     player: { ...state.player },
     action: publishAction(state, registry),
   };
+}
+
+// The map, as far as the player has found it. Adjacency is kept to places that
+// are themselves discovered, so the shape of what has not been found yet is not
+// readable off the edges leading to it. A condition on an edge gates travelling
+// it, not knowing the road is there, so a shut way is still drawn.
+function publishDiscovered(state: GameState, registry: Registry): PlayStatus['discovered'] {
+  const found = [...registry.locations.values()].filter((each) => truthy(state.flags[`${each.id}.${DISCOVERED}`]));
+  const known = new Set(found.map((each) => each.id));
+  return found.map((each) => ({
+    id: each.id,
+    title: each.title,
+    x: each.x,
+    y: each.y,
+    z: each.z,
+    // A road the player cannot walk today is still a road they know about, so a
+    // shut way is published rather than withheld and says that it is shut.
+    adjacent: each.adjacent
+      .filter((edge) => known.has(edge.target))
+      .map((edge) => ({ to: edge.target, open: !edge.condition || evaluateCondition(edge.condition, state) })),
+  }));
 }
 
 function publishResources(state: GameState, registry: Registry): PlayStatus['resources'] {
@@ -373,7 +441,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'use-on':
       return armFightAction(directive.action, directive.target, registry, state);
     case 'travel':
-      return state.location ? armTravel(state.location, directive.location, registry, state) : null;
+      return state.location ? armJourney(directive.location, registry, state) : null;
     default:
       return null;
   }
@@ -419,6 +487,7 @@ export function cancelAction(session: PlaySession): PlayView {
 // answering can still answer it. One pair or the whole form, either way.
 export function submitModal(session: PlaySession, answers: Record<string, string>): PlayView {
   answerModal(stateOf(session), session.registry, answers);
+  pruneModals(stateOf(session), session.registry);
   return view(session);
 }
 
@@ -435,9 +504,19 @@ function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'use-on' | 'trave
   }
 }
 
+// A move of the world can leave a frame standing that no answer takes down, so
+// every entry point that moves it settles the stack before a driver reads it.
+// This is that seam and `submitModal` is the other; nothing else here mutates
+// with a modal up, because a modal withdraws the choices the rest work from.
+export function applyDirective(session: PlaySession, directive: Directive): { failure?: string } {
+  const outcome = performDirective(session, directive);
+  pruneModals(stateOf(session), session.registry);
+  return outcome;
+}
+
 // `run:` is excluded: it recurses into another test, which only runTest can do
 // with its cyclic-run detection.
-export function applyDirective(session: PlaySession, directive: Directive): { failure?: string } {
+function performDirective(session: PlaySession, directive: Directive): { failure?: string } {
   const { registry } = session;
   const state = stateOf(session);
 
@@ -465,10 +544,10 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
     case 'use-on':
       useFight(directive.action, directive.target, registry, state);
       return {};
-    case 'travel':
-      if (!registry.locations.has(directive.location)) throw new RuntimeError(`unknown location: ${directive.location}`);
-      useTravel(state.location, directive.location, registry, state);
-      return {};
+    case 'travel': {
+      const refused = walkTo(directive.location, registry, state);
+      return refused ? { failure: refused } : {};
+    }
     case 'craft':
       craft(directive.recipe, registry, state);
       return {};
@@ -489,12 +568,16 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
       const saved = registry.saves.get(directive.save);
       if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
       const warnings = loadSave(state, saved, registry);
+      // A save replaces the location and every flag at once, which is both of
+      // discovery's inputs arriving without passing through a result.
+      spreadDiscovery(state, registry);
       own(session).logCursor = Math.max(0, state.log.length - warnings.length);
       return {};
     }
     case 'cancel':
-      // View-free because a test's state may have no resolvable location.
-      endAction(state);
+      // View-free because a test's state may have no resolvable location. The
+      // walk goes with the leg: stopping is stopping, not pausing.
+      endJourney(state);
       return {};
     case 'wait':
       resolve(state, registry, state.time + secondsToMs(directive.seconds));

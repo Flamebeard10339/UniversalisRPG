@@ -10,6 +10,7 @@ import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './li
 import { serializeSession, startSession, view, type PlayChoice, type PlayStatus, type PlayView } from '../src/runtime/session';
 import {
   askedOption,
+  createTicker,
   newContext,
   runLine,
   type AuthoringContext,
@@ -21,6 +22,7 @@ import {
   type LiveRun,
   type MessageTone,
   type Recorder,
+  type Ticker,
 } from '../src/runtime/command';
 import { type Modal } from '../src/runtime/runtime';
 
@@ -191,7 +193,14 @@ export function formatLive(progress: LiveProgress): string {
   return `${progress.label}... ${progressBar(progress.progress)}${pools || counting}  ${clock}`;
 }
 
-const LIVE_TICK_MS = 200;
+// What one tick puts on the terminal: whatever the world said as it passed, on
+// lines of its own, and the bar under them. A say produced by a run rides on
+// the view its tick hands back and is drained from every view after it, so a
+// driver that does not print it here never prints it at all — run.end reads a
+// view with nothing left on it.
+export function formatTick(progress: LiveProgress): string[] {
+  return [...progress.view.said, formatLive(progress)];
+}
 
 type LineResult = IteratorResult<string>;
 
@@ -199,14 +208,46 @@ function print(lines: string[]): void {
   if (lines.length > 0) console.log(lines.join('\n'));
 }
 
-// Ends when the action completes or the player cancels; only reached on a TTY.
+// The decision half of the live loop, with the terminal kept out of it: tick
+// the run, write what the tick said, and end exactly once however it ends. The
+// timer and the keypress cannot both arrive first, and `settled` is the whole
+// of what stops the second one from ending a run that is already over.
+export function driveRun(
+  run: LiveRun,
+  write: (text: string) => void,
+  ended: (result: CommandResult) => void,
+  ticker: Ticker = createTicker(),
+): (cancelled: boolean) => void {
+  let settled = false;
+  let stopTicking: (() => void) | null = null;
+
+  const stop = (cancelled: boolean): void => {
+    if (settled) return;
+    settled = true;
+    stopTicking?.();
+    ended(run.end(cancelled));
+  };
+
+  stopTicking = ticker((elapsedMs) => {
+    const progress = run.tick(elapsedMs);
+    // The said lines scroll away above the bar; the carriage return clears the
+    // last line written, which is the bar, so it redraws where it was.
+    write(`\r\x1b[K${formatTick(progress).join('\n')}`);
+    if (!progress.active) stop(false);
+  });
+
+  return stop;
+}
+
+// The terminal half. Ends when the action completes or the player cancels;
+// only reached on a TTY.
 //
 // ANY keypress cancels, which needs three things in order: rl.pause() so readline
-// stops fighting the \r-redrawn bar, setRawMode(true) so keys arrive unbuffered,
+// stops fighting the redrawn bar, setRawMode(true) so keys arrive unbuffered,
 // and input.resume() — the non-obvious one, since attaching a `data` listener only
 // auto-flows a stream for the FIRST listener and readline already installed one.
 // Ctrl-C raises no SIGINT in raw mode, so it is honoured explicitly below.
-function runLiveAction(run: LiveRun, rl: ReturnType<typeof createInterface>): Promise<void> {
+function runLiveAction(run: LiveRun, armed: readonly string[], rl: ReturnType<typeof createInterface>): Promise<void> {
   return new Promise<void>((resolvePromise) => {
     const input = process.stdin;
     const isTTY = Boolean(input.isTTY);
@@ -214,24 +255,20 @@ function runLiveAction(run: LiveRun, rl: ReturnType<typeof createInterface>): Pr
     rl.pause();
     if (isTTY) input.setRawMode(true);
     input.resume();
+    // Arming reports no output of its own; what the world said as the action
+    // began rides on the view it handed back.
+    print([...armed]);
     process.stdout.write('(press any key to stop)\n');
 
-    let lastTick = Date.now();
-    let settled = false;
-    let cancelled = false;
-
-    const finish = (): void => {
-      if (settled) return;
-      settled = true;
-      clearInterval(timer);
+    const stop = driveRun(run, (text) => void process.stdout.write(text), (result) => {
       input.off('data', onData);
       input.off('end', onEnd);
       if (isTTY) input.setRawMode(wasRaw);
       process.stdout.write('\n');
-      print(formatResult(run.end(cancelled)));
+      print(formatResult(result));
       rl.resume();
       resolvePromise();
-    };
+    });
 
     const onData = (chunk: Buffer): void => {
       if (isTTY && chunk.length === 1 && chunk[0] === 0x03) {
@@ -240,25 +277,12 @@ function runLiveAction(run: LiveRun, rl: ReturnType<typeof createInterface>): Pr
         rl.close();
         process.exit(130);
       }
-      cancelled = true;
-      finish();
+      stop(true);
     };
-    const onEnd = (): void => {
-      cancelled = true;
-      finish();
-    };
+    const onEnd = (): void => void stop(true);
 
     input.on('data', onData);
     input.on('end', onEnd);
-
-    const timer = setInterval(() => {
-      const now = Date.now();
-      const elapsedMs = now - lastTick;
-      lastTick = now;
-      const progress = run.tick(elapsedMs);
-      process.stdout.write(`\r\x1b[K${formatLive(progress)}`);
-      if (!progress.active) finish();
-    }, LIVE_TICK_MS);
   });
 }
 
@@ -371,6 +395,31 @@ export function loadModportalSources(dir: string): ModportalLoadResult {
   return { sources, warnings };
 }
 
+export interface Repl {
+  context: CommandContext;
+  // Written to stderr by main, because a disabled module is not part of the
+  // game being played.
+  diagnostics: string[];
+  opening: string[];
+}
+
+// Everything between having the sources and taking the first line: load the
+// universe, start a session, take the opening view, and build the one context
+// every line afterwards goes through. Lifted out of main so that the drift
+// proof drives the REPL rather than a second copy of it — a copy is what made
+// the previous cross-driver comparison measure only one of the two drivers.
+export function openRepl(sources: readonly ModuleSource[], options: { authoring?: AuthoringContext; driving?: boolean } = {}): Repl {
+  const loaded = loadUniverseWithDiagnostics(sources);
+  const session = startSession(loaded.registry);
+  const recorder: Recorder = { history: [], startSave: serializeSession(session) };
+  const opening = view(session);
+  return {
+    context: newContext(session, opening, { recorder, authoring: options.authoring, driving: options.driving }),
+    diagnostics: loaded.diagnostics.map((each) => `Disabled module: ${formatModuleDiagnostic(each)}`),
+    opening: formatView(opening),
+  };
+}
+
 async function main(): Promise<void> {
   const args = parseCliArgs(process.argv.slice(2));
   // Nobody to press a key on a non-TTY run, and a repeating action would tick
@@ -386,10 +435,6 @@ async function main(): Promise<void> {
   const localText = existsSync(localPath) ? readFileSync(localPath, 'utf8') : initialLocalChangesModule(dependencies);
   const localSource: ModuleSource = { name: sourceName(args.localFile), text: localText };
   const sources = existsSync(localPath) ? [...baseSources, localSource] : baseSources;
-  const loaded = loadUniverseWithDiagnostics(sources);
-  for (const each of loaded.diagnostics) console.error(`Disabled module: ${formatModuleDiagnostic(each)}`);
-  const session = startSession(loaded.registry);
-  const recorder: Recorder = { history: [], startSave: serializeSession(session) };
   const authoring: AuthoringContext = {
     baseSources,
     dependencies,
@@ -397,9 +442,9 @@ async function main(): Promise<void> {
     writeLocalChanges: (text) => writeLocalChanges(args.localFile, text),
   };
 
-  let opening: PlayView;
+  let repl: Repl;
   try {
-    opening = view(session);
+    repl = openRepl(sources, { authoring, driving: liveMode });
   } catch (err) {
     if (err instanceof RuntimeError) {
       console.error(`Error: ${err.message}`);
@@ -407,8 +452,9 @@ async function main(): Promise<void> {
     }
     throw err;
   }
-  const ctx: CommandContext = newContext(session, opening, { recorder, authoring, driving: liveMode });
-  console.log(formatView(opening).join('\n'));
+  for (const each of repl.diagnostics) console.error(each);
+  const ctx = repl.context;
+  console.log(repl.opening.join('\n'));
   console.log('\nType /help for commands (/state and /inventory show your progress).');
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -426,7 +472,7 @@ async function main(): Promise<void> {
 
       const result = runLine(ctx, line);
       print(formatResult(result));
-      if (result.live) await runLiveAction(result.live, rl);
+      if (result.live) await runLiveAction(result.live, result.view?.said ?? [], rl);
 
       if (result.quit) break;
       process.stdout.write('> ');

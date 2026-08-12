@@ -160,6 +160,8 @@
         "src/runtime/instances.test.ts",
         "src/runtime/instances.ts",
         "src/runtime/integration.test.ts",
+        "src/runtime/journey.test.ts",
+        "src/runtime/journey.ts",
         "src/runtime/location.test.ts",
         "src/runtime/modals.test.ts",
         "src/runtime/modals.ts",
@@ -252,6 +254,13 @@
             "src/runtime/command.ts"
           ],
           "note": "produced by the-command-set-lives-below-the-ui-layer"
+        },
+        {
+          "name": "multi-leg travel",
+          "paths": [
+            "src/runtime/journey.ts"
+          ],
+          "note": "produced by travel-reaches-anywhere-the-roads-do"
         }
       ]
     },
@@ -331,28 +340,52 @@
         "postcss.config.js",
         "public/changelog.txt",
         "public/favicon.svg",
+        "scripts/drift.test.ts",
         "src/index.css",
         "src/main.tsx",
         "src/ui/App.tsx",
+        "src/ui/Console.tsx",
         "src/ui/FloatingText.tsx",
         "src/ui/Home.tsx",
+        "src/ui/Ledger.tsx",
+        "src/ui/LiveSheet.tsx",
+        "src/ui/LocationBanner.tsx",
+        "src/ui/MapPane.tsx",
+        "src/ui/Meter.tsx",
         "src/ui/ModalSheet.tsx",
         "src/ui/Pager.tsx",
         "src/ui/Splitter.tsx",
+        "src/ui/StatusBanner.tsx",
         "src/ui/TabBar.tsx",
+        "src/ui/VStack.tsx",
+        "src/ui/agentSurfaces.test.ts",
+        "src/ui/agentSurfaces.ts",
+        "src/ui/bundle.test.ts",
         "src/ui/choices.test.ts",
         "src/ui/choices.ts",
+        "src/ui/consoleLine.test.ts",
+        "src/ui/consoleLine.ts",
+        "src/ui/discovery.test.ts",
+        "src/ui/discovery.ts",
         "src/ui/driver.test.ts",
         "src/ui/driver.ts",
         "src/ui/format.test.ts",
         "src/ui/format.ts",
         "src/ui/gesture.test.ts",
         "src/ui/gesture.ts",
+        "src/ui/labels.ts",
+        "src/ui/nav.test.ts",
+        "src/ui/nav.ts",
+        "src/ui/phone.test.tsx",
         "src/ui/render.test.tsx",
+        "src/ui/sheet.test.ts",
+        "src/ui/sheet.ts",
         "src/ui/shippedContent.test.ts",
         "src/ui/shippedContent.ts",
         "src/ui/surface.test.ts",
-        "src/ui/tabs.ts",
+        "src/ui/testHarness.test.ts",
+        "src/ui/testHarness.ts",
+        "src/ui/testSurface.ts",
         "src/ui/transcript.test.ts",
         "src/ui/transcript.ts",
         "src/ui/transient.test.ts",
@@ -392,9 +425,7 @@
             "src/main.tsx",
             "src/ui/App.tsx",
             "src/ui/Home.tsx",
-            "src/ui/TabBar.tsx",
             "src/ui/ModalSheet.tsx",
-            "src/ui/tabs.ts",
             "src/ui/transcript.ts",
             "src/ui/format.ts",
             "src/ui/gesture.ts",
@@ -402,7 +433,54 @@
             "src/ui/Splitter.tsx",
             "src/ui/choices.ts"
           ],
-          "note": "produced by the-gui-shell-and-the-play-surface; the chat-log surface, action sheet and five-tab nav the-map-and-character-tabs and the four Settings/Edit records land in"
+          "note": "produced by the-gui-shell-and-the-play-surface; the chat-log surface and the action sheet. The nav it shipped with was a five-tab one and is now a separate concept, because the-nav-becomes-three-vertical-layers-around-home made it a thing with its own model rather than a strip along the bottom of this one"
+        },
+        {
+          "name": "the map and the character sheet",
+          "paths": [
+            "src/ui/MapPane.tsx",
+            "src/ui/discovery.ts",
+            "src/ui/Ledger.tsx",
+            "src/ui/sheet.ts"
+          ],
+          "note": "produced by the-map-and-character-tabs for gui-rebuild c7 and rebuilt by the-map-draws-the-world-where-it-is: the discovered places drawn where they are, one z-plane at a time with whatever is adjacent to the player off it, panned within its own bounds, tapped to set off; and the four published dictionaries as rows. Both read the play surface only. the-view-publishes-the-map-a-driver-draws put the titles and the adjacency on the view, and the-view-publishes-where-a-place-is-and-whether-its-roads-ar put the coordinates, the passability and leadsTo there"
+        },
+        {
+          "name": "the GUI's real-time clock",
+          "paths": [
+            "src/ui/LiveSheet.tsx"
+          ],
+          "note": "produced by the-gui-runs-in-real-time for gui-rebuild c5; the run the command surface armed, rendered as the player sees it. The ticker that feeds it elapsed milliseconds moved down to src/runtime/command.ts on pass 3, so both drivers read one cadence and one elapsed rule rather than two that happen to agree"
+        },
+        {
+          "name": "the two-dimensional nav",
+          "paths": [
+            "src/ui/nav.ts",
+            "src/ui/VStack.tsx",
+            "src/ui/TabBar.tsx",
+            "src/ui/LocationBanner.tsx",
+            "src/ui/StatusBanner.tsx"
+          ],
+          "note": "produced by the-nav-becomes-three-vertical-layers-around-home for gui-rebuild c6: three vertical layers joined by two shared banners that are also the handles, and a bottom bar carrying the current layer's pages. the-map-and-character-tabs fills the Map and Character bodies it leaves empty"
+        },
+        {
+          "name": "browser test harness",
+          "paths": [
+            "src/ui/agentSurfaces.ts",
+            "src/ui/driver.ts",
+            "src/ui/testHarness.ts",
+            "src/ui/testSurface.ts"
+          ],
+          "note": "produced by the-agent-harness-returns-to-the-gui and finished by gui-rebuild-clause-9; dev-only window.__test batching the session's own actions and, since c9, the actions each component registers for what only it holds — the nav's layer and page, the map's pan, zoom and floor — through the useTestSurface hook in src/ui/testSurface.ts, which takes the plain values a component already holds and builds the surface from them in src/ui/agentSurfaces.ts. Installed from the GUI session container behind the DEV constant a production build folds away, and both the registry and the builders are reached only by imports inside that branch, which is what keeps them out of the shipped bundle"
+        },
+        {
+          "name": "the GUI",
+          "paths": [
+            "src/ui/App.tsx",
+            "src/ui/driver.ts",
+            "src/main.tsx"
+          ],
+          "note": "produced by gui-rebuild: the play surface's second driver, its session container and its shell"
         }
       ]
     },

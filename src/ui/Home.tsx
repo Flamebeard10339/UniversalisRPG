@@ -3,8 +3,8 @@ import type { MessageTone } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { groupOffers } from './choices';
 import type { DriverSnapshot } from './driver';
-import { fillPercent, formatClock, tidy } from './format';
 import { SPLIT_DEFAULT, splitFrom } from './gesture';
+import { LiveSheet } from './LiveSheet';
 import { Splitter } from './Splitter';
 import type { LogEntry, LogKind } from './transcript';
 
@@ -29,20 +29,6 @@ function Line({ entry }: { entry: LogEntry }): JSX.Element {
   return <p className={`arrived -mx-1 whitespace-pre-wrap break-words rounded px-1 leading-relaxed ${KIND_CLASS[entry.kind]} ${tone}`}>{entry.text}</p>;
 }
 
-function Meter({ resource }: { resource: PlayView['resources'][number] }): JSX.Element {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="w-20 shrink-0 truncate text-xs text-text-subtle">{resource.title}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-panel">
-        <div className="h-full bg-accent transition-[width] duration-200" style={{ width: `${fillPercent(resource.current, resource.max)}%` }} />
-      </div>
-      <span className="w-16 shrink-0 text-right text-xs tabular-nums text-text-subtle">
-        {resource.display === 'full' ? `${tidy(resource.current)}/${tidy(resource.max)}` : ''}
-      </span>
-    </div>
-  );
-}
-
 // Grouped under whatever offers them, so an offer with an owner and one without
 // read as the same shape: a row of buttons under a name, or a row on its own.
 function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: (position: number) => void }): JSX.Element {
@@ -57,7 +43,7 @@ function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: 
                 key={offer.id}
                 type="button"
                 onClick={() => onChoose(offer.position)}
-                className="min-h-[44px] grow basis-40 rounded-xl border border-border bg-panel px-3 py-2 text-sm font-medium transition-transform duration-75 active:scale-[0.97] active:bg-accent-strong active:text-accent-text"
+                className="grow basis-40 rounded-xl border border-border bg-panel px-3 py-2 text-sm font-medium transition-transform duration-75 active:scale-[0.97] active:bg-accent-strong active:text-accent-text"
               >
                 {offer.label}
               </button>
@@ -71,8 +57,9 @@ function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: 
 
 const NEAR_BOTTOM_PX = 32;
 
-export function Home({ snapshot, onChoose }: { snapshot: DriverSnapshot; onChoose: (position: number) => void }): JSX.Element {
+export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapshot; onChoose: (position: number) => void; onCancel: () => void }): JSX.Element {
   const view = snapshot.view;
+  const live = snapshot.live;
   const surface = useRef<HTMLDivElement>(null);
   const column = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -90,27 +77,10 @@ export function Home({ snapshot, onChoose }: { snapshot: DriverSnapshot; onChoos
 
   return (
     <>
-      {view ? (
-        <header className="shrink-0 border-b border-border bg-surface px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-          <div className="flex items-baseline justify-between gap-3">
-            <h1 className="truncate text-base font-semibold">{view.location.title}</h1>
-            <span className="shrink-0 text-xs tabular-nums text-text-subtle">{formatClock(view.time)}</span>
-          </div>
-          {view.entities.length > 0 ? (
-            <p className="mt-0.5 truncate text-xs text-text-subtle">{view.entities.map((entity) => entity.title).join(' · ')}</p>
-          ) : null}
-          <div className="mt-2 flex flex-col gap-1.5">
-            {view.resources.map((resource) => (
-              <Meter key={resource.id} resource={resource} />
-            ))}
-          </div>
-        </header>
-      ) : null}
-
       <div ref={surface} className="flex min-h-0 flex-1 flex-col">
         <div
           ref={column}
-          className="min-h-0 overflow-y-auto px-4 py-3"
+          className="unbarred min-h-0 overflow-y-auto px-4 py-3"
           style={{ flexGrow: split, flexBasis: 0 }}
           onScroll={(event) => {
             const scroller = event.currentTarget;
@@ -124,7 +94,7 @@ export function Home({ snapshot, onChoose }: { snapshot: DriverSnapshot; onChoos
           </div>
         </div>
 
-        {view && view.choices.length > 0 ? (
+        {live || (view && view.choices.length > 0) ? (
           <>
             <Splitter
               onGrab={() => void (held.current = split)}
@@ -133,8 +103,18 @@ export function Home({ snapshot, onChoose }: { snapshot: DriverSnapshot; onChoos
             {/* The sheet keeps the height the player gave it and scrolls inside
                 it, so a room offering five actions and one offering two do not
                 move everything else on the way past. */}
-            <div className="min-h-0 overflow-y-auto border-t border-border bg-surface-raised" style={{ flexGrow: 1 - split, flexBasis: 0 }}>
-              <Sheet choices={view.choices} onChoose={onChoose} />
+            <div className="flex min-h-0 flex-col border-t border-border bg-surface-raised" style={{ flexGrow: 1 - split, flexBasis: 0 }}>
+              {/* A run sits above the choices rather than in place of them, and
+                  outside the scroller, so the control that stops it is reachable
+                  however far down the list the player has gone. */}
+              {live ? (
+                <div className="shrink-0 border-b border-border">
+                  <LiveSheet progress={live} onCancel={onCancel} />
+                </div>
+              ) : null}
+              <div className="unbarred min-h-0 flex-1 overflow-y-auto">
+                {view && view.choices.length > 0 ? <Sheet choices={view.choices} onChoose={onChoose} /> : null}
+              </div>
             </div>
           </>
         ) : null}

@@ -61,9 +61,9 @@ The player's progress survives closing the game, through a store three queued br
 - **Settings are a slot, not a second system.** The record named the missing settings store as one
   of two gaps to close or declare. Building one would be a second persistence mechanism beside the
   one this branch is already building; a slot-keyed text store is what a settings store is. The
-  autosave cadence is its first entry. What a full settings surface holds — `src/index.css` has
-  `data-theme` and `data-font-size` rules nothing sets, and `single-dev-mode` has a toggle — is
-  nobody's yet and does not have to be, now that it has somewhere to live.
+  autosave cadence is its first entry. What a full settings surface holds — `single-dev-mode` has a
+  toggle, and `gui-rebuild` ships Settings as an empty frame waiting for a body — is nobody's yet
+  and does not have to be, now that it has somewhere to live.
 - **The stamp is offline-progression's ruling, not this branch's choice.** That spec reasons it out:
   a stamp inside the payload would mean an imported save carries someone else's clock, and a bare
   "last active" stamp is wrong when autosave is set to never, because the span the resumed state

@@ -335,7 +335,7 @@ open:
   give: 1 gold
 
 # save empty
-{"version":${SAVE_VERSION}}
+{"version":${SAVE_VERSION},"flags":{"camp.discovered":true}}
 
 # test load-and-match
 load: empty

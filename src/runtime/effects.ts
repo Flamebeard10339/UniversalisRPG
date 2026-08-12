@@ -157,6 +157,30 @@ export function applyResults(segment: Segment, results: readonly ActionResult[],
 
 // `undefined` where nothing was applied: a wrapper only selects, and a `say:`
 // that is not the batch's lead does not speak.
+// A place is discovered two ways: it was scouted from somewhere else, which is
+// what the `discover:` result is for, or the player could walk to it. The second
+// is what makes a map fill in as it is played rather than only where an author
+// remembered to say so, and it is why a locked door withholds what is behind it:
+// the edge's condition is read now, so unlocking the door discovers the beach
+// without the player having to leave the room and come back.
+//
+// Recomputed rather than remembered, because its two inputs -- where the player
+// is and what the flags say -- are written in this file and nowhere else.
+export function spreadDiscovery(state: GameState, registry: Registry): void {
+  const here = registry.locations.get(state.location);
+  if (!here) return;
+  state.flags[`${here.id}.${DISCOVERED}`] = true;
+  for (const edge of here.adjacent) {
+    const key = `${edge.target}.${DISCOVERED}`;
+    // Already known, so there is nothing a condition could tell us: discovery
+    // only ever adds. This runs on every flag written anywhere, and evaluating
+    // a condition per edge per write costs more than everything above it.
+    if (state.flags[key]) continue;
+    if (edge.condition && !evaluateCondition(edge.condition, state)) continue;
+    state.flags[key] = true;
+  }
+}
+
 function applyOne(segment: Segment, result: ActionResult, actor: string, count: number, lead: boolean): number | undefined {
   const { state, registry } = segment;
   switch (result.kind) {
@@ -166,15 +190,18 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       return 0;
     case 'set':
       state.flags[result.variable] = true;
+      spreadDiscovery(state, registry);
       return 0;
     case 'unset':
       delete state.flags[result.variable];
+      spreadDiscovery(state, registry);
       return 0;
     case 'add': {
       const current = state.flags[result.variable];
       const base = typeof current === 'number' ? current : 0;
       const amount = result.amount * count;
       state.flags[result.variable] = base + amount;
+      spreadDiscovery(state, registry);
       return amount;
     }
     case 'give': {
@@ -195,6 +222,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     }
     case 'relocate':
       state.location = result.location;
+      spreadDiscovery(state, registry);
       return 0;
     case 'discover':
       state.flags[`${result.location}.${DISCOVERED}`] = true;

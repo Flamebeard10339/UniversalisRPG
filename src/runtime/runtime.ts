@@ -25,6 +25,7 @@ import {
   newSegment,
   Segment,
   settlePools,
+  spreadDiscovery,
 } from './effects';
 import {
   ActiveAction,
@@ -57,12 +58,13 @@ import { Item } from '../content/item';
 import { Recipe } from '../content/recipe';
 import { Registry } from '../content/registry';
 import { nextRandom } from './rng';
+import { roadsFrom, routeTo } from './journey';
 import { advanceTime, endAction, GameState, PLAYER, RuntimeError } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { TagClause } from '../grammar/tagClause';
 import { msUntilEmpty, secondsToMs, toMilliUnits } from './units';
 
-export { advanceTime, createGameState, endAction, PLAYER, RuntimeError } from './state';
+export { advanceTime, createGameState, endAction, endJourney, PLAYER, RuntimeError } from './state';
 export type { ActiveBuff, GameState } from './state';
 export { contestSpread, minDamage, travelSecondsPerUnit } from './tuning';
 export { describeCondition, evaluateCondition, renderSegments } from './conditions';
@@ -408,6 +410,7 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
 function applyDueBoundaries(state: GameState, registry: Registry, at: number): void {
   for (;;) {
     let changed = applyRespawns(state);
+    if (stepJourney(state, registry)) changed = true;
     if (fightLeftItsLocation(state, registry)) {
       endAction(state);
       changed = true;
@@ -664,13 +667,104 @@ export function armTravel(origin: string, dest: string, registry: Registry, stat
   return armAction('travel', travelPair(origin, dest), label, registry, state);
 }
 
+// Sets off for anywhere the roads reach, which is one leg when the place is
+// next door and a queue of them when it is not. The route is worked out once
+// and held, so a walk crosses the same places it was started for.
+// The one sentence a walk with no route says, so the arming path and the
+// resolving path say the same thing and a caller reading it back reads the
+// sentence the player was shown.
+function noWayTo(dest: string, registry: Registry): string {
+  return `There is no way from here to ${registry.locations.get(dest)?.title ?? dest}.`;
+}
+
+export function armJourney(dest: string, registry: Registry, state: GameState): ArmResult {
+  if (!registry.locations.has(dest)) throw new RuntimeError(`unknown location: ${dest}`);
+  const route = routeTo(state.location, dest, registry, state);
+  if (!route) {
+    state.log.push(noWayTo(dest, registry));
+    return { armed: false };
+  }
+  state.journey = { to: dest, legs: route };
+  const armed = armTravel(state.location, route[0], registry, state);
+  if (!armed.armed) state.journey = null;
+  return armed;
+}
+
+// The one place a walk goes on: a leg ended, so the next one is armed off the
+// route the walk was started with. Every way an action can end passes through
+// here, because everything that ends one runs inside resolve and resolve asks
+// this after every segment — which is why the walk does not have to be re-armed
+// at each of endAction's call sites.
+//
+// Nothing is armed while an action is under way, so a fight opening mid-walk
+// suspends it rather than racing it, and the walk resumes when the fight is
+// over. A player who does not want that cancels, which ends both.
+function stepJourney(state: GameState, registry: Registry): boolean {
+  const journey = state.journey;
+  if (!journey || state.activeAction) return false;
+
+  // Arriving is what crosses a leg, so the front of the queue is dropped by
+  // standing on it rather than by the leg reporting itself done.
+  const crossed = journey.legs[0] === state.location;
+  if (crossed) journey.legs.shift();
+  if (journey.legs.length === 0) {
+    state.journey = null;
+    return true;
+  }
+
+  // Stopped: the player is not where the last leg was going, or the road on is
+  // shut now. Either way the route it was walking no longer describes the
+  // world, and re-finding one here would be the engine deciding the player
+  // meant to go anyway.
+  if (!roadsFrom(state.location, registry, state).includes(journey.legs[0])) {
+    state.journey = null;
+    return true;
+  }
+
+  const armed = armTravel(state.location, journey.legs[0], registry, state);
+  if (!armed.armed) state.journey = null;
+  return true;
+}
+
 export function useTravel(origin: string, dest: string, registry: Registry, state: GameState): void {
   if (!origin) {
     state.location = dest;
+    // Placed rather than walked, and standing somewhere is what discovers it:
+    // a journey reaches this through `relocate:`, which spreads on its own.
+    spreadDiscovery(state, registry);
     return;
   }
   const { label } = travelAction(origin, dest, registry);
   useAction('travel', travelPair(origin, dest), label, registry, state);
+}
+
+// The whole walk, resolved where it stands. The same route the armed walk
+// takes, so a driver that resolves and one that arms cross the same places and
+// spend the same time; the difference between them is who watches it happen.
+//
+// Returns the sentence refusing the walk, and nothing when one was made: no
+// route is the one way this leaves the world exactly as it found it, and a
+// caller that can only report what it is told needs telling.
+export function walkTo(dest: string, registry: Registry, state: GameState): string | undefined {
+  if (!registry.locations.has(dest)) throw new RuntimeError(`unknown location: ${dest}`);
+  if (!state.location) {
+    useTravel('', dest, registry, state);
+    return undefined;
+  }
+  const route = routeTo(state.location, dest, registry, state);
+  if (!route) {
+    const refused = noWayTo(dest, registry);
+    state.log.push(refused);
+    return refused;
+  }
+  for (const leg of route) {
+    const from = state.location;
+    if (!roadsFrom(from, registry, state).includes(leg)) return undefined;
+    useTravel(from, leg, registry, state);
+    // Somewhere along the way the world did something else with the player.
+    if (state.location !== leg) return undefined;
+  }
+  return undefined;
 }
 
 export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameState): boolean {

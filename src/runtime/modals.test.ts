@@ -106,6 +106,50 @@ node after:
   -> Nod.
 `;
 
+// Menus whose every choice is gated, which is the one shape in the grammar that
+// asks the player for an answer no answer satisfies. The hermit's is gated on a
+// flag a directive can set while the menu is up; the sage's sits behind a goto,
+// so it is reached by answering rather than by talking.
+const GATED_MENU_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  sage
+  hermit
+
+# flag secret
+
+# flag told
+
+# entity sage
+title: Sage
+
+# entity hermit
+title: Hermit
+
+# entity rumour
+tell: set: secret
+
+# dialogue sage-talk
+owner = sage
+
+node greeting:
+  when: not told
+  -> Ask about the mirror.
+    goto sealed
+
+node sealed:
+  -> Say more. (when told)
+
+# dialogue hermit-talk
+owner = hermit
+
+node greeting:
+  when: not told
+  -> Speak. (when not secret)
+`;
+
 function stackingSession(): PlaySession {
   return startSession(loadModule(STACKING_MODULE));
 }
@@ -287,6 +331,40 @@ describe('opening and answering', () => {
     // withdrawn — the only way to move the world while a menu is up.
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'rumour', actionId: 'tell' });
     expect(view(session).modals[0].options[0].values).toEqual(['Leave the sage.', 'Ask about the secret.']);
+  });
+
+  // Every route to a menu offering nothing: talked into, emptied under the
+  // player while it is up, reached by answering the menu above it, and carried
+  // in by a save. A frame no answer takes down publishes no control and holds
+  // the world withdrawn, so what proves it gone is the choices coming back.
+  it('never leaves a menu standing that offers nothing, however it came to offer nothing', () => {
+    const registry = loadModule(GATED_MENU_MODULE);
+
+    const talked = startSession(registry);
+    applyDirective(talked, { kind: 'use', obj: 'entity', objId: 'rumour', actionId: 'tell' });
+    const refused = apply(talked, 'talk:hermit');
+    expect(modalNames(refused)).toEqual([]);
+    expect(refused.choices.length).toBeGreaterThan(0);
+
+    // The gate closes while the menu is up, which only a directive can do.
+    const emptied = startSession(registry);
+    expect(modalNames(apply(emptied, 'talk:hermit'))).toEqual(['dialogue']);
+    applyDirective(emptied, { kind: 'use', obj: 'entity', objId: 'rumour', actionId: 'tell' });
+    const after = view(emptied);
+    expect(modalNames(after)).toEqual([]);
+    expect(after.choices.length).toBeGreaterThan(0);
+
+    // The GUI's own answer path, which does not run through applyDirective.
+    const answered = startSession(registry);
+    expect(modalNames(apply(answered, 'talk:sage'))).toEqual(['dialogue']);
+    const sealed = submitModal(answered, { choice: 'Ask about the mirror.' });
+    expect(modalNames(sealed)).toEqual([]);
+    expect(sealed.choices.length).toBeGreaterThan(0);
+
+    const saved = createGameState('camp');
+    (saved.modals as ModalFrame[]).push({ name: 'dialogue', answers: {}, cursor: { dialogue: 'sage-talk', node: 'sealed', resumeIndex: 1, replay: true } });
+    expect(pruneModals(saved, registry)).toEqual([{ name: 'dialogue', reason: 'it asks for choice and nothing answers it' }]);
+    expect(saved.modals).toEqual([]);
   });
 
   it('closes a frame a save left unanswerable — every option already answered, or one holding a value it refuses', () => {

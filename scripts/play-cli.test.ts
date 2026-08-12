@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { loadModule } from '../src/content/registry';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { serializeSession, startSession, view } from '../src/runtime/session';
-import { COMMANDS, newContext, runLine, type CommandContext, type Recorder } from '../src/runtime/command';
-import { formatLive, formatOutput, formatResult, loadModportalSources } from './play-cli';
+import { COMMANDS, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
+import { driveRun, formatLive, formatOutput, formatResult, formatTick, loadModportalSources } from './play-cli';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -53,7 +53,7 @@ x: 0, y: 0
 starting
 
 # save empty
-{"version":${SAVE_VERSION}}
+{"version":${SAVE_VERSION},"flags":{"camp.discovered":true}}
 `);
     expect(formatResult(runLine(ctx, '/assert time >= 0'))).toEqual(['✓ time >= 0 matches']);
     expect(formatResult(runLine(ctx, '/assert time < 0'))).toEqual(['⚠ time < 0']);
@@ -74,7 +74,9 @@ starting
     expect(formatResult(runLine(ctx, '/state'))).toEqual([
       'Location: tutorial-island.guide-house',
       'Elapsed simulated time: 7s',
-      'Flags: {}',
+      // Every place the player could walk to from the guide house, which is
+      // what discovery now means; the beach is behind the locked front door.
+      'Flags: {"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true}',
       'Inventory: {}',
       'XP: {}',
       'Health: ██████████ 30/30',
@@ -113,7 +115,8 @@ starting
 
 // `oven.roast` repeats and never self-completes; `anvil.strike` completes after
 // its single attempt; `bell.ring` whittles its own completion down instead of a
-// foe's pool. Every branch of the live line.
+// foe's pool. `kiln.fire` is the one that speaks when it lands. Every branch of
+// the live line.
 const LIVE_MODULE = `
 # stat tap
 base: 0.2
@@ -128,6 +131,7 @@ entities:
   oven
   anvil
   bell
+  kiln
 
 # item roasted-chestnut
 
@@ -143,6 +147,12 @@ roast:
 strike:
   time: 3
   give: 1 ingot
+
+# entity kiln
+fire:
+  time: 2
+  on success:
+    say: The kiln settles with a crack.
 
 # entity bell
 title: Bell
@@ -183,6 +193,39 @@ describe('play-cli renders the live clock', () => {
       'ring... [--------------------] hits:3 completion:0.4  [time: 3.0s]',
       'ring... [--------------------] hits:4 completion:0.2  [time: 4.0s]',
     ]);
+  });
+
+  // The say a completion produces rides on the view that tick hands back and
+  // is drained from every view after it, so the bar is the only thing between
+  // the world speaking and nobody hearing it.
+  it('prints what the world said as a tick passed, above the bar and not over it', () => {
+    const started = armed(driver(LIVE_MODULE, 1, true), 'use:entity.kiln.fire');
+
+    const before = formatTick(started.live!.tick(1000));
+    const landing = formatTick(started.live!.tick(1000));
+
+    expect(before).toEqual(['fire... [##########----------]  [time: 1.0s]']);
+    expect(landing).toEqual(['The kiln settles with a crack.', 'fire: done.  [time: 2.0s]']);
+  });
+
+  it('leaves nothing for the closing result to print, which is why the tick must', () => {
+    const started = armed(driver(LIVE_MODULE, 1, true), 'use:entity.kiln.fire');
+    started.live!.tick(2000);
+
+    const closing = formatResult(started.live!.end(false));
+
+    expect(closing).not.toContain('The kiln settles with a crack.');
+  });
+
+  // Whatever the world says as an action is armed — a take gate refusing, a
+  // relocation — is on the view and in no output, so a caller that formats the
+  // result alone prints none of it. runLiveAction takes that list as a
+  // parameter for want of a way to test the readline loop it prints inside.
+  it('reports no output at all when it arms, so the arming view is the only place a say is', () => {
+    const started = armed(driver(LIVE_MODULE, 1, true), 'use:entity.kiln.fire');
+
+    expect(started.output).toEqual([]);
+    expect(formatResult(started)).toEqual([]);
   });
 
   it('scales elapsed real time by the speed dial before it draws anything', () => {
@@ -338,5 +381,70 @@ describe('play-cli modportal cache loading', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// The loop itself, with the terminal taken out of it. runLiveAction keeps raw
+// mode, the keypress and readline, and has no decision left in it to test.
+describe('play-cli drives a live run', () => {
+  function handTicker(): Ticker & { advance(elapsedMs: number): void; stops: number } {
+    let ticking: ((elapsedMs: number) => void) | null = null;
+    const ticker = ((tick) => {
+      ticking = tick;
+      return () => void (ticker.stops += 1);
+    }) as Ticker & { advance(elapsedMs: number): void; stops: number };
+    ticker.stops = 0;
+    ticker.advance = (elapsedMs) => ticking?.(elapsedMs);
+    return ticker;
+  }
+
+  function driven(choiceId: string) {
+    const ctx = driver(LIVE_MODULE, 1, true);
+    const ticker = handTicker();
+    const written: string[] = [];
+    const closed: CommandResult[] = [];
+    const stop = driveRun(armed(ctx, choiceId).live!, (text) => void written.push(text), (result) => void closed.push(result), ticker);
+    return { ctx, ticker, written, closed, stop };
+  }
+
+  it('advances the run by the elapsed span the ticker hands it, and writes what the tick said', () => {
+    const run = driven('use:entity.kiln.fire');
+
+    run.ticker.advance(1000);
+
+    expect(run.ctx.view.time).toBe(1);
+    expect(run.written).toEqual([`\r\x1b[Kfire... [##########----------]  [time: 1.0s]`]);
+    expect(run.closed).toEqual([]);
+  });
+
+  it('ends itself when the run completes, and stops the ticker it started', () => {
+    const run = driven('use:entity.kiln.fire');
+
+    run.ticker.advance(2000);
+
+    expect(run.ticker.stops).toBe(1);
+    expect(run.closed).toHaveLength(1);
+    expect(run.written[0]).toContain('The kiln settles with a crack.');
+  });
+
+  it('ends once however it ends, so a keypress landing on the closing tick cannot end it twice', () => {
+    const run = driven('use:entity.kiln.fire');
+    run.ticker.advance(2000);
+
+    run.stop(true);
+
+    expect(run.closed).toHaveLength(1);
+    expect(formatResult(run.closed[0])).not.toContain('Stopped.');
+  });
+
+  it('stops the run and the ticker when the player cancels first', () => {
+    const run = driven('use:entity.oven.roast');
+    run.ticker.advance(1000);
+
+    run.stop(true);
+
+    expect(run.ticker.stops).toBe(1);
+    expect(formatResult(run.closed[0])).toContain('Stopped.');
+    expect(run.ctx.view.time).toBe(1);
   });
 });
