@@ -196,6 +196,13 @@ describe('the rules the driver is held to', () => {
     expect(controls(written)).toEqual(['<button onClick={() => (a > b ? x : y)} className="h-[12px]"']);
   });
 
+  it('writes the registration call in every component that holds what an agent has to move', () => {
+    const registering = SOURCES.filter((source) => /\buseTestSurface\s*\(/.test(source.text)).map((source) => source.file);
+
+    expect(registering).toContain('src/ui/App.tsx');
+    expect(registering).toContain('src/ui/MapPane.tsx');
+  });
+
   // c9's last sentence, as the structure that makes it true rather than as the
   // bundle it makes true — bundle.test.ts builds and reads that. This one names
   // the file: the harness is reached by an import inside a branch the DEV
