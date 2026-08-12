@@ -63,6 +63,13 @@ export function routeTo(from: string, to: string, registry: Registry, state: Gam
 // Every discovered place the roads reach from here, each with how many legs
 // away it is. What a driver needs to know which places it may set off for, and
 // how far, without walking the graph itself.
+//
+// A place the player has not found is neither crossed nor named. Crossing it
+// would make the shape of the unfound map readable off a journey; naming it
+// would put its title on the choice list, which is what `publishDiscovered`
+// refuses to give away and what a driver drawing the map has no bubble for.
+// Walking into the unknown next door is untouched: a road out of the room the
+// player is standing in is the location's own, and is offered there.
 export function reachable(from: string, registry: Registry, state: GameState): Map<string, number> {
   const found = new Map<string, number>();
   const seen = new Set([from]);
@@ -76,8 +83,9 @@ export function reachable(from: string, registry: Registry, state: GameState): M
       for (const target of roadsFrom(here, registry, state)) {
         if (seen.has(target)) continue;
         seen.add(target);
+        if (!discovered(state, target)) continue;
         found.set(target, legs);
-        if (discovered(state, target)) next.push(target);
+        next.push(target);
       }
     }
     frontier = next;

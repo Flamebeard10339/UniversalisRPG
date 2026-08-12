@@ -92,6 +92,16 @@ const universe = (lines: readonly string[], name: string): Registry => loadUnive
 
 const open = (lines: readonly string[], name: string): PlaySession => startSession(universe(lines, name));
 
+// Standing back at A with C on the map. Arriving discovers the room and its
+// neighbours, so C is two roads out and unfound until the player has stood in
+// B — and a walk to somewhere unfound is not offered.
+function walkedOut(registry: Registry): PlaySession {
+  const session = startSession(registry);
+  apply(session, 'travel:chain.b');
+  apply(session, 'travel:chain.a');
+  return session;
+}
+
 // A state to ask a route question of, with exactly the places named said to be
 // found. Built rather than taken off a session, because what the route reads is
 // a location and some flags and nothing else.
@@ -162,22 +172,49 @@ describe('everywhere the roads reach', () => {
   it('says how many legs away each place is', () => {
     const registry = universe(CHAIN, 'chain');
 
-    expect([...reachable('chain.a', registry, standingAt('chain.a', ['chain.a', 'chain.b', 'chain.c']))]).toEqual([
+    expect([...reachable('chain.a', registry, standingAt('chain.a', ['chain.a', 'chain.b', 'chain.c', 'chain.d']))]).toEqual([
       ['chain.b', 1],
       ['chain.c', 2],
       ['chain.d', 3],
+    ]);
+  });
+
+  it('names no place the player has not found, however many roads reach it', () => {
+    const registry = universe(CHAIN, 'chain');
+
+    // D is one road past C and C is found, so the roads reach it — and it is
+    // not somewhere to set off for, because the player has never seen it.
+    expect([...reachable('chain.a', registry, standingAt('chain.a', ['chain.a', 'chain.b', 'chain.c']))]).toEqual([
+      ['chain.b', 1],
+      ['chain.c', 2],
     ]);
   });
 });
 
 describe('setting off for somewhere that is not next door', () => {
   it('is offered as one choice, saying how far it is', () => {
-    const opening = view(open(CHAIN, 'chain'));
+    const shown = view(walkedOut(universe(CHAIN, 'chain')));
 
-    expect(opening.choices.filter((choice) => choice.kind === 'travel').map((choice) => [choice.leadsTo, choice.legs])).toEqual([
+    expect(shown.choices.filter((choice) => choice.kind === 'travel').map((choice) => [choice.leadsTo, choice.legs])).toEqual([
       ['chain.b', 1],
       ['chain.c', 2],
     ]);
+    // And the one that is a walk away is on the map, which is where a driver
+    // that withdraws it from the action sheet expects the player to pick it.
+    expect(shown.discovered.map((place) => place.id)).toContain('chain.c');
+  });
+
+  // The offer and the map are one thing: a place the sheet withdraws for being
+  // a walk away has a bubble to be tapped instead, and a place with no bubble
+  // is not named at all — including by its title, which is what the choice
+  // label would have carried.
+  it('offers only places the player has found, so nothing is named that the map cannot draw', () => {
+    const opening = view(open(CHAIN, 'chain'));
+    const drawn = new Set(opening.discovered.map((place) => place.id));
+
+    expect([...drawn].sort()).toEqual(['chain.a', 'chain.b']);
+    for (const choice of opening.choices) if (choice.leadsTo !== undefined) expect(drawn.has(choice.leadsTo), `${choice.leadsTo} is offered and not drawn`).toBe(true);
+    expect(opening.choices.map((choice) => choice.label)).not.toContain('Travel to C');
   });
 
   it('walks every leg where it stands, and spends every leg, on the instant path', () => {
@@ -194,7 +231,7 @@ describe('setting off for somewhere that is not next door', () => {
   });
 
   it('arms the first leg and publishes the route, on the driving path', () => {
-    const session = open(CHAIN, 'chain');
+    const session = walkedOut(universe(CHAIN, 'chain'));
 
     const armed = beginAction(session, 'travel:chain.c');
 
@@ -240,16 +277,17 @@ describe('setting off for somewhere that is not next door', () => {
   it('offers nothing to a place the roads do not reach', () => {
     const shut = view(open(GATED, 'gated'));
 
-    // The ford and what is one road past it; the far bank is past the
-    // shallows, and the shallows have not been found, so there is no route
-    // through them and the span that would have gone straight there is shut.
-    expect(shut.choices.map((choice) => choice.leadsTo)).toEqual(['gated.ford', 'gated.shallows']);
+    // The ford, and nowhere else. The shallows are one road past it and have
+    // not been found, so they are somewhere to walk into rather than set off
+    // for; the far bank is past them, and the span that would have gone
+    // straight there is shut.
+    expect(shut.choices.map((choice) => choice.leadsTo)).toEqual(['gated.ford']);
     expect(() => apply(open(GATED, 'gated'), 'travel:gated.far-bank')).toThrow(/unavailable choice/);
   });
 
   it('is still the walk it was after a save and a load', () => {
     const registry = universe(CHAIN, 'chain');
-    const session = startSession(registry);
+    const session = walkedOut(registry);
     beginAction(session, 'travel:chain.c');
     const carried = sessionStatus(session).journey;
 
@@ -268,7 +306,7 @@ describe('setting off for somewhere that is not next door', () => {
 
   it('is dropped whole when the place it was going to is no longer loaded', () => {
     const registry = universe(CHAIN, 'chain');
-    const session = startSession(registry);
+    const session = walkedOut(registry);
     beginAction(session, 'travel:chain.c');
     const { saved } = parseSaveSection({
       kind: 'save',
