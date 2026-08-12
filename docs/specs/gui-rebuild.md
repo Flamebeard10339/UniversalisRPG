@@ -20,7 +20,14 @@ Proof:
 - [c1] The GUI cannot drift from the REPL, and the proof runs. One scripted sequence of commands
   replayed through the REPL's driver and through the GUI's leaves byte-identical serialized state
   and the same ordered messages. The GUI defines no command of its own and filters none: a command
-  added to the shared table is dispatchable from the GUI with no edit under `src/ui`.
+  added to the shared table is dispatchable from the GUI with no edit under `src/ui`. One capability
+  is carved out and named rather than equalised away: the REPL is opened with an authoring context
+  and the GUI has none, so a command gated on it is refused by the GUI and runs in the REPL.
+  `mod-portal-gui`, `gui-dev-mode-toggle-banner-and-editing-gate`,
+  `gui-locale-editor-missing-toggle-and-language-dropdown` and `edit-mode-memory` own giving the GUI
+  one; until they do, the proof opens the REPL the way `play-cli`'s `main` does and holds the two to
+  identical output on every table entry the carve-out does not cover, so the drift that remains is
+  visible as a count rather than hidden by a capability taken off the REPL first.
 - [c2] The GUI cannot alter state. No file under `src/ui` reaches the runtime other than through the
   play surface, and none reads or writes `GameState`. The rule covers `src/main.tsx` as well as
   `src/ui`, which is what the prerequisite's layer-check clause is for — a driver whose entry point

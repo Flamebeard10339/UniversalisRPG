@@ -330,7 +330,7 @@ function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, te
   }
 }
 
-const UNAVAILABLE = 'local authoring is unavailable.';
+export const UNAVAILABLE = 'local authoring is unavailable.';
 
 function runSectionEdit(ctx: CommandContext, section: SectionArg): CommandResult {
   const authoring = ctx.authoring;
