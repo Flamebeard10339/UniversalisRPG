@@ -43,7 +43,7 @@ export type SlotState = 'none' | 'open' | 'filled' | 'blocked';
 // The cluster an item base carries when it declares no `cluster-jewel:` of its
 // own (c9). It is not a declaration and is never registered, so no content can
 // shadow it and `jewel: null` is what a save records for it.
-export const BASE_CLUSTER: ClusterJewel = {
+const BASE_CLUSTER: ClusterJewel = {
   id: 'base',
   title: 'Base',
   shape: 'point',
@@ -56,7 +56,7 @@ export const hexKey = (hex: Hex): string => `${hex.q},${hex.r}`;
 
 const HEX_KEY = /^(-?\d+),(-?\d+)$/;
 
-export function parseHexKey(key: string): Hex | undefined {
+function parseHexKey(key: string): Hex | undefined {
   const parts = HEX_KEY.exec(key);
   if (!parts) return undefined;
   const hex = { q: Number(parts[1]), r: Number(parts[2]) };
@@ -94,7 +94,7 @@ export function positionOnEdge(placement: Placement, direction: Direction): numb
   return getShape(placement.jewel.shape).edges[rotate(direction, -placement.rotation)];
 }
 
-export function describeNode(node: PlaneNode): string {
+function describeNode(node: PlaneNode): string {
   return node.kind === 'slot' ? `the ${node.direction} slot of ${hexKey(node.hex)}` : `position ${node.position} of ${hexKey(node.hex)}`;
 }
 
