@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
-import { dragAxis, landingIndex, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, SETTLE_EASING, wasDragged, type Axis, type Motion } from './gesture';
+import { dragAxis, landingIndex, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, wasDragged, type Axis, type Motion } from './gesture';
+import { useMomentPlayer } from './transient';
 
 interface Drag {
   x: number;
@@ -32,6 +33,7 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
   const strip = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const dragged = useRef(false);
+  const settle = useMomentPlayer('settle');
 
   useLayoutEffect(() => {
     const node = strip.current;
@@ -68,7 +70,7 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
 
     dragged.current = wasDragged(dragging.dx);
     const landing = landingIndex({ dx: dragging.dx, width: dragging.width, velocity: releaseVelocity(dragging.motion, at), taken }, index, panes.length);
-    node.style.transition = SETTLE_EASING;
+    node.style.transition = settle();
     node.style.transform = restingAt(landing);
     if (landing !== index) onIndex(landing);
   };

@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
 import { bounds, clampZoom, drawnBox, drawnFor, midpoint, onWalk, panAfterZoom, PER_UNIT, settled, spanBetween, tapTarget, walkLine, zoomByWheel, type Node, type Point, type Size } from './discovery';
 import { useTestSurface } from './testSurface';
+import { useMoment } from './transient';
 
 // The map draws its own working out — the box a pan is held against — for
 // whoever is building the map. Read once, off the address, because a debug
@@ -12,6 +13,57 @@ const DEBUGGING = typeof window !== 'undefined' && new URLSearchParams(window.lo
 // Where a place is drawn, in unscaled pixels: the zoom is applied to the whole
 // sheet at once, so nothing here has to know about it.
 const pixels = (node: Node): { left: number; top: number } => ({ left: node.at.x * PER_UNIT, top: node.at.y * PER_UNIT });
+
+// One place on the sheet. Its own component because the arrival it plays is
+// asked for through the channel, and a channel is reached by a hook.
+function Bubble({
+  node,
+  arrived,
+  walking,
+  position,
+  scale,
+  held,
+  onChoose,
+  dragged,
+}: {
+  node: Node;
+  arrived: boolean;
+  walking: 'going' | 'crossing' | undefined;
+  position: number | undefined;
+  scale: number;
+  held: (element: HTMLButtonElement | null) => void;
+  onChoose: (position: number) => void;
+  dragged: () => boolean;
+}): JSX.Element {
+  const spot = pixels(node);
+  const flash = useMoment('arrival', arrived, node.place.id);
+
+  return (
+    <button
+      ref={held}
+      type="button"
+      data-place={node.place.id}
+      data-walk={walking}
+      disabled={position === undefined}
+      onClick={() => {
+        if (dragged() || position === undefined) return;
+        onChoose(position);
+      }}
+      style={{ left: spot.left, top: spot.top }}
+      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-3 py-2 text-xs ${flash} ${
+        node.here ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-panel'
+      } ${walking === 'going' ? 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong' : ''} ${
+        walking === 'crossing' ? 'border-accent text-accent' : ''
+      } ${node.climb !== 0 ? 'opacity-70' : ''} ${position === undefined ? 'text-text-subtle' : ''}`}
+    >
+      {/* Inside the control, so what it covers is what the control answers, and
+          sized against the zoom the sheet is drawn at. */}
+      <span data-tap-target className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: tapTarget(scale), height: tapTarget(scale) }} />
+      <span className="block max-w-[8rem] truncate">{node.place.title}</span>
+    </button>
+  );
+}
+
 
 // A drag moves the map; a pinch moves and scales it. Both are held from where
 // they started rather than accumulated frame by frame, so a gesture that
@@ -241,38 +293,20 @@ export function MapPane({
           </div>
         ) : null}
 
-        {sheet.nodes.map((node, at) => {
-          const spot = pixels(node);
-          const position = travels.get(node.place.id);
-          const arrived = arrivals.includes(node.place.id);
-          // Where the walk ends, somewhere it still has to cross, or neither.
-          const walking = node.place.id === going ? 'going' : walk.includes(node.place.id) && !node.here ? 'crossing' : undefined;
-          return (
-            <button
-              key={`${node.place.id}-${arrived ? generation : 0}`}
-              ref={(element) => void (bubbles.current[at] = element)}
-              type="button"
-              data-place={node.place.id}
-              data-walk={walking}
-              disabled={position === undefined}
-              onClick={() => {
-                if (dragged() || position === undefined) return;
-                onChoose(position);
-              }}
-              style={{ left: spot.left, top: spot.top }}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-3 py-2 text-xs ${arrived ? 'arrived' : ''} ${
-                node.here ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-panel'
-              } ${walking === 'going' ? 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong' : ''} ${
-                walking === 'crossing' ? 'border-accent text-accent' : ''
-              } ${node.climb !== 0 ? 'opacity-70' : ''} ${position === undefined ? 'text-text-subtle' : ''}`}
-            >
-              {/* Inside the control, so what it covers is what the control
-                  answers, and sized against the zoom the sheet is drawn at. */}
-              <span data-tap-target className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: tapTarget(scale), height: tapTarget(scale) }} />
-              <span className="block max-w-[8rem] truncate">{node.place.title}</span>
-            </button>
-          );
-        })}
+        {sheet.nodes.map((node, at) => (
+          <Bubble
+            key={`${node.place.id}-${arrivals.includes(node.place.id) ? generation : 0}`}
+            node={node}
+            arrived={arrivals.includes(node.place.id)}
+            // Where the walk ends, somewhere it still has to cross, or neither.
+            walking={node.place.id === going ? 'going' : walk.includes(node.place.id) && !node.here ? 'crossing' : undefined}
+            position={travels.get(node.place.id)}
+            scale={scale}
+            held={(element) => void (bubbles.current[at] = element)}
+            onChoose={onChoose}
+            dragged={dragged}
+          />
+        ))}
       </div>
 
       {sheet.planes.length > 1 ? (

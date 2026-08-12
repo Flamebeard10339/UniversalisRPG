@@ -15,6 +15,7 @@ import { counted, named } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
 import { useTestSurface } from './testSurface';
+import { TransientProvider } from './transient';
 import { VStack } from './VStack';
 
 // What the world just gave up, and a count of how many times it has. The count
@@ -66,24 +67,26 @@ export function App({ driver }: { driver: Driver }): JSX.Element {
   ));
 
   return (
-    <div className="flex h-[100dvh] select-none flex-col overflow-hidden bg-background text-text">
-      <main className="relative flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
-        <VStack
-          layer={where.layer}
-          onLayer={(layer) => setWhere((held) => toLayer(held, layer))}
-          banners={[
-            // Re-keyed on a discovery, so the banner that is the handle to the
-            // Map plays the same arrival the Map's own row does. That is the
-            // acknowledgement a player standing on Home gets.
-            <LocationBanner key={`location-${generation}`} view={view} flash={generation > 0} />,
-            <StatusBanner key="status" view={view} />,
-          ]}
-          bodies={bodies}
-        />
-        <FloatingText channel={driver.transient} />
-      </main>
-      <TabBar tabs={LAYERS[where.layer].subpages} active={subpageOf(where)} onSelect={(index) => setWhere((held) => toSubpage(held, held.layer, index))} />
-      {asking ? <ModalSheet key={asking.key} option={asking} onAnswer={driver.answer} /> : null}
-    </div>
+    <TransientProvider value={driver.transient}>
+      <div className="flex h-[100dvh] select-none flex-col overflow-hidden bg-background text-text">
+        <main className="relative flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
+          <VStack
+            layer={where.layer}
+            onLayer={(layer) => setWhere((held) => toLayer(held, layer))}
+            banners={[
+              // Re-keyed on a discovery, so the banner that is the handle to the
+              // Map plays the same arrival the Map's own row does. That is the
+              // acknowledgement a player standing on Home gets.
+              <LocationBanner key={`location-${generation}`} view={view} flash={generation > 0} />,
+              <StatusBanner key="status" view={view} />,
+            ]}
+            bodies={bodies}
+          />
+          <FloatingText channel={driver.transient} />
+        </main>
+        <TabBar tabs={LAYERS[where.layer].subpages} active={subpageOf(where)} onSelect={(index) => setWhere((held) => toSubpage(held, held.layer, index))} />
+        {asking ? <ModalSheet key={asking.key} option={asking} onAnswer={driver.answer} /> : null}
+      </div>
+    </TransientProvider>
   );
 }

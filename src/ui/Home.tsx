@@ -7,6 +7,7 @@ import { SPLIT_DEFAULT, splitFrom } from './gesture';
 import { LiveSheet } from './LiveSheet';
 import { Splitter } from './Splitter';
 import type { LogEntry, LogKind } from './transcript';
+import { useMoment } from './transient';
 
 const TONE_CLASS: Record<MessageTone, string> = {
   plain: 'text-text',
@@ -26,7 +27,8 @@ const KIND_CLASS: Record<LogKind, string> = {
 // A line mounts once, so the flash marks exactly the text that just arrived.
 function Line({ entry }: { entry: LogEntry }): JSX.Element {
   const tone = entry.kind === 'message' ? TONE_CLASS[entry.tone] : '';
-  return <p className={`arrived -mx-1 whitespace-pre-wrap break-words rounded px-1 leading-relaxed ${KIND_CLASS[entry.kind]} ${tone}`}>{entry.text}</p>;
+  const arrived = useMoment('arrival', true, entry.kind);
+  return <p className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 leading-relaxed ${KIND_CLASS[entry.kind]} ${tone}`}>{entry.text}</p>;
 }
 
 // Grouped under whatever offers them, so an offer with an owner and one without

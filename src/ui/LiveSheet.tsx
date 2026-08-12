@@ -1,6 +1,7 @@
 import type { LiveProgress } from '../runtime/command';
 import { fillPercent } from './format';
-import { FILL_TRANSITION, Meter } from './Meter';
+import { Meter } from './Meter';
+import { FILL_TRANSITION } from './transient';
 
 // A run, above the choices it did not withdraw. Everything on it is the run's
 // own report: the label the engine gave the action, its progress, and whatever

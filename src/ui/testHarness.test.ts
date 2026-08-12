@@ -38,7 +38,7 @@ function driver(current: DriverSnapshot, calls: string[] = []): Driver {
   return {
     subscribe: () => () => undefined,
     snapshot: () => current,
-    transient: { announce: () => undefined, notes: () => [], subscribe: () => () => undefined },
+    transient: { play: () => '', notes: () => [], playedSince: () => ({ moments: [], cursor: 0 }), subscribe: () => () => undefined },
     send: (line) => void calls.push(`send:${line}`),
     choose: (position) => void calls.push(`choose:${position}`),
     answer: (key, value) => void calls.push(`answer:${key}=${value}`),
