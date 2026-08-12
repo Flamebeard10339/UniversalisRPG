@@ -1,7 +1,7 @@
-import { Direction } from '../content/hex';
+import { Direction, Hex, PlaneNode } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
-import { allocateNode, fillSlot, Hex, isPlane, originPlane, Plane, PlaneNode, pointsSpent, repairPlane } from './clusterPlane';
+import { allocateNode, fillSlot, isPlane, originPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
 import { createInstance, defineInstanceKind, instance } from './instances';
 import { skillLevel } from './skills';
 import { GameState } from './state';

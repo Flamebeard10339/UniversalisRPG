@@ -1,19 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { DIRECTIONS, Direction, NEIGHBOR_DELTA, opposite, rotate } from '../content/hex';
+import { DIRECTIONS, Direction, Hex, hexKey, NEIGHBOR_DELTA, opposite, PlaneNode, rotate } from '../content/hex';
 import { loadModule, Registry } from '../content/registry';
 import {
   allocateNode,
   clusterAt,
   fillSlot,
-  Hex,
-  hexKey,
   isAllocated,
   isPlane,
   neighbours,
   ORIGIN,
   originPlane,
   Plane,
-  PlaneNode,
   placementAt,
   pointsSpent,
   positionOnEdge,

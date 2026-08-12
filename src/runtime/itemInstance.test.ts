@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from '../content/registry';
 import { parseSaveSection } from '../content/saveSection';
-import { clusterAt, Hex, ORIGIN, PlaneNode, pointsSpent } from './clusterPlane';
+import { Hex, PlaneNode } from '../content/hex';
+import { clusterAt, ORIGIN, pointsSpent } from './clusterPlane';
 import { instance, instanceIsLive } from './instances';
 import { allocate, feedItem, itemInstance, itemLevel, pointsRemaining, slotJewel } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';

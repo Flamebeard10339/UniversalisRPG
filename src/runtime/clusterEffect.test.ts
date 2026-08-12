@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from '../content/registry';
 import { applyClusterEffect, instancePayloads } from './clusterEffect';
-import { clusterAt, Hex, ORIGIN } from './clusterPlane';
+import { Hex } from '../content/hex';
+import { clusterAt, ORIGIN } from './clusterPlane';
 import { equip } from './equipment';
 import { allocate, feedItem, Growth, itemInstance, slotJewel } from './itemInstance';
 import { initialState } from './save';

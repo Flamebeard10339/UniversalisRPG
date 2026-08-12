@@ -1,6 +1,7 @@
 import { Registry } from '../content/registry';
 import { BonusAmount } from '../grammar/tagClause';
-import { clusterAt, Hex, hexKey, isAllocated, placementAt, Plane, planeClusters, PlaneNode } from './clusterPlane';
+import { Hex, hexKey, PlaneNode } from '../content/hex';
+import { clusterAt, isAllocated, placementAt, Plane, planeClusters } from './clusterPlane';
 import { Growth, growItem, ItemInstance } from './itemInstance';
 import { GameState } from './state';
 
