@@ -313,6 +313,13 @@
             "src/runtime/equipment.ts"
           ],
           "note": "produced by a-grown-item-cannot-be-worn-equipped-holds-item-ids-and-stat: an equipped slot holds either spelling, an item id or a live instance id, and equip() reads the slot off the item behind either"
+        },
+        {
+          "name": "cluster effect scaling",
+          "paths": [
+            "src/runtime/clusterEffect.ts"
+          ],
+          "note": "produced by cluster-effect-fold: applying an effect to a placed cluster, the additive pool it joins, and the scaled payloads a grown item's plane hands statRange"
         }
       ]
     },
