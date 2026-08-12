@@ -9,7 +9,7 @@ import { LocationBanner } from './LocationBanner';
 import { MapPane } from './MapPane';
 import { newlyFound, type Place } from './discovery';
 import { ModalSheet } from './ModalSheet';
-import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpage } from './nav';
+import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
 import { counted, named } from './sheet';
 import { StatusBanner } from './StatusBanner';
@@ -36,14 +36,22 @@ function useArrivals(discovered: readonly Place[]): { arrivals: readonly string[
   return found;
 }
 
-export function App({ driver }: { driver: Driver }): JSX.Element {
+export function App({ driver, opening = OPENING }: { driver: Driver; opening?: Where }): JSX.Element {
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
-  const [where, setWhere] = useState(OPENING);
+  const [where, setWhere] = useState(opening);
   const view = snapshot.view;
   const asking = view ? askedOption(view.modals) : undefined;
   const { arrivals, generation } = useArrivals(view?.discovered ?? []);
 
-  useTestSurface('shell', { where, go: setWhere });
+  // Assembled once and both drawn from and handed over, the way the map's is:
+  // where the nav is standing is one value, and there is no second statement of
+  // it for a registration to get wrong. The handlers still call setWhere with a
+  // function, because what they read has to be the latest state and not the
+  // render's — the seam is about what is drawn, and a nav that loses a tap to
+  // batching would be a real defect bought for a test.
+  const shell = { where, go: setWhere };
+
+  useTestSurface('shell', shell);
 
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
@@ -60,7 +68,7 @@ export function App({ driver }: { driver: Driver }): JSX.Element {
   const bodies = LAYERS.map((layer, at) => (
     <Pager
       key={layer.id}
-      index={where.subpage[at]}
+      index={shell.where.subpage[at]}
       onIndex={(index) => setWhere((held) => toSubpage(held, at, index))}
       panes={layer.subpages.map((subpage) => pane(layer, subpage))}
     />
@@ -71,7 +79,7 @@ export function App({ driver }: { driver: Driver }): JSX.Element {
       <div className="flex h-[100dvh] select-none flex-col overflow-hidden bg-background text-text">
         <main className="relative flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
           <VStack
-            layer={where.layer}
+            layer={shell.where.layer}
             onLayer={(layer) => setWhere((held) => toLayer(held, layer))}
             banners={[
               // Re-keyed on a discovery, so the banner that is the handle to the
@@ -84,7 +92,7 @@ export function App({ driver }: { driver: Driver }): JSX.Element {
           />
           <FloatingText channel={driver.transient} />
         </main>
-        <TabBar tabs={LAYERS[where.layer].subpages} active={subpageOf(where)} onSelect={(index) => setWhere((held) => toSubpage(held, held.layer, index))} />
+        <TabBar tabs={LAYERS[shell.where.layer].subpages} active={subpageOf(shell.where)} onSelect={(index) => setWhere((held) => toSubpage(held, held.layer, index))} />
         {asking ? <ModalSheet key={asking.key} option={asking} onAnswer={driver.answer} /> : null}
       </div>
     </TransientProvider>

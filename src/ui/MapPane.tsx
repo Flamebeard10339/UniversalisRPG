@@ -170,7 +170,13 @@ export function MapPane({
     setPan(rest.pan);
   };
 
-  useTestSurface('map', { map: { plane: at, zoom: scale, pan: held, sheet, travels }, controls: { settle, plane: setPlane } });
+  // The one value the map both draws and hands over, assembled here and not
+  // twice. A registration that says a floor the map is not drawing is markup
+  // that says it too, so what a driving agent is told is what a player sees or
+  // a render test fails.
+  const map = { plane: at, zoom: scale, pan: held, sheet, travels };
+
+  useTestSurface('map', { map, controls: { settle, plane: setPlane } });
 
   // React's TouchList and the DOM's differ only in being iterable, and both
   // arrive here — one from the handler, one from the window listener.
@@ -277,10 +283,10 @@ export function MapPane({
         // A 2D translate, not a translate3d: the 3D one puts the sheet on its
         // own compositor layer, and a layer is rastered once and then scaled as
         // a picture, so every label went soft the moment the map was zoomed in.
-        style={{ transform: `translate(${held.x - centre.x * scale}px, ${held.y - centre.y * scale}px) scale(${scale})` }}
+        style={{ transform: `translate(${map.pan.x - centre.x * map.zoom}px, ${map.pan.y - centre.y * map.zoom}px) scale(${map.zoom})` }}
       >
         <svg className="pointer-events-none absolute overflow-visible" width={1} height={1}>
-          {sheet.roads.map((road) => (
+          {map.sheet.roads.map((road) => (
             <Road key={`${road.from.place.id}>${road.to.place.id}`} from={road.from} to={road.to} open={road.open} walking={onWalk(walk, road.from.place.id, road.to.place.id)} />
           ))}
         </svg>
@@ -288,20 +294,20 @@ export function MapPane({
         {DEBUGGING ? (
           <div data-debug="drawn-box" className="pointer-events-none absolute border-2 border-dashed border-accent/60" style={drawn}>
             <span className="absolute left-0 top-0 -translate-y-full whitespace-nowrap bg-accent px-1 text-[10px] tabular-nums text-accent-text">
-              {Math.round(drawn.width)}×{Math.round(drawn.height)} · bubble {bubble.width}×{bubble.height} · ×{scale.toFixed(2)}
+              {Math.round(drawn.width)}×{Math.round(drawn.height)} · bubble {bubble.width}×{bubble.height} · ×{map.zoom.toFixed(2)}
             </span>
           </div>
         ) : null}
 
-        {sheet.nodes.map((node, at) => (
+        {map.sheet.nodes.map((node, at) => (
           <Bubble
             key={`${node.place.id}-${arrivals.includes(node.place.id) ? generation : 0}`}
             node={node}
             arrived={arrivals.includes(node.place.id)}
             // Where the walk ends, somewhere it still has to cross, or neither.
             walking={node.place.id === going ? 'going' : walk.includes(node.place.id) && !node.here ? 'crossing' : undefined}
-            position={travels.get(node.place.id)}
-            scale={scale}
+            position={map.travels.get(node.place.id)}
+            scale={map.zoom}
             held={(element) => void (bubbles.current[at] = element)}
             onChoose={onChoose}
             dragged={dragged}
@@ -309,16 +315,18 @@ export function MapPane({
         ))}
       </div>
 
-      {sheet.planes.length > 1 ? (
+      {map.sheet.planes.length > 1 ? (
         // The floors, named by the number the author gave them. A word for up or
         // down would be this layer writing prose; the number is the content's.
         <div className="absolute right-3 top-3 flex flex-col overflow-hidden rounded-xl border border-border bg-surface">
-          {[...sheet.planes].reverse().map((floor) => (
+          {[...map.sheet.planes].reverse().map((floor) => (
             <button
               key={floor}
               type="button"
               onClick={() => setPlane(floor)}
-              className={`px-2 text-xs tabular-nums ${floor === at ? 'bg-accent-strong font-semibold text-accent-text' : 'text-text-subtle'}`}
+              data-floor={floor}
+              data-drawn={floor === map.plane ? 'yes' : undefined}
+              className={`px-2 text-xs tabular-nums ${floor === map.plane ? 'bg-accent-strong font-semibold text-accent-text' : 'text-text-subtle'}`}
             >
               {floor}
             </button>
