@@ -46,7 +46,7 @@ const clusterEffect: Parser<ClusterEffect> = {
 
 // `max-level:` defaults to 99 — an "unbounded" sentinel a base can lower to
 // tier itself, per the spec's decision on the field.
-const DEFAULT_MAX_LEVEL = 99;
+export const DEFAULT_MAX_LEVEL = 99;
 
 export const itemSchema: SectionSchema<Item, never, 'actions'> = {
   kind: 'item',
