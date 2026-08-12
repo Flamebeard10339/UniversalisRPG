@@ -293,6 +293,17 @@ describe('what the runtime reports', () => {
   });
 });
 
+describe('a worn stack contributes its cluster jewel\'s free root passive', () => {
+  it('grants the same passive before and after a feed that spends no point', () => {
+    const state = carrying({ 'chain-blade': 1, whetstone: 1 });
+    equip(state, registry, 'chain-blade');
+    expect(health(state)).toBeCloseTo(40, 10);
+
+    ok(feedItem(state, registry, 'chain-blade', 'whetstone'));
+    expect(health(state)).toBeCloseTo(40, 10);
+  });
+});
+
 describe("a plane's contribution reaches combat", () => {
   it('moves outgoing damage when a passive is allocated', () => {
     const bare = wearing('blade', [2]);

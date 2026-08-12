@@ -4,6 +4,7 @@ import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } f
 import { actorEntity, participants, sideOf } from './encounter';
 import { Registry } from '../content/registry';
 import { instancePayloads } from './clusterEffect';
+import { originPlane } from './clusterPlane';
 import { carriesItem, itemInstance, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
 import { skillLevel } from './skills';
@@ -33,11 +34,14 @@ function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatF
 
 // A worn item that was grown adds no channel and no arithmetic (c18): what its
 // cluster effects decided a payload is worth arrives as the same `times` a
-// skill's level arrives as, through the same fold.
+// skill's level arrives as, through the same fold. A worn stack copy is the
+// degenerate argument to the same instancePayloads (c9, c20): zero experience
+// and the item's default plane, not a second path that skips the fold.
 function foldPlanePayloads(registry: Registry, state: GameState, wornId: string, statId: string, fold: StatFold): void {
-  const grown = itemInstance(state, wornId);
-  if (!grown) return;
-  for (const payload of instancePayloads(registry, grown)) {
+  const item = registry.items.get(itemTemplate(state, wornId));
+  if (!item) return;
+  const instance = itemInstance(state, wornId) ?? { experience: 0, plane: originPlane(item.clusterJewel ?? null) };
+  for (const payload of instancePayloads(registry, instance)) {
     if (payload.statId === statId) foldBonus(payload.bonus, fold, payload.scale);
   }
 }
