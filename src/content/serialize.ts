@@ -19,6 +19,7 @@ import { Registry } from './registry';
 import { Resource } from './resource';
 import { ParsedSave } from './saveSection';
 import { Test, Directive } from './test';
+import { hexKey } from './hex';
 import { ModuleInfo } from './info';
 
 type Lines = string[];
@@ -256,7 +257,13 @@ function textSegments(values: readonly TextSegment[] | undefined): string {
     .join('');
 }
 
-function directive(value: Directive): string {
+// The verb, then whatever that verb's own line carries after its colon — the
+// shape `begin:` and `refuse:` both take their inner directive in.
+function inlined(inner: Directive, verb = inner.kind): string {
+  return `${verb} ${printDirective(inner).replace(/^[a-z-]+:[ \t]*/, '')}`;
+}
+
+export function printDirective(value: Directive): string {
   switch (value.kind) {
     case 'run':
       return `run: ${value.test}`;
@@ -273,8 +280,9 @@ function directive(value: Directive): string {
     case 'craft':
       return `craft: ${value.recipe}`;
     case 'begin':
-      // The verb, then whatever that verb's own line carries after its colon.
-      return `begin: ${value.inner.kind === 'use-on' ? 'use' : value.inner.kind} ${directive(value.inner).replace(/^[a-z-]+:[ \t]*/, '')}`;
+      return `begin: ${inlined(value.inner, value.inner.kind === 'use-on' ? 'use' : value.inner.kind)}`;
+    case 'refuse':
+      return `refuse: ${inlined(value.inner)}`;
     case 'assert':
       return `assert: ${condition(value.condition)}`;
     case 'expect':
@@ -289,6 +297,14 @@ function directive(value: Directive): string {
       return `equip: ${value.item}`;
     case 'unequip':
       return `unequip: ${value.slot}`;
+    case 'feed':
+      return `feed: ${value.target} with ${value.food}`;
+    case 'slot':
+      return `slot: ${value.target} at ${hexKey(value.hex)} ${value.direction} with ${value.jewel}`;
+    case 'allocate':
+      return `allocate: ${value.target} at ${hexKey(value.node.hex)} ${value.node.kind === 'position' ? `position ${value.node.position}` : `slot ${value.node.direction}`}`;
+    case 'apply':
+      return `apply: ${value.target} at ${hexKey(value.hex)} with ${value.effect}`;
     case 'submit-modal':
       return `submit-modal: ${value.key}=${value.value}`;
   }
@@ -427,7 +443,7 @@ function saveSection(moduleId: string, id: string, save: ParsedSave): string {
 }
 
 function testSection(moduleId: string, test: Test): string {
-  return [`# test ${moduleLocalId(moduleId, test.id)}`, ...test.directives.map(directive)].join('\n');
+  return [`# test ${moduleLocalId(moduleId, test.id)}`, ...test.directives.map(printDirective)].join('\n');
 }
 
 function infoLines(info: SerializeModuleOptions['info']): Lines {

@@ -8,7 +8,8 @@ import {
   localSectionHeadings,
   upsertLocalSection,
 } from '../content/localChanges';
-import { parseDirectiveLine, type Directive } from '../content/test';
+import { isGrowthDirective, parseDirectiveLine, type Directive } from '../content/test';
+import { printDirective } from '../content/serialize';
 import { resolveDirective } from '../content/typed';
 import { type ParsedSave } from '../content/saveSection';
 import { describeCondition, RuntimeError } from './runtime';
@@ -195,46 +196,24 @@ function nothing(): undefined {
 
 // --- the recorded spelling of what was done -------------------------------
 
-function beginInnerText(inner: Extract<Directive, { kind: 'use' | 'use-on' | 'travel' | 'craft' }>): string {
-  return canonicalDirective(inner).replace(': ', ' ');
+// One printer under the recorded spelling and the authored one, so a line a
+// session records is a line the load path reads back and widening Directive
+// costs one exhaustive case rather than two that can disagree. What is left
+// here is which kinds may reach it: these three are authored and never done,
+// so recording one is a bug rather than a spelling to invent.
+export function canonicalDirective(directive: Directive): string {
+  if (directive.kind === 'run' || directive.kind === 'expect' || directive.kind === 'assert') {
+    throw new RuntimeError(`canonicalDirective: ${directive.kind}: is authored, not recorded`);
+  }
+  return printDirective(directive);
 }
 
-export function canonicalDirective(directive: Directive): string {
-  switch (directive.kind) {
-    case 'talk':
-      return `talk: ${directive.entity}`;
-    case 'choose':
-      return `choose: ${directive.text}`;
-    case 'use':
-      return `use: ${directive.obj}.${directive.objId}.${directive.actionId}`;
-    case 'use-on':
-      return `use: ${directive.action} on ${directive.target}`;
-    case 'travel':
-      return `travel: ${directive.location}`;
-    case 'craft':
-      return `craft: ${directive.recipe}`;
-    case 'begin':
-      return `begin: ${beginInnerText(directive.inner)}`;
-    case 'load':
-      return `load: ${directive.save}`;
-    case 'cancel':
-      return 'cancel';
-    case 'wait':
-      return `wait: ${directive.seconds}`;
-    case 'equip':
-      return `equip: ${directive.item}`;
-    case 'unequip':
-      return `unequip: ${directive.slot}`;
-    case 'submit-modal':
-      return `submit-modal: ${directive.key}=${directive.value}`;
-    // Exhaustive, so widening Directive is a type error here rather than a
-    // throw at the moment a player picks the new kind. These three are
-    // authored, never recorded, so they never reach this.
-    case 'run':
-    case 'expect':
-    case 'assert':
-      throw new RuntimeError(`canonicalDirective: ${directive.kind}: is authored, not recorded`);
-  }
+// A session records what happened rather than what was typed: a growth the
+// plane refused is recorded as the refusal, so a test recorded from live play
+// replays the outcome the player saw instead of asserting the opposite of it.
+function recordedOutcome(directive: Directive, outcome: { failure?: string }): string {
+  if (outcome.failure === undefined || !isGrowthDirective(directive)) return canonicalDirective(directive);
+  return canonicalDirective({ kind: 'refuse', inner: directive });
 }
 
 // One mapping, so a numbered choice and its typed equivalent record identically.
@@ -274,9 +253,9 @@ function runDirective(ctx: CommandContext, directive: Directive): CommandResult 
   }
 
   try {
-    applyDirective(ctx.session, directive);
+    const outcome = applyDirective(ctx.session, directive);
     const next = view(ctx.session);
-    return { ...shown(next), recorded: [canonicalDirective(directive)] };
+    return { ...shown(next), recorded: [recordedOutcome(directive, outcome)] };
   } catch (error) {
     return refused(error);
   }

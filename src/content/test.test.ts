@@ -158,3 +158,48 @@ describe('begin: arm-only directive', () => {
     expect(() => parseModule('# test bad\nbegin: use entity.giant-rats')).toThrow(DslError);
   });
 });
+
+describe('the four growth verbs', () => {
+  const parsed = (line: string) => parseDirectiveLine(line);
+
+  it('parses one verb per way an item grows, addressing a hex the way a plane keys one', () => {
+    expect(parsed('feed: heartwood-blade with whetstone')).toEqual({ kind: 'feed', target: 'heartwood-blade', food: 'whetstone' });
+    expect(parsed('slot: 1 at 0,0 e with node-jewel')).toEqual({ kind: 'slot', target: '1', hex: { q: 0, r: 0 }, direction: 'e', jewel: 'node-jewel' });
+    expect(parsed('allocate: 1 at 1,-1 position 4')).toEqual({ kind: 'allocate', target: '1', node: { hex: { q: 1, r: -1 }, kind: 'position', position: 4 } });
+    expect(parsed('allocate: 1 at -2,3 slot ne')).toEqual({ kind: 'allocate', target: '1', node: { hex: { q: -2, r: 3 }, kind: 'slot', direction: 'ne' } });
+    expect(parsed('apply: 1 at 0,1 with lesser-orb')).toEqual({ kind: 'apply', target: '1', hex: { q: 0, r: 1 }, effect: 'lesser-orb' });
+  });
+
+  it('takes a target spelled as an item id or as a minted instance id, and nothing else', () => {
+    expect(parsed('feed: mod.heartwood-blade with whetstone')).toMatchObject({ target: 'mod.heartwood-blade' });
+    expect(parsed('feed: 12 with whetstone')).toMatchObject({ target: '12' });
+    expect(() => parsed('feed: 1a with whetstone')).toThrow(/malformed feed: payload/);
+  });
+
+  it('names the offending line for a malformed payload rather than reading as an unknown directive', () => {
+    expect(() => parsed('feed: heartwood-blade')).toThrow(/malformed feed: payload \(expected <target> with <item>\)/);
+    expect(() => parsed('slot: 1 at 0,0 with node-jewel')).toThrow(/malformed slot: payload/);
+    expect(() => parsed('allocate: 1 at 0,0 position e')).toThrow(/malformed allocate: payload/);
+    expect(() => parsed('allocate: 1 at 0,0 slot up')).toThrow(/malformed allocate: payload/);
+    expect(() => parsed('apply: 1 with lesser-orb')).toThrow(/malformed apply: payload/);
+  });
+
+  // The address a plane keys a cluster by is the address a directive writes, so
+  // a spelling `hexKey` would never have produced is refused where it is read.
+  it('refuses a hex address the plane would not have written', () => {
+    expect(() => parsed('apply: 1 at 01,0 with lesser-orb')).toThrow(/malformed hex address/);
+    expect(() => parsed('apply: 1 at -0,0 with lesser-orb')).toThrow(/malformed hex address/);
+  });
+});
+
+describe('refuse: the outcome under test', () => {
+  it('wraps each growth verb with its payload inline', () => {
+    expect(parseDirectiveLine('refuse: feed 1 with whetstone')).toEqual({ kind: 'refuse', inner: { kind: 'feed', target: '1', food: 'whetstone' } });
+    expect(parseDirectiveLine('refuse: allocate 1 at 0,0 position 2')).toEqual({ kind: 'refuse', inner: { kind: 'allocate', target: '1', node: { hex: { q: 0, r: 0 }, kind: 'position', position: 2 } } });
+  });
+
+  it('rejects a verb whose refusal is not a value the plane returns', () => {
+    expect(() => parseDirectiveLine('refuse: travel beach')).toThrow(/unknown refuse: verb \(expected one of feed, slot, allocate, apply\)/);
+    expect(() => parseDirectiveLine('refuse: feed 1')).toThrow(/malformed feed: payload/);
+  });
+});

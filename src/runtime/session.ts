@@ -3,7 +3,8 @@ import { DISCOVERED, Location } from '../content/location';
 import {
   actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { endJourney } from './state';
-import { grownItems, itemTemplate } from './itemInstance';
+import { allocate, feedItem, Growth, grownItems, itemTemplate, slotJewel } from './itemInstance';
+import { applyClusterEffect } from './clusterEffect';
 import { parseOwnerRef } from './actions';
 import { spreadDiscovery } from './effects';
 import { reachable, type Journey } from './journey';
@@ -16,7 +17,8 @@ import { answerModal, dialogueFrame, Modal, openModal, pruneModals, publishModal
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
 import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
-import { Directive } from '../content/test';
+import { Directive, GrowthDirective } from '../content/test';
+import { printDirective } from '../content/serialize';
 import { humanize } from '../grammar/values';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 
@@ -603,7 +605,42 @@ function performDirective(session: PlaySession, directive: Directive): { failure
     case 'unequip':
       unequip(state, directive.slot);
       return {};
+    case 'feed':
+    case 'slot':
+    case 'allocate':
+    case 'apply':
+      return grew(state, grow(state, registry, directive));
+    case 'refuse': {
+      const growth = grow(state, registry, directive.inner);
+      grew(state, growth);
+      return growth.ok ? { failure: `${printDirective(directive.inner)} was not refused` } : {};
+    }
   }
+}
+
+// Every rule and every refusal is inside these four; what is here is which one
+// the verb names and what it is handed, and a check appearing beside it would
+// be a check the plane could not enforce for a caller that is not a directive.
+function grow(state: GameState, registry: Registry, directive: GrowthDirective): Growth {
+  switch (directive.kind) {
+    case 'feed':
+      return feedItem(state, registry, directive.target, directive.food);
+    case 'slot':
+      return slotJewel(state, registry, directive.target, directive.jewel, directive.hex, directive.direction);
+    case 'allocate':
+      return allocate(state, registry, directive.target, directive.node);
+    case 'apply':
+      return applyClusterEffect(state, registry, directive.target, directive.effect, directive.hex);
+  }
+}
+
+// The refusal goes both ways a refused walk's does: into the log, where a
+// player reads what the world said, and back to the caller, which is how a
+// test knows the outcome rather than inferring it from state that did not move.
+function grew(state: GameState, growth: Growth): { failure?: string } {
+  if (growth.ok) return {};
+  state.log.push(growth.refused);
+  return { failure: growth.refused };
 }
 
 export interface TestResult {

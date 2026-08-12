@@ -209,6 +209,32 @@ describe('references the walk used to step over', () => {
     expect(test('equip: strawe')).toThrow(/# test walk equip: names an unknown item: strawe/);
   });
 
+  // The half of a growth verb that names a stack still resolves; the half that
+  // names what the player is growing resolves only when it could not have been
+  // minted, which is what keeps a typo caught without making a live copy
+  // unnameable.
+  it('rejects an unknown item a growth verb names, on either side', () => {
+    const test = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
+    expect(test('feed: hatt with straw')).toThrow(/# test walk feed: names an unknown item: hatt/);
+    expect(test('feed: hat with strawe')).toThrow(/# test walk feed: with names an unknown item: strawe/);
+    expect(test('slot: hatt at 0,0 e with straw')).toThrow(/# test walk slot: names an unknown item: hatt/);
+    expect(test('slot: hat at 0,0 e with strawe')).toThrow(/# test walk slot: with names an unknown item: strawe/);
+    expect(test('allocate: hatt at 0,0 position 1')).toThrow(/# test walk allocate: names an unknown item: hatt/);
+    expect(test('apply: hatt at 0,0 with straw')).toThrow(/# test walk apply: names an unknown item: hatt/);
+    expect(test('apply: hat at 0,0 with strawe')).toThrow(/# test walk apply: with names an unknown item: strawe/);
+    expect(test('refuse: feed hatt with straw')).toThrow(/# test walk refuse: feed: names an unknown item: hatt/);
+  });
+
+  it('leaves a target shaped like a minted instance id for the runtime to answer', () => {
+    const test = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
+    expect(test('feed: 1 with straw')).not.toThrow();
+    expect(test('slot: 12 at 1,-1 e with straw')).not.toThrow();
+    expect(test('allocate: 3 at 0,0 slot ne')).not.toThrow();
+    expect(test('apply: 7 at 0,0 with straw')).not.toThrow();
+    expect(test('equip: 4')).not.toThrow();
+    expect(test('refuse: apply 7 at 0,0 with strawe')).toThrow(/refuse: apply: with names an unknown item: strawe/);
+  });
+
   // A slot is no section's id, so it is checked against what items declare —
   // the same shape as a recipe's station against what entities supply.
   it('rejects an unequip: naming a slot no item declares', () => {

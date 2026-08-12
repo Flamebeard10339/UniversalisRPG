@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
-import { feedItem } from './itemInstance';
+import { feedItem, itemInstance } from './itemInstance';
 import { loadModule, Registry } from '../content/registry';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
@@ -705,9 +705,9 @@ describe('what the engine publishes', () => {
     expect(bare.stats.might).toBe(4);
   });
 
-  // The growth verbs are not directives yet, so the copy is grown against a
-  // state and handed to the session as a save — the way a session starts
-  // anywhere but the beginning.
+  // Grown against a state and handed to the session as a save, so what is
+  // under test is the published view of a copy rather than the verb that made
+  // one; the verbs have their own describe below.
   it('names a grown copy beside the stacks, and offers it as its own equip choice', () => {
     const registry = loadModule(GROWN_MODULE);
     const grownState = createGameState('camp');
@@ -1173,5 +1173,102 @@ stats: attack 0, max-health 1000000, accuracy 100, evasion 0, swings-per-minute 
 
     expect(said).toHaveLength(5);
     expect(said.every((line) => line.startsWith('You hit the Dummy'))).toBe(true);
+  });
+});
+
+const GROWTH_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# stat max-health
+base: 30
+
+# passive hale
++10 max-health
+
+# cluster-jewel node
+shape: point
+open-connections: e
+passives: 1 hale
+
+# item blade
+title: Blade
+slot: hand
+cluster-jewel: node
+max-level: 2
+
+# item node-jewel
+cluster-jewel: node
+
+# item whetstone
+item-experience: 1000
+
+# item lesser-orb
+cluster-effect: +25% max-health
+
+# test grow-a-blade
+feed: blade with whetstone
+allocate: 1 at 0,0 slot e
+slot: 1 at 0,0 e with node-jewel
+allocate: 1 at 1,0 position 1
+apply: 1 at 1,0 with lesser-orb
+refuse: feed 1 with whetstone
+refuse: feed 1 with lesser-orb
+refuse: slot 1 at 0,0 e with node-jewel
+refuse: allocate 1 at 1,0 slot e
+assert: has lesser-orb
+
+# test refusal-is-not-a-pass
+refuse: apply 1 at 0,0 with lesser-orb
+`;
+
+describe('the four growth verbs through the directive surface', () => {
+  const registry = loadModule(GROWTH_MODULE);
+
+  function stocked(): GameState {
+    const state = createGameState('camp');
+    Object.assign(state.inventory, { blade: 1, 'node-jewel': 1, whetstone: 2, 'lesser-orb': 2 });
+    return state;
+  }
+
+  // The whole loop c22 replays: a target named as an item id mints a copy, the
+  // copy is named by the id minting gave it, and every refusal is a written
+  // line rather than an absence.
+  it('replays a whole growth, and each refusal, out of an authored # test', () => {
+    const state = stocked();
+    expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
+
+    expect(state.inventory).toEqual({ blade: 0, 'node-jewel': 0, whetstone: 1, 'lesser-orb': 1 });
+    const grown = itemInstance(state, '1');
+    expect(grown?.experience).toBe(1000);
+    expect(grown?.plane['1,0']).toEqual({ jewel: 'node', entry: 'e', allocatedPositions: [1], allocatedSlots: [], effects: ['lesser-orb'] });
+  });
+
+  it('fails a refuse: whose growth the plane allowed', () => {
+    const state = stocked();
+    expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
+    expect(runTest('refusal-is-not-a-pass', registry, state)).toEqual({
+      passed: false,
+      failure: 'apply: 1 at 0,0 with lesser-orb was not refused',
+    });
+  });
+
+  it('hands a refusal back as the failure and says it where the player reads', () => {
+    const session = primed(registry, { inventory: { blade: 1 } });
+    const before = view(session).said.length;
+
+    expect(applyDirective(session, { kind: 'feed', target: 'blade', food: 'whetstone' })).toEqual({ failure: 'you carry no whetstone' });
+    expect(view(session).said.slice(before)).toContain('you carry no whetstone');
+    expect(sessionStatus(session).grown).toEqual({});
+  });
+
+  // Nothing is minted for a verb that was refused, so the counter a later
+  // authored line names is the one the successful verb advanced.
+  it('mints only on a growth that succeeded', () => {
+    const state = stocked();
+    expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
+    expect(Object.keys(state.instances.byId)).toEqual(['1']);
+    expect(state.instances.next).toBe(2);
   });
 });
