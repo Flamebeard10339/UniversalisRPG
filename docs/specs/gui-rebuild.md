@@ -63,9 +63,13 @@ Proof:
   It pans under a finger and cannot be panned away from what it is drawing. It shows one z-plane at
   a time, plus whatever sits off that plane and is adjacent to the player, and it cycles between the
   planes. Character renders the published inventory, equipment, skills and stats.
-  Settings and Edit are frames with no body — `gui-dev-mode-toggle-banner-and-editing-gate`,
-  `mod-portal-gui`, `gui-locale-editor-missing-toggle-and-language-dropdown` and `edit-mode-memory`
-  own their contents, and this branch owes them somewhere to land, not the landing.
+  Edit carries the command console: a field that hands any line to the shared table, which is what
+  makes c1's second sentence reachable from the GUI at all, and its output lands in Home's log like
+  every other engine line. Settings is the frame with no body —
+  `gui-dev-mode-toggle-banner-and-editing-gate`, `mod-portal-gui`,
+  `gui-locale-editor-missing-toggle-and-language-dropdown` and `edit-mode-memory` own their
+  contents, and this branch owes them somewhere to land, not the landing; the four that land on Edit
+  land beside the console rather than instead of it.
 - [c8] The web build carries its content. The shipped DSL reaches the browser through the build, so
   the itch.io bundle and the APK both start a session with no filesystem and no network.
   `public/content/` is not reintroduced: an audit deleted it once (UI-M2) and it is the obvious
@@ -111,10 +115,15 @@ The game becomes playable by a person on a phone, as a driver of the same surfac
   derived help, no reachable `GameState`. The behavioural half is c1 and lives here, because this is
   the first moment two drivers exist to compare. c1 drives the GUI's session container rather than
   React, so the comparison is of two drivers and not of a renderer.
-- **Settings and Edit ship empty on purpose.** Four tracked records own their bodies. Building them
-  here would absorb four records into a branch that already owes a whole directory, and each of them
-  is blocked on something this branch does not deliver — a dev slot, a mod-set decision, a locale
-  system, an editor. An empty frame is the seam they were split off to wait for.
+- **Settings ships empty on purpose, and Edit ships with the console.** Four tracked records own
+  the bodies of both. Building them here would absorb four records into a branch that already owes a
+  whole directory, and each of them is blocked on something this branch does not deliver — a dev
+  slot, a mod-set decision, a locale system, an editor. An empty frame is the seam they were split
+  off to wait for. Edit is the exception the author ruled on (2026-08-12): the command console is
+  what makes c1 true and is an authoring affordance, and the four records queued against Edit are
+  building the same room, so it belongs beside them. A fourth Home-layer subpage was rejected for
+  disturbing a layout measured at 375×812 and pinned by `phone.test.tsx`, and folding the console
+  into Home for putting an authoring surface in the middle of play.
 - **No persistence.** The session starts fresh on every load, exactly as `play-cli` does.
   `auto-save-export-and-load` and `single-dev-mode` own storage and reset between them; a GUI that
   quietly wrote to `localStorage` would be a second answer to a question they are being planned to
