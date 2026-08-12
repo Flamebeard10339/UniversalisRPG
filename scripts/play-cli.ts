@@ -25,6 +25,7 @@ import {
   type Ticker,
 } from '../src/runtime/command';
 import { type Modal } from '../src/runtime/runtime';
+import { formatPlanes } from './planeView';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -170,7 +171,7 @@ export function formatOutput(output: CommandOutput): string[] {
     case 'status':
       return formatState(output.status);
     case 'inventory':
-      return formatInventory(output.status);
+      return [...formatInventory(output.status), ...formatPlanes(output.status.planes, Object.values(output.status.equipment))];
     case 'choices':
       return formatChoices(output.choices);
     case 'help':

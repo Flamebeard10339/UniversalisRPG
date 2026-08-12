@@ -23,9 +23,17 @@ interface StatFold {
   increased: number;
 }
 
+// The one multiplication of a BonusAmount there is. A surface that shows what a
+// payload is worth calls this rather than scaling for itself, so the number on
+// screen and the number the fold takes cannot be two different answers (c19).
+export function scaledAmount(bonus: BonusAmount, times: number): BonusAmount {
+  return bonus.percent ? { percent: true, amount: bonus.amount * times } : { percent: false, amount: scaleRange(bonus.amount, times) };
+}
+
 function foldBonus(bonus: BonusAmount, fold: StatFold, times: number): void {
-  if (bonus.percent) fold.increased += (bonus.amount * times) / 100;
-  else fold.added = addRanges(fold.added, scaleRange(bonus.amount, times));
+  const scaled = scaledAmount(bonus, times);
+  if (scaled.percent) fold.increased += scaled.amount / 100;
+  else fold.added = addRanges(fold.added, scaled.amount);
 }
 
 function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatFold): void {

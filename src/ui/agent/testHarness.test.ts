@@ -23,6 +23,7 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
       journey: null,
       inventory: {},
       grown: {},
+      planes: [],
       equipment: {},
       xp: {},
       stats: {},

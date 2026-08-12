@@ -4,6 +4,7 @@ import {
   actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { endJourney } from './state';
 import { allocate, feedItem, Growth, grownItems, itemTemplate, slotJewel } from './itemInstance';
+import { planeReports, type PlaneReport } from './planeReport';
 import { applyClusterEffect } from './clusterEffect';
 import { parseOwnerRef } from './actions';
 import { spreadDiscovery } from './effects';
@@ -66,6 +67,10 @@ export interface PlayStatus {
   // are counted nowhere in `inventory`, so a surface listing what the player has
   // reads both records.
   grown: Record<string, string>;
+  // One per grown copy, in the order `grown` names them: the plane behind the
+  // id, already scaled, for a surface that shows one rather than a stat it
+  // arrived in.
+  planes: PlaneReport[];
   equipment: Record<string, string>;
   xp: Record<string, number>;
   stats: Record<string, number>;
@@ -381,6 +386,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     modals: state.modals.map((frame) => publishModal(frame, state, registry)),
     inventory: Object.fromEntries(Object.entries(state.inventory).filter(([, count]) => count > 0)),
     grown: grownItems(state),
+    planes: planeReports(registry, state),
     equipment: { ...state.equipped },
     xp: { ...state.xp },
     stats: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, statValue(stat.id, state, registry)])),

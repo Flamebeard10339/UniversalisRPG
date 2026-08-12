@@ -1,0 +1,162 @@
+import { ClusterEffect } from '../content/item';
+import { Direction, DIRECTIONS, Hex, hexKey, NEIGHBOR_DELTA, opposite, PlaneNode } from '../content/hex';
+import { Registry } from '../content/registry';
+import { getShape } from '../content/shapes';
+import { BonusAmount } from '../grammar/tagClause';
+import { positionPayloads } from './clusterEffect';
+import { isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
+import { grownItems, itemInstance, itemLevel, pointsRemaining } from './itemInstance';
+import { GameState } from './state';
+import { scaledAmount } from './stats';
+
+// Where a point may go, said once for both things a point buys. `blocked` is a
+// slot alone: the hex beyond it already holds a cluster that entered another
+// way, so the direction is foreclosed rather than merely unreached.
+export type Standing = 'allocated' | 'available' | 'unreached' | 'blocked';
+
+// The effective magnitude, never the declared one (c19). `scale` is carried
+// beside it so a reader can say where the number came from without being asked
+// to derive it back.
+export interface PayloadReport {
+  readonly statId: string;
+  readonly effective: BonusAmount;
+  readonly scale: number;
+}
+
+export interface PositionReport {
+  readonly position: number;
+  readonly passive: string | null;
+  readonly title: string | null;
+  readonly standing: Standing;
+  // Allocated without a point having been spent: the origin cluster's root.
+  readonly free: boolean;
+  readonly payloads: PayloadReport[];
+}
+
+export interface SlotReport {
+  readonly direction: Direction;
+  readonly standing: Standing;
+  // The hex beyond this edge when a cluster stands in it, whether this slot let
+  // it in or another one did — which is the whole difference between filled and
+  // blocked, and the reason both name the same neighbour.
+  readonly beyond: string | null;
+}
+
+export interface ClusterReport {
+  readonly hex: string;
+  readonly jewel: string;
+  readonly title: string;
+  readonly shape: string;
+  // The slot this cluster was slotted through, as the hex and direction the
+  // `slot:` verb named — null at the origin, which is never slotted.
+  readonly entry: { hex: string; direction: Direction } | null;
+  readonly effects: Array<{ id: string; title: string; effect: ClusterEffect }>;
+  readonly modSlots: number;
+  readonly positions: PositionReport[];
+  readonly slots: SlotReport[];
+}
+
+export interface PlaneReport {
+  // The id the four verbs address this plane by.
+  readonly instance: string;
+  readonly template: string;
+  readonly title: string;
+  readonly level: number;
+  readonly maxLevel: number;
+  readonly spent: number;
+  readonly remaining: number;
+  readonly clusters: ClusterReport[];
+}
+
+function standingOf(registry: Registry, plane: Plane, node: PlaneNode): Standing {
+  if (isAllocated(registry, plane, node)) return 'allocated';
+  if (node.kind === 'slot' && slotState(registry, plane, node.hex, node.direction) === 'blocked') return 'blocked';
+  return neighbours(registry, plane, node).some((each) => isAllocated(registry, plane, each)) ? 'available' : 'unreached';
+}
+
+const step = (hex: Hex, direction: Direction): string => hexKey({ q: hex.q + NEIGHBOR_DELTA[direction].q, r: hex.r + NEIGHBOR_DELTA[direction].r });
+
+function payloadsOf(registry: Registry, plane: Plane, hex: Hex, position: number): PayloadReport[] {
+  return positionPayloads(registry, plane, hex, position).map((payload) => ({
+    statId: payload.statId,
+    effective: scaledAmount(payload.bonus, payload.scale),
+    scale: payload.scale,
+  }));
+}
+
+// The rings out from the origin, and within a ring a settled order, so two
+// readings of one plane list its hexes the same way.
+function distance(hex: Hex): number {
+  return (Math.abs(hex.q) + Math.abs(hex.r) + Math.abs(hex.q + hex.r)) / 2;
+}
+
+function clusterReport(registry: Registry, plane: Plane, hex: Hex): ClusterReport | undefined {
+  const cluster = plane[hexKey(hex)];
+  const placement = placementAt(registry, plane, hex);
+  if (!cluster || !placement) return undefined;
+
+  const { jewel } = placement;
+  const shape = getShape(jewel.shape);
+  const positions: PositionReport[] = [];
+  for (let position = 1; position <= shape.positionCount; position++) {
+    const passive: string | undefined = jewel.positions[position];
+    const declared = passive === undefined ? undefined : registry.passives.get(passive);
+    const standing = standingOf(registry, plane, { hex, kind: 'position', position });
+    positions.push({
+      position,
+      passive: passive ?? null,
+      title: declared?.title ?? null,
+      standing,
+      free: standing === 'allocated' && !cluster.allocatedPositions.includes(position),
+      payloads: payloadsOf(registry, plane, hex, position),
+    });
+  }
+
+  const open = slotDirections(placement);
+  const slots: SlotReport[] = [];
+  for (const direction of DIRECTIONS) {
+    if (!open.includes(direction)) continue;
+    const occupied = plane[step(hex, direction)] !== undefined;
+    slots.push({
+      direction,
+      standing: standingOf(registry, plane, { hex, kind: 'slot', direction }),
+      beyond: occupied ? step(hex, direction) : null,
+    });
+  }
+
+  const effects: ClusterReport['effects'] = [];
+  for (const id of cluster.effects) {
+    const item = registry.items.get(id);
+    if (item?.clusterEffect) effects.push({ id, title: item.title, effect: item.clusterEffect });
+  }
+
+  const entry = cluster.entry === null ? null : { hex: step(hex, opposite(cluster.entry)), direction: cluster.entry };
+  return { hex: hexKey(hex), jewel: jewel.id, title: jewel.title, shape: jewel.shape, entry, effects, modSlots: jewel.modSlots, positions, slots };
+}
+
+export function planeReport(registry: Registry, state: GameState, instanceId: string): PlaneReport | undefined {
+  const template: string | undefined = grownItems(state)[instanceId];
+  const payload = itemInstance(state, instanceId);
+  if (template === undefined || !payload) return undefined;
+  const item = registry.items.get(template);
+  if (!item) return undefined;
+
+  const clusters = planeClusters(payload.plane)
+    .sort((a, b) => distance(a.hex) - distance(b.hex) || a.hex.q - b.hex.q || a.hex.r - b.hex.r)
+    .flatMap(({ hex }) => clusterReport(registry, payload.plane, hex) ?? []);
+
+  return {
+    instance: instanceId,
+    template,
+    title: item.title,
+    level: itemLevel(payload, item),
+    maxLevel: item.maxLevel,
+    spent: pointsSpent(payload.plane),
+    remaining: pointsRemaining(payload, item),
+    clusters,
+  };
+}
+
+export function planeReports(registry: Registry, state: GameState): PlaneReport[] {
+  return Object.keys(grownItems(state)).flatMap((id) => planeReport(registry, state, id) ?? []);
+}
