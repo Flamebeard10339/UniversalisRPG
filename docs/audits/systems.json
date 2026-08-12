@@ -160,6 +160,20 @@
             "src/content/clusterJewel.ts"
           ],
           "note": "produced by cluster-jewel-sections: the # passive and # cluster-jewel section kinds, their load-time validation, and the item fields that reach a cluster jewel from a droppable item"
+        },
+        {
+          "name": "minted instance id shape",
+          "paths": [
+            "src/content/instanceId.ts"
+          ],
+          "note": "produced by cluster-directives: what a runtime-minted instance id looks like, so a reference site can tell one from an authored item id"
+        },
+        {
+          "name": "the directive grammar",
+          "paths": [
+            "src/content/test.ts"
+          ],
+          "note": "the one parser turning a directive line into the Directive union, for # test sections and the REPL alike; cluster-directives added the five growth spellings (feed:, slot:, allocate:, apply:, refuse:) to it rather than a surface of their own"
         }
       ]
     },
