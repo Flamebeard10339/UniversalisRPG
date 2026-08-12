@@ -41,6 +41,7 @@ function Bubble({
   return (
     <button
       ref={held}
+      data-drive="choose"
       type="button"
       data-place={node.place.id}
       data-walk={walking}
@@ -322,6 +323,7 @@ export function MapPane({
           {[...map.sheet.planes].reverse().map((floor) => (
             <button
               key={floor}
+              data-drive="map.plane"
               type="button"
               onClick={() => setPlane(floor)}
               data-floor={floor}

@@ -21,6 +21,7 @@ export function LiveSheet({ progress, onCancel }: { progress: LiveProgress; onCa
           </div>
         </div>
         <button
+          data-drive="cancel"
           type="button"
           onClick={onCancel}
           aria-label={progress.label}

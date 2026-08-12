@@ -8,8 +8,11 @@ import { describe, expect, it } from 'vitest';
 // past the play surface the rules below hold the driver to, which is allowed
 // of a test and of nothing else here: SOURCES excludes it.
 import { MODAL_NAMES } from '../runtime/modals';
+import { SURFACE_BUILDERS } from './agent/surfaces';
+import { createSurfaceRegistry, installTestHarness } from './agent/testHarness';
 import { TOUCH_FLOOR } from './discovery';
 import { LABELS } from './labels';
+import { createTransientChannel } from './transient';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -104,6 +107,32 @@ function controls(text: string): string[] {
 // sets. A control may ask for more room than the floor and may not ask for
 // less, so the check is on the number and not on which utility carries it.
 const SIZED = /\b(?:min-|max-)?[hw]-\[(\d+(?:\.\d+)?)px\]/g;
+
+// What a control says drives it, written on its own tag. An attribute rather
+// than a table beside the tree, because a table is a second place to remember
+// and the whole point is that a control that declares nothing fails.
+const DRIVEN_BY = /\bdata-drive="([^"]*)"/;
+
+// A control that needs no driving says so here, with why. Nothing in the tree
+// uses this today — every control answers to an action — and it exists so the
+// rule has an answer other than being argued with.
+const NEEDS_NONE = /^none: \S/;
+
+// Everything the harness offers, taken from the harness rather than listed:
+// the actions the driver installs, plus the ones every surface builder makes.
+// A builder is called with a value that answers to anything, because an action
+// map is built the moment the surface is and reads nothing to do it — so this
+// needs to know what the surfaces are called and nothing about what they hold.
+function offered(): string[] {
+  const anything = new Proxy(() => anything, { get: () => anything }) as never;
+  const surfaces = createSurfaceRegistry();
+  for (const name of Object.keys(SURFACE_BUILDERS) as Array<keyof typeof SURFACE_BUILDERS>) {
+    surfaces.register(name, () => SURFACE_BUILDERS[name](anything));
+  }
+  return installTestHarness({ transient: createTransientChannel() } as never, {}, { surfaces }).actions();
+}
+
+const OFFERED = offered();
 
 // The other half of the same rule, and the half that does not depend on how a
 // name arrived. The allowlist above reads `import { x } from`; this reads the
@@ -204,6 +233,32 @@ describe('the rules the driver is held to', () => {
     }
     // A scanner that found nothing would pass every line above.
     expect(checked).toBeGreaterThan(6);
+  });
+
+  // c2. The set is read off the tree by the same scanner the floor rule uses,
+  // so a component that adds a control and names nothing fails rather than
+  // passing quietly, and the name is checked against what the harness actually
+  // offers, so a control naming an action no surface has fails too.
+  it('offers what the harness offers, read off the harness rather than written down here', () => {
+    expect(OFFERED).toContain('send');
+    expect(OFFERED).toContain('shell.layer');
+    expect(OFFERED).toContain('map.plane');
+  });
+
+  it('names on every control the harness action that drives it, or why it needs none', () => {
+    let named = 0;
+    for (const source of SOURCES) {
+      for (const control of controls(source.text)) {
+        const declared = DRIVEN_BY.exec(control)?.[1];
+
+        expect(declared, `${source.file} renders a control that names no driver: ${control.slice(0, 60)}`).toBeDefined();
+        named += 1;
+        if (NEEDS_NONE.test(declared!)) continue;
+        expect(OFFERED, `${source.file} names the driver ${declared}, which the harness does not offer`).toContain(declared);
+      }
+    }
+    // A scanner that found nothing would pass every control above.
+    expect(named).toBeGreaterThan(6);
   });
 
   it('reads a control whole, however much of a handler sits inside its tag', () => {

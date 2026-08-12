@@ -22,6 +22,7 @@ export function ModalSheet({ option, onAnswer }: { option: Option; onAnswer: (ke
             {option.values.map((value) => (
               <button
                 key={value}
+                data-drive="answer"
                 type="button"
                 onClick={() => onAnswer(option.key, value)}
                 className="min-h-[48px] w-full rounded-xl border border-border bg-panel px-4 py-2 text-left transition-transform duration-75 active:scale-[0.99] active:bg-accent-strong active:text-accent-text"
@@ -39,12 +40,13 @@ export function ModalSheet({ option, onAnswer }: { option: Option; onAnswer: (ke
             }}
           >
             <input
+              data-drive="answer"
               className="min-h-[48px] flex-1 select-text rounded-xl border border-border bg-panel px-3 text-text outline-none focus:border-accent"
               value={typed}
               autoFocus
               onChange={(event) => setTyped(event.target.value)}
             />
-            <button type="submit" aria-label={option.label} className="min-h-[48px] min-w-[48px] rounded-xl bg-accent text-lg text-accent-text transition-transform duration-75 active:scale-[0.97]">
+            <button data-drive="answer" type="submit" aria-label={option.label} className="min-h-[48px] min-w-[48px] rounded-xl bg-accent text-lg text-accent-text transition-transform duration-75 active:scale-[0.97]">
               ▸
             </button>
           </form>
