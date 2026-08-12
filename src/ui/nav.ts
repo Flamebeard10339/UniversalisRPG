@@ -1,6 +1,5 @@
 import { clampIndex } from './gesture';
 import type { LabelId } from './labels';
-import type { TestSurface } from './testSurface';
 
 // The nav has two axes. A layer is a context and is reached vertically; a
 // subpage is a page inside one layer and is reached horizontally. Between two
@@ -94,54 +93,6 @@ export function toSubpage(where: Where, layer: number, at: number): Where {
 // handle in both directions.
 export function across(layer: number, boundary: number): number {
   return layer === boundary ? boundary + 1 : boundary;
-}
-
-// A driving agent names a layer and a subpage the way the model does, so an
-// index it would have had to count to is never the thing it says. A name no
-// layer answers to is refused rather than clamped: an agent that asked for
-// somewhere that does not exist has to be told, where a player's drag past the
-// last layer is a gesture to hold at the edge.
-export function layerNamed(value: unknown): number {
-  const at = LAYERS.findIndex((layer) => layer.id === value);
-  if (at < 0) throw new Error(`no layer is named ${String(value)}`);
-  return at;
-}
-
-// Within one layer, because a tab bar only ever offers the layer's own: an
-// agent reaching another layer's page would be doing something no player can.
-export function subpageNamed(layer: number, value: unknown): number {
-  const held = clampIndex(layer, LAYERS.length);
-  const at = LAYERS[held].subpages.findIndex((subpage) => subpage.id === value);
-  if (at < 0) throw new Error(`${LAYERS[held].id} has no subpage named ${String(value)}`);
-  return at;
-}
-
-export interface ShellState {
-  layer: LayerId;
-  subpage: LabelId;
-  layers: readonly LayerId[];
-  // The current layer's, which is what the tab bar is offering.
-  subpages: readonly LabelId[];
-}
-
-export function shellState(where: Where): ShellState {
-  const layer = LAYERS[where.layer];
-  return {
-    layer: layer.id,
-    subpage: layer.subpages[subpageOf(where)].id,
-    layers: LAYERS.map((each) => each.id),
-    subpages: layer.subpages.map((subpage) => subpage.id),
-  };
-}
-
-export function shellSurface(where: Where, go: (where: Where) => void): TestSurface {
-  return {
-    state: () => shellState(where),
-    actions: {
-      layer: (value) => go(toLayer(where, layerNamed(value))),
-      subpage: (value) => go(toSubpage(where, where.layer, subpageNamed(where.layer, value))),
-    },
-  };
 }
 
 export interface Bands {

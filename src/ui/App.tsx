@@ -9,7 +9,7 @@ import { LocationBanner } from './LocationBanner';
 import { MapPane } from './MapPane';
 import { newlyFound, type Place } from './discovery';
 import { ModalSheet } from './ModalSheet';
-import { LAYERS, OPENING, shellSurface, subpageOf, toLayer, toSubpage, type Layer, type Subpage } from './nav';
+import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpage } from './nav';
 import { Pager } from './Pager';
 import { counted, named } from './sheet';
 import { StatusBanner } from './StatusBanner';
@@ -42,9 +42,9 @@ export function App({ driver }: { driver: Driver }): JSX.Element {
   const asking = view ? askedOption(view.modals) : undefined;
   const { arrivals, generation } = useArrivals(view?.discovered ?? []);
 
-  useTestSurface('shell', shellSurface(where, setWhere));
+  useTestSurface('shell', { where, go: setWhere });
 
-  const pane =(layer: Layer, subpage: Subpage): JSX.Element | null => {
+  const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
       if (subpage.id === 'home') return <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} />;
       return subpage.id === 'edit' ? <Console onSend={driver.send} /> : null;

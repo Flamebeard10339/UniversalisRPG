@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import type { AgentSurfaces } from './agentSurfaces';
 
 export type TestAction = (value: unknown) => void | Promise<void>;
 
@@ -12,22 +13,25 @@ export interface TestSurface {
 }
 
 // The registration point, gated on the constant a production build folds to
-// false. The harness itself arrives by an import inside the dead branch, which
-// is the same shape the session container installs it with, so a build that
-// drops the branch drops every module reachable only from it.
-export function useTestSurface(name: string, surface: TestSurface): void {
-  // Re-read on every call rather than captured once: the actions close over the
-  // render they were built in, and an agent calling one a minute later must
-  // move the component as it stands now.
-  const latest = useRef(surface);
-  latest.current = surface;
+// false. The harness and the builders both arrive by imports inside the dead
+// branch, which is the same shape the session container installs the harness
+// with, so a build that drops the branch drops every module reachable only from
+// it. A caller hands over the values it already holds and never the surface
+// built from them: a call site that named a builder would keep the builder
+// reachable however the branch folds.
+export function useTestSurface<Name extends keyof AgentSurfaces>(name: Name, held: AgentSurfaces[Name]): void {
+  // Re-read on every call rather than captured once: what a component hands
+  // over belongs to the render it handed it over in, and an agent calling an
+  // action a minute later must move the component as it stands now.
+  const latest = useRef(held);
+  latest.current = held;
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     let drop: (() => void) | null = null;
     let dropped = false;
-    void import('./testHarness').then(({ registerTestSurface }) => {
-      if (!dropped) drop = registerTestSurface(name, () => latest.current);
+    void Promise.all([import('./testHarness'), import('./agentSurfaces')]).then(([{ registerTestSurface }, { SURFACE_BUILDERS }]) => {
+      if (!dropped) drop = registerTestSurface(name, () => SURFACE_BUILDERS[name](latest.current));
     });
     return () => {
       dropped = true;

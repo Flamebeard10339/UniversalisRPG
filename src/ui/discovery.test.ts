@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, drawnBox, mapState, mapSurface, midpoint, newlyFound, panAfterZoom, PER_UNIT, pointFrom, settled, sheetAt, onWalk, spanBetween, tapTarget, TOUCH_FLOOR, walkLine, waysOut, zoomFrom, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place, type Point } from './discovery';
+import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, drawnBox, midpoint, newlyFound, panAfterZoom, PER_UNIT, settled, sheetAt, onWalk, spanBetween, tapTarget, TOUCH_FLOOR, walkLine, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -326,58 +326,5 @@ describe('how big a place is to tap', () => {
     for (const scale of [ZOOM_MIN, 0.5, 0.75, 1, 2, ZOOM_MAX]) {
       expect(tapTarget(scale) * scale).toBeGreaterThanOrEqual(TOUCH_FLOOR);
     }
-  });
-});
-
-describe('the map as a driving agent reaches it', () => {
-  const sheet = sheetAt(HOUSE, 'hall', 0);
-  const travels = new Map([['beach', 3]]);
-  const view = { plane: 0, zoom: 1, pan: { x: 0, y: 0 }, sheet, travels };
-
-  it('publishes what is drawn and where, so nothing has to be read off the markup', () => {
-    const state = mapState(view);
-
-    expect(state).toMatchObject({ plane: 0, planes: [-1, 0, 1], zoom: 1, pan: { x: 0, y: 0 } });
-    expect(state.places.find((place) => place.id === 'hall')).toMatchObject({ here: true, climb: 0, goes: null });
-    expect(state.places.find((place) => place.id === 'beach')).toMatchObject({ here: false, goes: 3 });
-    expect(state.places.find((place) => place.id === 'landing')).toMatchObject({ climb: 1, at: { x: CLIMB_NUDGE, y: -CLIMB_NUDGE } });
-  });
-
-  it('pans and zooms through the same settling a finger goes through', () => {
-    const rests: Array<{ pan: Point; zoom: number }> = [];
-    const surface = mapSurface(view, { settle: (pan, zoom) => void rests.push({ pan, zoom }), plane: () => undefined });
-
-    surface.actions!.pan({ x: 20, y: -5 });
-    surface.actions!.zoom(2);
-
-    expect(rests).toEqual([
-      { pan: { x: 20, y: -5 }, zoom: 1 },
-      { pan: { x: 0, y: 0 }, zoom: 2 },
-    ]);
-  });
-
-  it('holds a zoom to the stops the pinch is held to, and refuses what is not a number at all', () => {
-    expect(zoomFrom(99)).toBe(ZOOM_MAX);
-    expect(zoomFrom(0)).toBe(ZOOM_MIN);
-    expect(() => zoomFrom('in')).toThrow('a zoom is a finite number');
-    expect(() => zoomFrom(Number.NaN)).toThrow('a zoom is a finite number');
-  });
-
-  it('refuses a pan that is not a pair of finite numbers rather than moving to NaN', () => {
-    expect(pointFrom({ x: 1, y: 2 })).toEqual({ x: 1, y: 2 });
-    expect(() => pointFrom(null)).toThrow('a pan is an { x, y } of finite numbers');
-    expect(() => pointFrom({ x: 1 })).toThrow('a pan is an { x, y } of finite numbers');
-    expect(() => pointFrom({ x: Number.POSITIVE_INFINITY, y: 0 })).toThrow('a pan is an { x, y } of finite numbers');
-  });
-
-  it('changes to a floor it is drawing, and refuses one it is not', () => {
-    const floors: number[] = [];
-    const surface = mapSurface(view, { settle: () => undefined, plane: (at) => void floors.push(at) });
-
-    surface.actions!.plane(-1);
-
-    expect(floors).toEqual([-1]);
-    expect(() => surface.actions!.plane(4)).toThrow('no plane is drawn at 4');
-    expect(() => surface.actions!.plane('up')).toThrow('no plane is drawn at up');
   });
 });

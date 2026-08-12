@@ -32,6 +32,13 @@ const SOURCES: Array<{ file: string; text: string }> = [
   { file: 'src/main.tsx', path: resolve(here, '..', 'main.tsx') },
 ].map(({ file, path }) => ({ file, text: readFileSync(path, 'utf8') }));
 
+// A module this layer reaches by a dynamic import, which is the seam a DEV
+// branch is folded away at. Read off the tree rather than listed, so the rule
+// below covers a second agent-only module from the day something imports it.
+const DEAD_BRANCH = /\bimport\(\s*['"`]\.\/([\w.-]+)['"`]\s*\)/g;
+
+const AGENT_ONLY = [...new Set(SOURCES.flatMap((source) => [...source.text.matchAll(DEAD_BRANCH)].map(([, module]) => module)))];
+
 // Any quoted path into the runtime, whatever brought it in. Matching `from`
 // and one quote style would be matching a coding habit: a dynamic import in
 // backticks reaches exactly as far and reads nothing like an import.
@@ -205,15 +212,20 @@ describe('the rules the driver is held to', () => {
 
   // c9's last sentence, as the structure that makes it true rather than as the
   // bundle it makes true — bundle.test.ts builds and reads that. This one names
-  // the file: the harness is reached by an import inside a branch the DEV
-  // constant folds away, so no module may bring it in as a value at the top.
-  it('reaches the harness only from a branch a production build folds away', () => {
-    const reaching = SOURCES.filter((source) => !source.file.endsWith('/testHarness.ts') && source.text.includes('testHarness'));
+  // the files: an agent-only module is reached by an import inside a branch the
+  // DEV constant folds away, so no module may bring one in as a value at the
+  // top.
+  it('reaches every agent-only module only from a branch a production build folds away', () => {
+    expect(AGENT_ONLY, 'nothing in the tree is reached by a dead-branch import').toContain('testHarness');
 
-    expect(reaching.map((source) => source.file)).toContain('src/ui/driver.ts');
-    for (const source of reaching) {
-      expect(source.text, `${source.file} names the harness with no DEV constant to fold it away`).toContain('import.meta.env.DEV');
-      expect(source.text, `${source.file} brings the harness in as a value at the top`).not.toMatch(/import\s+(?!type\b)[^;]*from\s*['"`][^'"`]*testHarness['"`]/);
+    for (const module of AGENT_ONLY) {
+      const reaching = SOURCES.filter((source) => !source.file.endsWith(`/${module}.ts`) && source.text.includes(module));
+
+      expect(reaching.length, `nothing in the tree reaches ${module}`).toBeGreaterThan(0);
+      for (const source of reaching) {
+        expect(source.text, `${source.file} names ${module} with no DEV constant to fold it away`).toContain('import.meta.env.DEV');
+        expect(source.text, `${source.file} brings ${module} in as a value at the top`).not.toMatch(new RegExp(`import\\s+(?!type\\b)[^;]*from\\s*['"\`][^'"\`]*${module}['"\`]`));
+      }
     }
   });
 
