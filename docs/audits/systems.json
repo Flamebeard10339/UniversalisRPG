@@ -413,12 +413,12 @@
           "note": "produced by the-gui-shell-and-the-play-surface for gui-rebuild c8; the route the DSL takes to the browser, in place of the public/content/ an audit deleted"
         },
         {
-          "name": "transient text over the play surface",
+          "name": "one channel every played moment is begun on",
           "paths": [
             "src/ui/transient.ts",
             "src/ui/FloatingText.tsx"
           ],
-          "note": "produced by the-gui-shell-and-the-play-surface for gui-rebuild c10; floating-text-for-xp-events is the first producer that will use it"
+          "note": "was \"transient text over the play surface\", produced by the-gui-shell-and-the-play-surface for gui-rebuild c10; widened by moments-play-through-one-channel for an-agent-needs-no-screenshot c3, which made a text note one kind of moment on it rather than the only thing it carries. Taken over rather than duplicated: a second channel beside it would be the report that one of them does two jobs"
         },
         {
           "name": "the GUI shell",
