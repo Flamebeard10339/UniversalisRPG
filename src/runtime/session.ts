@@ -3,6 +3,7 @@ import { DISCOVERED, Location } from '../content/location';
 import {
   actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { endJourney } from './state';
+import { grownItems, itemTemplate } from './itemInstance';
 import { parseOwnerRef } from './actions';
 import { spreadDiscovery } from './effects';
 import { reachable, type Journey } from './journey';
@@ -59,6 +60,10 @@ export interface PlayStatus {
   // Bottom of the stack first, so the last one is the one being answered.
   modals: Modal[];
   inventory: Record<string, number>;
+  // Grown copies the player carries, by the instance id each is named by. They
+  // are counted nowhere in `inventory`, so a surface listing what the player has
+  // reads both records.
+  grown: Record<string, string>;
   equipment: Record<string, string>;
   xp: Record<string, number>;
   stats: Record<string, number>;
@@ -212,8 +217,17 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     }
   }
 
-  for (const [slot, itemId] of Object.entries(state.equipped)) {
-    const item = registry.items.get(itemId);
+  // A grown copy is named by its instance id in the choice as well as in the
+  // slot, because a player holding both it and its stack has to be able to say
+  // which one they mean.
+  for (const [grownId, template] of Object.entries(grownItems(state))) {
+    const item = registry.items.get(template);
+    if (!item?.slot || state.equipped[item.slot] === grownId) continue;
+    choices.push({ id: `equip:${grownId}`, kind: 'equip', label: `Equip ${item.title} #${grownId}`, detail: item.slot });
+  }
+
+  for (const [slot, wornId] of Object.entries(state.equipped)) {
+    const item = registry.items.get(itemTemplate(state, wornId));
     choices.push({ id: `unequip:${slot}`, kind: 'unequip', label: `Unequip ${item?.title ?? slot}`, detail: slot });
   }
 
@@ -364,6 +378,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     encounter: encounterView(state, registry),
     modals: state.modals.map((frame) => publishModal(frame, state, registry)),
     inventory: Object.fromEntries(Object.entries(state.inventory).filter(([, count]) => count > 0)),
+    grown: grownItems(state),
     equipment: { ...state.equipped },
     xp: { ...state.xp },
     stats: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, statValue(stat.id, state, registry)])),

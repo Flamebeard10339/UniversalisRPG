@@ -47,6 +47,29 @@ export function itemInstance(state: GameState, id: string): ItemInstance | undef
   return grown(state, id)?.payload;
 }
 
+// A grown copy is spelled by its instance id and a stack by its item id. These
+// two are the whole of the difference between the spellings, so a consumer asks
+// which item stands behind an id and whether the player still has the one thing
+// the id names, and never which spelling it was handed.
+export function itemTemplate(state: GameState, id: string): string {
+  return grown(state, id)?.template ?? id;
+}
+
+export function carriesItem(state: GameState, id: string): boolean {
+  return grown(state, id) !== undefined || held(state, id) > 0;
+}
+
+// Every grown copy the player carries, by the id it is named by. They are not in
+// `inventory` — c11 took them out of their stacks — so a surface that lists what
+// the player has reads both.
+export function grownItems(state: GameState): Record<string, string> {
+  const carried: Record<string, string> = {};
+  for (const [id, row] of Object.entries(state.instances.byId)) {
+    if (row.kind === ITEM_INSTANCE) carried[id] = row.template;
+  }
+  return carried;
+}
+
 export function itemLevel(payload: ItemInstance, item: Item): number {
   return Math.min(skillLevel(payload.experience), item.maxLevel);
 }
@@ -67,6 +90,17 @@ function held(state: GameState, itemId: string): number {
 
 function take(state: GameState, itemId: string): void {
   state.inventory[itemId] = held(state, itemId) - 1;
+}
+
+// Growing never empties a slot. A stack the player was wearing that minting has
+// just emptied leaves a worn id naming nothing, so the slot follows the copy
+// that left it; a stack with copies still in it is still wearable, and moving
+// the slot then would change what the player wears without being asked.
+function wearInstead(state: GameState, template: string, grownId: string): void {
+  if (held(state, template) > 0) return;
+  for (const [slot, worn] of Object.entries(state.equipped)) {
+    if (worn === template) state.equipped[slot] = grownId;
+  }
 }
 
 // The one door onto a plane, and the whole of c11's laziness. A target names
@@ -92,7 +126,9 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
   if (consumes !== undefined) take(state, consumes);
   if (!minting) return { ok: true, instance: target };
   take(state, template);
-  return { ok: true, instance: createInstance(state, ITEM_INSTANCE, template, payload) };
+  const minted = createInstance(state, ITEM_INSTANCE, template, payload);
+  wearInstead(state, template, minted);
+  return { ok: true, instance: minted };
 }
 
 // c12: the only event in the game that moves an item's experience.

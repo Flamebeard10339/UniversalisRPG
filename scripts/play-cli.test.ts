@@ -84,6 +84,20 @@ starting
     expect(formatResult(runLine(ctx, '/quit'))[0]).toBe('Location: tutorial-island.guide-house');
   });
 
+  // A grown copy is counted in no stack, so a reader who only had `Inventory:`
+  // would not see it at all, and the id printed here is what equips it.
+  it('names grown copies on a line of their own, above the stack counts’ neighbours', () => {
+    const ctx = driver(source);
+    const status = runLine(ctx, '/inventory').output.find((out) => out.kind === 'inventory')!.status;
+
+    expect(formatOutput({ kind: 'inventory', status })).toEqual(['Inventory: {}', 'XP: {}']);
+    expect(formatOutput({ kind: 'inventory', status: { ...status, grown: { '1': 'tutorial-island.iron-sword' } } })).toEqual([
+      'Inventory: {}',
+      'Grown: {"1":"tutorial-island.iron-sword"}',
+      'XP: {}',
+    ]);
+  });
+
   it('separates each authored block with a blank line, so the emission pastes into a module', () => {
     expect(formatOutput({ kind: 'authored', blocks: [['# save foo-start', '{}'], ['# test foo', 'wait: 1']] })).toEqual([
       '',

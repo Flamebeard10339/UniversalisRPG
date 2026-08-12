@@ -3,6 +3,7 @@ import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
 import { actorEntity, participants, sideOf } from './encounter';
 import { Registry } from '../content/registry';
+import { carriesItem, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
 import { skillLevel } from './skills';
 import { ActiveBuff, GameState, PLAYER, RuntimeError } from './state';
@@ -68,9 +69,9 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
     else fold.increased += buff.amount;
   }
   foldStatBonuses(performing(state, registry, actorId)?.tags ?? [], statId, fold);
-  for (const itemId of own.equipped) {
-    if ((state.inventory[itemId] ?? 0) === 0) continue;
-    const item = registry.items.get(itemId);
+  for (const wornId of own.equipped) {
+    if (!carriesItem(state, wornId)) continue;
+    const item = registry.items.get(itemTemplate(state, wornId));
     if (item) foldStatBonuses(item.tags, statId, fold);
   }
   return scaleRange(fold.added, 1 + fold.increased);

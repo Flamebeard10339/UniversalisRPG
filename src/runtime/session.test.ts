@@ -1,8 +1,9 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
+import { feedItem } from './itemInstance';
 import { loadModule, Registry } from '../content/registry';
-import { SaveDiff, SAVE_VERSION } from './save';
+import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 import { apply, applyDirective, beginAction, cancelAction, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
 
@@ -668,6 +669,27 @@ forget:
 travel: forge
 `;
 
+const GROWN_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# stat might
+base: 4
+
+# entity player
+equipment-slots: hand
+
+# item gauntlet
+title: Gauntlet
+slot: hand
+max-level: 10
++3 might
+
+# item oil
+item-experience: 1000
+`;
+
 describe('what the engine publishes', () => {
   it('carries stat values, and recomputes them when equipment changes them', () => {
     const session = primed(loadModule(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
@@ -681,6 +703,32 @@ describe('what the engine publishes', () => {
     const bare = apply(session, 'unequip:hand');
     expect(bare.equipment).toEqual({});
     expect(bare.stats.might).toBe(4);
+  });
+
+  // The growth verbs are not directives yet, so the copy is grown against a
+  // state and handed to the session as a save — the way a session starts
+  // anywhere but the beginning.
+  it('names a grown copy beside the stacks, and offers it as its own equip choice', () => {
+    const registry = loadModule(GROWN_MODULE);
+    const grownState = createGameState('camp');
+    Object.assign(grownState.inventory, { gauntlet: 2, oil: 1 });
+    const grown = feedItem(grownState, registry, 'gauntlet', 'oil');
+    if (!grown.ok) throw new Error(grown.refused);
+
+    const { version: _version, ...diff } = JSON.parse(serializeSave(grownState, registry)) as SaveDiff & { version: number };
+    const session = primed(registry, diff);
+
+    const carried = view(session);
+    expect(carried.inventory).toEqual({ gauntlet: 1 });
+    expect(carried.grown).toEqual({ [grown.instance]: 'gauntlet' });
+    expect(ids(carried)).toContain(`equip:${grown.instance}`);
+    expect(carried.stats.might).toBe(4);
+
+    const armed = apply(session, `equip:${grown.instance}`);
+    expect(armed.equipment).toEqual({ hand: grown.instance });
+    expect(armed.stats.might).toBe(7);
+    expect(ids(armed)).not.toContain(`equip:${grown.instance}`);
+    expect(armed.choices.find((choice) => choice.id === 'unequip:hand')?.label).toBe('Unequip Gauntlet');
   });
 
   it('carries skill xp as it is earned', () => {
@@ -872,7 +920,10 @@ describe('what the engine withholds', () => {
       visits: 'withheld',
       activeBuffs: 'withheld',
       resourceRateRemainders: 'withheld',
-      instances: 'withheld',
+      // Which grown copies the player carries, and nothing about what is inside
+      // one: a driver has to name what it is equipping, and a plane is read
+      // through a surface of its own.
+      instances: 'published',
       // How many of each place's population are down. A driver renders what is
       // standing, which `entities` already carries.
       populations: 'withheld',
@@ -885,7 +936,7 @@ describe('what the engine withholds', () => {
     const published = Object.keys(classified).filter((field) => classified[field as keyof GameState] === 'published');
     const carried = new Set(Object.keys(view(startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n')))));
     // Two of them are renamed on the way out and one is drained into `said`.
-    const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action' };
+    const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action', instances: 'grown' };
     for (const field of published) expect(carried.has(renamed[field] ?? field), field).toBe(true);
   });
 });

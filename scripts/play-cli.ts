@@ -118,7 +118,14 @@ function formatView(v: PlayView, reread = false): string[] {
 }
 
 function formatInventory(status: PlayStatus): string[] {
-  const lines = [`Inventory: ${JSON.stringify(status.inventory)}`, `XP: ${JSON.stringify(status.xp)}`];
+  const lines = [`Inventory: ${JSON.stringify(status.inventory)}`];
+  // Named on their own line rather than folded into the stack counts: a grown
+  // copy is not interchangeable with its stack, and the id here is the handle a
+  // player equips it by.
+  if (Object.keys(status.grown).length > 0) {
+    lines.push(`Grown: ${JSON.stringify(status.grown)}`);
+  }
+  lines.push(`XP: ${JSON.stringify(status.xp)}`);
   if (Object.keys(status.equipment).length > 0) {
     lines.push(`Equipped: ${JSON.stringify(status.equipment)}`);
   }
