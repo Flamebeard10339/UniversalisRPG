@@ -267,13 +267,30 @@ describe('the rules the driver is held to', () => {
     expect(controls(written)).toEqual(['<button onClick={() => (a > b ? x : y)} className="h-[12px]"']);
   });
 
-  // The registration text-grep that used to sit here is gone. It asserted that
-  // App.tsx and MapPane.tsx contain `useTestSurface(`, which killed deleting
-  // either call and nothing else — a map registering a floor it was not drawing
-  // survived it and the whole suite. What holds that now is the seam: each
-  // component assembles one value, draws from it and hands that same value
-  // over, so a registration that lies is markup that lies and render.test.tsx
-  // fails on it. The two files this named were also a hand-written list.
+  // A registration has two halves and they fail differently. That it does not
+  // lie is held by the seam — each component assembles one value, draws from it
+  // and hands that same value over, so render.test.tsx fails on a lie. That it
+  // exists at all is held here.
+  //
+  // The rule this replaced named App.tsx and MapPane.tsx, which was a list of
+  // two filenames; removing it left the existing half unheld, and deleting a
+  // component's whole call survived all 2523 tests. The set is derived instead:
+  // a builder and a registration are the same surface named twice, so the
+  // builders are what says which registrations must exist.
+  it('registers every surface a builder can make, and none a builder cannot', () => {
+    const registering = SHIPPED.flatMap((source) =>
+      [...source.text.matchAll(/\buseTestSurface\s*\(\s*'([^']+)'/g)].map(([, surface]) => ({ surface, file: source.file })),
+    );
+    const buildable = Object.keys(SURFACE_BUILDERS);
+
+    expect(buildable.length, 'no surface has a builder, so every check below holds vacuously').toBeGreaterThan(0);
+    for (const surface of buildable) {
+      expect(registering.map((one) => one.surface), `nothing under src/ui registers the ${surface} surface`).toContain(surface);
+    }
+    for (const one of registering) {
+      expect(buildable, `${one.file} registers ${one.surface}, which no builder makes`).toContain(one.surface);
+    }
+  });
 
   // c6's structural half — bundle.test.ts builds the release and reads the
   // module graph, which is the other. A module that ships may reach into the
