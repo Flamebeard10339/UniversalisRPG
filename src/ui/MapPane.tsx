@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampZoom, drawnBox, midpoint, onWalk, panAfterZoom, PER_UNIT, settled, sheetAt, spanBetween, tapTarget, walkLine, waysOut, zoomByWheel, type Node, type Point, type Size } from './discovery';
+import { bounds, clampZoom, drawnBox, drawnFor, midpoint, onWalk, panAfterZoom, PER_UNIT, settled, spanBetween, tapTarget, walkLine, zoomByWheel, type Node, type Point, type Size } from './discovery';
 import { useTestSurface } from './testSurface';
 
 // The map draws its own working out — the box a pan is held against — for
@@ -69,17 +69,11 @@ export function MapPane({
   const [scale, setScale] = useState(1);
   const [bubble, setBubble] = useState<Size>({ width: 0, height: 0 });
 
-  const discovered = view?.discovered ?? [];
-  const here = view?.location.id ?? '';
-  const standing = discovered.find((place) => place.id === here);
-  const at = plane ?? standing?.z ?? 0;
-  const sheet = sheetAt(discovered, here, at);
-  const box = bounds(sheet.nodes);
-  const centre = { x: ((box.minX + box.maxX) / 2) * PER_UNIT, y: ((box.minY + box.maxY) / 2) * PER_UNIT };
-
   // A place with no way out to it is somewhere the player cannot set off for
   // now, and the map says so by not being tappable rather than by saying why.
-  const travels = waysOut(view?.choices ?? []);
+  const { plane: at, here, sheet, travels } = drawnFor(view, plane);
+  const box = bounds(sheet.nodes);
+  const centre = { x: ((box.minX + box.maxX) / 2) * PER_UNIT, y: ((box.minY + box.maxY) / 2) * PER_UNIT };
 
   // The walk under way, as the engine published it, with the place the player
   // is standing in at the head so a road on it is a pair of neighbours.

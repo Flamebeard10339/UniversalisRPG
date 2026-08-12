@@ -45,13 +45,15 @@ export function drawnAt(place: Place, plane: number): Point {
 }
 
 // What is drawn on one z-plane: everything standing on it, plus anywhere off it
-// the player could step to from where they are. A staircase is a place on
-// another floor, and a floor plan that hid it would hide the way out of the
-// room the player is in.
-export function sheetAt(discovered: readonly Place[], here: string, plane: number): Sheet {
+// the player could step to from where they are, plus anywhere the view is
+// offering a way out to. A staircase is a place on another floor, and a floor
+// plan that hid it would hide the way out of the room the player is in; a
+// destination the player can set off for now is one the map has to be able to
+// show, or the offer sits nowhere a finger can reach it.
+export function sheetAt(discovered: readonly Place[], here: string, plane: number, offered: ReadonlyMap<string, number> = new Map()): Sheet {
   const standing = discovered.find((place) => place.id === here);
   const reachable = new Set(standing?.adjacent.map((edge) => edge.to) ?? []);
-  const shown = discovered.filter((place) => place.z === plane || place.id === here || reachable.has(place.id));
+  const shown = discovered.filter((place) => place.z === plane || place.id === here || reachable.has(place.id) || offered.has(place.id));
   const nodes = shown.map((place) => ({ place, here: place.id === here, climb: place.z - plane, at: drawnAt(place, plane) }));
   const byId = new Map(nodes.map((node) => [node.place.id, node]));
 
@@ -83,6 +85,28 @@ export function waysOut(choices: readonly PlayView['choices'][number][]): Map<st
     ways.set(choice.leadsTo, index + 1);
   });
   return ways;
+}
+
+export interface Drawn {
+  // The plane being looked at: the one asked for, or the one the player is
+  // standing on until they ask for another.
+  plane: number;
+  here: string;
+  sheet: Sheet;
+  travels: ReadonlyMap<string, number>;
+}
+
+// The whole of what the map draws for one view. Composed here rather than in
+// the component, because the two halves have to agree — a place is drawn on the
+// strength of the offer that leads to it — and a composition inside a render is
+// one no test in this suite can reach.
+export function drawnFor(view: PlayView | null, asked: number | null): Drawn {
+  const discovered = view?.discovered ?? [];
+  const here = view?.location.id ?? '';
+  const plane = asked ?? discovered.find((place) => place.id === here)?.z ?? 0;
+  const travels = waysOut(view?.choices ?? []);
+
+  return { plane, here, sheet: sheetAt(discovered, here, plane, travels), travels };
 }
 
 export interface Box {

@@ -16,8 +16,8 @@ export interface OfferGroup {
 }
 
 // Somewhere the engine says is more than one road away. It is on the table and
-// it is not on this table: the sheet is what the room offers, and a place a
-// walk away is offered by the map, which is where a player picks it out.
+// it is not on this table: the sheet is what the room the player is standing in
+// offers, and a walk crossing roads out of sight of it is not one of those.
 const aWalkAway = (choice: PlayView['choices'][number]): boolean => choice.legs !== undefined && choice.legs > 1;
 
 export function groupOffers(choices: PlayView['choices']): OfferGroup[] {

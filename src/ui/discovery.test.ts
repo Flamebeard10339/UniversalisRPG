@@ -41,6 +41,17 @@ describe('one plane of the map', () => {
     expect(ids).not.toContain('attic');
   });
 
+  it('draws a place the view is offering a walk to, however far off the shown plane it stands', () => {
+    // Neither on the plane being looked at nor a step from where the player is:
+    // the offer is the whole of what puts the attic on the sheet.
+    const withAttic = [...HOUSE, place('attic', 5, 5, 1, 'landing')];
+    const walk: PlayView['choices'][number] = { id: 'travel:attic', kind: 'travel', label: 'Travel to Attic', leadsTo: 'attic', legs: 2 };
+
+    const ids = sheetAt(withAttic, 'hall', 0, waysOut([walk])).nodes.map((node) => node.place.id);
+
+    expect(ids).toContain('attic');
+  });
+
   it('keeps the player on the map even when they are standing off the plane', () => {
     const sheet = sheetAt(HOUSE, 'cellar', 0);
 
