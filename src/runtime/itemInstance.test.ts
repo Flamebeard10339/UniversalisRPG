@@ -398,6 +398,40 @@ describe('destroying a carried item', () => {
 
     destroyItem(state, 'iron-sword');
     expect(state.equipped).toEqual({ mainhand: '1' });
+    // c21: the copy is on and is counted nowhere on the carried side, so the
+    // stack going empty is the whole of what the count has to say.
+    expect(carriedCount(state, 'iron-sword')).toBe(0);
+  });
+});
+
+// c21, growing side. The stack a copy is minted out of has two places to be
+// once carried and worn are disjoint, and which one it came out of is the whole
+// of what says where the minted copy ends up.
+describe('growing a copy the player is wearing', () => {
+  it('grows the worn copy and puts what it minted back on, once the stack behind it is empty', () => {
+    const state = carrying({ 'iron-sword': 1, whetstone: 1 });
+    equip(state, registry, 'iron-sword');
+
+    const grown = feedItem(state, registry, 'iron-sword', 'whetstone');
+    expect(grown).toEqual({ ok: true, instance: '1' });
+    expect(state.equipped).toEqual({ mainhand: '1' });
+    expect(itemInstance(state, '1')?.experience).toBe(1000);
+    expect(carriedCount(state, 'iron-sword')).toBe(0);
+  });
+
+  it('grows a carried copy and leaves the slot alone while the stack still has one', () => {
+    const state = carrying({ 'iron-sword': 2, whetstone: 1 });
+    equip(state, registry, 'iron-sword');
+
+    expect(feedItem(state, registry, 'iron-sword', 'whetstone')).toEqual({ ok: true, instance: '1' });
+    expect(state.equipped).toEqual({ mainhand: 'iron-sword' });
     expect(carriedCount(state, 'iron-sword')).toBe(1);
+  });
+
+  it('refuses an item the player neither carries nor wears', () => {
+    const state = carrying({ whetstone: 1 });
+
+    expect(feedItem(state, registry, 'iron-sword', 'whetstone')).toEqual({ ok: false, refused: 'you carry no iron-sword' });
+    expect(state.instances.byId).toEqual({});
   });
 });

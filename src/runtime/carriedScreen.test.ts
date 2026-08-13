@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule, Registry } from '../content/registry';
 import { carriedEntries, carriedOptions, carriedSubmit, CONFIRMED, LEAVE } from './carriedScreen';
+import { equip } from './equipment';
 import { carriedCount, feedItem } from './itemInstance';
+import { planeFrame } from './planeScreen';
 import { initialState } from './save';
 import { GameState } from './state';
 
@@ -102,6 +104,28 @@ describe('what the screen lists', () => {
   it('names an item the registry has lost by the id the player still carries it under', () => {
     expect(carriedEntries(carrying({ 'gone.relic': 1 }), registry)[0].value).toBe('gone.relic x1');
   });
+
+  // c21: one copy, one row. The stack it came out of keeps its own row with one
+  // fewer on it, and the worn copy names the slot it is in.
+  it('lists a worn stack copy once, under its slot, and takes it off the stack’s count', () => {
+    const state = carrying({ 'iron-sword': 3 });
+    equip(state, registry, 'iron-sword');
+
+    expect(carriedEntries(state, registry)).toEqual([
+      { id: 'iron-sword', name: 'Iron Sword', count: 2, value: 'Iron Sword x2', grown: false },
+      { id: 'iron-sword', name: 'Iron Sword', count: 1, value: 'Iron Sword (mainhand)', grown: false, slot: 'mainhand' },
+    ]);
+  });
+
+  it('lists a worn grown copy under equipment and nowhere else', () => {
+    const state = withGrownBlade();
+    equip(state, registry, '1');
+
+    expect(carriedEntries(state, registry)).toEqual([
+      { id: 'heartwood-blade', name: 'Heartwood Blade', count: 1, value: 'Heartwood Blade x1', grown: false },
+      { id: '1', name: 'Modified Heartwood Blade', count: 1, value: 'Modified Heartwood Blade (mainhand)', grown: true, slot: 'mainhand' },
+    ]);
+  });
 });
 
 describe('what the screen asks', () => {
@@ -122,22 +146,24 @@ describe('what the screen asks', () => {
   });
 
   // c18: an entry offers only verbs that apply to it, and an item already worn
-  // disproves the one that would do nothing.
+  // disproves the one that would do nothing. c21 adds the other half: the worn
+  // entry offers every verb a carried one does, so what the player most wants to
+  // improve is still one press from being grown.
   it('offers a worn entry Unequip rather than an Equip that would do nothing', () => {
     const state = carrying({ 'iron-sword': 1, 'heartwood-blade': 1 });
-    state.equipped.mainhand = 'iron-sword';
+    equip(state, registry, 'iron-sword');
 
-    expect(values({ item: 'Iron Sword x1' }, state, 'verb')).toEqual(['Grow', 'Unequip', 'Destroy', LEAVE]);
+    expect(values({ item: 'Iron Sword (mainhand)' }, state, 'verb')).toEqual(['Grow', 'Unequip', 'Destroy', LEAVE]);
     expect(values({ item: 'Heartwood Blade x1' }, state, 'verb')).toEqual(['Grow', 'Equip', 'Destroy', LEAVE]);
   });
 
-  // The slot holds the spelling that was worn, so a stack still in the slot does
-  // not make the grown copy beside it read as worn.
+  // The slot holds the spelling that was worn, so a stack still in the stack does
+  // not make the grown copy in the slot read as carried.
   it('offers Unequip to the very copy in the slot and Equip to the one beside it', () => {
     const state = withGrownBlade();
-    state.equipped.mainhand = '1';
+    equip(state, registry, '1');
 
-    expect(values({ item: 'Modified Heartwood Blade' }, state, 'verb')).toEqual(['Grow', 'Unequip', 'Destroy', LEAVE]);
+    expect(values({ item: 'Modified Heartwood Blade (mainhand)' }, state, 'verb')).toEqual(['Grow', 'Unequip', 'Destroy', LEAVE]);
     expect(values({ item: 'Heartwood Blade x1' }, state, 'verb')).toEqual(['Grow', 'Equip', 'Destroy', LEAVE]);
   });
 
@@ -199,9 +225,9 @@ describe('what the screen does with an answer', () => {
 
   it('takes off what unequip names, and empties the slot rather than the hands', () => {
     const state = carrying({ 'iron-sword': 1 });
-    state.equipped.mainhand = 'iron-sword';
+    equip(state, registry, 'iron-sword');
 
-    expect(carriedSubmit({ item: 'Iron Sword x1', verb: 'Unequip' }, state, registry)).toBeNull();
+    expect(carriedSubmit({ item: 'Iron Sword (mainhand)', verb: 'Unequip' }, state, registry)).toBeNull();
     expect(state.equipped).toEqual({});
     expect(carriedCount(state, 'iron-sword')).toBe(1);
   });
@@ -222,6 +248,27 @@ describe('what the screen does with an answer', () => {
 
     expect(carriedSubmit({ item: 'Modified Heartwood Blade', verb: 'Destroy', confirm: CONFIRMED }, state, registry)).toBeNull();
     expect(carriedCount(state, 'heartwood-blade')).toBe(0);
+  });
+
+  // c21: the equipment's entries take the verbs a carried entry takes, so the
+  // copy the player is wearing is the one they can grow without taking it off.
+  it('opens the plane of the copy in the slot, and puts what growing it minted back on', () => {
+    const state = withGrownBlade();
+    state.inventory.whetstone = 1;
+    equip(state, registry, 'heartwood-blade');
+
+    expect(carriedSubmit({ item: 'Heartwood Blade (mainhand)', verb: 'Grow' }, state, registry)).toEqual(planeFrame('heartwood-blade'));
+    expect(feedItem(state, registry, 'heartwood-blade', 'whetstone')).toEqual({ ok: true, instance: '2' });
+    expect(state.equipped).toEqual({ mainhand: '2' });
+  });
+
+  it('destroys the copy in the slot without reaching into the stack behind it', () => {
+    const state = carrying({ 'iron-sword': 1 });
+    equip(state, registry, 'iron-sword');
+
+    expect(carriedSubmit({ item: 'Iron Sword (mainhand)', verb: 'Destroy' }, state, registry)).toBeNull();
+    expect(state.equipped).toEqual({});
+    expect(carriedCount(state, 'iron-sword')).toBe(0);
   });
 
   it('does nothing for an answer naming what the player has stopped carrying', () => {

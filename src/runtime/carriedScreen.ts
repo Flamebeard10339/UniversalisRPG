@@ -2,7 +2,7 @@ import { isBase, Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
 import { equip, unequip } from './equipment';
-import { carriedItems, destroyItem, grownItems, itemTemplate } from './itemInstance';
+import { itemCopies, destroyItem, grownItems, isGrownCopy, itemTemplate, wornIn } from './itemInstance';
 import { type ModalAnswers, type ModalFrame, type ModalOption } from './modals';
 import { planeFrame } from './planeScreen';
 import { GameState } from './state';
@@ -28,23 +28,21 @@ export interface CarriedEntry {
   readonly id: string;
   // The one name for it (c16). Every surface spells a carried thing this way.
   readonly name: string;
-  // How many the player has: a stack's count, and one for a grown copy, which
-  // is counted in no stack.
+  // How many the player has: a stack's count, and one for a grown copy or a
+  // worn one, neither of which is counted in a stack.
   readonly count: number;
   // What the screen publishes and an answer comes back as.
   readonly value: string;
   readonly grown: boolean;
-}
-
-// What is worn, in the spelling a slot holds it in, so a verb asks whether this
-// very copy is on rather than whether one like it is.
-function wornSlot(entry: CarriedEntry, item: Item | undefined, state: GameState): string | undefined {
-  return item?.slot !== undefined && state.equipped[item.slot] === entry.id ? item.slot : undefined;
+  // The slot this entry is worn in, and undefined for a carried one: c21 puts
+  // every entry on exactly one of those two sides, so this is what a page
+  // listing one side and not the other reads, and what says which verbs apply.
+  readonly slot?: string;
 }
 
 interface CarriedVerb {
   readonly value: string;
-  applies(item: Item | undefined, entry: CarriedEntry, state: GameState): boolean;
+  applies(item: Item | undefined, entry: CarriedEntry): boolean;
   // Whether taking it asks once more, naming what is lost, before it happens (c12).
   confirms(entry: CarriedEntry): boolean;
   take(entry: CarriedEntry, state: GameState, registry: Registry): ModalFrame | null;
@@ -61,7 +59,7 @@ const VERBS: readonly CarriedVerb[] = [
   },
   {
     value: 'Equip',
-    applies: (item, entry, state) => item?.slot !== undefined && wornSlot(entry, item, state) === undefined,
+    applies: (item, entry) => item?.slot !== undefined && entry.slot === undefined,
     confirms: () => false,
     take: (entry, state, registry) => {
       equip(state, registry, entry.id);
@@ -70,11 +68,10 @@ const VERBS: readonly CarriedVerb[] = [
   },
   {
     value: 'Unequip',
-    applies: (item, entry, state) => wornSlot(entry, item, state) !== undefined,
+    applies: (_item, entry) => entry.slot !== undefined,
     confirms: () => false,
-    take: (entry, state, registry) => {
-      const slot = wornSlot(entry, registry.items.get(itemTemplate(state, entry.id)), state);
-      if (slot !== undefined) unequip(state, slot);
+    take: (entry, state) => {
+      if (entry.slot !== undefined) unequip(state, entry.slot);
       return null;
     },
   },
@@ -111,23 +108,31 @@ function distinct(entries: CarriedEntry[]): CarriedEntry[] {
 }
 
 // c1: a stack is listed by name and count, a grown copy by name alone, because
-// a grown copy is not interchangeable with its stack and is never in one.
+// a grown copy is not interchangeable with its stack and is never in one. c21
+// adds the third side: what is worn is listed once, under the slot wearing it,
+// and is on neither of the first two lists.
 export function carriedEntries(state: GameState, registry: Registry): CarriedEntry[] {
   const entries: CarriedEntry[] = [];
-  for (const [template, { stack }] of carriedItems(state)) {
+  for (const [template, { stack }] of itemCopies(state)) {
     const name = nameOf(template, registry, false);
     if (stack > 0) entries.push({ id: template, name, count: stack, value: `${name} x${stack}`, grown: false });
   }
   for (const [id, template] of Object.entries(grownItems(state))) {
+    if (wornIn(state, id) !== undefined) continue;
     const name = nameOf(template, registry, true);
     entries.push({ id, name, count: 1, value: name, grown: true });
+  }
+  for (const [slot, id] of Object.entries(state.equipped)) {
+    const grown = isGrownCopy(state, id);
+    const name = nameOf(itemTemplate(state, id), registry, grown);
+    entries.push({ id, name, count: 1, value: `${name} (${slot})`, grown, slot });
   }
   return distinct(entries);
 }
 
 function verbsFor(entry: CarriedEntry, state: GameState, registry: Registry): readonly CarriedVerb[] {
   const item = registry.items.get(itemTemplate(state, entry.id));
-  return VERBS.filter((verb) => verb.applies(item, entry, state));
+  return VERBS.filter((verb) => verb.applies(item, entry));
 }
 
 function listed(values: readonly string[]): readonly string[] {

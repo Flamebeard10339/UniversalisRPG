@@ -3,7 +3,7 @@ import { DISCOVERED, Location } from '../content/location';
 import {
   actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { endJourney } from './state';
-import { carriedItems, Growth, grownItems, itemTemplate } from './itemInstance';
+import { itemCopies, Growth, grownItems, itemTemplate } from './itemInstance';
 import { grow } from './growth';
 import { planeReports, type PlaneFocus, type PlaneReport } from './planeReport';
 import { parseOwnerRef } from './actions';
@@ -65,14 +65,15 @@ export interface PlayStatus {
   // Bottom of the stack first, so the last one is the one being answered.
   modals: Modal[];
   inventory: Record<string, number>;
-  // Grown copies the player carries, by the instance id each is named by. They
-  // are counted nowhere in `inventory`, so a surface listing what the player has
-  // reads both records.
+  // Grown copies the player has, carried or worn, by the instance id each is
+  // named by. They are counted nowhere in `inventory`, so a surface listing what
+  // the player has reads both records.
   grown: Record<string, string>;
-  // The same two records as the rows a page draws: named once below every
+  // Every row a page draws, on either side of c21: named once below every
   // screen, counted, and each under the id a verb addresses it by, so a surface
-  // listing what the player carries states the engine's answer rather than
-  // reading a dictionary's keys as names (c16, c18).
+  // states the engine's answer rather than reading a dictionary's keys as names
+  // (c16, c18). A row worn in a slot names it; a row without one is carried, and
+  // a page that lists one side filters on that rather than on a second record.
   carried: CarriedEntry[];
   // One per plane the player carries, grown copies first in the order `grown`
   // names them and then the bases still in their stacks: the plane behind the
@@ -224,10 +225,11 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     choices.push({ id: `use:location.${location.id}.${action.label}`, kind: 'action', label: action.label, detail: location.title });
   }
 
-  // Item actions are offered per item the player carries, however the copies are
-  // spelled; equipping is offered per copy, and a stack the player has emptied
-  // by growing its last copy is not one of them.
-  for (const [itemId, { stack }] of carriedItems(state)) {
+  // Item actions are offered per item the player has, however the copies are
+  // spelled and whichever side of c21 they are on — wearing a thing is not a way
+  // to stop being able to use it. Equipping is offered per copy, and a stack the
+  // player has emptied by growing or wearing its last copy is not one of them.
+  for (const [itemId, { stack }] of itemCopies(state)) {
     const item = registry.items.get(itemId);
     if (!item) continue;
     for (const action of availableActions(item, state)) {
@@ -400,7 +402,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     resources: publishResources(state, registry),
     encounter: encounterView(state, registry),
     modals: state.modals.map((frame) => publishModal(frame, state, registry)),
-    inventory: Object.fromEntries([...carriedItems(state)].flatMap(([id, { stack }]) => (stack > 0 ? [[id, stack] as const] : []))),
+    inventory: Object.fromEntries([...itemCopies(state)].flatMap(([id, { stack }]) => (stack > 0 ? [[id, stack] as const] : []))),
     grown: grownItems(state),
     carried: carriedEntries(state, registry),
     planes: planeReports(registry, state),

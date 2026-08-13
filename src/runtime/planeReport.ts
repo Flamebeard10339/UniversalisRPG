@@ -7,7 +7,7 @@ import { carriedName } from './carriedName';
 import { positionPayloads } from './clusterEffect';
 import { basePlane, isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
-import { carried, carriedItems, grownItems, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining } from './itemInstance';
+import { copiesOf, itemCopies, grownItems, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining, wornIn } from './itemInstance';
 import { GameState } from './state';
 
 // Where a point may go, said once for both things a point buys. `blocked` is a
@@ -151,7 +151,9 @@ function clusterReport(registry: Registry, plane: Plane, hex: Hex): ClusterRepor
 
 // A growth verb spells its target either way an item is carried, and both have
 // a plane to report: a base still in its stack has the one growing it would
-// mint, which is what a screen opened on that stack is looking at.
+// mint, which is what a screen opened on that stack is looking at. A base the
+// player is wearing is the same case — c21 took it out of the stack, and the
+// plane growing it would mint is the one its equipment row opens.
 function targeted(registry: Registry, state: GameState, target: string): { item: Item; template: string; grown: boolean; payload: ItemInstance } | undefined {
   const template = itemTemplate(state, target);
   const item = registry.items.get(template);
@@ -159,7 +161,7 @@ function targeted(registry: Registry, state: GameState, target: string): { item:
 
   const live = itemInstance(state, target);
   if (live) return { item, template, grown: true, payload: live };
-  if (carried(state, target).stack < 1) return undefined;
+  if (copiesOf(state, target).stack < 1 && wornIn(state, target) === undefined) return undefined;
 
   const plane = basePlane(item);
   return plane === undefined ? undefined : { item, template, grown: false, payload: { experience: 0, plane } };
@@ -188,12 +190,13 @@ export function planeReport(registry: Registry, state: GameState, target: string
   };
 }
 
-// Every plane the player is carrying, whichever way they carry it: a grown copy
-// under its own id, and a base still in its stack under the item's, which is the
-// plane growing it would mint. Both are addressable by the growth verbs and both
-// are what a screen can be opened on, so publishing only the grown ones would
-// leave a focus pointing at a plane no driver could find.
+// Every plane the player has, whichever way they have it: a grown copy under its
+// own id, a base still in its stack under the item's, and whatever fills a slot
+// under the spelling that slot holds. All three are addressable by the growth
+// verbs and all three are what a screen can be opened on, so publishing only the
+// grown ones would leave a focus pointing at a plane no driver could find, and
+// publishing only the carried ones would lose the plane of what is worn (c21).
 export function planeReports(registry: Registry, state: GameState): PlaneReport[] {
-  const stacks = [...carriedItems(state).keys()];
-  return [...Object.keys(grownItems(state)), ...stacks].flatMap((id) => planeReport(registry, state, id) ?? []);
+  const targets = new Set([...Object.keys(grownItems(state)), ...itemCopies(state).keys(), ...Object.values(state.equipped)]);
+  return [...targets].flatMap((id) => planeReport(registry, state, id) ?? []);
 }

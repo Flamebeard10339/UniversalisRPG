@@ -40,12 +40,14 @@ export function contributionText(contributions: readonly Contribution[]): string
   return parts.join(', ');
 }
 
-// Everything the player is carrying, as the engine names and counts it. A grown
-// copy carries no id in its name, so what tells two of them apart is the stat
-// summary beneath — which is the plane report's, looked up by the id the row is
-// of and never folded here (c8, c18).
+// Everything the player is carrying, as the engine names and counts it — which
+// is the rows on the carried side of c21, the worn ones being the equipment
+// page's. A grown copy carries no id in its name, so what tells two of them
+// apart is the stat summary beneath — which is the plane report's, looked up by
+// the id the row is of and never folded here (c8, c18).
 export function carried(rows: readonly CarriedRow[], planes: readonly Plane[]): Entry[] {
   return rows
+    .filter((row) => row.slot === undefined)
     .map((row) => {
       const contributions = row.grown ? (planes.find((plane) => plane.instance === row.id)?.contributions ?? []) : [];
       const detail = contributionText(contributions);

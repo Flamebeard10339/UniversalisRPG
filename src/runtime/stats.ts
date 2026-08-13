@@ -4,7 +4,7 @@ import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } f
 import { actorEntity, participants, sideOf } from './encounter';
 import { Registry } from '../content/registry';
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
-import { carriesItem, itemInstance, itemTemplate } from './itemInstance';
+import { itemInstance, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
 import { skillLevel } from './skills';
 import { ActiveBuff, GameState, PLAYER, RuntimeError } from './state';
@@ -82,8 +82,10 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
     else fold.increased += buff.amount;
   }
   foldStatBonuses(performing(state, registry, actorId)?.tags ?? [], statId, fold);
+  // c21: a slot is the only place its copy is, so what is worn contributes on
+  // the strength of being worn. Asking whether it is also carried would fold
+  // nothing at all, because being worn is exactly what says it is not.
   for (const wornId of own.equipped) {
-    if (!carriesItem(state, wornId)) continue;
     const item = registry.items.get(itemTemplate(state, wornId));
     if (item) foldContribution(itemContribution(registry, item, itemInstance(state, wornId)), statId, fold);
   }

@@ -5,7 +5,7 @@ import { carriedName } from './carriedName';
 import { carriedEntries, carriedFrame } from './carriedScreen';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
-import { carriedItems } from './itemInstance';
+import { itemCopies } from './itemInstance';
 import { type ModalFrame, type ModalOption } from './modals';
 import { ClusterReport, PlaneFocus, PlaneReport, planeReport } from './planeReport';
 import { GameState } from './state';
@@ -80,7 +80,7 @@ function reachable(report: PlaneReport, here: ClusterReport): string[] {
 // the kind a growth verb consumes. A grown copy is never taken, so a jewel that
 // has itself been grown is not one to slot.
 function stacked(state: GameState, registry: Registry, spent: (item: Item) => boolean): Array<{ id: string; name: string }> {
-  return [...carriedItems(state)].flatMap(([id, { stack }]) => {
+  return [...itemCopies(state)].flatMap(([id, { stack }]) => {
     const item = registry.items.get(id);
     return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(item.title, false) }] : [];
   });

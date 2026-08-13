@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { armFightAction, createGameState, equip, GameState, initResources, resolve, statValue, unequip } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { parseSaveSection } from '../content/saveSection';
-import { feedItem } from './itemInstance';
+import { carriedCount, carriesItem, feedItem } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
@@ -164,20 +164,80 @@ describe('equipment', () => {
     expect(statValue('tutorial-island.defense', state, tutorial)).toBe(bareDefense + 2);
   });
 
-  it('equipment-slots: a slot keeps its item across losing and re-acquiring it', () => {
+  // c21: a worn copy is out of the stack, so it is the slot and nothing else
+  // that says the player has it, and it is worth its bonus on those terms.
+  it('equipment-slots: a worn copy contributes on the strength of being worn, with no stack behind it', () => {
     const registry = loaded();
     const state = createGameState('arena');
     initResources(state, registry);
     state.inventory['attack-bonus'] = 1;
+    const bare = statValue('attack', state, registry);
+
     equip(state, registry, 'attack-bonus');
-    const equipped = statValue('attack', state, registry);
+    expect(carriedCount(state, 'attack-bonus')).toBe(0);
+    expect(statValue('attack', state, registry)).toBe(bare + 2);
+  });
+});
 
-    state.inventory['attack-bonus'] = 0;
-    expect(statValue('attack', state, registry)).toBe(equipped - 2);
-    expect(state.equipped['mainhand']).toBe('attack-bonus');
+// c21, and the whole of it: what the player carries and what they are wearing
+// are two places, a copy is in exactly one of them, and equipping is the move.
+describe('carried and worn are disjoint', () => {
+  it('reads two carried and one equipped out of a stack of three, and three again once it comes off', () => {
+    const registry = loaded();
+    const state = carrying(registry, { 'attack-bonus': 3 });
 
+    equip(state, registry, 'attack-bonus');
+    expect(carriedCount(state, 'attack-bonus')).toBe(2);
+    expect(state.inventory['attack-bonus']).toBe(2);
+    expect(state.equipped).toEqual({ mainhand: 'attack-bonus' });
+
+    unequip(state, 'mainhand');
+    expect(carriedCount(state, 'attack-bonus')).toBe(3);
+    expect(state.equipped).toEqual({});
+  });
+
+  it('lists a worn grown copy under equipment and counts it nowhere the player carries', () => {
+    const registry = loaded();
+    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
+    const grownId = fed(state, registry, 'attack-bonus');
+
+    equip(state, registry, grownId);
+    expect(state.equipped).toEqual({ mainhand: grownId });
+    expect(carriedCount(state, 'attack-bonus')).toBe(0);
+    expect(carriesItem(state, grownId)).toBe(false);
+
+    unequip(state, 'mainhand');
+    expect(carriedCount(state, 'attack-bonus')).toBe(1);
+    expect(carriesItem(state, grownId)).toBe(true);
+  });
+
+  // A slot that is filled while it is occupied is two moves of one copy each:
+  // without the first, the copy that was in it is in no place at all.
+  it('gives back what a slot was holding when another copy takes it', () => {
+    const registry = loaded();
+    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
+    const grownId = fed(state, registry, 'attack-bonus');
     state.inventory['attack-bonus'] = 1;
-    expect(statValue('attack', state, registry)).toBe(equipped);
+
+    equip(state, registry, 'attack-bonus');
+    equip(state, registry, grownId);
+    expect(state.equipped).toEqual({ mainhand: grownId });
+    expect(carriedCount(state, 'attack-bonus')).toBe(1);
+
+    equip(state, registry, 'attack-bonus');
+    expect(state.equipped).toEqual({ mainhand: 'attack-bonus' });
+    expect(carriesItem(state, grownId)).toBe(true);
+    expect(carriedCount(state, 'attack-bonus')).toBe(1);
+  });
+
+  it('refuses to wear what the player is already wearing rather than duplicating the move', () => {
+    const registry = loaded();
+    const state = carrying(registry, { 'attack-bonus': 1 });
+    equip(state, registry, 'attack-bonus');
+
+    expect(() => equip(state, registry, 'attack-bonus')).toThrow(/does not carry/);
+    expect(state.equipped).toEqual({ mainhand: 'attack-bonus' });
+    expect(carriedCount(state, 'attack-bonus')).toBe(0);
   });
 });
 

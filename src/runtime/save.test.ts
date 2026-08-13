@@ -391,8 +391,10 @@ describe('a # test section records an equip', () => {
     const state = replaying('equips-a-charm');
     expect(state.equipped).toEqual({ neck: 'charm' });
     expect(statValue('might', state, loadModule(SAVE_TEST_MODULE))).toBe(5);
-    // Equipping moves no counts: the charm is still carried.
-    expect(state.inventory['charm']).toBe(1);
+    // c21: equipping moves the copy. The stack it came out of is empty, and the
+    // `assert: has charm` the section replays still holds, because having a
+    // thing and carrying it are two questions and only one of them is the stack.
+    expect(state.inventory['charm']).toBe(0);
   });
 
   it('unequips by slot, emptying it again', () => {

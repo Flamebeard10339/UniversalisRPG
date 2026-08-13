@@ -57,62 +57,96 @@ export function itemTemplate(state: GameState, id: string): string {
   return grown(state, id)?.template ?? id;
 }
 
-// Whether the one copy an id names is still carried, which is not the same
-// question as how many the player has: a slot holds an id, and a slot whose
-// grown copy is gone is empty even where the stack behind it is not.
-export function carriesItem(state: GameState, id: string): boolean {
-  return grown(state, id) !== undefined || carried(state, id).stack > 0;
+// Which spelling an id is: the minted id of a copy that has left its stack, or
+// the item id a stack is spelled by. Asked wherever the two are moved
+// differently, because only one of them is counted in a stack at all.
+export function isGrownCopy(state: GameState, id: string): boolean {
+  return grown(state, id) !== undefined;
 }
 
-// The two sides of carrying an item, and the whole of the asymmetry a plane
-// rests on. `stack` is the only side a directive may spend; `grown` is the
-// copies that satisfy every gate and are never taken, so no cost, recipe or
-// take: can destroy a plane.
-export interface Carried {
+// Which slot an id is worn in, where it is worn in one. A slot holds either
+// spelling, so this is asked of the id in hand and not of the item behind it.
+export function wornIn(state: GameState, id: string): string | undefined {
+  return Object.entries(state.equipped).find(([, worn]) => worn === id)?.[0];
+}
+
+// Whether the one copy an id names is on the carried side of c21, which is not
+// the same question as whether the player has it: what is worn is not carried,
+// and unequipping is what puts it back.
+export function carriesItem(state: GameState, id: string): boolean {
+  if (wornIn(state, id) !== undefined) return false;
+  return grown(state, id) !== undefined || copiesOf(state, id).stack > 0;
+}
+
+// The three places a copy of one item can be, and the whole of the asymmetry a
+// plane rests on. `stack` is the only side a directive may spend; `grown` and
+// `worn` are the copies that satisfy every gate and are never taken, so no cost,
+// recipe or take: can destroy a plane or strip a slot. c21 is the line between
+// the first two and the third: what is worn is not carried, and it is counted
+// here so that one read answers both what the player carries and what they have.
+export interface Copies {
   stack: number;
   grown: number;
+  worn: number;
 }
 
-const CARRIES_NONE: Carried = { stack: 0, grown: 0 };
+const NO_COPIES: Copies = { stack: 0, grown: 0, worn: 0 };
 
-// The one read of `inventory`, so there is one answer to what the player has.
-export function carriedItems(state: GameState): Map<string, Carried> {
-  const items = new Map<string, Carried>();
-  const entry = (id: string): Carried => {
+// The one read of where an item's copies are, so there is one answer to both
+// questions. A stack the player is wearing one of was decremented when the slot
+// was filled, so `stack` needs no subtraction here; a grown copy is in no stack,
+// so which side it counts on is the slot's to say.
+export function itemCopies(state: GameState): Map<string, Copies> {
+  const items = new Map<string, Copies>();
+  const entry = (id: string): Copies => {
     const existing = items.get(id);
     if (existing) return existing;
-    const fresh = { stack: 0, grown: 0 };
+    const fresh = { stack: 0, grown: 0, worn: 0 };
     items.set(id, fresh);
     return fresh;
   };
   for (const [id, count] of Object.entries(state.inventory)) {
     if (count > 0) entry(id).stack = count;
   }
-  for (const template of Object.values(grownItems(state))) entry(template).grown += 1;
+  for (const [id, template] of Object.entries(grownItems(state))) {
+    if (wornIn(state, id) === undefined) entry(template).grown += 1;
+  }
+  for (const worn of Object.values(state.equipped)) entry(itemTemplate(state, worn)).worn += 1;
   return items;
 }
 
-export function carried(state: GameState, itemId: string): Carried {
-  return carriedItems(state).get(itemId) ?? CARRIES_NONE;
+export function copiesOf(state: GameState, itemId: string): Copies {
+  return itemCopies(state).get(itemId) ?? NO_COPIES;
 }
 
+// How many the player carries, which is what an inventory row states: a stack of
+// three with one worn reads two (c21).
 export function carriedCount(state: GameState, itemId: string): number {
-  const { stack, grown } = carried(state, itemId);
+  const { stack, grown } = copiesOf(state, itemId);
   return stack + grown;
+}
+
+// How many the player has, however they have them, which is what a gate asks:
+// `requires: has blade` is a question about the player and not about their
+// inventory, so wearing the blade is not a way to stop having one.
+export function heldCount(state: GameState, itemId: string): number {
+  const { stack, grown, worn } = copiesOf(state, itemId);
+  return stack + grown + worn;
 }
 
 // The one write, and the reason a grown copy survives every directive: it moves
 // the stack and nothing else, floored at empty. Returns what actually moved.
 export function stockItem(state: GameState, itemId: string, delta: number): number {
-  const before = carried(state, itemId).stack;
+  const before = copiesOf(state, itemId).stack;
   const after = Math.max(0, before + delta);
   state.inventory[itemId] = after;
   return after - before;
 }
 
-// Every grown copy the player carries, by the id it is named by. They are not in
-// `inventory` — c11 took them out of their stacks — so a surface that lists what
-// the player has reads both.
+// Every grown copy the player has, by the id it is named by, whether it is
+// carried or worn. They are not in `inventory` — c11 took them out of their
+// stacks — so a surface that lists what the player has reads both, and one that
+// lists only what is carried asks `itemCopies` instead.
 export function grownItems(state: GameState): Record<string, string> {
   const copies: Record<string, string> = {};
   for (const [id, row] of Object.entries(state.instances.byId)) {
@@ -121,15 +155,25 @@ export function grownItems(state: GameState): Record<string, string> {
   return copies;
 }
 
-// A slot may only name a copy the player still carries, so a destroyed copy is
-// taken off. Sweeping every slot is one rule where naming the affected slot
-// would be two, and it never reaches for a replacement: which of the copies
-// left to wear is the player's answer, where `wearInstead` moves a slot only
-// because the copy that left the stack is the one already worn.
-function takeOffWhatIsGone(state: GameState): void {
-  for (const [slot, worn] of Object.entries(state.equipped)) {
-    if (!carriesItem(state, worn)) delete state.equipped[slot];
-  }
+// A slot may only name a copy that still exists, so a destroyed one is taken
+// off. The id destroyed is the id in hand, so this names the slot holding it
+// rather than re-deciding every slot from what is carried — a sweep on that
+// question empties every occupied slot once carried and worn are disjoint.
+function takeOff(state: GameState, id: string): void {
+  const slot = wornIn(state, id);
+  if (slot !== undefined) delete state.equipped[slot];
+}
+
+// Where the one copy a verb reaches comes from when the player names a stack
+// item. c21 gives a stack copy two places to be, and the copies of one stack are
+// interchangeable, so the item's name is the whole of what a verb needs to say:
+// the stack answers while it has one, and the slot answers once it has not.
+type StackCopy = { readonly from: 'stack' } | { readonly from: 'slot'; readonly slot: string };
+
+function stackCopy(state: GameState, itemId: string): StackCopy | undefined {
+  if (copiesOf(state, itemId).stack > 0) return { from: 'stack' };
+  const slot = wornIn(state, itemId);
+  return slot === undefined ? undefined : { from: 'slot', slot };
 }
 
 // c12: the one way an item leaves the player for good, and the only verb that
@@ -139,14 +183,19 @@ function takeOffWhatIsGone(state: GameState): void {
 // item down anywhere, and nothing here asks whether the player meant it.
 export function destroyItem(state: GameState, id: string): Destruction {
   const standing = grown(state, id);
-  if (standing) removeInstance(state, id);
-  else if (carried(state, id).stack < 1) return refused(`you carry no ${id}`);
+  if (standing) {
+    removeInstance(state, id);
+    takeOff(state, id);
+    return { ok: true, item: standing.template };
+  }
+  const source = stackCopy(state, id);
+  if (!source) return refused(`you carry no ${id}`);
+  if (source.from === 'slot') delete state.equipped[source.slot];
   else {
     stockItem(state, id, -1);
     if (state.inventory[id] === 0) delete state.inventory[id];
   }
-  takeOffWhatIsGone(state);
-  return { ok: true, item: standing?.template ?? id };
+  return { ok: true, item: id };
 }
 
 export function itemLevel(payload: ItemInstance, item: Item): number {
@@ -163,26 +212,18 @@ interface Growing {
   change(payload: ItemInstance, item: Item): string | undefined;
 }
 
-const held = (state: GameState, itemId: string): number => carried(state, itemId).stack;
+const held = (state: GameState, itemId: string): number => copiesOf(state, itemId).stack;
 
 const take = (state: GameState, itemId: string): void => void stockItem(state, itemId, -1);
-
-// Growing never empties a slot. A stack the player was wearing that minting has
-// just emptied leaves a worn id naming nothing, so the slot follows the copy
-// that left it; a stack with copies still in it is still wearable, and moving
-// the slot then would change what the player wears without being asked.
-function wearInstead(state: GameState, template: string, grownId: string): void {
-  if (held(state, template) > 0) return;
-  for (const [slot, worn] of Object.entries(state.equipped)) {
-    if (worn === template) state.equipped[slot] = grownId;
-  }
-}
 
 // The one door onto a plane, and the whole of c11's laziness. A target names
 // either a live instance or a stack; a stack is minted only once the change
 // has succeeded, so a refused verb leaves the stack whole and no instance
 // behind. Everything a caller may do to a plane comes through here, which is
 // why no other file needs to know that instancing happens at all.
+// Minting out of a slot is what keeps growing what you wear one press away: the
+// copy that left is the copy that was worn, so the slot names the minted id and
+// the player wears what they grew.
 export function growItem(state: GameState, registry: Registry, growing: Growing): Growth {
   const { target, consumes } = growing;
   const standing = grown(state, target);
@@ -193,19 +234,19 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
   const plane = basePlane(item);
   if (!plane) return refused(`${template} is not a base: only an item you can wear has a plane to grow`);
 
-  const minting = standing === undefined;
-  if (minting && held(state, template) < 1) return refused(`you carry no ${template}`);
-  if (consumes !== undefined && held(state, consumes) < (minting && consumes === template ? 2 : 1)) return refused(`you carry no ${consumes}`);
+  const source = standing ? undefined : stackCopy(state, template);
+  if (!standing && !source) return refused(`you carry no ${template}`);
+  if (consumes !== undefined && held(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(`you carry no ${consumes}`);
 
   const payload = standing?.payload ?? { experience: 0, plane };
   const problem = growing.change(payload, item);
   if (problem) return refused(problem);
 
   if (consumes !== undefined) take(state, consumes);
-  if (!minting) return { ok: true, instance: target };
-  take(state, template);
+  if (!source) return { ok: true, instance: target };
+  if (source.from === 'stack') take(state, template);
   const minted = createInstance(state, ITEM_INSTANCE, template, payload);
-  wearInstead(state, template, minted);
+  if (source.from === 'slot') state.equipped[source.slot] = minted;
   return { ok: true, instance: minted };
 }
 
