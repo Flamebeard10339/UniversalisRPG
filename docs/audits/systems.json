@@ -377,6 +377,13 @@
             "src/runtime/itemContribution.test.ts"
           ],
           "note": "produced by item-contribution-fold: what one carried item is worth per stat, its own tags and its plane's allocated payloads folded once and scaled by the cluster effects on them, plus scaledAmount, the one multiplication of a BonusAmount. planeReport publishes it and statRange spends it."
+        },
+        {
+          "name": "destroying a carried item",
+          "paths": [
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by destroy-a-carried-item: destroyItem is the one verb that ends a carried copy, and the only one that ends a plane"
         }
       ]
     },

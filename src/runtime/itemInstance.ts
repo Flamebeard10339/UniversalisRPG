@@ -2,7 +2,7 @@ import { Direction, Hex, PlaneNode } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
-import { createInstance, defineInstanceKind, instance } from './instances';
+import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';
 import { skillLevel } from './skills';
 import { GameState } from './state';
 
@@ -16,9 +16,11 @@ export interface ItemInstance {
   plane: Plane;
 }
 
-export type Growth = { ok: true; instance: string } | { ok: false; refused: string };
+export type Refusal = { ok: false; refused: string };
+export type Growth = { ok: true; instance: string } | Refusal;
+export type Destruction = { ok: true; item: string } | Refusal;
 
-const refused = (reason: string): Growth => ({ ok: false, refused: reason });
+const refused = (reason: string): Refusal => ({ ok: false, refused: reason });
 
 export function isItemInstance(payload: unknown): payload is ItemInstance {
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return false;
@@ -117,6 +119,34 @@ export function grownItems(state: GameState): Record<string, string> {
     if (row.kind === ITEM_INSTANCE) copies[id] = row.template;
   }
   return copies;
+}
+
+// A slot may only name a copy the player still carries, so a destroyed copy is
+// taken off. Sweeping every slot is one rule where naming the affected slot
+// would be two, and it never reaches for a replacement: which of the copies
+// left to wear is the player's answer, where `wearInstead` moves a slot only
+// because the copy that left the stack is the one already worn.
+function takeOffWhatIsGone(state: GameState): void {
+  for (const [slot, worn] of Object.entries(state.equipped)) {
+    if (!carriesItem(state, worn)) delete state.equipped[slot];
+  }
+}
+
+// c12: the one way an item leaves the player for good, and the only verb that
+// ends a plane — a grown copy goes with everything recorded about it, and what
+// its plane consumed does not come back. A stack loses one, and an emptied
+// stack goes rather than staying on as a count of none. Nothing here puts the
+// item down anywhere, and nothing here asks whether the player meant it.
+export function destroyItem(state: GameState, id: string): Destruction {
+  const standing = grown(state, id);
+  if (standing) removeInstance(state, id);
+  else if (carried(state, id).stack < 1) return refused(`you carry no ${id}`);
+  else {
+    stockItem(state, id, -1);
+    if (state.inventory[id] === 0) delete state.inventory[id];
+  }
+  takeOffWhatIsGone(state);
+  return { ok: true, item: standing?.template ?? id };
 }
 
 export function itemLevel(payload: ItemInstance, item: Item): number {

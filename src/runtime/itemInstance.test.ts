@@ -3,8 +3,9 @@ import { loadModule } from '../content/registry';
 import { parseSaveSection } from '../content/saveSection';
 import { Hex, PlaneNode } from '../content/hex';
 import { clusterAt, ORIGIN, pointsSpent } from './clusterPlane';
+import { equip } from './equipment';
 import { instance, instanceIsLive } from './instances';
-import { allocate, feedItem, Growth, itemInstance, itemLevel, pointsRemaining, slotJewel } from './itemInstance';
+import { allocate, carriedCount, carriesItem, destroyItem, feedItem, Growth, itemInstance, itemLevel, pointsRemaining, slotJewel } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { skillLevel } from './skills';
 import { GameState } from './state';
@@ -310,5 +311,93 @@ describe('an instance across a reload', () => {
     const state = initialState(registry);
     const row = { kind: 'item', template: 'iron-sword', payload: { experience: 0, plane: { '0,0': { jewel: null, entry: 'e', allocatedPositions: [], allocatedSlots: [], effects: [] } } } };
     expect(() => loadSave(state, { version: SAVE_VERSION, diff: { instances: { next: 2, byId: { 1: row } } } }, registry)).toThrow(/save field instances holds/);
+  });
+});
+
+// c12: this is the rule half. No screen, no confirmation and no second question
+// live here — what it costs to be sure belongs to the frame that calls it.
+describe('destroying a carried item', () => {
+  it('takes one copy off the stack and leaves the rest countable', () => {
+    const state = carrying({ 'iron-sword': 3, whetstone: 1 });
+
+    expect(destroyItem(state, 'iron-sword')).toEqual({ ok: true, item: 'iron-sword' });
+    expect(state.inventory).toEqual({ 'iron-sword': 2, whetstone: 1 });
+    expect(carriedCount(state, 'iron-sword')).toBe(2);
+  });
+
+  it('takes an emptied stack out of what the player carries rather than leaving a count of none', () => {
+    const state = carrying({ 'iron-sword': 1 });
+
+    expect(destroyItem(state, 'iron-sword')).toEqual({ ok: true, item: 'iron-sword' });
+    expect(state.inventory).toEqual({});
+    expect(carriesItem(state, 'iron-sword')).toBe(false);
+    expect(destroyItem(state, 'iron-sword')).toEqual({ ok: false, refused: 'you carry no iron-sword' });
+  });
+
+  it('destroys a grown copy with the plane it holds, and gives nothing back to the stack', () => {
+    const state = carrying({ 'heartwood-blade': 2, 'crossroads-jewel': 1, whetstone: 4 });
+    feedItem(state, registry, 'heartwood-blade', 'whetstone');
+    for (let fed = 1; fed < 4; fed++) feedItem(state, registry, '1', 'whetstone');
+    for (const index of [2, 3, 4]) grow(state, '1', position(ORIGIN, index));
+    grow(state, '1', slot(ORIGIN));
+    slotJewel(state, registry, '1', 'crossroads-jewel', ORIGIN, 'e');
+
+    expect(destroyItem(state, '1')).toEqual({ ok: true, item: 'heartwood-blade' });
+    expect(instanceIsLive(state, '1')).toBe(false);
+    expect(itemInstance(state, '1')).toBeUndefined();
+    expect(state.inventory).toEqual({ 'heartwood-blade': 1, 'crossroads-jewel': 0, whetstone: 0 });
+    expect(carriedCount(state, 'heartwood-blade')).toBe(1);
+  });
+
+  it('destroys the one copy it was handed, leaving another grown copy of the same base whole', () => {
+    const state = carrying({ 'heartwood-blade': 2, whetstone: 2 });
+    feedItem(state, registry, 'heartwood-blade', 'whetstone');
+    feedItem(state, registry, 'heartwood-blade', 'whetstone');
+    grow(state, '2', position(ORIGIN, 2));
+
+    destroyItem(state, '1');
+    expect(itemInstance(state, '1')).toBeUndefined();
+    expect(pointsSpent(itemInstance(state, '2')!.plane)).toBe(1);
+  });
+
+  it('refuses an id naming nothing the player carries, leaving every copy and every instance whole', () => {
+    const state = carrying({ 'heartwood-blade': 1, whetstone: 1 });
+    grow(state, 'heartwood-blade', position(ORIGIN, 2));
+    const before = JSON.stringify(state);
+
+    expect(destroyItem(state, 'no-such-thing')).toEqual({ ok: false, refused: 'you carry no no-such-thing' });
+    expect(destroyItem(state, '7')).toEqual({ ok: false, refused: 'you carry no 7' });
+    expect(JSON.stringify(state)).toBe(before);
+  });
+
+  it('takes a worn stack copy off only once the last of it is gone', () => {
+    const state = carrying({ 'iron-sword': 2 });
+    equip(state, registry, 'iron-sword');
+
+    destroyItem(state, 'iron-sword');
+    expect(state.equipped).toEqual({ mainhand: 'iron-sword' });
+
+    destroyItem(state, 'iron-sword');
+    expect(state.equipped).toEqual({});
+  });
+
+  it('takes a destroyed grown copy off without putting another copy on in its place', () => {
+    const state = carrying({ 'iron-sword': 2, whetstone: 1 });
+    feedItem(state, registry, 'iron-sword', 'whetstone');
+    equip(state, registry, '1');
+
+    destroyItem(state, '1');
+    expect(state.equipped).toEqual({});
+    expect(carriedCount(state, 'iron-sword')).toBe(1);
+  });
+
+  it('leaves a worn grown copy on when the stack it left is destroyed out from under it', () => {
+    const state = carrying({ 'iron-sword': 2, whetstone: 1 });
+    feedItem(state, registry, 'iron-sword', 'whetstone');
+    equip(state, registry, '1');
+
+    destroyItem(state, 'iron-sword');
+    expect(state.equipped).toEqual({ mainhand: '1' });
+    expect(carriedCount(state, 'iron-sword')).toBe(1);
   });
 });
