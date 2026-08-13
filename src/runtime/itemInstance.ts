@@ -97,12 +97,19 @@ export function wornIn(state: GameState, id: string): string | undefined {
   return Object.entries(state.equipped).find(([, worn]) => worn === copy)?.[0];
 }
 
-// Whether the one copy an id names is on the carried side of c21, which is not
-// the same question as whether the player has it: what is worn is not carried,
-// and unequipping is what puts it back.
+// Whether the id names a copy on the carried side of c21, which is what equip
+// asks before it moves one — not whether the player has one at all, which is
+// what a gate asks and `heldCount` answers. The two spellings answer by
+// different rules because they name different things: a grown copy's id names
+// one copy, so wearing that copy is what takes it off this side, while an item
+// id names the stack, whose copies are interchangeable — a stack of three with
+// one worn still has two to put on. This is the one reader that resolves
+// neither spelling through `named`: a slot's spelling names the copy in the
+// slot, and that copy is worn, which is the answer an unresolved id already
+// gives.
 export function carriesItem(state: GameState, id: string): boolean {
-  if (wornIn(state, id) !== undefined) return false;
-  return grown(state, named(state, id)) !== undefined || copiesOf(state, id).stack > 0;
+  if (grown(state, id) !== undefined) return wornIn(state, id) === undefined;
+  return copiesOf(state, id).stack > 0;
 }
 
 // The three places a copy of one item can be, and the whole of the asymmetry a

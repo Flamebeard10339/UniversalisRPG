@@ -232,14 +232,25 @@ describe('carried and worn are disjoint', () => {
     expect(carriedCount(state, 'attack-bonus')).toBe(1);
   });
 
-  it('refuses to wear what the player is already wearing rather than duplicating the move', () => {
+  // An item id names the stack and not the copy in the slot, so what makes a
+  // second wearing possible is a stack that still has one — not the slot being
+  // free. Refusing on a stack of one is the same rule read where the stack has
+  // run out, and the two only look alike where nothing distinguishes them.
+  it('wears a second copy out of a stack that still has one, and refuses once the stack is empty', () => {
     const registry = loaded();
-    const state = carrying(registry, { 'attack-bonus': 1 });
+    const state = carrying(registry, { 'attack-bonus': 3 });
     equip(state, registry, 'attack-bonus');
 
-    expect(() => equip(state, registry, 'attack-bonus')).toThrow(/does not carry/);
+    equip(state, registry, 'attack-bonus');
     expect(state.equipped).toEqual({ mainhand: 'attack-bonus' });
-    expect(carriedCount(state, 'attack-bonus')).toBe(0);
+    expect(carriedCount(state, 'attack-bonus')).toBe(2);
+
+    const alone = carrying(registry, { 'attack-bonus': 1 });
+    equip(alone, registry, 'attack-bonus');
+
+    expect(() => equip(alone, registry, 'attack-bonus')).toThrow(/does not carry/);
+    expect(alone.equipped).toEqual({ mainhand: 'attack-bonus' });
+    expect(carriedCount(alone, 'attack-bonus')).toBe(0);
   });
 });
 

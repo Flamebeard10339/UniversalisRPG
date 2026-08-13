@@ -229,6 +229,18 @@ describe('what the screen does with an answer', () => {
     expect(state.equipped).toEqual({ mainhand: 'iron-sword' });
   });
 
+  // c18: the row offers Equip while the stack it stands for has a copy, so
+  // taking it has to be a move and not an error. Offering it is asserted above;
+  // this is the other half, and the half the screen is removed by when it fails.
+  it('wears a second copy off a row whose stack is short one already worn', () => {
+    const state = carrying({ 'iron-sword': 3 });
+    equip(state, registry, 'iron-sword');
+
+    expect(carriedSubmit({ item: 'Iron Sword x2', verb: 'Equip' }, state, registry)).toBeNull();
+    expect(state.equipped).toEqual({ mainhand: 'iron-sword' });
+    expect(carriedCount(state, 'iron-sword')).toBe(2);
+  });
+
   it('takes off what unequip names, and empties the slot rather than the hands', () => {
     const state = carrying({ 'iron-sword': 1 });
     equip(state, registry, 'iron-sword');
