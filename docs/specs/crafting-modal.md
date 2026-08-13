@@ -120,10 +120,13 @@ Proof:
   listed under equipment and nowhere else. Added 2026-08-13, ruled by the author, and it is the one
   rule this branch adds — the spec's standing decision that it adds none is overridden here
   deliberately and only here. Two places already read the invariant it replaces and both are this
-  clause's to correct: the destroy sweep empties a slot whose worn id is no longer carried, which
-  under this rule fires the instant anything is equipped, and `wearInstead` repoints a slot when a
-  stack copy is grown. What an equipped item contributes is read off `state.equipped` and is not
-  affected.
+  clause's to correct. `destroyItem` sweeps every slot and empties any whose worn id is no longer
+  carried; under this rule every worn item is not-carried by definition, so the first destroy would
+  strip every slot. It is replaced rather than repaired, by a removal naming the destroyed id — the
+  author's reading 2026-08-13, that the helper's own comment mistook one rule for two, and that the
+  targeted form being untouched by c21 is the evidence the generality was never carrying anything.
+  `wearInstead` repoints a slot when a stack copy is grown and assumes carried-and-worn coexist.
+  What an equipped item contributes is read off `state.equipped` and is not affected.
 
 ## Goal
 
