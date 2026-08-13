@@ -91,6 +91,24 @@ describe('what a click away from a screen answers', () => {
     expect(dismissal(talking.modals)).toBeNull();
   });
 
+  // The screen the player is looking at is the top one, so a way out is the top
+  // one's and never whatever is covered by it — read in both directions, since a
+  // stack whose screens agree cannot tell which one was asked.
+  it('belongs to the covering screen and not to the one underneath it', () => {
+    const covering = stocked();
+    applyDirective(covering, { kind: 'open-modal', modal: 'character-creation' });
+    applyDirective(covering, { kind: 'open-modal', modal: 'carried-items' });
+
+    expect(view(covering).modals.map((modal) => modal.name)).toEqual(['character-creation', 'carried-items']);
+    expect(dismissal(view(covering).modals)).toEqual({ key: 'item', value: 'Close' });
+
+    const covered = onBlade();
+    applyDirective(covered, { kind: 'talk', entity: 'sage' });
+
+    expect(view(covered).modals.map((modal) => modal.name)).toEqual(['carried-items', 'dialogue']);
+    expect(dismissal(view(covered).modals)).toBeNull();
+  });
+
   // A screen may name a way out that the question in front of the player does
   // not offer, and a click that answered it would be answering a value the
   // engine is not listing.

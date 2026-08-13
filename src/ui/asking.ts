@@ -34,7 +34,6 @@ export function dismissal(modals: readonly Modal[]): Answer | null {
 // carry and is drawn over everything instead — which is read off the published
 // focus, never off which screen it is.
 export function askedOfRow(view: PlayView | null, opened: string | null): string | null {
-  if (!view || opened === null || view.focus !== null) return null;
-  if (!askedOption(view.modals)) return null;
+  if (!view || view.focus !== null || !askedOption(view.modals)) return null;
   return view.carried.some((row) => row.id === opened) ? opened : null;
 }
