@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { askedOption } from '../runtime/command';
-import { askedOfRow, dismissal } from './asking';
+import { dismissal } from './asking';
 import { Console } from './Console';
 import type { Driver } from './driver';
 import { FloatingText } from './FloatingText';
@@ -42,21 +42,21 @@ function useArrivals(discovered: readonly Place[]): { arrivals: readonly string[
 export function App({ driver, opening = OPENING }: { driver: Driver; opening?: Where }): JSX.Element {
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
   const [where, setWhere] = useState(opening);
-  // Which row of the character sheet this shell opened, and the whole of what
-  // makes a question one of that row's: the page that dispatched knows what it
-  // dispatched on, and nothing published says who asked. It is dropped the
-  // moment nothing is being asked, so the next screen the world raises is
-  // nobody's row, and dropped on a move away, so a question left behind on a
-  // page becomes a sheet rather than a screen with no way back to it.
-  const [opened, setOpened] = useState<string | null>(null);
   const view = snapshot.view;
   const asking = view ? askedOption(view.modals) : undefined;
-  const answering = asking !== undefined;
   // Drawn because the engine says one is in hand, never because the shell
   // recognised the screen holding it: the focus is a published field and the
   // screen's name is not a thing this layer can read.
   const plane = focusedPlane(view);
   const { arrivals, generation } = useArrivals(view?.discovered ?? []);
+
+  // The one answer a gesture away from the open screen makes: the value that
+  // screen published as the way out of itself, or nothing where it published
+  // none (c19). Both gestures this shell has go through it, so a click on the
+  // sheet's ground and a move to another page say the same thing and neither
+  // has a way out the other has not got.
+  const leaving = view ? dismissal(view.modals) : null;
+  const leave = leaving ? () => driver.answer(leaving.key, leaving.value) : undefined;
 
   // Assembled once and both drawn from and handed over, the way the map's is:
   // where the nav is standing is one value, and there is no second statement of
@@ -65,24 +65,12 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
   // and not the render's — the seam is about what is drawn, and a nav that lost
   // a tap to batching would be a real defect bought for a test.
   const go = (next: Where | ((held: Where) => Where)): void => {
-    setOpened(null);
+    leave?.();
     setWhere(next);
   };
   const shell = { where, go };
 
   useTestSurface('shell', shell);
-
-  useEffect(() => {
-    if (!answering) setOpened(null);
-  }, [answering]);
-
-  const row = askedOfRow(view, opened);
-  const asked = row !== null && asking ? { id: row, option: asking, onAnswer: driver.answer } : undefined;
-  const open = (id: string): void => {
-    setOpened(id);
-    driver.open(id);
-  };
-  const leaving = view ? dismissal(view.modals) : null;
 
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
@@ -95,8 +83,8 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
     // Both sides of what the player has are rows that act, because c21 puts a
     // worn copy on this page and nowhere else and the verbs it offers are
     // reachable from nowhere else either.
-    if (subpage.id === 'equipment') return <Ledger entries={worn(view?.equipment ?? {}, view?.carried ?? [])} onOpen={open} asking={asked} />;
-    return <Ledger entries={carried(view?.carried ?? [], view?.planes ?? [])} onOpen={open} asking={asked} />;
+    if (subpage.id === 'equipment') return <Ledger entries={worn(view?.equipment ?? {}, view?.carried ?? [])} onOpen={driver.open} />;
+    return <Ledger entries={carried(view?.carried ?? [], view?.planes ?? [])} onOpen={driver.open} />;
   };
 
   const bodies = LAYERS.map((layer, at) => (
@@ -127,8 +115,8 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
           <FloatingText channel={driver.transient} />
         </main>
         <TabBar tabs={LAYERS[shell.where.layer].subpages} active={subpageOf(shell.where)} onSelect={(index) => go((held) => toSubpage(held, held.layer, index))} />
-        {asking && !asked ? (
-          <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leaving ? () => driver.answer(leaving.key, leaving.value) : undefined}>
+        {asking ? (
+          <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave}>
             {plane ? <PlanePane plane={plane} /> : null}
           </ModalSheet>
         ) : null}

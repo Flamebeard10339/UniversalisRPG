@@ -1,10 +1,9 @@
 import { askedOption } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 
-// Two decisions about the question the engine is asking, both taken off
-// published fields alone: what leaving it answers, and where on this driver it
-// is drawn. Neither reads a screen's name, so a screen this layer has never
-// heard of is dismissed and placed by the same rules as one it has.
+// One decision about the question the engine is asking, taken off published
+// fields alone: what leaving it answers. It reads no screen's name, so a screen
+// this layer has never heard of is left by the same rule as one it has.
 
 type Modal = PlayView['modals'][number];
 
@@ -25,15 +24,4 @@ export function dismissal(modals: readonly Modal[]): Answer | null {
   const asking = askedOption(modals);
   if (!leaving || !asking?.values?.includes(leaving)) return null;
   return { key: asking.key, value: leaving };
-}
-
-// Which row the question belongs to, and null for a question that belongs to no
-// row. A page that opened one of its own rows is being asked about that row, so
-// the answers go under it and the verbs an entry offers are reached from the
-// entry (c20). A screen holding a subject of its own is more than a row can
-// carry and is drawn over everything instead — which is read off the published
-// focus, never off which screen it is.
-export function askedOfRow(view: PlayView | null, opened: string | null): string | null {
-  if (!view || view.focus !== null || !askedOption(view.modals)) return null;
-  return view.carried.some((row) => row.id === opened) ? opened : null;
 }

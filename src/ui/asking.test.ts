@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { loadModule } from '../content/registry';
 import { SAVE_VERSION } from '../runtime/save';
 import { applyDirective, startSession, submitModal, view, type PlaySession, type PlayView } from '../runtime/session';
-import { askedOfRow, dismissal } from './asking';
+import { dismissal } from './asking';
 
-// Driven off real published views rather than hand-built ones: what these two
-// decisions are worth is entirely in reading fields the engine actually fills,
+// Driven off real published views rather than hand-built ones: what this
+// decision is worth is entirely in reading fields the engine actually fills,
 // and a fixture typed here could agree with the rule while disagreeing with the
 // engine.
 const MODULE = `
@@ -116,34 +116,5 @@ describe('what a click away from a screen answers', () => {
     const asked: PlayView['modals'] = [{ name: 'held', leaving: 'Close', options: [{ key: 'item', label: 'Item', values: ['Blade x1'] }] }];
 
     expect(dismissal(asked)).toBeNull();
-  });
-});
-
-describe('which row a question belongs to', () => {
-  it('is the row the page opened, while the screen has no subject of its own', () => {
-    const opened = view(onBlade());
-
-    expect(askedOfRow(opened, 'blade')).toBe('blade');
-    // A row this page is not drawing, and a row nothing was opened on.
-    expect(askedOfRow(opened, 'whetstone')).toBeNull();
-    expect(askedOfRow(opened, null)).toBeNull();
-  });
-
-  // c10's focus is what says a screen holds more than a row can carry, so the
-  // plane goes over the page however it was reached — and the name of the screen
-  // is still never read.
-  it('is nothing for a screen holding a subject beside its options', () => {
-    const session = onBlade();
-    submitModal(session, { verb: 'Grow' });
-
-    expect(view(session).focus).not.toBeNull();
-    expect(askedOfRow(view(session), 'blade')).toBeNull();
-  });
-
-  it('is nothing when nothing is being asked', () => {
-    const session = stocked();
-
-    expect(askedOfRow(view(session), 'blade')).toBeNull();
-    expect(askedOfRow(null, 'blade')).toBeNull();
   });
 });
