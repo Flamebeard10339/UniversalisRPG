@@ -126,7 +126,14 @@ Proof:
   author's reading 2026-08-13, that the helper's own comment mistook one rule for two, and that the
   targeted form being untouched by c21 is the evidence the generality was never carrying anything.
   `wearInstead` repoints a slot when a stack copy is grown and assumes carried-and-worn coexist.
-  What an equipped item contributes is read off `state.equipped` and is not affected.
+  This clause first claimed a third reader was unaffected — that what an equipped item contributes is
+  read off `state.equipped` — and it was wrong: the fold then guarded each worn id on "does the
+  player carry this", which c21 makes false for everything worn, so an equipped item would have
+  contributed nothing. Corrected 2026-08-13 by the member that worked it, and left standing here as
+  written rather than quietly repaired, because the reason it was wrong is the clause's real content:
+  "carried" was one word doing two jobs. What an inventory row states and what a gate asks are
+  different questions — a stack of three with one worn is two on the row, and three to a
+  `requires: has` — and c21 is met only where both are answered separately.
 
 ## Goal
 
