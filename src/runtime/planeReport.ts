@@ -1,12 +1,12 @@
-import { ClusterEffect } from '../content/item';
+import { ClusterEffect, Item } from '../content/item';
 import { Direction, DIRECTIONS, Hex, hexKey, NEIGHBOR_DELTA, opposite, PlaneNode } from '../content/hex';
 import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';
 import { BonusAmount } from '../grammar/tagClause';
 import { positionPayloads } from './clusterEffect';
-import { isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
+import { basePlane, isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
-import { grownItems, itemInstance, itemLevel, pointsRemaining } from './itemInstance';
+import { carried, grownItems, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining } from './itemInstance';
 import { GameState } from './state';
 
 // Where a point may go, said once for both things a point buys. `blocked` is a
@@ -138,19 +138,33 @@ function clusterReport(registry: Registry, plane: Plane, hex: Hex): ClusterRepor
   return { hex: hexKey(hex), jewel: jewel.id, title: jewel.title, shape: jewel.shape, entry, effects, modSlots: jewel.modSlots, positions, slots };
 }
 
-export function planeReport(registry: Registry, state: GameState, instanceId: string): PlaneReport | undefined {
-  const template: string | undefined = grownItems(state)[instanceId];
-  const payload = itemInstance(state, instanceId);
-  if (template === undefined || !payload) return undefined;
+// A growth verb spells its target either way an item is carried, and both have
+// a plane to report: a base still in its stack has the one growing it would
+// mint, which is what a screen opened on that stack is looking at.
+function targeted(registry: Registry, state: GameState, target: string): { item: Item; template: string; payload: ItemInstance } | undefined {
+  const template = itemTemplate(state, target);
   const item = registry.items.get(template);
   if (!item) return undefined;
+
+  const live = itemInstance(state, target);
+  if (live) return { item, template, payload: live };
+  if (carried(state, target).stack < 1) return undefined;
+
+  const plane = basePlane(item);
+  return plane === undefined ? undefined : { item, template, payload: { experience: 0, plane } };
+}
+
+export function planeReport(registry: Registry, state: GameState, target: string): PlaneReport | undefined {
+  const targets = targeted(registry, state, target);
+  if (!targets) return undefined;
+  const { item, template, payload } = targets;
 
   const clusters = planeClusters(payload.plane)
     .sort((a, b) => distance(a.hex) - distance(b.hex) || a.hex.q - b.hex.q || a.hex.r - b.hex.r)
     .flatMap(({ hex }) => clusterReport(registry, payload.plane, hex) ?? []);
 
   return {
-    instance: instanceId,
+    instance: target,
     template,
     title: item.title,
     level: itemLevel(payload, item),

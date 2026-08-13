@@ -95,7 +95,7 @@ describe('what the screen asks', () => {
     const state = carrying({ rope: 1, 'iron-sword': 1 });
 
     expect(values({ item: 'Rope x1' }, state, 'verb')).toEqual(['Destroy', LEAVE]);
-    expect(values({ item: 'Iron Sword x1' }, state, 'verb')).toEqual(['Equip', 'Destroy', LEAVE]);
+    expect(values({ item: 'Iron Sword x1' }, state, 'verb')).toEqual(['Grow', 'Equip', 'Destroy', LEAVE]);
   });
 
   // c15: every question this screen asks publishes a way out of it, including

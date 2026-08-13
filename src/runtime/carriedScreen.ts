@@ -1,8 +1,9 @@
-import { Item } from '../content/item';
+import { isBase, Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { equip } from './equipment';
 import { carriedItems, destroyItem, grownItems, itemTemplate } from './itemInstance';
 import { type ModalAnswers, type ModalFrame, type ModalOption } from './modals';
+import { planeFrame } from './planeScreen';
 import { GameState } from './state';
 
 // What the player carries, as a list of entries and the verbs each of them
@@ -38,6 +39,14 @@ interface CarriedVerb {
 }
 
 const VERBS: readonly CarriedVerb[] = [
+  {
+    value: 'Grow',
+    applies: (item) => item !== undefined && isBase(item),
+    confirms: () => false,
+    // c3: the plane screen replaces this one rather than stacking on it, which
+    // is what returning a frame from a verb already means.
+    take: (entry) => planeFrame(entry.id),
+  },
   {
     value: 'Equip',
     applies: (item) => item?.slot !== undefined,
