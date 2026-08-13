@@ -181,6 +181,13 @@
             "content/tutorial-island.dsl"
           ],
           "note": "produced by cluster-content"
+        },
+        {
+          "name": "base and jewel roles are exclusive",
+          "paths": [
+            "src/content/item.ts"
+          ],
+          "note": "produced by items-mods-and-crafting-pass1-a-base-s-own-origin-cluster-an: isBase says an item is a base iff it declares slot:, and itemRoleProblem refuses at load an item claiming both roles. Registered over item.ts alone -- the runtime half lives in basePlane and belongs to Runtime's existing item cluster plane concept"
         }
       ]
     },
