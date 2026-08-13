@@ -3,6 +3,7 @@ import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
 import { findActionOwner, parseOwnerRef } from './actions';
 import { isInstanceTable, pruneInstances } from './instances';
+import { itemTemplate } from './itemInstance';
 import { isPopulations, prunePopulations } from './population';
 import { isModalFrame, pruneModals } from './modals';
 import { PLAYER } from './state';
@@ -166,12 +167,16 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     addWarning(warnings, `activeBuffs.${key}`, key, `Removed active buff ${key} because its ${missing} is not loaded.`);
   }
 
-  for (const [slot, itemId] of Object.entries(state.equipped)) {
+  // A worn id may spell a grown copy, and pruneInstances has already settled
+  // which of those are left, so an id that no longer resolves to one is read as
+  // the item id it would otherwise be and drops the same way a missing item does.
+  for (const [slot, wornId] of Object.entries(state.equipped)) {
+    const itemId = itemTemplate(state, wornId);
     const item = registry.items.get(itemId);
     const missing = !item ? `item ${itemId} is not loaded` : item.slot !== slot ? `item ${itemId} no longer declares that slot` : undefined;
     if (!missing) continue;
     delete state.equipped[slot];
-    addWarning(warnings, `equipped.${slot}`, itemId, `Unequipped ${slot} because its ${missing}.`);
+    addWarning(warnings, `equipped.${slot}`, wornId, `Unequipped ${slot} because its ${missing}.`);
   }
 
   for (const { name, reason } of pruneModals(state, registry)) {

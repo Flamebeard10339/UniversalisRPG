@@ -1,4 +1,5 @@
 import { parseActionSection } from './action';
+import { clusterJewelSchema } from './clusterJewel';
 import { parseDialogue } from './dialogue';
 import { parseDropTable } from './dropTable';
 import { entitySchema } from './entity';
@@ -8,6 +9,7 @@ import { flagSchema } from './flag';
 import { infoSchema } from './info';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
+import { passiveSchema } from './passive';
 import { DslError } from '../grammar/parser';
 import { recipeSchema } from './recipe';
 import { parseRemoval } from './removal';
@@ -33,6 +35,8 @@ export const SCHEMAS: Record<string, AnySchema> = {
   recipe: recipeSchema,
   resource: resourceSchema,
   variable: variableSchema,
+  passive: passiveSchema,
+  'cluster-jewel': clusterJewelSchema,
 };
 
 // A few kinds have a grammar too far from key/value to fit the generic engine

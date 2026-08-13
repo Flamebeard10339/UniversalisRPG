@@ -3,6 +3,7 @@ import { point } from '../grammar/range';
 import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields } from '../grammar/action';
 import { Condition } from '../grammar/condition';
 import { HOOK_LABELS } from '../grammar/hook';
+import { ClusterJewel, clusterJewelProblem, clusterJewelSchema } from './clusterJewel';
 import { Dialogue } from './dialogue';
 import { DropTable } from './dropTable';
 import { ActionDeclaration } from './action';
@@ -10,7 +11,9 @@ import { AuthoredEntity, Entity, EntityBlock, entitySchema, Handler, isHandlerBl
 import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
 import { GameEvent, eventSchema } from './event';
-import { Item, itemSchema } from './item';
+import { Item, itemRoleProblem, itemSchema } from './item';
+import { Passive, passiveRangeProblem, passiveSchema } from './passive';
+import { getShape } from './shapes';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
 import { mergeSection } from './merge';
 import { ModuleSection } from './module';
@@ -45,6 +48,8 @@ export interface Registry {
   player?: Entity;
   locations: Map<string, Location>;
   items: Map<string, Item>;
+  passives: Map<string, Passive>;
+  clusterJewels: Map<string, ClusterJewel>;
   stats: Map<string, Stat>;
   skills: Map<string, Skill>;
   recipes: Map<string, Recipe>;
@@ -71,6 +76,8 @@ export const CONTENT_SECTION_MAPS: readonly (readonly [string, keyof Registry])[
   ['faction', 'factions'],
   ['location', 'locations'],
   ['item', 'items'],
+  ['passive', 'passives'],
+  ['cluster-jewel', 'clusterJewels'],
   ['stat', 'stats'],
   ['skill', 'skills'],
   ['recipe', 'recipes'],
@@ -156,6 +163,8 @@ function emptyRegistry(): Registry {
     factionBits: new Map(),
     locations: new Map(),
     items: new Map(),
+    passives: new Map(),
+    clusterJewels: new Map(),
     stats: new Map(),
     skills: new Map(),
     recipes: new Map(),
@@ -251,7 +260,31 @@ function applySection(registry: Registry, section: ModuleSection): void {
     }
     case 'item': {
       const item = hydrateSection(section.value as Authored<Item>, itemSchema);
+      const problem = itemRoleProblem(item);
+      if (problem) throw new DslError(`# item ${item.id}: ${problem}`);
       registry.items.set(item.id, item);
+      break;
+    }
+    case 'passive': {
+      const authored = section.value as Authored<Passive>;
+      const passive = hydrateSection(authored, passiveSchema);
+      const problem = passiveRangeProblem(passive);
+      if (problem) throw new DslError(`# passive ${authored.id}: ${problem}`);
+      registry.passives.set(passive.id, passive);
+      break;
+    }
+    case 'cluster-jewel': {
+      const authored = section.value as Authored<ClusterJewel>;
+      try {
+        const clusterJewel = hydrateSection(authored, clusterJewelSchema);
+        const shape = getShape(clusterJewel.shape);
+        const problem = clusterJewelProblem(clusterJewel, shape);
+        if (problem) throw new DslError(problem);
+        registry.clusterJewels.set(clusterJewel.id, clusterJewel);
+      } catch (raw) {
+        if (!(raw instanceof DslError)) throw raw;
+        throw new DslError(`# cluster-jewel ${authored.id}: ${raw.message}`, raw.span);
+      }
       break;
     }
     case 'stat': {

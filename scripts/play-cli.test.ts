@@ -31,7 +31,7 @@ describe('play-cli renders what a command result says happened', () => {
 
     expect(lines[0]).toBe('Guide House (tutorial-island.guide-house)');
     expect(lines[1]).toBe(`A cluttered but cozy cottage. Miki's guide house.`);
-    expect(lines[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven');
+    expect(lines[2]).toBe("Here: Miki, Front Door, Stairs, Mirror, Oven, Smith's Chest");
     expect(lines[3]).toBe('Health: ██████████ 30/30');
     expect(lines).toContain('  1) Talk to Miki');
     expect(lines[lines.length - 1]).toBe('[time: 0s]');
@@ -82,6 +82,20 @@ starting
       'Health: ██████████ 30/30',
     ]);
     expect(formatResult(runLine(ctx, '/quit'))[0]).toBe('Location: tutorial-island.guide-house');
+  });
+
+  // A grown copy is counted in no stack, so a reader who only had `Inventory:`
+  // would not see it at all, and the id printed here is what equips it.
+  it('names grown copies on a line of their own, above the stack counts’ neighbours', () => {
+    const ctx = driver(source);
+    const status = runLine(ctx, '/inventory').output.find((out) => out.kind === 'inventory')!.status;
+
+    expect(formatOutput({ kind: 'inventory', status })).toEqual(['Inventory: {}', 'XP: {}']);
+    expect(formatOutput({ kind: 'inventory', status: { ...status, grown: { '1': 'tutorial-island.iron-sword' } } })).toEqual([
+      'Inventory: {}',
+      'Grown: {"1":"tutorial-island.iron-sword"}',
+      'XP: {}',
+    ]);
   });
 
   it('separates each authored block with a blank line, so the emission pastes into a module', () => {

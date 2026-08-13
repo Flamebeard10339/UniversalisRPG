@@ -1,3 +1,4 @@
+import { mayBeInstanceId } from '../content/instanceId';
 import type { Registry } from '../content/registry';
 import type { PruneWarning } from './save';
 import { GameState, RuntimeError } from './state';
@@ -160,7 +161,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // An id no counter could have minted is refused here rather than colliding with
 // a real one later, which is the save-side half of an id naming one instance.
 function isMintedId(id: string, next: number): boolean {
-  return /^(0|[1-9][0-9]*)$/.test(id) && Number(id) < next;
+  return mayBeInstanceId(id) && Number(id) < next;
 }
 
 export function isInstanceTable(value: unknown): boolean {

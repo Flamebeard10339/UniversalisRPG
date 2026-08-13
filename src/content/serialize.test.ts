@@ -135,6 +135,12 @@ node greet:
 
 # test smoke
 use: entity.npc.cheer
+feed: bramble-mail with snack
+slot: 1 at 0,0 e with ore
+allocate: 1 at 1,-1 position 4
+allocate: 1 at -2,3 slot ne
+apply: 1 at 0,1 with ingot
+refuse: feed 1 with snack
 expect: blank
 `;
 

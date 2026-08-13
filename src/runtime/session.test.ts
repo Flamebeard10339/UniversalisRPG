@@ -1,8 +1,9 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
+import { feedItem, itemInstance } from './itemInstance';
 import { loadModule, Registry } from '../content/registry';
-import { SaveDiff, SAVE_VERSION } from './save';
+import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 import { apply, applyDirective, beginAction, cancelAction, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
 
@@ -668,6 +669,27 @@ forget:
 travel: forge
 `;
 
+const GROWN_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# stat might
+base: 4
+
+# entity player
+equipment-slots: hand
+
+# item gauntlet
+title: Gauntlet
+slot: hand
+max-level: 10
++3 might
+
+# item oil
+item-experience: 1000
+`;
+
 describe('what the engine publishes', () => {
   it('carries stat values, and recomputes them when equipment changes them', () => {
     const session = primed(loadModule(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
@@ -681,6 +703,32 @@ describe('what the engine publishes', () => {
     const bare = apply(session, 'unequip:hand');
     expect(bare.equipment).toEqual({});
     expect(bare.stats.might).toBe(4);
+  });
+
+  // Grown against a state and handed to the session as a save, so what is
+  // under test is the published view of a copy rather than the verb that made
+  // one; the verbs have their own describe below.
+  it('names a grown copy beside the stacks, and offers it as its own equip choice', () => {
+    const registry = loadModule(GROWN_MODULE);
+    const grownState = createGameState('camp');
+    Object.assign(grownState.inventory, { gauntlet: 2, oil: 1 });
+    const grown = feedItem(grownState, registry, 'gauntlet', 'oil');
+    if (!grown.ok) throw new Error(grown.refused);
+
+    const { version: _version, ...diff } = JSON.parse(serializeSave(grownState, registry)) as SaveDiff & { version: number };
+    const session = primed(registry, diff);
+
+    const carried = view(session);
+    expect(carried.inventory).toEqual({ gauntlet: 1 });
+    expect(carried.grown).toEqual({ [grown.instance]: 'gauntlet' });
+    expect(ids(carried)).toContain(`equip:${grown.instance}`);
+    expect(carried.stats.might).toBe(4);
+
+    const armed = apply(session, `equip:${grown.instance}`);
+    expect(armed.equipment).toEqual({ hand: grown.instance });
+    expect(armed.stats.might).toBe(7);
+    expect(ids(armed)).not.toContain(`equip:${grown.instance}`);
+    expect(armed.choices.find((choice) => choice.id === 'unequip:hand')?.label).toBe('Unequip Gauntlet');
   });
 
   it('carries skill xp as it is earned', () => {
@@ -872,7 +920,10 @@ describe('what the engine withholds', () => {
       visits: 'withheld',
       activeBuffs: 'withheld',
       resourceRateRemainders: 'withheld',
-      instances: 'withheld',
+      // Which grown copies the player carries, and nothing about what is inside
+      // one: a driver has to name what it is equipping, and a plane is read
+      // through a surface of its own.
+      instances: 'published',
       // How many of each place's population are down. A driver renders what is
       // standing, which `entities` already carries.
       populations: 'withheld',
@@ -885,7 +936,7 @@ describe('what the engine withholds', () => {
     const published = Object.keys(classified).filter((field) => classified[field as keyof GameState] === 'published');
     const carried = new Set(Object.keys(view(startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n')))));
     // Two of them are renamed on the way out and one is drained into `said`.
-    const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action' };
+    const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action', instances: 'grown' };
     for (const field of published) expect(carried.has(renamed[field] ?? field), field).toBe(true);
   });
 });
@@ -1122,5 +1173,102 @@ stats: attack 0, max-health 1000000, accuracy 100, evasion 0, swings-per-minute 
 
     expect(said).toHaveLength(5);
     expect(said.every((line) => line.startsWith('You hit the Dummy'))).toBe(true);
+  });
+});
+
+const GROWTH_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# stat max-health
+base: 30
+
+# passive hale
++10 max-health
+
+# cluster-jewel node
+shape: point
+open-connections: e
+passives: 1 hale
+
+# item blade
+title: Blade
+slot: hand
+origin-cluster: node
+max-level: 2
+
+# item node-jewel
+cluster-jewel: node
+
+# item whetstone
+item-experience: 1000
+
+# item lesser-orb
+cluster-effect: +25% max-health
+
+# test grow-a-blade
+feed: blade with whetstone
+allocate: 1 at 0,0 slot e
+slot: 1 at 0,0 e with node-jewel
+allocate: 1 at 1,0 position 1
+apply: 1 at 1,0 with lesser-orb
+refuse: feed 1 with whetstone
+refuse: feed 1 with lesser-orb
+refuse: slot 1 at 0,0 e with node-jewel
+refuse: allocate 1 at 1,0 slot e
+assert: has lesser-orb
+
+# test refusal-is-not-a-pass
+refuse: apply 1 at 0,0 with lesser-orb
+`;
+
+describe('the four growth verbs through the directive surface', () => {
+  const registry = loadModule(GROWTH_MODULE);
+
+  function stocked(): GameState {
+    const state = createGameState('camp');
+    Object.assign(state.inventory, { blade: 1, 'node-jewel': 1, whetstone: 2, 'lesser-orb': 2 });
+    return state;
+  }
+
+  // The whole loop c22 replays: a target named as an item id mints a copy, the
+  // copy is named by the id minting gave it, and every refusal is a written
+  // line rather than an absence.
+  it('replays a whole growth, and each refusal, out of an authored # test', () => {
+    const state = stocked();
+    expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
+
+    expect(state.inventory).toEqual({ blade: 0, 'node-jewel': 0, whetstone: 1, 'lesser-orb': 1 });
+    const grown = itemInstance(state, '1');
+    expect(grown?.experience).toBe(1000);
+    expect(grown?.plane['1,0']).toEqual({ jewel: 'node', entry: 'e', allocatedPositions: [1], allocatedSlots: [], effects: ['lesser-orb'] });
+  });
+
+  it('fails a refuse: whose growth the plane allowed', () => {
+    const state = stocked();
+    expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
+    expect(runTest('refusal-is-not-a-pass', registry, state)).toEqual({
+      passed: false,
+      failure: 'apply: 1 at 0,0 with lesser-orb was not refused',
+    });
+  });
+
+  it('hands a refusal back as the failure and says it where the player reads', () => {
+    const session = primed(registry, { inventory: { blade: 1 } });
+    const before = view(session).said.length;
+
+    expect(applyDirective(session, { kind: 'feed', target: 'blade', food: 'whetstone' })).toEqual({ failure: 'you carry no whetstone' });
+    expect(view(session).said.slice(before)).toContain('you carry no whetstone');
+    expect(sessionStatus(session).grown).toEqual({});
+  });
+
+  // Nothing is minted for a verb that was refused, so the counter a later
+  // authored line names is the one the successful verb advanced.
+  it('mints only on a growth that succeeded', () => {
+    const state = stocked();
+    expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
+    expect(Object.keys(state.instances.byId)).toEqual(['1']);
+    expect(state.instances.next).toBe(2);
   });
 });

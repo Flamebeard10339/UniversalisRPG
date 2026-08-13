@@ -6,10 +6,11 @@ import { Directive } from './test';
 import { Ally, EntityBlock, isHandlerBlock } from './entity';
 import { Edge, Population, Relative } from './location';
 import { isFieldEdits, listMembers } from '../grammar/section';
+import { mayBeInstanceId } from './instanceId';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
-export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'action' | 'event' | 'faction' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node';
+export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'action' | 'event' | 'faction' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node' | 'passive' | 'cluster-jewel';
 
 // Returns what the id should become. Resolution rewrites it into a namespaced
 // key; validation hands it back and throws if it names nothing.
@@ -24,6 +25,17 @@ function put<T extends object>(holder: T, key: keyof T & string, kind: Reference
   if (typeof current !== 'string') return;
   const next = visit(kind, current, where);
   if (next !== current) (holder as Loose)[key] = next;
+}
+
+// A directive naming what the player carries may name a stack by its item id
+// or one grown copy by the id minting gave it, and only the first is declared
+// anywhere. The shape is what tells them apart, so a name that could not have
+// been minted is still resolved and a typo'd item id is still caught, while a
+// bare number is left for the runtime, which alone knows what is live.
+function putCarried<T extends object>(holder: T, key: keyof T & string, where: string, visit: Visit): void {
+  const current = (holder as Loose)[key];
+  if (typeof current === 'string' && mayBeInstanceId(current)) return;
+  put(holder, key, 'item', where, visit);
 }
 
 function strings(holder: Loose, key: string, kind: ReferenceKind, where: string, visit: Visit): void {
@@ -227,7 +239,27 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       put(value, 'target', 'entity', `${where} use: on`, visit);
       return;
     case 'equip':
-      put(value, 'item', 'item', `${where} equip:`, visit);
+      putCarried(value, 'item', `${where} equip:`, visit);
+      return;
+    // A growth verb's target is what is grown; whatever it consumes comes off a
+    // stack and is always an item id.
+    case 'feed':
+      putCarried(value, 'target', `${where} feed:`, visit);
+      put(value, 'food', 'item', `${where} feed: with`, visit);
+      return;
+    case 'slot':
+      putCarried(value, 'target', `${where} slot:`, visit);
+      put(value, 'jewel', 'item', `${where} slot: with`, visit);
+      return;
+    case 'apply':
+      putCarried(value, 'target', `${where} apply:`, visit);
+      put(value, 'effect', 'item', `${where} apply: with`, visit);
+      return;
+    case 'allocate':
+      putCarried(value, 'target', `${where} allocate:`, visit);
+      return;
+    case 'refuse':
+      visitDirective(value.inner, `${where} refuse:`, visit);
       return;
     // `unequip:` names a slot and `submit-modal:` an option key, neither of
     // which is a section's id, so they resolve nothing here; a slot is checked
@@ -289,6 +321,20 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       visitTags(section.tags, where, visit);
       actions(section.actions, where, visit);
       hooks(section, where, visit);
+      put(section, 'clusterJewel', 'cluster-jewel', `${where} cluster-jewel:`, visit);
+      put(section, 'originCluster', 'cluster-jewel', `${where} origin-cluster:`, visit);
+      if (section.clusterEffect) put(section.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
+      return;
+    case 'passive':
+      visitTags(section.tags, where, visit);
+      return;
+    case 'cluster-jewel':
+      // Positions are authored as `<position> <passive>` pairs, the same
+      // list-of-pairs shape `# entity stats:` walks above — the key here is a
+      // position number rather than a stat id, so only the value resolves.
+      for (const assignment of listMembers<[number, string]>(section.positions)) {
+        assignment[1] = visit('passive', assignment[1], `${where} passives:`);
+      }
       return;
     case 'location':
       for (const entry of listMembers<Population>(section.entities)) put(entry, 'entity', 'entity', `${where} entities:`, visit);

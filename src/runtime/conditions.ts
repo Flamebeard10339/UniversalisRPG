@@ -2,6 +2,7 @@ import { Condition, PLAYER, Reference, TIME, visitedNode } from '../grammar/cond
 import { TextSegment } from '../content/dialogue';
 import { GameState } from './state';
 import { msToSeconds } from './units';
+import { carriedCount } from './itemInstance';
 
 // Rendering asks the same questions of state that conditions do, which is why
 // the two live together.
@@ -50,7 +51,7 @@ export function evaluateCondition(condition: Condition, state: GameState): boole
     case 'or':
       return condition.conditions.some((c) => evaluateCondition(c, state));
     case 'has':
-      return (state.inventory[condition.item] ?? 0) >= condition.count;
+      return carriedCount(state, condition.item) >= condition.count;
   }
 }
 

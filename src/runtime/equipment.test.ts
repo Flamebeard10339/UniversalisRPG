@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { armFightAction, createGameState, equip, GameState, initResources, resolve, statValue, unequip } from './runtime';
 import { loadModule, Registry } from '../content/registry';
+import { parseSaveSection } from '../content/saveSection';
+import { feedItem } from './itemInstance';
+import { initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
 const MODULE = `
@@ -45,11 +48,15 @@ uses: strike
 
 # item attack-bonus
 slot: mainhand
+max-level: 10
 +2 attack
 
 # item defense-bonus
 slot: offhand
 +2 defense
+
+# item whetstone
+item-experience: 1000
 `;
 
 function loaded(source = MODULE): Registry {
@@ -171,5 +178,95 @@ describe('equipment', () => {
 
     state.inventory['attack-bonus'] = 1;
     expect(statValue('attack', state, registry)).toBe(equipped);
+  });
+});
+
+function carrying(registry: Registry, stacks: Record<string, number>): GameState {
+  const state = createGameState('arena');
+  initResources(state, registry);
+  Object.assign(state.inventory, stacks);
+  return state;
+}
+
+function fed(state: GameState, registry: Registry, target: string): string {
+  const outcome = feedItem(state, registry, target, 'whetstone');
+  if (!outcome.ok) throw new Error(outcome.refused);
+  return outcome.instance;
+}
+
+function reloaded(state: GameState, registry: Registry): GameState {
+  const target = initialState(registry);
+  loadSave(target, parseSaveSection({ kind: 'save', id: 'x', body: [{ text: serializeSave(state, registry), span: { start: 0, end: 0 }, children: [] }], span: { start: 0, end: 0 } }).saved, registry);
+  return target;
+}
+
+describe('a grown item is worn like any other', () => {
+  const BARE = 10;
+
+  it('can be worn at all, though growing it took it out of its stack', () => {
+    const registry = loaded();
+    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
+    const grownId = fed(state, registry, 'attack-bonus');
+
+    expect(state.inventory['attack-bonus']).toBe(0);
+    equip(state, registry, grownId);
+    expect(state.equipped['mainhand']).toBe(grownId);
+    expect(statValue('attack', state, registry)).toBe(BARE + 2);
+  });
+
+  it('grants nothing while it is carried and not worn', () => {
+    const registry = loaded();
+    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
+    fed(state, registry, 'attack-bonus');
+    expect(statValue('attack', state, registry)).toBe(BARE);
+  });
+
+  it('keeps granting its +2 attack through being modified while worn', () => {
+    const registry = loaded();
+    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
+    equip(state, registry, 'attack-bonus');
+    expect(statValue('attack', state, registry)).toBe(BARE + 2);
+
+    const grownId = fed(state, registry, 'attack-bonus');
+    expect(state.equipped['mainhand']).toBe(grownId);
+    expect(statValue('attack', state, registry)).toBe(BARE + 2);
+  });
+
+  // The slot follows the copy only when the stack it came out of is empty:
+  // with copies still in it the worn id still names something the player has,
+  // and moving the slot would change what they wear without being asked.
+  it('leaves a slot on the stack when growing one copy did not empty it', () => {
+    const registry = loaded();
+    const state = carrying(registry, { 'attack-bonus': 2, whetstone: 1 });
+    equip(state, registry, 'attack-bonus');
+    const grownId = fed(state, registry, 'attack-bonus');
+
+    expect(state.equipped['mainhand']).toBe('attack-bonus');
+    expect(grownId).not.toBe('attack-bonus');
+    expect(statValue('attack', state, registry)).toBe(BARE + 2);
+  });
+
+  it('is still worn, and still worth the same, after a reload', () => {
+    const registry = loaded();
+    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
+    equip(state, registry, fed(state, registry, 'attack-bonus'));
+
+    const target = reloaded(state, registry);
+    expect(target.equipped).toEqual(state.equipped);
+    expect(statValue('attack', target, registry)).toBe(statValue('attack', state, registry));
+  });
+
+  it('is unequipped when the item it grew from leaves the content', () => {
+    const registry = loaded();
+    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
+    const grownId = fed(state, registry, 'attack-bonus');
+    equip(state, registry, grownId);
+
+    // Pruning drops the copy first and the slot after, so the slot is reported
+    // against the id it was holding rather than against the item that has gone.
+    const warnings = pruneStateForRegistry(state, loaded(MODULE.replace('# item attack-bonus\nslot: mainhand\nmax-level: 10\n+2 attack\n', '')));
+    expect(warnings.map((warning) => warning.message)).toContain(`Removed instance ${grownId} because its template attack-bonus is not loaded.`);
+    expect(warnings.map((warning) => warning.message)).toContain(`Unequipped mainhand because its item ${grownId} is not loaded.`);
+    expect(state.equipped['mainhand']).toBeUndefined();
   });
 });

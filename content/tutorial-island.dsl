@@ -134,10 +134,15 @@ eat:
   take: 1 cooked-shrimp
   say: You eat the shrimp. Simple, warm, and better than it looks.
 
+// No `origin-cluster:` of its own, so hex (0,0) falls back to a single point
+// carrying one east jewel slot: the on-ramp every base has when it declares
+// nothing. `max-level:` is where a base is tiered, and this one is a starter
+// forever.
 # item iron-sword
 examine: A well-balanced blade, standard adventurer's kit.
 slot: mainhand
 weapon, +2 attack
+max-level: 10
 
 # item wooden-shield
 examine: A sturdy shield of banded oak.
@@ -180,6 +185,224 @@ examine: A copper coin someone stepped on.
 # item rats-eye-gem
 examine: A red stone the size of a thumbnail. It does not warm in your hand.
 
+// --- passives ---
+//
+// Flat and percent are separated by cluster rather than mixed inside one.
+// statRange folds a stat as (base + added) x (1 + increased), so a percent
+// passive is worth almost nothing until flat ones have been stacked: keeping
+// them apart puts the order a player has to build in on the plane itself,
+// where a percent cluster slotted early is a mistake they can see.
+
+# passive hale
+life, +15 max-health
+
+# passive constitution
+life, +20 max-health
+
+# passive tempered-frame
+examine: Not more armour. Better armour.
+life, +12% max-health
+
+# passive mending
+examine: The wound closes while you are still deciding whether it hurt.
+life, recovery, +2 regeneration
+
+# passive warded
+armour, +2 defense
+
+# passive plated
+armour, +3 defense
+
+# passive hardened
+armour, +10% defense
+
+# passive whetted
+physical, +2 attack
+
+# passive honed
+physical, +3 attack
+
+# passive brutal
+physical, +8% attack
+
+# passive swift-hands
+speed, +2 attack-rate
+
+# passive flurry
+speed, +3 attack-rate
+
+# passive frenzied
+speed, +10% attack-rate
+
+# passive keen-eye
+precision, +6 accuracy
+
+# passive marksman
+precision, +8 accuracy
+
+# passive deadly-precision
+precision, +12% accuracy
+
+# passive quickstep
+evasion, +8 evasion
+
+# passive evasive
+evasion, +15% evasion
+
+# passive fortune
+utility, +5 luck
+
+// --- cluster jewels ---
+//
+// Every shape the catalogue holds is authored at least once, so a shape that
+// plays badly is met in play rather than only in a unit test. An unfilled
+// position is a node the player pays for and gets nothing from, which is what
+// makes a sparse jewel a corridor rather than a defective one.
+
+# cluster-jewel keen-edge
+examine: Six facets, each one sharpened against the last.
+shape: ring
+open-connections: e
+passives: 1 whetted, 2 keen-eye, 3 honed, 4 brutal, 5 swift-hands, 6 whetted
+
+# cluster-jewel stout-heart
+examine: A knot of iron that will not be moved.
+shape: ring
+open-connections: ne, se
+passives: 1 warded, 2 hale, 3 constitution, 5 hale, 6 mending
+
+// Mostly percent, and worth close to nothing slotted early. Slotted behind a
+// flat cluster it multiplies what that one already pays.
+# cluster-jewel tempered-will
+examine: It does not add. It insists.
+shape: wheel
+open-connections: e, se
+passives: 1 hale, 2 tempered-frame, 3 brutal, 4 hardened, 5 tempered-frame, 6 brutal, 7 fortune
+
+// Twelve positions and two exits. The inner ring is left mostly empty on
+// purpose: crossing it costs four points and pays on one, where the short way
+// round the outer ring costs three and pays on all of them.
+# cluster-jewel great-work
+examine: Twelve years of somebody's evenings, and they are not finished.
+shape: double-ring
+open-connections: e, sw
+passives:
+  1 warded
+  2 plated
+  3 constitution
+  4 marksman
+  5 hale
+  6 honed
+  7 fortune
+  10 flurry
+
+# cluster-jewel causeway
+examine: A road, and nothing on either side of it.
+shape: spindle
+open-connections: e
+passives: 2 hale
+
+// One node, five ways out, and no payload at all. Six points buys the item
+// nothing except five live directions from a single hex, which nothing else
+// in the catalogue can do.
+# cluster-jewel crossroads
+examine: A junction stone. It offers roads, not shelter.
+shape: point
+open-connections: ne, e, se, sw, nw
+
+// Hex (0,0) of the Heartwood Blade. It is never slotted and so never rotated,
+// which is why its root may sit where it likes; the west-edge convention that
+// binds every jewel above exists only to give slotting a defined rotation.
+# cluster-jewel heartwood-core
+shape: spindle
+open-connections: e, ne
+passives: 1 mending, 2 tempered-frame
+
+// --- cluster jewel items ---
+//
+// A jewel reaches the player as an ordinary item naming its declaration, so
+// drops, stacking and inventory are the machinery that already exists.
+
+# item keen-edge-jewel
+examine: A closed ring of iron, warm to the touch.
+cluster-jewel: keen-edge
+
+# item stout-heart-jewel
+cluster-jewel: stout-heart
+
+# item tempered-will-jewel
+cluster-jewel: tempered-will
+
+# item great-work-jewel
+cluster-jewel: great-work
+
+# item causeway-jewel
+cluster-jewel: causeway
+
+# item crossroads-jewel
+cluster-jewel: crossroads
+
+// --- item experience ---
+//
+// Experience is fed, never earned, and the grant is authored per item: a
+// greater whetstone is a second declaration and not a second mechanism.
+
+# item whetstone
+examine: A grey block, faintly oiled.
+item-experience: 1000
+
+# item masters-whetstone
+title: Master's Whetstone
+examine: The same grey block, cut true, and it lasts.
+item-experience: 10000
+
+// --- cluster effects ---
+//
+// An orb is used on a cluster already standing in a plane, never on a jewel
+// in inventory, which is what keeps jewels stackable. It scales every payload
+// naming its stat in that cluster and nowhere else, so an orb is a question
+// about which hexagon — spent on a cluster with no such payload it is worth
+// exactly nothing, and the runtime says so by reporting back the same numbers.
+//
+// Two orbs naming one stat pool additively, so the pair below is 35% and not
+// 37.5%. The two tiers exist so that the pooling rule is reachable in play at
+// all: a cluster refuses a second copy of one orb, so one orb per stat would
+// leave `mod-slots: 2` unable to hold two effects on the same stat.
+
+# item orb-of-vitality
+title: Orb of Vitality
+examine: A dull red bead. It beats, very slowly.
+cluster-effect: +25% max-health
+
+# item orb-of-the-edge
+title: Orb of the Edge
+examine: A sliver of something that was never blunt.
+cluster-effect: +25% attack
+
+# item lesser-orb-of-the-edge
+title: Lesser Orb of the Edge
+examine: The same sliver, ground down by whoever had it first.
+cluster-effect: +10% attack
+
+# item orb-of-the-bulwark
+title: Orb of the Bulwark
+examine: Heavier than the hand expects.
+cluster-effect: +25% defense
+
+# item orb-of-renewal
+title: Orb of Renewal
+examine: Cool, and faintly wet, and it does not dry.
+cluster-effect: +25% regeneration
+
+// A base that declares its own origin cluster, which is the general rule the
+// iron sword's bare east slot is the degenerate case of.
+# item heartwood-blade
+examine: The grain still moves, slowly, when you are not looking.
+slot: mainhand
+weapon, +4 attack
+max-level: 40
+origin-cluster: heartwood-core
+
 // --- drop tables ---
 
 // A table is a named result list, so what a rat leaves behind reads as two
@@ -187,6 +410,28 @@ examine: A red stone the size of a thumbnail. It does not warm in your hand.
 # droptable rat-remains
 give: 1-3 rat-bone
 1 in 4: give: 1 rat-tail
+
+// The smithing on-ramp: one of each shape, the whetstones to pay for them and
+// the orbs to spend on what they carry. Every line is certain, because this
+// table is the tutorial's way of putting a plane in the player's hands rather
+// than a drop economy — the rats are a capped population and a jewel behind a
+// 1-in-150 roll would never arrive on this island at all.
+# droptable smiths-cache
+give: 1 heartwood-blade
+give: 1 iron-sword
+give: 6 whetstone
+give: 4 masters-whetstone
+give: 1 keen-edge-jewel
+give: 1 stout-heart-jewel
+give: 1 tempered-will-jewel
+give: 1 great-work-jewel
+give: 1 causeway-jewel
+give: 1 crossroads-jewel
+give: 1 orb-of-vitality
+give: 2 orb-of-the-edge
+give: 1 lesser-orb-of-the-edge
+give: 1 orb-of-the-bulwark
+give: 1 orb-of-renewal
 
 // Named rather than written inline because two different things reach it: the
 // rat's corpse and the dresser's drawer. That is the whole reason a table has an
@@ -210,7 +455,7 @@ adjacent:
   basement
   beach while front-door.unlocked
 entities:
-  miki, front-door, stairs, mirror, oven
+  miki, front-door, stairs, mirror, oven, smiths-chest
 
 # location guide-house-upstairs
 x: 0, y: 0, z: 1
@@ -309,6 +554,17 @@ ascend:
   instant
   relocate: guide-house
   say: You climb back up to the ground floor.
+
+# entity smiths-chest
+title: Smith's Chest
+examine: A banded chest shoved under the workbench, its lid unlatched.
+flags: emptied
+open:
+  instant
+  hidden if: emptied
+  roll: smiths-cache
+  set: emptied
+  say: Whetstones, a handful of cut stones, and a blade nobody came back for.
 
 # entity dresser
 examine: A dusty dresser, one drawer left slightly ajar.
@@ -503,3 +759,82 @@ expect: dresser-trinket-end
 load: explored-and-unlocked
 assert: front-door.unlocked
 assert: beach.discovered
+
+// --- growing an item ---
+//
+// Recorded from a live session with /create-valid-test, so what follows is what
+// a player types and the closing `expect:` is the sheet that session ended on:
+// both grown copies, their planes, every allocation, and the effects each
+// cluster carries. Regenerate with /create-valid-test when this content changes
+// on purpose.
+//
+// The Heartwood Blade's origin is a spindle whose root, position 1, is
+// allocated from the start and free. Both of its jewel slots hang off position
+// 3, so either one costs two points to reach before the slot itself.
+
+# test growing-a-heartwood-blade
+load: growing-a-heartwood-blade-start
+use: entity.smiths-chest.open
+// An orb grants no item experience, and nothing else in the game moves it.
+refuse: feed heartwood-blade with orb-of-vitality
+// Out of adjacency: position 3 touches only position 2 and the two slots,
+// and the point to pay for it is in hand.
+refuse: allocate heartwood-blade at 0,0 position 3
+// The first verb the plane allows is what mints the copy. The two refusals
+// above left the stack whole, so this one still names an item, not an id.
+feed: heartwood-blade with whetstone
+feed: 1 with whetstone
+feed: 1 with whetstone
+feed: 1 with whetstone
+allocate: 1 at 0,0 position 2
+allocate: 1 at 0,0 position 3
+allocate: 1 at 0,0 slot ne
+slot: 1 at 0,0 ne with keen-edge-jewel
+allocate: 1 at 0,0 slot e
+slot: 1 at 0,0 e with crossroads-jewel
+// Slotting is permanent: a filled slot refuses a second jewel forever.
+refuse: slot 1 at 0,0 e with causeway-jewel
+feed: 1 with masters-whetstone
+// Allocation is permanent too, and this is asked with six points spare so
+// that having none cannot be the reason.
+refuse: allocate 1 at 0,0 position 2
+allocate: 1 at 1,-1 position 1
+allocate: 1 at 1,-1 position 2
+allocate: 1 at 1,-1 position 3
+allocate: 1 at 1,-1 position 4
+allocate: 1 at 1,-1 position 5
+allocate: 1 at 1,0 position 1
+// The junction's nw edge faces the ring slotted a moment ago, and one hex
+// holds one cluster: that direction is foreclosed for good. Asked with a
+// point in hand and its own position allocated, so blocking is the only
+// answer left — and the ne edge of the same hex, two lines down, takes the
+// point the nw edge would not.
+refuse: allocate 1 at 1,0 slot nw
+refuse: slot 1 at 1,0 nw with causeway-jewel
+allocate: 1 at 1,0 slot ne
+// Level 11 bought eleven points and all eleven are spent.
+refuse: allocate 1 at 1,0 slot se
+apply: 1 at 1,-1 with orb-of-the-edge
+apply: 1 at 1,-1 with lesser-orb-of-the-edge
+// Two effects naming one stat pool to 35% rather than compounding to 37.5%.
+// A second copy of one orb is refused by identity, a third orb by capacity.
+refuse: apply 1 at 1,-1 with orb-of-the-edge
+refuse: apply 1 at 1,-1 with orb-of-the-bulwark
+// The origin's only allocated payload is a percent one, so this is an orb
+// scaling the increased channel rather than the added one.
+apply: 1 at 0,0 with orb-of-vitality
+// The ordinary base, whose hex (0,0) is the bare east slot every base falls
+// back to. Two Master's Whetstones carry it to the level 10 it is capped at,
+// and feeding it again is refused with the whetstone intact.
+feed: iron-sword with masters-whetstone
+feed: 2 with masters-whetstone
+refuse: feed 2 with masters-whetstone
+allocate: 2 at 0,0 slot e
+slot: 2 at 0,0 e with causeway-jewel
+expect: growing-a-heartwood-blade-end
+
+# save growing-a-heartwood-blade-start
+{"version":8,"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true}}
+
+# save growing-a-heartwood-blade-end
+{"version":8,"inventory":{"tutorial-island.heartwood-blade":0,"tutorial-island.iron-sword":0,"tutorial-island.whetstone":2,"tutorial-island.masters-whetstone":1,"tutorial-island.keen-edge-jewel":0,"tutorial-island.stout-heart-jewel":1,"tutorial-island.tempered-will-jewel":1,"tutorial-island.great-work-jewel":1,"tutorial-island.causeway-jewel":0,"tutorial-island.crossroads-jewel":0,"tutorial-island.orb-of-vitality":0,"tutorial-island.orb-of-the-edge":1,"tutorial-island.lesser-orb-of-the-edge":0,"tutorial-island.orb-of-the-bulwark":1,"tutorial-island.orb-of-renewal":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"tutorial-island.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"tutorial-island.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["tutorial-island.orb-of-vitality"]},"1,-1":{"jewel":"tutorial-island.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["tutorial-island.orb-of-the-edge","tutorial-island.lesser-orb-of-the-edge"]},"1,0":{"jewel":"tutorial-island.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"tutorial-island.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"tutorial-island.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}

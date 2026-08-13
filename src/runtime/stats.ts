@@ -3,6 +3,9 @@ import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
 import { actorEntity, participants, sideOf } from './encounter';
 import { Registry } from '../content/registry';
+import { instancePayloads } from './clusterEffect';
+import { basePlane } from './clusterPlane';
+import { carriesItem, itemInstance, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
 import { skillLevel } from './skills';
 import { ActiveBuff, GameState, PLAYER, RuntimeError } from './state';
@@ -20,13 +23,37 @@ interface StatFold {
   increased: number;
 }
 
+// The one multiplication of a BonusAmount there is. A surface that shows what a
+// payload is worth calls this rather than scaling for itself, so the number on
+// screen and the number the fold takes cannot be two different answers (c19).
+export function scaledAmount(bonus: BonusAmount, times: number): BonusAmount {
+  return bonus.percent ? { percent: true, amount: bonus.amount * times } : { percent: false, amount: scaleRange(bonus.amount, times) };
+}
+
 function foldBonus(bonus: BonusAmount, fold: StatFold, times: number): void {
-  if (bonus.percent) fold.increased += (bonus.amount * times) / 100;
-  else fold.added = addRanges(fold.added, scaleRange(bonus.amount, times));
+  const scaled = scaledAmount(bonus, times);
+  if (scaled.percent) fold.increased += scaled.amount / 100;
+  else fold.added = addRanges(fold.added, scaled.amount);
 }
 
 function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatFold): void {
   for (const tag of tags) if (tag.kind === 'stat-bonus' && tag.statId === statId) foldBonus(tag, fold, 1);
+}
+
+// A worn item that was grown adds no channel and no arithmetic (c18): what its
+// cluster effects decided a payload is worth arrives as the same `times` a
+// skill's level arrives as, through the same fold. A worn stack copy is the
+// degenerate argument to the same instancePayloads (c9, c20): zero experience
+// and the item's default plane, not a second path that skips the fold.
+function foldPlanePayloads(registry: Registry, state: GameState, wornId: string, statId: string, fold: StatFold): void {
+  const item = registry.items.get(itemTemplate(state, wornId));
+  if (!item) return;
+  const plane = basePlane(item);
+  const instance = itemInstance(state, wornId) ?? (plane && { experience: 0, plane });
+  if (!instance) return;
+  for (const payload of instancePayloads(registry, instance)) {
+    if (payload.statId === statId) foldBonus(payload.bonus, fold, payload.scale);
+  }
 }
 
 // A state holds one store of buffs, one of equipment and one of skill xp, and
@@ -68,10 +95,11 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
     else fold.increased += buff.amount;
   }
   foldStatBonuses(performing(state, registry, actorId)?.tags ?? [], statId, fold);
-  for (const itemId of own.equipped) {
-    if ((state.inventory[itemId] ?? 0) === 0) continue;
-    const item = registry.items.get(itemId);
+  for (const wornId of own.equipped) {
+    if (!carriesItem(state, wornId)) continue;
+    const item = registry.items.get(itemTemplate(state, wornId));
     if (item) foldStatBonuses(item.tags, statId, fold);
+    foldPlanePayloads(registry, state, wornId, statId, fold);
   }
   return scaleRange(fold.added, 1 + fold.increased);
 }

@@ -11,14 +11,17 @@ import { DropTable } from './dropTable';
 import { ActionDeclaration } from './action';
 import { Entity } from './entity';
 import { GameEvent } from './event';
+import { ClusterJewel, DEFAULT_MOD_SLOTS } from './clusterJewel';
+import { Passive } from './passive';
 import { Faction } from './faction';
-import { Item } from './item';
+import { DEFAULT_MAX_LEVEL, Item } from './item';
 import { Location, Population } from './location';
 import { Recipe } from './recipe';
 import { Registry } from './registry';
 import { Resource } from './resource';
 import { ParsedSave } from './saveSection';
 import { Test, Directive } from './test';
+import { hexKey } from './hex';
 import { ModuleInfo } from './info';
 
 type Lines = string[];
@@ -256,7 +259,13 @@ function textSegments(values: readonly TextSegment[] | undefined): string {
     .join('');
 }
 
-function directive(value: Directive): string {
+// The verb, then whatever that verb's own line carries after its colon — the
+// shape `begin:` and `refuse:` both take their inner directive in.
+function inlined(inner: Directive, verb = inner.kind): string {
+  return `${verb} ${printDirective(inner).replace(/^[a-z-]+:[ \t]*/, '')}`;
+}
+
+export function printDirective(value: Directive): string {
   switch (value.kind) {
     case 'run':
       return `run: ${value.test}`;
@@ -273,8 +282,9 @@ function directive(value: Directive): string {
     case 'craft':
       return `craft: ${value.recipe}`;
     case 'begin':
-      // The verb, then whatever that verb's own line carries after its colon.
-      return `begin: ${value.inner.kind === 'use-on' ? 'use' : value.inner.kind} ${directive(value.inner).replace(/^[a-z-]+:[ \t]*/, '')}`;
+      return `begin: ${inlined(value.inner, value.inner.kind === 'use-on' ? 'use' : value.inner.kind)}`;
+    case 'refuse':
+      return `refuse: ${inlined(value.inner)}`;
     case 'assert':
       return `assert: ${condition(value.condition)}`;
     case 'expect':
@@ -289,6 +299,14 @@ function directive(value: Directive): string {
       return `equip: ${value.item}`;
     case 'unequip':
       return `unequip: ${value.slot}`;
+    case 'feed':
+      return `feed: ${value.target} with ${value.food}`;
+    case 'slot':
+      return `slot: ${value.target} at ${hexKey(value.hex)} ${value.direction} with ${value.jewel}`;
+    case 'allocate':
+      return `allocate: ${value.target} at ${hexKey(value.node.hex)} ${value.node.kind === 'position' ? `position ${value.node.position}` : `slot ${value.node.direction}`}`;
+    case 'apply':
+      return `apply: ${value.target} at ${hexKey(value.hex)} with ${value.effect}`;
     case 'submit-modal':
       return `submit-modal: ${value.key}=${value.value}`;
   }
@@ -308,8 +326,33 @@ function itemSection(moduleId: string, item: Item): string {
   titled(lines, item);
   if (item.slot) lines.push(`slot: ${item.slot}`);
   if (item.tags && item.tags.length > 0) lines.push(item.tags.map(tag).join(', '));
+  if (item.clusterJewel) lines.push(`cluster-jewel: ${item.clusterJewel}`);
+  if (item.originCluster) lines.push(`origin-cluster: ${item.originCluster}`);
+  if (item.clusterEffect) lines.push(`cluster-effect: ${item.clusterEffect.percent < 0 ? '-' : '+'}${Math.abs(item.clusterEffect.percent)}% ${item.clusterEffect.statId}`);
+  if (item.itemExperience !== undefined) lines.push(`item-experience: ${n(item.itemExperience)}`);
+  if (item.maxLevel !== DEFAULT_MAX_LEVEL) lines.push(`max-level: ${n(item.maxLevel)}`);
   hookLines(lines, item);
   for (const action of item.actions ?? []) lines.push(...actionLines(action));
+  return lines.join('\n');
+}
+
+function passiveSection(moduleId: string, passive: Passive): string {
+  const lines = [`# passive ${moduleLocalId(moduleId, passive.id)}`];
+  titled(lines, passive);
+  if (passive.tags.length > 0) lines.push(passive.tags.map(tag).join(', '));
+  return lines.join('\n');
+}
+
+function clusterJewelSection(moduleId: string, jewel: ClusterJewel): string {
+  const lines = [`# cluster-jewel ${moduleLocalId(moduleId, jewel.id)}`];
+  titled(lines, jewel);
+  lines.push(`shape: ${jewel.shape}`);
+  lines.push(`open-connections: ${jewel.openConnections.join(', ')}`);
+  const positions = Object.keys(jewel.positions)
+    .map(Number)
+    .sort((one, other) => one - other);
+  if (positions.length > 0) lines.push(`passives: ${positions.map((position) => `${n(position)} ${jewel.positions[position]}`).join(', ')}`);
+  if (jewel.modSlots !== DEFAULT_MOD_SLOTS) lines.push(`mod-slots: ${n(jewel.modSlots)}`);
   return lines.join('\n');
 }
 
@@ -427,7 +470,7 @@ function saveSection(moduleId: string, id: string, save: ParsedSave): string {
 }
 
 function testSection(moduleId: string, test: Test): string {
-  return [`# test ${moduleLocalId(moduleId, test.id)}`, ...test.directives.map(directive)].join('\n');
+  return [`# test ${moduleLocalId(moduleId, test.id)}`, ...test.directives.map(printDirective)].join('\n');
 }
 
 function infoLines(info: SerializeModuleOptions['info']): Lines {
@@ -453,6 +496,8 @@ export function serializeRegistryModule(registry: Registry, options: SerializeMo
         [`# skill ${moduleLocalId(moduleId, skill.id)}`, `title: ${skill.title}`, ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : []), ...(skill['per-level'] ? [`per-level: ${bonusAmount(skill['per-level'])}`] : [])].join('\n'),
       );
   for (const item of registry.items.values()) if (inModule(moduleId, item.id)) sections.push(itemSection(moduleId, item));
+  for (const passive of registry.passives.values()) if (inModule(moduleId, passive.id)) sections.push(passiveSection(moduleId, passive));
+  for (const jewel of registry.clusterJewels.values()) if (inModule(moduleId, jewel.id)) sections.push(clusterJewelSection(moduleId, jewel));
   for (const faction of registry.factions.values()) if (inModule(moduleId, faction.id)) sections.push(factionSection(moduleId, faction));
   for (const event of registry.events.values()) if (inModule(moduleId, event.id)) sections.push(eventSection(moduleId, event));
   for (const action of registry.actions.values()) if (inModule(moduleId, action.id)) sections.push(actionSection(moduleId, action));

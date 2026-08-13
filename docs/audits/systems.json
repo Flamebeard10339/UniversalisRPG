@@ -18,6 +18,8 @@
       "paths": [
         "content/tutorial-island.dsl",
         "src/content/action.ts",
+        "src/content/clusterJewel.test.ts",
+        "src/content/clusterJewel.ts",
         "src/content/dialogue.ts",
         "src/content/dropTable.test.ts",
         "src/content/dropTable.ts",
@@ -26,7 +28,11 @@
         "src/content/faction.ts",
         "src/content/flag.ts",
         "src/content/flags.test.ts",
+        "src/content/hex.test.ts",
+        "src/content/hex.ts",
         "src/content/info.ts",
+        "src/content/instanceId.ts",
+        "src/content/item.test.ts",
         "src/content/item.ts",
         "src/content/location.ts",
         "src/content/merge.test.ts",
@@ -34,6 +40,8 @@
         "src/content/module.ts",
         "src/content/namespace.ts",
         "src/content/parse.test.ts",
+        "src/content/passive.test.ts",
+        "src/content/passive.ts",
         "src/content/recipe.ts",
         "src/content/referenceSites.ts",
         "src/content/references.test.ts",
@@ -44,6 +52,8 @@
         "src/content/resolve.ts",
         "src/content/resource.ts",
         "src/content/saveSection.ts",
+        "src/content/shapes.test.ts",
+        "src/content/shapes.ts",
         "src/content/skill.ts",
         "src/content/stat.ts",
         "src/content/test.test.ts",
@@ -134,6 +144,50 @@
             "src/grammar/hook.ts"
           ],
           "note": "produced by combat-hook-grammar"
+        },
+        {
+          "name": "cluster shape catalogue",
+          "paths": [
+            "src/content/hex.ts",
+            "src/content/shapes.ts"
+          ],
+          "note": "produced by cluster-shape-catalogue: axial hex direction vocabulary and the closed catalogue of cluster-jewel shapes (point, spindle, ring, wheel, double-ring)"
+        },
+        {
+          "name": "cluster jewel authoring",
+          "paths": [
+            "src/content/passive.ts",
+            "src/content/clusterJewel.ts"
+          ],
+          "note": "produced by cluster-jewel-sections: the # passive and # cluster-jewel section kinds, their load-time validation, and the item fields that reach a cluster jewel from a droppable item"
+        },
+        {
+          "name": "minted instance id shape",
+          "paths": [
+            "src/content/instanceId.ts"
+          ],
+          "note": "produced by cluster-directives: what a runtime-minted instance id looks like, so a reference site can tell one from an authored item id"
+        },
+        {
+          "name": "the directive grammar",
+          "paths": [
+            "src/content/test.ts"
+          ],
+          "note": "the one parser turning a directive line into the Directive union, for # test sections and the REPL alike; cluster-directives added the five growth spellings (feed:, slot:, allocate:, apply:, refuse:) to it rather than a surface of their own"
+        },
+        {
+          "name": "cluster jewel content",
+          "paths": [
+            "content/tutorial-island.dsl"
+          ],
+          "note": "produced by cluster-content"
+        },
+        {
+          "name": "base and jewel roles are exclusive",
+          "paths": [
+            "src/content/item.ts"
+          ],
+          "note": "produced by items-mods-and-crafting-pass1-a-base-s-own-origin-cluster-an: isBase says an item is a base iff it declares slot:, and itemRoleProblem refuses at load an item claiming both roles. Registered over item.ts alone -- the runtime half lives in basePlane and belongs to Runtime's existing item cluster plane concept"
         }
       ]
     },
@@ -142,6 +196,11 @@
       "paths": [
         "src/runtime/actions.ts",
         "src/runtime/cadence.test.ts",
+        "src/runtime/carriedItem.test.ts",
+        "src/runtime/clusterEffect.test.ts",
+        "src/runtime/clusterEffect.ts",
+        "src/runtime/clusterPlane.test.ts",
+        "src/runtime/clusterPlane.ts",
         "src/runtime/command.test.ts",
         "src/runtime/command.ts",
         "src/runtime/conditions.ts",
@@ -160,11 +219,15 @@
         "src/runtime/instances.test.ts",
         "src/runtime/instances.ts",
         "src/runtime/integration.test.ts",
+        "src/runtime/itemInstance.test.ts",
+        "src/runtime/itemInstance.ts",
         "src/runtime/journey.test.ts",
         "src/runtime/journey.ts",
         "src/runtime/location.test.ts",
         "src/runtime/modals.test.ts",
         "src/runtime/modals.ts",
+        "src/runtime/planeReport.test.ts",
+        "src/runtime/planeReport.ts",
         "src/runtime/population.ts",
         "src/runtime/recipe.test.ts",
         "src/runtime/resolve.test.ts",
@@ -261,6 +324,49 @@
             "src/runtime/journey.ts"
           ],
           "note": "produced by travel-reaches-anywhere-the-roads-do"
+        },
+        {
+          "name": "item cluster plane",
+          "paths": [
+            "src/runtime/clusterPlane.ts"
+          ],
+          "note": "produced by cluster-plane-runtime: the hex plane state model and every rule over it -- placement, determined rotation, one cluster to a hex with blocking, adjacency-gated allocation, and the c21 repair"
+        },
+        {
+          "name": "lazy item instancing",
+          "paths": [
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by cluster-plane-runtime: a stacked item leaves its stack and becomes an instanced-objects payload at the first thing recorded about it, and every verb that grows one routes through growItem"
+        },
+        {
+          "name": "instanced item equipping",
+          "paths": [
+            "src/runtime/equipment.ts"
+          ],
+          "note": "produced by a-grown-item-cannot-be-worn-equipped-holds-item-ids-and-stat: an equipped slot holds either spelling, an item id or a live instance id, and equip() reads the slot off the item behind either"
+        },
+        {
+          "name": "cluster effect scaling",
+          "paths": [
+            "src/runtime/clusterEffect.ts"
+          ],
+          "note": "produced by cluster-effect-fold: applying an effect to a placed cluster, the additive pool it joins, and the scaled payloads a grown item's plane hands statRange"
+        },
+        {
+          "name": "published item plane",
+          "paths": [
+            "src/runtime/planeReport.ts",
+            "src/runtime/planeReport.test.ts"
+          ],
+          "note": "produced by cluster-plane-view: a grown item's plane as data a driver renders — standings, effective payloads read through positionPayloads, and the hex/direction address each verb takes"
+        },
+        {
+          "name": "carried item count",
+          "paths": [
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by growing-an-item-revokes-every-has-gate-recipe-and-cost-that-"
         }
       ]
     },
@@ -834,6 +940,8 @@
         "scripts/migrate-saves.ts",
         "scripts/mutate.test.ts",
         "scripts/mutate.ts",
+        "scripts/planeView.test.ts",
+        "scripts/planeView.ts",
         "scripts/play-cli.test.ts",
         "scripts/play-cli.ts",
         "scripts/probe.test.ts",
@@ -873,6 +981,14 @@
             "scripts/migrate-saves.ts"
           ],
           "note": "produced by save-fixture-migration; the one-shot shape rewrite of every # save fixture at a SAVE_VERSION bump, retired by save-migration-system's ladder"
+        },
+        {
+          "name": "cluster plane view",
+          "paths": [
+            "scripts/planeView.ts",
+            "scripts/planeView.test.ts"
+          ],
+          "note": "produced by cluster-plane-view: the /inventory rendering of a grown item's plane, its standings and the verb line each row invites"
         }
       ]
     },

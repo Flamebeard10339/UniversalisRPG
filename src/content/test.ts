@@ -1,6 +1,7 @@
 import { Condition, condition } from '../grammar/condition';
 import { DslError, parseWhole } from '../grammar/parser';
 import { RawSection } from '../grammar/structure';
+import { Direction, DIRECTIONS, Hex, parseHexKey, PlaneNode } from './hex';
 
 export type Directive =
   | { kind: 'run'; test: string }
@@ -20,7 +21,22 @@ export type Directive =
   | { kind: 'wait'; seconds: number }
   | { kind: 'equip'; item: string }
   | { kind: 'unequip'; slot: string }
+  // The four ways an item grows, one verb each rather than one verb reading
+  // what the consumed item declares: allocation consumes nothing, and the
+  // three that do consume take different addresses, so a single verb would
+  // have to decide which of its arguments were required after parsing them.
+  | { kind: 'feed'; target: string; food: string }
+  | { kind: 'slot'; target: string; hex: Hex; direction: Direction; jewel: string }
+  | { kind: 'allocate'; target: string; node: PlaneNode }
+  | { kind: 'apply'; target: string; hex: Hex; effect: string }
+  // A growth refused is the outcome under test, so it is written rather than
+  // inferred from a state that did not move. Only growth verbs may be wrapped:
+  // their refusal is a value the one door returns, where every other verb
+  // pushes a sentence into the log and leaves nothing to invert.
+  | { kind: 'refuse'; inner: GrowthDirective }
   | { kind: 'submit-modal'; key: string; value: string };
+
+export type GrowthDirective = Extract<Directive, { kind: 'feed' | 'slot' | 'allocate' | 'apply' }>;
 
 export interface Test {
   id: string;
@@ -54,8 +70,66 @@ const EXPECT = new RegExp(`^expect:[ \\t]*(?<id>${PATH})$`);
 const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
 const CANCEL = /^cancel$/;
 const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
-const EQUIP = new RegExp(`^equip:[ \\t]*(?<item>${PATH})$`);
+// What the player carries is named either by an item id or by the id minting
+// gave one grown copy, and a minted id is a bare number, so the two spellings
+// never overlap and no site has to be told which one it was handed.
+const CARRIED = `(?:${PATH}|[0-9]+)`;
+const HEX = '-?\\d+,-?\\d+';
+const DIRECTION = [...DIRECTIONS].sort((a, b) => b.length - a.length).join('|');
+
+const EQUIP = new RegExp(`^equip:[ \\t]*(?<item>${CARRIED})$`);
 const UNEQUIP = new RegExp(`^unequip:[ \\t]*(?<slot>${PATH})$`);
+
+// Factored out so `refuse:` takes the same payloads with the verb inline, the
+// way `begin:` already does.
+const GROWTH_PAYLOAD = {
+  feed: `(?<target>${CARRIED})[ \\t]+with[ \\t]+(?<food>${PATH})`,
+  slot: `(?<target>${CARRIED})[ \\t]+at[ \\t]+(?<hex>${HEX})[ \\t]+(?<direction>${DIRECTION})[ \\t]+with[ \\t]+(?<jewel>${PATH})`,
+  allocate: `(?<target>${CARRIED})[ \\t]+at[ \\t]+(?<hex>${HEX})[ \\t]+(?:position[ \\t]+(?<position>[0-9]+)|slot[ \\t]+(?<direction>${DIRECTION}))`,
+  apply: `(?<target>${CARRIED})[ \\t]+at[ \\t]+(?<hex>${HEX})[ \\t]+with[ \\t]+(?<effect>${PATH})`,
+} as const;
+
+type GrowthVerb = GrowthDirective['kind'];
+const GROWTH_VERBS = Object.keys(GROWTH_PAYLOAD) as GrowthVerb[];
+
+const GROWTH_LINE = new Map(GROWTH_VERBS.map((verb) => [verb, new RegExp(`^${verb}:[ \\t]*${GROWTH_PAYLOAD[verb]}$`)]));
+const GROWTH_INLINE = new Map(GROWTH_VERBS.map((verb) => [verb, new RegExp(`^${GROWTH_PAYLOAD[verb]}$`)]));
+const GROWTH_VERB = new RegExp(`^(?<verb>${GROWTH_VERBS.join('|')}):`);
+const REFUSE_VERB = /^refuse:/;
+const REFUSE = new RegExp(`^refuse:[ \\t]*(?<verb>${GROWTH_VERBS.join('|')})[ \\t]+(?<rest>.+)$`);
+
+const GROWTH_FORM: Readonly<Record<GrowthVerb, string>> = {
+  feed: '<target> with <item>',
+  slot: '<target> at <q>,<r> <direction> with <jewel item>',
+  allocate: '<target> at <q>,<r> position <n>, or <target> at <q>,<r> slot <direction>',
+  apply: '<target> at <q>,<r> with <effect item>',
+};
+
+export function isGrowthDirective(value: Directive): value is GrowthDirective {
+  return (GROWTH_VERBS as string[]).includes(value.kind);
+}
+
+type Groups = Record<string, string | undefined>;
+
+function growth(verb: GrowthVerb, text: string, groups: Groups): GrowthDirective {
+  const target = groups.target as string;
+  if (verb === 'feed') return { kind: 'feed', target, food: groups.food as string };
+
+  const hex = parseHexKey(groups.hex as string);
+  if (!hex) throw new DslError(`malformed hex address (expected <q>,<r> with no leading zeroes): ${text}`);
+  const direction = groups.direction as Direction;
+
+  if (verb === 'slot') return { kind: 'slot', target, hex, direction, jewel: groups.jewel as string };
+  if (verb === 'apply') return { kind: 'apply', target, hex, effect: groups.effect as string };
+  const node: PlaneNode = groups.position === undefined ? { hex, kind: 'slot', direction } : { hex, kind: 'position', position: Number(groups.position) };
+  return { kind: 'allocate', target, node };
+}
+
+function parseGrowth(verb: GrowthVerb, pattern: Map<GrowthVerb, RegExp>, payload: string, text: string): GrowthDirective {
+  const groups = pattern.get(verb)!.exec(payload)?.groups;
+  if (!groups) throw new DslError(`malformed ${verb}: payload (expected ${GROWTH_FORM[verb]}): ${text}`);
+  return growth(verb, text, groups);
+}
 const SUBMIT_MODAL_VERB = /^submit-modal:/;
 // One pair per line, the value running to the end of it, so an answer may hold
 // the spaces and punctuation a dialogue line is written with.
@@ -130,6 +204,15 @@ export function parseDirectiveLine(text: string): Directive | null {
 
   const unequip = UNEQUIP.exec(text)?.groups;
   if (unequip) return { kind: 'unequip', slot: unequip.slot };
+
+  const growing = GROWTH_VERB.exec(text)?.groups;
+  if (growing) return parseGrowth(growing.verb as GrowthVerb, GROWTH_LINE, text, text);
+
+  if (REFUSE_VERB.test(text)) {
+    const refuse = REFUSE.exec(text)?.groups;
+    if (!refuse) throw new DslError(`unknown refuse: verb (expected one of ${GROWTH_VERBS.join(', ')}): ${text}`);
+    return { kind: 'refuse', inner: parseGrowth(refuse.verb as GrowthVerb, GROWTH_INLINE, refuse.rest, text) };
+  }
 
   if (SUBMIT_MODAL_VERB.test(text)) {
     const submit = SUBMIT_MODAL.exec(text)?.groups;

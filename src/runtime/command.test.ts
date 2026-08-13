@@ -1226,3 +1226,48 @@ describe('the ticker a live run is advanced by', () => {
     expect(clock.stops).toBe(1);
   });
 });
+
+// A recording is what a `# test` is authored from, so what it says has to be
+// what happened: a growth the plane turned down records as the refusal, and
+// the line replays green instead of asserting the opposite of the session.
+describe('recording a growth the plane refused', () => {
+  const GROWTH_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# stat max-health
+base: 30
+
+# passive hale
++10 max-health
+
+# cluster-jewel node
+shape: point
+open-connections: e
+passives: 1 hale
+
+# item blade
+title: Blade
+slot: hand
+origin-cluster: node
+max-level: 2
+
+# item whetstone
+item-experience: 1000
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"blade":1,"whetstone":2}}
+`;
+
+  it('records the verb when it was done and the refusal when it was not', () => {
+    const { ctx, recorder } = fixture(GROWTH_MODULE);
+    runLine(ctx, '/load stocked');
+
+    runLine(ctx, 'feed: blade with whetstone');
+    const said = runLine(ctx, 'feed: 1 with whetstone');
+
+    expect(recorder.history).toEqual(['load: stocked', 'feed: blade with whetstone', 'refuse: feed 1 with whetstone']);
+    expect(said.view?.said).toContain('Blade is already at level 2, which is its maximum');
+  });
+});

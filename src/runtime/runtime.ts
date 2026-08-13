@@ -573,6 +573,19 @@ function firstUnitSpan(action: Action, state: GameState, registry: Registry): nu
   return resolvesPerAttempt(action) ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
 }
 
+// A cost the player cannot pay stops the action before it arms. Carrying an
+// input only as grown copies is its own refusal: the cost is afforded, so the
+// action is offered, and paying it would take a plane.
+function refuseUnpayableInputs(action: Action, registry: Registry, state: GameState): ArmResult | undefined {
+  const { short, grownOnly } = inputLimit(action, state);
+  if (short === undefined && grownOnly === undefined) return undefined;
+  const title = (id: string): string => registry.items.get(id)?.title ?? id;
+  if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
+  else if (short !== undefined) state.log.push(`You don't have enough ${title(short)}.`);
+  else state.log.push(`Your ${title(grownOnly!)} has grown a plane of its own, and a grown item is never spent.`);
+  return { armed: false };
+}
+
 export function armAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): ArmResult {
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   if (!target) throw new RuntimeError(`unknown ${obj}: ${objId}`);
@@ -583,12 +596,8 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   if (!actionVisible(action, state)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
   // Gates only the START; running dry mid-flight is resolve()'s limiting math.
-  const { short: shortfall } = inputLimit(action, state);
-  if (shortfall !== undefined) {
-    if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
-    else state.log.push(`You don't have enough ${registry.items.get(shortfall)?.title ?? shortfall}.`);
-    return { armed: false };
-  }
+  const unpayable = refuseUnpayableInputs(action, registry, state);
+  if (unpayable) return unpayable;
 
   const repeating = actionKind(action) === 'continuous';
   const duration = attemptDuration(action, state, registry);
@@ -632,12 +641,8 @@ export function armFightAction(actionId: string, targetId: string, registry: Reg
   if (!requiresMet(action, state)) throw new RuntimeError(`action requires unmet: ${actionId}`);
   if (!actionVisible(action, state)) throw new RuntimeError(`action hidden: ${actionId}`);
 
-  const { short: shortfall } = inputLimit(action, state);
-  if (shortfall !== undefined) {
-    if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
-    else state.log.push(`You don't have enough ${registry.items.get(shortfall)?.title ?? shortfall}.`);
-    return { armed: false };
-  }
+  const unpayable = refuseUnpayableInputs(action, registry, state);
+  if (unpayable) return unpayable;
 
   armFight(state, registry, actionId, action, targetId);
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
