@@ -197,6 +197,7 @@ export function answerModal(state: GameState, registry: Registry, answers: Modal
     const refusal = optionRefusal(options, key, value);
     if (refusal) throw new RuntimeError(`modal ${frame.name} ${refusal}`);
   }
+  const asFound = { ...answersOf(frame) };
   Object.assign(answersOf(frame), answers);
 
   // What is left to ask is read off the frame as it now stands rather than off
@@ -209,8 +210,28 @@ export function answerModal(state: GameState, registry: Registry, answers: Modal
   // Popped before the modal acts, so anything its answer opens stacks on what
   // is left rather than on a frame that is already spent.
   stack(state).pop();
-  const next = definitionFor(frame).submit(frame, state, registry);
+  let next: ModalFrame | null;
+  try {
+    next = definitionFor(frame).submit(frame, state, registry);
+  } catch (error) {
+    // c7: a refusal reaches the player where they are. The pop has already
+    // happened and a throw unwinds past everything that would raise a screen,
+    // so without this the error is stated under a world with nothing on it and
+    // the screen it is about is gone. The frame goes back as the player found
+    // it, which is where the refusals above already leave one.
+    restoreAnswers(frame, asFound);
+    openModal(state, frame);
+    throw error;
+  }
   if (next) openModal(state, next);
+}
+
+// Replacing a frame's answers rather than adding to them, so a frame put back
+// carries nothing the answer that failed had written on it.
+function restoreAnswers(frame: ModalFrame, answers: ModalAnswers): void {
+  const held = answersOf(frame);
+  for (const key of Object.keys(held)) delete held[key];
+  Object.assign(held, answers);
 }
 
 // What a `# save` body has to hold to be a frame at all. Shape only: a name

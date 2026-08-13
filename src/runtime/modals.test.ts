@@ -151,6 +151,31 @@ node greeting:
   -> Speak. (when not secret)
 `;
 
+// A menu choice the engine can only refuse once it is taken: a screen name
+// nothing defines loads, because only the layer that raises one knows which
+// names there are. Answering it is the shortest route to a submit that throws.
+const THROWING_CHOICE_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  sage
+
+# flag greeted
+
+# entity sage
+title: Sage
+
+# dialogue sage-talk
+owner = sage
+
+node greeting:
+  when: not greeted
+  -> Ask about the mirror.
+    open modal: no-such-screen
+  -> Say nothing.
+`;
+
 function stackingSession(): PlaySession {
   return startSession(loadModule(STACKING_MODULE));
 }
@@ -272,6 +297,19 @@ describe('opening and answering', () => {
     expect(() => answerModal(state, registry, { name: 'Rowan', race: 'Wyvern' })).toThrow(/has no race that takes "Wyvern"/);
     expect(topModal(state)?.answers).toEqual({});
     expect(publishModal(topModal(state)!, state, registry).options.map((option) => option.key)).toEqual(['name', 'race']);
+  });
+
+  // c7: a refusal reaches the player where they are. The frame is popped before
+  // submit runs so that what an answer opens stacks on what is left, which
+  // leaves a throw out of submit with nothing between it and an empty world.
+  it('puts the frame back when acting on the answer throws, rather than leaving the screen popped and gone', () => {
+    const module = loadModule(THROWING_CHOICE_MODULE);
+    const state = talking(module);
+
+    expect(() => answerModal(state, module, { choice: 'Ask about the mirror.' })).toThrow(/unknown modal: no-such-screen/);
+    expect(names(state)).toEqual(['dialogue']);
+    expect(topModal(state)?.answers).toEqual({});
+    expect(publishModal(topModal(state)!, state, module).options[0].values).toEqual(['Ask about the mirror.', 'Say nothing.']);
   });
 
   it('stacks a second dialogue rather than dropping it after its effects have already run', () => {
