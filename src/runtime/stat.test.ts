@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Cursor, DslError } from '../grammar/parser';
 import { point, range } from '../grammar/range';
-import { ActiveAction, createGameState, GameState, hitDamage, minDamage, PLAYER, sampleStat, statRange, statValue } from './runtime';
+import { ActiveAction, createGameState, equip, GameState, hitDamage, initResources, minDamage, PLAYER, sampleStat, statRange, statValue } from './runtime';
+import { restorePools } from './effects';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { loadModule, Registry } from '../content/registry';
 import { tagClause } from '../grammar/tagClause';
@@ -175,5 +176,74 @@ describe('hitDamage', () => {
 
   it('when ability is below min-damage, deals the ability value not the floor', () => {
     expect(hitDamage(0.5, 0, registry)).toBe(toMilliUnits(0.5));
+  });
+});
+
+// A counter-scaled bonus needs a pool to read, which the module above has none
+// of. `plain-blade` is the control: the same shape without `per`.
+const COUNTER_MODULE = `
+# stat attack
+base: 4
+
+# stat dr
+base: 10
+
+# stat max-fury
+base: 10
+
+# resource fury
+max: max-fury
+start: 0
+
+# item fury-blade
+slot: mainhand
++2 attack per fury
+
+# item fury-guard
+slot: body
++10% dr per fury
+
+# item plain-blade
+slot: head
++2 attack
+`;
+
+describe('a stat bonus scaled by a counter', () => {
+  function wearing(...itemIds: string[]): { registry: Registry; state: GameState } {
+    const registry = loadModule(COUNTER_MODULE);
+    const state = createGameState('nowhere');
+    initResources(state, registry);
+    for (const itemId of itemIds) {
+      state.inventory[itemId] = 1;
+      equip(state, registry, itemId);
+    }
+    return { registry, state };
+  }
+
+  it('reads a resource level as the count, and leaves a bonus naming no counter alone', () => {
+    const { registry, state } = wearing('fury-blade', 'plain-blade');
+    expect(statValue('attack', state, registry)).toBe(6);
+
+    restorePools(state, { fury: toMilliUnits(3) });
+    expect(statValue('attack', state, registry)).toBe(12);
+  });
+
+  it('floors the level before it multiplies, because a counter counts points', () => {
+    const { registry, state } = wearing('fury-blade');
+    restorePools(state, { fury: toMilliUnits(3.7) });
+    expect(statValue('attack', state, registry)).toBe(10);
+  });
+
+  it('scales the percent form through the same fold', () => {
+    const { registry, state } = wearing('fury-guard');
+    expect(statValue('dr', state, registry)).toBe(10);
+
+    restorePools(state, { fury: toMilliUnits(3) });
+    expect(statValue('dr', state, registry)).toBe(13);
+  });
+
+  it('grants nothing at all where the counter is empty, rather than a flat bonus', () => {
+    const { registry, state } = wearing('fury-blade');
+    expect(statRange('attack', state, registry)).toEqual(point(4));
   });
 });
