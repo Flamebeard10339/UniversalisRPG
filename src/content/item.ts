@@ -25,6 +25,9 @@ export interface Item extends HookCarrier {
   // Names a `# cluster-jewel` to become the droppable jewel, so it drops
   // through `droptables` and is carried by the ordinary item machinery (c10).
   clusterJewel?: string;
+  // Names the `# cluster-jewel` that stands at hex (0,0) of this base's plane
+  // (c9). `clusterJewel` says the item is one; this says the item has one.
+  originCluster?: string;
   clusterEffect?: ClusterEffect;
   itemExperience?: number;
   maxLevel: number;
@@ -48,6 +51,25 @@ const clusterEffect: Parser<ClusterEffect> = {
 // tier itself, per the spec's decision on the field.
 export const DEFAULT_MAX_LEVEL = 99;
 
+// You grow what you can wear (c9): a base is spelled `slot:` and nothing else,
+// so this is the one place the question is answered for every verb that asks.
+export function isBase(item: Item): boolean {
+  return item.slot !== undefined;
+}
+
+// c10's exclusion, asked of one assembled item: `cluster-jewel:` says the item
+// is a jewel, `slot:` and `origin-cluster:` say it is a base with a plane, and
+// an item claiming both roles would be consumed by the growth it can undergo.
+export function itemRoleProblem(item: Item): string | undefined {
+  if (item.clusterJewel !== undefined && (isBase(item) || item.originCluster !== undefined)) {
+    return `cluster-jewel: makes ${item.id} a jewel, which is exclusive with the ${isBase(item) ? 'slot:' : 'origin-cluster:'} that makes it a base`;
+  }
+  if (item.originCluster !== undefined && !isBase(item)) {
+    return `origin-cluster: is the cluster hex (0,0) of ${item.id}'s plane, and only a base has one: give it a slot: or drop the field`;
+  }
+  return undefined;
+}
+
 export const itemSchema: SectionSchema<Item, never, 'actions'> = {
   kind: 'item',
   fields: {
@@ -56,6 +78,7 @@ export const itemSchema: SectionSchema<Item, never, 'actions'> = {
     slot: { parser: id },
     tags: { parser: list(tagClause), default: () => [] },
     clusterJewel: { parser: id, keyword: 'cluster-jewel' },
+    originCluster: { parser: id, keyword: 'origin-cluster' },
     clusterEffect: { parser: clusterEffect, keyword: 'cluster-effect' },
     itemExperience: { parser: number, keyword: 'item-experience' },
     maxLevel: { parser: number, default: () => DEFAULT_MAX_LEVEL, keyword: 'max-level' },

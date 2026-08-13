@@ -134,7 +134,7 @@ eat:
   take: 1 cooked-shrimp
   say: You eat the shrimp. Simple, warm, and better than it looks.
 
-// No `cluster-jewel:` of its own, so hex (0,0) falls back to a single point
+// No `origin-cluster:` of its own, so hex (0,0) falls back to a single point
 // carrying one east jewel slot: the on-ramp every base has when it declares
 // nothing. `max-level:` is where a base is tiered, and this one is a starter
 // forever.
@@ -401,7 +401,7 @@ examine: The grain still moves, slowly, when you are not looking.
 slot: mainhand
 weapon, +4 attack
 max-level: 40
-cluster-jewel: heartwood-core
+origin-cluster: heartwood-core
 
 // --- drop tables ---
 

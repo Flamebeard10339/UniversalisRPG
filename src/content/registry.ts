@@ -11,7 +11,7 @@ import { AuthoredEntity, Entity, EntityBlock, entitySchema, Handler, isHandlerBl
 import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
 import { GameEvent, eventSchema } from './event';
-import { Item, itemSchema } from './item';
+import { Item, itemRoleProblem, itemSchema } from './item';
 import { Passive, passiveRangeProblem, passiveSchema } from './passive';
 import { getShape } from './shapes';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
@@ -260,6 +260,8 @@ function applySection(registry: Registry, section: ModuleSection): void {
     }
     case 'item': {
       const item = hydrateSection(section.value as Authored<Item>, itemSchema);
+      const problem = itemRoleProblem(item);
+      if (problem) throw new DslError(`# item ${item.id}: ${problem}`);
       registry.items.set(item.id, item);
       break;
     }

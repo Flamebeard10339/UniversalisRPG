@@ -4,7 +4,7 @@ import { parseSaveSection } from '../content/saveSection';
 import { Hex, PlaneNode } from '../content/hex';
 import { clusterAt, ORIGIN, pointsSpent } from './clusterPlane';
 import { instance, instanceIsLive } from './instances';
-import { allocate, feedItem, itemInstance, itemLevel, pointsRemaining, slotJewel } from './itemInstance';
+import { allocate, feedItem, Growth, itemInstance, itemLevel, pointsRemaining, slotJewel } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { skillLevel } from './skills';
 import { GameState } from './state';
@@ -36,13 +36,17 @@ max-level: 10
 
 # item heartwood-blade
 slot: mainhand
-cluster-jewel: ringlet
+origin-cluster: ringlet
 
 # item whetstone
 item-experience: 1000
 
 # item master-whetstone
 item-experience: 20000
+
+# item sacrificial-blade
+slot: mainhand
+item-experience: 1000
 `;
 
 const CROSSROADS = `
@@ -123,12 +127,52 @@ describe('an item is a stack until something is recorded about one of them', () 
   });
 
   it('will not feed a stack of one to itself, because the copy that leaves it is not there to be eaten', () => {
-    const state = carrying({ whetstone: 1 });
-    expect(feedItem(state, registry, 'whetstone', 'whetstone')).toEqual({ ok: false, refused: 'you carry no whetstone' });
+    const state = carrying({ 'sacrificial-blade': 1 });
+    expect(feedItem(state, registry, 'sacrificial-blade', 'sacrificial-blade')).toEqual({ ok: false, refused: 'you carry no sacrificial-blade' });
 
-    state.inventory.whetstone = 2;
-    expect(feedItem(state, registry, 'whetstone', 'whetstone')).toEqual({ ok: true, instance: '1' });
-    expect(state.inventory.whetstone).toBe(0);
+    state.inventory['sacrificial-blade'] = 2;
+    expect(feedItem(state, registry, 'sacrificial-blade', 'sacrificial-blade')).toEqual({ ok: true, instance: '1' });
+    expect(state.inventory['sacrificial-blade']).toBe(0);
+  });
+});
+
+// c9: you grow what you can wear. An item is a base if and only if it declares
+// a slot:, so the whole of what has a plane is decided once, at the one door,
+// rather than by each verb remembering to ask.
+describe('an item with no slot has no plane', () => {
+  it('refuses every growth verb, leaving the stack and what it would have consumed whole', () => {
+    const state = carrying({ whetstone: 4, 'crossroads-jewel': 2 });
+    const noPlane = (id: string): Growth => ({ ok: false, refused: `${id} is not a base: only an item you can wear has a plane to grow` });
+
+    expect(feedItem(state, registry, 'whetstone', 'whetstone')).toEqual(noPlane('whetstone'));
+    expect(allocate(state, registry, 'crossroads-jewel', position(ORIGIN, 1))).toEqual(noPlane('crossroads-jewel'));
+    expect(slotJewel(state, registry, 'crossroads-jewel', 'crossroads-jewel', ORIGIN, 'e')).toEqual(noPlane('crossroads-jewel'));
+
+    expect(state.instances.byId).toEqual({});
+    expect(state.inventory).toEqual({ whetstone: 4, 'crossroads-jewel': 2 });
+  });
+
+  it('is refused before the stack is counted, so a jewel nobody carries reports the same reason', () => {
+    const state = carrying({});
+    expect(feedItem(state, registry, 'crossroads-jewel', 'whetstone')).toEqual({ ok: false, refused: 'crossroads-jewel is not a base: only an item you can wear has a plane to grow' });
+  });
+});
+
+// The reproduction that filed this: `slot:` and `cluster-jewel:` named one
+// field, so the shipped level-40 base was consumable into another base's plane.
+describe('a base is not a jewel', () => {
+  it('refuses a base as the jewel a slot is filled with, since only a jewel declares cluster-jewel:', () => {
+    const state = carrying({ 'heartwood-blade': 2, whetstone: 4 });
+    feedItem(state, registry, 'heartwood-blade', 'whetstone');
+    for (let fed = 1; fed < 4; fed++) feedItem(state, registry, '1', 'whetstone');
+    grow(state, '1', position(ORIGIN, 2));
+    grow(state, '1', position(ORIGIN, 3));
+    grow(state, '1', position(ORIGIN, 4));
+    grow(state, '1', slot(ORIGIN));
+
+    expect(slotJewel(state, registry, '1', 'heartwood-blade', ORIGIN, 'e')).toEqual({ ok: false, refused: 'heartwood-blade is not a cluster jewel' });
+    expect(state.inventory['heartwood-blade']).toBe(1);
+    expect(clusterAt(itemInstance(state, '1')!.plane, { q: 1, r: 0 })).toBeUndefined();
   });
 });
 
@@ -235,7 +279,7 @@ describe('an instance across a reload', () => {
 
   it('is pruned when its own template goes', () => {
     const state = grownBlade();
-    const warnings = pruneStateForRegistry(state, loadModule(MODULE.replace('# item heartwood-blade\nslot: mainhand\ncluster-jewel: ringlet\n', '')));
+    const warnings = pruneStateForRegistry(state, loadModule(MODULE.replace('# item heartwood-blade\nslot: mainhand\norigin-cluster: ringlet\n', '')));
 
     expect(warnings.map((warning) => warning.message)).toContain('Removed instance 1 because its template heartwood-blade is not loaded.');
     expect(instanceIsLive(state, '1')).toBe(false);

@@ -322,6 +322,7 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       actions(section.actions, where, visit);
       hooks(section, where, visit);
       put(section, 'clusterJewel', 'cluster-jewel', `${where} cluster-jewel:`, visit);
+      put(section, 'originCluster', 'cluster-jewel', `${where} origin-cluster:`, visit);
       if (section.clusterEffect) put(section.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
       return;
     case 'passive':

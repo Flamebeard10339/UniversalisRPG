@@ -59,28 +59,28 @@ mod-slots: 1
 
 # item blade
 slot: mainhand
-cluster-jewel: twin
+origin-cluster: twin
 
 # item plated-blade
 slot: mainhand
-cluster-jewel: twin
+origin-cluster: twin
 +10 max-health
 
 # item chain-blade
 slot: mainhand
-cluster-jewel: node
+origin-cluster: node
 
 # item spark-blade
 slot: mainhand
-cluster-jewel: spark
+origin-cluster: spark
 
 # item wide-blade
 slot: mainhand
-cluster-jewel: quad
+origin-cluster: quad
 
 # item tight-blade
 slot: mainhand
-cluster-jewel: tight
+origin-cluster: tight
 
 # item node-jewel
 cluster-jewel: node
@@ -198,6 +198,17 @@ describe('applying a cluster effect', () => {
     const state = carrying({ blade: 2, 'lesser-orb': 1 });
     expect(applyClusterEffect(state, registry, 'blade', 'lesser-orb', ORIGIN)).toEqual({ ok: true, instance: '1' });
     expect(state.inventory).toEqual({ blade: 1, 'lesser-orb': 0 });
+  });
+
+  // c15: never to a jewel in inventory. A jewel declares no `slot:`, so it is
+  // not a base and has no plane for the effect to be recorded against — and
+  // both items survive, still stackable and still usable for what they are.
+  it('refuses a jewel in inventory as its target, leaving both items stacked and uninstanced', () => {
+    const state = carrying({ 'node-jewel': 3, 'lesser-orb': 1 });
+    expect(applyClusterEffect(state, registry, 'node-jewel', 'lesser-orb', ORIGIN)).toEqual({ ok: false, refused: 'node-jewel is not a base: only an item you can wear has a plane to grow' });
+
+    expect(state.inventory).toEqual({ 'node-jewel': 3, 'lesser-orb': 1 });
+    expect(state.instances.byId).toEqual({});
   });
 });
 

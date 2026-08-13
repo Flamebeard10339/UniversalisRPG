@@ -42,12 +42,12 @@ passives: 1 hale, 2 keen
 # item blade
 slot: mainhand
 max-level: 20
-cluster-jewel: core
+origin-cluster: core
 
 # item hub-blade
 slot: mainhand
 max-level: 20
-cluster-jewel: junction
+origin-cluster: junction
 
 # item plain-blade
 slot: mainhand

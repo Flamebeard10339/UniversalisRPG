@@ -327,6 +327,7 @@ function itemSection(moduleId: string, item: Item): string {
   if (item.slot) lines.push(`slot: ${item.slot}`);
   if (item.tags && item.tags.length > 0) lines.push(item.tags.map(tag).join(', '));
   if (item.clusterJewel) lines.push(`cluster-jewel: ${item.clusterJewel}`);
+  if (item.originCluster) lines.push(`origin-cluster: ${item.originCluster}`);
   if (item.clusterEffect) lines.push(`cluster-effect: ${item.clusterEffect.percent < 0 ? '-' : '+'}${Math.abs(item.clusterEffect.percent)}% ${item.clusterEffect.statId}`);
   if (item.itemExperience !== undefined) lines.push(`item-experience: ${n(item.itemExperience)}`);
   if (item.maxLevel !== DEFAULT_MAX_LEVEL) lines.push(`max-level: ${n(item.maxLevel)}`);

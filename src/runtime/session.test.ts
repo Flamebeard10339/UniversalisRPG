@@ -1195,7 +1195,7 @@ passives: 1 hale
 # item blade
 title: Blade
 slot: hand
-cluster-jewel: node
+origin-cluster: node
 max-level: 2
 
 # item node-jewel

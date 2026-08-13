@@ -1,7 +1,7 @@
 import { Direction, Hex, PlaneNode } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
-import { allocateNode, fillSlot, isPlane, originPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
+import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
 import { createInstance, defineInstanceKind, instance } from './instances';
 import { skillLevel } from './skills';
 import { GameState } from './state';
@@ -115,11 +115,14 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
   const item = registry.items.get(template);
   if (!item) return refused(`there is no item or item instance called ${target}`);
 
+  const plane = basePlane(item);
+  if (!plane) return refused(`${template} is not a base: only an item you can wear has a plane to grow`);
+
   const minting = standing === undefined;
   if (minting && held(state, template) < 1) return refused(`you carry no ${template}`);
   if (consumes !== undefined && held(state, consumes) < (minting && consumes === template ? 2 : 1)) return refused(`you carry no ${consumes}`);
 
-  const payload = standing?.payload ?? { experience: 0, plane: originPlane(item.clusterJewel ?? null) };
+  const payload = standing?.payload ?? { experience: 0, plane };
   const problem = growing.change(payload, item);
   if (problem) return refused(problem);
 

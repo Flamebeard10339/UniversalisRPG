@@ -1,5 +1,6 @@
 import { ClusterJewel, DEFAULT_MOD_SLOTS } from '../content/clusterJewel';
 import { Direction, DIRECTIONS, Hex, hexKey, NEIGHBOR_DELTA, opposite, parseHexKey, PlaneNode, rotate, rotationOnto } from '../content/hex';
+import { isBase, Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';
 
@@ -28,7 +29,7 @@ export interface Placement {
 
 export type SlotState = 'none' | 'open' | 'filled' | 'blocked';
 
-// The cluster an item base carries when it declares no `cluster-jewel:` of its
+// The cluster an item base carries when it declares no `origin-cluster:` of its
 // own (c9). It is not a declaration and is never registered, so no content can
 // shadow it and `jewel: null` is what a save records for it.
 const BASE_CLUSTER: ClusterJewel = {
@@ -150,6 +151,13 @@ export function pointsSpent(plane: Plane): number {
 
 export function originPlane(jewel: string | null): Plane {
   return { [hexKey(ORIGIN)]: { jewel, entry: null, allocatedPositions: [], allocatedSlots: [], effects: [] } };
+}
+
+// The plane an item starts with, and `undefined` for an item that has none: a
+// jewel, an orb and a consumable are not bases, so there is nothing to grow and
+// nothing for a worn stack copy to contribute (c9).
+export function basePlane(item: Item): Plane | undefined {
+  return isBase(item) ? originPlane(item.originCluster ?? null) : undefined;
 }
 
 // Checks and then places, so no caller holds a way to put a cluster down

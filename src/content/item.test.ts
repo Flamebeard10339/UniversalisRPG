@@ -22,6 +22,36 @@ describe('# item cluster-jewel:', () => {
   });
 });
 
+// c9 and c10: `cluster-jewel:` says the item is a jewel, `origin-cluster:` and
+// `slot:` say it is a base with a plane of its own, and the two roles are
+// exclusive — which is what stops a weapon being consumed as a jewel.
+describe('# item origin-cluster:', () => {
+  const SWORD = ['# item heartwood-blade', 'slot: mainhand'].join('\n');
+
+  it('names the # cluster-jewel standing at hex (0,0) of the base plane', () => {
+    const registry = loadModule([JEWEL, SWORD, 'origin-cluster: keen-edge'].join('\n'));
+    expect(registry.items.get('heartwood-blade')!.originCluster).toBe('keen-edge');
+    expect(registry.items.get('heartwood-blade')!.clusterJewel).toBeUndefined();
+  });
+
+  it('rejects an origin-cluster: naming an unknown declaration', () => {
+    expect(() => loadModule([JEWEL, SWORD, 'origin-cluster: nope'].join('\n'))).toThrow(/# item heartwood-blade origin-cluster: names an unknown cluster-jewel: nope/);
+  });
+
+  it('refuses an item declaring both, because one item cannot be a jewel and have a plane', () => {
+    expect(() => loadModule([JEWEL, '# item oddity', 'origin-cluster: keen-edge', 'cluster-jewel: keen-edge'].join('\n'))).toThrow(/# item oddity: cluster-jewel: makes oddity a jewel, which is exclusive with the origin-cluster:/);
+    expect(() => loadModule([JEWEL, SWORD, 'origin-cluster: keen-edge', 'cluster-jewel: keen-edge'].join('\n'))).toThrow(/# item heartwood-blade: cluster-jewel: makes heartwood-blade a jewel/);
+  });
+
+  it('refuses a jewel that is also wearable, since a base is spelled slot: and a base can be grown', () => {
+    expect(() => loadModule([JEWEL, '# item keen-edge-jewel', 'slot: mainhand', 'cluster-jewel: keen-edge'].join('\n'))).toThrow(/# item keen-edge-jewel: cluster-jewel: makes keen-edge-jewel a jewel, which is exclusive with the slot:/);
+  });
+
+  it('refuses an origin-cluster: on an item nothing can wear, because only a base has a plane', () => {
+    expect(() => loadModule([JEWEL, '# item whetstone', 'origin-cluster: keen-edge'].join('\n'))).toThrow(/# item whetstone: origin-cluster: is the cluster hex \(0,0\) of whetstone's plane, and only a base has one/);
+  });
+});
+
 describe('# item cluster-effect:', () => {
   it('reads a percent and a stat', () => {
     const registry = loadModule('# stat max-health\n\n# item orb-of-vitality\ncluster-effect: +25% max-health');
