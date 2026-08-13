@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { counted, named } from './sheet';
+import { carried, counted, named } from './sheet';
 
 describe('a published dictionary as rows', () => {
   it('sorts by name, so a row does not move when its number does', () => {
@@ -22,5 +22,15 @@ describe('a published dictionary as rows', () => {
   it('has nothing to draw for a player carrying nothing', () => {
     expect(counted({})).toEqual([]);
     expect(named({})).toEqual([]);
+    expect(carried({}, {})).toEqual([]);
+  });
+
+  it('lists both records a player carries in, so a grown copy is on the page its screen is reached from', () => {
+    expect(carried({ rope: 2, awl: 1 }, { 3: 'blade', 1: 'shield' })).toEqual([
+      { name: 'awl', value: '1' },
+      { name: 'rope', value: '2' },
+      { name: '1', value: 'shield' },
+      { name: '3', value: 'blade' },
+    ]);
   });
 });

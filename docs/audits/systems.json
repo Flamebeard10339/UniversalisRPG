@@ -507,6 +507,7 @@
         "src/ui/Meter.tsx",
         "src/ui/ModalSheet.tsx",
         "src/ui/Pager.tsx",
+        "src/ui/PlanePane.tsx",
         "src/ui/Splitter.tsx",
         "src/ui/StatusBanner.tsx",
         "src/ui/TabBar.tsx",
@@ -533,6 +534,8 @@
         "src/ui/nav.test.ts",
         "src/ui/nav.ts",
         "src/ui/phone.test.tsx",
+        "src/ui/plane.test.ts",
+        "src/ui/plane.ts",
         "src/ui/render.test.tsx",
         "src/ui/sheet.test.ts",
         "src/ui/sheet.ts",
@@ -652,6 +655,14 @@
             "src/ui/surface.test.ts"
           ],
           "note": "produced by a-control-names-its-driver-on-its-own-tag for an-agent-needs-no-screenshot c2: every button, input, select and textarea under src/ui carries data-drive naming the action, or none: with a reason; the rule reads the set off the tree with the control scanner and checks the name against what installTestHarness plus the surface builders actually offer"
+        },
+        {
+          "name": "the plane pane",
+          "paths": [
+            "src/ui/plane.ts",
+            "src/ui/PlanePane.tsx"
+          ],
+          "note": "produced by gui-draws-the-focused-plane: the focused plane read into rows and drawn above the option sheet, off PlayStatus.focus and never off a screen's name (c9/c10)"
         }
       ]
     },

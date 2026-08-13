@@ -21,3 +21,12 @@ export function named(held: Record<string, string>): Entry[] {
     .map(([name, value]) => ({ name, value }))
     .sort(byName);
 }
+
+// Everything the player is carrying, in the two records the engine publishes it
+// in: stacks under the item they are of, then each grown copy under the id
+// minting gave it. Both, because a grown copy is counted in neither the stacks
+// nor anywhere else on the sheet, and a page that read one record would leave
+// what a player grew off the only page it could be reached from.
+export function carried(stacks: Record<string, number>, grown: Record<string, string>): Entry[] {
+  return [...counted(stacks), ...named(grown)];
+}

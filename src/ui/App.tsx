@@ -13,7 +13,7 @@ import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpag
 import { Pager } from './Pager';
 import { focusedPlane } from './plane';
 import { PlanePane } from './PlanePane';
-import { counted, named } from './sheet';
+import { carried, counted, named } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
 import { useTestSurface } from './testSurface';
@@ -68,9 +68,7 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
     if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? {})} />;
     if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? {})} />;
     if (subpage.id === 'equipment') return <Ledger entries={named(view?.equipment ?? {})} />;
-    // Both records, because a grown copy is counted in neither of the other's
-    // and a row is the only way either is opened.
-    return <Ledger entries={[...counted(view?.inventory ?? {}), ...named(view?.grown ?? {})]} onOpen={driver.open} />;
+    return <Ledger entries={carried(view?.inventory ?? {}, view?.grown ?? {})} onOpen={driver.open} />;
   };
 
   const bodies = LAYERS.map((layer, at) => (
