@@ -105,12 +105,14 @@ describe('what the plane screen lists', () => {
     ]);
   });
 
+  // A slot a cluster has already come in through is somewhere to walk to and no
+  // longer somewhere to put a jewel, with a second jewel still in hand.
   it('lists the hexagons a step from this one, from either side of the slot joining them', () => {
-    const state = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 1 });
+    const state = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 2 });
     const grown = plane(state, [...FED, 'allocate: slot e', 'slot: e with spark-jewel']);
 
-    expect(values(grown, state)).toContain('Go to 1,0');
-    expect(values({ ...grown, hex: '1,0' }, state)).toContain('Go to 0,0');
+    expect(values(grown, state)).toEqual(['Go to 1,0', 'allocate: slot ne', BACK]);
+    expect(values({ ...grown, hex: '1,0' }, state)).toEqual(['Go to 0,0', 'allocate: position 1', BACK]);
   });
 
   // c15: the value that leaves is published beside every question, including the
