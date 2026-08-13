@@ -423,6 +423,14 @@
             "src/runtime/carriedName.ts"
           ],
           "note": "produced by one-name-for-a-carried-thing-on-every-surface: the one function every screen reads to name a stack or a grown copy (c16), and the seam reimplement-localization routes"
+        },
+        {
+          "name": "the carried and worn partition",
+          "paths": [
+            "src/runtime/equipment.ts",
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by carried-and-worn-are-disjoint: equip() takes the copy off the carried side as it fills the slot and unequip() puts it back, and itemCopies is the one read that says where every copy of an item is - carriedCount for what an inventory row states, heldCount for what a gate asks"
         }
       ]
     },
