@@ -359,6 +359,13 @@
             "src/runtime/planeReport.test.ts"
           ],
           "note": "produced by cluster-plane-view: a grown item's plane as data a driver renders — standings, effective payloads read through positionPayloads, and the hex/direction address each verb takes"
+        },
+        {
+          "name": "carried item count",
+          "paths": [
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by growing-an-item-revokes-every-has-gate-recipe-and-cost-that-"
         }
       ]
     },

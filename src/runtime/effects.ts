@@ -7,6 +7,7 @@ import { Registry } from '../content/registry';
 import { Resource } from '../content/resource';
 import { evaluateCondition } from './conditions';
 import { actorEntity } from './encounter';
+import { stockItem } from './itemInstance';
 import { openModalNamed } from './modals';
 import { nextRandom } from './rng';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
@@ -204,17 +205,12 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       spreadDiscovery(state, registry);
       return amount;
     }
-    case 'give': {
-      const amount = drawCount(state, result.amount) * count;
-      state.inventory[result.item] = (state.inventory[result.item] ?? 0) + amount;
-      return amount;
-    }
-    case 'take': {
-      const held = state.inventory[result.item] ?? 0;
-      const left = Math.max(0, held - (result.amount ?? 1) * count);
-      state.inventory[result.item] = left;
-      return left - held;
-    }
+    case 'give':
+      return stockItem(state, result.item, drawCount(state, result.amount) * count);
+    // The stack alone: a grown copy affords this cost but is never the thing
+    // spent for it, so the stack running out is what stops the take.
+    case 'take':
+      return stockItem(state, result.item, -(result.amount ?? 1) * count);
     case 'xp': {
       const amount = drawCount(state, result.amount) * count;
       state.xp[result.skill] = (state.xp[result.skill] ?? 0) + amount;

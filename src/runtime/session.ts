@@ -3,7 +3,7 @@ import { DISCOVERED, Location } from '../content/location';
 import {
   actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { endJourney } from './state';
-import { allocate, feedItem, Growth, grownItems, itemTemplate, slotJewel } from './itemInstance';
+import { allocate, carriedItems, feedItem, Growth, grownItems, itemTemplate, slotJewel } from './itemInstance';
 import { planeReports, type PlaneReport } from './planeReport';
 import { applyClusterEffect } from './clusterEffect';
 import { parseOwnerRef } from './actions';
@@ -212,14 +212,16 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     choices.push({ id: `use:location.${location.id}.${action.label}`, kind: 'action', label: action.label, detail: location.title });
   }
 
-  for (const [itemId, count] of Object.entries(state.inventory)) {
-    if (count <= 0) continue;
+  // Item actions are offered per item the player carries, however the copies are
+  // spelled; equipping is offered per copy, and a stack the player has emptied
+  // by growing its last copy is not one of them.
+  for (const [itemId, { stack }] of carriedItems(state)) {
     const item = registry.items.get(itemId);
     if (!item) continue;
     for (const action of availableActions(item, state)) {
       choices.push({ id: `use:item.${itemId}.${action.label}`, kind: 'action', label: action.label, detail: item.title });
     }
-    if (item.slot && state.equipped[item.slot] !== itemId) {
+    if (item.slot && stack > 0 && state.equipped[item.slot] !== itemId) {
       choices.push({ id: `equip:${itemId}`, kind: 'equip', label: `Equip ${item.title}`, detail: item.slot });
     }
   }
@@ -384,7 +386,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     resources: publishResources(state, registry),
     encounter: encounterView(state, registry),
     modals: state.modals.map((frame) => publishModal(frame, state, registry)),
-    inventory: Object.fromEntries(Object.entries(state.inventory).filter(([, count]) => count > 0)),
+    inventory: Object.fromEntries([...carriedItems(state)].flatMap(([id, { stack }]) => (stack > 0 ? [[id, stack] as const] : []))),
     grown: grownItems(state),
     planes: planeReports(registry, state),
     equipment: { ...state.equipped },

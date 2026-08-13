@@ -55,19 +55,68 @@ export function itemTemplate(state: GameState, id: string): string {
   return grown(state, id)?.template ?? id;
 }
 
+// Whether the one copy an id names is still carried, which is not the same
+// question as how many the player has: a slot holds an id, and a slot whose
+// grown copy is gone is empty even where the stack behind it is not.
 export function carriesItem(state: GameState, id: string): boolean {
-  return grown(state, id) !== undefined || held(state, id) > 0;
+  return grown(state, id) !== undefined || carried(state, id).stack > 0;
+}
+
+// The two sides of carrying an item, and the whole of the asymmetry a plane
+// rests on. `stack` is the only side a directive may spend; `grown` is the
+// copies that satisfy every gate and are never taken, so no cost, recipe or
+// take: can destroy a plane.
+export interface Carried {
+  stack: number;
+  grown: number;
+}
+
+const CARRIES_NONE: Carried = { stack: 0, grown: 0 };
+
+// The one read of `inventory`, so there is one answer to what the player has.
+export function carriedItems(state: GameState): Map<string, Carried> {
+  const items = new Map<string, Carried>();
+  const entry = (id: string): Carried => {
+    const existing = items.get(id);
+    if (existing) return existing;
+    const fresh = { stack: 0, grown: 0 };
+    items.set(id, fresh);
+    return fresh;
+  };
+  for (const [id, count] of Object.entries(state.inventory)) {
+    if (count > 0) entry(id).stack = count;
+  }
+  for (const template of Object.values(grownItems(state))) entry(template).grown += 1;
+  return items;
+}
+
+export function carried(state: GameState, itemId: string): Carried {
+  return carriedItems(state).get(itemId) ?? CARRIES_NONE;
+}
+
+export function carriedCount(state: GameState, itemId: string): number {
+  const { stack, grown } = carried(state, itemId);
+  return stack + grown;
+}
+
+// The one write, and the reason a grown copy survives every directive: it moves
+// the stack and nothing else, floored at empty. Returns what actually moved.
+export function stockItem(state: GameState, itemId: string, delta: number): number {
+  const before = carried(state, itemId).stack;
+  const after = Math.max(0, before + delta);
+  state.inventory[itemId] = after;
+  return after - before;
 }
 
 // Every grown copy the player carries, by the id it is named by. They are not in
 // `inventory` — c11 took them out of their stacks — so a surface that lists what
 // the player has reads both.
 export function grownItems(state: GameState): Record<string, string> {
-  const carried: Record<string, string> = {};
+  const copies: Record<string, string> = {};
   for (const [id, row] of Object.entries(state.instances.byId)) {
-    if (row.kind === ITEM_INSTANCE) carried[id] = row.template;
+    if (row.kind === ITEM_INSTANCE) copies[id] = row.template;
   }
-  return carried;
+  return copies;
 }
 
 export function itemLevel(payload: ItemInstance, item: Item): number {
@@ -84,13 +133,9 @@ interface Growing {
   change(payload: ItemInstance, item: Item): string | undefined;
 }
 
-function held(state: GameState, itemId: string): number {
-  return state.inventory[itemId] ?? 0;
-}
+const held = (state: GameState, itemId: string): number => carried(state, itemId).stack;
 
-function take(state: GameState, itemId: string): void {
-  state.inventory[itemId] = held(state, itemId) - 1;
-}
+const take = (state: GameState, itemId: string): void => void stockItem(state, itemId, -1);
 
 // Growing never empties a slot. A stack the player was wearing that minting has
 // just emptied leaves a worn id naming nothing, so the slot follows the copy
