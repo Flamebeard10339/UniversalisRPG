@@ -10,9 +10,9 @@ import { driveRun, formatLive, formatOutput, formatResult, formatTick, loadModpo
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
-// A base the player carries but has not grown: the plane a screen opened on it
-// holds is one no copy exists for yet, which is the focus this driver has to be
-// able to draw.
+// Two bases the player carries and has grown neither of: the plane a screen
+// opened on one holds is a plane no copy exists for yet, and the other is there
+// so that drawing the focused one is not the same as drawing the first one.
 const PLANE_SOURCE = `
 # location camp
 x: 0, y: 0
@@ -28,9 +28,27 @@ slot: mainhand
 max-level: 2
 origin-cluster: core
 
+# item shield
+title: Shield
+slot: offhand
+max-level: 2
+origin-cluster: core
+
 # save stocked
-{"version":${SAVE_VERSION},"inventory":{"blade":1}}
+{"version":${SAVE_VERSION},"inventory":{"blade":1,"shield":1}}
+
+# save worn
+{"version":${SAVE_VERSION},"inventory":{"blade":1,"shield":1},"equipped":{"offhand":"shield"}}
 `;
+
+// The screen a plane is in hand on: the inventory opened on one of the two
+// bases, and then its first verb, which is the one that opens a plane.
+function onPlaneScreen(save: string, item: string): string[] {
+  const ctx = driver(PLANE_SOURCE);
+  runLine(ctx, `/load ${save}`);
+  runLine(ctx, `/inv ${item}`);
+  return formatResult(runLine(ctx, '1'));
+}
 
 function driver(text: string, speed = 1, driving = false): CommandContext {
   const session = startSession(loadModule(text));
@@ -134,16 +152,26 @@ starting
   // it publishes beside it, and this driver reads no modal name to decide it —
   // the same route draws a screen it has never heard of.
   it('draws the plane a screen has in hand above the question it is asking', () => {
-    const ctx = driver(PLANE_SOURCE);
-    runLine(ctx, '/load stocked');
-    runLine(ctx, '/inv blade');
-    const lines = formatResult(runLine(ctx, '1'));
+    const lines = onPlaneScreen('stocked', 'blade');
 
     expect(lines).toContain('[item-plane] plane');
     expect(lines).toContain('Blade — blade (blade) — level 1/2, 0 spent, 1 point left');
     // The hexagon in hand is marked, and the question it belongs to comes under it.
     expect(lines.indexOf('> 0,0  core · point · origin · mods 0/2')).toBeGreaterThan(lines.indexOf('[item-plane] plane'));
     expect(lines.indexOf('Blade at 0,0:')).toBeGreaterThan(lines.indexOf('> 0,0  core · point · origin · mods 0/2'));
+  });
+
+  // The focus says which of the published planes, so a driver that drew the
+  // first one it was handed would draw the wrong plane here.
+  it('draws the plane the focus names rather than the first one published', () => {
+    const lines = onPlaneScreen('stocked', 'shield');
+
+    expect(lines).toContain('Shield — shield (shield) — level 1/2, 0 spent, 1 point left');
+    expect(lines.some((line) => line.startsWith('Blade —'))).toBe(false);
+  });
+
+  it('says the plane in hand is one the player is wearing', () => {
+    expect(onPlaneScreen('worn', 'shield')).toContain('Shield — shield (shield) — worn — level 1/2, 0 spent, 1 point left');
   });
 
   it('draws no plane for a screen with none in hand', () => {

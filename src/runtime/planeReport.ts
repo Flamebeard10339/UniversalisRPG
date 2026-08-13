@@ -190,6 +190,6 @@ export function planeReport(registry: Registry, state: GameState, target: string
 // are what a screen can be opened on, so publishing only the grown ones would
 // leave a focus pointing at a plane no driver could find.
 export function planeReports(registry: Registry, state: GameState): PlaneReport[] {
-  const stacks = [...carriedItems(state)].flatMap(([id, { stack }]) => (stack > 0 ? [id] : []));
+  const stacks = [...carriedItems(state).keys()];
   return [...Object.keys(grownItems(state)), ...stacks].flatMap((id) => planeReport(registry, state, id) ?? []);
 }
