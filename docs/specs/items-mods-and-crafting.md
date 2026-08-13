@@ -361,3 +361,221 @@ required for the clauses above to be provable.
 - `skill-levels-xp-events` is itself blocked on `first-class-modals`. The level curve is one pure
   function; whichever of the two branches lands first should own it and the other import it, rather
   than either waiting on the other for arithmetic.
+
+## Audit passes
+
+### Pass 1 — 2026-08-13
+
+- base: `7d58a6491c0ca32f9d19569c2c3f8951132f3ef7`
+- head: `239c0e4dd91f510ed69c3f31f46064b6cd0d7df9`
+- proof 1: met — `passiveSchema` in src/content/passive.ts registers kind `passive` with the
+same `list(tagClause)` body `# item` uses (`clauses: 'tags'`); src/content/module.ts adds it to
+SCHEMAS, src/content/namespace.ts adds it to NAMESPACED_KINDS, src/content/registry.ts adds
+`registry.passives` and the `['passive','passives']` entry in CONTENT_SECTION_MAPS. Re-run:
+`npx vitest run src/content/passive.test.ts` — "reads bare tags and stat-bonus payloads in one
+comma list", "defaults its title from its id, the way every other section does", "is named from
+the global id space, so any number of cluster jewels can reference it". Shipped content backs the
+sharing claim: `hale` in content/tutorial-island.dsl is named by stout-heart (positions 2 and 5),
+tempered-will (1) and great-work (5).
+- proof 2: met — `passiveRangeProblem` (src/content/passive.ts:38-45) is called from applySection's
+`case 'passive'` in src/content/registry.ts, so it runs on the merged value rather than on one
+authored section. The percent half needs no check: tagClause's `parseAmount` already throws "a
+percent stat bonus cannot be a range" and BonusAmount types a percent amount as `number`.
+Mutation-tested: replacing the guard condition with `if (false)` is KILLED by
+src/content/passive.test.ts > "# passive refuses a range payload > rejects +5-8 accuracy, naming
+the clause it rejected" and > "passiveRangeProblem > names the statId and the range when a payload
+is not fixed". Enforcement is at assembly, not at authoring: `npm run inspect` over a module that
+re-declares `# passive keen` with `+5-8 accuracy` is refused with "# passive keen: +5-8 accuracy is
+a range; a passive has no moment to roll one, so its payload must be one value".
+- proof 3: met — src/content/shapes.ts holds CATALOGUE as a module-private const with five entries and
+no authoring grammar anywhere; `getShape` throws "shape must be one of point, spindle, ring, wheel,
+double-ring, got ...". Re-run: `npx vitest run src/content/shapes.test.ts` — the generated
+"<shape> reaches every position from position 1" case per catalogue entry proves connectivity once
+over the set, plus "numbers positions 1..N and never lets adjacency or an edge name a position
+outside that range". Mutation-tested: neutering `if (!shape)` in getShape is KILLED by
+src/content/clusterJewel.test.ts > "rejects a shape that does not exist, listing the ones that do"
+and src/content/shapes.test.ts > "names a shape that does not exist with an error listing the ones
+that do". No per-jewel reachability check exists: grep for a walk over `adjacency` outside
+shapes.test.ts and clusterPlane.ts's `neighbours` returns nothing.
+- proof 4: met — `positionAssignment` in src/content/clusterJewel.ts parses `<position> <passive>` the
+way src/content/entity.ts's `statAssignment` parses `stats:`, and `hydratePositions` throws on a
+repeat rather than letting the later one win. `modSlots` defaults to DEFAULT_MOD_SLOTS = 2.
+Re-run: `npx vitest run src/content/clusterJewel.test.ts` — "reads a shape, open-connections and
+passives inline", "reads passives one pair to a line, the way # entity reads stats: as a block",
+"defaults mod-slots to 2, and reads an explicit override", "rejects a position outside the shape's
+range", "rejects a position filled twice", "rejects a passive that does not resolve, as an ordinary
+load-time reference error".
+- proof 5: met — allocateNode (src/runtime/clusterPlane.ts:176) bounds a position by
+`getShape(...).positionCount` and never by which positions the jewel filled; positionPayloads
+returns `[]` for an unfilled one, and `neighbours` walks the shape's adjacency regardless.
+Re-run: `npx vitest run src/runtime/clusterPlane.test.ts -t "treats an unfilled position as a node"`.
+Mutation-tested: narrowing the bound to `Object.keys(placement.jewel.positions).length` is KILLED
+(15 of 30 tests in clusterPlane.test.ts fail).
+- proof 6: met — `clusterJewelProblem` (src/content/clusterJewel.ts:68-84) refuses an empty
+open-connections, the west edge, a repeat and an unknown direction, and is called from
+registry.ts's `case 'cluster-jewel'`. Re-run: `npx vitest run src/content/clusterJewel.test.ts` —
+"accepts all five non-root edges at once", "rejects the west edge, which the root occupies",
+"rejects the same edge named twice", "rejects zero open connections, the structural non-termination
+guarantee", "rejects a direction that is not one of the six". Mutation-tested: neutering the west
+guard is KILLED by "open-connections > rejects the west edge, which the root occupies".
+- proof 7: met — `placementOf` (src/runtime/clusterPlane.ts:66) computes
+`rotationOnto('w', opposite(cluster.entry))` and stores nothing but `entry`; the Cluster interface
+has no rotation field. Re-run: `npx vitest run src/runtime/clusterPlane.test.ts` — "carries the root
+west edge onto the edge it entered through, through every one of the six", "is the identity through
+an east-facing slot and a half turn through a west-facing one", "is a sixth of a turn for every
+other edge, and the plane stores only the edge". Mutation-tested: dropping the `opposite` is KILLED
+by the first two of those.
+- proof 8: met — src/content/hex.ts names the six axial directions with constant deltas and no odd/even
+case; `slotState` returns 'blocked' when the hex beyond holds a cluster that entered another way,
+and `slotProblem` is the single sentence both `fillSlot` and `allocateNode` refuse through.
+`neighbours` crosses a hex boundary only when `beyond.entry === node.direction`. Re-run:
+`npx vitest run src/runtime/clusterPlane.test.ts` — "blocks the slot facing an occupied hex, for
+filling and for allocating alike", "joins two clusters only through a slot that was filled, never
+through the edge they share", plus src/content/hex.test.ts's four cases. Mutation-tested: collapsing
+`beyond.entry === direction ? 'filled' : 'blocked'` to `'filled'` is KILLED by the blocking test.
+- proof 9: met — BASE_CLUSTER (src/runtime/clusterPlane.ts) is a `point` with `open-connections: e`, no
+positions, and is never registered; `originPlane(item.clusterJewel ?? null)` is the one constructor
+and records `jewel: null` for the default. `isAllocated` grants the root free only where
+`cluster.entry === null`, which is the origin and nowhere else, so the origin is the general rule
+with entry unset rather than a branch beside it. Re-run:
+`npx vitest run src/runtime/clusterPlane.test.ts` — "is a point with one open east connection when
+the base declares none of its own", "is the base own cluster when it declares one, standing
+unrotated", "has its root allocated from the start, and costs a point for every other node".
+Shipped: content/tutorial-island.dsl's iron-sword takes the default and heartwood-blade declares
+`cluster-jewel: heartwood-core`. See finding "a base's own origin cluster and a droppable cluster
+jewel are one field" — the mechanism works, the field it is spelled with does two jobs.
+- proof 10: met — `clusterJewel` is an ordinary `id` field on itemSchema resolved through
+referenceSites.ts's `put(section, 'clusterJewel', 'cluster-jewel', ...)`, so it is a load-time
+reference error like any other, and nothing about drops, stacking or inventory was touched.
+Re-run: `npx vitest run src/content/item.test.ts` — "names a # cluster-jewel to become the
+droppable jewel", "rejects a cluster-jewel: naming an unknown declaration", "is optional: an
+ordinary item declares no cluster-jewel: at all". Shipped: the `# droptable smiths-cache` in
+content/tutorial-island.dsl hands out six jewel items, and `# test growing-a-heartwood-blade`
+opens the chest and slots two of them, replayed by src/runtime/integration.test.ts.
+- proof 11: met — `growItem` (src/runtime/itemInstance.ts) is the only door: it mints through
+`createInstance` after `growing.change` succeeds, so a refused verb leaves the stack whole.
+`defineInstanceKind<ItemInstance>(ITEM_INSTANCE, ...)` is the whole registration — grep of the
+diff shows no new field in SAVE_FIELDS in src/runtime/save.ts, no new table in GameState and no
+new prune. Re-run: `npx vitest run src/runtime/itemInstance.test.ts` — "counts stacks while nothing
+has happened to any of them", "leaves the stack the moment it is fed, and takes its experience with
+it", "mints nothing and consumes nothing when the verb is refused", "grows the one that left the
+stack from then on, and leaves the rest countable".
+- proof 12: met — `feedItem` is the one writer of `payload.experience`; `grep -n "experience" src/runtime`
+finds no other assignment. `itemLevel` is `Math.min(skillLevel(payload.experience), item.maxLevel)`
+with `skillLevel` imported from ./skills, and `pointsRemaining` is `itemLevel - pointsSpent`.
+DEFAULT_MAX_LEVEL = 99 in src/content/item.ts. Re-run:
+`npx vitest run src/runtime/itemInstance.test.ts` — "has one source, so an item that grants none is
+refused as food", "buys one passive point a level, off the one level curve in the repository",
+"stops at the base max-level, refusing the feed with the item intact", "runs past ten on a base that
+declares no maximum, because the default is 99". Mutation-tested: neutering the max-level guard is
+KILLED by the third of those.
+- proof 13: met — allocateNode refuses in order: out of the shape's range or no slot / blocked, already
+allocated, `points < 1`, then no allocated neighbour — and returns a string before touching the
+plane in every case, so a refusal costs nothing. `neighbours` is symmetric and never a parent
+relation. Re-run: `npx vitest run src/runtime/clusterPlane.test.ts` — "asks for a neighbour and not
+a parent, so a ring is walked either way round", "refuses a node nothing allocated touches, and the
+refusal costs nothing", "refuses when no point remains, and the refusal costs nothing", "refuses a
+position the shape does not have, and an edge with no slot on it". Mutation-tested: neutering the
+adjacency gate is KILLED by "refuses a node nothing allocated touches".
+- proof 14: met — No directive in the Directive union un-allocates or un-slots; `drop` in
+clusterPlane.ts is reachable only from repairPlane. `fillSlot` refuses a filled slot and
+`allocateNode` refuses an allocated node. Re-run: `npx vitest run src/runtime/clusterPlane.test.ts`
+— "refuses a second jewel in a slot that already holds one", "refuses a node twice, the
+pre-allocated root included" — and `npx vitest run src/runtime/itemInstance.test.ts -t "refuses a
+second jewel into a filled slot"`. Mutation-tested: both guards neutered separately, both KILLED.
+The shipped `# test growing-a-heartwood-blade` writes both refusals out (`refuse: slot 1 at 0,0 e
+with causeway-jewel`, `refuse: allocate 1 at 0,0 position 2`) with points deliberately in hand.
+- proof 15: unmet — The capacity and consumption halves hold, and are proved:
+`npx vitest run src/runtime/clusterEffect.test.ts` — "consumes the item and records it against the
+cluster it was used on", "leaves the orb a stack and mints no second instance for it", "refuses the
+effect once the cluster fills its mod slots, with the item intact", "reads the capacity off the
+jewel, so one that declares a single slot holds one"; mutation-testing the mod-slots guard is
+KILLED. What fails is "never to a jewel in inventory". `applyClusterEffect` hands its `target`
+straight to `growItem`, which accepts any id `registry.items.get` resolves, so a stacked cluster
+jewel is a legal target: it de-stacks into an ItemInstance whose origin cluster is its own
+declaration, and the effect is recorded on it. Reproduced with `npm run inspect` over a two-item
+module (`# item node-jewel / cluster-jewel: node`, `# item orb / cluster-effect: +25% max-health`):
+`applyClusterEffect(state, registry, 'node-jewel', 'orb', ORIGIN)` returns
+`{ ok: true, instance: '1' }`, inventory goes node-jewel 3 -> 2 and orb 1 -> 0, and
+`state.instances.byId['1']` is `{ kind: 'item', template: 'node-jewel', payload: { experience: 0,
+plane: { '0,0': { jewel: 'node', entry: null, ..., effects: ['orb'] } } } }`. Both items are gone
+and the resulting instance can never be slotted, because slotJewel consumes from `inventory`.
+That is the clause's own sentence and the "Cluster mods are applied to a placed cluster, never to a
+jewel in inventory" decision failing at once. Filed as "every growth verb accepts any item as its
+target".
+- proof 16: met — `clusterScale` (src/runtime/clusterEffect.ts:22-30) sums `percent / 100` into one
+`pooled` and returns `1 + pooled`, over `cluster.effects` alone, so it stops at the cluster's edge;
+`scaledAmount` in src/runtime/stats.ts multiplies within the channel the BonusAmount already
+declares and never moves it. Re-run: `npx vitest run src/runtime/clusterEffect.test.ts` — "scales a
+flat payload in the added channel" (42.5), "scales a percent payload in the increased channel, where
+it multiplies the base" (33.75), "leaves an identical passive in another cluster at its declared
+value" (scales `[1.25, 1]`). Mutation-tested: replacing the pool with
+`pooled = (1 + pooled) * (1 + declared.percent / 100) - 1` is KILLED by "evaluates (30 + 15) x 1.15
+under two, and not the 52.75 multiplying them would give".
+- proof 17: met — `npx vitest run src/runtime/clusterEffect.test.ts -t "the worked case the reader will
+check"` — three cases asserting 44, 47.8125 and 51.75 with `toBeCloseTo(..., 10)`, and the third
+also asserts `.not.toBeCloseTo(52.75, 2)`. The fixture is real rather than derived: `max-health`
+has `base: 30`, `# cluster-jewel twin` is a spindle whose root (position 1, the west edge) is
+`hale` = `+10 max-health` free at the origin, and position 2 is `vigorous` = `+10% max-health`
+allocated with a point — so `(30 + 10) x 1.10` is arithmetic the test does not compute for itself.
+The tolerance is load-bearing exactly as the clause says: the additive path lands on
+51.74999999999999.
+- proof 18: met — The diff to `statRange` adds no channel: StatFold is unchanged, `foldBonus` routes
+through `scaledAmount` and is arithmetically identical for `times === 1`
+(`(amount * times) / 100` vs `(amount * times) / 100`), and the effect arrives as the same `times`
+argument a skill level already arrives as. Re-run:
+`npx vitest run src/runtime/clusterEffect.test.ts -t "an effect stops at its cluster"` — "leaves an
+identical passive in another cluster at its declared value" (two clusters both carrying `hale`,
+one scaled 1.25 and one 1, 50 -> 52.5), "lets a payload percent multiply the equipped item's own
+flat bonus, which the effect never touches" (55 -> 59.0625), "scales only the payloads naming the
+effect's stat".
+- proof 19: met — `scaledAmount` is the one multiplication of a BonusAmount and rounds nothing;
+`positionPayloads` hands out the declared bonus and the factor separately, and PlaneReport's
+`effective` is `scaledAmount(payload.bonus, payload.scale)` so the surface and the fold read the
+same number. Re-run: `npx vitest run src/runtime/clusterEffect.test.ts` — "rounds no payload, so
+four scaled +10s are worth 50 and never 48" (80 with base 30), "hands the fold the declared bonus
+and the factor, leaving one place that multiplies one" — and `npx vitest run scripts/planeView.test.ts
+-t "states the effective payload first and the factor that made it after"`. Mutation-tested:
+rounding inside scaledAmount is KILLED by three tests including "evaluates (30 + 12.5) x 1.125
+under one 25% effect".
+- proof 20: met — `instancePayloads(registry, instance)` is one pure function of the instance, and
+`foldPlanePayloads` in src/runtime/stats.ts feeds it to the same `foldBonus` an equipped `+2 attack`
+takes, inside the existing `for (const wornId of own.equipped)` loop. Re-run:
+`npx vitest run src/runtime/clusterEffect.test.ts -t "a plane's contribution reaches combat"` —
+"moves outgoing damage when a passive is allocated" (attack 4 -> 8, and hitDamage compared), "is
+inert while the player is not wearing the instance" (30 and 4 unworn, 44 once equipped) — and
+`-t "leaves an identical passive in another cluster at its declared value"` for the third clause of
+the fixture.
+- proof 21: met — `repairPlane` runs from the instance kind's `repair` hook, so it is the substrate's
+own prune rather than a second one; `templateLoaded` prunes an instance whose item is gone, and
+dropUnplaceable / dropStranded / dropVanishedAllocations / dropVanishedEffects /
+dropUnreachableAllocations each return the point rather than leaving it spent. Re-run:
+`npx vitest run src/runtime/itemInstance.test.ts -t "an instance across a reload"` — "comes back
+with the same experience and the same plane", "is pruned when its own template goes", "drops a
+slotted jewel whose declaration is gone and returns its point, so it is never over its budget",
+"survives a repair that leaves nothing recorded, because dropping it would destroy the item",
+"refuses a save whose plane is not one" — plus the seven cases under
+`npx vitest run src/runtime/clusterPlane.test.ts -t "a plane whose content moved underneath it"`
+(including "has nothing left to say about a plane it has already repaired", which is the fixpoint)
+and `npx vitest run src/runtime/equipment.test.ts -t "is still worn, and still worth the same,
+after a reload"` for the identical-evaluated-stats half.
+- proof 22: met — `# test growing-a-heartwood-blade` in content/tutorial-island.dsl uses the four
+directives added to the Directive union in src/content/test.ts and nothing else, and closes on
+`expect: growing-a-heartwood-blade-end`, a full save comparison covering both instances, every
+allocation and every recorded effect. It is replayed over the shipped content by the generated
+`test "<id>" passes` case in src/runtime/integration.test.ts, which is green under `npm test` in
+`npm run tasks -- merge-ready`. Refusals it records: c8 blocking (`refuse: allocate 1 at 1,0 slot
+nw`, `refuse: slot 1 at 1,0 nw with causeway-jewel`), c12 (`refuse: feed heartwood-blade with
+orb-of-vitality`, `refuse: feed 2 with masters-whetstone` at the level-10 cap), c13 (`refuse:
+allocate heartwood-blade at 0,0 position 3` out of adjacency, `refuse: allocate 1 at 1,0 slot se`
+with no point left), c14 (`refuse: slot 1 at 0,0 e with causeway-jewel`, `refuse: allocate 1 at 0,0
+position 2`). Note for the record: the clause's "c17" has no refusal in it; what the test carries
+is c15's two (`refuse: apply 1 at 1,-1 with orb-of-the-edge` by identity and `refuse: apply 1 at
+1,-1 with orb-of-the-bulwark` by capacity), which is what the sentence must have meant.
+- proof 23: met — `npm run tasks -- merge-ready` on 239c0e4: tsc ok, npm test ok, layer-check ok,
+audit-status ok, doctor ok (20 warnings, which do not fail the leg), bytes ok — the six legs the
+clause names, all green in one invocation, plus tree and base. Re-run the same command. The
+invocation as a whole still exits non-zero on three spec-standing legs: `spec crafting-modal`
+(1 open member), `spec items-mods-and-crafting` (1 open member, cluster-merge-ready) and
+`clauses items-mods-and-crafting` (no recorded audit pass — this pass). The second and third close
+themselves; the first is filed as a finding.
