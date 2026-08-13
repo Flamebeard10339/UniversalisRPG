@@ -683,6 +683,14 @@
             "src/ui/PlanePane.tsx"
           ],
           "note": "produced by gui-draws-the-focused-plane: the focused plane read into rows and drawn above the option sheet, off PlayStatus.focus and never off a screen's name (c9/c10)"
+        },
+        {
+          "name": "where a question is drawn and what leaving it answers",
+          "paths": [
+            "src/ui/asking.ts",
+            "src/ui/Question.tsx"
+          ],
+          "note": "produced by a-row-acts-in-one-click-and-clicking-away-leaves-the-screen for crafting-modal c19 and c20; two decisions taken off published fields alone - which row of the page a question belongs to, so an entry's verbs come back under the entry, and what a click away from a sheet answers, which is the leaving value the Modal itself publishes. Question.tsx is the one thing that renders an option, drawn by the sheet and by the row alike, so an unheard-of screen is answerable through one component wherever it is put"
         }
       ]
     },
