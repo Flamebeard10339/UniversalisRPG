@@ -219,6 +219,8 @@
         "src/runtime/instances.test.ts",
         "src/runtime/instances.ts",
         "src/runtime/integration.test.ts",
+        "src/runtime/itemContribution.test.ts",
+        "src/runtime/itemContribution.ts",
         "src/runtime/itemInstance.test.ts",
         "src/runtime/itemInstance.ts",
         "src/runtime/journey.test.ts",
@@ -367,6 +369,14 @@
             "src/runtime/itemInstance.ts"
           ],
           "note": "produced by growing-an-item-revokes-every-has-gate-recipe-and-cost-that-"
+        },
+        {
+          "name": "item stat contribution",
+          "paths": [
+            "src/runtime/itemContribution.ts",
+            "src/runtime/itemContribution.test.ts"
+          ],
+          "note": "produced by item-contribution-fold: what one carried item is worth per stat, its own tags and its plane's allocated payloads folded once and scaled by the cluster effects on them, plus scaledAmount, the one multiplication of a BonusAmount. planeReport publishes it and statRange spends it."
         }
       ]
     },

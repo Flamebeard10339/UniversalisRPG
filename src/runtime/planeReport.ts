@@ -5,9 +5,9 @@ import { getShape } from '../content/shapes';
 import { BonusAmount } from '../grammar/tagClause';
 import { positionPayloads } from './clusterEffect';
 import { isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
+import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
 import { grownItems, itemInstance, itemLevel, pointsRemaining } from './itemInstance';
 import { GameState } from './state';
-import { scaledAmount } from './stats';
 
 // Where a point may go, said once for both things a point buys. `blocked` is a
 // slot alone: the hex beyond it already holds a cluster that entered another
@@ -66,6 +66,10 @@ export interface PlaneReport {
   readonly spent: number;
   readonly remaining: number;
   readonly clusters: ClusterReport[];
+  // What wearing this copy is worth, per stat, as the stat fold itself reads it
+  // — the item's own tags and its allocated payloads together, so a screen
+  // states this rather than adding the clusters up again (c8).
+  readonly contributions: StatContribution[];
 }
 
 function standingOf(registry: Registry, plane: Plane, node: PlaneNode): Standing {
@@ -154,6 +158,7 @@ export function planeReport(registry: Registry, state: GameState, instanceId: st
     spent: pointsSpent(payload.plane),
     remaining: pointsRemaining(payload, item),
     clusters,
+    contributions: itemContribution(registry, item, payload),
   };
 }
 

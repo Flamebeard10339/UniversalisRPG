@@ -202,4 +202,22 @@ describe('planeReport', () => {
   it('reports an empty list when nothing has been grown', () => {
     expect(planeReports(registry, initialState(registry))).toEqual([]);
   });
+
+  it('publishes what the copy is worth per stat, so a screen states it rather than adding the clusters up', () => {
+    const state = fed('blade', 3);
+    for (const position of [2, 3]) ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position }));
+
+    expect(report(state).contributions).toEqual([
+      { statId: 'attack', added: { min: 4, max: 4 }, increased: 0 },
+      { statId: 'max-health', added: { min: 10, max: 10 }, increased: 0 },
+    ]);
+  });
+
+  it('publishes the effective contribution, so an effect on the cluster moves the summary', () => {
+    const state = fed('blade', 3, { goad: 1 });
+    for (const position of [2, 3]) ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position }));
+    ok(applyClusterEffect(state, registry, '1', 'goad', ORIGIN));
+
+    expect(report(state).contributions).toContainEqual({ statId: 'attack', added: { min: 6, max: 6 }, increased: 0 });
+  });
 });

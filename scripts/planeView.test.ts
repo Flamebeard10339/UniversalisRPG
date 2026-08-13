@@ -38,6 +38,7 @@ const plane = (over: Partial<PlaneReport> = {}): PlaneReport => ({
   spent: 1,
   remaining: 2,
   clusters: [],
+  contributions: [],
   ...over,
 });
 
