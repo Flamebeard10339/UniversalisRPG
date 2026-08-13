@@ -108,11 +108,15 @@ Proof:
   REPL answers, so c11 holds and no driver gains a way to leave a screen the other has not got — and
   a frame that publishes no such value, dialogue among them, is not dismissable this way, because
   there is nothing for the click to answer. Added 2026-08-13, ruled by the author.
-- [c20] **A row acts in one click.** The verbs an entry offers are reachable from the entry itself
-  rather than through a screen that asks which verb second: one press on what the player carries and
-  one on what to do with it, not one to select and one to open and one to act. Every press is still a
-  dispatch of the shared command table with the same answers the REPL gives, so c11 is what stops
-  this becoming a GUI-only capability. Added 2026-08-13, ruled by the author after playing the GUI.
+- [c20] ~~**A row acts in one click.**~~ **Withdrawn 2026-08-13 by the author, unmet and not
+  deferred to a later member of this spec.** The implementation drew the question under the row that
+  opened it, which left the row still needing a press to find out what it offered — orthogonal to the
+  goal — and bought a modal that is sometimes a sheet and sometimes not, which is a special case in
+  the driver of exactly the kind c9 exists to forbid. The clause is struck rather than reworded
+  because the author judged the problem non-trivial under the screen's space constraints: making
+  every action an item offers visible without opening anything is filed as its own work, requiring
+  thought rather than another attempt. What replaces it here is nothing — pressing a row opens a
+  screen, as it did before, and the branch closes without claiming otherwise.
 
 - [c21] **What the player carries and what they are wearing are disjoint.** Equipping takes the item
   out of the inventory and puts it in the equipment; unequipping returns it. A stack of three, one
@@ -236,6 +240,14 @@ Make growing an item something the author can judge by playing it, without teach
   same verbs a carried row does. The alternative — unequip, grow, re-equip — makes the item a player
   most wants to improve the one the branch's own goal line cannot reach. Recorded as the default the
   worker implements; the author may overturn it, and the cost of doing so is one clause.
+
+- **c20 is withdrawn, not deferred.** Ruled by the author 2026-08-13 after playing the
+  implementation. Two independent reasons, either sufficient: it did not reach the goal — a row still
+  had to be pressed to learn what it offered, and drawing the answer lower is orthogonal to that —
+  and it made a modal that is a sheet on one page and an inline block on another, which is a driver
+  holding a special case about screens and is the thing c9 forbids in a different costume. The
+  capability is real and is filed as its own work; what is refused is reaching it this way. A clause
+  a branch cannot meet is struck by the author or it is owed, and this one is struck.
 
 ## Out of scope
 
