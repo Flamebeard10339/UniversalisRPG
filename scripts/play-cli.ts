@@ -24,7 +24,7 @@ import {
   type Recorder,
   type Ticker,
 } from '../src/runtime/command';
-import { type Modal } from '../src/runtime/runtime';
+import { formatPlane } from './planeView';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -84,14 +84,27 @@ function formatEncounter(encounter: PlayView['encounter']): string[] {
   return [...lines, meters.join('   ')];
 }
 
+// What the screen has in hand, drawn above the question it belongs to. The plane
+// is looked up in the ones the view publishes and the focus is what says which,
+// so a screen this driver has never heard of draws its subject too and no modal
+// name is read to decide it (c10).
+function formatFocus(v: PlayView): string[] {
+  const focus = v.focus;
+  if (!focus) return [];
+  const plane = v.planes.find((each) => each.instance === focus.instance);
+  if (!plane) return [];
+  return ['', ...formatPlane(plane, Object.values(v.equipment).includes(plane.instance), focus.hex), ''];
+}
+
 // Rendered from the published name and options alone, so a modal this driver
 // has never heard of prints the same way the ones it has do. The option being
 // asked for is the top modal's first; a listed value is answerable by number.
-function formatModals(modals: Modal[]): string[] {
+function formatModals(v: PlayView): string[] {
   const lines: string[] = [];
-  for (const modal of modals) lines.push(`[${modal.name}] ${modal.options.map((option) => option.key).join(', ') || '(answered)'}`);
+  for (const modal of v.modals) lines.push(`[${modal.name}] ${modal.options.map((option) => option.key).join(', ') || '(answered)'}`);
+  lines.push(...formatFocus(v));
 
-  const asking = askedOption(modals);
+  const asking = askedOption(v.modals);
   if (!asking) return lines;
   lines.push(`${asking.label}:`);
   if (asking.values) asking.values.forEach((value, index) => lines.push(`  ${index + 1}) ${value}`));
@@ -111,7 +124,7 @@ function formatView(v: PlayView, reread = false): string[] {
   if (v.entities.length > 0) lines.push(`Here: ${v.entities.map((entity) => entity.title).join(', ')}`);
   lines.push(...formatResources(v.resources));
   lines.push(...formatEncounter(v.encounter));
-  lines.push(...formatModals(v.modals));
+  lines.push(...formatModals(v));
   lines.push(...formatChoices(v.choices));
   lines.push(`[time: ${v.time}s]`);
   return lines;

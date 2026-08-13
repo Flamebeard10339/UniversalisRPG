@@ -16,6 +16,7 @@ function viewAt(id: string, said: string[] = [], description = ''): PlayView {
     inventory: {},
     grown: {},
     planes: [],
+    focus: null,
     equipment: {},
     xp: {},
     stats: {},

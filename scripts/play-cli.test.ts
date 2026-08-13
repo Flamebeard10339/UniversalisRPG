@@ -10,6 +10,28 @@ import { driveRun, formatLive, formatOutput, formatResult, formatTick, loadModpo
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
+// A base the player carries but has not grown: the plane a screen opened on it
+// holds is one no copy exists for yet, which is the focus this driver has to be
+// able to draw.
+const PLANE_SOURCE = `
+# location camp
+x: 0, y: 0
+starting
+
+# cluster-jewel core
+shape: point
+open-connections: e
+
+# item blade
+title: Blade
+slot: mainhand
+max-level: 2
+origin-cluster: core
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"blade":1}}
+`;
+
 function driver(text: string, speed = 1, driving = false): CommandContext {
   const session = startSession(loadModule(text));
   const recorder: Recorder = { history: [], startSave: serializeSession(session) };
@@ -106,6 +128,29 @@ starting
     expect(lines).toContain('Item:');
     expect(lines).toContain('  1) Close');
     expect(lines.some((line) => line.startsWith('Inventory:'))).toBe(false);
+  });
+
+  // c10: the plane is drawn because the view publishes a focus into the planes
+  // it publishes beside it, and this driver reads no modal name to decide it —
+  // the same route draws a screen it has never heard of.
+  it('draws the plane a screen has in hand above the question it is asking', () => {
+    const ctx = driver(PLANE_SOURCE);
+    runLine(ctx, '/load stocked');
+    runLine(ctx, '/inv blade');
+    const lines = formatResult(runLine(ctx, '1'));
+
+    expect(lines).toContain('[item-plane] plane');
+    expect(lines).toContain('Blade — blade (blade) — level 1/2, 0 spent, 1 point left');
+    // The hexagon in hand is marked, and the question it belongs to comes under it.
+    expect(lines.indexOf('> 0,0  core · point · origin · mods 0/2')).toBeGreaterThan(lines.indexOf('[item-plane] plane'));
+    expect(lines.indexOf('Blade at 0,0:')).toBeGreaterThan(lines.indexOf('> 0,0  core · point · origin · mods 0/2'));
+  });
+
+  it('draws no plane for a screen with none in hand', () => {
+    const ctx = driver(PLANE_SOURCE);
+    runLine(ctx, '/load stocked');
+
+    expect(formatResult(runLine(ctx, '/inv'))).not.toContain('Blade — blade (blade) — level 1/2, 0 spent, 1 point left');
   });
 
   it('separates each authored block with a blank line, so the emission pastes into a module', () => {

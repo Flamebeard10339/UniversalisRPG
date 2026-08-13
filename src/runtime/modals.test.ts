@@ -583,6 +583,39 @@ describe('the plane screen, as a frame like any other', () => {
     expect(names(state)).toEqual(['item-plane']);
   });
 
+  // c10: what the screen shows beyond its options leaves as ordinary published
+  // data — the plane among the ones the view already publishes, and where on it
+  // — so a driver draws it without ever asking which screen is up. A base still
+  // in its stack is a plane the screen can be opened on, so it is among them.
+  it('publishes which plane is in hand as a focus into the planes the view already publishes', () => {
+    const session = openOnBlade();
+    submitModal(session, { verb: 'Grow' });
+
+    const shown = view(session);
+    expect(shown.focus).toEqual({ instance: 'blade', hex: '0,0' });
+    expect(shown.planes.map((plane) => plane.instance)).toContain('blade');
+  });
+
+  it('publishes no focus for a screen that has no plane in hand, nor for none at all', () => {
+    const session = openOnBlade();
+    expect(view(session).focus).toBeNull();
+
+    submitModal(session, { verb: 'Grow' });
+    submitModal(session, { plane: 'Back to inventory' });
+    expect(view(session).focus).toBeNull();
+  });
+
+  // The screen the player is answering is the top one, so a plane covered by
+  // another screen is not what is in hand.
+  it('publishes no focus while another screen covers the plane', () => {
+    const session = openOnBlade();
+    submitModal(session, { verb: 'Grow' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+
+    expect(modalNames(view(session))).toEqual(['item-plane', 'carried-items']);
+    expect(view(session).focus).toBeNull();
+  });
+
   it('refuses a saved body that is not a plane frame', () => {
     expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' })).toBe(true);
     expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0', said: 'no' })).toBe(true);

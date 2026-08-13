@@ -5,7 +5,7 @@ import {
 import { endJourney } from './state';
 import { carriedItems, Growth, grownItems, itemTemplate } from './itemInstance';
 import { grow } from './growth';
-import { planeReports, type PlaneReport } from './planeReport';
+import { planeReports, type PlaneFocus, type PlaneReport } from './planeReport';
 import { parseOwnerRef } from './actions';
 import { spreadDiscovery } from './effects';
 import { reachable, type Journey } from './journey';
@@ -14,7 +14,7 @@ import { declaredId } from '../content/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
-import { answerModal, dialogueFrame, Modal, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { answerModal, dialogueFrame, Modal, modalFocus, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
 import { carriedEntries, type CarriedEntry } from './carriedScreen';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
@@ -68,10 +68,15 @@ export interface PlayStatus {
   // are counted nowhere in `inventory`, so a surface listing what the player has
   // reads both records.
   grown: Record<string, string>;
-  // One per grown copy, in the order `grown` names them: the plane behind the
+  // One per plane the player carries, grown copies first in the order `grown`
+  // names them and then the bases still in their stacks: the plane behind the
   // id, already scaled, for a surface that shows one rather than a stat it
   // arrived in.
   planes: PlaneReport[];
+  // Which of those planes is in hand and where on it, or null when none is. It
+  // names a plane rather than carrying one, so a surface draws it by looking the
+  // id up in `planes` and never by recognising the screen that holds it.
+  focus: PlaneFocus | null;
   equipment: Record<string, string>;
   xp: Record<string, number>;
   stats: Record<string, number>;
@@ -390,6 +395,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     inventory: Object.fromEntries([...carriedItems(state)].flatMap(([id, { stack }]) => (stack > 0 ? [[id, stack] as const] : []))),
     grown: grownItems(state),
     planes: planeReports(registry, state),
+    focus: modalFocus(state),
     equipment: { ...state.equipped },
     xp: { ...state.xp },
     stats: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, statValue(stat.id, state, registry)])),

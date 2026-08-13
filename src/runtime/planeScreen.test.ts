@@ -6,7 +6,7 @@ import { growLine } from './growth';
 import { grownItems } from './itemInstance';
 import { ModalFrame } from './modals';
 import { planeReport } from './planeReport';
-import { BACK, PLANE, PlaneFrame, planeFrame, planeOptions, planeStale, planeSubmit } from './planeScreen';
+import { BACK, PLANE, PlaneFrame, planeFocus, planeFrame, planeOptions, planeStale, planeSubmit } from './planeScreen';
 import { initialState } from './save';
 import { GameState } from './state';
 
@@ -225,6 +225,26 @@ describe('what the screen does with an answer', () => {
 
     expect(walk(state, grown, [BACK])).toEqual(carriedFrame({ item: 'Blade #1' }));
     expect(walk(state, planeFrame('rope'), [BACK])).toEqual(carriedFrame());
+  });
+});
+
+describe('what the screen has in hand', () => {
+  // c10: the focus is the two ids the frame already holds, and planeReport
+  // answers for both spellings of a target, so a driver looks the plane up in
+  // what the view publishes rather than being handed a copy of it.
+  it('names the copy and the hexagon, whichever way the copy is carried', () => {
+    const state = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 1 });
+
+    expect(planeFocus(planeFrame('blade'))).toEqual({ instance: 'blade', hex: '0,0' });
+    const walked = plane(state, [...FED, 'allocate: slot e', 'slot: e with spark-jewel', 'Go to 1,0']);
+    expect(planeFocus(walked)).toEqual({ instance: '1', hex: '1,0' });
+    expect(planeReport(registry, state, planeFocus(walked).instance)?.clusters.map((cluster) => cluster.hex)).toContain('1,0');
+  });
+
+  // A refusal is what the screen says, not what it holds, so the focus is the
+  // same two ids whether or not the plane last refused something.
+  it('names them the same whatever the plane last said', () => {
+    expect(planeFocus(planeFrame('blade', '1,0', 'no points remain'))).toEqual({ instance: 'blade', hex: '1,0' });
   });
 });
 

@@ -1,6 +1,7 @@
 import { choose, cursorProblem, DialogueCursor, menuTexts } from './dialogue-runtime';
 import { carriedFrame, carriedOptions, carriedSubmit } from './carriedScreen';
-import { isPlaneFrameBody, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
+import { isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
+import { type PlaneFocus } from './planeReport';
 import { GameState, RuntimeError } from './state';
 import { Registry } from '../content/registry';
 
@@ -33,11 +34,12 @@ export type ModalFrame =
 
 export type ModalName = ModalFrame['name'];
 
-// Everything a member of the union knows about itself. The three optional ones
-// are what a frame carrying more than answers costs: what its body must hold to
-// be one, why the world it points at can no longer hold it up, and when two of
-// them are the same screen. A member that declares none is a screen its name
-// alone identifies, whose body is its answers, and which nothing can stale.
+// Everything a member of the union knows about itself. The optional ones are
+// what a frame carrying more than answers costs: what its body must hold to be
+// one, why the world it points at can no longer hold it up, when two of them are
+// the same screen, and what it has in hand beside its options. A member that
+// declares none is a screen its name alone identifies, whose body is its
+// answers, which nothing can stale and which is drawn from its options alone.
 interface ModalDefinition<F extends ModalFrame> {
   // The frame a bare `open modal: <name>` makes, or null for a modal that
   // carries a payload no result line can spell.
@@ -48,6 +50,10 @@ interface ModalDefinition<F extends ModalFrame> {
   holds?(value: Record<string, unknown>): boolean;
   stale?(frame: F, state: GameState, registry: Registry): string | null;
   same?(a: F, b: F): boolean;
+  // Which published plane this screen has in hand, for a member whose subject is
+  // one. A member that declares none is a screen with nothing beside its options,
+  // which is what keeps a driver from having to know which member is which.
+  focus?(frame: F): PlaneFocus;
 }
 
 const RACES = ['Human', 'Elf', 'Dwarf', 'Orc'];
@@ -80,6 +86,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     holds: isPlaneFrameBody,
     stale: planeStale,
     same: samePlane,
+    focus: planeFocus,
   },
   dialogue: {
     open: () => null,
@@ -143,6 +150,15 @@ export function openModalNamed(state: GameState, name: string): void {
 
 export function topModal(state: GameState): ModalFrame | null {
   return state.modals.length > 0 ? state.modals[state.modals.length - 1] : null;
+}
+
+// What the screen being answered has in hand, and null where it has nothing or
+// where nothing is open. Only the top frame is asked: a screen covered by
+// another is not what the player is looking at.
+export function modalFocus(state: GameState): PlaneFocus | null {
+  const frame = topModal(state);
+  if (!frame) return null;
+  return definitionFor(frame).focus?.(frame) ?? null;
 }
 
 function allOptions(frame: ModalFrame, state: GameState, registry: Registry): readonly ModalOption[] {

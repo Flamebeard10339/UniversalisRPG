@@ -207,9 +207,7 @@ describe('planeReport', () => {
     });
     expect(planeReport(registry, state, 'plain-blade')?.clusters[0]).toMatchObject({ hex: '0,0', jewel: 'base' });
 
-    // What is published per grown copy is unchanged: a stack is not a plane the
-    // player has, it is one they could have.
-    expect(planeReports(registry, state)).toEqual([]);
+    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['blade', 'plain-blade']);
   });
 
   it('reports nothing for a stack the player has none of, and nothing for an item that is no base', () => {
@@ -220,12 +218,24 @@ describe('planeReport', () => {
     expect(planeReport(registry, state, 'whetstone')).toBeUndefined();
   });
 
-  it('reports one plane per grown copy, in the order they were grown', () => {
+  it('reports the grown copies in the order they were grown, before the stacks left carried', () => {
     const state = initialState(registry);
-    Object.assign(state.inventory, { blade: 1, 'plain-blade': 1, whetstone: 2 });
+    Object.assign(state.inventory, { blade: 2, 'plain-blade': 1, whetstone: 2 });
     ok(feedItem(state, registry, 'blade', 'whetstone'));
     ok(feedItem(state, registry, 'plain-blade', 'whetstone'));
-    expect(planeReports(registry, state).map((plane) => plane.template)).toEqual(['blade', 'plain-blade']);
+    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['1', '2', 'blade']);
+  });
+
+  // A plane screen can be opened on a base still in its stack, and a focus names
+  // the plane it points at rather than carrying one, so every plane the player
+  // could be looking at has to be among the published ones.
+  it('reports the plane of a stack the player carries, and drops it when the last one leaves', () => {
+    const state = initialState(registry);
+    Object.assign(state.inventory, { blade: 1, whetstone: 3 });
+    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['blade']);
+
+    state.inventory.blade = 0;
+    expect(planeReports(registry, state)).toEqual([]);
   });
 
   it('reports an empty list when nothing has been grown', () => {

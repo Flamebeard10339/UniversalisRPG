@@ -6,7 +6,7 @@ import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
 import { carriedItems } from './itemInstance';
 import { type ModalFrame, type ModalOption } from './modals';
-import { ClusterReport, PlaneReport, planeReport } from './planeReport';
+import { ClusterReport, PlaneFocus, PlaneReport, planeReport } from './planeReport';
 import { GameState } from './state';
 
 // One item's plane, with one hexagon of it in hand. The screen asks a single
@@ -130,6 +130,13 @@ export function planeSubmit(frame: PlaneFrame, state: GameState, registry: Regis
   // after a growth is the one the growth itself names.
   const growth = growLine(state, registry, move.line);
   return growth.ok ? planeFrame(growth.instance, move.focus) : planeFrame(frame.target, frame.hex, growth.refused);
+}
+
+// The two ids this frame holds are the two a focus is, and planeReport answers
+// for the target either way it is carried, so what the frame has in hand is
+// already a plane the view publishes rather than one it would have to copy.
+export function planeFocus(frame: PlaneFrame): PlaneFocus {
+  return { instance: frame.target, hex: frame.hex };
 }
 
 // Beyond a name and answers, a saved frame is two ids and whatever the plane

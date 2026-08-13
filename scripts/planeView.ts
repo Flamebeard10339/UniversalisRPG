@@ -81,9 +81,11 @@ function slotRow(plane: PlaneReport, cluster: ClusterReport, slot: SlotReport): 
   };
 }
 
-function clusterHeading(cluster: ClusterReport): string[] {
+// The hexagon in hand is marked in the margin, so which of three things a
+// growth line names is read off the screen rather than remembered.
+function clusterHeading(cluster: ClusterReport, focused: boolean): string[] {
   const from = cluster.entry === null ? 'origin' : `via ${cluster.entry.hex} ${cluster.entry.direction}`;
-  const heading = `  ${cluster.hex}  ${bare(cluster.jewel)} · ${cluster.shape} · ${from} · mods ${cluster.effects.length}/${cluster.modSlots}`;
+  const heading = `${focused ? '> ' : '  '}${cluster.hex}  ${bare(cluster.jewel)} · ${cluster.shape} · ${from} · mods ${cluster.effects.length}/${cluster.modSlots}`;
   if (cluster.effects.length === 0) return [heading];
   const effects = cluster.effects.map((each) => `${each.title} ${signed(each.effect.percent)}% ${bare(each.effect.statId)}`);
   return [heading, `       ${effects.join(', ')}`];
@@ -103,19 +105,17 @@ function pad(rows: readonly Row[]): string[] {
 }
 
 // One plane, and every hex and direction spelled the way the four verbs take
-// them, so the line a player reads is the line they type back.
-export function formatPlane(plane: PlaneReport, worn: boolean): string[] {
+// them, so the line a player reads is the line they type back. `focused` is the
+// hexagon a screen holding this plane has in hand, or null where it is read
+// without one.
+export function formatPlane(plane: PlaneReport, worn: boolean, focused: string | null): string[] {
   const lines = [heading(plane, worn)];
   for (const cluster of plane.clusters) {
     const rows = [
       ...cluster.positions.map((position) => positionRow(plane, cluster, position)),
       ...cluster.slots.map((slot) => slotRow(plane, cluster, slot)),
     ];
-    lines.push('', ...clusterHeading(cluster), ...pad(rows));
+    lines.push('', ...clusterHeading(cluster, cluster.hex === focused), ...pad(rows));
   }
   return lines;
-}
-
-export function formatPlanes(planes: readonly PlaneReport[], worn: readonly string[]): string[] {
-  return planes.flatMap((plane) => ['', ...formatPlane(plane, worn.includes(plane.instance))]);
 }

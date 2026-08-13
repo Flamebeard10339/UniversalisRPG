@@ -6,7 +6,7 @@ import { BonusAmount } from '../grammar/tagClause';
 import { positionPayloads } from './clusterEffect';
 import { basePlane, isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
-import { carried, grownItems, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining } from './itemInstance';
+import { carried, carriedItems, grownItems, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining } from './itemInstance';
 import { GameState } from './state';
 
 // Where a point may go, said once for both things a point buys. `blocked` is a
@@ -54,6 +54,14 @@ export interface ClusterReport {
   readonly modSlots: number;
   readonly positions: PositionReport[];
   readonly slots: SlotReport[];
+}
+
+// Which plane a screen has in hand and which hexagon of it, as the two ids the
+// growth verbs spell — never the plane itself, so a surface that draws one
+// draws the report the view already publishes rather than a second copy of it.
+export interface PlaneFocus {
+  readonly instance: string;
+  readonly hex: string;
 }
 
 export interface PlaneReport {
@@ -176,6 +184,12 @@ export function planeReport(registry: Registry, state: GameState, target: string
   };
 }
 
+// Every plane the player is carrying, whichever way they carry it: a grown copy
+// under its own id, and a base still in its stack under the item's, which is the
+// plane growing it would mint. Both are addressable by the growth verbs and both
+// are what a screen can be opened on, so publishing only the grown ones would
+// leave a focus pointing at a plane no driver could find.
 export function planeReports(registry: Registry, state: GameState): PlaneReport[] {
-  return Object.keys(grownItems(state)).flatMap((id) => planeReport(registry, state, id) ?? []);
+  const stacks = [...carriedItems(state)].flatMap(([id, { stack }]) => (stack > 0 ? [id] : []));
+  return [...Object.keys(grownItems(state)), ...stacks].flatMap((id) => planeReport(registry, state, id) ?? []);
 }

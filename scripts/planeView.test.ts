@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ClusterReport, PayloadReport, PlaneReport, PositionReport, SlotReport } from '../src/runtime/planeReport';
-import { formatPlane, formatPlanes } from './planeView';
+import { formatPlane } from './planeView';
 
 const flat = (statId: string, amount: number, scale = 1): PayloadReport => ({ statId, effective: { percent: false, amount: { min: amount, max: amount } }, scale });
 
@@ -42,15 +42,15 @@ const plane = (over: Partial<PlaneReport> = {}): PlaneReport => ({
   ...over,
 });
 
-const shown = (report: PlaneReport, worn = false): string => formatPlane(report, worn).join('\n');
+const shown = (report: PlaneReport, worn = false): string => formatPlane(report, worn, null).join('\n');
 
 describe('formatPlane', () => {
   it('heads a plane with the id the verbs take, the level and the points left', () => {
-    expect(formatPlane(plane(), false)[0]).toBe('Blade — 1 (blade) — level 3/20, 1 spent, 2 points left');
+    expect(formatPlane(plane(), false, null)[0]).toBe('Blade — 1 (blade) — level 3/20, 1 spent, 2 points left');
   });
 
   it('says a single point in the singular, and marks a plane the player is wearing', () => {
-    expect(formatPlane(plane({ remaining: 1 }), true)[0]).toBe('Blade — 1 (blade) — worn — level 3/20, 1 spent, 1 point left');
+    expect(formatPlane(plane({ remaining: 1 }), true, null)[0]).toBe('Blade — 1 (blade) — worn — level 3/20, 1 spent, 1 point left');
   });
 
   it('addresses the origin as an origin and a slotted cluster by the slot it came through', () => {
@@ -77,7 +77,7 @@ describe('formatPlane', () => {
       position({ position: 3, standing: 'available' }),
       position({ position: 4, standing: 'unreached' }),
     ];
-    const rows = formatPlane(plane({ clusters: [cluster({ positions, slots: [slot({ standing: 'blocked', beyond: '1,-1' })] })] }), false);
+    const rows = formatPlane(plane({ clusters: [cluster({ positions, slots: [slot({ standing: 'blocked', beyond: '1,-1' })] })] }), false, null);
     expect(rows.map((row) => row.trim().split(/\s+/)[0])).toEqual(['Blade', '', '0,0', 'free', 'spent', 'ready', 'locked', 'dead']);
   });
 
@@ -127,7 +127,7 @@ describe('formatPlane', () => {
         slot({ direction: 'se', standing: 'unreached' }),
       ],
     });
-    const rows = formatPlane(plane({ clusters: [settled] }), false);
+    const rows = formatPlane(plane({ clusters: [settled] }), false, null);
     expect(rows.slice(3)).toEqual([
       '    spent  slot e  holds 1,0',
       '    dead   slot ne blocked by 1,-1',
@@ -140,20 +140,21 @@ describe('formatPlane', () => {
       position({ position: 1, title: 'Hale', standing: 'allocated', payloads: [flat('mod.max-health', 15)] }),
       position({ position: 2, title: 'Swift Hands', standing: 'available', payloads: [flat('mod.attack-rate', 2)] }),
     ];
-    const rows = formatPlane(plane({ clusters: [cluster({ positions })] }), false).slice(3);
+    const rows = formatPlane(plane({ clusters: [cluster({ positions })] }), false, null).slice(3);
     expect(rows).toEqual([
       '    spent  pos 1   Hale         +15 max-health',
       '    ready  pos 2   Swift Hands  +2 attack-rate  allocate: 1 at 0,0 position 2',
     ]);
   });
 
-  it('separates one plane from the next with a blank line and shows none at all for nothing grown', () => {
-    expect(formatPlanes([plane(), plane({ instance: '2' })], [])[0]).toBe('');
-    expect(formatPlanes([], [])).toEqual([]);
+  it('marks the hexagon in hand in the margin, and only that one', () => {
+    const entered = cluster({ hex: '1,-1', jewel: 'mod.junction', shape: 'point', entry: { hex: '0,0', direction: 'ne' } });
+    const lines = formatPlane(plane({ clusters: [cluster(), entered] }), false, '1,-1');
+    expect(lines).toContain('> 1,-1  junction · point · via 0,0 ne · mods 0/2');
+    expect(lines).toContain('  0,0  core · spindle · origin · mods 0/2');
   });
 
-  it('marks worn by instance id rather than by template', () => {
-    expect(formatPlanes([plane()], ['2'])[1]).not.toContain('worn');
-    expect(formatPlanes([plane()], ['1'])[1]).toContain('worn');
+  it('marks nothing when the hexagon in hand is not one this plane has', () => {
+    expect(formatPlane(plane(), false, '4,4').filter((line) => line.startsWith('>'))).toEqual([]);
   });
 });
