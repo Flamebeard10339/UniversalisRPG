@@ -3,7 +3,7 @@ import { DISCOVERED, Location } from '../content/location';
 import {
   actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { endJourney } from './state';
-import { itemCopies, Growth, grownItems, itemTemplate } from './itemInstance';
+import { itemCopies, Growth, grownItems } from './itemInstance';
 import { grow } from './growth';
 import { planeReports, type PlaneFocus, type PlaneReport } from './planeReport';
 import { parseOwnerRef } from './actions';
@@ -15,7 +15,6 @@ import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
 import { answerModal, dialogueFrame, Modal, modalFocus, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
-import { carriedName } from './carriedName';
 import { carriedEntries, type CarriedEntry } from './carriedScreen';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
@@ -25,7 +24,7 @@ import { printDirective } from '../content/serialize';
 import { humanize } from '../grammar/values';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 
-export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'equip' | 'unequip';
+export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft';
 
 export interface PlayChoice {
   id: string;
@@ -227,33 +226,17 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 
   // Item actions are offered per item the player has, however the copies are
   // spelled and whichever side of c21 they are on — wearing a thing is not a way
-  // to stop being able to use it. Equipping is offered per copy, and a stack the
-  // player has emptied by growing or wearing its last copy is not one of them.
-  for (const [itemId, { stack }] of itemCopies(state)) {
+  // to stop being able to use it. Wearing and taking off are not among them:
+  // they are what a copy takes rather than what it does, and the carried-items
+  // screen is where a copy is named and its verbs taken, so a room offering them
+  // as well would put the same act in two places and scope to a location what an
+  // item is not scoped by.
+  for (const [itemId] of itemCopies(state)) {
     const item = registry.items.get(itemId);
     if (!item) continue;
     for (const action of availableActions(item, state)) {
       choices.push({ id: `use:item.${itemId}.${action.label}`, kind: 'action', label: action.label, detail: item.title });
     }
-    if (item.slot && stack > 0 && state.equipped[item.slot] !== itemId) {
-      choices.push({ id: `equip:${itemId}`, kind: 'equip', label: `Equip ${carriedName(item.title, false)}`, detail: item.slot });
-    }
-  }
-
-  // A grown copy is its own choice, because a player holding both it and its
-  // stack has to be able to say which one they mean; the id that says so is the
-  // choice's rather than its label's (c16).
-  for (const [grownId, template] of Object.entries(grownItems(state))) {
-    const item = registry.items.get(template);
-    if (!item?.slot || state.equipped[item.slot] === grownId) continue;
-    choices.push({ id: `equip:${grownId}`, kind: 'equip', label: `Equip ${carriedName(item.title, true)}`, detail: item.slot });
-  }
-
-  for (const [slot, wornId] of Object.entries(state.equipped)) {
-    const template = itemTemplate(state, wornId);
-    const item = registry.items.get(template);
-    const worn = item === undefined ? slot : carriedName(item.title, template !== wornId);
-    choices.push({ id: `unequip:${slot}`, kind: 'unequip', label: `Unequip ${worn}`, detail: slot });
   }
 
     // TODO(inventory-crafting): stationless recipes clutter the room list. See backlog.
@@ -323,10 +306,6 @@ export function choiceToDirective(choice: PlayChoice): Directive {
       return { kind: 'travel', location: choice.id.slice('travel:'.length) };
     case 'craft':
       return { kind: 'craft', recipe: choice.id.slice('craft:'.length) };
-    case 'equip':
-      return { kind: 'equip', item: choice.id.slice('equip:'.length) };
-    case 'unequip':
-      return { kind: 'unequip', slot: choice.id.slice('unequip:'.length) };
   }
 }
 

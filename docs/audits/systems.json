@@ -525,7 +525,6 @@
         "src/ui/ModalSheet.tsx",
         "src/ui/Pager.tsx",
         "src/ui/PlanePane.tsx",
-        "src/ui/Question.tsx",
         "src/ui/Splitter.tsx",
         "src/ui/StatusBanner.tsx",
         "src/ui/TabBar.tsx",
@@ -685,12 +684,11 @@
           "note": "produced by gui-draws-the-focused-plane: the focused plane read into rows and drawn above the option sheet, off PlayStatus.focus and never off a screen's name (c9/c10)"
         },
         {
-          "name": "where a question is drawn and what leaving it answers",
+          "name": "what leaving a screen answers",
           "paths": [
-            "src/ui/asking.ts",
-            "src/ui/Question.tsx"
+            "src/ui/asking.ts"
           ],
-          "note": "produced by a-row-acts-in-one-click-and-clicking-away-leaves-the-screen for crafting-modal c19 and c20; two decisions taken off published fields alone - which row of the page a question belongs to, so an entry's verbs come back under the entry, and what a click away from a sheet answers, which is the leaving value the Modal itself publishes. Question.tsx is the one thing that renders an option, drawn by the sheet and by the row alike, so an unheard-of screen is answerable through one component wherever it is put"
+          "note": "produced by a-row-acts-in-one-click-and-clicking-away-leaves-the-screen for crafting-modal c19: one decision taken off published fields alone - what a gesture away from the open screen answers, which is the leaving value the Modal itself publishes and nothing where it publishes none. Both gestures the GUI shell has, a click on the sheet's ground and a move to another page, go through it. The concept was registered with a second half, the row that owned its own question, and revert-the-inline-row-question-and-five-bugs-the-author-foun struck it with c20: src/ui/Question.tsx went back inside ModalSheet, which is the one thing drawing an option again"
         }
       ]
     },

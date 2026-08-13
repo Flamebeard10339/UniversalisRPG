@@ -696,19 +696,41 @@ describe('what the engine publishes', () => {
 
     expect(view(session).stats.might).toBe(4);
 
-    const armed = apply(session, 'equip:gauntlet');
+    applyDirective(session, { kind: 'equip', item: 'gauntlet' });
+    const armed = view(session);
     expect(armed.equipment).toEqual({ hand: 'gauntlet' });
     expect(armed.stats.might).toBe(7);
 
-    const bare = apply(session, 'unequip:hand');
+    applyDirective(session, { kind: 'unequip', slot: 'hand' });
+    const bare = view(session);
     expect(bare.equipment).toEqual({});
     expect(bare.stats.might).toBe(4);
+  });
+
+  // Wearing a thing and taking it off are what a copy takes rather than what it
+  // does, and the carried-items screen is where a copy's verbs are taken. A room
+  // offering them as well put the same act in two places and scoped an item to a
+  // location, which nothing about an item is.
+  it('offers no room-level way to wear a carried thing or take a worn one off', () => {
+    const session = primed(loadModule(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
+
+    expect(ids(view(session)).filter((id) => id.startsWith('equip:'))).toEqual([]);
+
+    applyDirective(session, { kind: 'equip', item: 'gauntlet' });
+    expect(ids(view(session)).filter((id) => id.startsWith('unequip:'))).toEqual([]);
+
+    // The screen that does own them still does, under the one name every
+    // surface spells a carried thing by.
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    submitModal(session, { item: 'Gauntlet (hand)' });
+    const asked = view(session).modals[0].options;
+    expect(asked[asked.length - 1].values).toContain('Unequip');
   });
 
   // Grown against a state and handed to the session as a save, so what is
   // under test is the published view of a copy rather than the verb that made
   // one; the verbs have their own describe below.
-  it('names a grown copy beside the stacks, and offers it as its own equip choice', () => {
+  it('names a grown copy beside the stacks, and offers it as its own row to wear', () => {
     const registry = loadModule(GROWN_MODULE);
     const grownState = createGameState('camp');
     Object.assign(grownState.inventory, { gauntlet: 2, oil: 1 });
@@ -721,22 +743,25 @@ describe('what the engine publishes', () => {
     const carried = view(session);
     expect(carried.inventory).toEqual({ gauntlet: 1 });
     expect(carried.grown).toEqual({ [grown.instance]: 'gauntlet' });
-    expect(ids(carried)).toContain(`equip:${grown.instance}`);
     expect(carried.stats.might).toBe(4);
 
     // c16: the world names a copy the one way every screen does — under a
-    // descriptor, and never under the id the choice itself carries.
+    // descriptor, and never under the id the row itself carries.
     expect(carried.carried).toEqual([
       { id: 'gauntlet', name: 'Gauntlet', count: 1, value: 'Gauntlet x1', grown: false },
       { id: grown.instance, name: 'Modified Gauntlet', count: 1, value: 'Modified Gauntlet', grown: true },
     ]);
-    expect(carried.choices.find((choice) => choice.id === `equip:${grown.instance}`)?.label).toBe('Equip Modified Gauntlet');
 
-    const armed = apply(session, `equip:${grown.instance}`);
+    applyDirective(session, { kind: 'equip', item: grown.instance });
+    const armed = view(session);
     expect(armed.equipment).toEqual({ hand: grown.instance });
     expect(armed.stats.might).toBe(7);
-    expect(ids(armed)).not.toContain(`equip:${grown.instance}`);
-    expect(armed.choices.find((choice) => choice.id === 'unequip:hand')?.label).toBe('Unequip Modified Gauntlet');
+    // The worn copy leaves the carried side and is named there instead (c21),
+    // still under the id that says which of the two the player meant.
+    expect(armed.carried).toEqual([
+      { id: 'gauntlet', name: 'Gauntlet', count: 1, value: 'Gauntlet x1', grown: false },
+      { id: grown.instance, name: 'Modified Gauntlet', count: 1, value: 'Modified Gauntlet (hand)', grown: true, slot: 'hand' },
+    ]);
   });
 
   it('carries skill xp as it is earned', () => {
