@@ -13,7 +13,7 @@ export type Moment = keyof HookCarrier;
 // unequipped item is not on that walk, so its hook reaches nobody.
 export function characterHooks(state: GameState, registry: Registry, actorId: string, moment: Moment): ActionResult[][] {
   return modifierCarriers(state, registry, actorId)
-    .map((carrier) => carrier.hooks[moment])
+    .map((carrier) => carrier.hooks?.[moment] ?? [])
     .filter((results) => results.length > 0);
 }
 

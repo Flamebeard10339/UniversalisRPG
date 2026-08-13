@@ -113,6 +113,17 @@ on death:
     give: 1 ear
     restore: 3 fury
 
+# entity boss
+title: Boss
+stats: max-health 40, max-fury 0, attack 1, attack-rate 60, aim 1000, dodge 0
+uses: swing
+allies: minion
+
+# entity minion
+title: Minion
+stats: max-health 5, max-fury 0, attack 1, attack-rate 60, aim 1000, dodge 0
+uses: swing
+
 # entity anvil
 title: Anvil
 stats: max-health 100, max-fury 0, attack-rate 60, aim 1000, dodge 0
@@ -124,7 +135,7 @@ pry:
 # location arena
 x: 0, y: 0
 starting
-entities: dummy, biter, anvil
+entities: dummy, biter, boss, minion, anvil
 `;
 
 const loaded = (): Registry => loadModule(MODULE);
@@ -315,6 +326,25 @@ describe('depletion is decided after the hooks, over everyone they reached (c9)'
     expect(state.activeAction).not.toBeNull();
     expect(foeHealth(state, 'biter')).toBe(3);
     expect(state.inventory['ear']).toBeUndefined();
+  });
+
+  it('takes a character a hook felled out of the fight it was not the target of', () => {
+    const registry = loaded();
+    const state = arena(registry);
+    wearing(registry, state, 'briar-mail');
+    armFightAction('swing', 'boss', registry, state);
+    expect(Object.keys(state.activeAction!.actors!).sort()).toEqual(['boss', 'minion']);
+
+    // The minion's own swing is answered by the mail for the whole of its
+    // pool, and the boss is who the fight is measured on, so the fight stands.
+    resolve(state, registry, secondsToMs(3));
+    expect(state.activeAction).not.toBeNull();
+    expect(Object.keys(state.activeAction!.roster!).sort()).toEqual([PLAYER, 'boss'].sort());
+    expect(Object.keys(state.activeAction!.actors!)).toEqual(['boss']);
+    expect(state.activeAction!.cadences['minion']).toBeUndefined();
+    // It swung once and never again.
+    expect(state.log.filter((line) => line.startsWith('The Minion hits you'))).toHaveLength(1);
+    expect(state.log.filter((line) => line.startsWith('The Boss hits you'))).toHaveLength(3);
   });
 
   it('fells a swinger with what it struck, and ends the fight because it was the target', () => {

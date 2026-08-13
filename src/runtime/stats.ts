@@ -77,12 +77,18 @@ function ownStores(state: GameState, actorId: string): { buffs: ActiveBuff[]; eq
 }
 
 // What a character carries a modifier on, and the order a fold reads them in:
-// its own sheet first, then each equipped item it still carries. A stat bonus
-// and a hook are read off this one walk, so a passive or a buff becomes a
-// carrier of both by joining it rather than by a gather of its own.
+// its own sheet, then what is buffing it, then each equipped item it still
+// carries. A stat bonus and a hook are read off this one walk, so a source
+// appears on it once and joins as a carrier of both at once. A skill's
+// `per-level:` is not here because it is a declaration on `# skill` rather
+// than a thing carried, and the performing action is not here because an
+// action is a verb and no character carries it.
 export interface ModifierCarrier {
-  hooks: HookCarrier;
+  // Absent where the source cannot hold a hook block, which today is a buff:
+  // what it grants is an amount the engine wrote, not an authored section.
+  hooks?: HookCarrier;
   tags: readonly TagClause[];
+  buff?: ActiveBuff;
   // The equipment slot's id, where the carrier is a worn item: what a grown
   // plane pays out is read off the copy rather than off the template.
   wornId?: string;
@@ -92,12 +98,20 @@ export function modifierCarriers(state: GameState, registry: Registry, actorId: 
   const carriers: ModifierCarrier[] = [];
   const entity = actorEntity(registry, actorId);
   if (entity) carriers.push({ hooks: entity, tags: [] });
-  for (const wornId of ownStores(state, actorId).equipped) {
+  const own = ownStores(state, actorId);
+  for (const buff of own.buffs) carriers.push({ buff, tags: [] });
+  for (const wornId of own.equipped) {
     if (!carriesItem(state, wornId)) continue;
     const item = registry.items.get(itemTemplate(state, wornId));
     if (item) carriers.push({ hooks: item, tags: item.tags, wornId });
   }
   return carriers;
+}
+
+function foldBuff(buff: ActiveBuff, statId: string, fold: StatFold): void {
+  if (buff.statId !== statId) return;
+  if (buff.kind === 'added') fold.added = addRanges(fold.added, buff.amount);
+  else fold.increased += buff.amount;
 }
 
 // Which skills an actor has is the entity's to say, so a skill sheet is read off
@@ -123,15 +137,10 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
     added: actorEntity(registry, actorId)?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0),
     increased: 0,
   };
-  const own = ownStores(state, actorId);
-  foldSkillLevels(registry, actorId, statId, own.xp, fold);
-  for (const buff of own.buffs) {
-    if (buff.statId !== statId) continue;
-    if (buff.kind === 'added') fold.added = addRanges(fold.added, buff.amount);
-    else fold.increased += buff.amount;
-  }
+  foldSkillLevels(registry, actorId, statId, ownStores(state, actorId).xp, fold);
   foldStatBonuses(performing(state, registry, actorId)?.tags ?? [], statId, fold, state, actorId);
   for (const carrier of modifierCarriers(state, registry, actorId)) {
+    if (carrier.buff) foldBuff(carrier.buff, statId, fold);
     foldStatBonuses(carrier.tags, statId, fold, state, actorId);
     if (carrier.wornId !== undefined) foldPlanePayloads(registry, state, carrier.wornId, statId, fold);
   }

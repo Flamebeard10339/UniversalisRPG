@@ -206,6 +206,11 @@ slot: body
 # item plain-blade
 slot: head
 +2 attack
+
+# entity ogre
+swing:
+  time: 1
+  +5 attack per fury
 `;
 
 describe('a stat bonus scaled by a counter', () => {
@@ -245,5 +250,24 @@ describe('a stat bonus scaled by a counter', () => {
   it('grants nothing at all where the counter is empty, rather than a flat bonus', () => {
     const { registry, state } = wearing('fury-blade');
     expect(statRange('attack', state, registry)).toEqual(point(4));
+  });
+
+  it('reads the counter off the character being evaluated, not off the player', () => {
+    const { registry, state } = wearing();
+    restorePools(state, { fury: toMilliUnits(3) });
+    state.activeAction = {
+      ownerRef: 'entity.ogre',
+      actionLabel: 'swing',
+      repeating: false,
+      implicitTarget: IMPLICIT_TARGET_FULL,
+      cadences: { ogre: newCadence() },
+      roster: { ogre: { ownerRef: 'entity.ogre', actionLabel: 'swing', target: PLAYER } },
+      actors: { ogre: { resources: { fury: toMilliUnits(4) }, rateRemainders: {} } },
+    };
+
+    // The ogre's own swing carries the bonus and the ogre's own pool is the
+    // count: 4 + 5 x 4, and never 4 + 5 x the player's 3.
+    expect(statValue('attack', state, registry, 'ogre')).toBe(24);
+    expect(statValue('attack', state, registry)).toBe(4);
   });
 });
