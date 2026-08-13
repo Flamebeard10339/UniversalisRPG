@@ -3,7 +3,7 @@ import { restorePools } from './effects';
 import { createGameState, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadModule } from '../content/registry';
-import { answerModal, openModalNamed } from './modals';
+import { answerModal, ModalFrame, openModalNamed } from './modals';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
@@ -152,9 +152,26 @@ describe('loadSave', () => {
       [{ name: 'dialogue', answers: {} }],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'chat', node: 'greeting', resumeIndex: 1.5, replay: true } }],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'chat', node: 'greeting', resumeIndex: 1 } }],
+      [{ name: 'item-plane', answers: {}, target: 'charm' }],
+      [{ name: 'item-plane', answers: {}, hex: '0,0' }],
+      [{ name: 'item-plane', answers: {}, target: 'charm', hex: 0 }],
     ]) {
       expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { modals: body } as never }, registry), JSON.stringify(body)).toThrow(/modals holds/);
     }
+  });
+
+  // A frame carrying two ids of its own is a frame a `# save` can hold, so what
+  // it points at is checked on the way in rather than trusted.
+  it('carries a plane screen across a round trip while the copy it grows is still carried', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    state.inventory.charm = 1;
+    (state.modals as ModalFrame[]).push({ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' });
+
+    const { version, ...diff } = JSON.parse(serializeSave(state, registry));
+    const restored = createGameState();
+    expect(loadSave(restored, { version, diff }, registry)).toEqual([]);
+    expect(restored.modals).toEqual([{ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' }]);
   });
 
   it('closes a modal frame the loaded registry cannot answer, and says so, instead of restoring it', () => {
@@ -163,6 +180,8 @@ describe('loadSave', () => {
       [{ name: 'quest-journal', answers: {} }, 'Closed modal quest-journal because it is not a modal this engine knows.'],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'gone', node: 'greeting', resumeIndex: 1, replay: true } }, 'Closed modal dialogue because dialogue gone is not loaded.'],
       [{ name: 'character-creation', answers: { name: 'Rowan', race: 'Elf' } }, 'Closed modal character-creation because it was saved with every option already answered.'],
+      [{ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' }, 'Closed modal item-plane because it grows charm, which the player no longer carries.'],
+      [{ name: 'item-plane', answers: {}, target: '4', hex: '0,0' }, 'Closed modal item-plane because it grows 4, which the player no longer carries.'],
     ] as const) {
       const state = createGameState();
       const warnings = loadSave(state, { version: SAVE_VERSION, diff: { modals: [frame] } as never }, registry);

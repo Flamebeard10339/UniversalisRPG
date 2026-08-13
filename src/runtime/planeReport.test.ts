@@ -191,6 +191,35 @@ describe('planeReport', () => {
     expect(planeReport(registry, fed('blade', 1), '9')).toBeUndefined();
   });
 
+  // A growth verb spells its target either way a base is carried, so the report
+  // answers for both: a base still in its stack has the plane growing it mints.
+  it('reports the plane a base still in its stack would mint', () => {
+    const state = initialState(registry);
+    Object.assign(state.inventory, { blade: 1, 'plain-blade': 1 });
+
+    expect(planeReport(registry, state, 'blade')).toMatchObject({
+      instance: 'blade',
+      template: 'blade',
+      level: 1,
+      spent: 0,
+      remaining: 1,
+      clusters: [expect.objectContaining({ hex: '0,0', jewel: 'core' })],
+    });
+    expect(planeReport(registry, state, 'plain-blade')?.clusters[0]).toMatchObject({ hex: '0,0', jewel: 'base' });
+
+    // What is published per grown copy is unchanged: a stack is not a plane the
+    // player has, it is one they could have.
+    expect(planeReports(registry, state)).toEqual([]);
+  });
+
+  it('reports nothing for a stack the player has none of, and nothing for an item that is no base', () => {
+    const state = initialState(registry);
+    Object.assign(state.inventory, { whetstone: 1 });
+
+    expect(planeReport(registry, state, 'blade')).toBeUndefined();
+    expect(planeReport(registry, state, 'whetstone')).toBeUndefined();
+  });
+
   it('reports one plane per grown copy, in the order they were grown', () => {
     const state = initialState(registry);
     Object.assign(state.inventory, { blade: 1, 'plain-blade': 1, whetstone: 2 });

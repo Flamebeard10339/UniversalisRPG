@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule, Registry } from '../content/registry';
-import { answerModal, dialogueFrame, Modal, ModalFrame, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { answerModal, dialogueFrame, isModalFrame, Modal, ModalFrame, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { SAVE_VERSION } from './save';
 import { choose, createGameState, DialogueCursor, GameState, RuntimeError, talk } from './runtime';
 import { applyResultsNow } from './effects';
 import { apply, applyDirective, PlaySession, PlayStatus, startSession, submitModal, view } from './session';
@@ -472,5 +473,122 @@ describe('the carried-items screen, as a frame like any other', () => {
     const empty = half();
     expect(pruneModals(empty, registry)).toEqual([{ name: 'carried-items', reason: 'it has no item that takes "Rope x1"' }]);
     expect(empty.modals).toEqual([]);
+  });
+});
+
+const PLANE_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# cluster-jewel core
+shape: point
+open-connections: e
+
+# item blade
+title: Blade
+slot: mainhand
+max-level: 1
+origin-cluster: core
+
+# item whetstone
+title: Whetstone
+item-experience: 1000
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"blade":1,"whetstone":1}}
+`;
+
+// The inventory screen, with the copy already chosen, which is the one route
+// onto a plane screen there is.
+function openOnBlade(): PlaySession {
+  const session = startSession(loadModule(PLANE_MODULE));
+  applyDirective(session, { kind: 'load', save: 'stocked' });
+  applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+  applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Blade x1' });
+  return session;
+}
+
+describe('the plane screen, as a frame like any other', () => {
+  // c3: the screen replaces the one it was opened from rather than stacking a
+  // second one, and leaving it puts that one back with the copy still chosen.
+  // `submit` returning a frame is the whole mechanism; nothing else is built.
+  it('replaces the inventory frame, and returns one with that copy still selected', () => {
+    const session = openOnBlade();
+
+    expect(modalNames(view(session))).toEqual(['carried-items']);
+    submitModal(session, { verb: 'Grow' });
+    expect(modalNames(view(session))).toEqual(['item-plane']);
+
+    submitModal(session, { plane: 'Back to inventory' });
+    expect(modalNames(view(session))).toEqual(['carried-items']);
+    expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['verb']);
+  });
+
+  // c7: the refusal reaches the player on the screen they are looking at. The
+  // line grew() puts in the log is the directive path's and stays there; a
+  // player who had to scroll under the screen to find out would not be told.
+  it('states a refused growth on the screen it was refused on, and puts nothing under it', () => {
+    const session = openOnBlade();
+    submitModal(session, { verb: 'Grow' });
+    expect(view(session).modals[0].options[0].values).toContain('feed: with whetstone');
+
+    const refused = submitModal(session, { plane: 'feed: with whetstone' });
+    expect(modalNames(refused)).toEqual(['item-plane']);
+    expect(refused.modals[0].options[0].label).toBe('Blade at 0,0 — Blade is already at level 1, which is its maximum');
+    expect(refused.said).toEqual([]);
+    expect(refused.inventory).toEqual({ blade: 1, whetstone: 1 });
+  });
+
+  it('is not a screen a name alone can raise, because a name cannot say which copy', () => {
+    const session = startSession(loadModule(PLANE_MODULE));
+
+    expect(() => applyDirective(session, { kind: 'open-modal', modal: 'item-plane' })).toThrow(/not opened by name/);
+    expect(view(session).modals).toEqual([]);
+  });
+
+  it('tells two plane screens apart by the copy and the hexagon each holds', () => {
+    const state = createGameState('camp');
+
+    openModal(state, { name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' });
+    openModal(state, { name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' });
+    expect(state.modals).toHaveLength(1);
+
+    openModal(state, { name: 'item-plane', answers: {}, target: 'blade', hex: '1,0' });
+    openModal(state, { name: 'item-plane', answers: {}, target: 'other', hex: '0,0' });
+    expect(state.modals).toHaveLength(3);
+  });
+
+  it('closes a saved frame whose copy or hexagon the world no longer has', () => {
+    const registry = loadModule(PLANE_MODULE);
+    for (const [frame, reason] of [
+      [{ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' }, 'it grows blade, which the player no longer carries'],
+      [{ name: 'item-plane', answers: {}, target: 'rope', hex: '0,0' }, 'it grows rope, which the player no longer carries'],
+    ] as const) {
+      const state = createGameState('camp');
+      (state.modals as ModalFrame[]).push(frame);
+
+      expect(pruneModals(state, registry), JSON.stringify(frame)).toEqual([{ name: 'item-plane', reason }]);
+      expect(state.modals).toEqual([]);
+    }
+  });
+
+  it('keeps a saved frame whose copy is still carried', () => {
+    const registry = loadModule(PLANE_MODULE);
+    const state = createGameState('camp');
+    state.inventory.blade = 1;
+    (state.modals as ModalFrame[]).push({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' });
+
+    expect(pruneModals(state, registry)).toEqual([]);
+    expect(names(state)).toEqual(['item-plane']);
+  });
+
+  it('refuses a saved body that is not a plane frame', () => {
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' })).toBe(true);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0', said: 'no' })).toBe(true);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade' })).toBe(false);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, hex: '0,0' })).toBe(false);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: 7 })).toBe(false);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0', said: 7 })).toBe(false);
   });
 });

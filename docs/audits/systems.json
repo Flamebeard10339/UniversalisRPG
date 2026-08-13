@@ -218,6 +218,8 @@
         "src/runtime/equipment.ts",
         "src/runtime/fight.test.ts",
         "src/runtime/forwardProgress.ts",
+        "src/runtime/growth.test.ts",
+        "src/runtime/growth.ts",
         "src/runtime/instances.test.ts",
         "src/runtime/instances.ts",
         "src/runtime/integration.test.ts",
@@ -232,6 +234,8 @@
         "src/runtime/modals.ts",
         "src/runtime/planeReport.test.ts",
         "src/runtime/planeReport.ts",
+        "src/runtime/planeScreen.test.ts",
+        "src/runtime/planeScreen.ts",
         "src/runtime/population.ts",
         "src/runtime/recipe.test.ts",
         "src/runtime/resolve.test.ts",
@@ -394,6 +398,22 @@
             "src/runtime/carriedScreen.test.ts"
           ],
           "note": "produced by inventory-frame"
+        },
+        {
+          "name": "the plane screen",
+          "paths": [
+            "src/runtime/planeScreen.ts",
+            "src/runtime/planeScreen.test.ts"
+          ],
+          "note": "produced by plane-frame: the item-plane ModalFrame member, its listed values as growth directives with what the frame holds prefilled, its refusal, and its return to the inventory frame"
+        },
+        {
+          "name": "the growth dispatch",
+          "paths": [
+            "src/runtime/growth.ts",
+            "src/runtime/growth.test.ts"
+          ],
+          "note": "produced by plane-frame: which of the four growth verbs a directive names, reached from a parsed directive or from a line through the one parser, below every caller"
         }
       ]
     },
