@@ -428,6 +428,17 @@ describe('growing a copy the player is wearing', () => {
     expect(carriedCount(state, 'iron-sword')).toBe(1);
   });
 
+  // The copy came out of the slot, so the stack is not where it came from and is
+  // not touched — including a stack that was never written down at all.
+  it('leaves the stack alone when it mints out of a slot', () => {
+    const state = carrying({ whetstone: 1 });
+    state.equipped.mainhand = 'iron-sword';
+
+    expect(feedItem(state, registry, 'iron-sword', 'whetstone')).toEqual({ ok: true, instance: '1' });
+    expect(state.equipped).toEqual({ mainhand: '1' });
+    expect(state.inventory).toEqual({ whetstone: 0 });
+  });
+
   it('refuses an item the player neither carries nor wears', () => {
     const state = carrying({ whetstone: 1 });
 

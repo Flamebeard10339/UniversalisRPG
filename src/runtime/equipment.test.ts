@@ -209,6 +209,8 @@ describe('carried and worn are disjoint', () => {
     unequip(state, 'mainhand');
     expect(carriedCount(state, 'attack-bonus')).toBe(1);
     expect(carriesItem(state, grownId)).toBe(true);
+    // A grown copy is in no stack, so neither move writes one under its id.
+    expect(state.inventory).toEqual({ 'attack-bonus': 0, whetstone: 0 });
   });
 
   // A slot that is filled while it is occupied is two moves of one copy each:

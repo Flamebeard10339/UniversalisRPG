@@ -104,4 +104,13 @@ describe('what the player is wearing, as rows', () => {
   it('falls back to the id for a slot holding something the player no longer carries', () => {
     expect(worn({ mainhand: '9' }, [])).toEqual([{ name: 'mainhand', value: '9' }]);
   });
+
+  // c21: one copy, one page. The engine says which side a row is on and this
+  // page is the one that draws the worn side, so the carried page draws the rest.
+  it('leaves the worn rows to this page and off the one that lists what is carried', () => {
+    const rows = [row({ id: 'blade', name: 'Blade', count: 2, value: 'Blade x2' }), row({ id: 'blade', name: 'Blade', value: 'Blade (mainhand)', slot: 'mainhand' })];
+
+    expect(carried(rows, []).map((entry) => entry.value)).toEqual(['2']);
+    expect(worn({ mainhand: 'blade' }, rows)).toEqual([{ name: 'mainhand', value: 'Blade' }]);
+  });
 });

@@ -191,12 +191,12 @@ export function planeReport(registry: Registry, state: GameState, target: string
 }
 
 // Every plane the player has, whichever way they have it: a grown copy under its
-// own id, a base still in its stack under the item's, and whatever fills a slot
-// under the spelling that slot holds. All three are addressable by the growth
-// verbs and all three are what a screen can be opened on, so publishing only the
-// grown ones would leave a focus pointing at a plane no driver could find, and
-// publishing only the carried ones would lose the plane of what is worn (c21).
+// own id and a base under the item's, whether that base is in a stack or in a
+// slot — `itemCopies` counts both sides of c21, so a worn base is among its keys
+// and needs no reading of `equipped` here. All are addressable by the growth
+// verbs and all are what a screen can be opened on, so publishing only the grown
+// ones would leave a focus pointing at a plane no driver could find.
 export function planeReports(registry: Registry, state: GameState): PlaneReport[] {
-  const targets = new Set([...Object.keys(grownItems(state)), ...itemCopies(state).keys(), ...Object.values(state.equipped)]);
-  return [...targets].flatMap((id) => planeReport(registry, state, id) ?? []);
+  const stacks = [...itemCopies(state).keys()];
+  return [...Object.keys(grownItems(state)), ...stacks].flatMap((id) => planeReport(registry, state, id) ?? []);
 }

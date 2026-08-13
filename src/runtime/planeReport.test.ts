@@ -3,6 +3,7 @@ import { loadModule } from '../content/registry';
 import { Direction } from '../content/hex';
 import { applyClusterEffect } from './clusterEffect';
 import { ORIGIN } from './clusterPlane';
+import { equip } from './equipment';
 import { allocate, feedItem, Growth, slotJewel } from './itemInstance';
 import { ClusterReport, PlaneReport, planeReport, planeReports, PositionReport, SlotReport } from './planeReport';
 import { initialState } from './save';
@@ -250,6 +251,19 @@ describe('planeReport', () => {
 
   it('reports an empty list when nothing has been grown', () => {
     expect(planeReports(registry, initialState(registry))).toEqual([]);
+  });
+
+  // c21 took the worn copy out of its stack, so a base whose only copy is on the
+  // player is a plane a screen can still be opened on and one no other read here
+  // would reach.
+  it('reports the plane of a base the player is wearing, with no stack left behind it', () => {
+    const state = initialState(registry);
+    Object.assign(state.inventory, { blade: 1 });
+    equip(state, registry, 'blade');
+
+    expect(state.inventory.blade).toBe(0);
+    expect(planeReport(registry, state, 'blade')).toMatchObject({ instance: 'blade', template: 'blade', spent: 0 });
+    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['blade']);
   });
 
   it('publishes what the copy is worth per stat, so a screen states it rather than adding the clusters up', () => {
