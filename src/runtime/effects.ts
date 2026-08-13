@@ -1,4 +1,4 @@
-import { ActionResult, DropRow, nestedResults } from '../grammar/actionResult';
+import { ActionResult, DropRow, nestedResults, Party } from '../grammar/actionResult';
 import { DISCOVERED } from '../content/location';
 import { DropTable } from '../content/dropTable';
 import { EventTrigger, GameEvent } from '../content/event';
@@ -27,6 +27,10 @@ export interface Segment {
   // Who a `credit:` inside a handler moves its results to. The moment supplies
   // it, which is why an author never names one.
   credit?: string;
+  // Which character a hook's `me` and `them` name, for as long as one is
+  // firing. Absent outside that moment, which is the only moment the grammar
+  // lets a result name a party in.
+  parties?: { readonly [P in Party]: string };
 }
 export type PoolDeltas = Map<string, Map<string, number>>;
 
@@ -182,6 +186,12 @@ export function spreadDiscovery(state: GameState, registry: Registry): void {
   }
 }
 
+// Whose pool an amount moves. An unmarked result lands on whoever the list is
+// being applied to, which under a hook is the carrier that wrote it.
+function subjectOf(segment: Segment, party: Party | undefined, actor: string): string {
+  return party === undefined ? actor : segment.parties?.[party] ?? actor;
+}
+
 function applyOne(segment: Segment, result: ActionResult, actor: string, count: number, lead: boolean): number | undefined {
   const { state, registry } = segment;
   switch (result.kind) {
@@ -229,7 +239,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     case 'pool': {
       requireResource(registry, result.resource);
       const milliAmount = toMilliUnits(drawAmount(state, result.delta)) * count;
-      addDelta(segment.deltas, actor, result.resource, milliAmount);
+      addDelta(segment.deltas, subjectOf(segment, result.party, actor), result.resource, milliAmount);
       return milliAmount;
     }
     case 'stop':

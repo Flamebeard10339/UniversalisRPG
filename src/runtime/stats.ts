@@ -10,8 +10,9 @@ import { nextRandom } from './rng';
 import { skillLevel } from './skills';
 import { ActiveBuff, GameState, PLAYER, RuntimeError } from './state';
 import { contestSpread, defaultActionDuration, minDamage } from './tuning';
-import { MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
+import { fromMilliUnits, MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
 import { BonusAmount, TagClause } from '../grammar/tagClause';
+import { HookCarrier } from '../grammar/hook';
 
 // Difficulty is a stat, never an authored probability, so gear and buffs move it.
 export function hitChance(accuracy: number, evasion: number, registry: Registry): number {
@@ -36,8 +37,19 @@ function foldBonus(bonus: BonusAmount, fold: StatFold, times: number): void {
   else fold.added = addRanges(fold.added, scaled.amount);
 }
 
-function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatFold): void {
-  for (const tag of tags) if (tag.kind === 'stat-bonus' && tag.statId === statId) foldBonus(tag, fold, 1);
+// A resource's level, beside a skill's, as a source for the count `foldBonus`
+// already multiplies by. Floored, because `per rage` is per point of it, and
+// zero for an actor holding no such pool.
+function counterLevel(state: GameState, actorId: string, resourceId: string): number {
+  const levels = actorId === PLAYER ? state.resources : state.activeAction?.actors?.[actorId]?.resources;
+  return Math.floor(fromMilliUnits(levels?.[resourceId] ?? 0));
+}
+
+function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatFold, state: GameState, actorId: string): void {
+  for (const tag of tags) {
+    if (tag.kind !== 'stat-bonus' || tag.statId !== statId) continue;
+    foldBonus(tag, fold, tag.per === undefined ? 1 : counterLevel(state, actorId, tag.per));
+  }
 }
 
 // A worn item that was grown adds no channel and no arithmetic (c18): what its
@@ -62,6 +74,30 @@ function foldPlanePayloads(registry: Registry, state: GameState, wornId: string,
 function ownStores(state: GameState, actorId: string): { buffs: ActiveBuff[]; equipped: string[]; xp: Record<string, number> } {
   const stored = actorId === PLAYER;
   return { buffs: stored ? Object.values(state.activeBuffs) : [], equipped: stored ? Object.values(state.equipped) : [], xp: stored ? state.xp : {} };
+}
+
+// What a character carries a modifier on, and the order a fold reads them in:
+// its own sheet first, then each equipped item it still carries. A stat bonus
+// and a hook are read off this one walk, so a passive or a buff becomes a
+// carrier of both by joining it rather than by a gather of its own.
+export interface ModifierCarrier {
+  hooks: HookCarrier;
+  tags: readonly TagClause[];
+  // The equipment slot's id, where the carrier is a worn item: what a grown
+  // plane pays out is read off the copy rather than off the template.
+  wornId?: string;
+}
+
+export function modifierCarriers(state: GameState, registry: Registry, actorId: string): ModifierCarrier[] {
+  const carriers: ModifierCarrier[] = [];
+  const entity = actorEntity(registry, actorId);
+  if (entity) carriers.push({ hooks: entity, tags: [] });
+  for (const wornId of ownStores(state, actorId).equipped) {
+    if (!carriesItem(state, wornId)) continue;
+    const item = registry.items.get(itemTemplate(state, wornId));
+    if (item) carriers.push({ hooks: item, tags: item.tags, wornId });
+  }
+  return carriers;
 }
 
 // Which skills an actor has is the entity's to say, so a skill sheet is read off
@@ -94,12 +130,10 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
     if (buff.kind === 'added') fold.added = addRanges(fold.added, buff.amount);
     else fold.increased += buff.amount;
   }
-  foldStatBonuses(performing(state, registry, actorId)?.tags ?? [], statId, fold);
-  for (const wornId of own.equipped) {
-    if (!carriesItem(state, wornId)) continue;
-    const item = registry.items.get(itemTemplate(state, wornId));
-    if (item) foldStatBonuses(item.tags, statId, fold);
-    foldPlanePayloads(registry, state, wornId, statId, fold);
+  foldStatBonuses(performing(state, registry, actorId)?.tags ?? [], statId, fold, state, actorId);
+  for (const carrier of modifierCarriers(state, registry, actorId)) {
+    foldStatBonuses(carrier.tags, statId, fold, state, actorId);
+    if (carrier.wornId !== undefined) foldPlanePayloads(registry, state, carrier.wornId, statId, fold);
   }
   return scaleRange(fold.added, 1 + fold.increased);
 }

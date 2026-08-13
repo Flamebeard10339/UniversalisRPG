@@ -216,6 +216,8 @@
         "src/runtime/equipment.ts",
         "src/runtime/fight.test.ts",
         "src/runtime/forwardProgress.ts",
+        "src/runtime/hooks.test.ts",
+        "src/runtime/hooks.ts",
         "src/runtime/instances.test.ts",
         "src/runtime/instances.ts",
         "src/runtime/integration.test.ts",
@@ -367,6 +369,13 @@
             "src/runtime/itemInstance.ts"
           ],
           "note": "produced by growing-an-item-revokes-every-has-gate-recipe-and-cost-that-"
+        },
+        {
+          "name": "combat hook firing",
+          "paths": [
+            "src/runtime/hooks.ts"
+          ],
+          "note": "produced by combat-hook-firing"
         }
       ]
     },
