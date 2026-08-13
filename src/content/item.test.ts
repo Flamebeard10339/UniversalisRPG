@@ -65,6 +65,18 @@ describe('# item cluster-effect:', () => {
   it('rejects a stat that does not resolve', () => {
     expect(() => loadModule('# item orb\ncluster-effect: +25% nope')).toThrow(/# item orb cluster-effect: names an unknown stat: nope/);
   });
+
+  // c9: a base and an orb are exclusive roles, the way a base and a jewel
+  // already are — an item claiming both would be a plane and, at the same
+  // time, consumable into someone else's.
+  it('refuses an item declaring both slot: and cluster-effect:, since a base has no orb role', () => {
+    expect(() => loadModule('# stat max-health\n\n# item warding-blade\nslot: mainhand\ncluster-effect: +25% max-health')).toThrow(/# item warding-blade: cluster-effect: makes warding-blade an orb, which is exclusive with the slot: that makes it a base/);
+  });
+
+  it('refuses an item declaring both origin-cluster: and cluster-effect:, for the same reason one field over', () => {
+    const JEWEL = ['# stat max-health', '# passive hale', '# cluster-jewel keen-edge', 'shape: point', 'open-connections: e', 'passives: 1 hale'].join('\n');
+    expect(() => loadModule([JEWEL, '# item warding-orb', 'origin-cluster: keen-edge', 'cluster-effect: +25% max-health'].join('\n'))).toThrow(/# item warding-orb: cluster-effect: makes warding-orb an orb, which is exclusive with the origin-cluster: that makes it a base/);
+  });
 });
 
 describe('# item item-experience: and max-level:', () => {

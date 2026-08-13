@@ -57,12 +57,16 @@ export function isBase(item: Item): boolean {
   return item.slot !== undefined;
 }
 
-// c10's exclusion, asked of one assembled item: `cluster-jewel:` says the item
-// is a jewel, `slot:` and `origin-cluster:` say it is a base with a plane, and
-// an item claiming both roles would be consumed by the growth it can undergo.
+// c9's roles, asked of one assembled item: `cluster-jewel:` says the item is a
+// jewel and `cluster-effect:` says it is an orb, `slot:` and `origin-cluster:`
+// say it is a base with a plane, and an item claiming a base role alongside a
+// jewel or orb role would be consumed by the growth it can undergo.
 export function itemRoleProblem(item: Item): string | undefined {
   if (item.clusterJewel !== undefined && (isBase(item) || item.originCluster !== undefined)) {
     return `cluster-jewel: makes ${item.id} a jewel, which is exclusive with the ${isBase(item) ? 'slot:' : 'origin-cluster:'} that makes it a base`;
+  }
+  if (item.clusterEffect !== undefined && (isBase(item) || item.originCluster !== undefined)) {
+    return `cluster-effect: makes ${item.id} an orb, which is exclusive with the ${isBase(item) ? 'slot:' : 'origin-cluster:'} that makes it a base`;
   }
   if (item.originCluster !== undefined && !isBase(item)) {
     return `origin-cluster: is the cluster hex (0,0) of ${item.id}'s plane, and only a base has one: give it a slot: or drop the field`;

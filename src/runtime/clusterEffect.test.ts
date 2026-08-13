@@ -210,6 +210,17 @@ describe('applying a cluster effect', () => {
     expect(state.inventory).toEqual({ 'node-jewel': 3, 'lesser-orb': 1 });
     expect(state.instances.byId).toEqual({});
   });
+
+  // c9's orb third of "a consumable, a jewel and an orb have no plane": an
+  // orb declares no `slot:` either, so it is exactly as inert a target as the
+  // jewel case above.
+  it('refuses an orb in inventory as its target, leaving both items stacked and uninstanced', () => {
+    const state = carrying({ 'lesser-orb': 1, 'greater-orb': 1 });
+    expect(applyClusterEffect(state, registry, 'lesser-orb', 'greater-orb', ORIGIN)).toEqual({ ok: false, refused: 'lesser-orb is not a base: only an item you can wear has a plane to grow' });
+
+    expect(state.inventory).toEqual({ 'lesser-orb': 1, 'greater-orb': 1 });
+    expect(state.instances.byId).toEqual({});
+  });
 });
 
 describe('the worked case the reader will check', () => {
