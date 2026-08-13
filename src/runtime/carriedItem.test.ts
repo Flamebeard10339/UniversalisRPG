@@ -36,6 +36,11 @@ temper:
   instant
   take: 1 blade
   say: She quenches the blade and hands it back.
+grind:
+  continuous
+  time: 1
+  take: 1 blade
+  give: 1 sharp-blade
 
 # recipe sharpen
 in: 1 blade
@@ -114,6 +119,17 @@ describe('a grown copy is never spent', () => {
     expect(played.said).not.toContain('She quenches the blade and hands it back.');
     expect(played.grown).toEqual({ '1': 'blade' });
     expect(played.equipment.mainhand).toBe('1');
+  });
+
+  it('stops a repeating action when the stack runs dry, rather than running on nothing', () => {
+    const session = grownFrom('two-blades');
+    applyDirective(session, { kind: 'begin', inner: { kind: 'use', obj: 'entity', objId: 'smith', actionId: 'grind' } });
+    applyDirective(session, { kind: 'wait', seconds: 30 });
+
+    const played = view(session);
+    expect(played.inventory['sharp-blade']).toBe(1);
+    expect(played.inventory.blade).toBeUndefined();
+    expect(played.grown).toEqual({ '1': 'blade' });
   });
 
   it('spends the stack, and only the stack, when one is still there', () => {
