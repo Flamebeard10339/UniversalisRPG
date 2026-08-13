@@ -57,10 +57,12 @@ export function carried(rows: readonly CarriedRow[], planes: readonly Plane[]): 
 }
 
 // What is worn, slot by slot: the slot is the row and what fills it is the
-// value, named the one way every surface names a carried thing.
+// value, named the one way every surface names a carried thing. The row is of
+// the copy filling the slot rather than of the slot, because a verb names the
+// copy and c21 leaves a worn one reachable from nowhere else.
 export function worn(equipment: Record<string, string>, rows: readonly CarriedRow[]): Entry[] {
   const named = new Map(rows.map((row) => [row.id, row.name]));
   return Object.entries(equipment)
-    .map(([slot, id]) => ({ name: slot, value: named.get(id) ?? id }))
+    .map(([slot, id]) => ({ id, name: slot, value: named.get(id) ?? id }))
     .sort(byName);
 }

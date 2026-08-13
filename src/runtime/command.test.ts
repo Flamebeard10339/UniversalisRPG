@@ -332,7 +332,7 @@ describe('the commands a player plays with', () => {
     const opened = runLine(ctx, '/inv');
     expect(kinds(opened)).toEqual(['view']);
     expect(opened.recorded).toEqual(['open-modal: carried-items']);
-    expect(opened.view?.modals).toEqual([{ name: 'carried-items', options: [{ key: 'item', label: 'Item', values: ['Gauntlet x1', 'Close'] }] }]);
+    expect(opened.view?.modals).toEqual([{ name: 'carried-items', leaving: 'Close', options: [{ key: 'item', label: 'Item', values: ['Gauntlet x1', 'Close'] }] }]);
   });
 
   // c1: the argument a GUI row hands over is the same dispatch a player types,

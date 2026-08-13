@@ -204,7 +204,7 @@ node greeting:
     const session = startSession(registry);
 
     let v = apply(session, 'use:entity.mirror.look in');
-    expect(v.modals).toEqual([{ name: 'character-creation', options: [
+    expect(v.modals).toEqual([{ name: 'character-creation', leaving: null, options: [
       { key: 'name', label: 'Name', values: null },
       { key: 'race', label: 'Race', values: ['Human', 'Elf', 'Dwarf', 'Orc'] },
     ] }]);

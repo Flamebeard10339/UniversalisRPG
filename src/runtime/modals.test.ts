@@ -194,7 +194,7 @@ describe('the modal stack', () => {
     const session = stackingSession();
     const published: Modal = apply(session, 'talk:sage').modals[0];
 
-    expect(Object.keys(published).sort()).toEqual(['name', 'options']);
+    expect(Object.keys(published).sort()).toEqual(['leaving', 'name', 'options']);
     for (const option of published.options) expect(Object.keys(option).sort()).toEqual(['key', 'label', 'values']);
   });
 
@@ -425,6 +425,9 @@ starting
 
 # item rope
 title: Rope
+
+# save coiled
+{"version":${SAVE_VERSION},"inventory":{"rope":1}}
 `;
 
 // c2: the screen is a member of the closed union, so what proves it is a modal
@@ -623,5 +626,56 @@ describe('the plane screen, as a frame like any other', () => {
     expect(isModalFrame({ name: 'item-plane', answers: {}, hex: '0,0' })).toBe(false);
     expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: 7 })).toBe(false);
     expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0', said: 7 })).toBe(false);
+  });
+});
+
+// c15 as a published word rather than a rule each screen keeps to itself: what
+// leaves a screen has to be readable off the screen, or a driver offering the
+// way out is a driver holding a table of which screen leaves by which word.
+describe('the value a screen leaves by', () => {
+  // The invariant that makes it answerable at all: every question the screen is
+  // still asking lists it, so whichever one the player is on, the way out is one
+  // of the answers to that one.
+  const leaves = (status: PlayStatus): { leaving: string | null; listed: boolean } => {
+    const modal = status.modals[status.modals.length - 1];
+    return { leaving: modal.leaving, listed: modal.options.every((option) => option.values?.includes(modal.leaving ?? '') ?? false) };
+  };
+
+  it('is listed on every question the inventory asks, and takes it down from any of them', () => {
+    const session = startSession(loadModule(CARRIED_MODULE));
+    applyDirective(session, { kind: 'load', save: 'coiled' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+
+    expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['item']);
+    expect(leaves(view(session))).toEqual({ leaving: 'Close', listed: true });
+
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Rope x1' });
+    expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['verb']);
+    expect(leaves(view(session))).toEqual({ leaving: 'Close', listed: true });
+
+    applyDirective(session, { kind: 'submit-modal', key: 'verb', value: 'Close' });
+    expect(view(session).modals).toEqual([]);
+  });
+
+  it('is the word the plane screen leaves by, and goes back rather than closing the world', () => {
+    const session = openOnBlade();
+    submitModal(session, { verb: 'Grow' });
+
+    expect(leaves(view(session))).toEqual({ leaving: 'Back to inventory', listed: true });
+
+    submitModal(session, { plane: view(session).modals[0].leaving! });
+    expect(modalNames(view(session))).toEqual(['carried-items']);
+  });
+
+  // The other half of c19: a screen no answer leaves publishes nothing for a way
+  // out to say, so there is nothing a gesture could answer on its behalf.
+  it('is nothing for a screen answering cannot leave', () => {
+    const session = stackingSession();
+    const opened = apply(session, 'talk:sage');
+
+    expect(opened.modals.map((modal) => [modal.name, modal.leaving])).toEqual([
+      ['character-creation', null],
+      ['dialogue', null],
+    ]);
   });
 });

@@ -463,7 +463,7 @@ function parseDirective(line: string, ctx: CommandContext): Directive | null | C
 
 // The one option a driver is waiting on: the first unanswered of the topmost
 // modal, since the ones beneath it are covered over until that is cleared.
-export function askedOption(modals: Modal[]): ModalOption | undefined {
+export function askedOption(modals: readonly Modal[]): ModalOption | undefined {
   return modals[modals.length - 1]?.options[0];
 }
 

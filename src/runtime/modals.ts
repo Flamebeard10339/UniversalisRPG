@@ -1,6 +1,6 @@
 import { choose, cursorProblem, DialogueCursor, menuTexts } from './dialogue-runtime';
-import { carriedFrame, carriedOptions, carriedSubmit } from './carriedScreen';
-import { isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
+import { carriedFrame, carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
+import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
 import { type PlaneFocus } from './planeReport';
 import { GameState, RuntimeError } from './state';
 import { Registry } from '../content/registry';
@@ -17,11 +17,16 @@ export interface ModalOption {
   values: readonly string[] | null;
 }
 
-// The whole of what leaves src/runtime: a name, and the options still to be
-// answered. A driver can render a modal it has never heard of from this alone.
+// The whole of what leaves src/runtime: a name, the options still to be
+// answered, and the value that answering any of them with takes the screen
+// down. A driver can render a modal it has never heard of from this alone, and
+// can offer the way out of one without knowing which screen it is looking at.
 export interface Modal {
   name: string;
   options: readonly ModalOption[];
+  // c15's leaving value, as a word rather than as a rule: null for a screen
+  // that publishes none, which is a screen no gesture can take down either.
+  leaving: string | null;
 }
 
 export type ModalAnswers = Readonly<Record<string, string>>;
@@ -54,6 +59,10 @@ interface ModalDefinition<F extends ModalFrame> {
   // one. A member that declares none is a screen with nothing beside its options,
   // which is what keeps a driver from having to know which member is which.
   focus?(frame: F): PlaneFocus;
+  // The value this screen leaves by (c15), listed on every option it publishes.
+  // A member that declares none is a screen answering cannot leave, which is
+  // what a driver reads to know there is nothing for a way out to say.
+  leaves?: string;
 }
 
 const RACES = ['Human', 'Elf', 'Dwarf', 'Orc'];
@@ -78,6 +87,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     open: () => carriedFrame(),
     options: (frame, state, registry) => carriedOptions(frame.answers, state, registry),
     submit: (frame, state, registry) => carriedSubmit(frame.answers, state, registry),
+    leaves: LEAVE,
   },
   'item-plane': {
     open: () => null,
@@ -87,6 +97,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     stale: planeStale,
     same: samePlane,
     focus: planeFocus,
+    leaves: BACK,
   },
   dialogue: {
     open: () => null,
@@ -166,7 +177,11 @@ function allOptions(frame: ModalFrame, state: GameState, registry: Registry): re
 }
 
 export function publishModal(frame: ModalFrame, state: GameState, registry: Registry): Modal {
-  return { name: frame.name, options: allOptions(frame, state, registry).filter((option) => !(option.key in frame.answers)) };
+  return {
+    name: frame.name,
+    options: allOptions(frame, state, registry).filter((option) => !(option.key in frame.answers)),
+    leaving: definitionFor(frame).leaves ?? null,
+  };
 }
 
 // Answers land on the top modal; it closes on the answer that completes it, so

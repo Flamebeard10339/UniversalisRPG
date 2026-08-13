@@ -96,13 +96,13 @@ describe('what the player is wearing, as rows', () => {
   it('names the slot and the thing in it, never the id the slot holds', () => {
     const rows = [row({ id: '1', name: 'Modified Blade', grown: true }), row({ id: 'cloak', name: 'Cloak' })];
     expect(worn({ mainhand: '1', back: 'cloak' }, rows)).toEqual([
-      { name: 'back', value: 'Cloak' },
-      { name: 'mainhand', value: 'Modified Blade' },
+      { id: 'cloak', name: 'back', value: 'Cloak' },
+      { id: '1', name: 'mainhand', value: 'Modified Blade' },
     ]);
   });
 
   it('falls back to the id for a slot holding something the player no longer carries', () => {
-    expect(worn({ mainhand: '9' }, [])).toEqual([{ name: 'mainhand', value: '9' }]);
+    expect(worn({ mainhand: '9' }, [])).toEqual([{ id: '9', name: 'mainhand', value: '9' }]);
   });
 
   // c21: one copy, one page. The engine says which side a row is on and this
@@ -111,6 +111,6 @@ describe('what the player is wearing, as rows', () => {
     const rows = [row({ id: 'blade', name: 'Blade', count: 2, value: 'Blade x2' }), row({ id: 'blade', name: 'Blade', value: 'Blade (mainhand)', slot: 'mainhand' })];
 
     expect(carried(rows, []).map((entry) => entry.value)).toEqual(['2']);
-    expect(worn({ mainhand: 'blade' }, rows)).toEqual([{ name: 'mainhand', value: 'Blade' }]);
+    expect(worn({ mainhand: 'blade' }, rows)).toEqual([{ id: 'blade', name: 'mainhand', value: 'Blade' }]);
   });
 });
