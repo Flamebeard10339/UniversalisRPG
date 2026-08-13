@@ -114,6 +114,17 @@ Proof:
   dispatch of the shared command table with the same answers the REPL gives, so c11 is what stops
   this becoming a GUI-only capability. Added 2026-08-13, ruled by the author after playing the GUI.
 
+- [c21] **What the player carries and what they are wearing are disjoint.** Equipping takes the item
+  out of the inventory and puts it in the equipment; unequipping returns it. A stack of three, one
+  worn, reads two carried and one equipped, and unequipping reads three again. A grown copy worn is
+  listed under equipment and nowhere else. Added 2026-08-13, ruled by the author, and it is the one
+  rule this branch adds — the spec's standing decision that it adds none is overridden here
+  deliberately and only here. Two places already read the invariant it replaces and both are this
+  clause's to correct: the destroy sweep empties a slot whose worn id is no longer carried, which
+  under this rule fires the instant anything is equipped, and `wearInstead` repoints a slot when a
+  stack copy is grown. What an equipped item contributes is read off `state.equipped` and is not
+  affected.
+
 ## Goal
 
 Make growing an item something the author can judge by playing it, without teaching them a grammar.
@@ -202,6 +213,19 @@ Make growing an item something the author can judge by playing it, without teach
   the modal verb step is this branch's own design falling short of its own goal. c20 is that
   correction and it stays here, because letting it wait would leave the branch closing on a screen
   the author has already said is one press too long.
+
+- **The branch adds exactly one rule, and it is named.** Ruled by the author 2026-08-13, overriding
+  this spec's own "This branch adds no rule" for c21 and nothing else. That decision exists so a rule
+  appearing inside a screen is read as the seam being cut wrong; an author ruling that the inventory
+  and the equipment are disjoint is not that — it is a statement about the model, it lands in
+  `equipment.ts` below every screen, and both surfaces get it for free. The decision stands for
+  everything else on this branch.
+- **Growing what you wear stays one press away.** Consequence of c21 and not a separate ruling: today
+  an equipped item is still carried, so `/inv` reaches it and it can be grown while worn. Once it
+  leaves the inventory it is reachable only from the equipment, so the equipment's rows offer the
+  same verbs a carried row does. The alternative — unequip, grow, re-equip — makes the item a player
+  most wants to improve the one the branch's own goal line cannot reach. Recorded as the default the
+  worker implements; the author may overturn it, and the cost of doing so is one clause.
 
 ## Out of scope
 
