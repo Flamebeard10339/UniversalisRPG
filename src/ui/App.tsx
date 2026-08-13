@@ -11,6 +11,8 @@ import { newlyFound, type Place } from './discovery';
 import { ModalSheet } from './ModalSheet';
 import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
+import { focusedPlane } from './plane';
+import { PlanePane } from './PlanePane';
 import { counted, named } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
@@ -41,6 +43,10 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
   const [where, setWhere] = useState(opening);
   const view = snapshot.view;
   const asking = view ? askedOption(view.modals) : undefined;
+  // Drawn because the engine says one is in hand, never because the shell
+  // recognised the screen holding it: the focus is a published field and the
+  // screen's name is not a thing this layer can read.
+  const plane = focusedPlane(view);
   const { arrivals, generation } = useArrivals(view?.discovered ?? []);
 
   // Assembled once and both drawn from and handed over, the way the map's is:
@@ -62,7 +68,9 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
     if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? {})} />;
     if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? {})} />;
     if (subpage.id === 'equipment') return <Ledger entries={named(view?.equipment ?? {})} />;
-    return <Ledger entries={counted(view?.inventory ?? {})} />;
+    // Both records, because a grown copy is counted in neither of the other's
+    // and a row is the only way either is opened.
+    return <Ledger entries={[...counted(view?.inventory ?? {}), ...named(view?.grown ?? {})]} onOpen={driver.open} />;
   };
 
   const bodies = LAYERS.map((layer, at) => (
@@ -93,7 +101,11 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
           <FloatingText channel={driver.transient} />
         </main>
         <TabBar tabs={LAYERS[shell.where.layer].subpages} active={subpageOf(shell.where)} onSelect={(index) => setWhere((held) => toSubpage(held, held.layer, index))} />
-        {asking ? <ModalSheet key={asking.key} option={asking} onAnswer={driver.answer} /> : null}
+        {asking ? (
+          <ModalSheet option={asking} onAnswer={driver.answer}>
+            {plane ? <PlanePane plane={plane} /> : null}
+          </ModalSheet>
+        ) : null}
       </div>
     </TransientProvider>
   );

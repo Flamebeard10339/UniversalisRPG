@@ -1,21 +1,28 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { PlayView } from '../runtime/session';
 import { useMoment } from './transient';
 
 type Option = PlayView['modals'][number]['options'][number];
 
-// Everything drawn here comes off the option the engine is asking for, so a
-// modal this file has never heard of is answerable on the same path as one it
-// has. The arrow is the driver's own glyph, the way a terminal owns its prompt,
-// and it answers to the option's own label rather than to a word for submitting.
-export function ModalSheet({ option, onAnswer }: { option: Option; onAnswer: (key: string, value: string) => void }): JSX.Element {
+// Everything this file draws comes off the option the engine is asking for, so
+// a modal it has never heard of is answerable on the same path as one it has.
+// What the shell hands over is drawn above the question and never read here,
+// which is what keeps that true of a screen with a subject as well as options.
+// The arrow is the driver's own glyph, the way a terminal owns its prompt, and
+// it answers to the option's own label rather than to a word for submitting.
+//
+// The card is keyed on the option rather than the sheet, so the question that
+// replaces an answered one rises where a shell keying the whole sheet would
+// re-mount everything above it too.
+export function ModalSheet({ option, onAnswer, children }: { option: Option; onAnswer: (key: string, value: string) => void; children?: ReactNode }): JSX.Element {
   const [typed, setTyped] = useState('');
   const darkened = useMoment('darken', true, option.key);
   const risen = useMoment('rise', true, option.key);
 
   return (
-    <div role="dialog" aria-modal className={`${darkened} fixed inset-0 z-50 flex flex-col justify-end bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-8`}>
-      <div className={`${risen} mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4`}>
+    <div role="dialog" aria-modal className={`${darkened} fixed inset-0 z-50 flex flex-col justify-end gap-3 bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-8`}>
+      {children}
+      <div key={option.key} className={`${risen} mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4`}>
         <p className="mb-3 text-xs uppercase tracking-wide text-text-subtle">{option.label}</p>
         {option.values ? (
           <div className="unbarred flex max-h-[60vh] flex-col gap-2 overflow-y-auto">
