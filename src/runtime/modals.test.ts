@@ -416,3 +416,61 @@ describe('opening and answering', () => {
     expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['name', 'race']);
   });
 });
+
+const CARRIED_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# item rope
+title: Rope
+`;
+
+// c2: the screen is a member of the closed union, so what proves it is a modal
+// at all is the machinery `first-class-modals` already ships driving it.
+describe('the carried-items screen, as a frame like any other', () => {
+  it('is raised by name, and raising it again raises no second screen', () => {
+    const session = startSession(loadModule(CARRIED_MODULE));
+
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+
+    expect(modalNames(view(session))).toEqual(['carried-items']);
+  });
+
+  it('refuses a screen no definition knows, wherever the name came from', () => {
+    const session = startSession(loadModule(CARRIED_MODULE));
+
+    expect(() => applyDirective(session, { kind: 'open-modal', modal: 'carried' })).toThrow(/unknown modal: carried/);
+    expect(view(session).modals).toEqual([]);
+  });
+
+  // c15: a screen listing nothing still publishes the answer that takes it down,
+  // so empty hands are not a screen the player can be left standing on.
+  it('is answerable with nothing to list', () => {
+    const session = startSession(loadModule(CARRIED_MODULE));
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+
+    expect(view(session).modals[0].options).toEqual([{ key: 'item', label: 'Item', values: ['Close'] }]);
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Close' });
+    expect(view(session).modals).toEqual([]);
+  });
+
+  it('survives a load half-answered, and closes when its answer names what the player has stopped carrying', () => {
+    const registry = loadModule(CARRIED_MODULE);
+    const half = (): GameState => {
+      const state = createGameState('camp');
+      (state.modals as ModalFrame[]).push({ name: 'carried-items', answers: { item: 'Rope x1' } });
+      return state;
+    };
+
+    const carrying = half();
+    carrying.inventory.rope = 1;
+    expect(pruneModals(carrying, registry)).toEqual([]);
+    expect(names(carrying)).toEqual(['carried-items']);
+
+    const empty = half();
+    expect(pruneModals(empty, registry)).toEqual([{ name: 'carried-items', reason: 'it has no item that takes "Rope x1"' }]);
+    expect(empty.modals).toEqual([]);
+  });
+});

@@ -106,6 +106,26 @@ describe('test: composable in-game scripts', () => {
   });
 });
 
+describe('open-modal: raises a screen by name', () => {
+  it('takes the name of the screen and nothing else, so the route onto one is a recorded line', () => {
+    const source = ['# test opening', 'open-modal: character-creation', 'open-modal: carried-items'].join('\n');
+    const [section] = parseModule(source) as { value: { directives: unknown[] } }[];
+
+    expect(section.value.directives).toEqual([
+      { kind: 'open-modal', modal: 'character-creation' },
+      { kind: 'open-modal', modal: 'carried-items' },
+    ]);
+  });
+
+  // The name belongs to the engine, so a payload no name could be is an
+  // unrecognised line rather than a screen this layer has an opinion about.
+  it('reads a payload that is no name at all as no directive', () => {
+    const bad = (line: string) => () => parseModule(['# test bad', line].join('\n'));
+    expect(bad('open-modal: Carried Items')).toThrow(/unexpected line in # test/);
+    expect(bad('open-modal:')).toThrow(/unexpected line in # test/);
+  });
+});
+
 describe('submit-modal: answers one option of the open modal', () => {
   it('takes one key=value pair, with the value running to the end of the line', () => {
     const source = [

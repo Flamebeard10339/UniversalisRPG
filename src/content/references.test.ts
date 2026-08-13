@@ -246,6 +246,17 @@ ${line}
     expect(test('unequip: head')).not.toThrow();
   });
 
+  // A modal name is the engine's, a layer above this one, so nothing here can
+  // say whether it exists; an unknown one is refused where the screen is raised.
+  it('resolves nothing for an open-modal:, whatever screen it names', () => {
+    const test = (line: string) => () => loadModule(`${VALID}
+# test walk
+${line}
+`);
+    expect(test('open-modal: character-creation')).not.toThrow();
+    expect(test('open-modal: no-such-screen')).not.toThrow();
+  });
+
   it('rejects a `use:` naming an unknown kind, object, or action', () => {
     const test = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
     expect(test('use: creature.training-dummy.eat')).toThrow(/# test walk use: names an unknown kind: creature/);

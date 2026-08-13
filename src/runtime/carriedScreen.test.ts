@@ -47,6 +47,8 @@ function withGrownBlade(): GameState {
 const values = (answers: Record<string, string>, state: GameState, key: string): readonly string[] | null =>
   carriedOptions(answers, state, registry).find((option) => option.key === key)?.values ?? null;
 
+const last = <T,>(list: readonly T[] | null | undefined): T | undefined => (list ? list[list.length - 1] : undefined);
+
 describe('what the screen lists', () => {
   // c1: a stack is one line with a count on it, and a grown copy is not folded
   // into the stack it left, because the two are not interchangeable.
@@ -102,8 +104,8 @@ describe('what the screen asks', () => {
     const state = withGrownBlade();
 
     expect(values({}, carrying({}), 'item')).toEqual([LEAVE]);
-    expect(values({}, state, 'item')?.at(-1)).toBe(LEAVE);
-    expect(values({ item: 'Heartwood Blade #1' }, state, 'verb')?.at(-1)).toBe(LEAVE);
+    expect(last(values({}, state, 'item'))).toBe(LEAVE);
+    expect(last(values({ item: 'Heartwood Blade #1' }, state, 'verb'))).toBe(LEAVE);
     expect(values({ item: 'Heartwood Blade #1', verb: 'Destroy' }, state, 'confirm')).toEqual([CONFIRMED, LEAVE]);
   });
 
@@ -112,7 +114,7 @@ describe('what the screen asks', () => {
   it('asks a grown copy’s destruction once more, naming the copy, and asks a stack nothing', () => {
     const state = withGrownBlade();
 
-    expect(carriedOptions({ item: 'Heartwood Blade #1', verb: 'Destroy' }, state, registry).at(-1)).toEqual({
+    expect(last(carriedOptions({ item: 'Heartwood Blade #1', verb: 'Destroy' }, state, registry))).toEqual({
       key: 'confirm',
       label: 'Destroy Heartwood Blade #1 for good?',
       values: [CONFIRMED, LEAVE],
