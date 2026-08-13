@@ -76,6 +76,19 @@ Proof:
   answering it moves no game state and is not recorded as a move. Added 2026-08-13, after the survey
   found that `first-class-modals` gives a frame no cancel and that `/inv` therefore turns an
   at-a-glance read into a screen the player can be stranded on.
+- [c16] **One function names a carried thing, and every surface spells it that way.** A screen never
+  composes a name of its own: the inventory row, the plane screen's heading, the option that names a
+  jewel or a whetstone and the GUI's row all read the same answer, and a grown copy reads
+  `Heartwood Blade #1` on every one of them. Added 2026-08-13 after the author played the REPL and
+  found one screen saying `Whetstone x6` and the next saying `feed: with tutorial-island.whetstone`,
+  one step apart. This is c8's rule about an assembled value applied to the name instead of the
+  number, and it is the seam localization needs: a name reached through one function is a name
+  `reimplement-localization` can route, and a name each screen builds is not.
+- [c17] **A row states what a choice does, not the line that would do it.** The plane screen prints
+  no directive text beside the option that abbreviates it — typing the number achieves the same
+  result, so the spelled-out form is noise on the screen that exists to retire it. The full directive
+  stays spellable everywhere it already is, which is c4 and is unchanged; c17 is only about what a
+  screen prints. Added 2026-08-13, ruled by the author.
 
 ## Goal
 
@@ -135,6 +148,21 @@ Make growing an item something the author can judge by playing it, without teach
   two specs and keep the audit target moving, which is the split `gui-rebuild` was already divided
   along for the same reason.
 
+- **A name is assembled once, like a number is.** Ruled by the author 2026-08-13, playing the REPL
+  this branch had just built. Three screens named one item three ways — `Whetstone x6`, then
+  `feed: with tutorial-island.whetstone`, then a heading reading `Heartwood Blade — 1`. None is a
+  defect in any member: each screen was written to name what it holds, and naming is what none of
+  them was told to share. That is the same shape c8 already ruled on for the contribution fold, and
+  the ruling is the same — one function, read by every surface. c16 is that as a proof clause. The
+  raw id in an option label is additionally a localization question, and is filed as a finding
+  against `reimplement-localization` rather than answered here: this branch owes the seam, that spec
+  owes what passes through it.
+- **The screen does not teach the grammar.** Ruled by the author 2026-08-13. A plane row printed the
+  full directive beside the option that shortens it, which reads as proof that c4 holds. It is not
+  worth its space: typing the number does the same thing, and the branch exists precisely so the
+  author never reads that line. c17 says so, and c4 is untouched — the directive stays spellable, it
+  just stops being printed.
+
 ## Out of scope
 
 Showing more than one item's plane at once, or a whole tree across hexagons — c4 exists so that
@@ -148,7 +176,7 @@ not got.
 
 ## Open questions
 
-- The in-game verb that opens a plane screen, subject only to it not being `craft`.
+- ~~The in-game verb that opens a plane screen~~ — answered by `plane-frame`: it is `Grow`.
 - Whether a growth refusal is stated by the frame that comes back or by the log beneath it. c7 fixes
   that the player reads it without leaving the screen and that the verb costs nothing; `grow()`
   already returns the sentence and already pushes it into the log, so the worker chooses between
