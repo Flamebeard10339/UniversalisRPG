@@ -11,8 +11,8 @@ rewrite: there are items, there are modifiers, and crafting is the act of growin
 
 ## Deliverable
 
-An item occupies one hexagon of an unbounded plane. Each of that hexagon's six edges can carry a
-**jewel slot** at its midpoint; a **cluster jewel** dropped in the world is an authored hexagon's
+An item occupies one hexagon of an unbounded plane. Its root node holds the west edge, and each of
+the five remaining edges can carry a **jewel slot** at its midpoint; a **cluster jewel** dropped in the world is an authored hexagon's
 worth of passives and further slots, and slotting one places its **cluster** in the empty hex on the
 far side of the slot. The clusters it brings carry slots of their own, so the plane fills outward
 without ever terminating. What the player can light up is bounded elsewhere: an item gains experience
@@ -73,15 +73,21 @@ Proof:
   that was not authored.
 - [c9] The origin is the general rule's degenerate case, not a special case beside it. An item base
   occupies hex `(0, 0)` with a cluster that is never slotted and therefore never rotated: its root
-  node is allocated from the start, costs no point, and is under no obligation to sit on the west
-  edge, because the west-edge convention exists only to give slotting a defined rotation. By default
-  that cluster is a single jewel slot on the east edge and nothing else, which is the item's on-ramp.
+  node is allocated from the start, costs no point, and sits on the west edge exactly as every other
+  cluster's root does, so the origin hex offers the same five outward edges any cluster offers and
+  not a sixth. By default that cluster is a single jewel slot on the east edge and nothing else,
+  which is the item's on-ramp.
   A base may instead declare an `origin-cluster:` of its own for hex `(0, 0)`, so a unique weapon
   ships with authored passives and a slot layout of its choosing; the default is what that rule
   yields when nothing is declared. **You grow what you can wear:** an item is a base if and only if
   it declares a `slot:`, so a consumable, a jewel and an orb have no plane and every growth verb
   refuses one as its target. Amended 2026-08-12, after this spec's first audit found that one field
-  named two roles and that nothing said which items had a plane at all.
+  named two roles and that nothing said which items had a plane at all; amended again 2026-08-13,
+  after the second pass found the west-edge sentence had never been true of the code and had been
+  graded met twice anyway. What it claimed — that the origin is exempt from the west-edge convention
+  because it is never rotated — would have made the origin the one cluster with six outward edges,
+  which is the special case this clause's own first sentence disowns, and would have made a
+  `# cluster-jewel`'s validity depend on which field referenced it.
 - [c10] A cluster jewel reaches the player as an ordinary item. An `# item` names one through
   `cluster-jewel:` to become the droppable thing, so jewels drop through `droptables`, stack in
   inventory, and are carried by the existing item machinery with no second inventory and no second
@@ -150,7 +156,7 @@ Proof:
   not a promise that deleted content stays evaluable.
 - [c22] Growing an item is reachable through the directive surface every other play input goes
   through, so a `# test` section records feeding, slotting, allocating and applying a cluster mod —
-  and each refusal in c8, c12, c13, c14 and c17 — and replays green over the shipped content.
+  and each refusal in c8, c12, c13, c14 and c15 — and replays green over the shipped content.
 - [c23] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
   layer-check, audit-status, doctor and the byte check in one invocation.
 
