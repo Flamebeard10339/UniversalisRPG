@@ -255,7 +255,8 @@ describe('planeReport', () => {
 
   // c21 took the worn copy out of its stack, so a base whose only copy is on the
   // player is a plane a screen can still be opened on and one no other read here
-  // would reach.
+  // would reach. The slot's spelling is the one its equipment row opens, so a
+  // focus on it has a published plane to be drawn from.
   it('reports the plane of a base the player is wearing, with no stack left behind it', () => {
     const state = initialState(registry);
     Object.assign(state.inventory, { blade: 1 });
@@ -263,7 +264,22 @@ describe('planeReport', () => {
 
     expect(state.inventory.blade).toBe(0);
     expect(planeReport(registry, state, 'blade')).toMatchObject({ instance: 'blade', template: 'blade', spent: 0 });
-    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['blade']);
+    expect(planeReport(registry, state, 'worn:mainhand')).toMatchObject({ instance: 'worn:mainhand', template: 'blade', spent: 0 });
+    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['blade', 'worn:mainhand']);
+  });
+
+  // The worn copy and the stack it left are two copies of one item, so the slot
+  // is what tells its plane from the stack's — an item id names the stack, and
+  // reaching the worn one through it would depend on the stack being empty.
+  it('reports the worn copy’s plane apart from the stack standing behind it', () => {
+    const state = fed('blade', 3);
+    ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position: 2 }));
+    Object.assign(state.inventory, { blade: 2 });
+    equip(state, registry, 'blade');
+
+    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['1', 'blade', 'worn:mainhand']);
+    expect(planeReport(registry, state, 'worn:mainhand')).toMatchObject({ instance: 'worn:mainhand', template: 'blade', spent: 0 });
+    expect(planeReport(registry, state, '1')).toMatchObject({ instance: '1', spent: 1 });
   });
 
   it('publishes what the copy is worth per stat, so a screen states it rather than adding the clusters up', () => {

@@ -7,7 +7,7 @@ import { carriedName } from './carriedName';
 import { positionPayloads } from './clusterEffect';
 import { basePlane, isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
-import { copiesOf, itemCopies, grownItems, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining, wornIn } from './itemInstance';
+import { hasStackCopy, itemCopies, grownItems, isGrownCopy, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining, wornCopy } from './itemInstance';
 import { GameState } from './state';
 
 // Where a point may go, said once for both things a point buys. `blocked` is a
@@ -161,7 +161,7 @@ function targeted(registry: Registry, state: GameState, target: string): { item:
 
   const live = itemInstance(state, target);
   if (live) return { item, template, grown: true, payload: live };
-  if (copiesOf(state, target).stack < 1 && wornIn(state, target) === undefined) return undefined;
+  if (!hasStackCopy(state, target)) return undefined;
 
   const plane = basePlane(item);
   return plane === undefined ? undefined : { item, template, grown: false, payload: { experience: 0, plane } };
@@ -198,5 +198,10 @@ export function planeReport(registry: Registry, state: GameState, target: string
 // ones would leave a focus pointing at a plane no driver could find.
 export function planeReports(registry: Registry, state: GameState): PlaneReport[] {
   const stacks = [...itemCopies(state).keys()];
-  return [...Object.keys(grownItems(state)), ...stacks].flatMap((id) => planeReport(registry, state, id) ?? []);
+  // A worn stack copy answers to the slot wearing it rather than to its item, so
+  // its plane is published under that spelling too — it is the one an equipment
+  // row opens, and a focus on it would otherwise point at a plane no driver
+  // could find. A worn grown copy is already among the first list.
+  const slots = Object.entries(state.equipped).flatMap(([slot, id]) => (isGrownCopy(state, id) ? [] : [wornCopy(slot)]));
+  return [...Object.keys(grownItems(state)), ...stacks, ...slots].flatMap((id) => planeReport(registry, state, id) ?? []);
 }

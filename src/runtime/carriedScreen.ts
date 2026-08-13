@@ -2,7 +2,7 @@ import { isBase, Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
 import { equip, unequip } from './equipment';
-import { itemCopies, destroyItem, grownItems, isGrownCopy, itemTemplate, wornIn } from './itemInstance';
+import { itemCopies, destroyItem, grownItems, isGrownCopy, itemTemplate, wornCopy, wornIn } from './itemInstance';
 import { type ModalAnswers, type ModalFrame, type ModalOption } from './modals';
 import { planeFrame } from './planeScreen';
 import { GameState } from './state';
@@ -23,8 +23,10 @@ export const LEAVE = 'Close';
 export const CONFIRMED = 'Go ahead';
 
 export interface CarriedEntry {
-  // What a verb names this by: an item id for a stack, the minted id for one
-  // grown copy.
+  // What a verb names this by, and what names this one row apart from every
+  // other: an item id for a stack, the minted id for a grown copy, and the slot
+  // for the stack copy worn in one — which has left its stack and so is not the
+  // row its item id names.
   readonly id: string;
   // The one name for it (c16). Every surface spells a carried thing this way.
   readonly name: string;
@@ -125,7 +127,7 @@ export function carriedEntries(state: GameState, registry: Registry): CarriedEnt
   for (const [slot, id] of Object.entries(state.equipped)) {
     const grown = isGrownCopy(state, id);
     const name = nameOf(itemTemplate(state, id), registry, grown);
-    entries.push({ id, name, count: 1, value: `${name} (${slot})`, grown, slot });
+    entries.push({ id: grown ? id : wornCopy(slot), name, count: 1, value: `${name} (${slot})`, grown, slot });
   }
   return distinct(entries);
 }

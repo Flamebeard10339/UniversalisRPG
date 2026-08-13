@@ -40,29 +40,35 @@ export function contributionText(contributions: readonly Contribution[]): string
   return parts.join(', ');
 }
 
+// A grown copy carries no id in its name, so what tells two of them apart is the
+// stat summary beneath — which is the plane report's, looked up by the id the
+// row is of and never folded here (c8, c18). A stack has no such summary: what
+// is worth stating about one copy of it is worth stating on the page the copy
+// that left is listed on.
+function detailOf(row: CarriedRow, planes: readonly Plane[]): Partial<Entry> {
+  const contributions = row.grown ? (planes.find((plane) => plane.instance === row.id)?.contributions ?? []) : [];
+  const detail = contributionText(contributions);
+  return detail === '' ? {} : { detail };
+}
+
 // Everything the player is carrying, as the engine names and counts it — which
 // is the rows on the carried side of c21, the worn ones being the equipment
-// page's. A grown copy carries no id in its name, so what tells two of them
-// apart is the stat summary beneath — which is the plane report's, looked up by
-// the id the row is of and never folded here (c8, c18).
+// page's.
 export function carried(rows: readonly CarriedRow[], planes: readonly Plane[]): Entry[] {
   return rows
     .filter((row) => row.slot === undefined)
-    .map((row) => {
-      const contributions = row.grown ? (planes.find((plane) => plane.instance === row.id)?.contributions ?? []) : [];
-      const detail = contributionText(contributions);
-      return { id: row.id, name: row.name, value: tidy(row.count), ...(detail === '' ? {} : { detail }) };
-    })
+    .map((row) => ({ id: row.id, name: row.name, value: tidy(row.count), ...detailOf(row, planes) }))
     .sort(byName);
 }
 
 // What is worn, slot by slot: the slot is the row and what fills it is the
-// value, named the one way every surface names a carried thing. The row is of
-// the copy filling the slot rather than of the slot, because a verb names the
-// copy and c21 leaves a worn one reachable from nowhere else.
-export function worn(equipment: Record<string, string>, rows: readonly CarriedRow[]): Entry[] {
-  const named = new Map(rows.map((row) => [row.id, row.name]));
-  return Object.entries(equipment)
-    .map(([slot, id]) => ({ id, name: slot, value: named.get(id) ?? id }))
+// value, named the one way every surface names a carried thing. This is the
+// other side of c21 rather than a second reading of the equipment dictionary,
+// so a row is of the copy the engine already named and opening it dispatches
+// the id that names that copy and not the item behind it.
+export function worn(rows: readonly CarriedRow[], planes: readonly Plane[]): Entry[] {
+  return rows
+    .filter((row) => row.slot !== undefined)
+    .map((row) => ({ id: row.id, name: row.slot as string, value: row.name, ...detailOf(row, planes) }))
     .sort(byName);
 }

@@ -199,7 +199,13 @@ export function answerModal(state: GameState, registry: Registry, answers: Modal
   }
   Object.assign(answersOf(frame), answers);
 
-  if (options.some((option) => !(option.key in frame.answers))) return;
+  // What is left to ask is read off the frame as it now stands rather than off
+  // the list the answer was weighed against, because an answer can retract a
+  // question the one before it raised — choosing another item drops the
+  // confirmation the first one's destruction asked for. Reading the stale list
+  // leaves a frame every option of which is answered, which publishes nothing,
+  // which no answer can take down and pruneModals deletes without a word.
+  if (allOptions(frame, state, registry).some((option) => !(option.key in frame.answers))) return;
   // Popped before the modal acts, so anything its answer opens stacks on what
   // is left rather than on a frame that is already spent.
   stack(state).pop();

@@ -38,7 +38,7 @@ describe('a published dictionary as rows', () => {
   it('has nothing to draw for a player carrying nothing', () => {
     expect(counted({})).toEqual([]);
     expect(carried([], [])).toEqual([]);
-    expect(worn({}, [])).toEqual([]);
+    expect(worn([], [])).toEqual([]);
   });
 });
 
@@ -94,23 +94,44 @@ describe('a contribution, as words', () => {
 
 describe('what the player is wearing, as rows', () => {
   it('names the slot and the thing in it, never the id the slot holds', () => {
-    const rows = [row({ id: '1', name: 'Modified Blade', grown: true }), row({ id: 'cloak', name: 'Cloak' })];
-    expect(worn({ mainhand: '1', back: 'cloak' }, rows)).toEqual([
-      { id: 'cloak', name: 'back', value: 'Cloak' },
+    const rows = [
+      row({ id: '1', name: 'Modified Blade', grown: true, slot: 'mainhand' }),
+      row({ id: 'worn:back', name: 'Cloak', value: 'Cloak (back)', slot: 'back' }),
+    ];
+    expect(worn(rows, [])).toEqual([
+      { id: 'worn:back', name: 'back', value: 'Cloak' },
       { id: '1', name: 'mainhand', value: 'Modified Blade' },
     ]);
   });
 
-  it('falls back to the id for a slot holding something the player no longer carries', () => {
-    expect(worn({ mainhand: '9' }, [])).toEqual([{ id: '9', name: 'mainhand', value: '9' }]);
+  // c18: a grown copy is legible on the page it is listed on, and c21 makes this
+  // the only page a worn one is listed on — so the summary that tells two of
+  // them apart has to be here rather than only on the carried page.
+  it('states a worn grown copy’s contribution beneath its name', () => {
+    const rows = [row({ id: '1', name: 'Modified Blade', grown: true, slot: 'mainhand' })];
+    const published = plane({ instance: '1', contributions: [flat('mod.attack', 15)] });
+
+    expect(worn(rows, [published])[0].detail).toBe('+15 attack');
+  });
+
+  it('leaves a worn stack copy without a summary, the way the carried page leaves its stack', () => {
+    const rows = [row({ id: 'worn:mainhand', name: 'Blade', value: 'Blade (mainhand)', slot: 'mainhand' })];
+    const published = plane({ instance: 'worn:mainhand', contributions: [flat('mod.attack', 15)] });
+
+    expect(worn(rows, [published])[0].detail).toBeUndefined();
   });
 
   // c21: one copy, one page. The engine says which side a row is on and this
   // page is the one that draws the worn side, so the carried page draws the rest.
+  // The two rows are of one item and are two copies, so the ids differ and the
+  // press each page sends reaches the copy that page drew.
   it('leaves the worn rows to this page and off the one that lists what is carried', () => {
-    const rows = [row({ id: 'blade', name: 'Blade', count: 2, value: 'Blade x2' }), row({ id: 'blade', name: 'Blade', value: 'Blade (mainhand)', slot: 'mainhand' })];
+    const rows = [
+      row({ id: 'blade', name: 'Blade', count: 2, value: 'Blade x2' }),
+      row({ id: 'worn:mainhand', name: 'Blade', value: 'Blade (mainhand)', slot: 'mainhand' }),
+    ];
 
-    expect(carried(rows, []).map((entry) => entry.value)).toEqual(['2']);
-    expect(worn({ mainhand: 'blade' }, rows)).toEqual([{ id: 'blade', name: 'mainhand', value: 'Blade' }]);
+    expect(carried(rows, []).map((entry) => entry.id)).toEqual(['blade']);
+    expect(worn(rows, [])).toEqual([{ id: 'worn:mainhand', name: 'mainhand', value: 'Blade' }]);
   });
 });

@@ -42,6 +42,9 @@ slot: hand
 
 # save stocked
 {"version":${SAVE_VERSION},"inventory":{"gauntlet":1},"xp":{"smithing":5}}
+
+# save armed
+{"version":${SAVE_VERSION},"inventory":{"gauntlet":1},"equipped":{"hand":"gauntlet"}}
 `;
 
 // tutorial-island.dsl has no `# save` section, so /load and /expect need their own.
@@ -343,6 +346,27 @@ describe('the commands a player plays with', () => {
 
     const opened = runLine(ctx, '/inv gauntlet');
     expect(kinds(opened)).toEqual(['view']);
+    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet x1']);
+    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
+  });
+
+  // c1 and c18: the equipment row dispatches the same command, and the id it
+  // hands over names the copy in the slot rather than the stack that copy left —
+  // so the screen opens on the worn one and offers it Unequip.
+  it('/inventory <slot> opens the copy that is worn while its stack still stands', () => {
+    const { ctx } = fixture(CARRYING_MODULE);
+    runLine(ctx, '/load armed');
+
+    const opened = runLine(ctx, '/inv worn:hand');
+    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet (hand)']);
+    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Unequip', 'Destroy', 'Close'] }]);
+  });
+
+  it('/inventory <item> still opens the stack the worn copy left, and offers it Equip', () => {
+    const { ctx } = fixture(CARRYING_MODULE);
+    runLine(ctx, '/load armed');
+
+    const opened = runLine(ctx, '/inv gauntlet');
     expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet x1']);
     expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
   });

@@ -13,6 +13,7 @@ import { printDirective } from '../content/serialize';
 import { resolveCarried, resolveDirective } from '../content/typed';
 import { type ParsedSave } from '../content/saveSection';
 import { describeCondition, RuntimeError } from './runtime';
+import { wornCopySlot } from './itemInstance';
 import { type Modal, type ModalOption } from './modals';
 import {
   adoptRegistry,
@@ -527,7 +528,10 @@ export const COMMANDS: readonly CommandSpec[] = [
     argHint: '[<item>]',
     summary: 'open the inventory screen, on <item> when one is named',
     parse: (rest, ctx) => {
-      if (rest === '') return rest;
+      // A slot's spelling is the runtime's own and names no item, so it reaches
+      // the screen unresolved: the load path resolves what an author could have
+      // written, and a slot is not something anyone writes.
+      if (rest === '' || wornCopySlot(rest) !== undefined) return rest;
       try {
         return resolveCarried(rest, ctx.session.registry, '/inventory');
       } catch (error) {

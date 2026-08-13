@@ -46,7 +46,7 @@ function grown(state: GameState, id: string): { template: string; payload: ItemI
 }
 
 export function itemInstance(state: GameState, id: string): ItemInstance | undefined {
-  return grown(state, id)?.payload;
+  return grown(state, named(state, id))?.payload;
 }
 
 // A grown copy is spelled by its instance id and a stack by its item id. These
@@ -54,20 +54,47 @@ export function itemInstance(state: GameState, id: string): ItemInstance | undef
 // which item stands behind an id and whether the player still has the one thing
 // the id names, and never which spelling it was handed.
 export function itemTemplate(state: GameState, id: string): string {
-  return grown(state, id)?.template ?? id;
+  const copy = named(state, id);
+  return grown(state, copy)?.template ?? copy;
 }
 
 // Which spelling an id is: the minted id of a copy that has left its stack, or
 // the item id a stack is spelled by. Asked wherever the two are moved
 // differently, because only one of them is counted in a stack at all.
 export function isGrownCopy(state: GameState, id: string): boolean {
-  return grown(state, id) !== undefined;
+  return grown(state, named(state, id)) !== undefined;
+}
+
+// The third way one copy is spelled, and the one an item id cannot manage. A
+// grown copy's minted id names the copy wherever it is; a stack copy that has
+// been worn left its stack with no id of its own, so an item id would name both
+// it and the stack it left and every route would reach whichever came first.
+// The slot wearing it is what tells the two apart.
+const WORN = 'worn:';
+
+export function wornCopy(slot: string): string {
+  return `${WORN}${slot}`;
+}
+
+export function wornCopySlot(id: string): string | undefined {
+  return id.startsWith(WORN) ? id.slice(WORN.length) : undefined;
+}
+
+// The copy a spelling names: a slot's spelling stands for whatever is in the
+// slot, and every other spelling stands for itself. Where a verb needs to know
+// that the slot is where the copy is rather than only which copy it is, it asks
+// stackCopy instead.
+function named(state: GameState, id: string): string {
+  const slot = wornCopySlot(id);
+  if (slot === undefined) return id;
+  return state.equipped[slot] ?? id;
 }
 
 // Which slot an id is worn in, where it is worn in one. A slot holds either
 // spelling, so this is asked of the id in hand and not of the item behind it.
 export function wornIn(state: GameState, id: string): string | undefined {
-  return Object.entries(state.equipped).find(([, worn]) => worn === id)?.[0];
+  const copy = named(state, id);
+  return Object.entries(state.equipped).find(([, worn]) => worn === copy)?.[0];
 }
 
 // Whether the one copy an id names is on the carried side of c21, which is not
@@ -75,7 +102,7 @@ export function wornIn(state: GameState, id: string): string | undefined {
 // and unequipping is what puts it back.
 export function carriesItem(state: GameState, id: string): boolean {
   if (wornIn(state, id) !== undefined) return false;
-  return grown(state, id) !== undefined || copiesOf(state, id).stack > 0;
+  return grown(state, named(state, id)) !== undefined || copiesOf(state, id).stack > 0;
 }
 
 // The three places a copy of one item can be, and the whole of the asymmetry a
@@ -164,16 +191,23 @@ function takeOff(state: GameState, id: string): void {
   if (slot !== undefined) delete state.equipped[slot];
 }
 
-// Where the one copy a verb reaches comes from when the player names a stack
-// item. c21 gives a stack copy two places to be, and the copies of one stack are
-// interchangeable, so the item's name is the whole of what a verb needs to say:
-// the stack answers while it has one, and the slot answers once it has not.
+// Where the one copy a verb reaches is. c21 gives a stack copy two places to be:
+// a slot's spelling is in no stack and so goes straight to the slot, while an
+// item id names the stack, whose copies are interchangeable — so the stack
+// answers while it has one and the slot answers once it has not.
 type StackCopy = { readonly from: 'stack' } | { readonly from: 'slot'; readonly slot: string };
 
-function stackCopy(state: GameState, itemId: string): StackCopy | undefined {
-  if (copiesOf(state, itemId).stack > 0) return { from: 'stack' };
-  const slot = wornIn(state, itemId);
+function stackCopy(state: GameState, id: string): StackCopy | undefined {
+  if (copiesOf(state, id).stack > 0) return { from: 'stack' };
+  const slot = wornIn(state, id);
   return slot === undefined ? undefined : { from: 'slot', slot };
+}
+
+// Whether the player has the one stack copy an id names, wherever c21 puts it.
+// A grown copy is not this question — its instance is what says whether it is
+// still there — so a target that is one is asked about before this is reached.
+export function hasStackCopy(state: GameState, id: string): boolean {
+  return stackCopy(state, id) !== undefined;
 }
 
 // c12: the one way an item leaves the player for good, and the only verb that
@@ -182,20 +216,22 @@ function stackCopy(state: GameState, itemId: string): StackCopy | undefined {
 // stack goes rather than staying on as a count of none. Nothing here puts the
 // item down anywhere, and nothing here asks whether the player meant it.
 export function destroyItem(state: GameState, id: string): Destruction {
-  const standing = grown(state, id);
+  const copy = named(state, id);
+  const standing = grown(state, copy);
   if (standing) {
-    removeInstance(state, id);
-    takeOff(state, id);
+    removeInstance(state, copy);
+    takeOff(state, copy);
     return { ok: true, item: standing.template };
   }
   const source = stackCopy(state, id);
   if (!source) return refused(`you carry no ${id}`);
+  const template = itemTemplate(state, id);
   if (source.from === 'slot') delete state.equipped[source.slot];
   else {
-    stockItem(state, id, -1);
-    if (state.inventory[id] === 0) delete state.inventory[id];
+    stockItem(state, template, -1);
+    if (state.inventory[template] === 0) delete state.inventory[template];
   }
-  return { ok: true, item: id };
+  return { ok: true, item: template };
 }
 
 export function itemLevel(payload: ItemInstance, item: Item): number {
@@ -226,15 +262,16 @@ const take = (state: GameState, itemId: string): void => void stockItem(state, i
 // the player wears what they grew.
 export function growItem(state: GameState, registry: Registry, growing: Growing): Growth {
   const { target, consumes } = growing;
-  const standing = grown(state, target);
-  const template = standing?.template ?? target;
+  const copy = named(state, target);
+  const standing = grown(state, copy);
+  const template = itemTemplate(state, target);
   const item = registry.items.get(template);
   if (!item) return refused(`there is no item or item instance called ${target}`);
 
   const plane = basePlane(item);
   if (!plane) return refused(`${template} is not a base: only an item you can wear has a plane to grow`);
 
-  const source = standing ? undefined : stackCopy(state, template);
+  const source = standing ? undefined : stackCopy(state, target);
   if (!standing && !source) return refused(`you carry no ${template}`);
   if (consumes !== undefined && held(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(`you carry no ${consumes}`);
 
@@ -243,7 +280,7 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
   if (problem) return refused(problem);
 
   if (consumes !== undefined) take(state, consumes);
-  if (!source) return { ok: true, instance: target };
+  if (!source) return { ok: true, instance: copy };
   if (source.from === 'stack') take(state, template);
   const minted = createInstance(state, ITEM_INSTANCE, template, payload);
   if (source.from === 'slot') state.equipped[source.slot] = minted;

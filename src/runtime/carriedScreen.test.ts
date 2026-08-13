@@ -106,14 +106,16 @@ describe('what the screen lists', () => {
   });
 
   // c21: one copy, one row. The stack it came out of keeps its own row with one
-  // fewer on it, and the worn copy names the slot it is in.
-  it('lists a worn stack copy once, under its slot, and takes it off the stack’s count', () => {
+  // fewer on it, and the worn copy names the slot it is in. The two rows are two
+  // copies, so what names one names neither the other nor the item both are of:
+  // an item id names the stack, which the worn copy has left.
+  it('lists a worn stack copy once, under its slot, and never under the id of the stack it left', () => {
     const state = carrying({ 'iron-sword': 3 });
     equip(state, registry, 'iron-sword');
 
     expect(carriedEntries(state, registry)).toEqual([
       { id: 'iron-sword', name: 'Iron Sword', count: 2, value: 'Iron Sword x2', grown: false },
-      { id: 'iron-sword', name: 'Iron Sword', count: 1, value: 'Iron Sword (mainhand)', grown: false, slot: 'mainhand' },
+      { id: 'worn:mainhand', name: 'Iron Sword', count: 1, value: 'Iron Sword (mainhand)', grown: false, slot: 'mainhand' },
     ]);
   });
 
@@ -149,11 +151,15 @@ describe('what the screen asks', () => {
   // disproves the one that would do nothing. c21 adds the other half: the worn
   // entry offers every verb a carried one does, so what the player most wants to
   // improve is still one press from being grown.
+  // The stack the worn copy left is still stocked, so the two rows are of one
+  // item and differ only in which copy they are: what is worn takes Unequip and
+  // what is on the stack takes Equip, from the same item and at the same moment.
   it('offers a worn entry Unequip rather than an Equip that would do nothing', () => {
-    const state = carrying({ 'iron-sword': 1, 'heartwood-blade': 1 });
+    const state = carrying({ 'iron-sword': 3, 'heartwood-blade': 1 });
     equip(state, registry, 'iron-sword');
 
     expect(values({ item: 'Iron Sword (mainhand)' }, state, 'verb')).toEqual(['Grow', 'Unequip', 'Destroy', LEAVE]);
+    expect(values({ item: 'Iron Sword x2' }, state, 'verb')).toEqual(['Grow', 'Equip', 'Destroy', LEAVE]);
     expect(values({ item: 'Heartwood Blade x1' }, state, 'verb')).toEqual(['Grow', 'Equip', 'Destroy', LEAVE]);
   });
 
@@ -252,23 +258,26 @@ describe('what the screen does with an answer', () => {
 
   // c21: the equipment's entries take the verbs a carried entry takes, so the
   // copy the player is wearing is the one they can grow without taking it off.
+  // A stack is left standing behind the slot throughout, because an item id
+  // answers for the stack while it has one and would reach past the worn copy.
   it('opens the plane of the copy in the slot, and puts what growing it minted back on', () => {
     const state = withGrownBlade();
-    state.inventory.whetstone = 1;
+    Object.assign(state.inventory, { 'heartwood-blade': 3, whetstone: 1 });
     equip(state, registry, 'heartwood-blade');
 
-    expect(carriedSubmit({ item: 'Heartwood Blade (mainhand)', verb: 'Grow' }, state, registry)).toEqual(planeFrame('heartwood-blade'));
-    expect(feedItem(state, registry, 'heartwood-blade', 'whetstone')).toEqual({ ok: true, instance: '2' });
+    expect(carriedSubmit({ item: 'Heartwood Blade (mainhand)', verb: 'Grow' }, state, registry)).toEqual(planeFrame('worn:mainhand'));
+    expect(feedItem(state, registry, 'worn:mainhand', 'whetstone')).toEqual({ ok: true, instance: '2' });
     expect(state.equipped).toEqual({ mainhand: '2' });
+    expect(state.inventory['heartwood-blade']).toBe(2);
   });
 
   it('destroys the copy in the slot without reaching into the stack behind it', () => {
-    const state = carrying({ 'iron-sword': 1 });
+    const state = carrying({ 'iron-sword': 3 });
     equip(state, registry, 'iron-sword');
 
     expect(carriedSubmit({ item: 'Iron Sword (mainhand)', verb: 'Destroy' }, state, registry)).toBeNull();
     expect(state.equipped).toEqual({});
-    expect(carriedCount(state, 'iron-sword')).toBe(0);
+    expect(carriedCount(state, 'iron-sword')).toBe(2);
   });
 
   it('does nothing for an answer naming what the player has stopped carrying', () => {

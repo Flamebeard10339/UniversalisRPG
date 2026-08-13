@@ -477,7 +477,57 @@ describe('the carried-items screen, as a frame like any other', () => {
     expect(pruneModals(empty, registry)).toEqual([{ name: 'carried-items', reason: 'it has no item that takes "Rope x1"' }]);
     expect(empty.modals).toEqual([]);
   });
+
+  // A frame is either answerable or gone. An answer can retract the question the
+  // one before it raised — pointing a standing destruction at a stack copy, which
+  // needs no confirming — so what is left to ask is read off the frame as it now
+  // stands. Read off the list the answer was weighed against, the frame is left
+  // with every option answered: it publishes nothing, no gesture can take it
+  // down (c15), and the next load deletes it without a word.
+  it('leaves no screen with nothing to publish when an answer retracts the question under it', () => {
+    const session = startSession(loadModule(GROWING_MODULE));
+    applyDirective(session, { kind: 'load', save: 'stocked' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    submitModal(session, { item: 'Blade x1' });
+    submitModal(session, { verb: 'Grow' });
+    submitModal(session, { plane: 'feed: with Whetstone' });
+    submitModal(session, { plane: 'Back to inventory' });
+
+    expect(submitModal(session, { verb: 'Destroy' }).modals[0].options.map((option) => option.key)).toEqual(['confirm']);
+
+    const answered = submitModal(session, { item: 'Rope x1' });
+    expect(answered.modals).toEqual([]);
+    expect(answered.inventory.rope).toBeUndefined();
+  });
 });
+
+// A base that can actually be grown and a second thing to carry, which is the
+// smallest world a confirmation can be raised in and then pointed elsewhere.
+const GROWING_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# cluster-jewel core
+shape: point
+open-connections: e
+
+# item blade
+title: Blade
+slot: mainhand
+max-level: 10
+origin-cluster: core
+
+# item rope
+title: Rope
+
+# item whetstone
+title: Whetstone
+item-experience: 1000
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"blade":1,"rope":1,"whetstone":1}}
+`;
 
 const PLANE_MODULE = `
 # location camp
