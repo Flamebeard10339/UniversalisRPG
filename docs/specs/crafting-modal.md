@@ -108,8 +108,8 @@ Proof:
   REPL answers, so c11 holds and no driver gains a way to leave a screen the other has not got — and
   a frame that publishes no such value, dialogue among them, is not dismissable this way, because
   there is nothing for the click to answer. Added 2026-08-13, ruled by the author.
-- [c20] ~~**A row acts in one click.**~~ **Withdrawn 2026-08-13 by the author, unmet and not
-  deferred to a later member of this spec.** The implementation drew the question under the row that
+- [c20] ~~**A row acts in one click.**~~ **Withdrawn 2026-08-13 by the author, and not re-attempted
+  by any later member of this spec.** The implementation drew the question under the row that
   opened it, which left the row still needing a press to find out what it offered — orthogonal to the
   goal — and bought a modal that is sometimes a sheet and sometimes not, which is a special case in
   the driver of exactly the kind c9 exists to forbid. The clause is struck rather than reworded
@@ -247,7 +247,12 @@ Make growing an item something the author can judge by playing it, without teach
   and it made a modal that is a sheet on one page and an inline block on another, which is a driver
   holding a special case about screens and is the thing c9 forbids in a different costume. The
   capability is real and is filed as its own work; what is refused is reaching it this way. A clause
-  a branch cannot meet is struck by the author or it is owed, and this one is struck.
+  a branch cannot meet is struck by the author or it is owed, and this one is struck. An audit grades
+  a struck clause **deferred** — checked, fails, and the goal holds without it — never unmet. Pass 1
+  recorded unmet because the clause above once read "unmet and not deferred to a later member of this
+  spec", which meant not postponed inside this spec and reads exactly like the audit tool's own word
+  for something else. The wording was the planner's; it is corrected above and the undelivered record
+  it produced is declined with that reason on it.
 
 ## Out of scope
 
