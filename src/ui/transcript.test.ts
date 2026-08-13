@@ -74,7 +74,6 @@ describe('the narration column', () => {
     const before = emptyTranscript();
     const after = appendOutputs(before, [
       { kind: 'status', status: viewAt('hall') },
-      { kind: 'inventory', status: viewAt('hall') },
       { kind: 'choices', choices: [] },
     ]);
 

@@ -197,6 +197,8 @@
         "src/runtime/actions.ts",
         "src/runtime/cadence.test.ts",
         "src/runtime/carriedItem.test.ts",
+        "src/runtime/carriedScreen.test.ts",
+        "src/runtime/carriedScreen.ts",
         "src/runtime/clusterEffect.test.ts",
         "src/runtime/clusterEffect.ts",
         "src/runtime/clusterPlane.test.ts",

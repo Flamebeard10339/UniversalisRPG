@@ -88,14 +88,24 @@ starting
   // would not see it at all, and the id printed here is what equips it.
   it('names grown copies on a line of their own, above the stack counts’ neighbours', () => {
     const ctx = driver(source);
-    const status = runLine(ctx, '/inventory').output.find((out) => out.kind === 'inventory')!.status;
+    const status = runLine(ctx, '/state').output.find((out) => out.kind === 'status')!.status;
 
-    expect(formatOutput({ kind: 'inventory', status })).toEqual(['Inventory: {}', 'XP: {}']);
-    expect(formatOutput({ kind: 'inventory', status: { ...status, grown: { '1': 'tutorial-island.iron-sword' } } })).toEqual([
-      'Inventory: {}',
+    expect(formatOutput({ kind: 'status', status })).not.toContain('Grown: {}');
+    expect(formatOutput({ kind: 'status', status: { ...status, grown: { '1': 'tutorial-island.iron-sword' } } })).toContain(
       'Grown: {"1":"tutorial-island.iron-sword"}',
-      'XP: {}',
-    ]);
+    );
+  });
+
+  // c1: the screen is the modal, and /state is where the same holdings are
+  // still read as text.
+  it('draws the inventory screen /inv opens and nothing beside it', () => {
+    const ctx = driver(source);
+    const lines = formatResult(runLine(ctx, '/inv'));
+
+    expect(lines).toContain('[carried-items] item');
+    expect(lines).toContain('Item:');
+    expect(lines).toContain('  1) Close');
+    expect(lines.some((line) => line.startsWith('Inventory:'))).toBe(false);
   });
 
   it('separates each authored block with a blank line, so the emission pastes into a module', () => {

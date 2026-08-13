@@ -14,7 +14,8 @@ import { declaredId } from '../content/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
-import { answerModal, dialogueFrame, Modal, openModal, pruneModals, publishModal, topModal } from './modals';
+import { answerModal, dialogueFrame, Modal, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { carriedEntries, type CarriedEntry } from './carriedScreen';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
 import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
@@ -400,6 +401,12 @@ export function sessionStatus(session: PlaySession): PlayStatus {
   };
 }
 
+// What the inventory screen lists, for a driver that holds an id and needs the
+// value that screen publishes it as.
+export function carriedListing(session: PlaySession): CarriedEntry[] {
+  return carriedEntries(stateOf(session), session.registry);
+}
+
 // The map, as far as the player has found it. Adjacency is kept to places that
 // are themselves discovered, so the shape of what has not been found yet is not
 // readable off the edges leading to it. A condition on an edge gates travelling
@@ -560,6 +567,9 @@ function performDirective(session: PlaySession, directive: Directive): { failure
       answerModal(state, registry, { choice: directive.text });
       return {};
     }
+    case 'open-modal':
+      openModalNamed(state, directive.modal);
+      return {};
     case 'submit-modal':
       answerModal(state, registry, { [directive.key]: directive.value });
       return {};

@@ -1,4 +1,5 @@
 import { choose, cursorProblem, DialogueCursor, menuTexts } from './dialogue-runtime';
+import { carriedFrame, carriedOptions, carriedSubmit } from './carriedScreen';
 import { GameState, RuntimeError } from './state';
 import { Registry } from '../content/registry';
 
@@ -25,6 +26,7 @@ export type ModalAnswers = Readonly<Record<string, string>>;
 
 export type ModalFrame =
   | { readonly name: 'character-creation'; readonly answers: ModalAnswers }
+  | { readonly name: 'carried-items'; readonly answers: ModalAnswers }
   | { readonly name: 'dialogue'; readonly answers: ModalAnswers; readonly cursor: DialogueCursor };
 
 export type ModalName = ModalFrame['name'];
@@ -55,6 +57,11 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
       state.player = { name: frame.answers.name, race: frame.answers.race };
       return null;
     },
+  },
+  'carried-items': {
+    open: () => carriedFrame(),
+    options: (frame, state, registry) => carriedOptions(frame.answers, state, registry),
+    submit: (frame, state, registry) => carriedSubmit(frame.answers, state, registry),
   },
   dialogue: {
     open: () => null,
