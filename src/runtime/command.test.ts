@@ -344,7 +344,7 @@ describe('the commands a player plays with', () => {
     const opened = runLine(ctx, '/inv gauntlet');
     expect(kinds(opened)).toEqual(['view']);
     expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet x1']);
-    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet x1', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
+    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
   });
 
   it('refuses an item the player is not carrying, and opens no screen to say so', () => {

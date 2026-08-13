@@ -1,5 +1,5 @@
 import type { PlayView } from '../runtime/session';
-import { tidy } from './format';
+import { bare, signed, tidy } from './format';
 import { LABELS } from './labels';
 import type { Entry } from './sheet';
 
@@ -51,12 +51,6 @@ export interface PlaneView {
   facts: Entry[];
   hexes: PlaneHex[];
 }
-
-// Ids arrive namespaced and every other surface spells the short name, so a
-// stat is read the way the verbs and the DSL write it.
-const bare = (id: string): string => id.split('.').pop() ?? id;
-
-const signed = (value: number): string => (value < 0 ? tidy(value) : `+${tidy(value)}`);
 
 function magnitude(bonus: Payload['effective']): string {
   if (bonus.percent) return `${signed(bonus.amount)}%`;

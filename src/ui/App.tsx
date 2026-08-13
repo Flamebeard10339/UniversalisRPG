@@ -13,7 +13,7 @@ import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpag
 import { Pager } from './Pager';
 import { focusedPlane } from './plane';
 import { PlanePane } from './PlanePane';
-import { carried, counted, named } from './sheet';
+import { carried, counted, worn } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
 import { useTestSurface } from './testSurface';
@@ -67,8 +67,8 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
     if (layer.id === 'map') return <MapPane view={view} arrivals={arrivals} generation={generation} onChoose={driver.choose} />;
     if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? {})} />;
     if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? {})} />;
-    if (subpage.id === 'equipment') return <Ledger entries={named(view?.equipment ?? {})} />;
-    return <Ledger entries={carried(view?.inventory ?? {}, view?.grown ?? {})} onOpen={driver.open} />;
+    if (subpage.id === 'equipment') return <Ledger entries={worn(view?.equipment ?? {}, view?.carried ?? [])} />;
+    return <Ledger entries={carried(view?.carried ?? [], view?.planes ?? [])} onOpen={driver.open} />;
   };
 
   const bodies = LAYERS.map((layer, at) => (

@@ -1,6 +1,7 @@
 import { hexKey } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
+import { carriedName } from './carriedName';
 import { carriedEntries, carriedFrame } from './carriedScreen';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
@@ -44,12 +45,22 @@ interface PlaneMove {
 // be, the other two grow a hexagon of one — so the fill is written per verb
 // rather than as one shared prefix, and a frame that one day holds more than
 // one hexagon fills more in rather than needing a grammar to say so.
-function onCopy(frame: PlaneFrame, verb: string, tail: string): PlaneMove {
-  return { value: `${verb}: ${tail}`, line: `${verb}: ${frame.target} ${tail}`, focus: frame.hex };
+// The tail is said twice over: once in the words the screen offers and once in
+// the ids the directive takes, because a jewel is named to the player by the one
+// naming function (c16) and to the parser by its id.
+interface Tail {
+  readonly said: string;
+  readonly spelled: string;
 }
 
-function onHexagon(frame: PlaneFrame, verb: string, tail: string): PlaneMove {
-  return { value: `${verb}: ${tail}`, line: `${verb}: ${frame.target} at ${frame.hex} ${tail}`, focus: frame.hex };
+const same = (tail: string): Tail => ({ said: tail, spelled: tail });
+
+function onCopy(frame: PlaneFrame, verb: string, tail: Tail): PlaneMove {
+  return { value: `${verb}: ${tail.said}`, line: `${verb}: ${frame.target} ${tail.spelled}`, focus: frame.hex };
+}
+
+function onHexagon(frame: PlaneFrame, verb: string, tail: Tail): PlaneMove {
+  return { value: `${verb}: ${tail.said}`, line: `${verb}: ${frame.target} at ${frame.hex} ${tail.spelled}`, focus: frame.hex };
 }
 
 function goes(hex: string): PlaneMove {
@@ -68,10 +79,10 @@ function reachable(report: PlaneReport, here: ClusterReport): string[] {
 // What a stack the player can spend holds, by the field that says the item is
 // the kind a growth verb consumes. A grown copy is never taken, so a jewel that
 // has itself been grown is not one to slot.
-function stacked(state: GameState, registry: Registry, spent: (item: Item) => boolean): string[] {
+function stacked(state: GameState, registry: Registry, spent: (item: Item) => boolean): Array<{ id: string; name: string }> {
   return [...carriedItems(state)].flatMap(([id, { stack }]) => {
     const item = registry.items.get(id);
-    return stack > 0 && item !== undefined && spent(item) ? [id] : [];
+    return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(item.title, false) }] : [];
   });
 }
 
@@ -82,26 +93,29 @@ function movesOn(frame: PlaneFrame, report: PlaneReport | undefined, state: Game
   const moves = reachable(report, here).map(goes);
   for (const slot of here.slots) {
     if (slot.standing !== 'allocated' || slot.beyond !== null) continue;
-    for (const jewel of stacked(state, registry, (item) => item.clusterJewel !== undefined)) moves.push(onHexagon(frame, 'slot', `${slot.direction} with ${jewel}`));
+    for (const jewel of stacked(state, registry, (item) => item.clusterJewel !== undefined)) {
+      moves.push(onHexagon(frame, 'slot', { said: `${slot.direction} with ${jewel.name}`, spelled: `${slot.direction} with ${jewel.id}` }));
+    }
   }
   for (const slot of here.slots) {
-    if (slot.standing === 'available') moves.push(onHexagon(frame, 'allocate', `slot ${slot.direction}`));
+    if (slot.standing === 'available') moves.push(onHexagon(frame, 'allocate', same(`slot ${slot.direction}`)));
   }
   for (const position of here.positions) {
-    if (position.standing === 'available') moves.push(onHexagon(frame, 'allocate', `position ${position.position}`));
+    if (position.standing === 'available') moves.push(onHexagon(frame, 'allocate', same(`position ${position.position}`)));
   }
   // Last, and on every hexagon, because what a copy is fed is the one growth
   // that is the copy's rather than one hexagon of it — and without it a base
   // still in its stack would publish only values it has no point to spend on.
-  for (const food of stacked(state, registry, (item) => item.itemExperience !== undefined)) moves.push(onCopy(frame, 'feed', `with ${food}`));
+  for (const food of stacked(state, registry, (item) => item.itemExperience !== undefined)) {
+    moves.push(onCopy(frame, 'feed', { said: `with ${food.name}`, spelled: `with ${food.id}` }));
+  }
   return moves;
 }
 
 // The label is the whole of what this screen says beside its values, so a
 // refusal the frame came back holding reaches the player here (c7).
 function heading(frame: PlaneFrame, report: PlaneReport | undefined): string {
-  const named = report === undefined ? frame.target : report.instance === report.template ? report.title : `${report.title} #${report.instance}`;
-  const standing = `${named} at ${frame.hex}`;
+  const standing = `${report?.name ?? frame.target} at ${frame.hex}`;
   return frame.said === undefined ? standing : `${standing} — ${frame.said}`;
 }
 

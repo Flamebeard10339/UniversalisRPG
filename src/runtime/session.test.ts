@@ -724,11 +724,19 @@ describe('what the engine publishes', () => {
     expect(ids(carried)).toContain(`equip:${grown.instance}`);
     expect(carried.stats.might).toBe(4);
 
+    // c16: the world names a copy the one way every screen does — under a
+    // descriptor, and never under the id the choice itself carries.
+    expect(carried.carried).toEqual([
+      { id: 'gauntlet', name: 'Gauntlet', count: 1, value: 'Gauntlet x1', grown: false },
+      { id: grown.instance, name: 'Modified Gauntlet', count: 1, value: 'Modified Gauntlet', grown: true },
+    ]);
+    expect(carried.choices.find((choice) => choice.id === `equip:${grown.instance}`)?.label).toBe('Equip Modified Gauntlet');
+
     const armed = apply(session, `equip:${grown.instance}`);
     expect(armed.equipment).toEqual({ hand: grown.instance });
     expect(armed.stats.might).toBe(7);
     expect(ids(armed)).not.toContain(`equip:${grown.instance}`);
-    expect(armed.choices.find((choice) => choice.id === 'unequip:hand')?.label).toBe('Unequip Gauntlet');
+    expect(armed.choices.find((choice) => choice.id === 'unequip:hand')?.label).toBe('Unequip Modified Gauntlet');
   });
 
   it('carries skill xp as it is earned', () => {

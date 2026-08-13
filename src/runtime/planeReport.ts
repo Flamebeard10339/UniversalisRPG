@@ -3,6 +3,7 @@ import { Direction, DIRECTIONS, Hex, hexKey, NEIGHBOR_DELTA, opposite, PlaneNode
 import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';
 import { BonusAmount } from '../grammar/tagClause';
+import { carriedName } from './carriedName';
 import { positionPayloads } from './clusterEffect';
 import { basePlane, isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
@@ -69,6 +70,8 @@ export interface PlaneReport {
   readonly instance: string;
   readonly template: string;
   readonly title: string;
+  // What a screen holding this plane calls the copy it is growing (c16).
+  readonly name: string;
   readonly level: number;
   readonly maxLevel: number;
   readonly spent: number;
@@ -149,23 +152,23 @@ function clusterReport(registry: Registry, plane: Plane, hex: Hex): ClusterRepor
 // A growth verb spells its target either way an item is carried, and both have
 // a plane to report: a base still in its stack has the one growing it would
 // mint, which is what a screen opened on that stack is looking at.
-function targeted(registry: Registry, state: GameState, target: string): { item: Item; template: string; payload: ItemInstance } | undefined {
+function targeted(registry: Registry, state: GameState, target: string): { item: Item; template: string; grown: boolean; payload: ItemInstance } | undefined {
   const template = itemTemplate(state, target);
   const item = registry.items.get(template);
   if (!item) return undefined;
 
   const live = itemInstance(state, target);
-  if (live) return { item, template, payload: live };
+  if (live) return { item, template, grown: true, payload: live };
   if (carried(state, target).stack < 1) return undefined;
 
   const plane = basePlane(item);
-  return plane === undefined ? undefined : { item, template, payload: { experience: 0, plane } };
+  return plane === undefined ? undefined : { item, template, grown: false, payload: { experience: 0, plane } };
 }
 
 export function planeReport(registry: Registry, state: GameState, target: string): PlaneReport | undefined {
   const targets = targeted(registry, state, target);
   if (!targets) return undefined;
-  const { item, template, payload } = targets;
+  const { item, template, grown, payload } = targets;
 
   const clusters = planeClusters(payload.plane)
     .sort((a, b) => distance(a.hex) - distance(b.hex) || a.hex.q - b.hex.q || a.hex.r - b.hex.r)
@@ -175,6 +178,7 @@ export function planeReport(registry: Registry, state: GameState, target: string
     instance: target,
     template,
     title: item.title,
+    name: carriedName(item.title, grown),
     level: itemLevel(payload, item),
     maxLevel: item.maxLevel,
     spent: pointsSpent(payload.plane),

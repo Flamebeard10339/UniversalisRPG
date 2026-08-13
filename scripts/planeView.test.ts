@@ -33,6 +33,7 @@ const plane = (over: Partial<PlaneReport> = {}): PlaneReport => ({
   instance: '1',
   template: 'mod.blade',
   title: 'Blade',
+  name: 'Blade',
   level: 3,
   maxLevel: 20,
   spent: 1,
@@ -45,12 +46,12 @@ const plane = (over: Partial<PlaneReport> = {}): PlaneReport => ({
 const shown = (report: PlaneReport, worn = false): string => formatPlane(report, worn, null).join('\n');
 
 describe('formatPlane', () => {
-  it('heads a plane with the id the verbs take, the level and the points left', () => {
-    expect(formatPlane(plane(), false, null)[0]).toBe('Blade — 1 (blade) — level 3/20, 1 spent, 2 points left');
+  it('heads a plane with its name, the level and the points left', () => {
+    expect(formatPlane(plane(), false, null)[0]).toBe('Blade — level 3/20, 1 spent, 2 points left');
   });
 
   it('says a single point in the singular, and marks a plane the player is wearing', () => {
-    expect(formatPlane(plane({ remaining: 1 }), true, null)[0]).toBe('Blade — 1 (blade) — worn — level 3/20, 1 spent, 1 point left');
+    expect(formatPlane(plane({ remaining: 1 }), true, null)[0]).toBe('Blade — worn — level 3/20, 1 spent, 1 point left');
   });
 
   it('addresses the origin as an origin and a slotted cluster by the slot it came through', () => {
@@ -107,16 +108,17 @@ describe('formatPlane', () => {
     expect(shown(plane({ clusters: [cluster({ positions: [empty] })] }))).toContain('spent  pos 1   (empty)');
   });
 
-  it('offers allocate: for a position and a slot that can take the next point', () => {
+  // c17: the screen this is drawn above publishes each of these as an option a
+  // number answers, so spelling the directive out beside it is the noise the
+  // whole surface exists to retire. c4 is untouched — the line stays typeable.
+  it('spells no directive beside a node the next point could go to', () => {
     const ready = cluster({ hex: '1,-1', positions: [position({ position: 6, standing: 'available' })], slots: [slot({ direction: 'ne', standing: 'available' })] });
-    const rows = shown(plane({ clusters: [ready] }));
-    expect(rows).toContain('allocate: 1 at 1,-1 position 6');
-    expect(rows).toContain('allocate: 1 at 1,-1 slot ne');
-  });
-
-  it('offers slot: for an allocated slot still waiting for a jewel', () => {
     const waiting = cluster({ hex: '1,0', slots: [slot({ direction: 'se', standing: 'allocated' })] });
-    expect(shown(plane({ clusters: [waiting] }))).toContain('slot: 1 at 1,0 se with <jewel>');
+    const rows = shown(plane({ clusters: [ready, waiting] }));
+
+    for (const verb of ['allocate:', 'slot:', 'feed:', '<jewel>']) expect(rows).not.toContain(verb);
+    expect(rows).toContain('ready  pos 6');
+    expect(rows).toContain('spent  slot se');
   });
 
   it('offers nothing to type for a slot that is filled, blocked or out of reach', () => {
@@ -143,8 +145,15 @@ describe('formatPlane', () => {
     const rows = formatPlane(plane({ clusters: [cluster({ positions })] }), false, null).slice(3);
     expect(rows).toEqual([
       '    spent  pos 1   Hale         +15 max-health',
-      '    ready  pos 2   Swift Hands  +2 attack-rate  allocate: 1 at 0,0 position 2',
+      '    ready  pos 2   Swift Hands  +2 attack-rate',
     ]);
+  });
+
+  // c16: the copy is named the one way every surface names a carried thing, and
+  // the ids the verbs take are the frame's business rather than the heading's.
+  it('heads a plane with the name the engine published and no id at all', () => {
+    expect(formatPlane(plane({ name: 'Modified Blade' }), false, null)[0]).toContain('Modified Blade —');
+    expect(formatPlane(plane({ name: 'Modified Blade' }), false, null)[0]).not.toContain('mod.blade');
   });
 
   it('marks the hexagon in hand in the margin, and only that one', () => {

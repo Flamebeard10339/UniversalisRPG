@@ -197,6 +197,8 @@
         "src/runtime/actions.ts",
         "src/runtime/cadence.test.ts",
         "src/runtime/carriedItem.test.ts",
+        "src/runtime/carriedName.test.ts",
+        "src/runtime/carriedName.ts",
         "src/runtime/carriedScreen.test.ts",
         "src/runtime/carriedScreen.ts",
         "src/runtime/clusterEffect.test.ts",
@@ -414,6 +416,13 @@
             "src/runtime/growth.test.ts"
           ],
           "note": "produced by plane-frame: which of the four growth verbs a directive names, reached from a parsed directive or from a line through the one parser, below every caller"
+        },
+        {
+          "name": "the name of a carried thing",
+          "paths": [
+            "src/runtime/carriedName.ts"
+          ],
+          "note": "produced by one-name-for-a-carried-thing-on-every-surface: the one function every screen reads to name a stack or a grown copy (c16), and the seam reimplement-localization routes"
         }
       ]
     },

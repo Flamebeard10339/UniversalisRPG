@@ -57,10 +57,19 @@ describe('what the screen lists', () => {
     Object.assign(state.inventory, { 'iron-sword': 3 });
 
     expect(carriedEntries(state, registry)).toEqual([
-      { id: 'heartwood-blade', value: 'Heartwood Blade x1', grown: false },
-      { id: 'iron-sword', value: 'Iron Sword x3', grown: false },
-      { id: '1', value: 'Heartwood Blade #1', grown: true },
+      { id: 'heartwood-blade', name: 'Heartwood Blade', count: 1, value: 'Heartwood Blade x1', grown: false },
+      { id: 'iron-sword', name: 'Iron Sword', count: 3, value: 'Iron Sword x3', grown: false },
+      { id: '1', name: 'Modified Heartwood Blade', count: 1, value: 'Modified Heartwood Blade', grown: true },
     ]);
+  });
+
+  // c16: the descriptor is the whole of what says a copy is grown, and the id it
+  // was minted under is nowhere in what the player reads.
+  it('names a grown copy under a descriptor and no id, whatever id minting gave it', () => {
+    const grown = carriedEntries(withGrownBlade(), registry).find((entry) => entry.grown);
+
+    expect(grown?.name).toBe('Modified Heartwood Blade');
+    expect(grown?.name).not.toContain(grown?.id);
   });
 
   it('leaves out a stack the player has none of, and lists nothing at all for empty hands', () => {
@@ -74,6 +83,20 @@ describe('what the screen lists', () => {
     const state = carrying({ rope: 2, cord: 2 }, twins);
 
     expect(carriedEntries(state, twins).map((entry) => entry.value)).toEqual(['Rope x2 (rope)', 'Rope x2 (cord)']);
+  });
+
+  // c16: two grown copies of one base carry one name, so the value each is
+  // answered by is the one that has to be made distinct, and the name is not.
+  it('leaves two grown copies of one base named alike and answerable apart', () => {
+    const state = carrying({ 'heartwood-blade': 3, whetstone: 2 });
+    for (const _ of [0, 1]) {
+      const grown = feedItem(state, registry, 'heartwood-blade', 'whetstone');
+      if (!grown.ok) throw new Error(grown.refused);
+    }
+    const copies = carriedEntries(state, registry).filter((entry) => entry.grown);
+
+    expect(copies.map((entry) => entry.name)).toEqual(['Modified Heartwood Blade', 'Modified Heartwood Blade']);
+    expect(new Set(copies.map((entry) => entry.value)).size).toBe(2);
   });
 
   it('names an item the registry has lost by the id the player still carries it under', () => {
@@ -98,6 +121,26 @@ describe('what the screen asks', () => {
     expect(values({ item: 'Iron Sword x1' }, state, 'verb')).toEqual(['Grow', 'Equip', 'Destroy', LEAVE]);
   });
 
+  // c18: an entry offers only verbs that apply to it, and an item already worn
+  // disproves the one that would do nothing.
+  it('offers a worn entry Unequip rather than an Equip that would do nothing', () => {
+    const state = carrying({ 'iron-sword': 1, 'heartwood-blade': 1 });
+    state.equipped.mainhand = 'iron-sword';
+
+    expect(values({ item: 'Iron Sword x1' }, state, 'verb')).toEqual(['Grow', 'Unequip', 'Destroy', LEAVE]);
+    expect(values({ item: 'Heartwood Blade x1' }, state, 'verb')).toEqual(['Grow', 'Equip', 'Destroy', LEAVE]);
+  });
+
+  // The slot holds the spelling that was worn, so a stack still in the slot does
+  // not make the grown copy beside it read as worn.
+  it('offers Unequip to the very copy in the slot and Equip to the one beside it', () => {
+    const state = withGrownBlade();
+    state.equipped.mainhand = '1';
+
+    expect(values({ item: 'Modified Heartwood Blade' }, state, 'verb')).toEqual(['Grow', 'Unequip', 'Destroy', LEAVE]);
+    expect(values({ item: 'Heartwood Blade x1' }, state, 'verb')).toEqual(['Grow', 'Equip', 'Destroy', LEAVE]);
+  });
+
   // c15: every question this screen asks publishes a way out of it, including
   // the one it asks with nothing to list.
   it('publishes the value that leaves beside every question, empty hands included', () => {
@@ -105,8 +148,8 @@ describe('what the screen asks', () => {
 
     expect(values({}, carrying({}), 'item')).toEqual([LEAVE]);
     expect(last(values({}, state, 'item'))).toBe(LEAVE);
-    expect(last(values({ item: 'Heartwood Blade #1' }, state, 'verb'))).toBe(LEAVE);
-    expect(values({ item: 'Heartwood Blade #1', verb: 'Destroy' }, state, 'confirm')).toEqual([CONFIRMED, LEAVE]);
+    expect(last(values({ item: 'Modified Heartwood Blade' }, state, 'verb'))).toBe(LEAVE);
+    expect(values({ item: 'Modified Heartwood Blade', verb: 'Destroy' }, state, 'confirm')).toEqual([CONFIRMED, LEAVE]);
   });
 
   // c12: the second question is what names what is lost, and only a grown copy
@@ -114,9 +157,9 @@ describe('what the screen asks', () => {
   it('asks a grown copy’s destruction once more, naming the copy, and asks a stack nothing', () => {
     const state = withGrownBlade();
 
-    expect(last(carriedOptions({ item: 'Heartwood Blade #1', verb: 'Destroy' }, state, registry))).toEqual({
+    expect(last(carriedOptions({ item: 'Modified Heartwood Blade', verb: 'Destroy' }, state, registry))).toEqual({
       key: 'confirm',
-      label: 'Destroy Heartwood Blade #1 for good?',
+      label: 'Destroy Modified Heartwood Blade for good?',
       values: [CONFIRMED, LEAVE],
     });
     expect(carriedOptions({ item: 'Heartwood Blade x1', verb: 'Destroy' }, state, registry).map((option) => option.key)).toEqual(['item', 'verb']);
@@ -135,8 +178,8 @@ describe('what the screen does with an answer', () => {
     const before = JSON.stringify(state);
 
     expect(carriedSubmit({ item: LEAVE }, state, registry)).toBeNull();
-    expect(carriedSubmit({ item: 'Heartwood Blade #1', verb: LEAVE }, state, registry)).toBeNull();
-    expect(carriedSubmit({ item: 'Heartwood Blade #1', verb: 'Destroy', confirm: LEAVE }, state, registry)).toBeNull();
+    expect(carriedSubmit({ item: 'Modified Heartwood Blade', verb: LEAVE }, state, registry)).toBeNull();
+    expect(carriedSubmit({ item: 'Modified Heartwood Blade', verb: 'Destroy', confirm: LEAVE }, state, registry)).toBeNull();
     expect(JSON.stringify(state)).toBe(before);
   });
 
@@ -154,6 +197,15 @@ describe('what the screen does with an answer', () => {
     expect(state.equipped).toEqual({ mainhand: 'iron-sword' });
   });
 
+  it('takes off what unequip names, and empties the slot rather than the hands', () => {
+    const state = carrying({ 'iron-sword': 1 });
+    state.equipped.mainhand = 'iron-sword';
+
+    expect(carriedSubmit({ item: 'Iron Sword x1', verb: 'Unequip' }, state, registry)).toBeNull();
+    expect(state.equipped).toEqual({});
+    expect(carriedCount(state, 'iron-sword')).toBe(1);
+  });
+
   // c12: a stack copy goes on the verb; a grown copy waits for the answer to the
   // question naming it, and the other answer to that question leaves it standing.
   it('destroys a stack copy at once and a grown copy only once it is confirmed', () => {
@@ -162,13 +214,13 @@ describe('what the screen does with an answer', () => {
     expect(carriedSubmit({ item: 'Heartwood Blade x1', verb: 'Destroy' }, state, registry)).toBeNull();
     expect(carriedCount(state, 'heartwood-blade')).toBe(1);
 
-    expect(carriedSubmit({ item: 'Heartwood Blade #1', verb: 'Destroy' }, state, registry)).toEqual({
+    expect(carriedSubmit({ item: 'Modified Heartwood Blade', verb: 'Destroy' }, state, registry)).toEqual({
       name: 'carried-items',
-      answers: { item: 'Heartwood Blade #1', verb: 'Destroy' },
+      answers: { item: 'Modified Heartwood Blade', verb: 'Destroy' },
     });
     expect(carriedCount(state, 'heartwood-blade')).toBe(1);
 
-    expect(carriedSubmit({ item: 'Heartwood Blade #1', verb: 'Destroy', confirm: CONFIRMED }, state, registry)).toBeNull();
+    expect(carriedSubmit({ item: 'Modified Heartwood Blade', verb: 'Destroy', confirm: CONFIRMED }, state, registry)).toBeNull();
     expect(carriedCount(state, 'heartwood-blade')).toBe(0);
   });
 

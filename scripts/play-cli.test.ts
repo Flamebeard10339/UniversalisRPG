@@ -155,7 +155,7 @@ starting
     const lines = onPlaneScreen('stocked', 'blade');
 
     expect(lines).toContain('[item-plane] plane');
-    expect(lines).toContain('Blade — blade (blade) — level 1/2, 0 spent, 1 point left');
+    expect(lines).toContain('Blade — level 1/2, 0 spent, 1 point left');
     // The hexagon in hand is marked, and the question it belongs to comes under it.
     expect(lines.indexOf('> 0,0  core · point · origin · mods 0/2')).toBeGreaterThan(lines.indexOf('[item-plane] plane'));
     expect(lines.indexOf('Blade at 0,0:')).toBeGreaterThan(lines.indexOf('> 0,0  core · point · origin · mods 0/2'));
@@ -166,19 +166,19 @@ starting
   it('draws the plane the focus names rather than the first one published', () => {
     const lines = onPlaneScreen('stocked', 'shield');
 
-    expect(lines).toContain('Shield — shield (shield) — level 1/2, 0 spent, 1 point left');
+    expect(lines).toContain('Shield — level 1/2, 0 spent, 1 point left');
     expect(lines.some((line) => line.startsWith('Blade —'))).toBe(false);
   });
 
   it('says the plane in hand is one the player is wearing', () => {
-    expect(onPlaneScreen('worn', 'shield')).toContain('Shield — shield (shield) — worn — level 1/2, 0 spent, 1 point left');
+    expect(onPlaneScreen('worn', 'shield')).toContain('Shield — worn — level 1/2, 0 spent, 1 point left');
   });
 
   it('draws no plane for a screen with none in hand', () => {
     const ctx = driver(PLANE_SOURCE);
     runLine(ctx, '/load stocked');
 
-    expect(formatResult(runLine(ctx, '/inv'))).not.toContain('Blade — blade (blade) — level 1/2, 0 spent, 1 point left');
+    expect(formatResult(runLine(ctx, '/inv'))).not.toContain('Blade — level 1/2, 0 spent, 1 point left');
   });
 
   it('separates each authored block with a blank line, so the emission pastes into a module', () => {

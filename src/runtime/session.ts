@@ -15,6 +15,7 @@ import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
 import { answerModal, dialogueFrame, Modal, modalFocus, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { carriedName } from './carriedName';
 import { carriedEntries, type CarriedEntry } from './carriedScreen';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
@@ -68,6 +69,11 @@ export interface PlayStatus {
   // are counted nowhere in `inventory`, so a surface listing what the player has
   // reads both records.
   grown: Record<string, string>;
+  // The same two records as the rows a page draws: named once below every
+  // screen, counted, and each under the id a verb addresses it by, so a surface
+  // listing what the player carries states the engine's answer rather than
+  // reading a dictionary's keys as names (c16, c18).
+  carried: CarriedEntry[];
   // One per plane the player carries, grown copies first in the order `grown`
   // names them and then the bases still in their stacks: the plane behind the
   // id, already scaled, for a surface that shows one rather than a stat it
@@ -228,22 +234,24 @@ function locationChoices(session: PlaySession): PlayChoice[] {
       choices.push({ id: `use:item.${itemId}.${action.label}`, kind: 'action', label: action.label, detail: item.title });
     }
     if (item.slot && stack > 0 && state.equipped[item.slot] !== itemId) {
-      choices.push({ id: `equip:${itemId}`, kind: 'equip', label: `Equip ${item.title}`, detail: item.slot });
+      choices.push({ id: `equip:${itemId}`, kind: 'equip', label: `Equip ${carriedName(item.title, false)}`, detail: item.slot });
     }
   }
 
-  // A grown copy is named by its instance id in the choice as well as in the
-  // slot, because a player holding both it and its stack has to be able to say
-  // which one they mean.
+  // A grown copy is its own choice, because a player holding both it and its
+  // stack has to be able to say which one they mean; the id that says so is the
+  // choice's rather than its label's (c16).
   for (const [grownId, template] of Object.entries(grownItems(state))) {
     const item = registry.items.get(template);
     if (!item?.slot || state.equipped[item.slot] === grownId) continue;
-    choices.push({ id: `equip:${grownId}`, kind: 'equip', label: `Equip ${item.title} #${grownId}`, detail: item.slot });
+    choices.push({ id: `equip:${grownId}`, kind: 'equip', label: `Equip ${carriedName(item.title, true)}`, detail: item.slot });
   }
 
   for (const [slot, wornId] of Object.entries(state.equipped)) {
-    const item = registry.items.get(itemTemplate(state, wornId));
-    choices.push({ id: `unequip:${slot}`, kind: 'unequip', label: `Unequip ${item?.title ?? slot}`, detail: slot });
+    const template = itemTemplate(state, wornId);
+    const item = registry.items.get(template);
+    const worn = item === undefined ? slot : carriedName(item.title, template !== wornId);
+    choices.push({ id: `unequip:${slot}`, kind: 'unequip', label: `Unequip ${worn}`, detail: slot });
   }
 
     // TODO(inventory-crafting): stationless recipes clutter the room list. See backlog.
@@ -394,6 +402,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     modals: state.modals.map((frame) => publishModal(frame, state, registry)),
     inventory: Object.fromEntries([...carriedItems(state)].flatMap(([id, { stack }]) => (stack > 0 ? [[id, stack] as const] : []))),
     grown: grownItems(state),
+    carried: carriedEntries(state, registry),
     planes: planeReports(registry, state),
     focus: modalFocus(state),
     equipment: { ...state.equipped },

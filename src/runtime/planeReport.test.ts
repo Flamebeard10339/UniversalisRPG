@@ -118,6 +118,16 @@ describe('planeReport', () => {
     expect(plane).toMatchObject({ instance: '1', template: 'blade', title: 'Blade', level: 3, maxLevel: 20, spent: 0, remaining: 3 });
   });
 
+  // c16: the report carries the name every screen holding this plane spells, so
+  // a surface never works out from `instance` and `template` what to call it.
+  it('names a grown copy under the descriptor and a base still in its stack by its title', () => {
+    const state = initialState(registry);
+    Object.assign(state.inventory, { blade: 1 });
+
+    expect(planeReport(registry, state, 'blade')?.name).toBe('Blade');
+    expect(report(fed('blade', 3)).name).toBe('Modified Blade');
+  });
+
   it('names an origin cluster with no entry and a slotted one by the slot it came through', () => {
     const plane = report(hub({ 'junction-jewel': 1 }, [['ne', 'junction-jewel']]));
     expect(clusterAt(plane, '0,0')).toMatchObject({ jewel: 'junction', shape: 'point', entry: null });

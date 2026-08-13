@@ -1,6 +1,7 @@
 import { isBase, Item } from '../content/item';
 import { Registry } from '../content/registry';
-import { equip } from './equipment';
+import { carriedName } from './carriedName';
+import { equip, unequip } from './equipment';
 import { carriedItems, destroyItem, grownItems, itemTemplate } from './itemInstance';
 import { type ModalAnswers, type ModalFrame, type ModalOption } from './modals';
 import { planeFrame } from './planeScreen';
@@ -25,14 +26,25 @@ export interface CarriedEntry {
   // What a verb names this by: an item id for a stack, the minted id for one
   // grown copy.
   readonly id: string;
+  // The one name for it (c16). Every surface spells a carried thing this way.
+  readonly name: string;
+  // How many the player has: a stack's count, and one for a grown copy, which
+  // is counted in no stack.
+  readonly count: number;
   // What the screen publishes and an answer comes back as.
   readonly value: string;
   readonly grown: boolean;
 }
 
+// What is worn, in the spelling a slot holds it in, so a verb asks whether this
+// very copy is on rather than whether one like it is.
+function wornSlot(entry: CarriedEntry, item: Item | undefined, state: GameState): string | undefined {
+  return item?.slot !== undefined && state.equipped[item.slot] === entry.id ? item.slot : undefined;
+}
+
 interface CarriedVerb {
   readonly value: string;
-  applies(item: Item | undefined): boolean;
+  applies(item: Item | undefined, entry: CarriedEntry, state: GameState): boolean;
   // Whether taking it asks once more, naming what is lost, before it happens (c12).
   confirms(entry: CarriedEntry): boolean;
   take(entry: CarriedEntry, state: GameState, registry: Registry): ModalFrame | null;
@@ -49,10 +61,20 @@ const VERBS: readonly CarriedVerb[] = [
   },
   {
     value: 'Equip',
-    applies: (item) => item?.slot !== undefined,
+    applies: (item, entry, state) => item?.slot !== undefined && wornSlot(entry, item, state) === undefined,
     confirms: () => false,
     take: (entry, state, registry) => {
       equip(state, registry, entry.id);
+      return null;
+    },
+  },
+  {
+    value: 'Unequip',
+    applies: (item, entry, state) => wornSlot(entry, item, state) !== undefined,
+    confirms: () => false,
+    take: (entry, state, registry) => {
+      const slot = wornSlot(entry, registry.items.get(itemTemplate(state, entry.id)), state);
+      if (slot !== undefined) unequip(state, slot);
       return null;
     },
   },
@@ -73,34 +95,39 @@ export function carriedFrame(answers: ModalAnswers = {}): CarriedFrame {
   return { name: 'carried-items', answers };
 }
 
-function titleOf(template: string, registry: Registry): string {
-  return registry.items.get(template)?.title ?? template;
+function nameOf(template: string, registry: Registry, grown: boolean): string {
+  const title = registry.items.get(template)?.title;
+  return title === undefined ? template : carriedName(title, grown);
 }
 
-// Two items may be titled alike, and an answer is matched back by the value it
+// Two items may be named alike, and an answer is matched back by the value it
 // was published as, so a repeated value would resolve to whichever came first.
+// This is answerability rather than a second name (c16): what the screen calls
+// the thing is `name`, and only the value it is answered by is made distinct.
 function distinct(entries: CarriedEntry[]): CarriedEntry[] {
   const times = new Map<string, number>();
   for (const entry of entries) times.set(entry.value, (times.get(entry.value) ?? 0) + 1);
   return entries.map((entry) => (times.get(entry.value)! > 1 ? { ...entry, value: `${entry.value} (${entry.id})` } : entry));
 }
 
-// Stacks by title and count, then each grown copy under the name minting gave
-// it, because a grown copy is not interchangeable with its stack.
+// c1: a stack is listed by name and count, a grown copy by name alone, because
+// a grown copy is not interchangeable with its stack and is never in one.
 export function carriedEntries(state: GameState, registry: Registry): CarriedEntry[] {
   const entries: CarriedEntry[] = [];
   for (const [template, { stack }] of carriedItems(state)) {
-    if (stack > 0) entries.push({ id: template, value: `${titleOf(template, registry)} x${stack}`, grown: false });
+    const name = nameOf(template, registry, false);
+    if (stack > 0) entries.push({ id: template, name, count: stack, value: `${name} x${stack}`, grown: false });
   }
   for (const [id, template] of Object.entries(grownItems(state))) {
-    entries.push({ id, value: `${titleOf(template, registry)} #${id}`, grown: true });
+    const name = nameOf(template, registry, true);
+    entries.push({ id, name, count: 1, value: name, grown: true });
   }
   return distinct(entries);
 }
 
 function verbsFor(entry: CarriedEntry, state: GameState, registry: Registry): readonly CarriedVerb[] {
   const item = registry.items.get(itemTemplate(state, entry.id));
-  return VERBS.filter((verb) => verb.applies(item));
+  return VERBS.filter((verb) => verb.applies(item, entry, state));
 }
 
 function listed(values: readonly string[]): readonly string[] {
@@ -117,11 +144,11 @@ export function carriedOptions(answers: ModalAnswers, state: GameState, registry
   if (!chosen) return [item];
 
   const applicable = verbsFor(chosen, state, registry);
-  const verb: ModalOption = { key: 'verb', label: chosen.value, values: listed(applicable.map((each) => each.value)) };
+  const verb: ModalOption = { key: 'verb', label: chosen.name, values: listed(applicable.map((each) => each.value)) };
 
   const taking = applicable.find((each) => each.value === answers.verb);
   if (!taking?.confirms(chosen)) return [item, verb];
-  return [item, verb, { key: 'confirm', label: `${taking.value} ${chosen.value} for good?`, values: listed([CONFIRMED]) }];
+  return [item, verb, { key: 'confirm', label: `${taking.value} ${chosen.name} for good?`, values: listed([CONFIRMED]) }];
 }
 
 // The frame that replaces this one: itself with the answer kept while it still

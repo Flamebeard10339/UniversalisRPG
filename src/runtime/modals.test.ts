@@ -531,9 +531,9 @@ describe('the plane screen, as a frame like any other', () => {
   it('states a refused growth on the screen it was refused on, and puts nothing under it', () => {
     const session = openOnBlade();
     submitModal(session, { verb: 'Grow' });
-    expect(view(session).modals[0].options[0].values).toContain('feed: with whetstone');
+    expect(view(session).modals[0].options[0].values).toContain('feed: with Whetstone');
 
-    const refused = submitModal(session, { plane: 'feed: with whetstone' });
+    const refused = submitModal(session, { plane: 'feed: with Whetstone' });
     expect(modalNames(refused)).toEqual(['item-plane']);
     expect(refused.modals[0].options[0].label).toBe('Blade at 0,0 — Blade is already at level 1, which is its maximum');
     expect(refused.said).toEqual([]);

@@ -46,14 +46,15 @@ function published(view: PlayView): string[] {
     ...view.choices.flatMap((choice) => [choice.label, choice.detail ?? '']),
     ...view.resources.map((resource) => resource.title),
     ...view.modals.flatMap((modal) => modal.options.flatMap((option) => [option.label, ...(option.values ?? [])])),
-    // The map and the character sheet. The four dictionaries publish keys and
-    // not titles, so a key is what the engine gave and a key is what the sheet
-    // may draw.
+    // The map and the character sheet. Stats and skills publish keys and not
+    // titles, so a key is what the engine gave and a key is what the sheet may
+    // draw; what the player carries publishes a name, and that is what its rows
+    // and the equipment rows beside them read (c16).
     ...view.discovered.flatMap((place) => [place.id, place.title]),
-    ...Object.keys(view.inventory),
+    ...view.carried.map((row) => row.name),
     ...Object.keys(view.xp),
     ...Object.keys(view.stats),
-    ...Object.entries(view.equipment).flat(),
+    ...Object.keys(view.equipment),
     ...view.said,
   ];
 }
@@ -357,13 +358,20 @@ describe('what the shell puts on the screen', () => {
     const runs = engineRuns(renderToStaticMarkup(<App driver={driver} />));
 
     expect(Object.keys(view.stats)).toContain('surveyed.might');
-    expect(Object.keys(view.inventory)).toContain('surveyed.ore');
+    expect(view.carried.map((row) => row.id)).toContain('surveyed.ore');
     for (const stat of Object.keys(view.stats)) expect(runs).toContain(stat);
-    for (const item of Object.keys(view.inventory)) expect(runs).toContain(item);
     for (const skill of Object.keys(view.xp)) expect(runs).toContain(skill);
+
+    // c16 and c18: a carried thing reaches the page under the name the engine
+    // published and beside its count, never under the id a verb addresses it by.
+    const named = new Map(view.carried.map((row) => [row.id, row.name]));
+    for (const row of view.carried) {
+      expect(runs).toContain(row.name);
+      expect(runs).not.toContain(row.id);
+    }
     for (const [slot, item] of Object.entries(view.equipment)) {
       expect(runs).toContain(slot);
-      expect(runs).toContain(item);
+      expect(runs).toContain(named.get(item));
     }
   });
 
