@@ -77,18 +77,42 @@ Proof:
   found that `first-class-modals` gives a frame no cancel and that `/inv` therefore turns an
   at-a-glance read into a screen the player can be stranded on.
 - [c16] **One function names a carried thing, and every surface spells it that way.** A screen never
-  composes a name of its own: the inventory row, the plane screen's heading, the option that names a
-  jewel or a whetstone and the GUI's row all read the same answer, and a grown copy reads
-  `Heartwood Blade #1` on every one of them. Added 2026-08-13 after the author played the REPL and
-  found one screen saying `Whetstone x6` and the next saying `feed: with tutorial-island.whetstone`,
-  one step apart. This is c8's rule about an assembled value applied to the name instead of the
-  number, and it is the seam localization needs: a name reached through one function is a name
-  `reimplement-localization` can route, and a name each screen builds is not.
+  composes a name of its own: the inventory row, the equipment row, the plane screen's heading, the
+  option that names a jewel or a whetstone, the world's own `Unequip` choice and the GUI's rows all
+  read the same answer. A stack reads its title; a grown copy reads `Modified Iron Sword` — the
+  descriptor is what says it is grown, and it carries no id, because the stat summary beneath it is
+  what tells two apart. Ruled by the author 2026-08-13, who added that custom handles are a later
+  question and not this one. Where a name is an *answer* rather than a label — a listed option value,
+  which must be distinct to be answerable — disambiguating two identical names is a mechanism the
+  screen already has and is not a second name. This is c8's rule about an assembled value applied to
+  the name instead of the number, and it is the seam localization needs: a name reached through one
+  function is a name `reimplement-localization` can route, and a name each screen builds is not.
 - [c17] **A row states what a choice does, not the line that would do it.** The plane screen prints
   no directive text beside the option that abbreviates it — typing the number achieves the same
   result, so the spelled-out form is noise on the screen that exists to retire it. The full directive
   stays spellable everywhere it already is, which is c4 and is unchanged; c17 is only about what a
   screen prints. Added 2026-08-13, ruled by the author.
+
+- [c18] **A row says what its columns promise.** A page listing what the player carries states a
+  count where it shows a count, and a grown copy is legible on the page it is listed on: its name,
+  and beneath it the per-stat contribution `itemContribution` already publishes. An entry offers only
+  verbs that apply to it, which c1 already requires and which an item already worn disproves — worn
+  offers `Unequip`, not an `Equip` that does nothing. Added 2026-08-13 after the author played the
+  GUI and found the equipment page reading `mainhand 1`, the inventory reading `1` with the template
+  id where the quantity goes, and `Equip` offered on an item already equipped. One cause: both pages
+  draw an engine dictionary through a generic key-and-value ledger, so the key became the name and
+  the value became the column. The runtime publishes everything the rows need.
+- [c19] **A modal is dismissed the way its driver dismisses things.** c15 gives every screen this
+  branch adds a published value that leaves it; on the GUI, clicking away from the sheet answers
+  that value, so the way out is reachable without hunting for a button. It answers the same value the
+  REPL answers, so c11 holds and no driver gains a way to leave a screen the other has not got — and
+  a frame that publishes no such value, dialogue among them, is not dismissable this way, because
+  there is nothing for the click to answer. Added 2026-08-13, ruled by the author.
+- [c20] **A row acts in one click.** The verbs an entry offers are reachable from the entry itself
+  rather than through a screen that asks which verb second: one press on what the player carries and
+  one on what to do with it, not one to select and one to open and one to act. Every press is still a
+  dispatch of the shared command table with the same answers the REPL gives, so c11 is what stops
+  this becoming a GUI-only capability. Added 2026-08-13, ruled by the author after playing the GUI.
 
 ## Goal
 
@@ -162,6 +186,22 @@ Make growing an item something the author can judge by playing it, without teach
   worth its space: typing the number does the same thing, and the branch exists precisely so the
   author never reads that line. c17 says so, and c4 is untouched — the directive stays spellable, it
   just stops being printed.
+
+- **A grown copy is named, not numbered.** Ruled by the author 2026-08-13, correcting this spec's own
+  c16 as first written. The name is `Modified Iron Sword`: the descriptor carries the fact that it is
+  grown and the stat summary beneath carries which one it is, so the id stays out of the name
+  entirely. Custom handles were considered and deferred in the same breath — "that day is not today".
+  The id remains what a *directive* spells, which is unchanged and is c4's business, and remains
+  available to a listed option value that would otherwise be ambiguous, which is answerability rather
+  than naming.
+- **The geometry pane is a different branch; one-click rows are this one.** Ruled by the author
+  2026-08-13. Drawing the plane as a clickable map, with a node opening what it grants and what may
+  be slotted into it, is what this spec's Out of scope already refused, and it is filed as its own
+  work to be planned against the focus and `planes` data this branch publishes. Reshaping the
+  inventory page so a row acts in one press is not that: it is the surface this branch promised, and
+  the modal verb step is this branch's own design falling short of its own goal. c20 is that
+  correction and it stays here, because letting it wait would leave the branch closing on a screen
+  the author has already said is one press too long.
 
 ## Out of scope
 
