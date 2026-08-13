@@ -465,3 +465,202 @@ not got.
  (KILLED, 8 tests) and c21-a-gate-asks-what-is-carried-rather-than-what-is-held (KILLED, 57 tests
  at whole-suite scope). What is not met is not this clause's own text but the row identity it
  leaves behind — filed against c1 and c18.
+
+### Pass 2 — 2026-08-13
+
+- base: `3b355399a84e75c561de667023c340e601fcc1c3`
+- head: `540fbfaa8cf1cd214d604569b6eb013356ffe348`
+- proof 1: met — The pass 1 defect is fixed at the identity and proved. CarriedEntry.id is now `grown ? id : wornCopy(slot)`
+  (carriedScreen.ts:130), so a worn stack copy answers to `worn:<slot>` and the stack it left keeps the item id;
+  itemInstance.ts `named()` resolves that spelling in one place and itemInstance/itemTemplate/isGrownCopy/wornIn/
+  carriesItem/destroyItem/growItem all read through it. Re-run of the pass 1 reproduction, iron-sword x3 with one
+  worn: `/inv` lists `Iron Sword x2` (id iron-sword) and `Iron Sword (mainhand)` (id worn:mainhand); the worn row
+  offers ['Grow','Unequip','Destroy','Close'] and the carried row ['Grow','Equip','Destroy','Close']; `/inv
+  worn:mainhand` records `open-modal: carried-items` plus `submit-modal: item=Gauntlet (hand)` and opens the worn
+  row (src/runtime/command.test.ts > "/inventory <slot> opens the copy that is worn while its stack still
+  stands"), and `/inv <item>` still opens the stack. Growing the worn copy mints out of the slot and writes the
+  minted id back (equipped mainhand goes iron-sword to 1, stack stays 2); destroying it empties the slot and
+  leaves the stack at 2; unequipping returns it, stack 3. Mutations, manifest
+  C:\Users\yonat\AppData\Local\Temp\audit-crafting-modal-pass2-mutations.json, 8 killed 0 survived 0 unstable:
+  c1-a-worn-stack-row-is-named-by-the-stack-it-left (KILLED, 4 tests, re-run at carriedScreen.test.ts and
+  command.test.ts), c1-a-slot-spelling-resolves-to-nothing (KILLED, 5 tests), c1-a-worn-stack-copys-plane-is-not-
+  published (KILLED at planeReport.test.ts), c1-the-row-dispatch-cannot-name-a-slot (KILLED at command.test.ts),
+  c1-growing-a-worn-stack-copy-mints-out-of-the-stack (KILLED at carriedScreen.test.ts). The three tests pass 1
+  named as misleading were corrected rather than worked around: carriedScreen.test.ts now keeps a stack standing
+  behind the slot in the list, grow and destroy cases, which is where the defect lived. `/inv` printing no block
+  and `/state` still reading as text are unchanged since pass 1 and re-verified by the green suite.
+  Graded on c1's own enumeration of what applies means -- "equip for an item with a slot" -- which the carried
+  stack row satisfies structurally. That the engine then refuses that Equip is real and is graded under c18.
+- proof 2: met — Unchanged since pass 1 and re-verified: `carried-items` and `item-plane` are members of the ModalFrame
+  union in src/runtime/modals.ts and are declared in DEFINITIONS beside character-creation and dialogue; nothing
+  outside the engine can add one (`open-modal:` resolves no section, openModalNamed throws off DEFINITIONS). No
+  code in modals.ts changed in this pass's range except answerModal's stale-option read, which uses the same
+  machinery. src/runtime/modals.test.ts > "the plane screen, as a frame like any other" is green in the
+  2860-passing suite run on the head commit.
+- proof 3: met — src/runtime/modals.test.ts:519 > "replaces the inventory frame, and returns one with that copy still
+  selected", and structurally unchanged: answerModal pops the frame before submit, carriedScreen's Grow returns
+  `planeFrame(entry.id)`, planeSubmit returns `inventory(frame.target, ...)`. Re-verified for the copy identity
+  the fix commit changed: `carriedSubmit({item:'Heartwood Blade (mainhand)', verb:'Grow'})` returns
+  `planeFrame('worn:mainhand')`, and after a growth planeSubmit carries the target forward as `growth.instance`
+  (the minted id), so `inventory()`'s find on `each.id === target` matches the slot's row on both sides of the
+  mint (src/runtime/carriedScreen.test.ts > "opens the plane of the copy in the slot, and puts what growing it
+  minted back on", strengthened in 486e15c to keep a stack behind the slot).
+- proof 4: met — Unchanged since pass 1; no file the clause rests on (planeScreen.ts, growth.ts, src/content/test.ts)
+  changed in 5d71b79..540fbfa. One parser, one kind: planeScreen composes a whole growth line and hands it to
+  growth.ts `growLine`, which calls `parseDirectiveLine`. src/runtime/planeScreen.test.ts > "reaches
+  byte-identical state from the screen and from the directives typed in full" and "publishes each growth as the
+  directive it becomes, less what the frame holds" are green in the 2860-passing run. Pass 1's mutation
+  c4-a-growth-line-is-filled-from-a-hexagon-the-frame-does-not-hold stands. The said/spelled note pass 1 left for
+  this pass is still true and is still not a second parser: `Tail.spelled` is the id the one parser reads and
+  `Tail.said` is the label, so there is still no place a second reading of "position 4" could live.
+- proof 5: met — Unchanged since pass 1; planeScreen.ts untouched in this range. `goes()` returns `line: null` and
+  planeSubmit returns `planeFrame(frame.target, move.focus)` without touching state.
+  src/runtime/planeScreen.test.ts > what the screen does with an answer > "changes the focused hexagon and no
+  game state at all" is green. Pass 1's mutation c5-navigating-does-not-move-the-focus stands.
+- proof 6: met — Unchanged since pass 1; planeScreen.ts and growth.ts untouched in this range. The screen publishes
+  slot/allocate values only and each becomes a line growth.ts dispatches to slotJewel/allocate; growth.ts is a
+  four-arm switch with no check of its own. src/runtime/planeScreen.test.ts covers both verbs end to end and is
+  green in the 2860-passing run.
+- proof 7: met — Unchanged since pass 1; planeScreen.ts untouched in this range. planeSubmit returns
+  `planeFrame(frame.target, frame.hex, growth.refused)` on a refusal and `heading()` appends it to the option's
+  label, so the screen restates it and stays on the same hexagon; growItem calls `take(state, consumes)` only
+  after `growing.change` returned no problem. src/runtime/planeScreen.test.ts > "states what the plane said,
+  leaves the screen where it was, and moves nothing" is green. Pass 1's mutation
+  c7-a-refusal-does-not-reach-the-screen stands. Noted and filed separately, not counted here: a refusal from a
+  carried-screen verb is not a refusal at all but a thrown RuntimeError, and it takes the screen down.
+- proof 8: met — Unchanged since pass 1; itemContribution.ts and stats.ts untouched in this range.
+  src/runtime/itemContribution.ts is the one fold, stats.ts `statRange` calls it through `foldContribution`, and
+  planeReport publishes `contributions` off the same call. src/ui/sheet.ts is the only surface that reads them
+  and does no arithmetic -- 486e15c extended that reading to the equipment page through a shared `detailOf`
+  helper rather than adding a second fold, which is the clause working. src/runtime/itemContribution.test.ts >
+  "moves a worn stat by exactly the contribution published for it" is green. Pass 1's mutation
+  c8-a-worn-grown-copy-contributes-its-base-plane stands.
+- proof 9: met — src/ui/surface.test.ts > "names no modal, so it cannot be rendering one it knows" sweeps every
+  non-test module under src/ui for the MODAL_NAMES literals and is green. Re-checked for what this pass's fix
+  could have leaked: `grep -rn "worn:" src/ui --include=*.ts --include=*.tsx` matches only src/ui/sheet.test.ts,
+  so the runtime's worn-copy spelling did not become a driver literal either -- sheet.ts reads `row.slot` and
+  `row.id` as opaque published fields. App.tsx's equipment page now passes `view.carried` and `view.planes`,
+  which is less driver knowledge than the `view.equipment` dictionary it replaced.
+- proof 10: met — `PlaneFocus` is a PlayStatus field published by `modalFocus(state)`, which asks the top frame's
+  optional `focus()` and nothing else. Re-verified for the identity this pass changed: planeReport.ts
+  `planeReports` now also publishes each non-grown worn copy under `wornCopy(slot)` (line 205), so a focus on
+  `worn:mainhand` -- which is what a plane frame opened from an equipment row holds -- points at a plane both
+  drivers can find. Probed: with iron-sword x3 and one worn, planeReports publishes ['iron-sword','worn:mainhand'];
+  after feeding the worn copy it publishes ['1','iron-sword'] and planeSubmit has already moved the frame's
+  target to '1', so the focus is never orphaned. Proved by src/runtime/planeReport.test.ts > "reports the worn
+  copy's plane apart from the stack standing behind it" and by mutation
+  c1-a-worn-stack-copys-plane-is-not-published (KILLED, 2 tests, re-run at planeReport.test.ts).
+- proof 11: met — scripts/drift.test.ts > the two drivers cannot drift > "walks the crafting route through both
+  drivers, gesture against typed line" is green in the 2860-passing run, as are "reaches byte-identical state and
+  says the same things, over a scripted sequence" and "dispatches every entry in the shared table the way the
+  REPL does". The one capability this pass touched is the row dispatch, and it stayed inside the shared command:
+  the GUI's `driver.open` is `send('/inv ' + item)` (src/ui/driver.ts:156) for both pages, and openInventory
+  records `open-modal:` plus `submit-modal:` rather than any driver-only line, so what a `# test` replays is
+  driver-independent. Mutation c1-the-row-dispatch-cannot-name-a-slot was run with scripts/drift.test.ts in
+  scope and KILLED.
+- proof 12: met — `Destroy` applies to every entry, `confirms: (entry) => entry.grown`, and destroyItem is the only
+  verb that ends a plane. Re-verified against the identity this pass changed, which is where pass 1 said the
+  clause had to be read with c1: destroying the worn row now empties the slot and leaves the stack standing
+  (probed: equipped {} and stack 2 out of iron-sword x3 with one worn; carriedCount 2, heldCount 2), where
+  before 486e15c it decremented the stack and left the slot filled. src/runtime/carriedScreen.test.ts >
+  "destroys the copy in the slot without reaching into the stack behind it" was corrected in 486e15c to keep a
+  stack of three behind the slot rather than one, which is the case that could tell the two apart. Pass 1's
+  mutation c12-a-grown-copy-goes-without-a-second-question stands.
+- proof 13: met — `npx vitest run src/runtime/integration.test.ts -t "growing-through-the-inventory-screen"` -- 1
+  passed, 10 skipped, re-run in this pass on the head commit. The `# test` in content/tutorial-island.dsl is
+  twenty lines, every one of them a screen being answered, ending on an `expect:` against a `# save` with the
+  grown copy worn in mainhand and out of the inventory. content/tutorial-island.dsl did not change since pass 1.
+- proof 14: met — `npm test -- --reporter=dot` on the head commit: 121 files, 2860 of 2860 passed, 47.3s -- run twice
+  in this pass, both green. tsc, layer-check, audit-status, doctor, bytes, tree, base and `spec crafting-modal`
+  all pass in `npm run tasks -- merge-ready`, run three times. merge-ready's own npm test leg reported FAIL
+  exit=1 on all three, including one run with nothing else on the machine, and prints only exit=1 with the leg's
+  output discarded; that is the known channel record
+  npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s, recorded here as occurrence 14, and the direct
+  run on the same tree is the evidence for this leg. The only substantive FAIL is `clauses crafting-modal`,
+  which is what a recorded pass supplies.
+- proof 15: met — `Modal.leaving` is published from the member's declared `leaves` (LEAVE='Close', BACK='Back to
+  inventory') and both screens append it to every option they publish, so no question this branch adds can be
+  reached without one. 486e15c closed the pass 1 finding that broke this in one case: answerModal now reads what
+  is left to ask off `allOptions(frame, state, registry)` as the frame now stands rather than off the list the
+  answer was weighed against (modals.ts:208), so an answer that retracts the question before it -- pointing a
+  standing destruction at a stack copy, which needs no confirming -- cannot leave a frame with every option
+  answered, publishing nothing, closable by nothing and deleted by the next pruneModals without a word. Proved
+  by src/runtime/modals.test.ts > "leaves no screen with nothing to publish when an answer retracts the question
+  under it" and by mutation c15-what-is-left-to-ask-is-read-off-a-stale-option-list (KILLED at modals.test.ts,
+  re-run there with the mutation still applied). Pass 1's mutation c15-no-screen-publishes-a-way-out stands.
+  Read with the medium finding filed below: the published way out is correct, and what can still remove a screen
+  without one is a verb that throws out of submit after answerModal has popped the frame.
+- proof 16: met — Unchanged since pass 1; src/runtime/carriedName.ts untouched in this range. It is the one function;
+  carriedScreen's `nameOf`, planeScreen's `stacked`, planeReport's `name` field and both GUI ledgers read it or
+  the field it produced. 486e15c did not add a name: the worn row's `name` is still `nameOf(itemTemplate(...))`
+  and the new `worn:<slot>` string is an id, never rendered -- src/ui/sheet.ts `worn()` draws `row.slot` as the
+  term and `row.name` as the value, and the id is only what a press dispatches. Pass 1's mutation
+  c16-a-grown-copy-is-named-like-its-stack stands. Filed as a low finding, not counted here: the spelling does
+  reach two player-facing error sentences, which is a message rather than a name.
+- proof 17: met — Unchanged since pass 1; scripts/planeView.ts and src/ui/plane.ts untouched in this range. planeView
+  lost the `command` column and both `slotCommand` and the address it built; PlaneRow is node/standing/what/worth
+  with no directive field. scripts/planeView.test.ts:114 > "spells no directive beside a node the next point
+  could go to" is green in the 2860-passing run.
+- proof 18: unmet — Two of the three things the clause names are now fixed and mutation-proved, and the third fails one
+  case over from the one that was reported.
+  Fixed: (a) the count column -- src/ui/sheet.ts `carried()` puts `tidy(row.count)` where it shows a count and
+  `worn()` puts the slot in the term and the item's name in the value, driven off the carried rows rather than
+  off the equipment dictionary; mutation c18-the-equipment-page-reads-the-dictionary-rather-than-the-rows KILLED
+  at sheet.test.ts. (b) a worn grown copy is now legible on the one page c21 leaves it on -- `worn()` emits a
+  `detail` from PlaneReport.contributions through the same `detailOf` the carried page uses, so two identical
+  worn copies are told apart by the summary c16 says carries that job; mutation
+  c18-the-equipment-page-states-nothing-beneath-a-worn-grown-copy KILLED at src/ui/sheet.test.ts > "states a
+  worn grown copy's contribution beneath its name".
+  What fails is "An entry offers only verbs that apply to it ... not an Equip that does nothing". Pass 1's
+  reproduction was the worn row offering Equip, and that is fixed. The property is wider, and the carried row is
+  where it now breaks: with iron-sword x3 and one worn, the inventory screen lists `Iron Sword x2` -- the
+  correct count -- and offers it ['Grow','Equip','Destroy','Close']; answering Equip produces `message/error:
+  equip: player does not carry item iron-sword` and takes the screen down with it (modals []). So the row offers
+  a verb that cannot be taken, and it is a strictly worse instance of the sentence the clause was written about:
+  an Equip that errors rather than an Equip that does nothing.
+  The cause is in the runtime, not in the row: equipment.ts:21 guards on `carriesItem`, which this branch
+  changed (itemInstance.ts:103) to return false as soon as `wornIn(state, id)` finds the id in a slot. For a
+  stack item that is the whole stack, so carriesItem(state,'iron-sword') is false while
+  carriedCount(state,'iron-sword') is 2 -- two functions in one module answering "does the player carry this"
+  two different ways. 486e15c taught five id-taking functions the new worn-copy spelling and left this one
+  reading the conflated question.
+  Re-run: `npm run inspect -- -` with C:\Users\yonat\AppData\Local\Temp\audit-crafting-modal-pass2-probe3.js
+  (carriesItem false, carriedCount 2, THREW), and -probe8.js for the same thing through runLine as a player
+  walks it: `/inv iron-sword`, `2`, `/inv`, `1`, `2`.
+  Filed as the HIGH finding below, and it is the one I believe this branch must not merge without.
+- proof 19: met — Unchanged since pass 1; src/ui/asking.ts untouched in this range. `dismissal` takes the decision off
+  `Modal.leaving` and the option currently asked, reads no screen name, and returns null when the value is not
+  among the option's listed values; both GUI gestures route through it. src/ui/asking.test.ts > "is nothing where
+  the question being asked does not list it" is green in the 2860-passing run. Pass 1's mutation
+  c19-a-click-away-answers-a-value-the-question-does-not-list stands.
+- proof 20: deferred — The author struck this clause on 2026-08-13 before pass 1 ran, and the goal -- make growing an item
+  something the author can judge by playing it, without teaching them a grammar -- holds without it: a row opens
+  a screen, which is what it did before, and every other clause the surface rests on is answered. Both of the
+  author's reasons stand on re-reading the clause and the "c20 is withdrawn, not deferred" decision: the
+  implementation did not reach the goal, because a row still had to be pressed to learn what it offered, and it
+  made a modal that is a sheet on one page and an inline block on another, which is the driver special case c9
+  exists to forbid. Verified reverted: 7950a07 removed src/ui/Question.tsx, its markup is back inside
+  ModalSheet, and asking.ts kept `dismissal` and lost `askedOfRow`. The capability is filed as its own work.
+  Pass 1 graded this unmet only because the clause then read "unmet and not deferred to a later member of this
+  spec", which meant not postponed inside this spec and collided with the audit tool's own word; that wording
+  was the planner's, is corrected in docs/specs/crafting-modal.md by 89b9353, and the undelivered record it
+  produced is already declined with that reason. Regraded deferred, which is what the spec's own decision
+  instructs an audit to record.
+- proof 21: met — The clause's own text holds and is mutation-proved. Equipping moves the copy: equipment.ts
+  `carriedBy` calls `stockItem(state, id, -1)` on equip and `+1` on unequip, skipping a grown copy which is in
+  no stack. `itemCopies` is the one read of where every copy is and feeds `carriedCount` (what a row states) and
+  `heldCount` (what a gate asks) separately; conditions.ts `has` uses the second. Probed on the clause's own
+  example: iron-sword x3 with one worn reads carriedCount 2 and heldCount 3, and unequipping reads 3 and 3. A
+  worn grown copy is listed under equipment and nowhere else (carriedScreen.ts skips a grown id that `wornIn`
+  finds). The three readers the clause names are corrected: destroyItem's slot sweep is `takeOff` naming the
+  destroyed id, wearInstead is gone and growItem mints out of a slot and writes the minted id back, and stats.ts
+  dropped the `carriesItem` guard. Pass 1's mutations c21-equipping-does-not-take-the-copy-off-the-carried-side
+  and c21-a-gate-asks-what-is-carried-rather-than-what-is-held stand, and this pass's
+  c1-a-slot-spelling-resolves-to-nothing (KILLED, 5 tests) covers the identity underneath them.
+  Graded met on the two questions the clause names, and recorded here rather than counted against it: there is a
+  third reader of the same word that the clause did not enumerate and that this branch changed anyway --
+  `carriesItem`, whose only production caller is `equip()`. It answers "does the player carry this" off
+  `wornIn`, which for a stack item is true of the whole stack, and it is where "carried was one word doing two
+  jobs" is still true. That is the HIGH finding filed below. The clause's enumeration of affected readers has
+  now been wrong twice, which the spec records once already; the next pass should read that as the rule needing
+  a stated boundary rather than a longer exclusion list.
