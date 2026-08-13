@@ -249,12 +249,21 @@ function openInventory(ctx: CommandContext, id: string): CommandResult {
   if (id === '') return runDirective(ctx, opening);
 
   const entry = carriedListing(ctx.session).find((each) => each.id === id);
-  if (!entry) return said('error', `you carry no ${id}`);
+  if (!entry) return said('error', nothingIsNamed(id));
 
   const opened = runDirective(ctx, opening);
   if (opened.recorded.length === 0) return opened;
   const selected = runDirective(ctx, { kind: 'submit-modal', key: 'item', value: entry.value });
   return { ...selected, recorded: [...opened.recorded, ...selected.recorded] };
+}
+
+// c16: a player is refused in the words they would have met the thing by. A
+// slot's spelling is the runtime's own — it names whichever copy the slot holds
+// and nothing else spells one that way — so an empty slot is reported as an
+// empty slot rather than printed back at whoever typed it.
+function nothingIsNamed(id: string): string {
+  const slot = wornCopySlot(id);
+  return slot === undefined ? `you carry no ${id}` : `you wear nothing in ${slot}`;
 }
 
 function runDirective(ctx: CommandContext, directive: Directive): CommandResult {

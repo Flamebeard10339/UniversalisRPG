@@ -5,7 +5,7 @@ import { carriedName } from './carriedName';
 import { carriedEntries, carriedFrame } from './carriedScreen';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
-import { itemCopies } from './itemInstance';
+import { itemCopies, wornCopySlot } from './itemInstance';
 import { type ModalFrame, type ModalOption } from './modals';
 import { ClusterReport, PlaneFocus, PlaneReport, planeReport } from './planeReport';
 import { GameState } from './state';
@@ -162,7 +162,11 @@ export function isPlaneFrameBody(value: Record<string, unknown>): boolean {
 
 export function planeStale(frame: PlaneFrame, state: GameState, registry: Registry): string | null {
   const report = planeReport(registry, state, frame.target);
-  if (!report) return `it grows ${frame.target}, which the player no longer carries`;
+  // c16: a slot's spelling is the runtime's own word for whichever copy the slot
+  // holds, so a sentence about one that has emptied names the slot rather than
+  // printing a spelling the player has never seen.
+  const slot = wornCopySlot(frame.target);
+  if (!report) return slot === undefined ? `it grows ${frame.target}, which the player no longer carries` : `it grows what was worn in ${slot}, and that slot is empty`;
   if (!report.clusters.some((cluster) => cluster.hex === frame.hex)) return `it holds ${frame.hex}, where that plane has no cluster`;
   return null;
 }

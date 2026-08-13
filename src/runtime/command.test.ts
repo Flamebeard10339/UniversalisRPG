@@ -379,6 +379,16 @@ describe('the commands a player plays with', () => {
     expect(ctx.view.modals).toEqual([]);
   });
 
+  // c16: the slot spelling is the runtime's own and names nothing a player has
+  // met, so an empty slot is refused as an empty slot rather than printed back.
+  it('refuses an empty slot by naming the slot, and never by the spelling for it', () => {
+    const { ctx } = fixture(CARRYING_MODULE);
+    runLine(ctx, '/load stocked');
+
+    expect(errors(runLine(ctx, '/inv worn:hand'))).toEqual(['you wear nothing in hand']);
+    expect(ctx.view.modals).toEqual([]);
+  });
+
   it('equips what the screen was opened on, through the directive equip: already goes through', () => {
     const { ctx, session } = fixture(CARRYING_MODULE);
     runLine(ctx, '/load stocked');

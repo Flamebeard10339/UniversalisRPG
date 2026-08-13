@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { parseDirectiveLine } from '../content/test';
 import { loadModule } from '../content/registry';
 import { carriedFrame } from './carriedScreen';
+import { equip } from './equipment';
 import { growLine } from './growth';
-import { grownItems } from './itemInstance';
+import { grownItems, wornCopy } from './itemInstance';
 import { ModalFrame } from './modals';
 import { planeReport } from './planeReport';
 import { BACK, PLANE, PlaneFrame, planeFocus, planeFrame, planeOptions, planeStale, planeSubmit } from './planeScreen';
@@ -268,6 +269,17 @@ describe('what a saved frame may still point at', () => {
     expect(planeStale(planeFrame('blade'), state, registry)).toBeNull();
     expect(planeStale(planeFrame('rope'), state, registry)).toBe('it grows rope, which the player no longer carries');
     expect(planeStale(planeFrame('9'), state, registry)).toBe('it grows 9, which the player no longer carries');
+  });
+
+  // c16: the slot spelling is the runtime's own and names nothing a player has
+  // seen, so the sentence about an emptied slot says which slot emptied.
+  it('names the slot, and not the spelling for it, when a frame grows one that has emptied', () => {
+    const state = carrying({ blade: 1, whetstone: 1 });
+
+    expect(planeStale(planeFrame(wornCopy('mainhand')), state, registry)).toBe('it grows what was worn in mainhand, and that slot is empty');
+
+    equip(state, registry, 'blade');
+    expect(planeStale(planeFrame(wornCopy('mainhand')), state, registry)).toBeNull();
   });
 
   it('refuses a frame holding a hexagon that plane has no cluster in', () => {
