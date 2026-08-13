@@ -386,6 +386,14 @@
             "src/runtime/itemInstance.ts"
           ],
           "note": "produced by destroy-a-carried-item: destroyItem is the one verb that ends a carried copy, and the only one that ends a plane"
+        },
+        {
+          "name": "the inventory screen",
+          "paths": [
+            "src/runtime/carriedScreen.ts",
+            "src/runtime/carriedScreen.test.ts"
+          ],
+          "note": "produced by inventory-frame"
         }
       ]
     },
