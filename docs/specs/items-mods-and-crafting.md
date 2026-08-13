@@ -76,14 +76,19 @@ Proof:
   node is allocated from the start, costs no point, and is under no obligation to sit on the west
   edge, because the west-edge convention exists only to give slotting a defined rotation. By default
   that cluster is a single jewel slot on the east edge and nothing else, which is the item's on-ramp.
-  A base may instead declare a `cluster-jewel:` of its own for hex `(0, 0)`, so a unique weapon ships
-  with authored passives and a slot layout of its choosing; the default is what that rule yields when
-  nothing is declared.
+  A base may instead declare an `origin-cluster:` of its own for hex `(0, 0)`, so a unique weapon
+  ships with authored passives and a slot layout of its choosing; the default is what that rule
+  yields when nothing is declared. **You grow what you can wear:** an item is a base if and only if
+  it declares a `slot:`, so a consumable, a jewel and an orb have no plane and every growth verb
+  refuses one as its target. Amended 2026-08-12, after this spec's first audit found that one field
+  named two roles and that nothing said which items had a plane at all.
 - [c10] A cluster jewel reaches the player as an ordinary item. An `# item` names one through
   `cluster-jewel:` to become the droppable thing, so jewels drop through `droptables`, stack in
   inventory, and are carried by the existing item machinery with no second inventory and no second
   drop path. A `cluster-jewel:` naming an unknown declaration is a load-time reference error like
-  every other reference in the language.
+  every other reference in the language. `cluster-jewel:` says the item **is** a jewel and
+  `origin-cluster:` says the item **has** a plane; an item declaring both is refused at load, because
+  the two roles are exclusive and the refusal is what stops a weapon being consumed as a jewel.
 - [c11] Instancing is **lazy**. `inventory[itemId]` keeps counting stacks until a jewel is slotted
   into one; that single item then leaves the stack and becomes an instance carrying its plane, its
   allocations and its experience. Instances are the `instanced-objects` substrate and nothing else —
