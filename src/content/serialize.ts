@@ -508,7 +508,7 @@ function inModule(moduleId: string, id: string): boolean {
 export function serializeRegistryModule(registry: Registry, options: SerializeModuleOptions): string {
   const moduleId = options.info.id;
   const sections: string[] = [];
-  for (const stat of registry.stats.values()) if (inModule(moduleId, stat.id)) sections.push([`# stat ${moduleLocalId(moduleId, stat.id)}`, `title: ${stat.title}`, `base: ${range(stat.base)}`].join('\n'));
+  for (const stat of registry.stats.values()) if (inModule(moduleId, stat.id)) sections.push([`# stat ${moduleLocalId(moduleId, stat.id)}`, ...titleLine(registry, moduleId, 'stat', stat), `base: ${range(stat.base)}`].join('\n'));
   for (const skill of registry.skills.values())
     if (inModule(moduleId, skill.id))
       sections.push(

@@ -30,6 +30,14 @@ export const ENGINE_KEYS = [
   'engine.combat.other.miss',
   'engine.item.examine',
   'engine.item.modified',
+  'engine.modal.name',
+  'engine.modal.race',
+  'engine.modal.choice',
+  'engine.modal.item',
+  'engine.modal.confirm',
+  'engine.plane.heading',
+  'engine.plane.heading.said',
+  'engine.said.elided',
   'engine.modal.opened',
   'engine.prune.record',
   'engine.prune.location',
@@ -177,6 +185,25 @@ export interface LocaleDeclaration {
 }
 
 export const emptyLocales = (): Locales => ({ addressable: new Set(), base: new Map(), moduleLanguages: [], sections: [], declared: new Map() });
+
+const PARAM = /\{([a-z][a-z0-9-]*)\}/g;
+
+export const parametersOf = (pattern: string): string[] => [...pattern.matchAll(PARAM)].map((match) => match[1]);
+
+// A translation may drop a parameter — a Spanish `engine.item.examine` needs no
+// `{article}` — but it cannot invent one, because nothing supplies it and the
+// render throws. Enforced here, where the value is assembled, rather than on the
+// screen it would have taken down.
+export function unsuppliedParameters(locales: Locales, language: string, key: string, value: string): string[] {
+  const supplied = locales.declared.get(DEFAULT_LOCALE)?.get(key) ?? locales.base.get(key)?.text;
+  if (supplied === undefined || language === DEFAULT_LOCALE) return [];
+  const known = new Set(parametersOf(supplied));
+  return parametersOf(value).filter((name) => !known.has(name));
+}
+
+// The language the engine's own patterns are written in, which is what fixes
+// the parameters every other language's may name.
+const DEFAULT_LOCALE = 'en';
 
 export function addLocaleSection(locales: Locales, module: string | null, section: LocaleSection): void {
   locales.sections.push({ module, language: section.id, entries: section.entries });

@@ -101,7 +101,7 @@ export interface PlayStatus {
 }
 
 export interface PlayView extends PlayStatus {
-  said: string[];
+  said: Localized[];
 }
 
 // A driver reads the registry — it is content, and content is a layer below.
@@ -359,10 +359,10 @@ export function serializeSession(session: PlaySession): string {
 export const SAID_HEAD_KEPT = 40;
 export const SAID_TAIL_KEPT = 40;
 
-function elideMiddle(said: string[]): string[] {
+function elideMiddle(localizer: Localizer, said: Localized[]): Localized[] {
   const dropped = said.length - SAID_HEAD_KEPT - SAID_TAIL_KEPT;
   if (dropped <= 0) return said;
-  return [...said.slice(0, SAID_HEAD_KEPT), `… ${dropped} more lines`, ...said.slice(said.length - SAID_TAIL_KEPT)];
+  return [...said.slice(0, SAID_HEAD_KEPT), localizer.engine('engine.said.elided', { dropped }), ...said.slice(said.length - SAID_TAIL_KEPT)];
 }
 
 export function view(session: PlaySession): PlayView {
@@ -372,7 +372,7 @@ export function view(session: PlaySession): PlayView {
   // Spliced, not sliced-then-cleared: reading the lines is what removes them,
   // so a session that idles forever cannot grow a log nobody drains.
   const drained = internals.state.log.splice(0);
-  const said = elideMiddle(drained.slice(internals.logCursor));
+  const said = elideMiddle(localizerOf(session.registry, internals.state), drained.slice(internals.logCursor));
   internals.logCursor = 0;
 
   return { ...status, said };

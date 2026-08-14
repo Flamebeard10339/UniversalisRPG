@@ -148,7 +148,8 @@ function listed(values: readonly string[]): readonly string[] {
 // computed from the item already chosen rather than from every item at once.
 export function carriedOptions(answers: ModalAnswers, state: GameState, registry: Registry): ModalOption[] {
   const entries = carriedEntries(state, registry);
-  const item: ModalOption = { key: 'item', label: 'Item', values: listed(entries.map((entry) => entry.value)) };
+  const localizer = localizerOf(registry, state);
+  const item: ModalOption = { key: 'item', label: localizer.engine('engine.modal.item'), values: listed(entries.map((entry) => entry.value)) };
 
   const chosen = entries.find((entry) => entry.value === answers.item);
   if (!chosen) return [item];
@@ -158,7 +159,8 @@ export function carriedOptions(answers: ModalAnswers, state: GameState, registry
 
   const taking = applicable.find((each) => each.value === answers.verb);
   if (!taking?.confirms(chosen)) return [item, verb];
-  return [item, verb, { key: 'confirm', label: `${taking.value} ${chosen.name} for good?`, values: listed([CONFIRMED]) }];
+  // The verb is an answer value rather than words, so it goes in as an id.
+  return [item, verb, { key: 'confirm', label: localizer.engine('engine.modal.confirm', { verb: localizer.identifier(taking.value), item: chosen.name }), values: listed([CONFIRMED]) }];
 }
 
 // The frame that replaces this one: itself with the answer kept while it still

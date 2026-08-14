@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { asLocalized } from '../runtime/localizedFixture';
 import { loadUniverseWithDiagnostics } from '../content/registry';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
@@ -416,7 +417,7 @@ describe('what the shell puts on the screen', () => {
 
     expect(renderToStaticMarkup(<App driver={driver} />)).toContain(`aria-label="${running}"`);
 
-    const field = { key: 'name', label: 'Name', values: null };
+    const field = { key: 'name', label: asLocalized('Name'), values: null };
     expect(renderToStaticMarkup(<ModalSheet option={field} onAnswer={() => undefined} />)).toContain(`aria-label="${field.label}"`);
   });
 
@@ -445,7 +446,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('renders a modal it has never heard of from the option alone', () => {
-    const unheard = { key: 'heading', label: 'Which way from here', values: ['widdershins', 'deosil'] };
+    const unheard = { key: 'heading', label: asLocalized('Which way from here'), values: ['widdershins', 'deosil'] };
 
     const html = renderToStaticMarkup(<ModalSheet option={unheard} onAnswer={() => undefined} />);
 
@@ -453,7 +454,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('renders a free-text option as a field with no listed answer', () => {
-    const html = renderToStaticMarkup(<ModalSheet option={{ key: 'name', label: 'Name', values: null }} onAnswer={() => undefined} />);
+    const html = renderToStaticMarkup(<ModalSheet option={{ key: 'name', label: asLocalized('Name'), values: null }} onAnswer={() => undefined} />);
 
     expect(readable(html)).toEqual(['Name']);
     expect(html).toContain('<input');

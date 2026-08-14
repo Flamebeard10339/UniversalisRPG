@@ -26,6 +26,14 @@ engine.combat.other.hit: The {attacker} hits the {target} for {damage}.
 engine.combat.other.miss: The {attacker} misses the {target}.
 engine.item.examine: This is {article} {item}.
 engine.item.modified: Modified {item}
+engine.modal.name: Name
+engine.modal.race: Race
+engine.modal.choice: Choice
+engine.modal.item: Item
+engine.modal.confirm: {verb} {item} for good?
+engine.plane.heading: {plane} at {hex}
+engine.plane.heading.said: {plane} at {hex} — {said}
+engine.said.elided: … {dropped} more lines
 engine.modal.opened: modal:{modal}
 engine.prune.record: Removed {path} {id} because its {kind} is not loaded.
 engine.prune.location: Moved from unavailable location {from} to {to}.

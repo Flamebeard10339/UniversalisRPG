@@ -2,6 +2,7 @@ import { choose, cursorProblem, DialogueCursor, menuTexts } from './dialogue-run
 import { carriedFrame, carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
 import { type PlaneFocus } from './planeReport';
+import { Localized, localizerOf } from './localized';
 import { GameState, RuntimeError } from './state';
 import { Registry } from '../content/registry';
 
@@ -12,7 +13,10 @@ import { Registry } from '../content/registry';
 
 export interface ModalOption {
   key: string;
-  label: string;
+  // Branded, because a label is read and a value is answered: three screens
+  // rendered the base language while their room was translated, and nothing
+  // but the type stopped them (pass 2, pass 3).
+  label: Localized;
   // What this option will accept, or null where it takes free text.
   values: readonly string[] | null;
 }
@@ -74,9 +78,9 @@ export function dialogueFrame(cursor: DialogueCursor): ModalFrame {
 const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { name: K }>> } = {
   'character-creation': {
     open: () => ({ name: 'character-creation', answers: {} }),
-    options: () => [
-      { key: 'name', label: 'Name', values: null },
-      { key: 'race', label: 'Race', values: RACES },
+    options: (_frame, state, registry) => [
+      { key: 'name', label: localizerOf(registry, state).engine('engine.modal.name'), values: null },
+      { key: 'race', label: localizerOf(registry, state).engine('engine.modal.race'), values: RACES },
     ],
     submit: (frame, state) => {
       state.player = { name: frame.answers.name, race: frame.answers.race };
@@ -101,7 +105,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
   },
   dialogue: {
     open: () => null,
-    options: (frame, state, registry) => [{ key: 'choice', label: 'Choice', values: menuTexts(frame.cursor, registry, state) }],
+    options: (frame, state, registry) => [{ key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuTexts(frame.cursor, registry, state) }],
     submit: (frame, state, registry) => {
       const cursor = choose(frame.answers.choice, frame.cursor, registry, state);
       return cursor ? dialogueFrame(cursor) : null;

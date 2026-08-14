@@ -221,3 +221,30 @@ describe('the report covers every key the engine asks for (c7)', () => {
     expect(missingTranslations(loadUniverse([{ name: 'isla', text: SPANISH_MODULE }]).locales, 'es')).not.toContain('isla.entity.puerta.examine');
   });
 });
+
+// pass 3: a locale value may drop a parameter its English names, but naming one
+// nothing supplies threw at the moment a screen was drawn rather than at the
+// moment the value was written.
+describe('a translation may not name a parameter nothing supplies', () => {
+  const withLocale = (value: string) => () => loadUniverse([{ name: 'engine-en', text: ['# info engine-en', 'version: 1.0.0', '', '# locale en', 'engine.travel.to: Travel to {destination}'].join('\n') }, { name: 'es', text: ['# info es', 'version: 1.0.0', '', '# locale es', `engine.travel.to: ${value}`].join('\n') }]);
+
+  it('refuses one that does, naming the parameter and the key', () => {
+    expect(withLocale('Viaja a {destino}')).toThrow(/engine.travel.to names \{destino\}, which nothing supplies/);
+  });
+
+  it('takes one that drops a parameter, because another language need not use it', () => {
+    expect(withLocale('En marcha')).not.toThrow();
+  });
+});
+
+// pass 3: nine kinds printed their title through the gate and `# stat` printed
+// it bare, so a language: es module's stat gained an authored title on the trip
+// and registryDiff reported nothing.
+describe('no kind prints a title the loader would make for itself', () => {
+  it('keeps a stat with no title of its own unentered across a round trip', () => {
+    const text = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# stat ataque', 'base: 10'].join('\n');
+    const printed = serializeRegistryModule(loadUniverse([{ name: 'isla', text }]), { info: { id: 'isla', version: [1, 0, 0], language: 'es' } });
+
+    expect(loadUniverse([{ name: 'isla', text: printed }]).locales.base.has('isla.stat.ataque.title')).toBe(false);
+  });
+});

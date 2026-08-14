@@ -2,7 +2,7 @@ import { hexKey } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
-import { Localized, localizerOf } from './localized';
+import { Localized, Localizer, localizerOf } from './localized';
 import { carriedEntries, carriedFrame } from './carriedScreen';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
@@ -116,15 +116,20 @@ function movesOn(frame: PlaneFrame, report: PlaneReport | undefined, state: Game
 
 // The label is the whole of what this screen says beside its values, so a
 // refusal the frame came back holding reaches the player here (c7).
-function heading(frame: PlaneFrame, report: PlaneReport | undefined): string {
-  const standing = `${report?.name ?? frame.target} at ${frame.hex}`;
-  return frame.said === undefined ? standing : `${standing} — ${frame.said}`;
+// What the screen is of, where on it, and what it last said. A plane a report
+// cannot be built for is named by the id the verb addressed it with, which is an
+// id and not words.
+function heading(localizer: Localizer, frame: PlaneFrame, report: PlaneReport | undefined): Localized {
+  const plane = report?.name ?? localizer.identifier(frame.target);
+  const hex = localizer.identifier(frame.hex);
+  if (frame.said === undefined) return localizer.engine('engine.plane.heading', { plane, hex });
+  return localizer.engine('engine.plane.heading.said', { plane, hex, said: localizer.prose(frame.said) });
 }
 
 export function planeOptions(frame: PlaneFrame, state: GameState, registry: Registry): ModalOption[] {
   const report = planeReport(registry, state, frame.target);
   const values = movesOn(frame, report, state, registry).map((move) => move.value);
-  return [{ key: PLANE, label: heading(frame, report), values: [...values, BACK] }];
+  return [{ key: PLANE, label: heading(localizerOf(registry, state), frame, report), values: [...values, BACK] }];
 }
 
 // c3: leaving a plane is not closing a screen, it is going back to the one this

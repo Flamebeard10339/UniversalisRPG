@@ -252,6 +252,14 @@ Proof:
 - **The prose door asks the modules that carry prose.** Asking every loaded module could never open
   it for anybody, since the shipped engine locale declares `en`; a module that is nothing but
   translations says nothing about what language a `say:` is in.
+- **A modal option's label is branded and its values are not.** That split is the whole of what pass
+  3 needed: a label is read and a value is answered, so the label goes through the localizer and the
+  value stays the string a `submit-modal:` replays. Branding it is what finally closed c3 — the plane
+  screen was still composing its heading out of the registry's title and an English refusal, and no
+  amount of fixing screens one at a time would have stopped the next one.
+- **A translation is refused at load for naming a parameter nothing supplies.** It may drop one — a
+  Spanish `engine.item.examine` needs no `{article}` — but inventing one made every screen in that
+  language throw at render time. Enforced where the value is assembled rather than where it is read.
 - **`engine.item.examine` has one reader, `itemExamine`, and the schema default is gone.** Nothing
   displayed an item's examine before this branch either; what mattered was that the English sentence
   and its `article()` left the schema, which is what c2 and c5 ask for.

@@ -130,8 +130,15 @@ describe('an item with no examine of its own', () => {
 const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // A pattern as TypeScript would spell it: the literal parts verbatim, and a
-// template hole wherever the pattern names a parameter.
-const asTemplate = (pattern: string): RegExp => new RegExp(pattern.split(/\{[a-z-]+\}/).map(escaped).join('\\$\\{[^}]+\\}'));
+// template hole wherever the pattern names a parameter. Anchored on the quotes,
+// because an engine sentence surviving in TypeScript is a whole string —
+// matching a fragment of one flags `slot: ${a} at ${b}` for a heading that
+// reads `{plane} at {hex}`, and a parameterless pattern like `Item` would
+// otherwise match every occurrence of the word.
+const asTemplate = (pattern: string): RegExp => {
+  const parts = pattern.split(/\{[a-z-]+\}/).map(escaped);
+  return parts.length === 1 ? new RegExp(String.raw`(['"\`])${parts[0]}\1`) : new RegExp('`' + parts.join(String.raw`\$\{[^}]+\}`) + '`');
+};
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
@@ -206,5 +213,24 @@ describe('the prose door asks the modules that carry prose', () => {
 
   it('stays shut for a player of another one, however the locale modules are written', () => {
     expect(said('en')).toBe('(untranslated)');
+  });
+});
+
+// c8's proof lives in the content layer, where nothing calls the localizer, so
+// on two passes a mutation to the slug lookup survived that file (pass 3). The
+// property is that the display is keyed on the slug and the label stays the
+// identifier, and only a lookup can show it.
+describe('an action is displayed by its slug and identified by its label (c8)', () => {
+  const DOOR = ['# info hall', 'version: 1.0.0', '', '# location porch', 'x: 0, y: 0', 'starting', 'entities:', '  door', '', '# entity door', 'pick lock:', '  instant', '  say: click'].join('\n');
+  const DOOR_ES = ['# info hall-es', 'version: 1.0.0', 'dependencies:', '  hall', '', '# locale es', 'hall.entity.door.pick-lock: Forzar la cerradura'].join('\n');
+
+  const registry = loadUniverse([engineLocale(), { name: 'hall', text: DOOR }, { name: 'hall-es', text: DOOR_ES }]);
+
+  it('looks the display up under the slug, not under the label', () => {
+    expect(localizerFor(registry, 'es').actionLabel('entity', 'hall.door', 'pick lock')).toBe('Forzar la cerradura');
+  });
+
+  it('leaves the label the identifier a use: and a # test spell', () => {
+    expect(registry.entities.get('hall.door')?.actions[0].label).toBe('pick lock');
   });
 });

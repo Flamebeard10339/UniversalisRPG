@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { asLocalized } from '../runtime/localizedFixture';
 import { loadModule } from '../content/registry';
 import { SAVE_VERSION } from '../runtime/save';
 import { applyDirective, startSession, submitModal, view, type PlaySession, type PlayView } from '../runtime/session';
@@ -113,7 +114,7 @@ describe('what a click away from a screen answers', () => {
   // not offer, and a click that answered it would be answering a value the
   // engine is not listing.
   it('is nothing where the question being asked does not list it', () => {
-    const asked: PlayView['modals'] = [{ name: 'held', leaving: 'Close', options: [{ key: 'item', label: 'Item', values: ['Blade x1'] }] }];
+    const asked: PlayView['modals'] = [{ name: 'held', leaving: 'Close', options: [{ key: 'item', label: asLocalized('Item'), values: ['Blade x1'] }] }];
 
     expect(dismissal(asked)).toBeNull();
   });

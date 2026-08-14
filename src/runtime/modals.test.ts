@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { answerModal, dialogueFrame, isModalFrame, Modal, ModalFrame, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
 import { SAVE_VERSION } from './save';
 import { choose, createGameState, DialogueCursor, GameState, RuntimeError, talk } from './runtime';
@@ -177,7 +178,7 @@ node greeting:
 `;
 
 function stackingSession(): PlaySession {
-  return startSession(loadModule(STACKING_MODULE));
+  return startSession(loadInEnglish(STACKING_MODULE));
 }
 
 function names(state: GameState): string[] {
@@ -250,7 +251,7 @@ describe('the modal stack', () => {
 });
 
 describe('opening and answering', () => {
-  const registry = loadModule(STACKING_MODULE);
+  const registry = loadInEnglish(STACKING_MODULE);
 
   it('opens the same modal once however many times a batch applies the result', () => {
     const scaled = createGameState();
@@ -303,7 +304,7 @@ describe('opening and answering', () => {
   // submit runs so that what an answer opens stacks on what is left, which
   // leaves a throw out of submit with nothing between it and an empty world.
   it('puts the frame back when acting on the answer throws, rather than leaving the screen popped and gone', () => {
-    const module = loadModule(THROWING_CHOICE_MODULE);
+    const module = loadInEnglish(THROWING_CHOICE_MODULE);
     const state = talking(module);
 
     expect(() => answerModal(state, module, { choice: 'Ask about the mirror.' })).toThrow(/unknown modal: no-such-screen/);
@@ -313,7 +314,7 @@ describe('opening and answering', () => {
   });
 
   it('stacks a second dialogue rather than dropping it after its effects have already run', () => {
-    const session = startSession(loadModule(TWO_NPC_MODULE));
+    const session = startSession(loadInEnglish(TWO_NPC_MODULE));
 
     apply(session, 'talk:sage');
     // Through the directive, since the world's choices are withdrawn under an
@@ -331,16 +332,16 @@ describe('opening and answering', () => {
   });
 
   it('closes a dialogue whose content is gone rather than carrying a cursor into a registry without it', () => {
-    const state = talking(loadModule(STACKING_MODULE));
+    const state = talking(loadInEnglish(STACKING_MODULE));
     expect(names(state)).toEqual(['character-creation', 'dialogue']);
 
-    const dropped = pruneModals(state, loadModule('# location camp\nx: 0, y: 0\nstarting\n'));
+    const dropped = pruneModals(state, loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n'));
     expect(dropped).toEqual([{ name: 'dialogue', reason: 'dialogue sage-talk is not loaded' }]);
     expect(names(state)).toEqual(['character-creation']);
   });
 
   it('closes a frame naming a modal nothing defines, and one whose node no longer offers a menu there', () => {
-    const registry = loadModule(STACKING_MODULE);
+    const registry = loadInEnglish(STACKING_MODULE);
     const cursor = { ...(talking(registry).modals[1] as { cursor: DialogueCursor }).cursor };
 
     const withStranger = createGameState();
@@ -360,7 +361,7 @@ describe('opening and answering', () => {
   });
 
   it('withholds a choice its when: gate refuses, and refuses to answer with it', () => {
-    const session = startSession(loadModule(TWO_NPC_MODULE));
+    const session = startSession(loadInEnglish(TWO_NPC_MODULE));
 
     const gated = apply(session, 'talk:sage');
     expect(gated.modals[0].options[0].values).toEqual(['Leave the sage.']);
@@ -377,7 +378,7 @@ describe('opening and answering', () => {
   // in by a save. A frame no answer takes down publishes no control and holds
   // the world withdrawn, so what proves it gone is the choices coming back.
   it('never leaves a menu standing that offers nothing, however it came to offer nothing', () => {
-    const registry = loadModule(GATED_MENU_MODULE);
+    const registry = loadInEnglish(GATED_MENU_MODULE);
 
     const talked = startSession(registry);
     applyDirective(talked, { kind: 'use', obj: 'entity', objId: 'rumour', actionId: 'tell' });
@@ -407,7 +408,7 @@ describe('opening and answering', () => {
   });
 
   it('closes a frame a save left unanswerable — every option already answered, or one holding a value it refuses', () => {
-    const registry = loadModule(STACKING_MODULE);
+    const registry = loadInEnglish(STACKING_MODULE);
     for (const [answers, reason] of [
       [{ name: 'Rowan', race: 'Elf' }, 'it was saved with every option already answered'],
       [{ name: 'Rowan', race: 'Wombat' }, 'it has no race that takes "Wombat"'],
@@ -421,7 +422,7 @@ describe('opening and answering', () => {
   });
 
   it('stacks what an answer opens on what is left, and never on the frame that answer spent', () => {
-    const session = startSession(loadModule(ANSWER_OPENS_MODULE));
+    const session = startSession(loadInEnglish(ANSWER_OPENS_MODULE));
 
     expect(modalNames(apply(session, 'talk:sage'))).toEqual(['dialogue']);
 
@@ -437,7 +438,7 @@ describe('opening and answering', () => {
   // so this guard is only reachable by a caller of its own — which the runtime
   // barrel exports, and which is the reason it is not deleted as unreachable.
   it('refuses a choice text the menu is not offering when choose is called directly', () => {
-    const registry = loadModule(STACKING_MODULE);
+    const registry = loadInEnglish(STACKING_MODULE);
     const state = talking(registry);
     const { cursor } = state.modals[1] as { cursor: DialogueCursor };
 
@@ -472,7 +473,7 @@ title: Rope
 // at all is the machinery `first-class-modals` already ships driving it.
 describe('the carried-items screen, as a frame like any other', () => {
   it('is raised by name, and raising it again raises no second screen', () => {
-    const session = startSession(loadModule(CARRIED_MODULE));
+    const session = startSession(loadInEnglish(CARRIED_MODULE));
 
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
@@ -481,7 +482,7 @@ describe('the carried-items screen, as a frame like any other', () => {
   });
 
   it('refuses a screen no definition knows, wherever the name came from', () => {
-    const session = startSession(loadModule(CARRIED_MODULE));
+    const session = startSession(loadInEnglish(CARRIED_MODULE));
 
     expect(() => applyDirective(session, { kind: 'open-modal', modal: 'carried' })).toThrow(/unknown modal: carried/);
     expect(view(session).modals).toEqual([]);
@@ -490,7 +491,7 @@ describe('the carried-items screen, as a frame like any other', () => {
   // c15: a screen listing nothing still publishes the answer that takes it down,
   // so empty hands are not a screen the player can be left standing on.
   it('is answerable with nothing to list', () => {
-    const session = startSession(loadModule(CARRIED_MODULE));
+    const session = startSession(loadInEnglish(CARRIED_MODULE));
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
 
     expect(view(session).modals[0].options).toEqual([{ key: 'item', label: 'Item', values: ['Close'] }]);
@@ -499,7 +500,7 @@ describe('the carried-items screen, as a frame like any other', () => {
   });
 
   it('survives a load half-answered, and closes when its answer names what the player has stopped carrying', () => {
-    const registry = loadModule(CARRIED_MODULE);
+    const registry = loadInEnglish(CARRIED_MODULE);
     const half = (): GameState => {
       const state = createGameState('camp');
       (state.modals as ModalFrame[]).push({ name: 'carried-items', answers: { item: 'Rope x1' } });
@@ -523,7 +524,7 @@ describe('the carried-items screen, as a frame like any other', () => {
   // with every option answered: it publishes nothing, no gesture can take it
   // down (c15), and the next load deletes it without a word.
   it('leaves no screen with nothing to publish when an answer retracts the question under it', () => {
-    const session = startSession(loadModule(GROWING_MODULE));
+    const session = startSession(loadInEnglish(GROWING_MODULE));
     applyDirective(session, { kind: 'load', save: 'stocked' });
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
     submitModal(session, { item: 'Blade x1' });
@@ -593,7 +594,7 @@ item-experience: 1000
 // The inventory screen, with the copy already chosen, which is the one route
 // onto a plane screen there is.
 function openOnBlade(): PlaySession {
-  const session = startSession(loadModule(PLANE_MODULE));
+  const session = startSession(loadInEnglish(PLANE_MODULE));
   applyDirective(session, { kind: 'load', save: 'stocked' });
   applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
   applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Blade x1' });
@@ -632,7 +633,7 @@ describe('the plane screen, as a frame like any other', () => {
   });
 
   it('is not a screen a name alone can raise, because a name cannot say which copy', () => {
-    const session = startSession(loadModule(PLANE_MODULE));
+    const session = startSession(loadInEnglish(PLANE_MODULE));
 
     expect(() => applyDirective(session, { kind: 'open-modal', modal: 'item-plane' })).toThrow(/not opened by name/);
     expect(view(session).modals).toEqual([]);
@@ -651,7 +652,7 @@ describe('the plane screen, as a frame like any other', () => {
   });
 
   it('closes a saved frame whose copy or hexagon the world no longer has', () => {
-    const registry = loadModule(PLANE_MODULE);
+    const registry = loadInEnglish(PLANE_MODULE);
     for (const [frame, reason] of [
       [{ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' }, 'it grows blade, which the player no longer carries'],
       [{ name: 'item-plane', answers: {}, target: 'rope', hex: '0,0' }, 'it grows rope, which the player no longer carries'],
@@ -665,7 +666,7 @@ describe('the plane screen, as a frame like any other', () => {
   });
 
   it('keeps a saved frame whose copy is still carried', () => {
-    const registry = loadModule(PLANE_MODULE);
+    const registry = loadInEnglish(PLANE_MODULE);
     const state = createGameState('camp');
     state.inventory.blade = 1;
     (state.modals as ModalFrame[]).push({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' });
@@ -730,7 +731,7 @@ describe('the value a screen leaves by', () => {
   };
 
   it('is listed on every question the inventory asks, and takes it down from any of them', () => {
-    const session = startSession(loadModule(CARRIED_MODULE));
+    const session = startSession(loadInEnglish(CARRIED_MODULE));
     applyDirective(session, { kind: 'load', save: 'coiled' });
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
 

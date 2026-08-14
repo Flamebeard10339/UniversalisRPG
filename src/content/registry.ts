@@ -12,7 +12,7 @@ import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
 import { GameEvent, eventSchema } from './event';
 import { Item, itemRoleProblem, itemSchema } from './item';
-import { actionSlug, actionSlugProblem, addLocaleSection, emptyLocales, GENERATED_FIELD, localeKey, Locales, LocaleSection, TEXT_FIELDS } from './locale';
+import { actionSlug, actionSlugProblem, addLocaleSection, emptyLocales, GENERATED_FIELD, localeKey, Locales, LocaleSection, TEXT_FIELDS, unsuppliedParameters } from './locale';
 import { Passive, passiveRangeProblem, passiveSchema } from './passive';
 import { getShape } from './shapes';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
@@ -1043,11 +1043,10 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   }
   const validationFailure = validateBuiltRegistry(registry, owners, danglingRoots);
   if (validationFailure) return { failure: validationFailure };
-  // After validation, because that is where an entity's `uses:` becomes an
-  // action of its own and where an action naming what is gone is pruned: the
-  // labels keyed here are the ones a player will be offered.
-  // After validation, so that content dropped for a dangling reference leaves
-  // no key behind for a translator to answer.
+  // Both passes run after validation, so that content dropped for a dangling
+  // reference leaves no key behind for a translator to answer — and so that the
+  // labels keyed below are the assembled ones a player will be offered, since
+  // validation is where an entity's `uses:` becomes an action of its own.
   for (const [kind, byId] of merged) {
     for (const [id, section] of byId) {
       if (registry.namespace.has(kind, id)) recordBaseText(registry, languages, kind, section.value as Record<string, unknown>);
@@ -1059,6 +1058,18 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       return { failure: { module: sectionOwner(owners, kind, id) ?? modules[0], stage: 'build', error } };
+    }
+  }
+  // Last, because it reads both halves: what a locale said and what the English
+  // it is translating names. A parameter nothing supplies throws at the moment
+  // the screen is drawn, so it is refused where the value is assembled instead.
+  const byNamespace = new Map(modules.map((module) => [module.namespace, module]));
+  for (const declared of registry.locales.sections) {
+    for (const { key, value } of declared.entries) {
+      const unsupplied = unsuppliedParameters(registry.locales, declared.language, key, value);
+      if (unsupplied.length === 0) continue;
+      const error = new DslError(`# locale ${declared.language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
+      return { failure: { module: byNamespace.get(declared.module) ?? modules[0], stage: 'build', error } };
     }
   }
   return { registry };

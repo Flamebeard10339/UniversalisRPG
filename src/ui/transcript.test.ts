@@ -4,7 +4,8 @@ import type { CommandOutput } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 
-function viewAt(id: string, said: string[] = [], description = ''): PlayView {
+function viewAt(id: string, plain: string[] = [], description = ''): PlayView {
+  const said = plain.map(asLocalized);
   return {
     location: { id, title: asLocalized(`title of ${id}`), description: asLocalized(description) },
     entities: [],

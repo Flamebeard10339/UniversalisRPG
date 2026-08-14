@@ -1429,3 +1429,36 @@ describe('every screen a title reaches is played in one language', () => {
     expect(carrying('fr').planes.map((plane) => plane.title)).toEqual(['forge.item.blade.title']);
   });
 });
+
+// pass 3: the plane screen composed its heading out of the registry's title and
+// an English refusal, and `ModalOption.label` was a plain string, so nothing
+// stopped it. c3 held on every other screen and failed on this one.
+describe('a modal names what it is about in the language being played', () => {
+  const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# cluster-jewel core', 'shape: point', 'open-connections: e', '', '# item blade', 'title: Blade', 'slot: mainhand', 'max-level: 1', 'origin-cluster: core'].join('\n');
+  const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada', 'engine.plane.heading: {plane} en {hex}', 'engine.modal.item: Objeto'].join('\n');
+
+  const carrying = (language: string): PlaySession => {
+    const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
+    registry.saves.set('armed', { version: SAVE_VERSION, diff: { inventory: { 'forge.blade': 1 } } });
+    const session = startSession(registry, language);
+    applyDirective(session, { kind: 'load', save: 'armed' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    return session;
+  };
+
+  const grown = (language: string): PlayView => {
+    const session = carrying(language);
+    submitModal(session, { item: view(session).modals[0].options[0].values![0] });
+    return submitModal(session, { verb: 'Grow' });
+  };
+
+  it('labels the carried screen in it', () => {
+    expect(view(carrying('en')).modals[0].options[0].label).toBe('Item');
+    expect(view(carrying('es')).modals[0].options[0].label).toBe('Objeto');
+  });
+
+  it('heads the plane screen with the copy it is of, named in it', () => {
+    expect(grown('en').modals[0].options[0].label).toBe('Blade at 0,0');
+    expect(grown('es').modals[0].options[0].label).toBe('Espada en 0,0');
+  });
+});
