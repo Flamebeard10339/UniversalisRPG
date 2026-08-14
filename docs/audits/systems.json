@@ -546,6 +546,13 @@
             "src/runtime/localized.ts"
           ],
           "note": "produced by the-published-surface-declares-what-is-words-and-what-is-an-"
+        },
+        {
+          "name": "a command message says whose words it is",
+          "paths": [
+            "src/runtime/command.ts"
+          ],
+          "note": "produced by the-command-layer-and-the-plane-refuse-in-keys — CommandOutput's message arm is PlayerMessage (a Localized from a key, moving with the played language) or ToolMessage (the authoring tool's own English), discriminated at runtime by words: 'player' | 'tool'. PlayerMessage is a published.test.ts root, so the brand cannot be dropped silently."
         }
       ]
     },
