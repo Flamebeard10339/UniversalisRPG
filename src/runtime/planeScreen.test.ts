@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseDirectiveLine } from '../content/test';
-import { } from '../content/registry';
-import { loadInEnglish } from '../content/engineLocale';
+import { loadUniverse } from '../content/registry';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { carriedFrame } from './carriedScreen';
 import { equip } from './equipment';
 import { growLine } from './growth';
@@ -11,6 +11,8 @@ import { planeReport } from './planeReport';
 import { BACK, PLANE, PlaneFrame, planeFocus, planeFrame, planeOptions, planeStale, planeSubmit } from './planeScreen';
 import { initialState } from './save';
 import { GameState } from './state';
+import { inEnglish } from './sayFixture';
+import { aCount, anId, says } from './said';
 
 const MODULE = `
 # location camp
@@ -179,7 +181,7 @@ describe('the modal prefills and never narrows', () => {
       'allocate: 1 at 1,0 position 1',
     ]) {
       const growth = growLine(typed, registry, line);
-      if (!growth.ok) throw new Error(growth.refused);
+      if (!growth.ok) throw new Error(inEnglish(registry, growth.refused));
     }
 
     expect(JSON.stringify(answered)).toBe(JSON.stringify(typed));
@@ -225,7 +227,7 @@ describe('what the screen does with an answer', () => {
     const before = JSON.stringify(state);
 
     const refused = walk(state, spent, ['allocate: position 1']);
-    expect(refused).toEqual({ ...planeFrame('1', '1,0'), said: 'position 1 of 1,0 costs a point and none remain' });
+    expect(refused).toEqual({ ...planeFrame('1', '1,0'), said: says('engine.plane.no-points', { node: says('engine.plane.node.position', { position: aCount(1), hex: anId('1,0') }) }) });
     expect(label(refused as PlaneFrame, state)).toBe('Modified Blade at 1,0 — position 1 of 1,0 costs a point and none remain');
     expect(values(refused as PlaneFrame, state)).toContain('allocate: position 1');
     expect(JSON.stringify(state)).toBe(before);
@@ -259,7 +261,7 @@ describe('what the screen has in hand', () => {
   // A refusal is what the screen says, not what it holds, so the focus is the
   // same two ids whether or not the plane last refused something.
   it('names them the same whatever the plane last said', () => {
-    expect(planeFocus(planeFrame('blade', '1,0', 'no points remain'))).toEqual({ instance: 'blade', hex: '1,0' });
+    expect(planeFocus(planeFrame('blade', '1,0', says('engine.plane.no-points', { node: anId('position 1 of 1,0') })))).toEqual({ instance: 'blade', hex: '1,0' });
   });
 });
 
@@ -287,5 +289,60 @@ describe('what a saved frame may still point at', () => {
     const state = carrying({ blade: 1, whetstone: 1 });
 
     expect(planeStale(planeFrame('blade', '1,0'), state, registry)).toBe('it holds 1,0, where that plane has no cluster');
+  });
+});
+
+// c3: what a frame stores is a key and its parameters, so the sentence is made
+// when the screen is drawn and by whoever is reading it. Both directions,
+// because a save written by one player is loaded by the other.
+describe('a frame carries a key, not a sentence', () => {
+  const SPANISH = [
+    '# info camp-es',
+    'version: 1.0.0',
+    '',
+    '# locale es',
+    'item.blade.title: Hoja',
+    'engine.item.modified: {item} modificada',
+    'engine.plane.heading.said: {plane} en {hex} — {said}',
+    'engine.plane.no-points: {node} cuesta un punto y no queda ninguno',
+    'engine.plane.node.position: posicion {position} de {hex}',
+  ].join('\n');
+  const bilingual = loadUniverse([engineLocale(), { name: 'camp', text: MODULE }, { name: 'camp-es', text: SPANISH }]);
+
+  // The screen a refused allocation leaves standing, and the state it was left
+  // in, which is what a save of that session would carry.
+  const refusedIn = (language: string): { frame: PlaneFrame; state: GameState } => {
+    const state = initialState(bilingual, language);
+    Object.assign(state.inventory, { blade: 1, whetstone: 2, 'spark-jewel': 1 });
+    let frame: ModalFrame | null = planeFrame('blade');
+    for (const answer of [...FED, 'allocate: slot e', 'slot: e with Spark Jewel', 'allocate: slot ne', 'Go to 1,0', 'allocate: position 1']) {
+      if (frame === null || frame.name !== 'item-plane') throw new Error(`no plane screen to answer ${answer} on`);
+      const published = (planeOptions(frame, state, bilingual)[0].values ?? []).map((choice) => choice.value);
+      expect(published, language).toContain(answer);
+      frame = planeSubmit({ ...frame, answers: { [PLANE]: answer } }, state, bilingual);
+    }
+    if (frame === null || frame.name !== 'item-plane' || frame.said === undefined) throw new Error('the plane refused nothing');
+    return { frame, state };
+  };
+
+  // The same session read by the other player: one save, one instance table,
+  // one frame, and only the language setting between them.
+  const readIn = (language: string, written: { frame: PlaneFrame; state: GameState }): string =>
+    planeOptions(written.frame, { ...written.state, language }, bilingual)[0].label;
+
+  it('stores no words, so the same frame reads in whichever language loads it', () => {
+    const english = refusedIn('en');
+    const spanish = refusedIn('es');
+
+    expect(english.frame.said).toEqual(spanish.frame.said);
+    expect(JSON.parse(JSON.stringify(english.frame.said))).toEqual({
+      engine: 'engine.plane.no-points',
+      params: { node: { engine: 'engine.plane.node.position', params: { position: { count: 1 }, hex: { id: '1,0' } } } },
+    });
+  });
+
+  it('renders a frame written by one player in the language of the other, both directions', () => {
+    expect(readIn('en', refusedIn('es'))).toBe('Modified Blade at 1,0 — position 1 of 1,0 costs a point and none remain');
+    expect(readIn('es', refusedIn('en'))).toBe('Hoja modificada en 1,0 — posicion 1 de 1,0 cuesta un punto y no queda ninguno');
   });
 });

@@ -289,8 +289,10 @@
         "src/runtime/rng.ts",
         "src/runtime/runtime.test.ts",
         "src/runtime/runtime.ts",
+        "src/runtime/said.ts",
         "src/runtime/save.test.ts",
         "src/runtime/save.ts",
+        "src/runtime/sayFixture.ts",
         "src/runtime/session.test.ts",
         "src/runtime/session.ts",
         "src/runtime/skills.test.ts",
@@ -510,6 +512,14 @@
             "src/runtime/carriedName.ts"
           ],
           "note": "produced by an-instance-is-named-from-its-template; where the played language has no title for the template, a grown copy is named <template>#<ordinal> rather than the template's key, because a locale addresses only a template"
+        },
+        {
+          "name": "a sentence the engine has not said yet",
+          "paths": [
+            "src/runtime/said.ts",
+            "src/runtime/sayFixture.ts"
+          ],
+          "note": "produced by a-plane-frame-carries-a-key-not-a-sentence; a Said is an engine key and the parameters it takes, unrendered, so a growth refusal can be stored, replayed and read in whichever language loads it"
         }
       ]
     },

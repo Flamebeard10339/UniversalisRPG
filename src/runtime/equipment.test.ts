@@ -7,6 +7,7 @@ import { parseSaveSection } from '../content/saveSection';
 import { carriedCount, carriesItem, feedItem } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { secondsToMs, toMilliUnits } from './units';
+import { inEnglish } from './sayFixture';
 
 const MODULE = `
 # stat attack
@@ -264,7 +265,7 @@ function carrying(registry: Registry, stacks: Record<string, number>): GameState
 
 function fed(state: GameState, registry: Registry, target: string): string {
   const outcome = feedItem(state, registry, target, 'whetstone');
-  if (!outcome.ok) throw new Error(outcome.refused);
+  if (!outcome.ok) throw new Error(inEnglish(registry, outcome.refused));
   return outcome.instance;
 }
 

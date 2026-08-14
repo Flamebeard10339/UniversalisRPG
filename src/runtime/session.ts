@@ -24,6 +24,7 @@ import { Directive } from '../content/test';
 import { printDirective } from '../content/serialize';
 import { Localized, Localizer, localizerOf } from './localized';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
+import { say } from './said';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft';
 
@@ -659,10 +660,10 @@ function performDirective(session: PlaySession, directive: Directive): { failure
     case 'slot':
     case 'allocate':
     case 'apply':
-      return grew(state, grow(state, registry, directive));
+      return grew(session, state, grow(state, registry, directive));
     case 'refuse': {
       const growth = grow(state, registry, directive.inner);
-      grew(state, growth);
+      grew(session, state, growth);
       return growth.ok ? { failure: `${printDirective(directive.inner)} was not refused` } : {};
     }
   }
@@ -671,10 +672,11 @@ function performDirective(session: PlaySession, directive: Directive): { failure
 // The refusal goes both ways a refused walk's does: into the log, where a
 // player reads what the world said, and back to the caller, which is how a
 // test knows the outcome rather than inferring it from state that did not move.
-function grew(state: GameState, growth: Growth): { failure?: string } {
+function grew(session: PlaySession, state: GameState, growth: Growth): { failure?: string } {
   if (growth.ok) return {};
-  state.log.push(growth.refused);
-  return { failure: growth.refused };
+  const refused = say(sessionLocalizer(session), growth.refused);
+  state.log.push(refused);
+  return { failure: refused };
 }
 
 export interface TestResult {

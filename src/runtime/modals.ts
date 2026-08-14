@@ -6,6 +6,7 @@ import { Localized, Localizer, localizerOf } from './localized';
 import { GameState, RuntimeError } from './state';
 import { Registry } from '../content/registry';
 import type { EngineKey } from '../content/locale';
+import type { Said } from './said';
 
 // A modal is a named screen that presents options, sits atop whatever is
 // beneath it, and is cleared once every option has an answer. Nothing here
@@ -45,7 +46,7 @@ export type ModalAnswers = Readonly<Record<string, string>>;
 export type ModalFrame =
   | { readonly name: 'character-creation'; readonly answers: ModalAnswers }
   | { readonly name: 'carried-items'; readonly answers: ModalAnswers }
-  | { readonly name: 'item-plane'; readonly answers: ModalAnswers; readonly target: string; readonly hex: string; readonly said?: string }
+  | { readonly name: 'item-plane'; readonly answers: ModalAnswers; readonly target: string; readonly hex: string; readonly said?: Said }
   | { readonly name: 'dialogue'; readonly answers: ModalAnswers; readonly cursor: DialogueCursor };
 
 export type ModalName = ModalFrame['name'];

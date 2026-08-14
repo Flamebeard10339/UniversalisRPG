@@ -8,6 +8,7 @@ import { allocate, feedItem, Growth, itemInstance, slotJewel } from './itemInsta
 import { initialState } from './save';
 import { hitDamage, statValue } from './stats';
 import { GameState } from './state';
+import { inEnglish } from './sayFixture';
 
 const MODULE = `
 # location camp
@@ -106,7 +107,7 @@ const registry = loadInEnglish(MODULE);
 const AT_E: Hex = { q: 1, r: 0 };
 
 function ok(outcome: Growth): string {
-  if (!outcome.ok) throw new Error(outcome.refused);
+  if (!outcome.ok) throw new Error(inEnglish(registry, outcome.refused));
   return outcome.instance;
 }
 
@@ -140,6 +141,8 @@ function apply(state: GameState, effects: string[], hex: Hex = ORIGIN): Growth {
 
 const health = (state: GameState): number => statValue('max-health', state, registry);
 
+const refusalOf = (outcome: Growth): string => (outcome.ok ? 'not refused' : inEnglish(registry, outcome.refused));
+
 describe('applying a cluster effect', () => {
   it('consumes the item and records it against the cluster it was used on', () => {
     const state = wearing('blade', [2], { 'lesser-orb': 1 });
@@ -159,13 +162,13 @@ describe('applying a cluster effect', () => {
 
   it('refuses an item carrying no cluster effect, with the item intact', () => {
     const state = wearing('blade', [2], { 'node-jewel': 1 });
-    expect(applyClusterEffect(state, registry, '1', 'node-jewel', ORIGIN)).toEqual({ ok: false, refused: 'node-jewel carries no cluster effect' });
+    expect(refusalOf(applyClusterEffect(state, registry, '1', 'node-jewel', ORIGIN))).toBe('node-jewel carries no cluster effect');
     expect(state.inventory['node-jewel']).toBe(1);
   });
 
   it('refuses a hex no cluster stands in, with the item intact', () => {
     const state = wearing('blade', [2], { 'lesser-orb': 1 });
-    expect(applyClusterEffect(state, registry, '1', 'lesser-orb', AT_E)).toEqual({ ok: false, refused: 'no cluster stands in 1,0' });
+    expect(refusalOf(applyClusterEffect(state, registry, '1', 'lesser-orb', AT_E))).toBe('no cluster stands in 1,0');
     expect(state.inventory['lesser-orb']).toBe(1);
   });
 
@@ -173,7 +176,7 @@ describe('applying a cluster effect', () => {
     const state = wearing('blade', [2], { 'lesser-orb': 1, 'greater-orb': 1, 'third-orb': 1 });
     apply(state, ['lesser-orb', 'greater-orb']);
 
-    expect(applyClusterEffect(state, registry, '1', 'third-orb', ORIGIN)).toEqual({ ok: false, refused: 'the cluster at 0,0 fills all 2 of its mod slots' });
+    expect(refusalOf(applyClusterEffect(state, registry, '1', 'third-orb', ORIGIN))).toBe('the cluster at 0,0 fills all 2 of its mod slots');
     expect(state.inventory['third-orb']).toBe(1);
     expect(clusterAt(itemInstance(state, '1')!.plane, ORIGIN)!.effects).toEqual(['lesser-orb', 'greater-orb']);
   });
@@ -182,7 +185,7 @@ describe('applying a cluster effect', () => {
     const state = wearing('tight-blade', [], { 'lesser-orb': 1, 'greater-orb': 1 });
     apply(state, ['lesser-orb']);
 
-    expect(applyClusterEffect(state, registry, '1', 'greater-orb', ORIGIN)).toEqual({ ok: false, refused: 'the cluster at 0,0 fills all 1 of its mod slots' });
+    expect(refusalOf(applyClusterEffect(state, registry, '1', 'greater-orb', ORIGIN))).toBe('the cluster at 0,0 fills all 1 of its mod slots');
     expect(state.inventory['greater-orb']).toBe(1);
   });
 
@@ -190,7 +193,7 @@ describe('applying a cluster effect', () => {
     const state = wearing('blade', [2], { 'lesser-orb': 2 });
     apply(state, ['lesser-orb']);
 
-    expect(applyClusterEffect(state, registry, '1', 'lesser-orb', ORIGIN)).toEqual({ ok: false, refused: 'the cluster at 0,0 already carries lesser-orb' });
+    expect(refusalOf(applyClusterEffect(state, registry, '1', 'lesser-orb', ORIGIN))).toBe('the cluster at 0,0 already carries lesser-orb');
     expect(state.inventory['lesser-orb']).toBe(1);
   });
 
@@ -205,7 +208,7 @@ describe('applying a cluster effect', () => {
   // both items survive, still stackable and still usable for what they are.
   it('refuses a jewel in inventory as its target, leaving both items stacked and uninstanced', () => {
     const state = carrying({ 'node-jewel': 3, 'lesser-orb': 1 });
-    expect(applyClusterEffect(state, registry, 'node-jewel', 'lesser-orb', ORIGIN)).toEqual({ ok: false, refused: 'node-jewel is not a base: only an item you can wear has a plane to grow' });
+    expect(refusalOf(applyClusterEffect(state, registry, 'node-jewel', 'lesser-orb', ORIGIN))).toBe('node-jewel is not a base: only an item you can wear has a plane to grow');
 
     expect(state.inventory).toEqual({ 'node-jewel': 3, 'lesser-orb': 1 });
     expect(state.instances.byId).toEqual({});
@@ -216,7 +219,7 @@ describe('applying a cluster effect', () => {
   // jewel case above.
   it('refuses an orb in inventory as its target, leaving both items stacked and uninstanced', () => {
     const state = carrying({ 'lesser-orb': 1, 'greater-orb': 1 });
-    expect(applyClusterEffect(state, registry, 'lesser-orb', 'greater-orb', ORIGIN)).toEqual({ ok: false, refused: 'lesser-orb is not a base: only an item you can wear has a plane to grow' });
+    expect(refusalOf(applyClusterEffect(state, registry, 'lesser-orb', 'greater-orb', ORIGIN))).toBe('lesser-orb is not a base: only an item you can wear has a plane to grow');
 
     expect(state.inventory).toEqual({ 'lesser-orb': 1, 'greater-orb': 1 });
     expect(state.instances.byId).toEqual({});

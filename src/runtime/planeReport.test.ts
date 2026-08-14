@@ -9,6 +9,7 @@ import { allocate, feedItem, Growth, slotJewel } from './itemInstance';
 import { ClusterReport, PlaneReport, planeReport, planeReports, PositionReport, SlotReport } from './planeReport';
 import { initialState } from './save';
 import { GameState } from './state';
+import { inEnglish } from './sayFixture';
 
 const MODULE = `
 # location camp
@@ -71,7 +72,7 @@ item-experience: 1000
 const registry = loadInEnglish(MODULE);
 
 function ok(outcome: Growth): string {
-  if (!outcome.ok) throw new Error(outcome.refused);
+  if (!outcome.ok) throw new Error(inEnglish(registry, outcome.refused));
   return outcome.instance;
 }
 

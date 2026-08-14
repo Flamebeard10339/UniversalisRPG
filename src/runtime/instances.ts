@@ -1,6 +1,7 @@
 import { mayBeInstanceId } from '../content/instanceId';
 import type { Registry } from '../content/registry';
-import { Localized, Localizer, localizerOf } from './localized';
+import { Localized, localizerOf } from './localized';
+import { say, type Said } from './said';
 import type { PruneWarning } from './save';
 import { GameState, RuntimeError } from './state';
 
@@ -52,7 +53,7 @@ export interface InstanceKind<P = unknown> {
   // repair. `live` is the substrate's answer, so a kind never asks the table.
   // Called until the table settles, so a payload with nothing left to repair
   // must return nothing rather than repeat what it already reported.
-  repair(payload: P, registry: Registry, live: (id: string) => boolean, localizer: Localizer): Localized[];
+  repair(payload: P, registry: Registry, live: (id: string) => boolean): Said[];
 }
 
 const KINDS = new Map<string, InstanceKind<never>>();
@@ -144,8 +145,8 @@ export function pruneInstances(state: GameState, registry: Registry): PruneWarni
     settled = true;
     for (const [id, held] of Object.entries(table.byId)) {
       const definition = kindOf(held.kind)!;
-      for (const repaired of definition.repair(held.payload as never, registry, (ref) => instanceIsLive(state, ref), localizer)) {
-        warn(id, localizer.engine('engine.prune.instance.repaired', { instance: named(id), repair: repaired }));
+      for (const repaired of definition.repair(held.payload as never, registry, (ref) => instanceIsLive(state, ref))) {
+        warn(id, localizer.engine('engine.prune.instance.repaired', { instance: named(id), repair: say(localizer, repaired) }));
       }
       if (definition.empty(held.payload as never)) {
         drop(id, localizer.engine('engine.prune.instance.empty', { instance: named(id) }));

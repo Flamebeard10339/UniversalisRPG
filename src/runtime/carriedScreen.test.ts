@@ -7,6 +7,7 @@ import { carriedCount, feedItem } from './itemInstance';
 import { planeFrame } from './planeScreen';
 import { initialState } from './save';
 import { GameState } from './state';
+import { inEnglish } from './sayFixture';
 
 const MODULE = `
 # location camp
@@ -43,7 +44,7 @@ function carrying(inventory: Record<string, number>, over: Registry = registry):
 function withGrownBlade(): GameState {
   const state = carrying({ 'heartwood-blade': 2, whetstone: 1 });
   const grown = feedItem(state, registry, 'heartwood-blade', 'whetstone');
-  if (!grown.ok) throw new Error(grown.refused);
+  if (!grown.ok) throw new Error(inEnglish(registry, grown.refused));
   return state;
 }
 
@@ -96,7 +97,7 @@ describe('what the screen lists', () => {
     const state = carrying({ 'heartwood-blade': 3, whetstone: 2 });
     for (const _ of [0, 1]) {
       const grown = feedItem(state, registry, 'heartwood-blade', 'whetstone');
-      if (!grown.ok) throw new Error(grown.refused);
+      if (!grown.ok) throw new Error(inEnglish(registry, grown.refused));
     }
     const copies = carriedEntries(state, registry).filter((entry) => entry.grown);
 

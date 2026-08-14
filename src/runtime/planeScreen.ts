@@ -6,6 +6,7 @@ import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from '
 import { carriedEntries, carriedFrame } from './carriedScreen';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
+import { isSaid, say, type Said } from './said';
 import { itemCopies, wornCopySlot } from './itemInstance';
 import { type ModalChoice, type ModalFrame, type ModalOption } from './modals';
 import { ClusterReport, PlaneFocus, PlaneReport, planeReport } from './planeReport';
@@ -26,7 +27,7 @@ export const PLANE = 'plane';
 
 export type PlaneFrame = Extract<ModalFrame, { name: 'item-plane' }>;
 
-export function planeFrame(target: string, hex: string = hexKey(ORIGIN), said?: string): PlaneFrame {
+export function planeFrame(target: string, hex: string = hexKey(ORIGIN), said?: Said): PlaneFrame {
   const frame: PlaneFrame = { name: 'item-plane', answers: {}, target, hex };
   return said === undefined ? frame : { ...frame, said };
 }
@@ -133,7 +134,7 @@ function heading(localizer: Localizer, frame: PlaneFrame, report: PlaneReport | 
   const plane = report?.name ?? localizer.identifier(frame.target);
   const hex = localizer.identifier(frame.hex);
   if (frame.said === undefined) return localizer.engine('engine.plane.heading', { plane, hex });
-  return localizer.engine('engine.plane.heading.said', { plane, hex, said: localizer.prose(frame.said) });
+  return localizer.engine('engine.plane.heading.said', { plane, hex, said: say(localizer, frame.said) });
 }
 
 export function planeOptions(frame: PlaneFrame, state: GameState, registry: Registry): ModalOption[] {
@@ -172,10 +173,11 @@ export function planeFocus(frame: PlaneFrame): PlaneFocus {
 }
 
 // Beyond a name and answers, a saved frame is two ids and whatever the plane
-// last said. Shape only: whether either id still names anything is planeStale's.
+// last said, as the key it was said with. Shape only: whether either id still
+// names anything is planeStale's.
 export function isPlaneFrameBody(value: Record<string, unknown>): boolean {
   if (typeof value.target !== 'string' || typeof value.hex !== 'string') return false;
-  return value.said === undefined || typeof value.said === 'string';
+  return value.said === undefined || isSaid(value.said);
 }
 
 export function planeStale(frame: PlaneFrame, state: GameState, registry: Registry): Localized | null {

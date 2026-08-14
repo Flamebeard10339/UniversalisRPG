@@ -9,8 +9,7 @@ import {
   isInstanceTable,
   removeInstance,
 } from './instances';
-import { asLocalized } from './localizedFixture';
-import type { Localized } from './localized';
+import { anId, type Said } from './said';
 import { nextRandom } from './rng';
 import { createGameState } from './state';
 import { initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
@@ -54,14 +53,14 @@ defineInstanceKind<Token>(TOKEN, {
   },
   empty: (payload) => payload.notes.length === 0 && payload.stat === null && payload.linked.length === 0,
   repair: (payload, registry, live) => {
-    const repairs: Localized[] = [];
+    const repairs: Said[] = [];
     if (payload.stat !== null && !registry.stats.has(payload.stat)) {
-      repairs.push(asLocalized(`dropped stat ${payload.stat}, which is not loaded`));
+      repairs.push(anId(`dropped stat ${payload.stat}, which is not loaded`));
       payload.stat = null;
     }
     for (const ref of [...payload.linked]) {
       if (live(ref)) continue;
-      repairs.push(asLocalized(`dropped link to instance ${ref}, which is gone`));
+      repairs.push(anId(`dropped link to instance ${ref}, which is gone`));
       payload.linked.splice(payload.linked.indexOf(ref), 1);
     }
     return repairs;

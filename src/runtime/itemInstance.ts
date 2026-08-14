@@ -2,9 +2,8 @@ import { Direction, Hex, PlaneNode } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
-import { carriedName } from './carriedName';
 import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';
-import { Localized, localizerOf } from './localized';
+import { anId, aCopy, aCount, says, type Said } from './said';
 import { skillLevel } from './skills';
 import { GameState } from './state';
 
@@ -18,13 +17,14 @@ export interface ItemInstance {
   plane: Plane;
 }
 
-// What a refused verb tells the player. It has been through the localizer, so
-// a refusal cannot be assembled out of a registry field on its way to a screen.
-export type Refusal = { ok: false; refused: Localized };
+// What a refused verb tells the player: the key and the parameters it takes,
+// unsaid, because a refusal outlives the screen it was taken on — a plane frame
+// carries one across a save, and which words it is depends on who loads it (c3).
+export type Refusal = { ok: false; refused: Said };
 export type Growth = { ok: true; instance: string } | Refusal;
 export type Destruction = { ok: true; item: string } | Refusal;
 
-const refused = (reason: Localized): Refusal => ({ ok: false, refused: reason });
+const refused = (reason: Said): Refusal => ({ ok: false, refused: reason });
 
 export function isItemInstance(payload: unknown): payload is ItemInstance {
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return false;
@@ -40,7 +40,7 @@ defineInstanceKind<ItemInstance>(ITEM_INSTANCE, {
   templateLoaded: (registry, template) => registry.items.has(template),
   holds: isItemInstance,
   empty: () => false,
-  repair: (payload, registry, _live, localizer) => repairPlane(localizer, registry, payload.plane),
+  repair: (payload, registry) => repairPlane(registry, payload.plane),
 });
 
 function grown(state: GameState, id: string): { template: string; payload: ItemInstance } | undefined {
@@ -226,7 +226,7 @@ export function hasStackCopy(state: GameState, id: string): boolean {
 // its plane consumed does not come back. A stack loses one, and an emptied
 // stack goes rather than staying on as a count of none. Nothing here puts the
 // item down anywhere, and nothing here asks whether the player meant it.
-export function destroyItem(state: GameState, registry: Registry, id: string): Destruction {
+export function destroyItem(state: GameState, id: string): Destruction {
   const copy = named(state, id);
   const standing = grown(state, copy);
   if (standing) {
@@ -235,10 +235,7 @@ export function destroyItem(state: GameState, registry: Registry, id: string): D
     return { ok: true, item: standing.template };
   }
   const source = stackCopy(state, id);
-  if (!source) {
-    const localizer = localizerOf(registry, state);
-    return refused(localizer.engine('engine.growth.no-copy', { item: localizer.identifier(id) }));
-  }
+  if (!source) return refused(says('engine.growth.no-copy', { item: anId(id) }));
   const template = itemTemplate(state, id);
   if (source.from === 'slot') delete state.equipped[source.slot];
   else {
@@ -259,7 +256,7 @@ export function pointsRemaining(payload: ItemInstance, item: Item): number {
 interface Growing {
   target: string;
   consumes?: string;
-  change(payload: ItemInstance, item: Item): Localized | undefined;
+  change(payload: ItemInstance, item: Item): Said | undefined;
 }
 
 const held = (state: GameState, itemId: string): number => copiesOf(state, itemId).stack;
@@ -275,20 +272,19 @@ const take = (state: GameState, itemId: string): void => void stockItem(state, i
 // copy that left is the copy that was worn, so the slot names the minted id and
 // the player wears what they grew.
 export function growItem(state: GameState, registry: Registry, growing: Growing): Growth {
-  const localizer = localizerOf(registry, state);
   const { target, consumes } = growing;
   const copy = named(state, target);
   const standing = grown(state, copy);
   const template = itemTemplate(state, target);
   const item = registry.items.get(template);
-  if (!item) return refused(localizer.engine('engine.growth.unknown-item', { item: localizer.identifier(target) }));
+  if (!item) return refused(says('engine.growth.unknown-item', { item: anId(target) }));
 
   const plane = basePlane(item);
-  if (!plane) return refused(localizer.engine('engine.growth.not-a-base', { item: localizer.identifier(template) }));
+  if (!plane) return refused(says('engine.growth.not-a-base', { item: anId(template) }));
 
   const source = standing ? undefined : stackCopy(state, target);
-  if (!standing && !source) return refused(localizer.engine('engine.growth.no-copy', { item: localizer.identifier(template) }));
-  if (consumes !== undefined && held(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(localizer.engine('engine.growth.no-copy', { item: localizer.identifier(consumes) }));
+  if (!standing && !source) return refused(says('engine.growth.no-copy', { item: anId(template) }));
+  if (consumes !== undefined && held(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(says('engine.growth.no-copy', { item: anId(consumes) }));
 
   const payload = standing?.payload ?? { experience: 0, plane };
   const problem = growing.change(payload, item);
@@ -304,14 +300,13 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
 
 // c12: the only event in the game that moves an item's experience.
 export function feedItem(state: GameState, registry: Registry, target: string, food: string): Growth {
-  const localizer = localizerOf(registry, state);
   const experience = registry.items.get(food)?.itemExperience;
-  if (experience === undefined) return refused(localizer.engine('engine.growth.no-experience', { item: localizer.identifier(food) }));
+  if (experience === undefined) return refused(says('engine.growth.no-experience', { item: anId(food) }));
   return growItem(state, registry, {
     target,
     consumes: food,
     change: (payload, item) => {
-      if (itemLevel(payload, item) >= item.maxLevel) return localizer.engine('engine.growth.max-level', { item: carriedName(localizer, 'item', item.id, null), level: item.maxLevel });
+      if (itemLevel(payload, item) >= item.maxLevel) return says('engine.growth.max-level', { item: aCopy('item', item.id), level: aCount(item.maxLevel) });
       payload.experience += experience;
       return undefined;
     },
@@ -319,20 +314,18 @@ export function feedItem(state: GameState, registry: Registry, target: string, f
 }
 
 export function slotJewel(state: GameState, registry: Registry, target: string, jewelItem: string, hex: Hex, direction: Direction): Growth {
-  const localizer = localizerOf(registry, state);
   const jewel = registry.items.get(jewelItem)?.clusterJewel;
-  if (jewel === undefined) return refused(localizer.engine('engine.growth.not-a-jewel', { item: localizer.identifier(jewelItem) }));
+  if (jewel === undefined) return refused(says('engine.growth.not-a-jewel', { item: anId(jewelItem) }));
   return growItem(state, registry, {
     target,
     consumes: jewelItem,
-    change: (payload) => fillSlot(localizer, registry, payload.plane, hex, direction, jewel),
+    change: (payload) => fillSlot(registry, payload.plane, hex, direction, jewel),
   });
 }
 
 export function allocate(state: GameState, registry: Registry, target: string, node: PlaneNode): Growth {
-  const localizer = localizerOf(registry, state);
   return growItem(state, registry, {
     target,
-    change: (payload, item) => allocateNode(localizer, registry, payload.plane, node, pointsRemaining(payload, item)),
+    change: (payload, item) => allocateNode(registry, payload.plane, node, pointsRemaining(payload, item)),
   });
 }

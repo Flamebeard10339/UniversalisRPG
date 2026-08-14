@@ -12,7 +12,7 @@ import { Localized, Localizer, localizerOf } from './localized';
 import { PLAYER, templateOf } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 // A sparse diff against initialState: a new game saves as `{}`, and neither
 // `log` nor `language` is state — one is drained by reading it, the other is

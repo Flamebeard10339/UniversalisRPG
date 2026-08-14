@@ -719,11 +719,12 @@ describe('the plane screen, as a frame like any other', () => {
 
   it('refuses a saved body that is not a plane frame', () => {
     expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' })).toBe(true);
-    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0', said: 'no' })).toBe(true);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0', said: { engine: 'engine.plane.no-points', params: { node: { id: 'position 1 of 0,0' } } } })).toBe(true);
     expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade' })).toBe(false);
     expect(isModalFrame({ name: 'item-plane', answers: {}, hex: '0,0' })).toBe(false);
     expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: 7 })).toBe(false);
     expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0', said: 7 })).toBe(false);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0', said: { engine: 'no.such.key' } })).toBe(false);
   });
 });
 

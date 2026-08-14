@@ -10,6 +10,7 @@ import type { ModalChoice } from './modals';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 import { apply, applyDirective, beginAction, cancelAction, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
+import { inEnglish } from './sayFixture';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -739,7 +740,7 @@ describe('what the engine publishes', () => {
     const grownState = createGameState('camp');
     Object.assign(grownState.inventory, { gauntlet: 2, oil: 1 });
     const grown = feedItem(grownState, registry, 'gauntlet', 'oil');
-    if (!grown.ok) throw new Error(grown.refused);
+    if (!grown.ok) throw new Error(inEnglish(registry, grown.refused));
 
     const { version: _version, ...diff } = JSON.parse(serializeSave(grownState, registry)) as SaveDiff & { version: number };
     const session = primed(registry, diff);

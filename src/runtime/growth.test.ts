@@ -3,10 +3,13 @@ import { DslError } from '../grammar/parser';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { loadUniverse } from '../content/registry';
 import { grow, growLine } from './growth';
-import { itemInstance } from './itemInstance';
+import { itemInstance, type Growth } from './itemInstance';
 import { planeReport } from './planeReport';
 import { initialState } from './save';
 import { GameState, RuntimeError } from './state';
+import { localizerFor } from './localized';
+import { say } from './said';
+import { inEnglish } from './sayFixture';
 
 const MODULE = `
 # location camp
@@ -51,12 +54,14 @@ function fed(extra: Record<string, number> = {}): GameState {
   const state = initialState(registry);
   Object.assign(state.inventory, { blade: 1, whetstone: 1, ...extra });
   const growth = growLine(state, registry, 'feed: blade with whetstone');
-  if (!growth.ok) throw new Error(growth.refused);
+  if (!growth.ok) throw new Error(inEnglish(registry, growth.refused));
   return state;
 }
 
 const clusters = (state: GameState): Array<[string, string]> =>
   (planeReport(registry, state, '1')?.clusters ?? []).map((cluster) => [cluster.hex, cluster.jewel]);
+
+const refusalOf = (outcome: Growth): string => (outcome.ok ? 'not refused' : inEnglish(registry, outcome.refused));
 
 describe('the four verbs a growth names', () => {
   it('feeds a copy the experience its food carries', () => {
@@ -84,10 +89,7 @@ describe('the four verbs a growth names', () => {
   // The dispatch owns no rule of its own: the refusal a caller reads is the one
   // the plane wrote, handed back rather than restated here.
   it('hands back the refusal the verb itself wrote', () => {
-    expect(grow(fed(), registry, { kind: 'allocate', target: '1', node: { hex: { q: 9, r: 9 }, kind: 'position', position: 1 } })).toEqual({
-      ok: false,
-      refused: 'no cluster stands in 9,9',
-    });
+    expect(refusalOf(grow(fed(), registry, { kind: 'allocate', target: '1', node: { hex: { q: 9, r: 9 }, kind: 'position', position: 1 } }))).toBe('no cluster stands in 9,9');
   });
 });
 
@@ -107,7 +109,7 @@ describe('a growth reached from a line', () => {
   });
 
   it('refuses through the plane rather than through the parser, for a line that parses but cannot grow', () => {
-    expect(growLine(fed(), registry, 'allocate: 1 at 9,9 position 1')).toEqual({ ok: false, refused: 'no cluster stands in 9,9' });
+    expect(refusalOf(growLine(fed(), registry, 'allocate: 1 at 9,9 position 1'))).toBe('no cluster stands in 9,9');
   });
 
   it('is an engine fault, not a refusal, when a line is not a growth at all', () => {
@@ -137,7 +139,7 @@ describe('a refusal is a key, not a sentence', () => {
     Object.assign(state.inventory, { blade: 1, whetstone: 1, goad: 1 });
     const growth = growLine(state, bilingual, line);
     if (growth.ok) throw new Error(`${line} was not refused`);
-    return growth.refused;
+    return say(localizerFor(bilingual, language), growth.refused);
   };
 
   it('reads in the language being played', () => {

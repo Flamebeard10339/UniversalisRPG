@@ -99,8 +99,8 @@ const VERBS: readonly CarriedVerb[] = [
     shown: 'engine.carried.verb.destroy',
     applies: () => true,
     confirms: (entry) => entry.grown,
-    take: (entry, state, registry) => {
-      destroyItem(state, registry, entry.id);
+    take: (entry, state) => {
+      destroyItem(state, entry.id);
       return null;
     },
   },
