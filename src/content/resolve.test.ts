@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ACTION_MEMBER } from './namespace';
 import { loadModule, loadUniverse } from './registry';
 import { ModuleSource } from './universe';
 
@@ -161,5 +162,57 @@ describe('a new game begins in exactly one place', () => {
     expect(() => loadUniverse([module('base', '# location a', 'x: 0, y: 0', 'starting', '# location b', 'x: 1, y: 0', 'starting')])).toThrow(
       /is marked starting, and so is/,
     );
+  });
+});
+
+// c1. An action used to be reachable only by comparing its label against a
+// built table, which is why nothing outside the runtime could say whether one
+// existed. It hangs under its owner now, beside that owner's flags.
+describe("an action's address is a member of the namespace", () => {
+  const ISLA = module(
+    'isla',
+    '# action pry',
+    'instant',
+    'say: creak',
+    '# entity dresser',
+    'flags: searched',
+    'uses: pry',
+    'search drawer:',
+    '  instant',
+    '  say: dust',
+    '# location shore',
+    'x: 0, y: 0',
+    'starting',
+    'light beacon:',
+    '  instant',
+    '  say: lit',
+    '# item lamp',
+    'polish:',
+    '  instant',
+    '  say: shine',
+  );
+
+  const namespace = () => loadUniverse([ISLA]).namespace;
+
+  it('hangs an inline block under the object that heads it, on all three kinds that own one', () => {
+    expect(namespace().has(ACTION_MEMBER, 'isla.dresser.search-drawer')).toBe(true);
+    expect(namespace().has(ACTION_MEMBER, 'isla.shore.light-beacon')).toBe(true);
+    expect(namespace().has(ACTION_MEMBER, 'isla.lamp.polish')).toBe(true);
+  });
+
+  // Declared elsewhere and performed here, so the address is the id it was
+  // written under rather than a slug of the title it is shown as.
+  it('hangs an action a `uses:` brings under the entity that brings it', () => {
+    expect(namespace().has(ACTION_MEMBER, 'isla.dresser.pry')).toBe(true);
+    expect(namespace().has(ACTION_MEMBER, 'isla.pry')).toBe(false);
+  });
+
+  it('puts it beside the flags of the same owner, under the one path grammar', () => {
+    expect(namespace().has('flag', 'isla.dresser.searched')).toBe(true);
+    expect(namespace().snapshot()).toContain(`${ACTION_MEMBER} isla.dresser.search-drawer isla`);
+  });
+
+  it('declares nothing for an action nobody performs, so a slug is not a name on its own', () => {
+    expect(namespace().has(ACTION_MEMBER, 'isla.dresser.polish')).toBe(false);
   });
 });

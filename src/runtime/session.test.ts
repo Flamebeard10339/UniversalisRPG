@@ -9,8 +9,10 @@ import type { ModuleSource } from '../content/universe';
 import type { ModalChoice } from './modals';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
-import { apply, applyDirective, beginAction, cancelAction, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
+import { apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
 import { inEnglish } from './sayFixture';
+import { parseDirectiveLine, useChoiceId, type UseDirective } from '../content/test';
+import { printDirective } from '../content/serialize';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -1634,5 +1636,34 @@ describe('a modal answer is spelled in the base language on every screen, and on
     expect(words(verbs('es'))).toEqual(['Cultiva', 'engine.carried.verb.equip', 'engine.carried.verb.destroy', 'engine.carried.close']);
     expect(words(moves('es'))).toContain('alimenta: con Piedra');
     expect(words(moves('es'))).toContain('engine.plane.back');
+  });
+});
+
+// c6. The choice id the runtime offers and the `use:` an author writes are one
+// string in two places, and each used to carry its own template and its own
+// regex. Walked over the shipped content rather than a fixture, because what
+// the two have to agree on is every id a real session hands out.
+describe('a use: choice id and a use: directive are one shape', () => {
+  const useChoices = (v: PlayView) => v.choices.filter((choice) => choice.kind === 'action' && choice.id.startsWith('use:'));
+
+  it('offers no action choice the directive parser cannot read back', () => {
+    const session = startSession(loadInEnglish(source));
+    const offered = useChoices(view(session));
+
+    expect(offered.length).toBeGreaterThan(0);
+    for (const choice of offered) {
+      const directive = choiceToDirective(choice) as UseDirective;
+      expect(directive.kind).toBe('use');
+      expect(useChoiceId(directive)).toBe(choice.id);
+    }
+  });
+
+  it('prints a line the parser reads back as the directive the choice was', () => {
+    const session = startSession(loadInEnglish(source));
+
+    for (const choice of useChoices(view(session))) {
+      const directive = choiceToDirective(choice);
+      expect(parseDirectiveLine(printDirective(directive))).toEqual(directive);
+    }
   });
 });

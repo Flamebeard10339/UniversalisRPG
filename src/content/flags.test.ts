@@ -196,3 +196,37 @@ describe('a member key is owned by every kind that declares it', () => {
     expect(loadUniverse([door, adds]).namespace.has('flag', 'base.door.sealed')).toBe(true);
   });
 });
+
+// c3. An action's address goes away with the action for the same reason a flag
+// goes away with the field that listed it, through the same reconciliation
+// against the merged section — no removal logic of its own.
+describe('an action a field edit takes away', () => {
+  const BASE = module('base', '# action pry', 'instant', 'say: creak', '# entity dresser', 'uses: pry');
+  const cut = (id: string): ModuleSource => module(id, 'dependencies: base', '# entity base.dresser', '-uses: pry');
+  const wants = (id: string): ModuleSource => module(id, 'dependencies: base', '# test walk', 'use: entity.base.dresser.pry');
+  const dangles = /names an unknown action-slug: base.dresser.pry/;
+
+  it('goes away with the value, so a use: the edit stranded no longer resolves', () => {
+    expect(() => loadUniverse([BASE, wants('watcher')])).not.toThrow();
+    expect(() => loadUniverse([BASE, cut('mod'), wants('watcher')])).toThrow(dangles);
+  });
+
+  it('fails whichever module names it first, because what survives is decided at merge', () => {
+    expect(() => loadUniverse([BASE, cut('aaa-cut'), wants('zzz-wants')])).toThrow(dangles);
+    expect(() => loadUniverse([BASE, wants('aaa-wants'), cut('zzz-cut')])).toThrow(dangles);
+  });
+
+  it('stays when a + in the same section puts it back, because the merged section is what is asked', () => {
+    const readd = module('mod', 'dependencies: base', '# entity base.dresser', '-uses: pry', '+uses: pry');
+    expect(loadUniverse([BASE, readd, wants('watcher')]).entities.get('base.dresser')!.actions.map((action) => action.label)).toEqual(['Pry']);
+  });
+
+  // An entity's own block is a member the same way, and a patch that drops the
+  // whole entity takes both with it rather than either one alone.
+  it('takes an inline block with the object that headed it', () => {
+    const shelf = module('base', '# entity shelf', 'dust it:', '  instant', '  say: puff');
+    const uses = module('watcher', 'dependencies: base', '# test walk', 'use: entity.base.shelf.dust-it');
+    expect(() => loadUniverse([shelf, uses])).not.toThrow();
+    expect(() => loadUniverse([shelf, module('mod', 'dependencies: base', '# remove entity.base.shelf'), uses])).toThrow(/names an unknown entity: base.shelf/);
+  });
+});
