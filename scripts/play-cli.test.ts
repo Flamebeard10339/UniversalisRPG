@@ -3,10 +3,24 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../src/content/engineLocale';
+import { localizerFor } from '../src/runtime/localized';
+import { asLocalized } from '../src/runtime/localizedFixture';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { serializeSession, startSession, view } from '../src/runtime/session';
 import { COMMANDS, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
-import { driveRun, formatLive, formatOutput, formatResult, formatTick, loadModportalSources } from './play-cli';
+import { driveRun, formatLive, formatOutput, formatResult, formatTick, loadModportalSources, printed, type ReplLine } from './play-cli';
+
+// Every word this driver prints comes from an engine key, and the content text
+// it puts into one arrives localized on the view, so one English localizer
+// renders every case below whichever module the session was started from.
+const localizer = localizerFor(loadInEnglish(''), 'en');
+
+// What the terminal would have on it: the lines a result becomes, laid out.
+const asPrinted = (lines: readonly ReplLine[]): string[] => lines.map(printed);
+const shown = (result: CommandResult): string[] => asPrinted(formatResult(result, localizer));
+const drawn = (output: Parameters<typeof formatOutput>[0]): string[] => asPrinted(formatOutput(output, localizer));
+const live = (progress: Parameters<typeof formatLive>[0]): string => printed(formatLive(progress, localizer));
+const ticked = (progress: Parameters<typeof formatTick>[0]): string[] => asPrinted(formatTick(progress, localizer));
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -47,7 +61,7 @@ function onPlaneScreen(save: string, item: string): string[] {
   const ctx = driver(PLANE_SOURCE);
   runLine(ctx, `/load ${save}`);
   runLine(ctx, `/inv ${item}`);
-  return formatResult(runLine(ctx, '1'));
+  return shown(runLine(ctx, '1'));
 }
 
 function driver(text: string, speed = 1, driving = false): CommandContext {
@@ -67,7 +81,7 @@ function armed(ctx: CommandContext, choiceId: string) {
 describe('play-cli renders what a command result says happened', () => {
   it('prints a view as narration, location, occupants, pools, modals, choices and the clock', () => {
     const ctx = driver(source);
-    const lines = formatResult(runLine(ctx, '/look'));
+    const lines = shown(runLine(ctx, '/look'));
 
     expect(lines[0]).toBe('Guide House (tutorial-island.guide-house)');
     expect(lines[1]).toBe(`A cluttered but cozy cottage. Miki's guide house.`);
@@ -81,9 +95,9 @@ describe('play-cli renders what a command result says happened', () => {
     const ctx = driver(source);
     const described = `A cluttered but cozy cottage. Miki's guide house.`;
 
-    expect(formatResult(runLine(ctx, '/look'))).toContain(described);
-    expect(formatResult(runLine(ctx, '/wait 1'))).not.toContain(described);
-    expect(formatResult(runLine(ctx, '/look'))).toContain(described);
+    expect(shown(runLine(ctx, '/look'))).toContain(described);
+    expect(shown(runLine(ctx, '/wait 1'))).not.toContain(described);
+    expect(shown(runLine(ctx, '/look'))).toContain(described);
   });
 
   it('marks a match, a mismatch and a refusal with this driver’s own glyphs', () => {
@@ -95,23 +109,23 @@ starting
 # save empty
 {"version":${SAVE_VERSION},"flags":{"camp.discovered":true}}
 `);
-    expect(formatResult(runLine(ctx, '/assert time >= 0'))).toEqual(['✓ time >= 0 matches']);
-    expect(formatResult(runLine(ctx, '/assert time < 0'))).toEqual(['⚠ time < 0']);
-    expect(formatResult(runLine(ctx, '/expect empty'))).toEqual(['✓ empty matches']);
-    expect(formatResult(runLine(ctx, '/bogus'))).toEqual(['Error: unknown command: /bogus']);
+    expect(shown(runLine(ctx, '/assert time >= 0'))).toEqual(['✓ time >= 0 matches']);
+    expect(shown(runLine(ctx, '/assert time < 0'))).toEqual(['⚠ time < 0']);
+    expect(shown(runLine(ctx, '/expect empty'))).toEqual(['✓ empty matches']);
+    expect(shown(runLine(ctx, '/bogus'))).toEqual(['✗ unknown command: /bogus']);
   });
 
   it('indents the diagnostics under the error that carries them', () => {
     const ctx = driver('# location camp\nx: 0, y: 0\nstarting\n');
-    const failed = formatOutput({ kind: 'message', words: 'tool', tone: 'error', text: 'local changes did not load.', detail: ['first', 'second'] });
-    expect(failed).toEqual(['Error: local changes did not load.', '  first', '  second']);
-    expect(formatResult(runLine(ctx, '/state'))[0]).toBe('Location: camp');
+    const failed = drawn({ kind: 'message', words: 'tool', tone: 'error', text: 'local changes did not load.', detail: ['first', 'second'] });
+    expect(failed).toEqual(['✗ local changes did not load.', '  first', '  second']);
+    expect(shown(runLine(ctx, '/state'))[0]).toBe('Location: camp');
   });
 
   it('prints the status readout /state and /quit both produce', () => {
     const ctx = driver(source);
     runLine(ctx, '/wait 7');
-    expect(formatResult(runLine(ctx, '/state'))).toEqual([
+    expect(shown(runLine(ctx, '/state'))).toEqual([
       'Location: tutorial-island.guide-house',
       'Elapsed simulated time: 7s',
       // Every place the player could walk to from the guide house, which is
@@ -121,7 +135,7 @@ starting
       'XP: {}',
       'Health: ██████████ 30/30',
     ]);
-    expect(formatResult(runLine(ctx, '/quit'))[0]).toBe('Location: tutorial-island.guide-house');
+    expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: tutorial-island.guide-house');
   });
 
   // A grown copy is counted in no stack, so a reader who only had `Inventory:`
@@ -130,8 +144,8 @@ starting
     const ctx = driver(source);
     const status = runLine(ctx, '/state').output.find((out) => out.kind === 'status')!.status;
 
-    expect(formatOutput({ kind: 'status', status })).not.toContain('Grown: {}');
-    expect(formatOutput({ kind: 'status', status: { ...status, grown: { '1': 'tutorial-island.iron-sword' } } })).toContain(
+    expect(drawn({ kind: 'status', status })).not.toContain('Grown: {}');
+    expect(drawn({ kind: 'status', status: { ...status, grown: { '1': 'tutorial-island.iron-sword' } } })).toContain(
       'Grown: {"1":"tutorial-island.iron-sword"}',
     );
   });
@@ -140,7 +154,7 @@ starting
   // still read as text.
   it('draws the inventory screen /inv opens and nothing beside it', () => {
     const ctx = driver(source);
-    const lines = formatResult(runLine(ctx, '/inv'));
+    const lines = shown(runLine(ctx, '/inv'));
 
     expect(lines).toContain('[carried-items] item');
     expect(lines).toContain('Item:');
@@ -178,11 +192,11 @@ starting
     const ctx = driver(PLANE_SOURCE);
     runLine(ctx, '/load stocked');
 
-    expect(formatResult(runLine(ctx, '/inv'))).not.toContain('Blade — level 1/2, 0 spent, 1 point left');
+    expect(shown(runLine(ctx, '/inv'))).not.toContain('Blade — level 1/2, 0 spent, 1 point left');
   });
 
   it('separates each authored block with a blank line, so the emission pastes into a module', () => {
-    expect(formatOutput({ kind: 'authored', blocks: [['# save foo-start', '{}'], ['# test foo', 'wait: 1']] })).toEqual([
+    expect(drawn({ kind: 'authored', blocks: [['# save foo-start', '{}'], ['# test foo', 'wait: 1']] })).toEqual([
       '',
       '# save foo-start',
       '{}',
@@ -194,7 +208,7 @@ starting
 
   it('lays the help out from the table alone, one line per entry, plus this driver’s own startup argv', () => {
     const ctx = driver(source);
-    const lines = formatResult(runLine(ctx, '/help'));
+    const lines = shown(runLine(ctx, '/help'));
 
     expect(lines[0]).toBe('Commands:');
     expect(lines).toContain('  <N>          choose option N');
@@ -265,7 +279,7 @@ describe('play-cli renders the live clock', () => {
     const lines: string[] = [];
     for (let i = 0; i < ticks; i++) {
       const progress = started.live!.tick(elapsedMs);
-      lines.push(formatLive(progress));
+      lines.push(live(progress));
       if (!progress.active) break;
     }
     return lines;
@@ -298,8 +312,8 @@ describe('play-cli renders the live clock', () => {
   it('prints what the world said as a tick passed, above the bar and not over it', () => {
     const started = armed(driver(LIVE_MODULE, 1, true), 'use:entity.kiln.fire');
 
-    const before = formatTick(started.live!.tick(1000));
-    const landing = formatTick(started.live!.tick(1000));
+    const before = ticked(started.live!.tick(1000));
+    const landing = ticked(started.live!.tick(1000));
 
     expect(before).toEqual(['fire... [##########----------]  [time: 1.0s]']);
     expect(landing).toEqual(['The kiln settles with a crack.', 'fire: done.  [time: 2.0s]']);
@@ -309,7 +323,7 @@ describe('play-cli renders the live clock', () => {
     const started = armed(driver(LIVE_MODULE, 1, true), 'use:entity.kiln.fire');
     started.live!.tick(2000);
 
-    const closing = formatResult(started.live!.end(false));
+    const closing = shown(started.live!.end(false));
 
     expect(closing).not.toContain('The kiln settles with a crack.');
   });
@@ -322,7 +336,7 @@ describe('play-cli renders the live clock', () => {
     const started = armed(driver(LIVE_MODULE, 1, true), 'use:entity.kiln.fire');
 
     expect(started.output).toEqual([]);
-    expect(formatResult(started)).toEqual([]);
+    expect(shown(started)).toEqual([]);
   });
 
   it('scales elapsed real time by the speed dial before it draws anything', () => {
@@ -389,30 +403,30 @@ stats: max-health 12, attack 0, defense 0, attack-rate 6, accuracy 0, evasion 0
 uses: swing
 `, 1, true);
     const started = armed(ctx, 'fight:swing:rat');
-    expect(formatLive(started.live!.tick(900))).toBe('Swing... [##################--] Health 30/30 Rat 12/12  [time: 0.9s]');
-    expect(formatLive(started.live!.tick(900))).toBe('Swing... [################----] Health 30/30 Rat 6/12  [time: 1.8s]');
+    expect(live(started.live!.tick(900))).toBe('Swing... [##################--] Health 30/30 Rat 12/12  [time: 0.9s]');
+    expect(live(started.live!.tick(900))).toBe('Swing... [################----] Health 30/30 Rat 6/12  [time: 1.8s]');
   });
 
   it('prefers the pools to the countdown when a run has both, so a fight is never narrated as a tally', () => {
     const both = {
-      label: 'ring',
+      label: asLocalized('ring'),
       active: true,
       time: 2,
       progress: 0.5,
-      pools: [{ title: 'Health', current: 21, max: 30 }],
+      pools: [{ title: asLocalized('Health'), current: 21, max: 30 }],
       implicit: { attempts: 3, completion: 0.4 },
       view: undefined as never,
     };
-    expect(formatLive(both)).toBe('ring... [##########----------] Health 21/30  [time: 2.0s]');
-    expect(formatLive({ ...both, pools: [] })).toBe('ring... [##########----------] hits:3 completion:0.4  [time: 2.0s]');
+    expect(live(both)).toBe('ring... [##########----------] Health 21/30  [time: 2.0s]');
+    expect(live({ ...both, pools: [] })).toBe('ring... [##########----------] hits:3 completion:0.4  [time: 2.0s]');
   });
 
   it('prints the stop and the world it left when a run is cancelled', () => {
     const started = armed(driver(LIVE_MODULE, 1, true), 'use:entity.oven.roast');
-    expect(formatResult(started)).toEqual([]);
+    expect(shown(started)).toEqual([]);
 
     started.live!.tick(1000);
-    const lines = formatResult(started.live!.end(true));
+    const lines = shown(started.live!.end(true));
     expect(lines[0]).toBe('Stopped.');
     expect(lines[lines.length - 1]).toBe('[time: 1s]');
   });
@@ -500,7 +514,7 @@ describe('play-cli drives a live run', () => {
     const ticker = handTicker();
     const written: string[] = [];
     const closed: CommandResult[] = [];
-    const stop = driveRun(armed(ctx, choiceId).live!, (text) => void written.push(text), (result) => void closed.push(result), ticker);
+    const stop = driveRun(armed(ctx, choiceId).live!, localizer, (text) => void written.push(text), (result) => void closed.push(result), ticker);
     return { ctx, ticker, written, closed, stop };
   }
 
@@ -531,7 +545,7 @@ describe('play-cli drives a live run', () => {
     run.stop(true);
 
     expect(run.closed).toHaveLength(1);
-    expect(formatResult(run.closed[0])).not.toContain('Stopped.');
+    expect(shown(run.closed[0])).not.toContain('Stopped.');
   });
 
   it('stops the run and the ticker when the player cancels first', () => {
@@ -541,7 +555,7 @@ describe('play-cli drives a live run', () => {
     run.stop(true);
 
     expect(run.ticker.stops).toBe(1);
-    expect(formatResult(run.closed[0])).toContain('Stopped.');
+    expect(shown(run.closed[0])).toContain('Stopped.');
     expect(run.ctx.view.time).toBe(1);
   });
 });

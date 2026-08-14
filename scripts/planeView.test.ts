@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { loadInEnglish } from '../src/content/engineLocale';
+import { localizerFor } from '../src/runtime/localized';
 import { asLocalized } from '../src/runtime/localizedFixture';
 import { ClusterReport, PayloadReport, PlaneReport, PositionReport, SlotReport } from '../src/runtime/planeReport';
 import { formatPlane } from './planeView';
+
+// The engine's own English, which is where every word below now comes from: the
+// file under test spells none of them (c5).
+const localizer = localizerFor(loadInEnglish(''), 'en');
 
 const flat = (statId: string, amount: number, scale = 1): PayloadReport => ({ statId, effective: { percent: false, amount: { min: amount, max: amount } }, scale });
 
@@ -44,15 +50,15 @@ const plane = (over: Partial<PlaneReport> = {}): PlaneReport => ({
   ...over,
 });
 
-const shown = (report: PlaneReport, worn = false): string => formatPlane(report, worn, null).join('\n');
+const shown = (report: PlaneReport, worn = false): string => formatPlane(report, worn, null, localizer).join('\n');
 
 describe('formatPlane', () => {
   it('heads a plane with its name, the level and the points left', () => {
-    expect(formatPlane(plane(), false, null)[0]).toBe('Blade — level 3/20, 1 spent, 2 points left');
+    expect(formatPlane(plane(), false, null, localizer)[0]).toBe('Blade — level 3/20, 1 spent, 2 points left');
   });
 
   it('says a single point in the singular, and marks a plane the player is wearing', () => {
-    expect(formatPlane(plane({ remaining: 1 }), true, null)[0]).toBe('Blade — worn — level 3/20, 1 spent, 1 point left');
+    expect(formatPlane(plane({ remaining: 1 }), true, null, localizer)[0]).toBe('Blade — worn — level 3/20, 1 spent, 1 point left');
   });
 
   it('addresses the origin as an origin and a slotted cluster by the slot it came through', () => {
@@ -79,8 +85,8 @@ describe('formatPlane', () => {
       position({ position: 3, standing: 'available' }),
       position({ position: 4, standing: 'unreached' }),
     ];
-    const rows = formatPlane(plane({ clusters: [cluster({ positions, slots: [slot({ standing: 'blocked', beyond: '1,-1' })] })] }), false, null);
-    expect(rows.map((row) => row.trim().split(/\s+/)[0])).toEqual(['Blade', '', '0,0', 'free', 'spent', 'ready', 'locked', 'dead']);
+    const rows = formatPlane(plane({ clusters: [cluster({ positions, slots: [slot({ standing: 'blocked', beyond: '1,-1' })] })] }), false, null, localizer);
+    expect(rows.map((row) => row.trim().split(/\s+/)[0])).toEqual(['Blade', '', '0,0', 'Free', 'Spent', 'Ready', 'Locked', 'Dead']);
   });
 
   it('states the effective payload first and the factor that made it after', () => {
@@ -106,7 +112,7 @@ describe('formatPlane', () => {
 
   it('marks a position the jewel left empty rather than leaving the row bare', () => {
     const empty = position({ passive: null, title: null, standing: 'allocated' });
-    expect(shown(plane({ clusters: [cluster({ positions: [empty] })] }))).toContain('spent  pos 1   (empty)');
+    expect(shown(plane({ clusters: [cluster({ positions: [empty] })] }))).toContain('Spent  Position 1  (empty)');
   });
 
   // c17: the screen this is drawn above publishes each of these as an option a
@@ -118,8 +124,8 @@ describe('formatPlane', () => {
     const rows = shown(plane({ clusters: [ready, waiting] }));
 
     for (const verb of ['allocate:', 'slot:', 'feed:', '<jewel>']) expect(rows).not.toContain(verb);
-    expect(rows).toContain('ready  pos 6');
-    expect(rows).toContain('spent  slot se');
+    expect(rows).toContain('Ready  Position 6');
+    expect(rows).toContain('Spent  Slot se');
   });
 
   it('offers nothing to type for a slot that is filled, blocked or out of reach', () => {
@@ -130,11 +136,11 @@ describe('formatPlane', () => {
         slot({ direction: 'se', standing: 'unreached' }),
       ],
     });
-    const rows = formatPlane(plane({ clusters: [settled] }), false, null);
+    const rows = formatPlane(plane({ clusters: [settled] }), false, null, localizer);
     expect(rows.slice(3)).toEqual([
-      '    spent  slot e  holds 1,0',
-      '    dead   slot ne blocked by 1,-1',
-      '    locked slot se',
+      '    Spent  Slot e      holds 1,0',
+      '    Dead   Slot ne     blocked by 1,-1',
+      '    Locked Slot se',
     ]);
   });
 
@@ -143,28 +149,28 @@ describe('formatPlane', () => {
       position({ position: 1, title: asLocalized('Hale'), standing: 'allocated', payloads: [flat('mod.max-health', 15)] }),
       position({ position: 2, title: asLocalized('Swift Hands'), standing: 'available', payloads: [flat('mod.attack-rate', 2)] }),
     ];
-    const rows = formatPlane(plane({ clusters: [cluster({ positions })] }), false, null).slice(3);
+    const rows = formatPlane(plane({ clusters: [cluster({ positions })] }), false, null, localizer).slice(3);
     expect(rows).toEqual([
-      '    spent  pos 1   Hale         +15 max-health',
-      '    ready  pos 2   Swift Hands  +2 attack-rate',
+      '    Spent  Position 1  Hale         +15 max-health',
+      '    Ready  Position 2  Swift Hands  +2 attack-rate',
     ]);
   });
 
   // c16: the copy is named the one way every surface names a carried thing, and
   // the ids the verbs take are the frame's business rather than the heading's.
   it('heads a plane with the name the engine published and no id at all', () => {
-    expect(formatPlane(plane({ name: asLocalized('Modified Blade') }), false, null)[0]).toContain('Modified Blade —');
-    expect(formatPlane(plane({ name: asLocalized('Modified Blade') }), false, null)[0]).not.toContain('mod.blade');
+    expect(formatPlane(plane({ name: asLocalized('Modified Blade') }), false, null, localizer)[0]).toContain('Modified Blade —');
+    expect(formatPlane(plane({ name: asLocalized('Modified Blade') }), false, null, localizer)[0]).not.toContain('mod.blade');
   });
 
   it('marks the hexagon in hand in the margin, and only that one', () => {
     const entered = cluster({ hex: '1,-1', jewel: 'mod.junction', shape: 'point', entry: { hex: '0,0', direction: 'ne' } });
-    const lines = formatPlane(plane({ clusters: [cluster(), entered] }), false, '1,-1');
+    const lines = formatPlane(plane({ clusters: [cluster(), entered] }), false, '1,-1', localizer);
     expect(lines).toContain('> 1,-1  junction · point · via 0,0 ne · mods 0/2');
     expect(lines).toContain('  0,0  core · spindle · origin · mods 0/2');
   });
 
   it('marks nothing when the hexagon in hand is not one this plane has', () => {
-    expect(formatPlane(plane(), false, '4,4').filter((line) => line.startsWith('>'))).toEqual([]);
+    expect(formatPlane(plane(), false, '4,4', localizer).filter((line) => line.startsWith('>'))).toEqual([]);
   });
 });

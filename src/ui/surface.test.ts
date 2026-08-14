@@ -60,8 +60,11 @@ function reaches(source: { text: string }): string[] {
   return [...source.text.matchAll(REACHES)].map(([, module]) => module);
 }
 
-// What the runtime publishes for a driver to render and dispatch through.
-const PLAY_SURFACE = ['session', 'command'];
+// What the runtime publishes for a driver to render and dispatch through, plus
+// the module declaring what a published string may be: a driver that holds one
+// has to be able to name its type, and c3 makes every word this layer draws one
+// of them.
+const PLAY_SURFACE = ['session', 'command', 'localized'];
 
 // A named import off the play surface, and whether the statement brought it in
 // as a type. A type is a shape to render; a value is a thing to call.
@@ -76,7 +79,7 @@ function calls(source: { text: string }): string[] {
 // Everything src/ui takes off the play surface as a value: the entries a
 // driver dispatches through, the cadence both drivers tick at, and the ticker
 // that turns two clock readings into an elapsed span.
-const DISPATCHES = ['askedOption', 'createTicker', 'LIVE_TICK_MS', 'newContext', 'runLine', 'serializeSession', 'startSession', 'view'];
+const DISPATCHES = ['askedOption', 'BASE_LANGUAGE', 'createTicker', 'LIVE_TICK_MS', 'localizerFor', 'newContext', 'runLine', 'serializeSession', 'sessionLocalizer', 'startSession', 'view'];
 
 // The stylesheet the floor is set in, read as text: it is one rule over four
 // element names, so this is the whole of what holds a control that declares
@@ -191,19 +194,29 @@ describe('the rules the driver is held to', () => {
   });
 
   // The other half of the render sweep, which holds every word on the screen to
-  // being an engine value or one of these. That leaves the table itself free to
-  // grow, so this is what keeps a component from writing its own word: the
-  // vocabulary is a table because it lives in exactly one file.
-  it("writes each of the shell's own words in the table and nowhere else", () => {
+  // being an engine value or one of these. After c3 the table holds keys rather
+  // than words, so what this keeps out of a component is the key: a component
+  // reaching the localizer directly would be a second vocabulary, and the whole
+  // point is that there is one and it lives in exactly one file.
+  it("names each of the shell's own words in the table and nowhere else", () => {
     const table = SOURCES.filter((source) => source.file.endsWith('/labels.ts'));
     expect(table).toHaveLength(1);
 
-    for (const word of Object.values(LABELS)) {
+    for (const key of Object.values(LABELS)) {
       for (const source of SOURCES) {
         if (source === table[0]) continue;
-        expect(source.text, `${source.file} writes the word ${word} rather than reading it`).not.toContain(`'${word}'`);
-        expect(source.text, `${source.file} writes the word ${word} rather than reading it`).not.toContain(`>${word}<`);
+        expect(source.text, `${source.file} names the key ${key} rather than reading it off the table`).not.toContain(`'${key}'`);
       }
+    }
+  });
+
+  // The half the table cannot hold: nothing under src/ui may reach the one cast
+  // that makes a `Localized` without a localizer, so a component with a word to
+  // draw has no door but a key.
+  it('mints no Localized of its own', () => {
+    for (const source of SOURCES) {
+      expect(source.text, source.file).not.toContain('localizedFixture');
+      expect(source.text, source.file).not.toMatch(/[^A-Za-z]as Localized[^A-Za-z]/);
     }
   });
 

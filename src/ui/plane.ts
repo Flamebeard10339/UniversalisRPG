@@ -1,7 +1,9 @@
+import type { Answer, Localized, Localizer } from '../runtime/localized';
 import type { PlayView } from '../runtime/session';
 import { bare, signed, tidy } from './format';
-import { LABELS } from './labels';
+import type { LabelId } from './labels';
 import type { Entry } from './sheet';
+import { wordsOf, type Words } from './words';
 
 // The plane the view says is in hand, read into rows. Everything here is
 // decided from two published fields — the focus and the planes it points into —
@@ -18,27 +20,28 @@ type Standing = Position['standing'];
 // What a standing is worth to a player holding points, rather than what the
 // plane calls it: where the next point may go, where one has already gone, and
 // the two ways a node is out of reach.
-const STANDING: Record<Standing, string> = {
-  allocated: LABELS.spent,
-  available: LABELS.ready,
-  unreached: LABELS.locked,
-  blocked: LABELS.dead,
+const STANDING: Record<Standing, LabelId> = {
+  allocated: 'spent',
+  available: 'ready',
+  unreached: 'locked',
+  blocked: 'dead',
 };
 
 export interface PlaneRow {
   // Which node of the hexagon this is, and unique within one, so it is also
   // what the row is drawn under.
-  node: string;
-  standing: string;
-  // The passive a position carries, or the hexagon a slot leads to; empty
-  // where there is neither.
-  what: string;
-  worth: string;
+  node: Localized;
+  standing: Localized;
+  // The passive a position carries, or the hexagon a slot leads to; null where
+  // there is neither, because an empty row is nothing to say rather than a word
+  // for having nothing.
+  what: Localized | null;
+  worth: Localized | null;
 }
 
 export interface PlaneHex {
-  hex: string;
-  jewel: string;
+  hex: Answer;
+  jewel: Localized;
   // The one the screen has in hand, which is what every growth line it
   // publishes leaves unsaid.
   focused: boolean;
@@ -46,8 +49,8 @@ export interface PlaneHex {
 }
 
 export interface PlaneView {
-  instance: string;
-  title: string;
+  instance: Answer;
+  title: Localized;
   facts: Entry[];
   hexes: PlaneHex[];
 }
@@ -65,43 +68,45 @@ function payload(report: Payload): string {
   return `${magnitude(report.effective)} ${bare(report.statId)}${scale}`;
 }
 
-function positionRow(position: Position): PlaneRow {
+function positionRow(position: Position, words: Words, localizer: Localizer): PlaneRow {
+  const paid = position.payloads.map(payload).join(', ');
   return {
-    node: `${LABELS.position} ${position.position}`,
-    standing: position.free ? LABELS.free : STANDING[position.standing],
-    what: position.title ?? '',
-    worth: position.payloads.map(payload).join(', '),
+    node: words('position', { position: position.position }),
+    standing: words(position.free ? 'free' : STANDING[position.standing]),
+    what: position.title,
+    worth: paid === '' ? null : localizer.identifier(paid),
   };
 }
 
-function slotRow(slot: Slot): PlaneRow {
+function slotRow(slot: Slot, words: Words, localizer: Localizer): PlaneRow {
   return {
-    node: `${LABELS.slot} ${slot.direction}`,
-    standing: STANDING[slot.standing],
-    what: slot.beyond ?? '',
-    worth: '',
+    node: words('slot', { direction: localizer.identifier(slot.direction) }),
+    standing: words(STANDING[slot.standing]),
+    what: slot.beyond === null ? null : localizer.identifier(slot.beyond),
+    worth: null,
   };
 }
 
-export function focusedPlane(view: PlayView | null): PlaneView | null {
+export function focusedPlane(view: PlayView | null, localizer: Localizer): PlaneView | null {
   const focus = view?.focus;
   if (!view || !focus) return null;
 
   const plane = view.planes.find((each) => each.instance === focus.instance);
   if (!plane) return null;
 
+  const words = wordsOf(localizer);
   return {
     instance: plane.instance,
     title: plane.title,
     facts: [
-      { name: LABELS.level, value: `${tidy(plane.level)}/${tidy(plane.maxLevel)}` },
-      { name: LABELS.points, value: tidy(plane.remaining) },
+      { name: words('level'), value: localizer.identifier(`${tidy(plane.level)}/${tidy(plane.maxLevel)}`) },
+      { name: words('points'), value: localizer.identifier(tidy(plane.remaining)) },
     ],
     hexes: plane.clusters.map((cluster) => ({
       hex: cluster.hex,
       jewel: cluster.title,
       focused: cluster.hex === focus.hex,
-      rows: [...cluster.positions.map(positionRow), ...cluster.slots.map(slotRow)],
+      rows: [...cluster.positions.map((position) => positionRow(position, words, localizer)), ...cluster.slots.map((slot) => slotRow(slot, words, localizer))],
     })),
   };
 }

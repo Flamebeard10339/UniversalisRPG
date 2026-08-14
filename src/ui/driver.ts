@@ -1,7 +1,8 @@
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
 import { createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
-import { serializeSession, startSession, view, type PlayView } from '../runtime/session';
+import { BASE_LANGUAGE, localizerFor, type Localizer } from '../runtime/localized';
+import { sessionLocalizer, serializeSession, startSession, view, type PlayView } from '../runtime/session';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 import { createTransientChannel, type TransientChannel } from './transient';
 
@@ -26,6 +27,11 @@ export interface Driver {
   // driver reaches one the other has not got.
   open(item: string): void;
   cancel(): void;
+  // The localizer of the session as it stands, which is what every word this
+  // driver puts on a screen comes out of (c3). Asked for rather than held,
+  // because `/dsl` adopts a new registry and the language being played is the
+  // session's rather than the shell's.
+  localizer(): Localizer;
   // What a save of this session would write, and null when there is no session
   // to save. The bytes are the whole of what the two drivers are compared on,
   // because a view is what a driver was told and this is what it is standing in.
@@ -75,6 +81,13 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     const fault = error instanceof Error ? error.message : String(error);
     current = { view: null, transcript: appendOutputs(emptyTranscript(), [{ kind: 'message', words: 'tool', tone: 'error', text: fault }]), live: null, fault };
   }
+
+  // A shell with no session still draws its own tabs, so it still needs
+  // somewhere to ask for their words. A registry with no content answers every
+  // key with the key, which is what the localizer already does for a language
+  // nothing translated — unmistakable on a screen that has just failed to open
+  // a world, and one door rather than two.
+  const wordless = (): Localizer => localizerFor(loadUniverseWithDiagnostics([]).registry, BASE_LANGUAGE);
 
   const ticker = options.ticker ?? createTicker();
   let running: LiveRun | null = null;
@@ -154,6 +167,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     choose: (position) => send(String(position)),
     answer: (key, value) => send(`submit-modal: ${key}=${value}`),
     open: (item) => send(`/inv ${item}`),
+    localizer: () => (context ? sessionLocalizer(context.session) : wordless()),
     cancel: () => close(true),
     serialized: () => (context ? serializeSession(context.session) : null),
   };

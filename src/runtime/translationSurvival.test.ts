@@ -36,9 +36,28 @@ describe('a universe with every word replaced', () => {
     for (const language of PLAYED) expect(keys.filter((key) => registry.locales.declared.get(language)?.has(key) !== true)).toEqual([]);
   });
 
+  // Every key whose English is nothing but parameters and punctuation, which is
+  // the one thing no replacement can make different. Each is a line a driver
+  // lays out from values it was handed — a numbered choice, a resource beside
+  // its meter, a bar beside its clock — and each is a key rather than a
+  // template so that a language may reorder it, which is the only thing there
+  // is to translate about one.
+  const SHAPES = [
+    'engine.carried.worn',
+    'engine.repl.place',
+    'engine.repl.pool',
+    'engine.repl.choice',
+    'engine.repl.choice.owned',
+    'engine.repl.modal',
+    'engine.repl.modal.asking',
+    'engine.repl.live.running',
+    'engine.repl.live.pool',
+    'engine.repl.plane.effect',
+  ];
+
   it('leaves no key reading the English it was authored in', () => {
     const keys = everyKey(shipped.locales);
-    expect(keys.filter((key) => !hasWords(englishOf(shipped.locales, key)))).toEqual(['engine.carried.worn']);
+    expect(keys.filter((key) => !hasWords(englishOf(shipped.locales, key)))).toEqual(SHAPES);
     const worded = keys.filter((key) => hasWords(englishOf(shipped.locales, key)));
     for (const language of PLAYED) expect(worded.filter((key) => registry.locales.declared.get(language)?.get(key) === englishOf(shipped.locales, key))).toEqual([]);
   });

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../../runtime/localizedFixture';
 import { createSurfaceRegistry, installTestHarness, testState } from './testHarness';
 import type { Driver, DriverSnapshot } from '../driver';
+import { loadInEnglish } from '../../content/engineLocale';
+import { localizerFor } from '../../runtime/localized';
 import { createTransientChannel, type TransientChannel } from '../transient';
 import { emptyTranscript } from '../transcript';
 
@@ -49,6 +51,7 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     choose: (position) => void calls.push(`choose:${position}`),
     answer: (key, value) => void calls.push(`answer:${key}=${value}`),
     open: (item) => void calls.push(`open:${item}`),
+    localizer: () => localizerFor(loadInEnglish(''), 'en'),
     cancel: () => void calls.push('cancel'),
     serialized: () => null,
   };

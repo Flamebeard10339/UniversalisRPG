@@ -120,3 +120,57 @@ engine.text.untranslated: (untranslated)
 engine.command.invalid-choice: invalid choice: {choice}
 engine.command.speed: Speed set to {speed}x.
 engine.command.stopped: Stopped.
+engine.shell.map: Map
+engine.shell.edit: Edit
+engine.shell.home: Home
+engine.shell.settings: Settings
+engine.shell.stats: Stats
+engine.shell.skills: Skills
+engine.shell.equipment: Equipment
+engine.shell.inventory: Inventory
+engine.shell.command: Command
+engine.shell.run: Run
+engine.shell.level: Level
+engine.shell.points: Points
+engine.shell.spent: Spent
+engine.shell.ready: Ready
+engine.shell.locked: Locked
+engine.shell.dead: Dead
+engine.shell.free: Free
+engine.shell.node.position: Position {position}
+engine.shell.node.slot: Slot {direction}
+engine.repl.place: {location} ({id})
+engine.repl.here: Here: {entities}
+engine.repl.clock: [time: {time}s]
+engine.repl.pool: {resource}: {meter}
+engine.repl.swing: Your swing {meter}
+engine.repl.choice: {index}) {choice}
+engine.repl.choice.owned: {index}) {owner}: {choice}
+engine.repl.modal: [{modal}] {options}
+engine.repl.modal.answered: [{modal}] (answered)
+engine.repl.modal.asking: {option}:
+engine.repl.modal.free: submit-modal: {option}=<text>
+engine.repl.state.location: Location: {location}
+engine.repl.state.time: Elapsed simulated time: {time}s
+engine.repl.state.flags: Flags: {flags}
+engine.repl.state.inventory: Inventory: {inventory}
+engine.repl.state.grown: Grown: {grown}
+engine.repl.state.xp: XP: {xp}
+engine.repl.state.equipped: Equipped: {equipped}
+engine.repl.live.running: {action}... {bar}{pools}  {clock}
+engine.repl.live.done: {action}: done.  {clock}
+engine.repl.live.pool: {resource} {current}/{max}
+engine.repl.live.counting: hits:{attempts} completion:{completion}
+engine.repl.live.stop: (press any key to stop)
+engine.repl.opening: Type /help for commands (/state and /inventory show your progress).
+engine.repl.plane.heading: {plane} — level {level}/{max}, {spent} spent, {points}
+engine.repl.plane.heading.worn: {plane} — worn — level {level}/{max}, {spent} spent, {points}
+engine.repl.plane.points.one: 1 point left
+engine.repl.plane.points.many: {points} points left
+engine.repl.plane.cluster: {hex}  {jewel} · {shape} · {from} · mods {mods}/{slots}
+engine.repl.plane.origin: origin
+engine.repl.plane.via: via {hex} {direction}
+engine.repl.plane.effect: {effect} {amount}% {stat}
+engine.repl.plane.empty: (empty)
+engine.repl.plane.blocked: blocked by {beyond}
+engine.repl.plane.holds: holds {beyond}

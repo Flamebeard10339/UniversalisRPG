@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { actionAddress } from '../content/action';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { ENGINE_KEYS } from '../content/locale';
+import { hasWords } from '../content/translation';
 import { loadUniverse } from '../content/registry';
 import { itemExamine, localizerFor, type Localized } from './localized';
 import { RuntimeError } from './state';
@@ -41,7 +42,15 @@ describe('the engine speaks in keys (c2)', () => {
     // Every pattern, at any length, matched as the shape it would take in
     // TypeScript: its literal parts with a template hole where each parameter
     // is. A length filter is what let two of these hide (pass 1).
-    const patterns = [...(loadInEnglish('').locales.declared.get('en')?.entries() ?? [])];
+    // Only the patterns that have a word of their own. One that is nothing
+    // but parameters and punctuation — `{item} ({slot})`, `{index}) {choice}` —
+    // is no sentence to leave behind, and its shape is common enough in
+    // TypeScript that matching it reports ordinary templates that say nothing:
+    // `{resource}: {meter}` names five composed lines under src/content and
+    // src/grammar that carry no engine text at all. `hasWords` is the same
+    // predicate translationSurvival.test.ts asks with, so the two agree on what
+    // a pattern with words is.
+    const patterns = [...(loadInEnglish('').locales.declared.get('en')?.entries() ?? [])].filter(([, value]) => hasWords(value));
     const offenders = sourceFiles('src').flatMap((file) => {
       const text = readFileSync(file, 'utf8');
       return patterns.flatMap(([, value]) => [...text.matchAll(asTemplate(value))].map(() => `${file}: ${value}`));

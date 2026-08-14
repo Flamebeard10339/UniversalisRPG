@@ -3,14 +3,19 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { loadInEnglish } from '../content/engineLocale';
+import { localizerFor } from '../runtime/localized';
 import { App } from './App';
 import { createDriver } from './driver';
 import { SPLIT_DEFAULT } from './gesture';
 import { BOUNDARIES, LAYERS } from './nav';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { TabBar } from './TabBar';
+import { wordsOf } from './words';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
+
+const shellWord = wordsOf(localizerFor(loadInEnglish(''), 'en'));
 
 function modulesUnder(directory: string, prefix: string): Array<{ file: string; text: string }> {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -62,7 +67,7 @@ describe('the layout a phone is held to', () => {
 
   it('gives every subpage of every layer a control that is tapped rather than swiped', () => {
     for (const layer of LAYERS) {
-      const bar = renderToStaticMarkup(<TabBar tabs={layer.subpages} active={layer.opens} onSelect={() => undefined} />);
+      const bar = renderToStaticMarkup(<TabBar tabs={layer.subpages} active={layer.opens} onSelect={() => undefined} words={shellWord} />);
 
       expect(attributes(bar, 'data-subpage'), layer.id).toEqual(layer.subpages.map((subpage) => subpage.id));
     }

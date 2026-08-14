@@ -1,5 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { loadInEnglish } from '../content/engineLocale';
+import { localizerFor } from '../runtime/localized';
 import { asLocalized } from '../runtime/localizedFixture';
 import { loadUniverseWithDiagnostics } from '../content/registry';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
@@ -10,7 +12,8 @@ import { createDriver, type Driver } from './driver';
 import { MapPane } from './MapPane';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
-import { LABELS } from './labels';
+import { LABELS, type LabelId } from './labels';
+import { wordsOf } from './words';
 import { LAYERS, OPENING, toLayer } from './nav';
 
 // A run that is under way and going nowhere, which is what a test about what
@@ -60,11 +63,20 @@ function published(view: PlayView): string[] {
   ];
 }
 
-// The driver's own vocabulary, taken whole rather than by where it is drawn.
-// Excising the <nav> region derived the expectation from the structure under
-// test, so no wording could fail it; a table read as a set makes a word the
-// shell puts on the screen either an engine value or one of these.
-const SHELL_WORDS: readonly string[] = Object.values(LABELS);
+// The driver's own vocabulary, taken whole rather than by where it is drawn,
+// and read out of the localizer the way a component reads it: after c3 the
+// table names keys, and what lands on the screen is the English the shipped
+// engine locale gives them. Excising the <nav> region derived the expectation
+// from the structure under test, so no wording could fail it; a table read as a
+// set makes a word the shell puts on the screen either an engine value or one
+// of these.
+const shellWord = wordsOf(localizerFor(loadInEnglish(''), 'en'));
+
+// What the two nodes take, supplied at every call so the table can be read as a
+// set. A pattern that names neither is unaffected by being handed both.
+const NODE = { position: 1, direction: asLocalized('ne') };
+
+const SHELL_WORDS: readonly string[] = (Object.keys(LABELS) as LabelId[]).map((id) => shellWord(id, NODE));
 
 // The engine's half of what is drawn, with the shell's own words taken out by
 // what they are rather than by where they sit: excising a region left every
@@ -406,8 +418,8 @@ describe('what the shell puts on the screen', () => {
 
     const html = renderToStaticMarkup(<App driver={driver} />);
 
-    expect(html).toContain(`aria-label="${LABELS.command}"`);
-    expect(readable(html)).toContain(LABELS.run);
+    expect(html).toContain(`aria-label="${shellWord('command')}"`);
+    expect(readable(html)).toContain(shellWord('run'));
   });
 
   it('names its two glyph controls with the engine value each one acts on', () => {
@@ -505,12 +517,16 @@ describe('what the shell puts on the screen', () => {
       // where it is standing would draw the opening layer's tabs.
       const html = renderToStaticMarkup(<App driver={driver} opening={toLayer(OPENING, 2)} />);
 
-      const tabs = LAYERS[2].subpages.map((subpage) => LABELS[subpage.id]);
+      // Read out of this shell's own localizer rather than the shipped one:
+      // SURVEYED carries no engine locale, so its tabs are the keys themselves,
+      // and what is under test here is which four the bar offers.
+      const named = wordsOf(driver.localizer());
+      const tabs = LAYERS[2].subpages.map((subpage) => named(subpage.id));
       const bar = html.slice(html.lastIndexOf('<nav'));
 
       expect(tabs).toHaveLength(4);
       for (const tab of tabs) expect(bar, `the tab bar does not offer ${tab}`).toContain(tab);
-      for (const tab of LAYERS[OPENING.layer].subpages.map((subpage) => LABELS[subpage.id])) {
+      for (const tab of LAYERS[OPENING.layer].subpages.map((subpage) => named(subpage.id))) {
         if (!tabs.includes(tab)) expect(bar, `the tab bar still offers ${tab}`).not.toContain(tab);
       }
     });

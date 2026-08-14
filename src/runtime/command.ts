@@ -875,7 +875,7 @@ export function createTicker(clock: Clock = wallClock, everyMs: number = LIVE_TI
 }
 
 export interface LivePool {
-  title: string;
+  title: Localized;
   current: number;
   max: number;
 }
@@ -883,7 +883,7 @@ export interface LivePool {
 // One tick's answer: how far the action got, what it is whittling down, and
 // whether it is still going. Every number, no rendering.
 export interface LiveProgress {
-  label: string;
+  label: Localized;
   active: boolean;
   time: number;
   progress: number;
@@ -900,7 +900,7 @@ export interface LiveRun {
 
 // What a finished run reports, however it finished: no progress to make, no
 // target to narrate, and the world as the last tick left it.
-function finished(label: string, current: PlayView): LiveProgress {
+function finished(label: Localized, current: PlayView): LiveProgress {
   return { label, active: false, time: current.time, progress: 1, pools: [], implicit: null, view: current };
 }
 
@@ -913,9 +913,10 @@ function livePools(status: PlayStatus): LivePool[] {
 }
 
 // `previous` names the action being driven, which is gone from the view the
-// tick that finishes it hands back.
-function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number): LiveProgress {
-  const label = previous.action?.label ?? 'action';
+// tick that finishes it hands back; `armed` is the label it was begun under,
+// for the tick that finds it gone from both.
+function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number, armed: Localized): LiveProgress {
+  const label = previous.action?.label ?? armed;
   const next = wait(ctx.session, (elapsedMs / 1000) * ctx.live.speed);
   ctx.view = next;
 
@@ -961,6 +962,7 @@ function driveChoice(ctx: CommandContext, index: number): CommandResult {
   if (!opening.action) return { ...shown(opening), recorded: [recordedForChoice(choice)] };
 
   const started = opening.time;
+  const armed = opening.action.label;
   let latest = opening;
   // A run ends once, whichever way it ends. The driver that owns the timer and
   // the keypress cannot make both arrive first, so the run refuses the second
@@ -972,14 +974,14 @@ function driveChoice(ctx: CommandContext, index: number): CommandResult {
   const live: LiveRun = {
     tick(elapsedMs) {
       if (over) return over;
-      const progress = tickOnce(ctx, latest, elapsedMs);
+      const progress = tickOnce(ctx, latest, elapsedMs, armed);
       latest = progress.view;
       if (!progress.active) over = progress;
       return progress;
     },
     end(cancelled) {
       if (closed) return closed;
-      const label = latest.action?.label ?? 'action';
+      const label = latest.action?.label ?? armed;
       const output: CommandOutput[] = [];
       if (cancelled) {
         applyDirective(ctx.session, { kind: 'cancel' });

@@ -19,6 +19,17 @@ const ROOTS: ReadonlyArray<{ file: string; type: string; why: string }> = [
   { file: 'src/runtime/session.ts', type: 'PlayView', why: 'the whole of what a driver renders a turn from, and what every screen reads' },
   { file: 'src/runtime/save.ts', type: 'PruneWarning', why: 'what a load reports about content that has gone, reaching the player through a driver rather than through the view' },
   { file: 'src/runtime/command.ts', type: 'PlayerMessage', why: 'what a command answers the player, which both drivers put in the transcript beside the view (c4). Its sibling `ToolMessage` is deliberately not here: the authoring tool speaks its own English and the type says which of the two a reader is holding' },
+  { file: 'src/runtime/command.ts', type: 'LiveProgress', why: 'what a run under way reports of itself, which no view carries: both drivers draw it beside the choices rather than in them' },
+  // The GUI's surfaces (c3). Each is a value src/ui assembles out of engine
+  // fields and its own vocabulary, and each is what a component draws from.
+  { file: 'src/ui/transcript.ts', type: 'PlayerLine', why: "the log column, which is where every localized value in the app used to be laundered back to a plain string. Its sibling `ToolLine` is deliberately not here, for `ToolMessage`'s reason" },
+  { file: 'src/ui/choices.ts', type: 'OfferGroup', why: 'the choice sheet, as the buttons under whatever offers them' },
+  { file: 'src/ui/sheet.ts', type: 'Entry', why: 'one row of the ledger, which stats, skills, equipment and what the player carries are four readings of' },
+  { file: 'src/ui/plane.ts', type: 'PlaneView', why: 'the plane pane, which is the one surface that draws its own words for a standing and a node rather than an engine value' },
+  // The REPL's (c5). Leaving these out would localize the two drivers to
+  // different degrees, which is the fragmentation the spec exists to end.
+  { file: 'scripts/play-cli.ts', type: 'PlayerLine', why: "one line the terminal prints to the player, whatever command produced it. Its sibling `ToolLine` is deliberately not here, for `ToolMessage`'s reason" },
+  { file: 'scripts/planeView.ts', type: 'PlaneLines', why: 'the plane as the terminal draws it, which is the REPL surface with the most words of its own' },
 ];
 
 // Where the walk crosses out of src/runtime, and what its strings are there.

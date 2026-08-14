@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { localizerFor } from '../runtime/localized';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
 import { createDriver } from './driver';
-import { LABELS } from './labels';
+import { LABELS, type LabelId } from './labels';
 import { focusedPlane, type PlaneView } from './plane';
+import { wordsOf } from './words';
+
+// The engine's own English, so what is asserted is the word a player reads and
+// not the key it is addressed by.
+const localizer = localizerFor(loadInEnglish(''), 'en');
+const shellWord = wordsOf(localizer);
+
+// What the two nodes take, supplied at every call so the same table can be read
+// as a set. A pattern that names neither is unaffected by being handed both.
+const NODE = { position: 1, direction: asLocalized('ne') };
 
 type Plane = PlayView['planes'][number];
 type Cluster = Plane['clusters'][number];
@@ -72,7 +84,7 @@ function viewOf(planes: Plane[], focus: PlayView['focus']): PlayView {
   };
 }
 
-const drawn = (planes: Plane[], focus: PlayView['focus']): PlaneView | null => focusedPlane(viewOf(planes, focus));
+const drawn = (planes: Plane[], focus: PlayView['focus']): PlaneView | null => focusedPlane(viewOf(planes, focus), localizer);
 
 const rowsOf = (view: PlaneView): PlaneView['hexes'][number]['rows'] => view.hexes.flatMap((hex) => hex.rows);
 
@@ -86,7 +98,7 @@ function runs(view: PlaneView): string[] {
     view.title,
     ...view.facts.flatMap((fact) => [fact.name, fact.value]),
     ...view.hexes.flatMap((hex) => [hex.hex, hex.jewel, ...hex.rows.flatMap((row) => Object.values(row))]),
-  ];
+  ].filter((run): run is string => typeof run === 'string');
 }
 
 const WORD = /[A-Za-z][A-Za-z0-9-]*/g;
@@ -120,8 +132,8 @@ describe('the plane the view says is in hand', () => {
 
   it('heads it with the level it has reached and the points it has left to spend', () => {
     expect(drawn([plane({ level: 3, maxLevel: 20, remaining: 2 })], { instance: '1', hex: '0,0' })?.facts).toEqual([
-      { name: LABELS.level, value: '3/20' },
-      { name: LABELS.points, value: '2' },
+      { name: shellWord('level'), value: '3/20' },
+      { name: shellWord('points'), value: '2' },
     ]);
   });
 
@@ -141,7 +153,7 @@ describe('the plane the view says is in hand', () => {
     );
 
     expect(view?.hexes[0].jewel).toBe('Keen Edge');
-    expect(rowsOf(view!).map((row) => row[ROW.node])).toEqual([`${LABELS.position} 1`, `${LABELS.position} 2`, `${LABELS.slot} ne`]);
+    expect(rowsOf(view!).map((row) => row[ROW.node])).toEqual([shellWord('position', { position: 1 }), shellWord('position', { position: 2 }), shellWord('slot', { direction: asLocalized('ne') })]);
   });
 
   it('says of every node where a point may go, and of a position bought by nobody that it was free', () => {
@@ -154,7 +166,7 @@ describe('the plane the view says is in hand', () => {
     const slots = [slot({ direction: 'e', standing: 'blocked', beyond: '1,0' })];
     const view = drawn([plane({ clusters: [cluster({ positions, slots })] })], { instance: '1', hex: '0,0' });
 
-    expect(rowsOf(view!).map((row) => row[ROW.standing])).toEqual([LABELS.free, LABELS.spent, LABELS.ready, LABELS.locked, LABELS.dead]);
+    expect(rowsOf(view!).map((row) => row[ROW.standing])).toEqual([shellWord('free'), shellWord('spent'), shellWord('ready'), shellWord('locked'), shellWord('dead')]);
   });
 
   it('names what a position carries, and the hexagon on the far side of a slot that has one', () => {
@@ -162,7 +174,7 @@ describe('the plane the view says is in hand', () => {
     const slots = [slot({ direction: 'e', standing: 'allocated', beyond: '1,0' }), slot({ direction: 'ne' })];
     const view = drawn([plane({ clusters: [cluster({ positions, slots })] })], { instance: '1', hex: '0,0' });
 
-    expect(rowsOf(view!).map((row) => row[ROW.what])).toEqual(['Hale', '', '1,0', '']);
+    expect(rowsOf(view!).map((row) => row[ROW.what])).toEqual(['Hale', null, '1,0', null]);
   });
 
   it('states what a position pays as the effective amount, with the factor that made it', () => {
@@ -184,7 +196,7 @@ describe('the plane the view says is in hand', () => {
     const report = plane({ clusters: [cluster({ positions, slots }), cluster({ hex: '1,0', title: asLocalized('Causeway') })] });
     const view = drawn([report], { instance: '1', hex: '1,0' })!;
 
-    const allowed = new Set([...publishedWords(report), ...Object.values(LABELS).flatMap(words)]);
+    const allowed = new Set([...publishedWords(report), ...(Object.keys(LABELS) as LabelId[]).flatMap((id) => words(shellWord(id, NODE)))]);
     let checked = 0;
     for (const run of runs(view)) {
       for (const word of words(run)) {
@@ -241,7 +253,7 @@ const FORGE = {
 
 describe('the route a row opens', () => {
   it('draws the plane a screen opened from an inventory row has in hand', () => {
-    const driver = createDriver([FORGE]);
+    const driver = createDriver([engineLocale(), FORGE]);
     const take = driver.snapshot().view!.choices.findIndex((choice) => choice.id === 'use:entity.forge.bench.open');
     driver.choose(take + 1);
 
@@ -257,16 +269,16 @@ describe('the route a row opens', () => {
     expect(asking.key).toBe('verb');
     driver.answer(asking.key, asking.values!.find((choice) => choice.value === 'grow')!.value);
 
-    const view = focusedPlane(driver.snapshot().view)!;
+    const view = focusedPlane(driver.snapshot().view, driver.localizer())!;
     expect(view.title).toBe('The Blade');
     expect(view.hexes.map((hex) => [hex.hex, hex.focused])).toEqual([['0,0', true]]);
     // The spindle's three positions and its one exit: the root the jewel came
     // with, the node a point may go to next, and two the plane has not reached.
     expect(rowsOf(view)).toEqual([
-      { node: `${LABELS.position} 1`, standing: LABELS.free, what: 'Honed', worth: '+3 attack' },
-      { node: `${LABELS.position} 2`, standing: LABELS.ready, what: '', worth: '' },
-      { node: `${LABELS.position} 3`, standing: LABELS.locked, what: '', worth: '' },
-      { node: `${LABELS.slot} e`, standing: LABELS.locked, what: '', worth: '' },
+      { node: shellWord('position', { position: 1 }), standing: shellWord('free'), what: 'Honed', worth: '+3 attack' },
+      { node: shellWord('position', { position: 2 }), standing: shellWord('ready'), what: null, worth: null },
+      { node: shellWord('position', { position: 3 }), standing: shellWord('locked'), what: null, worth: null },
+      { node: shellWord('slot', { direction: asLocalized('e') }), standing: shellWord('locked'), what: null, worth: null },
     ]);
   });
 });

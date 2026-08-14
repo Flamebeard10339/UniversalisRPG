@@ -18,6 +18,7 @@ import { carried, counted, worn } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
 import { useTestSurface } from './testSurface';
+import { wordsOf } from './words';
 import { TransientProvider } from './transient';
 import { VStack } from './VStack';
 
@@ -43,11 +44,15 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
   const [where, setWhere] = useState(opening);
   const view = snapshot.view;
+  // Read every render rather than held: `/dsl` adopts a new registry, and the
+  // language being played is the session's rather than the shell's (c3).
+  const localizer = driver.localizer();
+  const words = wordsOf(localizer);
   const asking = view ? askedOption(view.modals) : undefined;
   // Drawn because the engine says one is in hand, never because the shell
   // recognised the screen holding it: the focus is a published field and the
   // screen's name is not a thing this layer can read.
-  const plane = focusedPlane(view);
+  const plane = focusedPlane(view, localizer);
   const { arrivals, generation } = useArrivals(view?.discovered ?? []);
 
   // The one answer a gesture away from the open screen makes: the value that
@@ -75,16 +80,16 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
       if (subpage.id === 'home') return <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} />;
-      return subpage.id === 'edit' ? <Console onSend={driver.send} /> : null;
+      return subpage.id === 'edit' ? <Console onSend={driver.send} words={words} /> : null;
     }
     if (layer.id === 'map') return <MapPane view={view} arrivals={arrivals} generation={generation} onChoose={driver.choose} />;
-    if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? {})} />;
-    if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? {})} />;
+    if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? {}, localizer)} />;
+    if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? {}, localizer)} />;
     // Both sides of what the player has are rows that act, because c21 puts a
     // worn copy on this page and nowhere else and the verbs it offers are
     // reachable from nowhere else either.
-    if (subpage.id === 'equipment') return <Ledger entries={worn(view?.carried ?? [], view?.planes ?? [])} onOpen={driver.open} />;
-    return <Ledger entries={carried(view?.carried ?? [], view?.planes ?? [])} onOpen={driver.open} />;
+    if (subpage.id === 'equipment') return <Ledger entries={worn(view?.carried ?? [], view?.planes ?? [], localizer)} onOpen={driver.open} />;
+    return <Ledger entries={carried(view?.carried ?? [], view?.planes ?? [], localizer)} onOpen={driver.open} />;
   };
 
   const bodies = LAYERS.map((layer, at) => (
@@ -114,7 +119,7 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
           />
           <FloatingText channel={driver.transient} />
         </main>
-        <TabBar tabs={LAYERS[shell.where.layer].subpages} active={subpageOf(shell.where)} onSelect={(index) => go((held) => toSubpage(held, held.layer, index))} />
+        <TabBar words={words} tabs={LAYERS[shell.where.layer].subpages} active={subpageOf(shell.where)} onSelect={(index) => go((held) => toSubpage(held, held.layer, index))} />
         {asking ? (
           <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave}>
             {plane ? <PlanePane plane={plane} /> : null}
