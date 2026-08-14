@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { armCraft, armTravel, buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
+import { armAction, armCraft, armFightAction, armTravel, buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, ModalFrame, openModalNamed } from './modals';
@@ -587,6 +587,111 @@ describe('a craft under way stores an id, not the sentence it is offered as', ()
 
     const warnings = pruneStateForRegistry(state, universe('barra'));
     expect(warnings.map((warning) => warning.message)).toEqual(['Detenida la accion recipe.cocina.pan.craft: no hay ningun recipe cocina.pan..']);
+    expect(state.activeAction).toBeNull();
+  });
+});
+
+// The third and last owner of an action label: the one an author writes. Its
+// `title:` line WAS the identifier, so `# action melee-combat` titled "Fight"
+// stored "Fight" and a rename to "Combat" dropped the fight and put an English
+// word into a Spanish player's log. Reproduced by pass 3 of
+// `what-is-stored-or-replayed-is-an-id` against the shipped content's own shape.
+describe('a fight under way survives its action being retitled', () => {
+  const ARENA = (title: string): string =>
+    [
+      '# info isla',
+      'version: 1.0.0',
+      'language: es',
+      '',
+      '# location arena',
+      'x: 0, y: 0',
+      'starting',
+      'entities:',
+      '  rata',
+      '',
+      '# stat attack',
+      'base: 4',
+      '',
+      '# stat dr',
+      '',
+      '# stat attack-rate',
+      'base: 60',
+      '',
+      '# stat max-health',
+      '',
+      '# resource health',
+      'max: max-health',
+      '',
+      '# action melee-combat',
+      `title: ${title}`,
+      'rate: my attack-rate',
+      'damage: my attack vs their dr',
+      'depletes: their health',
+      '',
+      '# entity player',
+      'stats: max-health 1000, attack 4, attack-rate 60',
+      'uses: melee-combat',
+      '',
+      '# entity rata',
+      'stats: max-health 1000',
+      '',
+      '# entity comoda',
+      `${title.toLowerCase()} drawer:`,
+      '  instant',
+      '  say: polvo',
+    ].join('\n');
+
+  const SPANISH = [
+    '# info isla-es',
+    'version: 1.0.0',
+    'dependencies:',
+    '  isla',
+    '',
+    '# locale es',
+    'engine.prune.action: Detenida la accion {action}: {reason}.',
+    'engine.action.stale.action: no existe la accion {action} en {owner}',
+  ].join('\n');
+
+  const universe = (title: string): Registry => loadUniverse([engineLocale(), { name: 'isla', text: ARENA(title) }, { name: 'isla-es', text: SPANISH }]);
+
+  const fighting = (): GameState => {
+    const registry = universe('Fight');
+    const state = initialState(registry, 'es');
+    armFightAction('isla.melee-combat', 'isla.rata', registry, state);
+    expect(state.activeAction, 'the fight did not arm').not.toBeNull();
+    return state;
+  };
+
+  it('stores an id rather than the title a player reads, on the roster as well', () => {
+    expect(fighting().activeAction!.actionSlug).toBe('melee-combat');
+    expect(fighting().activeAction!.roster![PLAYER].actionSlug).toBe('melee-combat');
+    expect(JSON.parse(serializeSave(fighting(), universe('Fight'))).activeAction.actionSlug).toBe('melee-combat');
+  });
+
+  it('keeps the fight when the action is retitled underneath it', () => {
+    const state = fighting();
+
+    expect(pruneStateForRegistry(state, universe('Combat'))).toEqual([]);
+    expect(state.activeAction).not.toBeNull();
+  });
+
+  // The other half, on the owner that can actually lose one: an inline block
+  // renamed out from under a save stops the action and says so from a key, with
+  // no word the played language did not supply. `Fight drawer` slugs as
+  // `fight-drawer`, so retitling the fixture retitles this block with it.
+  const searching = (): GameState => {
+    const registry = universe('Fight');
+    const state = initialState(registry, 'es');
+    armAction('entity', 'isla.comoda', 'fight-drawer', registry, state);
+    expect(state.activeAction, 'the search did not arm').not.toBeNull();
+    return state;
+  };
+
+  it('says a block that is gone is gone, with no English in the log', () => {
+    const state = searching();
+
+    const warnings = pruneStateForRegistry(state, universe('Combat'));
+    expect(warnings.map((warning) => warning.message)).toEqual(['Detenida la accion entity.isla.comoda.fight-drawer: no existe la accion fight-drawer en entity.isla.comoda.']);
     expect(state.activeAction).toBeNull();
   });
 });
