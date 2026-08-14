@@ -40,7 +40,7 @@ Proof:
   action is still under way with no English in the log.
   proof: vitest src/runtime/save.test.ts
 - [c5] What changes is only what had to, and it is named here in full. `SAVE_VERSION` moves 10 to
-  11, because `activeAction`'s action field changes both name and domain; the six `# save`
+  11, because `activeAction`'s action field changes both name and domain; the seven `# save`
   fixtures carry the version stamp and nothing else, since none holds an action. Two authored
   lines move and no others: `use: entity.mirror.look in` and `use: entity.dresser.search drawer`
   in shipped `# test` sections become their slugs, which is this spec's original promise that no
@@ -77,11 +77,16 @@ Proof:
   waste. Localization now touches it first and must, so the second touch is already happening; and
   `gui-rebuild` sits behind `first-class-modals` and the whole decided chain, which would leave a
   derived slug and a bespoke validator standing side by side for a long time.
-- **The slug is derived, not authored, and a collision is a load error.** `pick lock` becomes
-  `pick-lock` by the rule ids already follow, so no author writes anything new and every existing
-  action keeps working. Two labels under one owner deriving the same slug is rare, checkable, and
-  loud. The cost is honest: renaming a label moves its slug, so a `use:` elsewhere breaks — caught at
-  load rather than prevented, which is the same bargain every id in this DSL already makes.
+- **An address is derived, not authored, and it is derived from whatever the declaration is.** A
+  `# action` section is addressed by the id it was written under, so its `title:` is display and
+  moves freely; an inline block on an entity or a location has no id but the label it is headed
+  with, so a slug of that label is the only address available and renaming the heading renames the
+  declaration, which is honest. This corrects the rule as first written here — "the slug is
+  derived from the label", for every form — which c4 refutes: a slug of a title still moves when
+  the title moves, so a declaration addressed that way would still stop a save on a retitle, which
+  is the whole defect. The two agree wherever a label was generated rather than authored, because
+  `actionSlug(humanizeEn(id))` is the id again. Two declarations under one owner deriving the same
+  address is rare, checkable, and a load error.
 - **The identifier and the display are separated by localization, not here.** After that branch, the
   label is display text resolved through a key and the identifier is the slug. This branch does not
   re-litigate that split; it takes the slug as given and gives it a home in the namespace.
