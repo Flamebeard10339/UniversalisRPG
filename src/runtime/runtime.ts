@@ -37,12 +37,14 @@ import {
   logSwing,
   newCadence,
   FIGHT_SCOPED,
+  hasPool,
   isFightScoped,
   opposes,
   Participant,
   participants,
   leaveFight,
   playerCadence,
+  poolLevel,
   retaliation,
   seatOf,
   sideOf,
@@ -50,7 +52,8 @@ import {
 } from './encounter';
 import { applyRespawns, downOne, isStanding, nextRespawn, standing } from './population';
 import { Action, declaredId } from '../content/entity';
-import { actionKind } from '../grammar/action';
+import { actionKind, isTwoSided } from '../grammar/action';
+import { fireHooks } from './hooks';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { isPoint } from '../grammar/range';
 import { Boundary, BoundarySource, requireBoundaryNotPast, requireForwardProgress } from './forwardProgress';
@@ -256,8 +259,43 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
   }
 }
 
+// Who a swing left with nothing, and, for an action with no pool to deplete,
+// whether it ran its implicit target out. Two answers rather than one boolean
+// because a swing can fell more than the character it struck once the hooks it
+// fired have applied.
+interface SwingOutcome {
+  felled: string[];
+  finished: boolean;
+}
+
+// Where a pool is heading by the end of the segment, which is the level the
+// verdict is taken on: the clamped write happens when the segment settles.
+function emptied(segment: Segment, actorId: string, resourceId: string): boolean {
+  return poolLevel(segment.state, segment.registry, actorId, resourceId) + getDelta(segment.deltas, actorId, resourceId) <= 0;
+}
+
+// The verdict, taken after the swing's hooks have applied and over every
+// character they reached rather than over the struck one alone: a `when hit:`
+// draining `from them` empties the pool of whoever swung. The struck one is
+// judged on the swing's own target level, as it was before hooks existed; a
+// character a hook reached is judged only on a pool it carries.
+function felledBy(segment: Segment, action: Action, self: string, other: string, reached: readonly string[]): string[] {
+  const { state, registry } = segment;
+  const pool = action.depletes!.id;
+  const struck = sideOf(action.depletes!, self, other);
+  const down = emptied(segment, struck, pool) ? [struck] : [];
+  for (const actorId of reached) {
+    if (down.includes(actorId) || !hasPool(state, registry, actorId, pool) || !emptied(segment, actorId, pool)) continue;
+    down.push(actorId);
+  }
+  // Whoever felled a character is the other one in the swing: the struck one
+  // where the swing did it, the swinger's own target where its `when hit:` did.
+  for (const actorId of down) if (!segment.causedBy.has(actorId)) segment.causedBy.set(actorId, actorId === self ? other : self);
+  return down;
+}
+
 // Both sides read with statValue, not sampled: one uniform decides the hit.
-function resolveAttempt(participant: Participant, segment: Segment): boolean {
+function resolveAttempt(participant: Participant, segment: Segment): SwingOutcome {
   const { state, registry } = segment;
   const { self, other, action, cadence } = participant;
   cadence.progress = 0;
@@ -271,6 +309,7 @@ function resolveAttempt(participant: Participant, segment: Segment): boolean {
   const hit = action.accuracy === undefined || nextRandom(state) < hitChance(half(action.accuracy.left, statValue, 0), half(action.accuracy.right, statValue, 0), registry);
 
   const dealt = hit ? hitDamage(half(action.damage?.left, sampleStat, 1), half(action.damage?.right, sampleStat, 0), registry) : null;
+  if (dealt !== null) damageTarget(state, registry, action, self, other, dealt, segment.deltas);
   // A swing is narrated only in a fight: an implicit target is no one to hit.
   if (action.depletes) {
     logSwing(state, registry, self, other, dealt);
@@ -278,8 +317,13 @@ function resolveAttempt(participant: Participant, segment: Segment): boolean {
     // its results to; the moment supplies the subject, so nothing authored does.
     segment.causedBy.set(sideOf(action.depletes, self, other), self);
   }
-  if (dealt === null) return targetLevel(state, registry, action, self, other) <= 0;
-  return damageTarget(state, registry, action, self, other, dealt, segment.deltas) <= 0;
+
+  // A landed two-sided swing, and nothing else, fires a hook: a miss fires
+  // neither block, and an implicit target is nobody to answer for one.
+  const reached = dealt !== null && isTwoSided(action) ? fireHooks(segment, self, other) : [];
+
+  if (!action.depletes) return { felled: [], finished: targetLevel(state, registry, action, self, other) <= 0 };
+  return { felled: felledBy(segment, action, self, other, reached), finished: false };
 }
 
 // Whether a repeating fight has anything left to swing at. Asked here as well
@@ -338,23 +382,25 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
     for (const participant of roster) participant.cadence.progress += elapsed;
     advanceTime(state, elapsed);
 
-    const depleted = resolveAttempt(next, segment);
+    const outcome = resolveAttempt(next, segment);
 
     // A copy whose pool ran out has left the world, whoever landed the blow:
-    // its own handlers run at the instant it ran out, and its place records
-    // that it is down. The player's own pool settles with the segment instead,
-    // because it is the one the save carries.
-    const struck = depleted && next.action.depletes ? sideOf(next.action.depletes, next.self, next.other) : undefined;
-    if (struck !== undefined && struck !== PLAYER) {
-      emptyPoolNow(segment, struck, next.action.depletes!.id, next.self);
-      downOne(state, registry, state.location, struck);
+    // its own handlers run at the instant it ran out, its place records that it
+    // is down, and the fight goes on without it. The player's own pool settles
+    // with the segment instead, because it is the one the save carries.
+    for (const actorId of outcome.felled) {
+      if (actorId === PLAYER) continue;
+      emptyPoolNow(segment, actorId, next.action.depletes!.id, segment.causedBy.get(actorId) ?? next.self);
+      downOne(state, registry, state.location, actorId);
+      leaveFight(active, actorId);
     }
 
     // The fight is measured on what the armed action targets, not on who
-    // swung: an ally's killing blow ends it exactly as the player's does.
+    // swung: an ally's killing blow ends it exactly as the player's does, and a
+    // hook's ends it exactly as the swing that fired it would have.
     const armedTarget = active.roster?.[PLAYER]?.target;
     let fightOutcome: FightOutcome | null = null;
-    if (depleted && (struck === undefined ? next.self === PLAYER : struck === armedTarget)) fightOutcome = 'completion';
+    if (outcome.finished ? next.self === PLAYER : armedTarget !== undefined && outcome.felled.includes(armedTarget)) fightOutcome = 'completion';
     else if (next.self === PLAYER && playerCadence(active).attemptsMade >= (action.attempts ?? Infinity)) fightOutcome = 'unfinished';
 
     if (fightOutcome) {
@@ -375,9 +421,6 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         endAction(state);
         return;
       }
-    } else if (struck !== undefined && struck !== PLAYER) {
-      // Somebody else went down. The fight goes on without them.
-      leaveFight(active, struck);
     }
 
     if (state.time > segEnd || drainedAPool(segment)) return;

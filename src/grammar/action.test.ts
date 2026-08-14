@@ -171,9 +171,20 @@ describe('a hook is carried by a character, not by a verb', () => {
     expect(() => actionBody.parse(new Cursor('drain: 3 health from them', 0, 0), written)).toThrow(CARRIER);
   });
 
-  it.each([['on hit self'], ['on hit them']])('refuses the four-block spelling %s: by name, on both routes', (written) => {
-    expect(refusal(`${written}: drain: 3 health`)).toContain(`${written}: was never implemented`);
-    expect(refusal('drain: 3 health', written)).toContain(`${written}: was never implemented`);
+  // Every cell of the cross product an earlier plan spelled, and the moment
+  // name it used for being hit: nothing here may reach an action label, which
+  // is what a carrier gets when no rule refuses the line.
+  it.each([['on hit self'], ['on hit me'], ['on hit them'], ['when hit self'], ['when hit me'], ['when hit them'], ['on struck self'], ['on struck me'], ['on struck them'], ['on struck']])(
+    'refuses the retired spelling %s: by name, on both routes',
+    (written) => {
+      expect(refusal(`${written}: drain: 3 health`)).toContain(`${written}: was never implemented`);
+      expect(refusal('drain: 3 health', written)).toContain(`${written}: was never implemented`);
+    }
+  );
+
+  it('answers the retired moment name with the one that replaced it', () => {
+    expect(refusal('drain: 3 health', 'on struck')).toContain('the moment a swing lands on the carrier is `when hit:`');
+    expect(refusal('drain: 3 health', 'on struck them')).toContain('says so itself, as in `drain: 3 health from them`');
   });
 });
 

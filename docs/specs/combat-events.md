@@ -49,12 +49,19 @@ else does:
 # entity berserker
 stats: max-health 40, max-rage 10, attack 6
 uses: melee-combat
-+2 attack per rage
 on hit:
   restore: 1 rage
   1 in 20:
     drain: 4 health from them
+
+# item warbrand
+slot: mainhand
++2 attack per rage
 ```
+
+The counter-scaled bonus is on the blade rather than on the berserker because an `# entity` has
+never carried a tag clause of any kind, flat or scaled, and this branch does not give it one. Both
+hook blocks read off either.
 
 `# entity` and `# item` are the two carriers that exist. The same two blocks on `# passive`, which
 `archetype-mods` and `items-mods-and-crafting` own between them, is that record's line to write and
@@ -134,8 +141,10 @@ What this branch owes, named. Each is a strategy the runtime implements and the 
 | `from them` / `to me` | which party a `drain:` or `restore:` moves its amount between; unmarked is me |
 | `+N <stat> per <counter>` | a stat bonus whose size reads a counter; a resource's level here |
 
-Carried by an `# entity` block or an equipped `# item`, gathered by the same walk that folds a stat
-bonus, so `# passive` and a buff join as carriers without a second mechanism.
+The two hook blocks are carried by an `# entity` block or an equipped `# item`, gathered by the same
+walk that folds a stat bonus, so `# passive` and a buff join as carriers without a second mechanism.
+`+N <stat> per <counter>` reaches the carriers that hold a tag clause, which is an item and an
+action's own overload; `# entity` holds none, and giving it one is nobody's yet.
 
 ### Fixtures belong to `archetype-mods`
 
@@ -239,6 +248,11 @@ a counter-scaled bonus are both things a passive or an item grants a character.
   passive that scales off rage is nothing melee knows about — and a carrier should not have to
   restate what a level is worth. They meet at `foldBonus`, which is the test that they are one
   mechanism: if this branch writes a second scaling function, they were two after all.
+- **The counter-scaled bonus reaches an item, not an entity, and the spec says so rather than
+  printing a form nobody can author.** `# entity` declares no tag-clause field and never has, so
+  `+2 attack per rage` on the berserker the Deliverable used to print does not load at all. The
+  example moves the grant onto the blade and the Primitives table names where the shape reaches;
+  giving an entity a tag clause is a capability of its own, filed as one, and not this branch's.
 - **Fixtures are content, not code.** They exist to prove the primitives compose. A mechanism whose
   tests pass while the resolver has grown a branch named after one of them has failed at the thing
   it was built for, which is why their absence from `src/runtime` is a clause.
@@ -473,3 +487,242 @@ a counter-scaled bonus are both things a passive or an item grants a character.
  git diff --stat 402b310..6757444 -- src/runtime/ content/ is empty, so this branch ships no content and touches no
  resolver. It is clean because src/runtime is untouched, not because a resolver was written and kept general; the
  same two commands must be re-run against combat-hook-firing before this grade means anything there.
+
+### Pass 4 — 2026-08-13
+
+- base: `3b355399a84e75c561de667023c340e601fcc1c3`
+- head: `125f2304ae957d66ec7c44c1be78d53b1dfb7c7c`
+- proof 1: met — Re-verified independently; the grammar half is untouched by this range, so pass 3's bytes are the bytes graded. `git diff 3b355399a84e75c561de667023c340e601fcc1c3..125f2304ae957d66ec7c44c1be78d53b1dfb7c7c` over src/grammar/ and src/content/ prints nothing at all.
+ Structural, re-checked cold: HOOK_FIELDS is spread into exactly two schemas, src/content/entity.ts:132 and src/content/item.ts:89, and referenceSites calls hooks() only at src/content/referenceSites.ts:309 and :323, the entity and item arms.
+ Re-runnable, my own fixture rather than pass 3's: npm run probe -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-c1c5.dsl --round-trip reports "hookprobe: round-trips clean" for an item carrying `+4-7 attack`, an `on hit:` holding `1 in 20:`, `if calm:` and a `one of:` table with party phrases in its rows, and an inline `when hit: 1 in 4:` with a comma list; and for an entity carrying both blocks. Pass 3's four mutation kills stand over unchanged bytes.
+- proof 2: met — The gather is the walk statRange folds, and the two share one function rather than agreeing by convention: modifierCarriers is defined at src/runtime/stats.ts:91 and has exactly two callers, statRange at src/runtime/stats.ts:134 and characterHooks at src/runtime/hooks.ts:15.
+ Re-runnable: npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-mutations.json. Three entries, all KILLED, each re-run at its own file with the mutant still applied. "c2 an equipped item joins the one modifier walk both a hook and a stat bonus read" (emptying the hooks a worn item contributes) killed 9 named tests including hooks.test.ts "reaches its wearer while the item is equipped and stops when it comes off". "c2 the entity's own sheet is a carrier on the same walk" (deleting the entity push) killed 6, including "reads the entity block off whoever is being evaluated, whatever the player wears".
+ The shared-walk half is proved by the third entry rather than asserted: "c2 an item that came off is off the walk" deletes the carriesItem guard from inside modifierCarriers and is killed by src/runtime/equipment.test.ts "equipment-slots: a slot keeps its item across losing and re-acquiring it" — a stat-side test that predates hooks. Breaking the hook gather breaks the stat fold, which is what "rather than a list of its own" means.
+ Named, not a defect this branch owes: modifierCarriers gives the entity carrier `tags: []`, and statRange still folds the performing action's tags, buffs and skill levels outside the walk. See the finding on that seam.
+- proof 3: met — Re-verified independently of pass 3 and of the suite. Re-runnable: npm run probe -- - --each < C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-c3c4.txt. Variant 1 (a section-level `# action` carrying `on hit:`) is refused with 'action "swing": on hit: is carried by a character rather than by a verb — write it on the `# entity` or `# item` that carries it, because an action is the verb and is shared by everyone who performs it'; variant 2 reaches the same refusal through a `# location`; variants 3 and 4 refuse `on hit self:` and `on hit them:` by name with 'was never implemented — there is one `on hit:` per carrier'. The error names the carrier in every case. src/grammar/ is untouched by this range.
+- proof 4: met — Both halves now, where pass 3 could only grade the grammar. Grammar, re-probed at C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-c3c4.txt: `drain: 3 health to them` is refused with 'drain: takes its amount away from a party, so it is written `from them` rather than `to them`', `restore: 3 health from me` with the mirror of it naming `to me`, and `from nobody` with 'drain: from names a party'.
+ Runtime, which pass 3 recorded as unprovable at that layer: src/runtime/effects.ts:190 subjectOf is the one place a party becomes an actor, and it is read only by `case 'pool'` at :242. Re-runnable: the manifest entry "c4 a party phrase names a character other than the one the list is applying to" replaces subjectOf's body with `return actor` — KILLED by 6 named tests in src/runtime/hooks.test.ts, re-run at that file with the mutant still applied. `me` and `them` are set in one place, src/runtime/hooks.ts:36 fireMoment, as { me: carrier, them: other } for the duration of that carrier's results and restored after, which is what makes one rule serve both blocks.
+- proof 5: met — No chance mechanism was added: src/grammar/actionResult.ts is untouched by this range, and the whole of this branch's change to src/runtime/effects.ts is the Party import, the `parties` field on Segment, subjectOf, and its use in `case 'pool'` — no wrapper, no selector, no draw.
+ Re-runnable: npm run probe -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-c1c5.dsl --round-trip round-trips clean for a hook body holding `1 in 20:`, `if calm:`, a `one of:` table with a `nothing` row, and an inline `1 in 4:` followed by a comma list.
+ The draw discipline is now observable for the first time and the branch tests it: src/runtime/hooks.test.ts "draws once for the body rather than once per result inside it" runs 40 swings through a `1 in 2:` wrapping a say and an `add:`, and asserts the flag count equals the spoken count, which is the property that would fail if the draw were per result.
+- proof 6: met — Re-runnable: two entries in C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-mutations.json aimed at the one guard, src/runtime/runtime.ts:323. "c6 a miss fires neither block" drops `dealt !== null` and is KILLED by hooks.test.ts "fires neither block on a miss"; "c6 an attempt on an implicit target fires neither block" drops `isTwoSided(action)` and is KILLED by "fires nothing for an attempt that lands on an implicit target". Both re-run at their own file with the mutant still applied.
+ The clause's second sentence holds by construction as well as by test: assembledActionProblem at src/grammar/action.ts:276 refuses a side-naming action with nothing to deplete, so `isTwoSided(action)` implies `action.depletes`, and there is no two-sided moment that could fire a hook and then skip the verdict.
+- proof 7: met — Structural, and the structure is the whole argument the clause makes. fireHooks has exactly one call site in the repository — `grep -rn "fireHooks" src/ scripts/` returns its definition at src/runtime/hooks.ts:26, the import at runtime.ts:56 and the single call at runtime.ts:323, inside resolveAttempt. Nothing reachable from applyResults can swing: applyOne's arms are say, set, unset, add, give, take, xp, relocate, discover, open-modal, pool, stop, chance, contest, gate, credit, one-of and roll, and the one indirect route out of it, fireEvents, re-enters applyResults. There is no depth counter anywhere, which is what the clause promises.
+ Measured rather than argued: npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-c7c9.ts builds the most recursive shape the grammar allows — both characters carrying both blocks, every one of the four draining `from them`, plus an item carrying both — and one second of it returns in 2ms with exact arithmetic (player 97, mirror 93, two log lines). A firing that recursed would not terminate.
+- proof 8: met — Re-runnable: two entries in C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-mutations.json, both KILLED and re-run at their own file with the mutant still applied. "c8 the swinger's on hit: runs before the struck one's when hit:" swaps the two fireMoment calls at src/runtime/hooks.ts:27-28 and is killed by hooks.test.ts "logs the swing, then the swinger carrier by carrier, then the struck one", which asserts the log is exactly ['You hit the Dummy for 1.', 'charm', 'ring', 'dummy'] — the swing's line first, so "damage is applied, the swing is logged, then the hooks" is asserted as a sequence and not inferred. "c8 carriers fire in the order the modifier walk returns them" appends .reverse() to characterHooks and is killed by two named tests.
+ Within-character order is the gather's order by construction, not by a second sort: characterHooks maps modifierCarriers directly, and modifierCarriers is the same list statRange folds.
+- proof 9: met — Re-runnable: two entries in C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-mutations.json, both KILLED at src/runtime/hooks.test.ts with the mutant still applied. "c9 the verdict is taken over every character a hook reached, not the struck one alone" deletes the reached loop from felledBy (runtime.ts:287-290); "c9 the verdict is taken after the hooks have applied" passes an empty reached list. Both are killed by "fells a swinger with what it struck, and ends the fight because it was the target", which also pins the credit — the ear and the 3 fury go to whoever emptied the pool, not to whoever swung.
+ Measured beyond the branch's own fixtures, because a fight can hold more than two characters through `allies:` (runtime.ts:534): npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-c9b.ts arms the player against a boss whose ally joins, and the player's `when hit:` fells the ally on the ally's own swing. Roster goes from [player, boss, minion] to [player, boss], cadences and actors likewise, and the fight goes on — the "leaves the fight at that instant" half, on the one shape that can exercise it.
+ Two things this grade does not cover, both filed as findings. The leaveFight call that produces the result above survives its own mutation against the whole 2732-test suite. And "ends it if it was the player" is not delivered: a player emptied by a `when hit:` stays armed and keeps swinging — but a control probe (audit-combat-events-pass4-c9c.ts) shows a player emptied by an ordinary swing does exactly the same, so the parity this clause actually sets as its standard holds and the gap is the engine's, not this branch's.
+- proof 10: met — The half pass 1 and pass 3 both recorded missing is now shipped and mutation-proved, and the clause's own grep test still holds.
+ Re-runnable: three entries in C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-mutations.json. "c10 the counter is read as the count foldBonus multiplies by" rewrites src/runtime/stats.ts:51 back to `foldBonus(tag, fold, 1)`, which is the exact line passes 1 and 3 quoted as the defect — KILLED by 4 named tests in src/runtime/stat.test.ts including "grants nothing at all where the counter is empty, rather than a flat bonus". "c10 the counter is floored before it multiplies" drops Math.floor and is KILLED by "floors the level before it multiplies, because a counter counts points". Both re-run at their own file with the mutant still applied.
+ No second multiplier: `grep -n "foldBonus\|scaledAmount" src/runtime/stats.ts` finds foldBonus defined once at :34 with three call sites (:51 the tag fold, :67 the plane payload, :109 the skill level), all passing a count, and the one multiplication inside it is the pre-existing scaledAmount that c19 of items-mods-and-crafting put there. counterLevel supplies a count and multiplies nothing.
+ Two caveats, both filed. Which character's pool the counter is read off is unasserted — replacing that lookup with the player's own store survives the whole 2732-test suite, and I reproduced the reachable case by probe. And the clause names an entity among the carriers while the spec's own Deliverable prints `+2 attack per rage` on `# entity berserker`, which still does not load: npm run probe -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass4-deliverable.dsl reports 'unexpected content: "+2 attack per rage"'. That is the open pass-3 finding, recurred rather than refiled.
+- proof 11: met — Verified, and non-vacuous for the first time: passes 1 and 3 both recorded this clean only because src/runtime was untouched, and this range is the resolver those passes were waiting for.
+ Re-runnable: `grep -rniE "poison|thorns|rage|vigor|accelerated" src/runtime/` returns matches only inside DSL fixture text embedded in test files (clusterEffect.test.ts, command.test.ts, enemy-pool.test.ts, resolve.test.ts, runtime.test.ts) — no identifier and no resolver branch in any shipped file. The three new resolver surfaces are Moment, characterHooks, fireHooks, fireMoment (hooks.ts), subjectOf (effects.ts) and counterLevel, ModifierCarrier, modifierCarriers (stats.ts): every one is named for the mechanism and none for a fixture, and the branch's own test module deliberately spells its counter `fury` and its thorns carrier `briar-mail`. `git diff 3b35539..125f230` over content/ prints nothing, so this branch ships no content.
+
+### Pass 5 — 2026-08-13
+
+- base: `3b355399a84e75c561de667023c340e601fcc1c3`
+- head: `948477403fddc5a5b311f473f920055515cc2493`
+- proof 1: met — Re-verified cold, and independently of passes 3 and 4. The grammar half is untouched by
+ this range: `git diff --stat 3b355399a84e75c561de667023c340e601fcc1c3..948477403fddc5a5b311f473f920055515cc2493 -- src/grammar/ src/content/ content/`
+ prints nothing at all, so pass 3's bytes are the bytes graded.
+ Both carriers, both blocks, through serialize and reload -- my own fixture, not an earlier pass's:
+ npm run probe -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-c1c5.dsl --round-trip
+ reports "hookprobe: round-trips clean" for an item carrying `+4-7 attack`, an `on hit:` holding
+ `1 in 20:`, `vigor vs vigor:`, `if calm:` and a `one of:` table with party phrases in its rows, plus
+ an inline `when hit: 1 in 4:` with a comma list; a second item carrying `when hit:` alone; and an
+ entity carrying both blocks.
+ "and on nothing else", probed rather than argued:
+ npm run probe -- - --each < C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-c3.txt and
+ ...-c3b.txt refuse `on hit:` on a `# skill` ("unknown skill field: on hit"), a `# resource`
+ ("unknown resource field: on hit"), a `# event` ("unknown event field: on hit"), a `# droptable`
+ ("unrecognized action result"), a section-level `# action` and a `# location`. Only `# item` and
+ `# entity` accept one.
+ No side vocabulary: HookCarrier is two ActionResult[] and nothing else (src/grammar/hook.ts:7-10).
+- proof 2: met — The gather and the stat fold are one walk, and this range's triage commit made that true of
+ buffs as well -- which is what pass 4 could not grade, because the buff loop then sat outside
+ modifierCarriers. Re-runnable:
+ npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-mutations.json
+ Five entries, all KILLED, each re-run at its own file with the mutant still applied:
+ - "c2 an equipped item joins the one modifier walk both a hook and a stat bonus read" (deleting the
+   item push at src/runtime/stats.ts:106) killed by hooks.test.ts "reaches its wearer while the item
+   is equipped and stops when it comes off";
+ - "c2 the entity's own sheet is a carrier on the same walk" (deleting stats.ts:100) killed by
+   "reads the entity block off whoever is being evaluated, whatever the player wears";
+ - "c2 the unequip guard is inside the shared walk" (deleting `if (!carriesItem(...)) continue;` at
+   stats.ts:104) killed by src/runtime/equipment.test.ts "equipment-slots: a slot keeps its item
+   across losing and re-acquiring it" -- a stat-side test that predates hooks, which is the proof
+   that the gather is not a list of its own;
+ - "c2 a buff is on the walk" (deleting `for (const buff of own.buffs) carriers.push(...)` at
+   stats.ts:102) killed by stat.test.ts "leaves an unranged stat exactly where it was: base + added,
+   then x (1 + increased)";
+ - "c2 a buff on the walk is folded exactly once, not twice" (duplicating the foldBuff call at
+   stats.ts:143) killed by the same named test, which pins an exact 7.5 rather than a presence.
+ The last two are the property pass 4's finding was a reproduction of, not its sentence: the walk now
+ carries the buff, so "a source joins by joining this list" is true by construction and a second fold
+ is caught by value.
+ Structural, re-checked cold: `grep -rn "modifierCarriers" src/ --include=*.ts` returns the definition
+ at stats.ts:97 and exactly two callers, statRange at stats.ts:142 and characterHooks at
+ src/runtime/hooks.ts:15. Named, not a defect this branch owes: a skill's `per-level:` and the
+ performing action's tags still fold outside the walk, and stats.ts:79-85 now states why for each --
+ a declaration on `# skill` and a verb, which c3 already says is not a carrier.
+- proof 3: met — Re-probed cold, independently of the suite:
+ npm run probe -- - --each < C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-c3.txt
+ Variant 1 (a section-level `# action` carrying `on hit:`) and variant 2 (the same through a
+ `# location` action block) are both refused with 'action "swing": on hit: is carried by a character
+ rather than by a verb -- write it on the `# entity` or `# item` that carries it, because an action is
+ the verb and is shared by everyone who performs it', so the error names the carrier on both routes.
+ Variants 3 and 4 refuse `on hit self:` and `on hit them:` by name with 'was never implemented --
+ there is one `on hit:` per carrier', on an item; ...-c3c.txt shows `on hit self:` refused on an
+ entity too. src/grammar/ is untouched by this range.
+ Graded met because the clause's own two named spellings are refused. But the property that refusal is
+ a reproduction of is narrower than the clause: the spec's Decisions section names four retired
+ spellings (`on hit them:`, `on hit me:`, `on struck them:`, `on struck me:`) and
+ RETIRED_HOOK_LABELS holds two, one of which (`on hit self:`) the decision never lists. `on hit me:`,
+ `on struck me:`, `on struck them:`, `when hit self:` and `when hit them:` all LOAD, and become a
+ silently-created action on the carrier. Filed as a finding this pass.
+- proof 4: met — Both halves, and the runtime half measured beyond the branch's own fixtures.
+ Grammar, re-probed cold:
+ npm run probe -- - --each < C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-c4.txt
+ refuses `drain: 3 health to them` with 'drain: takes its amount away from a party, so it is written
+ `from them` rather than `to them`', `restore: 3 health from me` with the mirror of it naming
+ `to me`, and `from nobody` with 'drain: from names a party'. It accepts `from them`, `to me`,
+ unmarked, and both inside `1 in 4:` on either block; and it refuses the phrase on every non-hook
+ route tried -- a `# droptable` body and an entity `on death:` handler -- with 'reads only inside
+ `on hit:` or `when hit:`'.
+ Runtime, mutation-proved (same manifest, both KILLED and re-run at their own file with the mutant
+ still applied): "c4 a party phrase names a character other than the one the list is applying to"
+ replaces subjectOf's body (src/runtime/effects.ts:192) with `return actor`; "c4 me is the carrier and
+ them the other party, not the reverse" swaps the assignment at src/runtime/hooks.ts:39. Both killed
+ by hooks.test.ts "reaches its wearer while the item is equipped and stops when it comes off".
+ "in both blocks", measured rather than inferred:
+ npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-c4b.ts
+ An entity's `when hit: restore: 3 fury` leaves the SWINGER's fury at 0 (unmarked is the carrier, and
+ the carrier under `when hit:` is the struck one), and an item's `on hit: drain: 4 health from me`
+ takes 4 off the swinger (95) and nothing off the character it struck (99, the swing alone).
+ Not covered, and filed: deleting the `segment.parties = outer` restore at src/runtime/hooks.ts:41
+ SURVIVED the whole 2734-test suite.
+- proof 5: met — No chance mechanism was added. src/grammar/actionResult.ts is untouched by this range, and
+ the whole of this branch's change to src/runtime/effects.ts is the Party import, the `parties` field
+ on Segment, subjectOf and its one use in `case 'pool'` -- no wrapper, no selector, no draw
+ (`git diff 3b35539..9484774 -- src/runtime/effects.ts`, 14 lines).
+ Re-runnable: npm run probe -- C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-c1c5.dsl --round-trip
+ reports "round-trips clean" for a hook body holding `1 in 20:`, `vigor vs vigor:`, `if calm:` and a
+ `one of:` table, and for an inline `1 in 4:` followed by a comma list -- all four selectors the
+ clause names, nested inside a hook, unchanged.
+ The draw discipline is observable now and the branch tests it: hooks.test.ts "draws once for the body
+ rather than once per result inside it" runs 40 swings through a `1 in 2:` wrapping a `say:` and an
+ `add:` and asserts the flag count equals the spoken count -- the property that fails if the draw were
+ per result rather than per body.
+- proof 6: met — Re-runnable: two entries in
+ C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-mutations.json aimed at the one guard,
+ src/runtime/runtime.ts:323, both KILLED and re-run at their own file with the mutant still applied.
+ "c6 a miss fires neither block" drops `dealt !== null` and is killed by hooks.test.ts "fires neither
+ block on a miss"; "c6 an attempt on an implicit target fires neither block" drops
+ `isTwoSided(action)` and is killed by "fires nothing for an attempt that lands on an implicit
+ target". The second test is non-vacuous: it asserts the implicit target MOVED and still nothing
+ fired.
+ The clause's second sentence also holds structurally: fireHooks has one call site
+ (`grep -rn "fireHooks" src/ scripts/` returns the definition at hooks.ts:26, the import at
+ runtime.ts:56 and the call at runtime.ts:323), inside resolveAttempt, and resolveDeterministicSegment
+ -- the other segment path -- never reaches it.
+- proof 7: met — Structural, and the structure is the whole argument. `grep -rn "fireHooks" src/ scripts/`
+ returns exactly three lines: the definition at src/runtime/hooks.ts:26, the import at
+ src/runtime/runtime.ts:56 and one call at src/runtime/runtime.ts:323 inside resolveAttempt. Nothing
+ reachable from applyResults can swing: applyOne's arms are say, set, unset, add, give, take, xp,
+ relocate, discover, open-modal, pool, stop, chance, contest, gate, credit, one-of and roll, and the
+ one indirect route out of it, fireEvents, re-enters applyResults. There is no depth counter, which is
+ what the clause promises.
+ Measured, not only argued:
+ npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-c7c9.ts
+ builds the most recursive shape the grammar allows -- both characters carrying both blocks, all four
+ draining `from them`, plus an item on the player carrying both -- and one second of it returns in 2ms
+ with exact arithmetic and two log lines: mirror 95, player 97, which is 3 + 2 and 1 + 2 off two
+ swings and no more. A firing that recursed would not terminate.
+- proof 8: met — Re-runnable: two entries in
+ C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-mutations.json, both KILLED and re-run at
+ their own file with the mutant still applied. "c8 the swinger's on hit: runs before the struck one's
+ when hit:" swaps the two fireMoment calls at src/runtime/hooks.ts:28-29; "c8 carriers fire in the
+ order the modifier walk returns them" appends `.reverse()` to characterHooks at hooks.ts:17. Both are
+ killed by hooks.test.ts "logs the swing, then the swinger carrier by carrier, then the struck one",
+ which asserts the log is exactly ['You hit the Dummy for 1.', 'charm', 'ring', 'dummy'] -- the
+ swing's own line first, so "damage is applied, the swing is logged, then the hooks" is asserted as a
+ sequence rather than inferred, and 'charm' before 'ring' is the walk's order rather than a sort.
+ Within-character order is the gather's order by construction: characterHooks maps modifierCarriers
+ directly (hooks.ts:15-17) and applies no ordering of its own.
+ "Two hooks that write one pool compose deterministically" is pinned separately by "composes two hooks
+ writing one pool" (sheet restores 2, charm drains 1, net 1 per swing over 3 swings = 3).
+- proof 9: deferred — Three of the clause's four promises are delivered and mutation-proved; the fourth is
+ undelivered, and I re-measured it rather than inheriting pass 4's grade.
+ Delivered, re-runnable from
+ C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-mutations.json, all KILLED and re-run at
+ their own file with the mutant still applied:
+ - "c9 the verdict is taken over every character a hook reached, not the struck one alone" deletes the
+   reached loop from felledBy (runtime.ts:287-290) -- killed by "fells a swinger with what it struck";
+ - "c9 a character a hook felled leaves the fight at that instant" deletes `leaveFight` from the
+   felled loop (runtime.ts:395) -- killed by "takes a character a hook felled out of the fight it was
+   not the target of", the allies fixture this range's triage commit added. This is the mutation pass
+   4 recorded as surviving the whole suite; it is now dead;
+ - "c9 a character a hook felled is recorded down where it stood" deletes downOne (runtime.ts:394) --
+   killed by "ends the fight on a target a hook finished off";
+ - "c9 the kill is credited to whoever emptied the pool, not to whoever swung" replaces
+   `segment.causedBy.get(actorId) ?? next.self` with `next.self` (runtime.ts:393) -- killed by the
+   same test, which pins the ear and the 3 fury to whoever emptied the pool;
+ - "c9 the fight ends on the armed target whoever emptied it" narrows the outcome test at
+   runtime.ts:400 -- killed by "ends the fight on a target a hook finished off".
+ UNDELIVERED, and why this is deferred rather than met: "ends it if it was the player". Re-runnable,
+ my own probe rather than pass 4's:
+ npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-c7c9.ts
+ A player at 10 health swinging at a spiker carrying `when hit: drain: 50 health from them` reaches
+ health 0 with stillArmed true, and the log shows it swinging again afterwards. The control in the
+ same file settles the fault: a player at 10 felled by a brute's ordinary 50-damage swing behaves
+ identically -- health 0, still armed, still swinging. The parity the clause's previous sentence sets
+ as its standard therefore holds, and the missing half is pre-existing engine behaviour rather than
+ something this branch broke; that is why the goal still holds without it and this is deferred rather
+ than unmet. It is already tracked as
+ combat-events-pass4-a-player-emptied-by-a-when-hit-stays-arm, which triage deferred this range with
+ the reason on the record and whose deliverable is "either the engine ends an armed fight whose player
+ pool has emptied, or c9 drops the player half" -- so this deferral and that finding are one thing and
+ should be merged rather than scheduled twice.
+ One sentence I could not measure either way: "a character a hook reached is judged only on a pool it
+ carries" -- deleting the `hasPool` guard at runtime.ts:288 returned UNSTABLE (a
+ scripts/tasks/handoff.test.ts failure that did not repeat on the same tree with the same mutant), so
+ that scope cannot answer. Reported as a finding rather than re-run until it picks a side: no fixture
+ in hooks.test.ts can exercise the guard, because every entity in its module carries max-health > 0.
+- proof 10: met — The half passes 1 and 3 recorded missing is shipped, and the caveat pass 4 recorded as
+ surviving the whole suite is now dead. Re-runnable: three entries in
+ C:\Users\yonat\AppData\Local\Temp\audit-combat-events-pass5-mutations.json, all KILLED and re-run at
+ their own file with the mutant still applied:
+ - "c10 the counter is read as the count foldBonus multiplies by" rewrites src/runtime/stats.ts:51
+   back to `foldBonus(tag, fold, 1)`, the exact line passes 1 and 3 quoted as the defect -- killed by
+   stat.test.ts "grants nothing at all where the counter is empty, rather than a flat bonus";
+ - "c10 the counter is floored before it multiplies" drops Math.floor at stats.ts:45 -- killed by
+   "floors the level before it multiplies, because a counter counts points";
+ - "c10 the counter is read off the character being evaluated, not off the player" replaces the store
+   lookup at stats.ts:44 with `state.resources` -- killed by "reads the counter off the character
+   being evaluated, not off the player", the ogre regression this range's triage commit added, which
+   asserts 4 + 5x4 = 24 for the ogre and 4 for the player from the same state. This is pass 4's second
+   surviving mutation; it is now dead.
+ No second multiplier, the clause's own grep re-run:
+ `grep -n "foldBonus\|scaledAmount" src/runtime/stats.ts` finds scaledAmount defined once at :30 (the
+ pre-existing one c19 of items-mods-and-crafting put there), foldBonus defined once at :34 and
+ delegating to it, and three foldBonus call sites (:51 the tag fold, :67 the plane payload, :123 the
+ skill level) all passing a count. counterLevel supplies a count and multiplies nothing.
+ Recurred rather than refiled: the spec's own Deliverable prints `+2 attack per rage` on
+ `# entity berserker`, which still does not load -- an entity carries no stat bonus. That is the open
+ pass-3 finding combat-events-pass3-the-deliverable-s-own-entity-example-doe.
+- proof 11: met — Verified cold and non-vacuously: this range is the resolver, so unlike passes 1 and 3
+ the grep has something to be clean about.
+ Re-runnable: `grep -rniE "poison|thorns|rage|vigor|accelerated" src/runtime/` over shipped (non-test)
+ files returns exactly one line, src/runtime/stats.ts:41, and it is a comment using `per rage` as an
+ example of the shape -- no identifier, no branch. Every other match is DSL fixture text embedded in
+ test modules (clusterEffect, command, enemy-pool, resolve, runtime, stopping .test.ts).
+ The resolver surfaces this range adds are Moment, characterHooks, fireHooks, fireMoment (hooks.ts),
+ subjectOf and Segment.parties (effects.ts), counterLevel, ModifierCarrier, modifierCarriers and
+ foldBuff (stats.ts), and SwingOutcome, emptied and felledBy (runtime.ts): every one is named for the
+ mechanism and none for a fixture. The branch's own test module deliberately spells its counter `fury`
+ and its thorns carrier `briar-mail`.
+ `git diff --stat 3b35539..9484774 -- content/` prints nothing, so this branch ships no content and no
+ shipped fixture can stand in for a primitive that did not generalize.

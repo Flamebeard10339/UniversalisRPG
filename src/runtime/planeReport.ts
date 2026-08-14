@@ -9,6 +9,7 @@ import { basePlane, isAllocated, neighbours, placementAt, Plane, planeClusters, 
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
 import { hasStackCopy, itemCopies, grownItems, isGrownCopy, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining, wornCopy } from './itemInstance';
 import { GameState } from './state';
+import { counterLevels } from './stats';
 
 // Where a point may go, said once for both things a point buys. `blocked` is a
 // slot alone: the hex beyond it already holds a cluster that entered another
@@ -186,7 +187,7 @@ export function planeReport(registry: Registry, state: GameState, target: string
     spent: pointsSpent(payload.plane),
     remaining: pointsRemaining(payload, item),
     clusters,
-    contributions: itemContribution(registry, item, payload),
+    contributions: itemContribution(registry, item, payload, counterLevels(state)),
   };
 }
 

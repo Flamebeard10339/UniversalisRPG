@@ -13,6 +13,11 @@ export function scaledAmount(bonus: BonusAmount, times: number): BonusAmount {
   return bonus.percent ? { percent: true, amount: bonus.amount * times } : { percent: false, amount: scaleRange(bonus.amount, times) };
 }
 
+// How many of a counter a `per` bonus reads. It is a live fact about a
+// character and an item is not one, so whoever knows the character supplies it;
+// nobody is the same answer as an empty counter, which is nothing at all.
+export type CounterLevel = (resourceId: string) => number;
+
 // What one item is worth on one stat, effective rather than declared. The two
 // channels are the two a bonus can land in and are never mixed: `increased` is
 // in percent points, the units the bonus was authored in, so a reader states it
@@ -35,7 +40,7 @@ const byName = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 // carries, each scaled by what its cluster made it worth. A stack copy has no
 // instance and stands on the item's default plane, which is this same fold with
 // a degenerate argument rather than a second path that could answer differently.
-export function itemContribution(registry: Registry, item: Item, instance?: ItemInstance): StatContribution[] {
+export function itemContribution(registry: Registry, item: Item, instance?: ItemInstance, counter: CounterLevel = () => 0): StatContribution[] {
   const byStat = new Map<string, Channels>();
   const fold = (statId: string, bonus: BonusAmount, times: number): void => {
     const channels = byStat.get(statId) ?? { added: point(0), increased: 0 };
@@ -45,7 +50,7 @@ export function itemContribution(registry: Registry, item: Item, instance?: Item
     byStat.set(statId, channels);
   };
 
-  for (const tag of item.tags) if (tag.kind === 'stat-bonus') fold(tag.statId, tag, 1);
+  for (const tag of item.tags) if (tag.kind === 'stat-bonus') fold(tag.statId, tag, tag.per === undefined ? 1 : counter(tag.per));
 
   const plane = instance?.plane ?? basePlane(item);
   if (plane) for (const payload of instancePayloads(registry, { experience: instance?.experience ?? 0, plane })) fold(payload.statId, payload.bonus, payload.scale);
