@@ -2,7 +2,9 @@ import { Direction, Hex, PlaneNode } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
+import { carriedName } from './carriedName';
 import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';
+import { Localized, Localizer, localizerOf } from './localized';
 import { skillLevel } from './skills';
 import { GameState } from './state';
 
@@ -16,11 +18,18 @@ export interface ItemInstance {
   plane: Plane;
 }
 
-export type Refusal = { ok: false; refused: string };
+// What a refused verb tells the player. It has been through the localizer, so
+// a refusal cannot be assembled out of a registry field on its way to a screen.
+export type Refusal = { ok: false; refused: Localized };
 export type Growth = { ok: true; instance: string } | Refusal;
 export type Destruction = { ok: true; item: string } | Refusal;
 
-const refused = (reason: string): Refusal => ({ ok: false, refused: reason });
+const refused = (reason: Localized): Refusal => ({ ok: false, refused: reason });
+
+// A plane's own refusals name a hexagon, a direction and a node, and none of
+// those is keyed, so they take the prose door where they are made rather than
+// where they are shown.
+const plainly = (localizer: Localizer, problem: string | undefined): Localized | undefined => (problem === undefined ? undefined : localizer.prose(problem));
 
 export function isItemInstance(payload: unknown): payload is ItemInstance {
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return false;
@@ -222,7 +231,7 @@ export function hasStackCopy(state: GameState, id: string): boolean {
 // its plane consumed does not come back. A stack loses one, and an emptied
 // stack goes rather than staying on as a count of none. Nothing here puts the
 // item down anywhere, and nothing here asks whether the player meant it.
-export function destroyItem(state: GameState, id: string): Destruction {
+export function destroyItem(state: GameState, registry: Registry, id: string): Destruction {
   const copy = named(state, id);
   const standing = grown(state, copy);
   if (standing) {
@@ -231,7 +240,7 @@ export function destroyItem(state: GameState, id: string): Destruction {
     return { ok: true, item: standing.template };
   }
   const source = stackCopy(state, id);
-  if (!source) return refused(`you carry no ${id}`);
+  if (!source) return refused(localizerOf(registry, state).prose(`you carry no ${id}`));
   const template = itemTemplate(state, id);
   if (source.from === 'slot') delete state.equipped[source.slot];
   else {
@@ -252,7 +261,7 @@ export function pointsRemaining(payload: ItemInstance, item: Item): number {
 interface Growing {
   target: string;
   consumes?: string;
-  change(payload: ItemInstance, item: Item): string | undefined;
+  change(payload: ItemInstance, item: Item): Localized | undefined;
 }
 
 const held = (state: GameState, itemId: string): number => copiesOf(state, itemId).stack;
@@ -268,19 +277,20 @@ const take = (state: GameState, itemId: string): void => void stockItem(state, i
 // copy that left is the copy that was worn, so the slot names the minted id and
 // the player wears what they grew.
 export function growItem(state: GameState, registry: Registry, growing: Growing): Growth {
+  const localizer = localizerOf(registry, state);
   const { target, consumes } = growing;
   const copy = named(state, target);
   const standing = grown(state, copy);
   const template = itemTemplate(state, target);
   const item = registry.items.get(template);
-  if (!item) return refused(`there is no item or item instance called ${target}`);
+  if (!item) return refused(localizer.prose(`there is no item or item instance called ${target}`));
 
   const plane = basePlane(item);
-  if (!plane) return refused(`${template} is not a base: only an item you can wear has a plane to grow`);
+  if (!plane) return refused(localizer.prose(`${template} is not a base: only an item you can wear has a plane to grow`));
 
   const source = standing ? undefined : stackCopy(state, target);
-  if (!standing && !source) return refused(`you carry no ${template}`);
-  if (consumes !== undefined && held(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(`you carry no ${consumes}`);
+  if (!standing && !source) return refused(localizer.prose(`you carry no ${template}`));
+  if (consumes !== undefined && held(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(localizer.prose(`you carry no ${consumes}`));
 
   const payload = standing?.payload ?? { experience: 0, plane };
   const problem = growing.change(payload, item);
@@ -296,13 +306,14 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
 
 // c12: the only event in the game that moves an item's experience.
 export function feedItem(state: GameState, registry: Registry, target: string, food: string): Growth {
+  const localizer = localizerOf(registry, state);
   const experience = registry.items.get(food)?.itemExperience;
-  if (experience === undefined) return refused(`${food} grants no item experience`);
+  if (experience === undefined) return refused(localizer.prose(`${food} grants no item experience`));
   return growItem(state, registry, {
     target,
     consumes: food,
     change: (payload, item) => {
-      if (itemLevel(payload, item) >= item.maxLevel) return `${item.title} is already at level ${item.maxLevel}, which is its maximum`;
+      if (itemLevel(payload, item) >= item.maxLevel) return localizer.engine('engine.growth.max-level', { item: carriedName(localizer, 'item', item.id, false), level: item.maxLevel });
       payload.experience += experience;
       return undefined;
     },
@@ -310,18 +321,20 @@ export function feedItem(state: GameState, registry: Registry, target: string, f
 }
 
 export function slotJewel(state: GameState, registry: Registry, target: string, jewelItem: string, hex: Hex, direction: Direction): Growth {
+  const localizer = localizerOf(registry, state);
   const jewel = registry.items.get(jewelItem)?.clusterJewel;
-  if (jewel === undefined) return refused(`${jewelItem} is not a cluster jewel`);
+  if (jewel === undefined) return refused(localizer.prose(`${jewelItem} is not a cluster jewel`));
   return growItem(state, registry, {
     target,
     consumes: jewelItem,
-    change: (payload) => fillSlot(registry, payload.plane, hex, direction, jewel),
+    change: (payload) => plainly(localizer, fillSlot(registry, payload.plane, hex, direction, jewel)),
   });
 }
 
 export function allocate(state: GameState, registry: Registry, target: string, node: PlaneNode): Growth {
+  const localizer = localizerOf(registry, state);
   return growItem(state, registry, {
     target,
-    change: (payload, item) => allocateNode(registry, payload.plane, node, pointsRemaining(payload, item)),
+    change: (payload, item) => plainly(localizer, allocateNode(registry, payload.plane, node, pointsRemaining(payload, item))),
   });
 }

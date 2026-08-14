@@ -655,10 +655,10 @@ function performDirective(session: PlaySession, directive: Directive): { failure
     case 'slot':
     case 'allocate':
     case 'apply':
-      return grew(state, registry, grow(state, registry, directive));
+      return grew(state, grow(state, registry, directive));
     case 'refuse': {
       const growth = grow(state, registry, directive.inner);
-      grew(state, registry, growth);
+      grew(state, growth);
       return growth.ok ? { failure: `${printDirective(directive.inner)} was not refused` } : {};
     }
   }
@@ -667,11 +667,9 @@ function performDirective(session: PlaySession, directive: Directive): { failure
 // The refusal goes both ways a refused walk's does: into the log, where a
 // player reads what the world said, and back to the caller, which is how a
 // test knows the outcome rather than inferring it from state that did not move.
-function grew(state: GameState, registry: Registry, growth: Growth): { failure?: string } {
+function grew(state: GameState, growth: Growth): { failure?: string } {
   if (growth.ok) return {};
-  // A plane's refusals are assembled from a hex, a direction and a node, and
-  // none of that is keyed yet, so they go through the prose door.
-  state.log.push(localizerOf(registry, state).prose(growth.refused));
+  state.log.push(growth.refused);
   return { failure: growth.refused };
 }
 

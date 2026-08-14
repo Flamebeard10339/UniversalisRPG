@@ -37,6 +37,7 @@ export const ENGINE_KEYS = [
   'engine.modal.choice',
   'engine.modal.item',
   'engine.modal.confirm',
+  'engine.growth.max-level',
   'engine.plane.heading',
   'engine.plane.heading.said',
   'engine.said.elided',

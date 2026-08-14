@@ -3,6 +3,7 @@ import { BonusAmount } from '../grammar/tagClause';
 import { Hex, hexKey, PlaneNode } from '../content/hex';
 import { clusterAt, isAllocated, placementAt, Plane, planeClusters } from './clusterPlane';
 import { Growth, growItem, ItemInstance } from './itemInstance';
+import { localizerOf } from './localized';
 import { GameState } from './state';
 
 // One allocated payload and what the cluster it sits in makes it worth. The
@@ -84,10 +85,14 @@ function recordEffect(registry: Registry, plane: Plane, hex: Hex, effectItem: st
 // jewel in inventory, so it goes through the one door every other verb takes
 // and the item is consumed only once the plane has taken it.
 export function applyClusterEffect(state: GameState, registry: Registry, target: string, effectItem: string, hex: Hex): Growth {
-  if (registry.items.get(effectItem)?.clusterEffect === undefined) return { ok: false, refused: `${effectItem} carries no cluster effect` };
+  const localizer = localizerOf(registry, state);
+  if (registry.items.get(effectItem)?.clusterEffect === undefined) return { ok: false, refused: localizer.prose(`${effectItem} carries no cluster effect`) };
   return growItem(state, registry, {
     target,
     consumes: effectItem,
-    change: (payload) => recordEffect(registry, payload.plane, hex, effectItem),
+    change: (payload) => {
+      const problem = recordEffect(registry, payload.plane, hex, effectItem);
+      return problem === undefined ? undefined : localizer.prose(problem);
+    },
   });
 }

@@ -33,6 +33,7 @@ engine.modal.race: Race
 engine.modal.choice: Choice
 engine.modal.item: Item
 engine.modal.confirm: {verb} {item} for good?
+engine.growth.max-level: {item} is already at level {level}, which is its maximum
 engine.plane.heading: {plane} at {hex}
 engine.plane.heading.said: {plane} at {hex} — {said}
 engine.said.elided: … {dropped} more lines

@@ -1367,6 +1367,25 @@ describe('a missing translation shows its key, in every direction', () => {
     expect(v.location.title).toBe('Shore');
     expect(v.choices.map((choice) => choice.label)).toEqual(['engine.travel.to']);
   });
+
+  // The refusal a growth verb says is on the one line of that screen carrying
+  // words, and it was built in TypeScript around the registry's own `.title` —
+  // so a module writing a language with no title for an item put its raw id
+  // there while every other surface on the same screen showed the key (pass 5).
+  it('shows the key on what a refused growth says, and the translation where a locale supplies one', () => {
+    const ISLA = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location playa', 'x: 0, y: 0', 'starting', '', '# item cuerda-larga', 'slot: hand', 'max-level: 1', '', '# item miga', 'item-experience: 5'].join('\n');
+    const saidOnRefusal = (...extra: ModuleSource[]): string[] => {
+      const registry = loadUniverse([engineLocale(), { name: 'isla', text: ISLA }, ...extra]);
+      registry.saves.set('carried', { version: SAVE_VERSION, diff: { inventory: { 'isla.cuerda-larga': 1, 'isla.miga': 2 } } });
+      const session = startSession(registry, 'es');
+      applyDirective(session, { kind: 'load', save: 'carried' });
+      applyDirective(session, { kind: 'feed', target: 'isla.cuerda-larga', food: 'isla.miga' });
+      return view(session).said;
+    };
+
+    expect(saidOnRefusal()).toEqual(['engine.growth.max-level']);
+    expect(saidOnRefusal({ name: 'isla-es', text: ['# info isla-es', 'version: 1.0.0', 'dependencies:', '  isla', '', '# locale es', 'isla.item.cuerda-larga.title: Cuerda Larga', 'engine.growth.max-level: {item} ya alcanzo su nivel {level}, que es el maximo'].join('\n') })).toEqual(['Cuerda Larga ya alcanzo su nivel 1, que es el maximo']);
+  });
 });
 
 // pass 1: the choice that starts a craft and the bar that reports it were keyed
