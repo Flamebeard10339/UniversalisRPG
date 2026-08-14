@@ -49,12 +49,19 @@ else does:
 # entity berserker
 stats: max-health 40, max-rage 10, attack 6
 uses: melee-combat
-+2 attack per rage
 on hit:
   restore: 1 rage
   1 in 20:
     drain: 4 health from them
+
+# item warbrand
+slot: mainhand
++2 attack per rage
 ```
+
+The counter-scaled bonus is on the blade rather than on the berserker because an `# entity` has
+never carried a tag clause of any kind, flat or scaled, and this branch does not give it one. Both
+hook blocks read off either.
 
 `# entity` and `# item` are the two carriers that exist. The same two blocks on `# passive`, which
 `archetype-mods` and `items-mods-and-crafting` own between them, is that record's line to write and
@@ -134,8 +141,10 @@ What this branch owes, named. Each is a strategy the runtime implements and the 
 | `from them` / `to me` | which party a `drain:` or `restore:` moves its amount between; unmarked is me |
 | `+N <stat> per <counter>` | a stat bonus whose size reads a counter; a resource's level here |
 
-Carried by an `# entity` block or an equipped `# item`, gathered by the same walk that folds a stat
-bonus, so `# passive` and a buff join as carriers without a second mechanism.
+The two hook blocks are carried by an `# entity` block or an equipped `# item`, gathered by the same
+walk that folds a stat bonus, so `# passive` and a buff join as carriers without a second mechanism.
+`+N <stat> per <counter>` reaches the carriers that hold a tag clause, which is an item and an
+action's own overload; `# entity` holds none, and giving it one is nobody's yet.
 
 ### Fixtures belong to `archetype-mods`
 
@@ -239,6 +248,11 @@ a counter-scaled bonus are both things a passive or an item grants a character.
   passive that scales off rage is nothing melee knows about — and a carrier should not have to
   restate what a level is worth. They meet at `foldBonus`, which is the test that they are one
   mechanism: if this branch writes a second scaling function, they were two after all.
+- **The counter-scaled bonus reaches an item, not an entity, and the spec says so rather than
+  printing a form nobody can author.** `# entity` declares no tag-clause field and never has, so
+  `+2 attack per rage` on the berserker the Deliverable used to print does not load at all. The
+  example moves the grant onto the blade and the Primitives table names where the shape reaches;
+  giving an entity a tag clause is a capability of its own, filed as one, and not this branch's.
 - **Fixtures are content, not code.** They exist to prove the primitives compose. A mechanism whose
   tests pass while the resolver has grown a branch named after one of them has failed at the thing
   it was built for, which is why their absence from `src/runtime` is a clause.
