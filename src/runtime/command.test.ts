@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState } from './runtime';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { loadUniverse, type Registry } from '../content/registry';
+import { hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/translation';
+import { BASE_LANGUAGE, localizerFor } from './localized';
 import { initialLocalChangesModule } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 import { SAVE_VERSION } from './save';
@@ -1359,5 +1362,87 @@ item-experience: 1000
 
     expect(recorder.history).toEqual(['load: stocked', 'feed: blade with whetstone', 'refuse: feed 1 with whetstone']);
     expect(said.view?.said).toContain('Blade is already at level 2, which is its maximum');
+  });
+});
+
+// c4: whose words a message is. The universe is loaded twice — once as
+// authored and once with every word it can address replaced, engine patterns
+// included — and the same script is driven through both. A message that moved
+// went through the localizer; a message that did not is the tool speaking its
+// own language, which is the whole of what the type now says.
+describe('a command says whose words it answered in (c4)', () => {
+  const CAMP = ['# info camp', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', 'entities:', '  chest', '', '# entity chest', 'title: Chest', 'open:', '  time: 40'].join('\n');
+
+  const sources = [engineLocale(), { name: 'camp', text: CAMP }];
+  const english = loadUniverse(sources);
+  const translated = loadUniverse([...sources, translationOf(english)]);
+  const zz = localizerFor(translated, TRANSLATED_LANGUAGE);
+
+  const playing = (registry: Registry, language: string): CommandContext => {
+    const session = startSession(registry, language);
+    return newContext(session, view(session), { recorder: { history: [], startSave: serializeSession(session) }, driving: true });
+  };
+
+  const played = () => playing(translated, TRANSLATED_LANGUAGE);
+
+  const spoken = (result: CommandResult, words: 'player' | 'tool'): string[] => messages(result).filter((out) => out.words === words).map((out) => out.text);
+
+  it('answers the player from a key, in the language being played', () => {
+    const ctx = played();
+
+    expect(spoken(runLine(ctx, '/speed 3'), 'player')).toEqual([zz.engine('engine.command.speed', { speed: 3 })]);
+    expect(spoken(runLine(ctx, '99'), 'player')).toEqual([zz.engine('engine.command.invalid-choice', { choice: zz.identifier('"99"') })]);
+    expect(spoken(runLine(ctx, 'not a line at all'), 'player')).toEqual([zz.engine('engine.command.invalid-choice', { choice: zz.identifier('"not a line at all"') })]);
+  });
+
+  it('refuses a keystroke and a typed line in the one sentence, so neither driver has words the other lacks', () => {
+    const ctx = played();
+    const beyond = ctx.view.choices.length + 1;
+    const numbered = COMMANDS.find((spec) => spec.match === 'choice')!;
+
+    expect(spoken(runCommand(ctx, numbered, beyond), 'player')).toEqual(spoken(runLine(ctx, String(beyond)), 'player'));
+  });
+
+  it('stops a live run in the player language, which is the one message that route writes', () => {
+    const ctx = played();
+    const armed = runLine(ctx, choiceIndex(ctx, 'use:entity.camp.chest.open'));
+
+    expect(spoken(armed.live!.end(true), 'player')).toEqual([zz.engine('engine.command.stopped')]);
+  });
+
+  it('relays a fault out of the engine as the tool speaking, never as the player being refused', () => {
+    const ctx = played();
+    // Raised inside the run rather than by the parser, which is the route
+    // `refused()` owns.
+    const answered = runLine(ctx, 'submit-modal: verb=grow');
+
+    expect(spoken(answered, 'player')).toEqual([]);
+    expect(spoken(answered, 'tool')).toEqual(['no modal is open to answer: verb']);
+  });
+
+  // The rule the four above are examples of, read off the table rather than
+  // listed: every entry twice, bare and with an argument, through both
+  // universes at once. Nobody edits this when a command is added.
+  it('moves every player message with the language and no authoring message, over the whole table', () => {
+    const shaped: Record<string, string> = { '<N>': '1', '<enter>': '', '<directive>': 'use: entity.camp.chest.open' };
+    const script = COMMANDS.flatMap((spec) => [shaped[spec.name] ?? spec.name, `${shaped[spec.name] ?? spec.name} 1`]);
+    const sweep = (registry: Registry, language: string) => {
+      const ctx = playing(registry, language);
+      return script.flatMap((line) => messages(runLine(ctx, line)).map((out) => ({ line, words: out.words, text: out.text })));
+    };
+
+    const asAuthored = sweep(english, BASE_LANGUAGE);
+    const asPlayed = sweep(translated, TRANSLATED_LANGUAGE);
+
+    expect(asPlayed.map(({ line, words }) => `${line}: ${words}`)).toEqual(asAuthored.map(({ line, words }) => `${line}: ${words}`));
+    expect(new Set(asPlayed.map((each) => each.words))).toEqual(new Set(['player', 'tool']));
+
+    // A message with no word of its own has nothing a translation could move,
+    // and none of these has one; the filter is what keeps that honest.
+    const moved = asPlayed.filter((each, at) => each.text !== asAuthored[at].text);
+    expect(asPlayed.filter((each) => each.words === 'player' && hasWords(each.text) && !moved.includes(each))).toEqual([]);
+    expect(asPlayed.filter((each) => each.words === 'tool' && moved.includes(each))).toEqual([]);
+    // And a run in which nothing moved would pass both lines above.
+    expect(moved.length).toBeGreaterThan(0);
   });
 });
