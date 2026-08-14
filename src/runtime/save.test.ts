@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { armTravel, buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
+import { armCraft, armTravel, buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
-import { loadInEnglish } from '../content/engineLocale';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, ModalFrame, openModalNamed } from './modals';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
 import { TRAVEL_LABEL } from './actions';
+import { CRAFT_LABEL, loadUniverse, type Registry } from '../content/registry';
 import { GameState } from './state';
 import { toMilliUnits } from './units';
 
@@ -536,6 +537,56 @@ describe('a walk under way survives its destination being retitled', () => {
 
     const warnings = pruneStateForRegistry(state, registry);
     expect(warnings.map((warning) => warning.message)).toEqual(['Stopped unavailable action travel.isla.shore>isla.far.travel: unknown travel destination: isla.far.']);
+    expect(state.activeAction).toBeNull();
+  });
+});
+
+// The same field on the other owner of an action, the one the loader compiles
+// rather than an author writing it.
+describe('a craft under way stores an id, not the sentence it is offered as', () => {
+  const KITCHEN = (recipe: string): string =>
+    ['# info cocina', 'version: 1.0.0', 'language: es', '', '# location horno', 'x: 0, y: 0', 'starting', '', '# item harina', 'title: Harina', '', '# item pan', 'title: Pan', '', `# recipe ${recipe}`, 'time: 60', 'in: 1 harina', 'out: 1 pan'].join('\n');
+
+  const SPANISH = [
+    '# info cocina-es',
+    'version: 1.0.0',
+    'dependencies:',
+    '  cocina',
+    '',
+    '# locale es',
+    'engine.prune.action: Detenida la accion {action}: {reason}.',
+    'engine.action.stale.owner: no hay ningun {kind} {id}.',
+  ].join('\n');
+
+  const universe = (recipe: string): Registry => loadUniverse([engineLocale(), { name: 'cocina', text: KITCHEN(recipe) }, { name: 'cocina-es', text: SPANISH }]);
+
+  const cooking = (): GameState => {
+    const registry = universe('pan');
+    const state = initialState(registry, 'es');
+    state.inventory['cocina.harina'] = 5;
+    armCraft('cocina.pan', registry, state);
+    expect(state.activeAction, 'the craft did not arm').not.toBeNull();
+    return state;
+  };
+
+  it('stores an id rather than the sentence a player reads', () => {
+    expect(cooking().activeAction!.actionLabel).toBe(CRAFT_LABEL);
+    expect(JSON.parse(serializeSave(cooking(), universe('pan'))).activeAction.actionLabel).toBe(CRAFT_LABEL);
+  });
+
+  it('keeps the craft when the recipe is retitled underneath it', () => {
+    const state = cooking();
+    const renamed = loadUniverse([engineLocale(), { name: 'cocina', text: KITCHEN('pan') }, { name: 'cocina-es', text: [SPANISH, 'cocina.recipe.pan.title: Barra'].join('\n') }]);
+
+    expect(pruneStateForRegistry(state, renamed)).toEqual([]);
+    expect(state.activeAction).not.toBeNull();
+  });
+
+  it('says the craft is gone with no word the played language did not supply', () => {
+    const state = cooking();
+
+    const warnings = pruneStateForRegistry(state, universe('barra'));
+    expect(warnings.map((warning) => warning.message)).toEqual(['Detenida la accion recipe.cocina.pan.craft: no hay ningun recipe cocina.pan..']);
     expect(state.activeAction).toBeNull();
   });
 });

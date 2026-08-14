@@ -77,13 +77,6 @@ describe('the engine speaks in keys (c2)', () => {
     expect([...(shipped?.keys() ?? [])].sort()).toEqual([...ENGINE_KEYS].sort());
   });
 
-  // c4: what is left is one action label, and nothing else. An action's label
-  // is its identifier — `use:<kind>.<objId>.<label>` is spelled with it — so a
-  // compiled one stays English in TypeScript while its display is keyed. Every
-  // modal answer that used to sit here became an id (c2), every engine sentence
-  // became a key, and the travel label became one too, because a save holds it.
-  const IDENTIFIERS = ['src/content/registry.ts: Craft {recipe}'];
-
   it('leaves no engine sentence behind in TypeScript', () => {
     // Every pattern, at any length, matched as the shape it would take in
     // TypeScript: its literal parts with a template hole where each parameter
@@ -94,7 +87,7 @@ describe('the engine speaks in keys (c2)', () => {
       return patterns.flatMap(([, value]) => [...text.matchAll(asTemplate(value))].map(() => `${file}: ${value}`));
     });
 
-    expect(offenders.sort()).toEqual(IDENTIFIERS);
+    expect(offenders.sort()).toEqual([]);
   });
 
   it('renders the key itself when the language being played has no entry', () => {

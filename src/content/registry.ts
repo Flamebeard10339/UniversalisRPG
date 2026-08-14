@@ -124,6 +124,11 @@ export interface UniverseLoadResult {
   disabledModules: string[];
 }
 
+// A recipe owns one action, and a label is an action's identifier that a save
+// holds, so this one is a word the engine owns. Which recipe is the ownerRef's
+// to say; what a player reads is `engine.craft.label` over the recipe's title.
+export const CRAFT_LABEL = 'craft';
+
 // Compiled to an Action so a craft runs through the same resolve() machinery
 // as any other single-attempt fight.
 function recipeAction(recipe: Recipe): Action {
@@ -140,11 +145,7 @@ function recipeAction(recipe: Recipe): Action {
   const rate = typeof recipe.rate === 'string' ? { id: recipe.rate } : recipe.rate;
   const cadence: Pick<Action, 'rate' | 'time'> = rate !== undefined ? { rate } : recipe.time !== undefined ? { time: recipe.time } : {};
   const action: Action = {
-    // English by construction, so it is the recipe's identifier and never its
-    // display: a craft is shown through `engine.craft.label` over the recipe's
-    // own title key, in the choice list and once it is under way alike.
-    label: `Craft ${humanizeEn(recipe.id)}`,
-    generatedLabel: true,
+    label: CRAFT_LABEL,
     kind: 'rate' in cadence || 'time' in cadence ? 'continuous' : 'instant',
     results,
     ...cadence,
