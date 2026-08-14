@@ -112,6 +112,16 @@ stat-id: attack
 
 # skill cooking
 
+// --- equipment slots ---
+
+// The vocabulary is still `equipment-slots:` on # entity player; these are the
+// words the equipment page draws, and the keys a translation answers.
+# slot mainhand
+title: Main Hand
+
+# slot offhand
+title: Off Hand
+
 // --- actions ---
 
 // The shape every combattable thing in the game shares, written once and
