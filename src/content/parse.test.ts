@@ -525,7 +525,7 @@ describe('dialogue', () => {
           name: 'remind-mirror',
           when: ref('tutorial', 'quest-given'),
           sticky: true,
-          again: [literal('The mirror is still waiting.')],
+          again: { segments: [literal('The mirror is still waiting.')] },
           steps: [{ kind: 'say', segments: [literal('The mirror awaits you.')] }],
         },
         { name: 'snub', steps: [{ kind: 'say', segments: [literal('Hmph. Suit yourself.')] }] },

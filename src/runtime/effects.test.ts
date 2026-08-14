@@ -19,6 +19,9 @@ max: max-health
 # droptable spoils
 drain: 5 health
 
+# droptable bakery
+say: One loaf.
+
 // One of each wrapper kind, every one of them certain to fire, so what varies
 // between them is only which actor their body is applied to.
 # droptable every-wrapper
@@ -123,8 +126,10 @@ describe('applyResults: watching what was applied', () => {
     const { seen, observer } = watched();
     const segment = newSegment(state, registry, [observer]);
 
+    // Read off the registry rather than written here, because a `say:` speaks
+    // through the address the load path stamped on it and code cannot mint one.
     applyResults(segment, [
-      { kind: 'say', text: 'One loaf.' },
+      registry.dropTables.get('bakery')!.results[0],
       { kind: 'give', item: 'coin', amount: { min: 1, max: 4 } },
     ], PLAYER, 5);
 

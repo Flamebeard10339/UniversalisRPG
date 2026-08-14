@@ -1,5 +1,5 @@
 import { evaluateCondition, renderSegments } from './conditions';
-import { Choice, Dialogue, DialogueNode } from '../content/dialogue';
+import { Choice, Dialogue, DialogueNode, Spoken } from '../content/dialogue';
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';
@@ -15,6 +15,14 @@ export interface DialogueCursor {
   // The step after the menu, so the menu itself is at resumeIndex - 1.
   resumeIndex: number;
   replay: boolean;
+}
+
+// A line the dialogue speaks, at the address the load path stamped on it. A
+// line without one was built in code rather than loaded, and there is no
+// language it could be shown in.
+function spokenLine(registry: Registry, state: GameState, line: Spoken): Localized {
+  if (line.key === undefined) throw new RuntimeError(`a dialogue line reached the log with no address: ${JSON.stringify(renderSegments(line.segments, state))}`);
+  return localizerOf(registry, state).line(line.key, (segments) => renderSegments(segments, state));
 }
 
 function findNode(dialogue: Dialogue, name: string): DialogueNode {
@@ -50,7 +58,7 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, st
     const step = node.steps[i];
     switch (step.kind) {
       case 'say':
-        if (replay) state.log.push(localizerOf(registry, state).prose(renderSegments(step.segments, state)));
+        if (replay) state.log.push(spokenLine(registry, state, step));
         break;
       case 'effect':
         if (replay) applyResultsNow(state, registry, [step.result]);
@@ -70,7 +78,7 @@ function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, s
   const counter = `${dialogue.id}.${node.name}`;
   const visit = (state.visits[counter] = (state.visits[counter] ?? 0) + 1);
   const replay = visit === 1 || node.sticky === true;
-  if (!replay && node.again) state.log.push(localizerOf(registry, state).prose(renderSegments(node.again, state)));
+  if (!replay && node.again) state.log.push(spokenLine(registry, state, node.again));
   return runSteps(dialogue, node, registry, state, 0, replay);
 }
 
@@ -91,14 +99,17 @@ export function talk(entityId: string, registry: Registry, state: GameState): Di
 // c2: the index is the option's place among the choices its node declares, not
 // among the ones offered here, so a choice a `when:` withholds does not shift
 // the answer to every choice after it.
-function offered(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ choice: Choice; index: number; text: string }> {
+function offered(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ choice: Choice; index: number }> {
   return resolveMenu(cursor, registry)
-    .choices.map((choice, index) => ({ choice, index, text: renderSegments(choice.segments, state) }))
+    .choices.map((choice, index) => ({ choice, index }))
     .filter((entry) => !entry.choice.when || evaluateCondition(entry.choice.when, state));
 }
 
-export function menuChoices(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ index: number; text: string }> {
-  return offered(cursor, registry, state).map((entry) => ({ index: entry.index, text: entry.text }));
+// The index is what a driver answers with and the display is what it draws:
+// the two halves of a choice, and the reason a menu option is as translatable
+// as the lines around it (c6).
+export function menuChoices(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ index: number; display: Localized }> {
+  return offered(cursor, registry, state).map((entry) => ({ index: entry.index, display: spokenLine(registry, state, entry.choice) }));
 }
 
 export function choose(answer: string, cursor: DialogueCursor, registry: Registry, state: GameState): DialogueCursor | null {

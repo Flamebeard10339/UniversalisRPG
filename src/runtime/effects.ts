@@ -200,9 +200,11 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
   switch (result.kind) {
     case 'say':
       if (!lead) return undefined;
-      // Prose the author wrote inline, with no key to address it by, so it goes
-      // through the one door that says so.
-      state.log.push(localizerOf(registry, state).prose(result.text));
+      // The address the load path stamped on this line. A result that reached
+      // here without one was built in code rather than loaded, and there is no
+      // language it could be shown in.
+      if (result.key === undefined) throw new RuntimeError(`a say: reached the log with no address: ${JSON.stringify(result.text)}`);
+      state.log.push(localizerOf(registry, state).spoken(result.key));
       return 0;
     case 'set':
       state.flags[result.variable] = true;

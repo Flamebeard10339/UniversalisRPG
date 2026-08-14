@@ -41,7 +41,7 @@ describe('the four selectors', () => {
         rows: [
           { weight: 12, results: [] },
           { weight: 5, results: [{ kind: 'give', item: 'coins', amount: { min: 20, max: 20 } }] },
-          { weight: 1, results: [{ kind: 'give', item: 'gem', amount: { min: 1, max: 1 } }, { kind: 'say', text: 'It glitters.' }] },
+          { weight: 1, results: [{ kind: 'give', item: 'gem', amount: { min: 1, max: 1 } }, { kind: 'say', text: 'It glitters.', key: 'entity.giant-rat.say.0' }] },
         ],
       },
     ]);

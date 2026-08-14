@@ -120,7 +120,6 @@ export const ENGINE_KEYS = [
   'engine.prune.instance.repaired',
   'engine.prune.population.location',
   'engine.prune.population.entity',
-  'engine.text.untranslated',
   'engine.command.invalid-choice',
   'engine.command.speed',
   'engine.command.stopped',
@@ -245,6 +244,27 @@ export function localId(namespace: string | null, id: string): string {
   return namespace !== null && id.startsWith(`${namespace}.`) ? id.slice(namespace.length + 1) : id;
 }
 
+// Prose the DSL carries into the log has no id of its own, so it is addressed
+// by the object that authored it and its place in that object (c6). Each field
+// below is spelled with the word the DSL itself uses for the line, so a
+// translator reading a key can find what it names: `say:` a result, `line` a
+// bare line of dialogue, `->` a choice, `again:` a node's repeat.
+//
+// Reordering the lines under one owner moves their keys and breaks whatever
+// named them. That is accepted rather than designed around: an index is the
+// only address a line with no id has.
+export const sayField = (index: number): string => `say.${index}`;
+export const dialogueSayField = (node: string, index: number): string => `${node}.say.${index}`;
+export const dialogueLineField = (node: string, index: number): string => `${node}.line.${index}`;
+export const dialogueChoiceField = (node: string, index: number): string => `${node}.choice.${index}`;
+export const dialogueAgainField = (node: string): string => `${node}.again`;
+
+// How the words under a prose key are read back. A `say:` is printed as
+// written, because its braces are the author's own punctuation; a dialogue line
+// is parsed by the segment grammar it was authored in, so a translation carries
+// `{player.name}` where the English carried it.
+export type ProseShape = 'verbatim' | 'segments';
+
 // A label made into an id, by the rule ids already follow: `pick lock` becomes
 // `pick-lock`. What an action is addressed by is `actionAddress`, which reaches
 // for this only where an inline block has no id of its own.
@@ -290,10 +310,11 @@ export interface Locales {
   // the whole of a module writing a language nobody has translated.
   addressable: Set<string>;
   base: Map<string, BaseEntry>;
-  // The language each loaded module declared. A `say:` carries no key naming
-  // the module that wrote it, so this is what the one prose door asks before
-  // showing authored text to a player of another language.
-  moduleLanguages: string[];
+  // The keys whose words the DSL authored rather than the engine, and how each
+  // is read back. Braces in one belong to the grammar it was written in, not to
+  // the localizer's parameters, so the check that refuses an unsupplied
+  // parameter has nothing to say about it.
+  prose: Map<string, ProseShape>;
   // Every `# locale` section that loaded, in load order and still attributed to
   // the module that wrote it, which is what lets a module be printed back out
   // with its own translations and no one else's.
@@ -312,7 +333,7 @@ export interface LocaleDeclaration {
   entries: ReadonlyArray<{ key: string; value: string }>;
 }
 
-export const emptyLocales = (): Locales => ({ addressable: new Set(), base: new Map(), english: new Map(), moduleLanguages: [], sections: [], declared: new Map() });
+export const emptyLocales = (): Locales => ({ addressable: new Set(), base: new Map(), english: new Map(), prose: new Map(), sections: [], declared: new Map() });
 
 const PARAM = /\{([a-z][a-z0-9-]*)\}/g;
 
@@ -332,7 +353,12 @@ export const parametersOf = (pattern: string): string[] => [...pattern.matchAll(
 // A content key supplies nothing at all in any language: no caller passes a
 // parameter to a title. So it is checked whether or not any module has text for
 // it, which is every key of a module writing a language nobody has translated.
+// Authored prose supplies its own braces to its own grammar and takes no
+// parameter from any call site, so there is no such thing as one nothing
+// supplies: a `say:` prints them as written and a dialogue line renders them
+// through the segment grammar (c6).
 export function unsuppliedParameters(locales: Locales, key: string, value: string): string[] {
+  if (locales.prose.has(key)) return [];
   if (!isEngineKey(key)) return parametersOf(value);
   const english = locales.english.get(key);
   if (english === undefined) return [];

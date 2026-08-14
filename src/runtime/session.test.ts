@@ -1506,7 +1506,7 @@ describe('a modal names what it is about in the language being played', () => {
 // pass 2's carried-name fix had made the answer itself move with the player.
 describe('an answer is spelled once and read in the language being played', () => {
   const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', 'entities:', '  smith', '', '# item blade', 'title: Blade', 'slot: mainhand', '', '# flag greeted', '', '# entity smith', 'title: Smith', '', '# dialogue smith', 'owner = smith', 'node greeting:', '  when: not greeted', '  say: Well met.', '  -> Ask the way.', '  -> Say nothing.'].join('\n');
-  const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada', 'engine.carried.stack: {item} x{count}', 'engine.text.untranslated: (sin traducir)'].join('\n');
+  const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada', 'engine.carried.stack: {item} x{count}', 'forge.dialogue.smith.greeting.choice.0: Pregunta el camino.'].join('\n');
 
   const carried = (language: string): PlaySession => {
     const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
@@ -1534,13 +1534,13 @@ describe('an answer is spelled once and read in the language being played', () =
     expect(view(spanish).modals[0].options.map((option) => option.key)).toEqual(['verb']);
   });
 
-  it('reads a dialogue menu through the prose door, and answers it with the authored line', () => {
+  it('reads a dialogue menu in the played language, and shows the key for the choice nobody translated (c6)', () => {
     const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
     const spanish = startSession(registry, 'es');
     applyDirective(spanish, { kind: 'talk', entity: 'forge.smith' });
     const menu = view(spanish).modals[0].options[0].values!;
 
-    expect(menu.map((choice) => choice.shown)).toEqual(['(sin traducir)', '(sin traducir)']);
+    expect(menu.map((choice) => choice.shown)).toEqual(['Pregunta el camino.', 'forge.dialogue.smith.greeting.choice.1']);
     expect(menu.map((choice) => choice.value)).toEqual(['0', '1']);
   });
 });

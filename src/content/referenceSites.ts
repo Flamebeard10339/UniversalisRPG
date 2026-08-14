@@ -285,7 +285,7 @@ function dialogue(value: Dialogue, where: string, visit: Visit): void {
   for (const node of value.nodes ?? []) {
     const at = `${where} node ${node.name}`;
     condition(node.when, `${at} when:`, visit);
-    segments(node.again, at, visit);
+    segments(node.again?.segments, at, visit);
     for (const step of node.steps ?? []) {
       if (step.kind === 'effect') results([step.result], at, visit);
       if (step.kind === 'say') segments(step.segments, at, visit);

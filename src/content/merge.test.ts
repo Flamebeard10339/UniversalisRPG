@@ -68,8 +68,8 @@ describe('actions merge by label', () => {
     const entity = loadUniverse([BASE, patch('# entity base.crab', 'pinch:', '  time: 9')]).entities.get('base.crab')!;
     const pinch = entity.actions.find((action) => action.label === 'pinch')!;
     expect(pinch.time).toBe(9);
-    expect(pinch.results).toEqual([{ kind: 'say', text: 'Ouch.' }]);
-    expect(entity.actions.find((action) => action.label === 'flee')!.results).toEqual([{ kind: 'say', text: 'It scuttles off.' }]);
+    expect(pinch.results).toEqual([{ kind: 'say', text: 'Ouch.', key: 'base.entity.crab.say.0' }]);
+    expect(entity.actions.find((action) => action.label === 'flee')!.results).toEqual([{ kind: 'say', text: 'It scuttles off.', key: 'base.entity.crab.say.1' }]);
   });
 
   it('appends an action whose label is new, after the ones already there', () => {
@@ -114,14 +114,14 @@ describe('dialogue merges one node at a time', () => {
   it('replaces the steps of the node it names and leaves the others', () => {
     const dialogue = dialogueOf('# dialogue base.miki-intro', 'node greet:', '  Well met, traveller.');
     expect(dialogue.nodes.map((node) => node.name)).toEqual(['greet', 'farewell']);
-    expect(dialogue.nodes[0].steps).toEqual([{ kind: 'say', segments: [{ kind: 'literal', text: 'Well met, traveller.' }] }]);
-    expect(dialogue.nodes[1].steps).toEqual([{ kind: 'say', segments: [{ kind: 'literal', text: 'Goodbye.' }] }]);
+    expect(dialogue.nodes[0].steps).toEqual([{ kind: 'say', segments: [{ kind: 'literal', text: 'Well met, traveller.' }], key: 'base.dialogue.miki-intro.greet.line.0' }]);
+    expect(dialogue.nodes[1].steps).toEqual([{ kind: 'say', segments: [{ kind: 'literal', text: 'Goodbye.' }], key: 'base.dialogue.miki-intro.farewell.line.0' }]);
   });
 
   it('keeps the steps when a patch only changes a node property', () => {
     const dialogue = dialogueOf('# dialogue base.miki-intro', 'node greet:', '  once');
     expect(dialogue.nodes[0].once).toBe(true);
-    expect(dialogue.nodes[0].steps).toEqual([{ kind: 'say', segments: [{ kind: 'literal', text: 'Hello there.' }] }]);
+    expect(dialogue.nodes[0].steps).toEqual([{ kind: 'say', segments: [{ kind: 'literal', text: 'Hello there.' }], key: 'base.dialogue.miki-intro.greet.line.0' }]);
   });
 
   it('appends a node whose name is new, and keeps the owner', () => {

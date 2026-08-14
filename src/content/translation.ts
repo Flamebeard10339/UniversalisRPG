@@ -13,16 +13,20 @@ export const TRANSLATED_LANGUAGE = 'zz';
 // accident.
 const SHIFT: Readonly<Record<string, number>> = { [DEFAULT_LANGUAGE]: 13, [TRANSLATED_LANGUAGE]: 7 };
 
-// A parameter, or a letter. Punctuation, digits and spacing stand where they
-// are, and a parameter keeps the spelling the pattern it came from gave it,
-// because a translation may name no parameter its English does not.
-const PARAM = /\{[a-z][a-z0-9-]*\}/g;
-const TOKEN = new RegExp(`${PARAM.source}|[A-Za-z]`, 'g');
+// A braced fragment, or a letter. Punctuation, digits and spacing stand where
+// they are, and a fragment is carried through whole: an engine pattern's
+// parameter keeps the spelling its English gave it, because a translation may
+// name no parameter its English does not, and a spoken line's `{player.name}`
+// or `{quest-given: text}` is the segment grammar's machinery rather than words
+// — shifting its letters would leave a path naming nothing and a condition the
+// grammar cannot read.
+const FRAGMENT = /\{[^{}]*\}/g;
+const TOKEN = new RegExp(`${FRAGMENT.source}|[A-Za-z]`, 'g');
 
 // Whether a pattern has any word of its own for a replacement to reach. One
-// that is only parameters and punctuation has none, and is the one thing no
+// that is only fragments and punctuation has none, and is the one thing no
 // replacement can make different.
-export const hasWords = (text: string): boolean => /[A-Za-z]/.test(text.replace(PARAM, ''));
+export const hasWords = (text: string): boolean => /[A-Za-z]/.test(text.replace(FRAGMENT, ''));
 
 const rotate = (letter: string, shift: number): string => {
   const base = letter <= 'Z' ? 65 : 97;

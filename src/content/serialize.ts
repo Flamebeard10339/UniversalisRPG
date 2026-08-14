@@ -253,7 +253,10 @@ function actionLines(action: Action): Lines {
   return lines;
 }
 
-function textSegments(values: readonly TextSegment[] | undefined): string {
+// Exported because the load path records a spoken line's authored words as the
+// entry a `# locale` translates, and what it records has to be the same
+// spelling a translator will read back and write beside.
+export function printSegments(values: readonly TextSegment[] | undefined): string {
   return (values ?? [])
     .map((segment) => {
       if (segment.kind === 'literal') return segment.text;
@@ -466,14 +469,14 @@ function dialogueSection(moduleId: string, dialogue: Dialogue): string {
     if (node.when) lines.push(`  when: ${condition(node.when)}`);
     if (node.once) lines.push('  once');
     if (node.sticky) lines.push('  sticky');
-    if (node.again) lines.push(`  again: ${textSegments(node.again)}`);
+    if (node.again) lines.push(`  again: ${printSegments(node.again.segments)}`);
     for (const step of node.steps) {
-      if (step.kind === 'say') lines.push(`  ${textSegments(step.segments)}`);
+      if (step.kind === 'say') lines.push(`  ${printSegments(step.segments)}`);
       else if (step.kind === 'effect') lines.push(...indented(resultLines(step.result)));
       else if (step.kind === 'goto') lines.push(`  goto ${step.target}`);
       else {
         for (const choice of step.choices) {
-          lines.push(`  -> ${textSegments(choice.segments)}${choice.when ? ` (when ${condition(choice.when)})` : ''}`);
+          lines.push(`  -> ${printSegments(choice.segments)}${choice.when ? ` (when ${condition(choice.when)})` : ''}`);
           if (choice.goto) lines.push(`    goto ${choice.goto}`);
           for (const effect of choice.effects) lines.push(...indented(resultLines(effect), 4));
         }

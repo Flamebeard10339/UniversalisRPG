@@ -189,17 +189,20 @@ describe('an id survives translation, and prose does not', () => {
 
 // pass 2: the door asked every loaded module, and the shipped engine locale
 // always declares `en`, so it could never open for a player of anything else.
-describe('the prose door asks the modules that carry prose', () => {
-  const SPANISH_ISLAND = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting'].join('\n');
+// c6 retires the question: a `say:` is addressed, so what a player of another
+// language is shown is the key, which is what every other door already answers
+// with and what a translator needs in order to fill it in.
+describe('authored prose answers by its address', () => {
+  const SPANISH_ISLAND = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# entity puerta', 'abrir:', '  instant', '  say: se abre la puerta'].join('\n');
+  const registry = loadUniverse([engineLocale(), { name: 'isla', text: SPANISH_ISLAND }]);
+  const said = (language: string): string => localizerFor(registry, language).spoken('isla.entity.puerta.say.0');
 
-  const said = (language: string): string => localizerFor(loadUniverse([engineLocale(), { name: 'isla', text: SPANISH_ISLAND }]), language).prose('se abre la puerta');
-
-  it('opens for a player of the language every content module is written in', () => {
+  it('says the words to a player of the language the line was authored in', () => {
     expect(said('es')).toBe('se abre la puerta');
   });
 
-  it('stays shut for a player of another one, however the locale modules are written', () => {
-    expect(said('en')).toBe('(untranslated)');
+  it('says the key to a player of another one, rather than words nobody translated', () => {
+    expect(said('en')).toBe('isla.entity.puerta.say.0');
   });
 });
 

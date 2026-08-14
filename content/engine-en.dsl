@@ -116,7 +116,6 @@ engine.prune.instance.empty: Removed instance {instance} because nothing is left
 engine.prune.instance.repaired: Repaired instance {instance}: {repair}.
 engine.prune.population.location: Removed the population record for {entity} at {location} because its location {location} is not loaded.
 engine.prune.population.entity: Removed the population record for {entity} at {location} because its entity {entity} is not loaded.
-engine.text.untranslated: (untranslated)
 engine.command.invalid-choice: invalid choice: {choice}
 engine.command.speed: Speed set to {speed}x.
 engine.command.stopped: Stopped.

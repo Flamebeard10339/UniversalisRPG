@@ -192,10 +192,10 @@ describe('serializeRegistryModule', () => {
     expect(roundTrip.entities.get('base.npc')?.whenHit).toEqual([{ kind: 'pool', resource: 'base.stamina', delta: { min: 1, max: 1 } }]);
     const npcAction = (label: string) => roundTrip.entities.get('base.npc')?.actions.find((each) => each.label === label);
     expect(npcAction('haul')).toMatchObject({ kind: 'continuous', rate: 12 });
-    expect(npcAction('cheer')?.onSuccess).toEqual([{ kind: 'say', text: 'Hello.' }]);
+    expect(npcAction('cheer')?.onSuccess).toEqual([{ kind: 'say', text: 'Hello.', key: 'base.entity.npc.say.0' }]);
     expect(npcAction('sequence')?.results).toEqual([
       { kind: 'set', variable: 'base.levered' },
-      { kind: 'say', text: 'Middle.' },
+      { kind: 'say', text: 'Middle.', key: 'base.entity.npc.say.1' },
       { kind: 'unset', variable: 'base.levered' },
     ]);
     expect(roundTrip.locations.get('base.grove')?.x).toBe(1);

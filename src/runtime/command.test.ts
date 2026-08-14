@@ -1193,7 +1193,7 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     expect(failure.detail?.some((line) => line.includes('missing-item'))).toBe(true);
     expect(writes).toEqual([]);
     expect(authoring.localSource.text).toBe(before);
-    expect(session.registry.entities.get('base.chest')?.actions[0].results).toEqual([{ kind: 'say', text: 'Empty.' }]);
+    expect(session.registry.entities.get('base.chest')?.actions[0].results).toEqual([{ kind: 'say', text: 'Empty.', key: 'base.entity.chest.say.0' }]);
   });
 
   it('/local clear reloads and prunes stale state from removed local content', () => {
@@ -1237,7 +1237,7 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     expect(registry.stats.get('local-changes.vigor')?.base).toEqual({ min: 10, max: 10 });
     expect(registry.skills.get('local-changes.focus')?.['stat-id']).toBe('local-changes.vigor');
     expect(registry.items.get('local-changes.token')?.title).toBe('Token');
-    expect(registry.entities.get('local-changes.npc')?.actions).toEqual([{ label: 'cheer', results: [{ kind: 'say', text: 'Hello.' }] }]);
+    expect(registry.entities.get('local-changes.npc')?.actions).toEqual([{ label: 'cheer', results: [{ kind: 'say', text: 'Hello.', key: 'local-changes.entity.npc.say.0' }] }]);
     expect(registry.locations.get('local-changes.grove')).toMatchObject({ x: 1, y: 0, entities: [{ entity: 'local-changes.npc' }] });
     expect(registry.flags.has('local-changes.levered')).toBe(true);
     expect(registry.variables.get('local-knob')?.value).toBe(2);

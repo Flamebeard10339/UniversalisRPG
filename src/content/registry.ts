@@ -4,7 +4,7 @@ import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields 
 import { Condition } from '../grammar/condition';
 import { HOOK_LABELS } from '../grammar/hook';
 import { ClusterJewel, clusterJewelProblem, clusterJewelSchema } from './clusterJewel';
-import { Dialogue } from './dialogue';
+import { Dialogue, parseSegments, Spoken } from './dialogue';
 import { DropTable } from './dropTable';
 import { actionAddress, ActionDeclaration } from './action';
 import { AuthoredEntity, Entity, EntityBlock, entitySchema, Handler, isHandlerBlock } from './entity';
@@ -12,7 +12,24 @@ import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
 import { GameEvent, eventSchema } from './event';
 import { Item, itemRoleProblem, itemSchema } from './item';
-import { actionSlugProblem, addLocaleSection, BaseEntry, emptyLocales, GENERATED_FIELD, localeKey, Locales, LocaleSection, TEXT_FIELDS, unsuppliedParameters } from './locale';
+import {
+  actionSlugProblem,
+  addLocaleSection,
+  BaseEntry,
+  dialogueAgainField,
+  dialogueChoiceField,
+  dialogueLineField,
+  dialogueSayField,
+  emptyLocales,
+  GENERATED_FIELD,
+  localeKey,
+  Locales,
+  LocaleSection,
+  ProseShape,
+  sayField,
+  TEXT_FIELDS,
+  unsuppliedParameters,
+} from './locale';
 import { Passive, passiveRangeProblem, passiveSchema } from './passive';
 import { getShape } from './shapes';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
@@ -25,6 +42,7 @@ import { Recipe, recipeSchema } from './recipe';
 import { registryCapabilities, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
 import { ReferenceKind, Visit, visitAction, visitResults, visitSection, visitTags } from './referenceSites';
 import { Removal } from './removal';
+import { printSegments } from './serialize';
 import { actionAddresses, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
@@ -283,6 +301,107 @@ function recordActionText(registry: Registry, languages: ReadonlyMap<string | nu
     if (action.generatedLabel && language !== DEFAULT_LANGUAGE) continue;
     recordBase(registry, key, { text: action.label, ...(action.generatedLabel ? { generated: true as const } : {}), language });
   }
+}
+
+// Where a piece of authored prose hangs and what language it was written in,
+// asked once per owner because every line under one shares both.
+interface ProseOwner {
+  namespace: string | null;
+  kind: string;
+  id: string;
+  language: string;
+}
+
+function proseOwner(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string): ProseOwner {
+  const namespace = registry.namespace.ownerOf(kind, id) ?? null;
+  return { namespace, kind, id, language: languages.get(namespace) ?? DEFAULT_LANGUAGE };
+}
+
+function recordProse(registry: Registry, owner: ProseOwner, field: string, text: string, shape: ProseShape): string {
+  const key = localeKey(owner.namespace, owner.kind, owner.id, field);
+  registry.locales.addressable.add(key);
+  registry.locales.prose.set(key, shape);
+  recordBase(registry, key, { text, language: owner.language });
+  return key;
+}
+
+const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onFailure, action.onUnfinished].filter((list): list is ActionResult[] => list !== undefined);
+
+// Every result list a section AUTHORED, which is not every list a player can be
+// offered one from: an action an entity `uses:` was written once, under its own
+// declaration, and is keyed there however many entities perform it. An entity's
+// overload of one is written in that entity's block and is keyed under the
+// entity, which is where a translator will look for the words it changed.
+function authoredResults(registry: Registry): Array<[string, string, ActionResult[][]]> {
+  const owners: Array<[string, string, ActionResult[][]]> = [];
+  for (const [id, action] of registry.actions) owners.push(['action', id, actionResultLists(action)]);
+  for (const entity of registry.entities.values()) {
+    const blocks = entity.blocks.flatMap((block) => (isHandlerBlock(block) ? [block.results] : actionResultLists(block)));
+    owners.push(['entity', entity.id, [...blocks, entity.onHit, entity.whenHit]]);
+  }
+  for (const location of registry.locations.values()) owners.push(['location', location.id, location.actions.flatMap(actionResultLists)]);
+  for (const item of registry.items.values()) owners.push(['item', item.id, [...item.actions.flatMap(actionResultLists), item.onHit, item.whenHit]]);
+  for (const [id, table] of registry.dropTables) owners.push(['droptable', id, [table.results]]);
+  // Under the recipe rather than the compiled action, because the recipe's
+  // `say:` is what an author wrote and the action is what the loader made of it.
+  for (const [id, action] of registry.recipeActions) owners.push(['recipe', id, actionResultLists(action)]);
+  return owners;
+}
+
+// One counter over one owner's lists, in the order they were authored: a
+// wrapper is the last thing on its line, so the lines inside its body come
+// after every leaf the same list already spoke.
+function stampSays(registry: Registry, owner: ProseOwner, lists: readonly (readonly ActionResult[])[], field: (index: number) => string): void {
+  let index = 0;
+  const walk = (list: readonly ActionResult[]): void => {
+    for (const result of list) {
+      if (result.kind === 'say') result.key = recordProse(registry, owner, field(index++), result.text, 'verbatim');
+      for (const nested of nestedResults(result)) walk(nested);
+    }
+  };
+  for (const list of lists) walk(list);
+}
+
+// A node is the owner of every line spoken under it, and its `say:` results are
+// keyed beside them under the same node rather than under the dialogue: a
+// reader looking for the words of one node reads one prefix.
+function stampDialogue(registry: Registry, languages: ReadonlyMap<string | null, string>, dialogue: Dialogue): void {
+  const owner = proseOwner(registry, languages, 'dialogue', dialogue.id);
+  for (const node of dialogue.nodes) {
+    const spoken = (line: Spoken, field: string): void => {
+      line.key = recordProse(registry, owner, field, printSegments(line.segments), 'segments');
+    };
+    if (node.again) spoken(node.again, dialogueAgainField(node.name));
+    const results: ActionResult[][] = [];
+    let lines = 0;
+    let choices = 0;
+    for (const step of node.steps) {
+      if (step.kind === 'say') spoken(step, dialogueLineField(node.name, lines++));
+      else if (step.kind === 'effect') results.push([step.result]);
+      else if (step.kind === 'menu') {
+        for (const choice of step.choices) {
+          spoken(choice, dialogueChoiceField(node.name, choices++));
+          results.push(choice.effects);
+        }
+      }
+    }
+    stampSays(registry, owner, results, (index) => dialogueSayField(node.name, index));
+  }
+}
+
+function localeValueProblem(locales: Locales, language: string, key: string, value: string): DslError | undefined {
+  if (locales.prose.get(key) === 'segments') {
+    try {
+      parseSegments(value, 0);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return new DslError(`# locale ${language}: ${key} is a spoken line, and ${error.message}`);
+    }
+    return undefined;
+  }
+  const unsupplied = unsuppliedParameters(locales, key, value);
+  if (unsupplied.length === 0) return undefined;
+  return new DslError(`# locale ${language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
 }
 
 // A recipe is absent: its craft is shown through `engine.craft.label` over the
@@ -1059,7 +1178,6 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   // beside a Spanish island says nothing about what language its prose is in,
   // and counting it would shut the prose door for every player of every
   // language, since the shipped engine locale declares `en`.
-  registry.locales.moduleLanguages = modules.filter((module) => module.sections.some((section) => section.kind !== 'locale')).map((module) => module.info.language);
   for (const module of modules) {
     for (const section of module.sections) {
       if (section.kind === 'locale') addLocaleSection(registry.locales, module.namespace, section.value as LocaleSection);
@@ -1100,16 +1218,18 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
       return { failure: { module: sectionOwner(owners, kind, id) ?? modules[0], stage: 'build', error } };
     }
   }
+  for (const [kind, id, lists] of authoredResults(registry)) stampSays(registry, proseOwner(registry, languages, kind, id), lists, sayField);
+  for (const dialogue of registry.dialogues.values()) stampDialogue(registry, languages, dialogue);
   // Last, because it reads both halves: what a locale said and what the English
   // it is translating names. A parameter nothing supplies throws at the moment
-  // the screen is drawn, so it is refused where the value is assembled instead.
+  // the screen is drawn, so it is refused where the value is assembled instead,
+  // and a translated line the segment grammar cannot read is refused beside it
+  // for the same reason: it would otherwise throw out of the dialogue.
   const byNamespace = new Map(modules.map((module) => [module.namespace, module]));
   for (const declared of registry.locales.sections) {
     for (const { key, value } of declared.entries) {
-      const unsupplied = unsuppliedParameters(registry.locales, key, value);
-      if (unsupplied.length === 0) continue;
-      const error = new DslError(`# locale ${declared.language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
-      return { failure: { module: byNamespace.get(declared.module) ?? modules[0], stage: 'build', error } };
+      const error = localeValueProblem(registry.locales, declared.language, key, value);
+      if (error) return { failure: { module: byNamespace.get(declared.module) ?? modules[0], stage: 'build', error } };
     }
   }
   return { registry };

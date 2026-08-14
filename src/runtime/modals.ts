@@ -121,7 +121,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
   dialogue: {
     open: () => null,
     options: (frame, state, registry) => [
-      { key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuChoices(frame.cursor, registry, state).map((choice) => ({ value: String(choice.index), shown: localizerOf(registry, state).prose(choice.text) })) },
+      { key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuChoices(frame.cursor, registry, state).map((choice) => ({ value: String(choice.index), shown: choice.display })) },
     ],
     submit: (frame, state, registry) => {
       const cursor = choose(frame.answers.choice, frame.cursor, registry, state);

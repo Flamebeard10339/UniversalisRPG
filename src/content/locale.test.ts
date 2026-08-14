@@ -199,8 +199,12 @@ describe('the report covers every key the engine asks for (c7)', () => {
   it('reports a key no module has any text for, in every language', () => {
     const loaded = loadUniverse([{ name: 'isla', text: SPANISH_MODULE }]);
 
-    // Its one entry is the label it did author, in the language it declared.
-    expect([...loaded.locales.base]).toEqual([['isla.entity.puerta.abrir', { text: 'abrir', language: 'es' }]]);
+    // Its entries are what it did author — the action's label and the line it
+    // speaks — in the language it declared.
+    expect([...loaded.locales.base]).toEqual([
+      ['isla.entity.puerta.abrir', { text: 'abrir', language: 'es' }],
+      ['isla.entity.puerta.say.0', { text: 'se abre', language: 'es' }],
+    ]);
     expect(missingTranslations(loaded.locales, 'es')).toContain('isla.entity.puerta.title');
     expect(missingTranslations(loaded.locales, 'en')).toContain('isla.entity.puerta.title');
   });

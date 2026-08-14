@@ -1,4 +1,5 @@
 import { EngineKey, localeKey, Locales } from '../content/locale';
+import { parseSegments, TextSegment } from '../content/dialogue';
 import { Registry } from '../content/registry';
 import { articleEn } from '../grammar/values';
 import { GameState, RuntimeError } from './state';
@@ -62,12 +63,21 @@ export interface Localizer {
   title(kind: string, id: string): Localized;
   // An action's display, keyed on what addresses it under its owner.
   actionLabel(kind: string, ownerId: string, slug: string): Localized;
-  // The one door for prose the DSL carries verbatim into the log — a `say:`
-  // result, a dialogue line, a growth refusal. None of those carries a key, so
-  // none can be translated, and showing one to a player of another language
-  // would be the cross-language fallback c3 exists to forbid: the marker is
-  // shown instead unless every module loaded is writing this language.
-  prose(text: string): Localized;
+  // Prose the DSL wrote, at the address the load path stamped on it: the object
+  // that authored it and its place in that object (c6). The key is whole
+  // already, so this is the one door that is handed one rather than told how to
+  // build one. Nothing is substituted into the words — the braces in a `say:`
+  // are the author's own punctuation — and no prose can enter here either,
+  // because what comes back is a locale entry or the key and never the caller's
+  // argument.
+  spoken(key: string): Localized;
+  // A dialogue line, whose braces belong to the segment grammar it was authored
+  // in: the words come from the played language and are read back by the same
+  // reader that read the author's, so a translation carries `{player.name}`
+  // where the English carried it rather than pasting whatever the author's
+  // language resolved to. What a segment resolves to is a question about live
+  // state, which the caller holds and this file does not.
+  line(key: string, render: (segments: TextSegment[]) => string): Localized;
   // A value that is an id rather than words: a slot, an instance, a path into
   // the save. It belongs to no language, so it goes into the pattern verbatim
   // in every one of them — which is what keeps a translated warning naming the
@@ -98,7 +108,8 @@ export function localizerFor(registry: Registry, language: string): Localizer {
     },
     title: (kind, id) => self.content(kind, id, 'title'),
     actionLabel: (kind, ownerId, slug) => self.content(kind, ownerId, slug),
-    prose: (text) => (locales.moduleLanguages.every((declared) => declared === language) ? (text as Localized) : self.engine('engine.text.untranslated')),
+    spoken: (key) => (pattern(locales, language, key) ?? key) as Localized,
+    line: (key, render) => render(parseSegments(self.spoken(key), 0)) as Localized,
     identifier: (id) => id as Localized,
   };
   return self;
