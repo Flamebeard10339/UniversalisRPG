@@ -117,6 +117,36 @@ display were one string and no pass had standing to separate them.
   English belonged in TypeScript. The English never belonged there; the id does — and `Grow`
   was never an id, it was an English word doing an id's job, which is why c2 makes it `grow`.
 
+- **A craft's label is an id too, and c3 needs no boundary stated around it.** The compiled
+  recipe action was labelled `Craft ${humanizeEn(recipe.id)}`, so `activeAction.actionLabel`
+  held a sentence the engine had composed and `save.ts` folded it into `engine.prune.action`
+  and `engine.action.stale.action` — an English sentence in a Spanish player's log. It is the
+  same defect pass 1 found on `travelAction`, on the next owner along, which is this branch's
+  recurring failure mode. The label is `CRAFT_LABEL`; a recipe owns one action, so the id
+  identifies it, and the display was already `engine.craft.label` over the recipe's own title
+  key. Pass 2 graded c3 met against a stated boundary because that label derived from an id
+  and so could not move when words moved; the boundary is now unnecessary and is withdrawn,
+  and c3's first sentence is literally true. The sentence-scan allowlist is empty, which is
+  what c4's last sentence says.
+- **An answer is checked for holding a word, not only for being one.** c2's enumeration
+  intersected published values with the strings the universe can show, by equality, so a
+  value carrying a title inside a shape passed it — `slot: <dir> with <jewel.id>` rewritten
+  to use the jewel's name survived the whole of `modals.test.ts` and was caught only by the
+  shipped recordings. Equality was the wrong relation: every reopening of this clause has
+  been an embedded title. The check is containment, and the walk goes one step further so
+  the two verbs whose values embed a carried id — `slot:` and `feed:` — are published at all.
+- **Two surfaces this branch does not reach, named rather than left to be found.** Both are
+  outside `src/runtime`'s brand, which is why neither is a hole in it. The GUI shell keeps
+  its own twenty-word English vocabulary in `src/ui/labels.ts`, composes shapes from it in
+  `plane.ts` and `sheet.ts`, and shows a stat by the last segment of its id — and nothing
+  under `src/ui` can reach a localizer at all, because the driver publishes `PlayView` and
+  nothing else, so the channel is the work rather than the words. `gui-rebuild` owns that
+  tree. The command table answers in English through `said()`, and the GUI's console renders
+  the same `CommandOutput` the REPL prints. Filed as
+  `the-gui-shell-has-its-own-english-vocabulary-and-no-way-to-r` and
+  `the-command-layer-answers-in-english-and-the-gui-console-ren`; neither is in this diff,
+  and this spec's clauses are graded over what the engine puts on a screen.
+
 ## Open questions
 
 None.
