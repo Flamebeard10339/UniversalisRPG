@@ -34,6 +34,9 @@ trigger: on empty
 # item rat-tail
 examine: Still twitching.
 
+# item sword-oil
+food, +25% attack-rate, 60s
+
 # stat max-carapace
 
 # resource carapace
@@ -155,7 +158,7 @@ describe('a rate raised mid-swing (absolute carry)', () => {
     const registry = loaded();
     const state = fighting(registry);
     resolve(state, registry, secondsToMs(at));
-    grantBuff(state, PLAYER, { id: 'sword', tags: [{ kind: 'stat-bonus', statId: 'attack-rate', percent: true, amount: 25 }] }, secondsToMs(10_000));
+    grantBuff(state, PLAYER, registry.items.get('sword-oil')!, secondsToMs(10_000));
     return { registry, state };
   }
 
@@ -274,7 +277,7 @@ describe('rate: as the per-minute cadence, to the millisecond', () => {
     expect(attemptDuration(fight, state, registry)).toBe(secondsToMs(2.4));
     expect(attemptDuration(fight, state, registry, 'giant-rat')).toBe(secondsToMs(3.75));
 
-    grantBuff(state, PLAYER, { id: 'haste', tags: [{ kind: 'stat-bonus', statId: 'attack-rate', percent: true, amount: 25 }] }, secondsToMs(60));
+    grantBuff(state, PLAYER, registry.items.get('sword-oil')!, secondsToMs(60));
     expect(attemptDuration(fight, state, registry)).toBe(secondsToMs(1.92));
   });
 

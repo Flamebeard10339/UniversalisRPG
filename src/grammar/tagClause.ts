@@ -1,5 +1,5 @@
 import { DslError, Parser, Span } from './parser';
-import { Range } from './range';
+import { isRange, Range } from './range';
 
 // How much a bonus is worth and which channel it lands in. A percent bonus never
 // takes a range, so the two are separate members.
@@ -15,6 +15,32 @@ export type Counter = { kind: 'resource'; id: string } | { kind: 'stack'; id: st
 // and already has its counter — a bonus that named a second one there would be a
 // field one of the two readers has to refuse.
 export type TagClause = { kind: 'keyword'; value: string } | ({ kind: 'stat-bonus'; statId: string; per?: Counter } & BonusAmount) | { kind: 'duration'; seconds: number };
+
+// One check per member of TagClause, keyed by the union's own discriminant, so
+// a fourth member is a type error here rather than a refusal a reader of
+// unparsed clauses discovers at run time. A `# save` body is that reader: it is
+// hand-written JSON, and nothing between it and a fold parses what it holds.
+const CLAUSE_HOLDS: { [K in TagClause['kind']]: (clause: Record<string, unknown>) => boolean } = {
+  keyword: (clause) => typeof clause.value === 'string',
+  'stat-bonus': (clause) =>
+    typeof clause.statId === 'string' &&
+    (clause.per === undefined || isCounter(clause.per)) &&
+    (clause.percent === true ? typeof clause.amount === 'number' && Number.isFinite(clause.amount) : clause.percent === false && isRange(clause.amount)),
+  duration: (clause) => typeof clause.seconds === 'number' && Number.isFinite(clause.seconds),
+};
+
+function isCounter(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const { kind, id } = value as { kind?: unknown; id?: unknown };
+  return (kind === 'resource' || kind === 'stack') && typeof id === 'string';
+}
+
+export function isTagClause(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const clause = value as Record<string, unknown>;
+  const holds = CLAUSE_HOLDS[clause.kind as TagClause['kind']] as ((clause: Record<string, unknown>) => boolean) | undefined;
+  return holds !== undefined && holds(clause);
+}
 
 const SECONDS_PER_MINUTE = 60;
 

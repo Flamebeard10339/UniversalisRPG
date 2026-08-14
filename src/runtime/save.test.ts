@@ -225,6 +225,18 @@ node hello:
   Hi.
 `;
 
+// One more stat and one more item than the registry these are pruned against,
+// which is the shape of a mod that was loaded when the save was taken.
+const WIDER_MODULE = `${PRUNE_MODULE}
+# stat agility
+
+# item lost-meal
+food, +1 strength, 60s
+`
+  .replace('# item bread\n', '# item bread\nfood, +1 strength, 60s\n')
+  .replace('# item helm\nslot: head\n', '# item helm\nslot: head\n+1 agility\n');
+
+
 describe('pruneStateForRegistry', () => {
   it('removes state entries whose content ids are not loaded', () => {
     const registry = loadModule(PRUNE_MODULE);
@@ -241,11 +253,11 @@ describe('pruneStateForRegistry', () => {
     state.xp.cooking = 4;
     state.xp.mining = 5;
     restorePools(state, { health: toMilliUnits(6), mana: toMilliUnits(7) });
-    const strength = [{ kind: 'stat-bonus' as const, statId: 'strength', percent: false as const, amount: { min: 1, max: 1 } }];
-    grantBuff(state, PLAYER, { id: 'bread', tags: strength }, 10);
-    grantBuff(state, PLAYER, { id: 'mod.meal', tags: strength }, 10);
-    grantBuff(state, PLAYER, { id: 'helm', tags: [{ kind: 'stat-bonus', statId: 'agility', percent: false, amount: { min: 1, max: 1 } }] }, 10);
-    grantBuff(state, 'ghost', { id: 'bread', tags: strength }, 10);
+    const wider = loadModule(WIDER_MODULE);
+    grantBuff(state, PLAYER, wider.items.get('bread')!, 10);
+    grantBuff(state, PLAYER, wider.items.get('lost-meal')!, 10);
+    grantBuff(state, PLAYER, wider.items.get('helm')!, 10);
+    grantBuff(state, 'ghost', wider.items.get('bread')!, 10);
     state.activeAction = {
       ownerRef: 'item.mod.gem',
       actionLabel: 'eat',
@@ -273,7 +285,7 @@ describe('pruneStateForRegistry', () => {
         'visits.mod.dialogue.hello',
         'xp.mining',
         'resources.mana',
-        'buffs.player.mod.meal',
+        'buffs.player.lost-meal',
         'buffs.player.helm',
         'buffs.ghost',
         'activeAction',

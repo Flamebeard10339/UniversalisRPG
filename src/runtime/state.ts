@@ -62,5 +62,5 @@ export function endAction(state: GameState): void {
 // nothing arms the next one.
 export function endJourney(state: GameState): void {
   state.journey = null;
-  state.activeAction = null;
+  endAction(state);
 }

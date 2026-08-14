@@ -1,13 +1,12 @@
 import type { Registry } from '../content/registry';
-import type { TagClause } from '../grammar/tagClause';
+import type { Item } from '../content/item';
+import { isTagClause, TagClause } from '../grammar/tagClause';
 import type { PruneWarning } from './save';
 import type { GameState } from './state';
 
-// One application of one source to one character. A buff is equipment that
-// expires, so what it grants is the tag-clause list an item already carries and
-// nothing is scaled by how many are held: five instances of `+6 attack` are
-// `+30 attack` because the fold reads five carriers, not because anything here
-// multiplies. A penalty is a negative amount in that same list.
+// One application of one source to one character, holding the tag-clause list
+// that source carries. Nothing is scaled by how many instances are held, and
+// nothing distinguishes a penalty from a bonus.
 export interface BuffInstance {
   readonly source: string;
   readonly tags: readonly TagClause[];
@@ -19,12 +18,11 @@ export interface BuffInstance {
 // takes a source id apart, because none of them assembled it.
 export type BuffTable = { readonly [actorId: string]: readonly BuffInstance[] };
 
-// What a source has to say to grant one. An `# item` is one already, which is
-// why nothing converts one into anything.
-export interface BuffSource {
-  readonly id: string;
-  readonly tags: readonly TagClause[];
-}
+// An `# item` is the only thing that can grant one, because a source id has to
+// still resolve after a save is reloaded and an item id is what `pruneBuffs`
+// can ask the registry about. A grantor of any other shape is a second question
+// for that rule before it is a type here.
+export type BuffSource = Item;
 
 // Authored, so that whether a second application adds or replaces is a decision
 // a source states rather than a consequence of two keys colliding.
@@ -46,8 +44,7 @@ export function buffsOf(state: GameState, actorId: string): readonly BuffInstanc
   return state.buffs[actorId] ?? [];
 }
 
-// How many instances of one source a character is holding, which is what
-// `per stack of <source>` counts.
+// How many instances of one source a character is holding.
 export function stackCount(state: GameState, actorId: string, source: string): number {
   return buffsOf(state, actorId).filter((buff) => buff.source === source).length;
 }
@@ -62,9 +59,8 @@ export function clearBuffs(state: GameState, actorIds: readonly string[]): void 
   for (const actorId of actorIds) set(state, actorId, []);
 }
 
-// The earliest instant any instance ends, for the boundary walk to weigh
-// against every other clock. Each instance runs on its own, so a second
-// application is a second boundary rather than a moved one.
+// The earliest instant any instance ends. Each instance runs on its own clock,
+// so a second application is a second one of these rather than a moved one.
 export function nextBuffExpiry(state: GameState): { at: number; actorId: string; source: string } | undefined {
   let earliest: { at: number; actorId: string; source: string } | undefined;
   for (const [actorId, held] of Object.entries(state.buffs)) {
@@ -75,8 +71,6 @@ export function nextBuffExpiry(state: GameState): { at: number; actorId: string;
   return earliest;
 }
 
-// Returns whether anything ended, because the boundary loop repeats until a
-// pass moves nothing.
 export function expireBuffs(state: GameState, at: number): boolean {
   let changed = false;
   for (const [actorId, held] of Object.entries(state.buffs)) {
@@ -86,12 +80,6 @@ export function expireBuffs(state: GameState, at: number): boolean {
     changed = true;
   }
   return changed;
-}
-
-function isTagClause(value: unknown): boolean {
-  if (typeof value !== 'object' || value === null) return false;
-  const { kind } = value as { kind?: unknown };
-  return kind === 'keyword' || kind === 'stat-bonus' || kind === 'duration';
 }
 
 export function isBuffList(value: unknown): boolean {

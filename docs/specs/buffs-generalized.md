@@ -1,5 +1,10 @@
 # buffs-generalized
 
+## Goal
+
+One buff mechanism any character can hold, so that a debuff, a stack and an expiry are the same
+record with different values rather than three bespoke ones.
+
 ## Deliverable
 
 One buff mechanism, owned by one module, held by any actor. Today there is no such module: an
@@ -18,32 +23,41 @@ Proof:
 - [c1] One module owns a buff's whole life. Granting, expiring and folding all happen behind it, and no
   other module constructs an `ActiveBuff`, writes `activeBuffs`, or knows how a buff's identity is
   spelled. In particular `save.ts` no longer recovers an item id by slicing a key string.
+  proof: vitest src/runtime/buffs.test.ts, beside `grep -rn "state.buffs" src/ --include=*.ts`
 - [c2] A buff is held by an actor, and any actor can hold one. `statRange` stops gating the modifier fold
   on `actorId === PLAYER`, so a buff on an enemy changes that enemy's stats the way the player's
   already change theirs.
+  proof: vitest src/runtime/buffs.test.ts src/runtime/encounter.test.ts
 - [c3] Each instance carries its own expiry, and refreshing is replacement. A buff is a set of instances
   rather than one entry with a count, each expiring on its own clock; applying a source that is
   already held either adds an instance or replaces an existing one, and replacing is how a duration
   is refreshed. Which of the two a source does is authored, not implied by whether two keys collide.
+  proof: vitest src/runtime/buffs.test.ts
 - [c4] A debuff is a buff with a sign. There is no second record, no second code path, and no predicate
   anywhere that asks whether a modifier is a penalty.
+  proof: vitest src/runtime/buffs.test.ts
 - [c5] Durations tick on the existing cadence. A buff's expiry is a boundary `nextBoundary` returns and
   `applyDueBoundaries` applies, for whoever holds it, and no new clock is introduced.
+  proof: vitest src/runtime/buffs.test.ts src/runtime/resolve.test.ts src/runtime/cadence.test.ts
 - [c6] A buff's payload is the tag-clause vocabulary items already use, and stacking is repetition of it.
   A buff carrying `+6 attack` held five times contributes `+30 attack` because each stack applies
   its own effect through the existing fold. There is no per-stack arithmetic, no new payload shape,
   and nothing about a buff's own bonus that a piece of equipment's bonus does not already do.
+  proof: vitest src/runtime/buffs.test.ts src/runtime/stat.test.ts
 - [c7] A buff's stack count is readable by other modifiers. `+N <stat> per <counter>`, defined by
   `combat-events` over a resource's level, takes a named buff's stack count as a counter — so a
   sword granting `+1% attack per stack of accelerated-vigor` raises what each stack is worth. This
   is the path by which a player improves a buff they are stacking, and it is separate from the buff
   paying out its own payload.
+  proof: vitest src/runtime/buffs.test.ts src/content/parse.test.ts
 - [c8] The player's existing behaviour is unchanged. Food buffs grant, stack (or do not), and expire
   exactly as they do today; every shipped `# test` passes byte-identical and no `expect:` save is
   regenerated to accommodate this branch.
+  proof: vitest src/runtime/integration.test.ts src/runtime/resolve.test.ts, beside `git diff ae7232c -- content/`
 - [c9] A save written before this branch loads. Buffs it holds either survive with their meaning intact
   or are pruned with the warning the loader already emits — never silently dropped, and never
   reinterpreted as a different number of stacks.
+  proof: vitest src/runtime/buffs.test.ts src/runtime/save.test.ts scripts/migrate-saves.test.ts
 
 ## Decisions
 

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { DslError } from '../grammar/parser';
-import { point } from '../grammar/range';
 import { nextRandom } from './rng';
 import { armAction, armFightAction, createGameState, GameState, grantBuff, hitChance, initResources, PLAYER, resolve } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
@@ -57,6 +56,9 @@ rate: my attack-rate
 accuracy: my rat-skill vs their dodge
 damage: my attack vs their dr
 depletes: their health
+
+# item ring-of-dodging
+food, +100 dodge, 60s
 
 # entity player
 stats: max-health 1000000, dodge 0, attack 10, attack-skill 100, attack-rate 60
@@ -168,7 +170,7 @@ describe('a contest inside a fight', () => {
 
     const nimble = fighting(registry, 'biter');
     // A ring of dodging: +100 closes the rat's 100-point skill advantage to nil.
-    grantBuff(nimble, PLAYER, { id: 'ring', tags: [{ kind: 'stat-bonus', statId: 'dodge', percent: false, amount: point(100) }] }, secondsToMs(1e9));
+    grantBuff(nimble, PLAYER, registry.items.get('ring-of-dodging')!, secondsToMs(1e9));
     resolve(nimble, registry, secondsToMs(ATTEMPTS));
 
     expect(hitsTaken(bare) / ATTEMPTS).toBeCloseTo(0.909, 1);
@@ -179,7 +181,7 @@ describe('a contest inside a fight', () => {
     const registry = loaded();
 
     const nimble = fighting(registry, 'biter');
-    grantBuff(nimble, PLAYER, { id: 'ring', tags: [{ kind: 'stat-bonus', statId: 'dodge', percent: false, amount: point(100) }] }, secondsToMs(1e9));
+    grantBuff(nimble, PLAYER, registry.items.get('ring-of-dodging')!, secondsToMs(1e9));
     resolve(nimble, registry, secondsToMs(ATTEMPTS));
 
     // The player's own `evasion: dodge` reads the BITER's dodge, not their buff.
@@ -237,6 +239,9 @@ describe('a contest inside a fight', () => {
 base: ${blow}
 
 # flag fled
+
+# item ring-of-dodging
+food, +100 dodge, 60s
 
 # entity player
 stats: max-health 1000000, dodge 0, attack 10, attack-skill 100, attack-rate 60, blow ${blow}

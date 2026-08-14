@@ -1,4 +1,4 @@
-import { createGameState, GameState, initResources, RuntimeError } from './runtime';
+import { createGameState, endAction, GameState, initResources, RuntimeError } from './runtime';
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
 import { findActionOwner, parseOwnerRef } from './actions';
@@ -195,7 +195,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   if (activeProblem) {
     const active = state.activeAction!;
     const id = `${active.ownerRef}.${active.actionLabel}`;
-    state.activeAction = null;
+    endAction(state);
     addWarning(warnings, 'activeAction', id, `Stopped unavailable action ${id}: ${activeProblem}.`);
   }
 

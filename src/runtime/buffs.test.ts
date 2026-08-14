@@ -3,7 +3,7 @@ import { point } from '../grammar/range';
 import { loadModule, Registry } from '../content/registry';
 import { buffsOf, clearBuffs, expireBuffs, grantBuff, nextBuffExpiry, pruneBuffs, stackCount } from './buffs';
 import { Item } from '../content/item';
-import { createGameState, endAction, GameState, initResources, PLAYER, resolve, statRange, statValue, useFight } from './runtime';
+import { createGameState, endAction, endJourney, GameState, initResources, PLAYER, resolve, statRange, statValue, useFight } from './runtime';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
@@ -34,6 +34,9 @@ food, +6 attack, 60s
 # item mire-toxin
 food, -4 attack, 30s
 
+# item mint-tonic
+food, +7 attack, 60s
+
 # item keen-blade
 slot: mainhand
 +10% attack per stack of accelerated-vigor
@@ -55,6 +58,21 @@ stats: max-health 12, attack 5
 
 function loaded(): Registry {
   return loadModule(MODULE);
+}
+
+// One more stat and one more item than `loaded()`, which is the shape of a mod
+// that was loaded when the buff was granted and is gone when it is read back.
+function wider(): Registry {
+  // mint-tonic keeps its id and swaps its payload, so it is a source the
+  // narrower registry still holds while the stat it names has gone with the mod.
+  return loadModule(
+    `${MODULE}
+# stat panache
+
+# item mystery-flask
+food, +1 attack, 60s
+`.replace('food, +7 attack, 60s', 'food, +1 panache, 60s'),
+  );
 }
 
 function started(registry: Registry): GameState {
@@ -225,6 +243,34 @@ describe('a buff on a fight-scoped copy dies with the copy', () => {
     expect(Object.keys(state.buffs)).toEqual([PLAYER]);
   });
 
+  it('goes when a walk tears the fight down, which never reaches endAction directly', () => {
+    const registry = loaded();
+    const state = started(registry);
+    useFight('strike', 'giant-rat', registry, state);
+    grantBuff(state, 'giant-rat', itemOf(registry, 'accelerated-vigor'), secondsToMs(1e9));
+
+    endJourney(state);
+
+    expect(state.activeAction).toBeNull();
+    expect(state.buffs).toEqual({});
+  });
+
+  it('goes when a load stops an action the registry no longer offers', () => {
+    const registry = loaded();
+    const state = initialState(registry);
+    useFight('strike', 'giant-rat', registry, state);
+    grantBuff(state, 'giant-rat', itemOf(registry, 'accelerated-vigor'), secondsToMs(1e9));
+
+    const saved = { version: SAVE_VERSION, diff: diffState(state, initialState(registry)) };
+    const renamed = loadModule(MODULE.replace('# action strike', '# action swing').replace('uses: strike', 'uses: swing'));
+    const reloaded = initialState(renamed);
+    const warnings = loadSave(reloaded, saved, renamed);
+
+    expect(warnings.map((warning) => warning.path)).toContain('activeAction');
+    expect(reloaded.activeAction).toBeNull();
+    expect(reloaded.buffs).toEqual({});
+  });
+
   it('clears an actor named directly, and leaves every other holder alone', () => {
     const registry = loaded();
     const state = started(registry);
@@ -264,22 +310,43 @@ describe('a buff survives a save, or is pruned with a warning', () => {
     expect(load([])).not.toThrow();
   });
 
+  // Each of these once loaded clean and then threw a raw TypeError out of the
+  // stat fold, because the kind was checked and the payload under it was not.
+  it('refuses a tag whose kind is known and whose payload is not what that kind holds', () => {
+    const registry = loaded();
+    const load = (tag: unknown) => () =>
+      loadSave(initialState(registry), { version: SAVE_VERSION, diff: { buffs: { player: [{ source: 'accelerated-vigor', tags: [tag], expiresAt: 60 }] } } as never }, registry);
+
+    expect(load({ kind: 'stat-bonus', statId: 'attack' })).toThrow(/save field buffs/);
+    expect(load({ kind: 'stat-bonus', statId: 'attack', percent: false, amount: 6 })).toThrow(/save field buffs/);
+    expect(load({ kind: 'stat-bonus', statId: 'attack', percent: false, amount: { min: 9, max: 6 } })).toThrow(/save field buffs/);
+    expect(load({ kind: 'stat-bonus', statId: 'attack', percent: true, amount: point(6) })).toThrow(/save field buffs/);
+    expect(load({ kind: 'stat-bonus', statId: 'attack', percent: false, amount: point(6), per: 'accelerated-vigor' })).toThrow(/save field buffs/);
+    expect(load({ kind: 'keyword' })).toThrow(/save field buffs/);
+    expect(load({ kind: 'duration', seconds: 'sixty' })).toThrow(/save field buffs/);
+
+    expect(load({ kind: 'stat-bonus', statId: 'attack', percent: false, amount: point(6) })).not.toThrow();
+    expect(load({ kind: 'stat-bonus', statId: 'attack', percent: true, amount: 10, per: { kind: 'stack', id: 'accelerated-vigor' } })).not.toThrow();
+    expect(load({ kind: 'keyword', value: 'stacks' })).not.toThrow();
+    expect(load({ kind: 'duration', seconds: 60 })).not.toThrow();
+  });
+
   it('drops what the registry no longer has - the whole holder, or the one instance - and says so', () => {
     const registry = loaded();
     const state = initialState(registry);
     grantBuff(state, PLAYER, itemOf(registry, 'accelerated-vigor'), secondsToMs(60));
-    grantBuff(state, PLAYER, { id: 'mystery-flask', tags: [{ kind: 'stat-bonus', statId: 'attack', percent: false, amount: point(1) }] }, secondsToMs(60));
+    grantBuff(state, PLAYER, itemOf(wider(), 'mystery-flask'), secondsToMs(60));
     grantBuff(state, 'wyvern', itemOf(registry, 'accelerated-vigor'), secondsToMs(60));
-    grantBuff(state, PLAYER, { id: 'steady-draught', tags: [{ kind: 'stat-bonus', statId: 'panache', percent: false, amount: point(1) }] }, secondsToMs(60));
+    grantBuff(state, PLAYER, itemOf(wider(), 'mint-tonic'), secondsToMs(60));
 
     const warnings = pruneBuffs(state, registry, (actorId) => actorId === PLAYER || registry.entities.has(actorId));
 
     expect(Object.keys(state.buffs)).toEqual([PLAYER]);
     expect(buffsOf(state, PLAYER).map((buff) => buff.source)).toEqual(['accelerated-vigor']);
-    expect(warnings.map((warning) => warning.path)).toEqual(['buffs.player.mystery-flask', 'buffs.player.steady-draught', 'buffs.wyvern']);
+    expect(warnings.map((warning) => warning.path)).toEqual(['buffs.player.mystery-flask', 'buffs.player.mint-tonic', 'buffs.wyvern']);
     expect(warnings.map((warning) => warning.message)).toEqual([
       'Removed buff mystery-flask on player because its item mystery-flask is not loaded.',
-      'Removed buff steady-draught on player because its stat panache is not loaded.',
+      'Removed buff mint-tonic on player because its stat panache is not loaded.',
       'Removed every buff on wyvern because it is not a character this world has.',
     ]);
   });

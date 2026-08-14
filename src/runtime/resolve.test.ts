@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { ActiveAction, armAction, buffsOf, craft, createGameState, GameState, grantBuff, initResources, PLAYER, resolve, RuntimeError, statValue, useAction } from './runtime';
 import { Boundary, BoundarySource, boundarySourceName, requireBoundaryNotPast, requireForwardProgress, STALL_BOUND } from './forwardProgress';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
-import { point } from '../grammar/range';
 import { loadModule, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
 
@@ -22,6 +21,11 @@ base: 60
 examine: A root that quickens the hands at the stove.
 food, +100% cooking-rate, 500s
 eat: take: 1 quickroot, say: You chew the root. Your hands feel quick.
+
+// A payload that folds to nothing, so twenty of it can mark twenty boundaries
+// without moving a single number the segment produces.
+# item marker
+food, stacks, +0% cooking-rate, 1s
 
 // Quickroot is eaten instantly; stew takes 3s to eat. That difference is the
 // whole point: it is what routes stew to the ARMED path in a live driver, which
@@ -192,12 +196,10 @@ function recipeActive(registry: Registry, recipeId: string): ActiveAction {
   return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.kind === 'continuous', implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, target: recipeId } } };
 }
 
-const quickrootBuff = { id: 'quickroot', tags: [{ kind: 'stat-bonus' as const, statId: 'cooking-rate', percent: true as const, amount: 100 }] };
-
 function withCampfireCooking(registry: Registry, buffed: boolean): GameState {
   const state = createGameState('nowhere');
   if (buffed) {
-    grantBuff(state, PLAYER, quickrootBuff, secondsToMs(500));
+    grantBuff(state, PLAYER, registry.items.get('quickroot')!, secondsToMs(500));
   }
   state.activeAction = recipeActive(registry, 'campfire-cook');
   return state;
@@ -406,7 +408,7 @@ describe('resolve: buff expiry', () => {
   it('the buff is present and boosts the stat right up until expiresAt, then is gone', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
-    grantBuff(state, PLAYER, quickrootBuff, secondsToMs(500));
+    grantBuff(state, PLAYER, registry.items.get('quickroot')!, secondsToMs(500));
 
     resolve(state, registry, secondsToMs(499));
     expect(statValue('cooking-rate', state, registry)).toBe(120);
@@ -808,6 +810,9 @@ base: ${cap}
 rate: seep-rate
 max: seep-cap
 start: ${start}
+
+# item tide-charm
+food, stacks, +50 seep-rate, 7s
 `;
   }
 
@@ -836,7 +841,7 @@ start: ${start}
     function fresh(): GameState {
       const state = createGameState();
       initResources(state, registry);
-      grantBuff(state, PLAYER, { id: 'tide', tags: [{ kind: 'stat-bonus', statId: 'seep-rate', percent: false, amount: point(50) }] }, FLIP);
+      grantBuff(state, PLAYER, registry.items.get('tide-charm')!, FLIP);
       return state;
     }
 
@@ -1000,10 +1005,10 @@ on dried:
     const markers = 20;
     expect(markers).toBeGreaterThan(STALL_BOUND);
 
+    // One source that stacks, so twenty instances are twenty expiries a second
+    // apart, each its own boundary.
     const state = withCampfireCooking(registry, false);
-    for (let i = 1; i <= markers; i++) {
-      grantBuff(state, PLAYER, { id: `marker-${i}`, tags: [{ kind: 'stat-bonus', statId: 'cooking-rate', percent: true, amount: 0 }] }, secondsToMs(i));
-    }
+    for (let i = 1; i <= markers; i++) grantBuff(state, PLAYER, registry.items.get('marker')!, secondsToMs(i));
 
     resolve(state, registry, secondsToMs(25));
 

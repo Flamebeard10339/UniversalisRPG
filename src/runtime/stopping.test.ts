@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { point } from '../grammar/range';
 import { armAction, armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
@@ -65,6 +64,9 @@ examine: Still twitching.
 
 # item blessing
 examine: A moment of grace.
+
+# item elixir
+food, +20 max-vigor, 10s
 
 # location den
 x: 0, y: 0
@@ -243,7 +245,7 @@ describe('a pool running out stops the fight', () => {
   it('fires on empty: when a shrinking max squeezes a pool to nothing', () => {
     const { registry, state } = started();
     armAction('entity', 'beacon', 'tend', registry, state);
-    grantBuff(state, PLAYER, { id: 'elixir', tags: [{ kind: 'stat-bonus', statId: 'max-vigor', percent: false, amount: point(20) }] }, secondsToMs(10));
+    grantBuff(state, PLAYER, registry.items.get('elixir')!, secondsToMs(10));
     restorePools(state, { vigor: toMilliUnits(20) });
 
     resolve(state, registry, secondsToMs(20));

@@ -39,6 +39,9 @@ trigger: on empty
 # item straw
 examine: A fistful of straw.
 
+# item war-brew
+food, +50 attack, 60s
+
 # action strike
 title: strike
 continuous
@@ -120,7 +123,7 @@ describe('# entity stats: — an actor sheet', () => {
   it('keeps the player buffs and the running action off other actors', () => {
     const registry = loaded();
     const state = started(registry);
-    grantBuff(state, PLAYER, { id: 'brew', tags: [{ kind: 'stat-bonus', statId: 'attack', percent: false, amount: point(50) }] }, secondsToMs(60));
+    grantBuff(state, PLAYER, registry.items.get('war-brew')!, secondsToMs(60));
 
     expect(statRange('attack', state, registry, PLAYER)).toEqual(point(60));
     expect(statRange('attack', state, registry, 'training-dummy')).toEqual(point(10));

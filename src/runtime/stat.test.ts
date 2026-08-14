@@ -22,6 +22,18 @@ base: 3
 # stat spread
 base: 0-2
 
+# item trail-ration
+food, +2 chop-power, 60s
+
+# item honing-oil
+food, +50% chop-power, 60s
+
+# item war-brew
+food, +1-2 attack, 60s
+
+# item battle-hymn
+food, +100% attack, 60s
+
 # entity dummy
 strike:
   time: 1
@@ -76,8 +88,8 @@ describe('statRange', () => {
   it('leaves an unranged stat exactly where it was: base + added, then × (1 + increased)', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
-    grantBuff(state, PLAYER, { id: 'food', tags: [{ kind: 'stat-bonus', statId: 'chop-power', percent: false, amount: point(2) }] }, 60);
-    grantBuff(state, PLAYER, { id: 'gear', tags: [{ kind: 'stat-bonus', statId: 'chop-power', percent: true, amount: 50 }] }, 60);
+    grantBuff(state, PLAYER, registry.items.get('trail-ration')!, 60);
+    grantBuff(state, PLAYER, registry.items.get('honing-oil')!, 60);
     expect(statRange('chop-power', state, registry)).toEqual(point(7.5));
     expect(statValue('chop-power', state, registry)).toBe(7.5);
   });
@@ -86,14 +98,14 @@ describe('statRange', () => {
     const registry = loaded();
     const state = withStrike();
     // base 4-7, the action's +2-3, and a +1-2 buff.
-    grantBuff(state, PLAYER, { id: 'gear', tags: [{ kind: 'stat-bonus', statId: 'attack', percent: false, amount: { min: 1, max: 2 } }] }, 60);
+    grantBuff(state, PLAYER, registry.items.get('war-brew')!, 60);
     expect(statRange('attack', state, registry)).toEqual({ min: 7, max: 12 });
   });
 
   it('scales both endpoints by the increased factor', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
-    grantBuff(state, PLAYER, { id: 'gear', tags: [{ kind: 'stat-bonus', statId: 'attack', percent: true, amount: 100 }] }, 60);
+    grantBuff(state, PLAYER, registry.items.get('battle-hymn')!, 60);
     expect(statRange('attack', state, registry)).toEqual({ min: 8, max: 14 });
   });
 
@@ -127,7 +139,7 @@ describe('sampleStat', () => {
     sampleStat('spread', one, registry);
 
     const many = withStrike();
-    grantBuff(many, PLAYER, { id: 'gear', tags: [{ kind: 'stat-bonus', statId: 'attack', percent: false, amount: { min: 1, max: 2 } }] }, 60);
+    grantBuff(many, PLAYER, registry.items.get('war-brew')!, 60);
     sampleStat('attack', many, registry);
 
     expect(many.rng).toBe(one.rng);
