@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ActiveAction, armAction, craft, createGameState, GameState, initResources, PLAYER, resolve, RuntimeError, statValue, useAction } from './runtime';
+import { ActiveAction, armAction, buffsOf, craft, createGameState, GameState, grantBuff, initResources, PLAYER, resolve, RuntimeError, statValue, useAction } from './runtime';
 import { Boundary, BoundarySource, boundarySourceName, requireBoundaryNotPast, requireForwardProgress, STALL_BOUND } from './forwardProgress';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
-import { point } from '../grammar/range';
 import { loadModule, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
 
@@ -22,6 +21,11 @@ base: 60
 examine: A root that quickens the hands at the stove.
 food, +100% cooking-rate, 500s
 eat: take: 1 quickroot, say: You chew the root. Your hands feel quick.
+
+// A payload that folds to nothing, so twenty of it can mark twenty boundaries
+// without moving a single number the segment produces.
+# item marker
+food, stacks, +0% cooking-rate, 1s
 
 // Quickroot is eaten instantly; stew takes 3s to eat. That difference is the
 // whole point: it is what routes stew to the ARMED path in a live driver, which
@@ -195,7 +199,7 @@ function recipeActive(registry: Registry, recipeId: string): ActiveAction {
 function withCampfireCooking(registry: Registry, buffed: boolean): GameState {
   const state = createGameState('nowhere');
   if (buffed) {
-    state.activeBuffs['quickroot:cooking-rate'] = { statId: 'cooking-rate', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) };
+    grantBuff(state, PLAYER, registry.items.get('quickroot')!, secondsToMs(500));
   }
   state.activeAction = recipeActive(registry, 'campfire-cook');
   return state;
@@ -229,7 +233,7 @@ describe('resolve: associativity (the core invariant)', () => {
       expect(folded.time).toBe(oneShot.time);
       expect(folded.inventory).toEqual(oneShot.inventory);
       expect(folded.activeAction).toEqual(oneShot.activeAction);
-      expect(folded.activeBuffs).toEqual(oneShot.activeBuffs);
+      expect(folded.buffs).toEqual(oneShot.buffs);
       // xp must batch per completion, not per segment: this is what catches a
       // non-associative batch where a live driver over-fires against the REPL.
       expect(folded.flags).toEqual(oneShot.flags);
@@ -354,7 +358,7 @@ describe('resolve: repeating action, speed stat, and timed buff (test 1 from the
     expect(state.inventory['cooked-shrimp']).toBe(1500);
     expect(state.time).toBe(secondsToMs(1000));
     expect(state.activeAction).toEqual(recipeActive(registry, 'campfire-cook'));
-    expect(state.activeBuffs).toEqual({});
+    expect(state.buffs).toEqual({});
   });
 
   it('produces only 500 over the same 1000s with no buff (speed stays 1 throughout)', () => {
@@ -404,14 +408,14 @@ describe('resolve: buff expiry', () => {
   it('the buff is present and boosts the stat right up until expiresAt, then is gone', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
-    state.activeBuffs['quickroot:cooking-rate'] = { statId: 'cooking-rate', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) };
+    grantBuff(state, PLAYER, registry.items.get('quickroot')!, secondsToMs(500));
 
     resolve(state, registry, secondsToMs(499));
     expect(statValue('cooking-rate', state, registry)).toBe(120);
-    expect(state.activeBuffs['quickroot:cooking-rate']).toBeDefined();
+    expect(buffsOf(state, PLAYER)).toHaveLength(1);
 
     resolve(state, registry, secondsToMs(500));
-    expect(state.activeBuffs['quickroot:cooking-rate']).toBeUndefined();
+    expect(buffsOf(state, PLAYER)).toEqual([]);
     expect(statValue('cooking-rate', state, registry)).toBe(60);
   });
 });
@@ -440,7 +444,7 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
 
     expect(state.inventory['quickroot']).toBe(0);
     expect(state.log).toContain('You chew the root. Your hands feel quick.');
-    expect(state.activeBuffs['quickroot:cooking-rate']).toEqual({ statId: 'cooking-rate', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) });
+    expect(buffsOf(state, PLAYER)).toEqual([{ source: 'quickroot', tags: registry.items.get('quickroot')!.tags, expiresAt: secondsToMs(500) }]);
     expect(statValue('cooking-rate', state, registry)).toBe(120);
   });
 
@@ -462,7 +466,7 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
       expect(state.inventory['stew']).toBe(0);
       expect(statValue('cooking-rate', state, registry)).toBe(120);
       // The 60s window starts at the last spoonful, not when the bowl was picked up.
-      expect(state.activeBuffs['stew:cooking-rate'].expiresAt).toBe(secondsToMs(63));
+      expect(buffsOf(state, PLAYER)[0].expiresAt).toBe(secondsToMs(63));
     }
   });
 
@@ -512,7 +516,7 @@ function withTreeChopping(): GameState {
 }
 
 describe('resolve: stochastic associativity — the accuracy/RNG core gate', () => {
-  it('resolve(resolve(s,t1),t2) === resolve(s,t2) for random split points, including mid-fight splits, matching time/inventory/flags/xp/log/activeAction/activeBuffs AND rng', () => {
+  it('resolve(resolve(s,t1),t2) === resolve(s,t2) for random split points, including mid-fight splits, matching time/inventory/flags/xp/log/activeAction/buffs AND rng', () => {
     const registry = loaded();
 
     const oneShot = withGrillCooking(registry, 100_000);
@@ -541,7 +545,7 @@ describe('resolve: stochastic associativity — the accuracy/RNG core gate', () 
       expect(folded.xp).toEqual(oneShot.xp);
       expect(folded.log.length).toBe(oneShot.log.length);
       expect(folded.activeAction).toEqual(oneShot.activeAction);
-      expect(folded.activeBuffs).toEqual(oneShot.activeBuffs);
+      expect(folded.buffs).toEqual(oneShot.buffs);
       // The draw deciding attempt N must be the SAME draw however the calls split.
       // An RNG keyed by segment count instead of attempt order would break here.
       expect(folded.rng).toBe(oneShot.rng);
@@ -806,6 +810,9 @@ base: ${cap}
 rate: seep-rate
 max: seep-cap
 start: ${start}
+
+# item tide-charm
+food, stacks, +50 seep-rate, 7s
 `;
   }
 
@@ -834,7 +841,7 @@ start: ${start}
     function fresh(): GameState {
       const state = createGameState();
       initResources(state, registry);
-      state.activeBuffs['tide:seep-rate'] = { statId: 'seep-rate', amount: point(50), kind: 'added', expiresAt: FLIP };
+      grantBuff(state, PLAYER, registry.items.get('tide-charm')!, FLIP);
       return state;
     }
 
@@ -893,7 +900,7 @@ describe('resolve: forward progress', () => {
 
   it('names every source a report can carry', () => {
     expect(boundarySourceName({ kind: 'requested' })).toBe('the requested time');
-    expect(boundarySourceName({ kind: 'buff', buffKey: 'tide:seep-rate' })).toBe('buff tide:seep-rate');
+    expect(boundarySourceName({ kind: 'buff', actorId: PLAYER, source: 'tide' })).toBe('buff tide on player');
     expect(boundarySourceName({ kind: 'action', ownerRef: 'entity.mill', actionLabel: 'press' })).toBe('action entity.mill.press');
     expect(boundarySourceName({ kind: 'resource', resourceId: 'pool' })).toBe('resource pool');
   });
@@ -913,9 +920,9 @@ describe('resolve: forward progress', () => {
   // What 2c2ccee/f9dfd72 claimed and left unchecked: on the integer scale a
   // boundary is at the current instant or after it, never before.
   it('rejects a boundary before the current instant', () => {
-    const tide: BoundarySource = { kind: 'buff', buffKey: 'tide:seep-rate' };
+    const tide: BoundarySource = { kind: 'buff', actorId: PLAYER, source: 'tide' };
     expect(() => requireBoundaryNotPast({ at: secondsToMs(4) - 1, source: tide }, secondsToMs(4))).toThrow(RuntimeError);
-    expect(() => requireBoundaryNotPast({ at: secondsToMs(4) - 1, source: tide }, secondsToMs(4))).toThrow(/buff tide:seep-rate/);
+    expect(() => requireBoundaryNotPast({ at: secondsToMs(4) - 1, source: tide }, secondsToMs(4))).toThrow(/buff tide on player/);
     expect(() => requireBoundaryNotPast({ at: secondsToMs(4), source: tide }, secondsToMs(4))).not.toThrow();
   });
 
@@ -998,15 +1005,15 @@ on dried:
     const markers = 20;
     expect(markers).toBeGreaterThan(STALL_BOUND);
 
+    // One source that stacks, so twenty instances are twenty expiries a second
+    // apart, each its own boundary.
     const state = withCampfireCooking(registry, false);
-    for (let i = 1; i <= markers; i++) {
-      state.activeBuffs[`marker-${i}:cooking-rate`] = { statId: 'cooking-rate', amount: 0, kind: 'increased', expiresAt: secondsToMs(i) };
-    }
+    for (let i = 1; i <= markers; i++) grantBuff(state, PLAYER, registry.items.get('marker')!, secondsToMs(i));
 
     resolve(state, registry, secondsToMs(25));
 
     expect(state.inventory['cooked-shrimp']).toBe(25);
-    expect(state.activeBuffs).toEqual({});
+    expect(state.buffs).toEqual({});
     expect(state.time).toBe(secondsToMs(25));
   });
 });

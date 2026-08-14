@@ -36,9 +36,7 @@ import {
   IMPLICIT_TARGET_FULL,
   logSwing,
   newCadence,
-  FIGHT_SCOPED,
   hasPool,
-  isFightScoped,
   opposes,
   Participant,
   participants,
@@ -63,13 +61,16 @@ import { Registry } from '../content/registry';
 import { Localized, localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { roadsFrom, routeTo } from './journey';
-import { advanceTime, endAction, GameState, PLAYER, RuntimeError } from './state';
+import { clearBuffs, expireBuffs, grantBuff, nextBuffExpiry } from './buffs';
+import { advanceTime, endAction, FIGHT_SCOPED, GameState, isFightScoped, PLAYER, RuntimeError } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { TagClause } from '../grammar/tagClause';
 import { msUntilEmpty, secondsToMs, toMilliUnits } from './units';
 
 export { advanceTime, createGameState, endAction, endJourney, PLAYER, RuntimeError } from './state';
-export type { ActiveBuff, GameState } from './state';
+export type { GameState } from './state';
+export { buffsOf, grantBuff, stackCount } from './buffs';
+export type { BuffInstance, BuffTable } from './buffs';
 export { contestSpread, minDamage, travelSecondsPerUnit } from './tuning';
 export { describeCondition, evaluateCondition, renderSegments } from './conditions';
 export { actionVisible, requiresMet } from './actions';
@@ -181,9 +182,8 @@ function completionsBeforeDrain(action: Action, state: GameState, registry: Regi
 
 function nextBoundary(state: GameState, registry: Registry, toTime: number): Boundary {
   let boundary: Boundary = { at: toTime, source: { kind: 'requested' } };
-  for (const [key, buff] of Object.entries(state.activeBuffs)) {
-    if (buff.expiresAt < boundary.at) boundary = { at: buff.expiresAt, source: { kind: 'buff', buffKey: key } };
-  }
+  const expiry = nextBuffExpiry(state);
+  if (expiry && expiry.at < boundary.at) boundary = { at: expiry.at, source: { kind: 'buff', actorId: expiry.actorId, source: expiry.source } };
   if (state.activeAction) {
     const active = state.activeAction;
     const source: BoundarySource = { kind: 'action', ownerRef: active.ownerRef, actionLabel: active.actionLabel };
@@ -394,6 +394,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       emptyPoolNow(segment, actorId, next.action.depletes!.id, segment.causedBy.get(actorId) ?? next.self);
       downOne(state, registry, state.location, actorId);
       leaveFight(active, actorId);
+      clearBuffs(state, [actorId]);
     }
 
     // The fight is measured on what the armed action targets, not on who
@@ -460,12 +461,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
       changed = true;
     }
 
-    for (const key of Object.keys(state.activeBuffs)) {
-      if (state.activeBuffs[key].expiresAt <= at) {
-        delete state.activeBuffs[key];
-        changed = true;
-      }
-    }
+    if (expireBuffs(state, at)) changed = true;
 
     if (state.activeAction) {
       const action = armedAction(state, registry);
@@ -580,19 +576,16 @@ export function resolve(state: GameState, registry: Registry, toTimeMs: number):
   }
 }
 
+// A meal is one source of one payload, so eating grants one instance carrying
+// the item's whole tag list — the same list a worn copy of it would fold. Food
+// that moves no stat grants nothing, because there is nothing for the fold to
+// find and an instance of it would only be a clock.
 function grantFoodBuff(item: Item, state: GameState): void {
   if (!item.tags.some((tag) => tag.kind === 'keyword' && tag.value === 'food')) return;
+  if (!item.tags.some((tag) => tag.kind === 'stat-bonus')) return;
 
   const durationTag = item.tags.find((tag): tag is Extract<TagClause, { kind: 'duration' }> => tag.kind === 'duration');
-  const duration = durationTag?.seconds ?? 0;
-
-  for (const tag of item.tags) {
-    if (tag.kind !== 'stat-bonus') continue;
-    const expiresAt = state.time + secondsToMs(duration);
-    state.activeBuffs[`${item.id}:${tag.statId}`] = tag.percent
-      ? { statId: tag.statId, kind: 'increased', amount: tag.amount / 100, expiresAt }
-      : { statId: tag.statId, kind: 'added', amount: tag.amount, expiresAt };
-  }
+  grantBuff(state, PLAYER, item, state.time + secondsToMs(durationTag?.seconds ?? 0));
 }
 
 // On COMPLETION: the one moment both ways of starting an action pass through.

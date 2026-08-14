@@ -1,7 +1,6 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { point } from '../grammar/range';
-import { createGameState, resolve, useAction, useFight } from './runtime';
+import { createGameState, grantBuff, PLAYER, resolve, useAction, useFight } from './runtime';
 import { engineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/registry';
 import { runTest } from './session';
@@ -81,7 +80,7 @@ describe('tutorial-island health resource (Pass 2 end-to-end)', () => {
     expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);
 
     // A standing buff needs no active action to tick.
-    state.activeBuffs['tutorial-island.cooked-shrimp:regeneration'] = { statId: 'tutorial-island.regeneration', amount: point(3), kind: 'added', expiresAt: state.time + secondsToMs(60) };
+    grantBuff(state, PLAYER, registry.items.get('tutorial-island.cooked-shrimp')!, state.time + secondsToMs(60));
     resolve(state, registry, state.time + secondsToMs(60));
     expect(state.resources['tutorial-island.health']).toBe(Math.min(toMilliUnits(30), afterFighting + toMilliUnits(3)));
   });

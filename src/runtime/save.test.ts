@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { createGameState, PLAYER, statValue } from './runtime';
+import { buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadInEnglish } from '../content/engineLocale';
 import { answerModal, ModalFrame, openModalNamed } from './modals';
@@ -225,6 +225,18 @@ node hello:
   Hi.
 `;
 
+// One more stat and one more item than the registry these are pruned against,
+// which is the shape of a mod that was loaded when the save was taken.
+const WIDER_MODULE = `${PRUNE_MODULE}
+# stat agility
+
+# item lost-meal
+food, +1 strength, 60s
+`
+  .replace('# item bread\n', '# item bread\nfood, +1 strength, 60s\n')
+  .replace('# item helm\nslot: head\n', '# item helm\nslot: head\n+1 agility\n');
+
+
 describe('pruneStateForRegistry', () => {
   it('removes state entries whose content ids are not loaded', () => {
     const registry = loadInEnglish(PRUNE_MODULE);
@@ -241,9 +253,11 @@ describe('pruneStateForRegistry', () => {
     state.xp.cooking = 4;
     state.xp.mining = 5;
     restorePools(state, { health: toMilliUnits(6), mana: toMilliUnits(7) });
-    state.activeBuffs['bread:strength'] = { kind: 'added', statId: 'strength', amount: { min: 1, max: 1 }, expiresAt: 10 };
-    state.activeBuffs['mod.meal:strength'] = { kind: 'added', statId: 'strength', amount: { min: 1, max: 1 }, expiresAt: 10 };
-    state.activeBuffs['bread:agility'] = { kind: 'added', statId: 'agility', amount: { min: 1, max: 1 }, expiresAt: 10 };
+    const wider = loadInEnglish(WIDER_MODULE);
+    grantBuff(state, PLAYER, wider.items.get('bread')!, 10);
+    grantBuff(state, PLAYER, wider.items.get('lost-meal')!, 10);
+    grantBuff(state, PLAYER, wider.items.get('helm')!, 10);
+    grantBuff(state, 'ghost', wider.items.get('bread')!, 10);
     state.activeAction = {
       ownerRef: 'item.mod.gem',
       actionLabel: 'eat',
@@ -260,7 +274,8 @@ describe('pruneStateForRegistry', () => {
     expect(state.visits).toEqual({ 'miki.hello': 1 });
     expect(state.xp).toEqual({ cooking: 4 });
     expect(state.resources).toEqual({ health: toMilliUnits(6) });
-    expect(Object.keys(state.activeBuffs)).toEqual(['bread:strength']);
+    expect(Object.keys(state.buffs)).toEqual([PLAYER]);
+    expect(buffsOf(state, PLAYER).map((buff) => buff.source)).toEqual(['bread']);
     expect(state.activeAction).toBeNull();
     expect(warnings.map((warning) => warning.path)).toEqual(
       expect.arrayContaining([
@@ -270,8 +285,9 @@ describe('pruneStateForRegistry', () => {
         'visits.mod.dialogue.hello',
         'xp.mining',
         'resources.mana',
-        'activeBuffs.mod.meal:strength',
-        'activeBuffs.bread:agility',
+        'buffs.player.lost-meal',
+        'buffs.player.helm',
+        'buffs.ghost',
         'activeAction',
       ]),
     );

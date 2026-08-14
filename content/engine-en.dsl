@@ -30,8 +30,10 @@ engine.modal.opened: modal:{modal}
 engine.prune.record: Removed {path} {id} because its {kind} is not loaded.
 engine.prune.location: Moved from unavailable location {from} to {to}.
 engine.prune.nowhere: (nowhere)
-engine.prune.buff.stat: Removed active buff {buff} because its stat {stat} is not loaded.
-engine.prune.buff.item: Removed active buff {buff} because its item {item} is not loaded.
+engine.prune.buff.actor: Removed every buff on {actor} because it is not a character this world has.
+engine.prune.buff.stat: Removed buff {buff} on {actor} because its stat {stat} is not loaded.
+engine.prune.buff.item: Removed buff {buff} on {actor} because its item {item} is not loaded.
+engine.prune.buff.resource: Removed buff {buff} on {actor} because its resource {resource} is not loaded.
 engine.prune.equipped.missing: Unequipped {slot} because its item {item} is not loaded.
 engine.prune.equipped.slot: Unequipped {slot} because its item {item} no longer declares that slot.
 engine.prune.modal: Closed modal {modal} because {reason}.

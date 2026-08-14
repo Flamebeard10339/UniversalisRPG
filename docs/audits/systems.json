@@ -215,6 +215,8 @@
       "name": "Runtime",
       "paths": [
         "src/runtime/actions.ts",
+        "src/runtime/buffs.test.ts",
+        "src/runtime/buffs.ts",
         "src/runtime/cadence.test.ts",
         "src/runtime/carriedItem.test.ts",
         "src/runtime/carriedName.test.ts",
@@ -463,6 +465,13 @@
             "src/runtime/itemInstance.ts"
           ],
           "note": "produced by carried-and-worn-are-disjoint: equip() takes the copy off the carried side as it fills the slot and unequip() puts it back, and itemCopies is the one read that says where every copy of an item is - carriedCount for what an inventory row states, heldCount for what a gate asks"
+        },
+        {
+          "name": "buff engine",
+          "paths": [
+            "src/runtime/buffs.ts"
+          ],
+          "note": "produced by buffs-generalized"
         },
         {
           "name": "localized text type",

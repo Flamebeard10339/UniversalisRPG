@@ -1,7 +1,7 @@
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { addRanges, point, Range, scaleRange } from '../grammar/range';
-import { BonusAmount } from '../grammar/tagClause';
+import { BonusAmount, Counter } from '../grammar/tagClause';
 import { instancePayloads } from './clusterEffect';
 import { basePlane } from './clusterPlane';
 import { ItemInstance } from './itemInstance';
@@ -16,7 +16,7 @@ export function scaledAmount(bonus: BonusAmount, times: number): BonusAmount {
 // How many of a counter a `per` bonus reads. It is a live fact about a
 // character and an item is not one, so whoever knows the character supplies it;
 // nobody is the same answer as an empty counter, which is nothing at all.
-export type CounterLevel = (resourceId: string) => number;
+export type CounterLevel = (counter: Counter) => number;
 
 // What one item is worth on one stat, effective rather than declared. The two
 // channels are the two a bonus can land in and are never mixed: `increased` is

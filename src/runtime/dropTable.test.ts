@@ -1,28 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
-import { applyResultsNow, createGameState } from './runtime';
+import { Registry } from '../content/registry';
+import { applyResultsNow, createGameState, grantBuff, PLAYER } from './runtime';
 import { GameState } from './state';
 
 const ITEMS = ['# item bones', '# item coins', '# item gem', '# item tail'];
 
 function fight(...body: string[]) {
-  const registry = loadInEnglish([...ITEMS, '# stat luck', 'base: 60', '# stat ward', 'base: 60', '# flag lit', '# entity giant-rat', 'fight:', ...body.map((line) => `  ${line}`)].join('\n'));
+  const registry = loadInEnglish([...ITEMS, '# stat luck', 'base: 60', '# stat ward', 'base: 60', '# item charm', 'food, +400 luck, 60s', '# flag lit', '# entity giant-rat', 'fight:', ...body.map((line) => `  ${line}`)].join('\n'));
   const results = registry.entities.get('giant-rat')!.actions[0].results;
   return { registry, results };
 }
 
 // One state per run, so what a run produces depends on the seed alone.
-function run(seed: number, body: string[], count = 1, before: (state: GameState) => void = () => {}): GameState {
+function run(seed: number, body: string[], count = 1, before: (state: GameState, registry: Registry) => void = () => {}): GameState {
   const { registry, results } = fight(...body);
   const state = createGameState();
   state.rng = seed;
-  before(state);
+  before(state, registry);
   applyResultsNow(state, registry, results, count);
   return state;
 }
 
 // Over many seeds, so a rate is measured rather than asserted from one draw.
-function rate(body: string[], runs = 4000, before?: (state: GameState) => void): (item: string) => number {
+function rate(body: string[], runs = 4000, before?: (state: GameState, registry: Registry) => void): (item: string) => number {
   const counts: Record<string, number> = {};
   for (let seed = 1; seed <= runs; seed++) {
     const state = run(seed, body, 1, before);
@@ -65,8 +66,8 @@ describe('a wrapper draws for its own selector', () => {
   it('fires a contest at hitChance, and a bonus on the left side moves it', () => {
     const even = rate(['luck vs ward: give: 1 gem']);
     expect(even('gem')).toBeCloseTo(0.5, 1);
-    const favoured = rate(['luck vs ward: give: 1 gem'], 4000, (state) => {
-      state.activeBuffs.luck = { statId: 'luck', kind: 'added', amount: { min: 400, max: 400 }, expiresAt: Infinity };
+    const favoured = rate(['luck vs ward: give: 1 gem'], 4000, (state, registry) => {
+      grantBuff(state, PLAYER, registry.items.get('charm')!, Infinity);
     });
     expect(favoured('gem')).toBeGreaterThan(even('gem'));
     expect(favoured('gem')).toBeGreaterThan(0.9);

@@ -1,18 +1,18 @@
 import { DEFAULT_LANGUAGE } from '../grammar/section';
-import { createGameState, GameState, initResources, RuntimeError } from './runtime';
+import { createGameState, endAction, GameState, initResources, RuntimeError } from './runtime';
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
 import { findActionOwner, parseOwnerRef } from './actions';
+import { isBuffList, pruneBuffs } from './buffs';
 import { isInstanceTable, pruneInstances } from './instances';
 import { itemTemplate } from './itemInstance';
 import { isPopulations, prunePopulations } from './population';
 import { isModalFrame, pruneModals } from './modals';
 import { Localized, Localizer, localizerOf } from './localized';
-import { PLAYER } from './state';
-import { templateOf } from './encounter';
+import { PLAYER, templateOf } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 // A sparse diff against initialState: a new game saves as `{}`, and neither
 // `log` nor `language` is state — one is drained by reading it, the other is
@@ -53,7 +53,7 @@ const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   resources: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
   resourceRateRemainders: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
   equipped: { shape: 'record', holds: (value) => typeof value === 'string', prune: 'pruned by a rule of its own' },
-  activeBuffs: { shape: 'record', holds: isObject, prune: 'pruned by a rule of its own' },
+  buffs: { shape: 'record', holds: isBuffList, prune: 'pruned by a rule of its own' },
   activeAction: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
   journey: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
   instances: { shape: 'scalar', holds: isInstanceTable, prune: 'pruned by a rule of its own' },
@@ -169,19 +169,9 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     pruneRecord(state[field] as unknown as Record<string, unknown>, field, (id) => rule.loaded(registry, id), rule.of, warnings, localizer);
   }
 
-  for (const [key, buff] of Object.entries(state.activeBuffs)) {
-    const itemId = key.includes(':') ? key.slice(0, key.indexOf(':')) : undefined;
-    // Two patterns rather than one with a phrase substituted into it: a
-    // fragment like `stat attack` is a sentence a translator cannot reach.
-    const message = !registry.stats.has(buff.statId)
-      ? localizer.engine('engine.prune.buff.stat', { buff: named(key), stat: named(buff.statId) })
-      : itemId && !registry.items.has(itemId)
-        ? localizer.engine('engine.prune.buff.item', { buff: named(key), item: named(itemId) })
-        : undefined;
-    if (!message) continue;
-    delete state.activeBuffs[key];
-    addWarning(warnings, `activeBuffs.${key}`, key, message);
-  }
+  // Who counts as a character is this module's answer everywhere else in it, so
+  // the buff engine is handed the same one rather than deciding a second time.
+  warnings.push(...pruneBuffs(state, registry, (actorId) => actorId === PLAYER || registry.entities.has(templateOf(actorId))));
 
   // A worn id may spell a grown copy, and pruneInstances has already settled
   // which of those are left, so an id that no longer resolves to one is read as
@@ -215,7 +205,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   if (activeProblem) {
     const active = state.activeAction!;
     const id = `${active.ownerRef}.${active.actionLabel}`;
-    state.activeAction = null;
+    endAction(state);
     addWarning(warnings, 'activeAction', id, localizer.engine('engine.prune.action', { action: named(id), reason: localizer.prose(activeProblem) }));
   }
 

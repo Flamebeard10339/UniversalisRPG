@@ -8,7 +8,8 @@ import { Item } from '../content/item';
 import { itemInstance, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
 import { skillLevel } from './skills';
-import { ActiveBuff, GameState, PLAYER, RuntimeError } from './state';
+import { BuffInstance, buffsOf, stackCount } from './buffs';
+import { GameState, PLAYER, RuntimeError } from './state';
 import { contestSpread, defaultActionDuration, minDamage } from './tuning';
 import { fromMilliUnits, MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
 import { BonusAmount, TagClause } from '../grammar/tagClause';
@@ -30,12 +31,15 @@ function foldBonus(bonus: BonusAmount, fold: StatFold, times: number): void {
   else fold.added = addRanges(fold.added, scaled.amount);
 }
 
-// A resource's level, beside a skill's, as a source for the count `foldBonus`
-// and `itemContribution` both multiply by. Floored, because `per fury` is per
-// point of it, and zero for a character holding no such pool.
+// A resource's level or a buff's stack count, beside a skill's, as a source for
+// the count `foldBonus` and `itemContribution` both multiply by. Floored,
+// because `per fury` is per point of it, and zero for a character holding no
+// such pool. This is the path by which a stack is worth more than the last:
+// what a buff pays out is its own payload, and what a counter reads is how many
+// of it are held.
 export function counterLevels(state: GameState, actorId: string = PLAYER): CounterLevel {
   const levels = actorId === PLAYER ? state.resources : state.activeAction?.actors?.[actorId]?.resources;
-  return (resourceId) => Math.floor(fromMilliUnits(levels?.[resourceId] ?? 0));
+  return (counter) => (counter.kind === 'stack' ? stackCount(state, actorId, counter.id) : Math.floor(fromMilliUnits(levels?.[counter.id] ?? 0)));
 }
 
 function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatFold, counter: CounterLevel): void {
@@ -56,12 +60,13 @@ function foldContribution(contributions: readonly StatContribution[], statId: st
   }
 }
 
-// A state holds one store of buffs, one of equipment and one of skill xp, and
-// all three belong to `PLAYER`. Every other actor reads an empty store because
-// it has none.
-function ownStores(state: GameState, actorId: string): { buffs: ActiveBuff[]; equipped: string[]; xp: Record<string, number> } {
+// A state holds one store of equipment and one of skill xp, and both belong to
+// `PLAYER`; every other actor reads an empty store because it has none. Buffs
+// are not among them: buffs.ts holds them per character, so a rat reads its own
+// the way the player reads theirs.
+function ownStores(state: GameState, actorId: string): { buffs: readonly BuffInstance[]; equipped: string[]; xp: Record<string, number> } {
   const stored = actorId === PLAYER;
-  return { buffs: stored ? Object.values(state.activeBuffs) : [], equipped: stored ? Object.values(state.equipped) : [], xp: stored ? state.xp : {} };
+  return { buffs: buffsOf(state, actorId), equipped: stored ? Object.values(state.equipped) : [], xp: stored ? state.xp : {} };
 }
 
 // What a character carries a modifier on, and the order a fold reads them in:
@@ -75,7 +80,7 @@ export interface ModifierCarrier {
   // Absent where the source holds no hook block, which today is a buff: what it
   // grants is an amount the engine wrote and not an authored section.
   hooks?: HookCarrier;
-  buff?: ActiveBuff;
+  buff?: BuffInstance;
   // The worn item and the id its slot holds, which is what `itemContribution`
   // assembles a worth off — the copy, never the template.
   item?: Item;
@@ -93,12 +98,6 @@ export function modifierCarriers(state: GameState, registry: Registry, actorId: 
     if (item) carriers.push({ hooks: item, item, wornId });
   }
   return carriers;
-}
-
-function foldBuff(buff: ActiveBuff, statId: string, fold: StatFold): void {
-  if (buff.statId !== statId) return;
-  if (buff.kind === 'added') fold.added = addRanges(fold.added, buff.amount);
-  else fold.increased += buff.amount;
 }
 
 // Which skills an actor has is the entity's to say, so a skill sheet is read off
@@ -131,7 +130,7 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
   // the strength of being worn. Asking whether it is also carried would fold
   // nothing at all, because being worn is exactly what says it is not.
   for (const carrier of modifierCarriers(state, registry, actorId)) {
-    if (carrier.buff) foldBuff(carrier.buff, statId, fold);
+    if (carrier.buff) foldStatBonuses(carrier.buff.tags, statId, fold, counter);
     if (carrier.item) foldContribution(itemContribution(registry, carrier.item, itemInstance(state, carrier.wornId!), counter), statId, fold);
   }
   return scaleRange(fold.added, 1 + fold.increased);

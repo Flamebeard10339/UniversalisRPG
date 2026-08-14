@@ -32,13 +32,13 @@ export interface ShapeChange {
   moved(body: SaveBody, fixture: Fixture): SaveBody;
 }
 
+export const noFieldMoved = (writtenFor: number): ShapeChange => ({ writtenFor, declared: 'no field moved', moved: (body) => body });
+
 // Written by the branch that bumps SAVE_VERSION and deleted by the one after
 // it; `git log -p` on this file is the history of every bump's shape change.
 // null is "nobody said", not "nothing moved" — migrate refuses it, and a bump
 // that moved no field says so with noFieldMoved.
-export const SHAPE_CHANGE: ShapeChange | null = null;
-
-export const noFieldMoved = (writtenFor: number): ShapeChange => ({ writtenFor, declared: 'no field moved', moved: (body) => body });
+export const SHAPE_CHANGE: ShapeChange | null = noFieldMoved(9);
 
 export function isStaleDeclaration(change: ShapeChange | null): boolean {
   return change !== null && change.writtenFor !== SAVE_VERSION;
