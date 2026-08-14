@@ -2,6 +2,7 @@ import { createGameState, GameState, initResources, RuntimeError } from './runti
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
 import { findActionOwner, parseOwnerRef } from './actions';
+import { isBuffList, pruneBuffs } from './buffs';
 import { isInstanceTable, pruneInstances } from './instances';
 import { itemTemplate } from './itemInstance';
 import { isPopulations, prunePopulations } from './population';
@@ -10,7 +11,7 @@ import { PLAYER } from './state';
 import { templateOf } from './encounter';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 // A sparse diff against initialState: a new game saves as `{}`, and `log` is not state.
 export type SaveDiff = Partial<Omit<GameState, 'log'>>;
@@ -49,7 +50,7 @@ const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   resources: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
   resourceRateRemainders: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
   equipped: { shape: 'record', holds: (value) => typeof value === 'string', prune: 'pruned by a rule of its own' },
-  activeBuffs: { shape: 'record', holds: isObject, prune: 'pruned by a rule of its own' },
+  buffs: { shape: 'record', holds: isBuffList, prune: 'pruned by a rule of its own' },
   activeAction: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
   journey: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
   instances: { shape: 'scalar', holds: isInstanceTable, prune: 'pruned by a rule of its own' },
@@ -159,13 +160,9 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     pruneRecord(state[field] as unknown as Record<string, unknown>, field, (id) => rule.loaded(registry, id), rule.of, warnings);
   }
 
-  for (const [key, buff] of Object.entries(state.activeBuffs)) {
-    const itemId = key.includes(':') ? key.slice(0, key.indexOf(':')) : undefined;
-    const missing = !registry.stats.has(buff.statId) ? `stat ${buff.statId}` : itemId && !registry.items.has(itemId) ? `item ${itemId}` : undefined;
-    if (!missing) continue;
-    delete state.activeBuffs[key];
-    addWarning(warnings, `activeBuffs.${key}`, key, `Removed active buff ${key} because its ${missing} is not loaded.`);
-  }
+  // Who counts as a character is this module's answer everywhere else in it, so
+  // the buff engine is handed the same one rather than deciding a second time.
+  warnings.push(...pruneBuffs(state, registry, (actorId) => actorId === PLAYER || registry.entities.has(templateOf(actorId))));
 
   // A worn id may spell a grown copy, and pruneInstances has already settled
   // which of those are left, so an id that no longer resolves to one is read as

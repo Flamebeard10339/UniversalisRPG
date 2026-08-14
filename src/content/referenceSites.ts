@@ -142,13 +142,14 @@ function results(list: ActionResult[] | undefined, where: string, visit: Visit):
   }
 }
 
-// A counter is what a `per` names, and this branch's counter is a resource's
-// level. A second source joins by resolving here, not by a second walk.
+// A counter is what a `per` names: a resource whose level it reads, or the
+// source of the buff whose stacks it counts. A third joins by resolving here,
+// not by a second walk.
 export function visitTags(list: unknown, where: string, visit: Visit): void {
   for (const tag of listMembers<TagClause>(list)) {
     if (tag.kind !== 'stat-bonus') continue;
     put(tag, 'statId', 'stat', `${where} tag`, visit);
-    if (tag.per !== undefined) put(tag, 'per', 'resource', `${where} tag per`, visit);
+    if (tag.per !== undefined) put(tag.per, 'id', tag.per.kind === 'stack' ? 'item' : 'resource', `${where} tag per`, visit);
   }
 }
 

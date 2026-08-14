@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Cursor, DslError } from '../grammar/parser';
 import { point, range } from '../grammar/range';
-import { ActiveAction, createGameState, equip, GameState, hitDamage, initResources, minDamage, PLAYER, sampleStat, statRange, statValue } from './runtime';
+import { ActiveAction, createGameState, equip, GameState, grantBuff, hitDamage, initResources, minDamage, PLAYER, sampleStat, statRange, statValue } from './runtime';
 import { restorePools } from './effects';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { loadModule, Registry } from '../content/registry';
@@ -76,8 +76,8 @@ describe('statRange', () => {
   it('leaves an unranged stat exactly where it was: base + added, then × (1 + increased)', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
-    state.activeBuffs['food:chop-power'] = { statId: 'chop-power', kind: 'added', amount: point(2), expiresAt: 60 };
-    state.activeBuffs['gear:chop-power'] = { statId: 'chop-power', kind: 'increased', amount: 0.5, expiresAt: 60 };
+    grantBuff(state, PLAYER, { id: 'food', tags: [{ kind: 'stat-bonus', statId: 'chop-power', percent: false, amount: point(2) }] }, 60);
+    grantBuff(state, PLAYER, { id: 'gear', tags: [{ kind: 'stat-bonus', statId: 'chop-power', percent: true, amount: 50 }] }, 60);
     expect(statRange('chop-power', state, registry)).toEqual(point(7.5));
     expect(statValue('chop-power', state, registry)).toBe(7.5);
   });
@@ -86,14 +86,14 @@ describe('statRange', () => {
     const registry = loaded();
     const state = withStrike();
     // base 4-7, the action's +2-3, and a +1-2 buff.
-    state.activeBuffs['gear:attack'] = { statId: 'attack', kind: 'added', amount: { min: 1, max: 2 }, expiresAt: 60 };
+    grantBuff(state, PLAYER, { id: 'gear', tags: [{ kind: 'stat-bonus', statId: 'attack', percent: false, amount: { min: 1, max: 2 } }] }, 60);
     expect(statRange('attack', state, registry)).toEqual({ min: 7, max: 12 });
   });
 
   it('scales both endpoints by the increased factor', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
-    state.activeBuffs['gear:attack'] = { statId: 'attack', kind: 'increased', amount: 1, expiresAt: 60 };
+    grantBuff(state, PLAYER, { id: 'gear', tags: [{ kind: 'stat-bonus', statId: 'attack', percent: true, amount: 100 }] }, 60);
     expect(statRange('attack', state, registry)).toEqual({ min: 8, max: 14 });
   });
 
@@ -127,7 +127,7 @@ describe('sampleStat', () => {
     sampleStat('spread', one, registry);
 
     const many = withStrike();
-    many.activeBuffs['gear:attack'] = { statId: 'attack', kind: 'added', amount: { min: 1, max: 2 }, expiresAt: 60 };
+    grantBuff(many, PLAYER, { id: 'gear', tags: [{ kind: 'stat-bonus', statId: 'attack', percent: false, amount: { min: 1, max: 2 } }] }, 60);
     sampleStat('attack', many, registry);
 
     expect(many.rng).toBe(one.rng);

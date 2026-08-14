@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
 import { point } from '../grammar/range';
-import { armAction, armFightAction, createGameState, GameState, initResources, resolve } from './runtime';
+import { armAction, armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
 
@@ -243,7 +243,7 @@ describe('a pool running out stops the fight', () => {
   it('fires on empty: when a shrinking max squeezes a pool to nothing', () => {
     const { registry, state } = started();
     armAction('entity', 'beacon', 'tend', registry, state);
-    state.activeBuffs['elixir:max-vigor'] = { statId: 'max-vigor', amount: point(20), kind: 'added', expiresAt: secondsToMs(10) };
+    grantBuff(state, PLAYER, { id: 'elixir', tags: [{ kind: 'stat-bonus', statId: 'max-vigor', percent: false, amount: point(20) }] }, secondsToMs(10));
     restorePools(state, { vigor: toMilliUnits(20) });
 
     resolve(state, registry, secondsToMs(20));

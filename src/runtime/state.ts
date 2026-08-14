@@ -1,10 +1,10 @@
-import type { Range } from '../grammar/range';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import type { ActiveAction } from './encounter';
 import { createInstanceTable, type InstanceTable } from './instances';
 import type { Populations } from './population';
 import type { Journey } from './journey';
 import type { ModalFrame } from './modals';
+import { type BuffTable, clearBuffs } from './buffs';
 
 export class RuntimeError extends Error {}
 
@@ -12,14 +12,6 @@ export class RuntimeError extends Error {}
 export type PoolLevels = { readonly [resourceId: string]: number };
 
 export const PLAYER = 'player';
-
-interface TimedModifier {
-  statId: string;
-  expiresAt: number;
-}
-export type ActiveBuff =
-  | (TimedModifier & { kind: 'added'; amount: Range })
-  | (TimedModifier & { kind: 'increased'; amount: number });
 
 export interface GameState extends RngCursor {
   flags: Record<string, boolean | number>;
@@ -33,7 +25,8 @@ export interface GameState extends RngCursor {
   // The walk under way, and null when the player is not on one. journey.ts owns
   // the route; runtime.ts owns arming each leg off it.
   journey: Journey | null;
-  activeBuffs: Record<string, ActiveBuff>;
+  // Readonly because buffs.ts owns every write, and with it stacking and expiry.
+  readonly buffs: BuffTable;
   resources: PoolLevels;
   resourceRateRemainders: Record<string, number>;
   equipped: Record<string, string>;
@@ -48,7 +41,7 @@ export interface GameState extends RngCursor {
 }
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, journey: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
 }
 
 // The one seam through which simulated time advances; nothing reads a real clock.
@@ -59,6 +52,9 @@ export function advanceTime(state: GameState, milliseconds: number): void {
 }
 
 export function endAction(state: GameState): void {
+  // A fight-scoped copy vanishes with the fight it was minted for, so what was
+  // buffing it has nobody left to buff.
+  if (state.activeAction) clearBuffs(state, Object.keys(state.activeAction.actors ?? {}));
   state.activeAction = null;
 }
 

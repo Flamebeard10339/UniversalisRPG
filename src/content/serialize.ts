@@ -4,7 +4,7 @@ import { Condition, Reference } from '../grammar/condition';
 import { formatDependency, formatVersion, Version } from '../grammar/dependency';
 import { HookCarrier } from '../grammar/hook';
 import { isPoint, Range, scaleRange } from '../grammar/range';
-import { BonusAmount, TagClause } from '../grammar/tagClause';
+import { BonusAmount, Counter, TagClause } from '../grammar/tagClause';
 import { Produced, Quantified } from '../grammar/values';
 import { Dialogue, TextSegment } from './dialogue';
 import { DropTable } from './dropTable';
@@ -167,6 +167,8 @@ function bonusAmount(value: BonusAmount): string {
   return lo === hi ? `${sign}${n(lo)}` : `${sign}${n(lo)}-${n(hi)}`;
 }
 
+const counter = (value: Counter): string => (value.kind === 'stack' ? `stack of ${value.id}` : value.id);
+
 function tag(value: TagClause): string {
   switch (value.kind) {
     case 'keyword':
@@ -174,7 +176,7 @@ function tag(value: TagClause): string {
     case 'duration':
       return duration(value.seconds);
     case 'stat-bonus':
-      return `${bonusAmount(value)} ${value.statId}${value.per === undefined ? '' : ` per ${value.per}`}`;
+      return `${bonusAmount(value)} ${value.statId}${value.per === undefined ? '' : ` per ${counter(value.per)}`}`;
   }
 }
 

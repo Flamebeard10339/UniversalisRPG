@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from '../content/registry';
-import { applyResultsNow, createGameState } from './runtime';
+import { applyResultsNow, createGameState, grantBuff, PLAYER } from './runtime';
 import { GameState } from './state';
 
 const ITEMS = ['# item bones', '# item coins', '# item gem', '# item tail'];
@@ -66,7 +66,7 @@ describe('a wrapper draws for its own selector', () => {
     const even = rate(['luck vs ward: give: 1 gem']);
     expect(even('gem')).toBeCloseTo(0.5, 1);
     const favoured = rate(['luck vs ward: give: 1 gem'], 4000, (state) => {
-      state.activeBuffs.luck = { statId: 'luck', kind: 'added', amount: { min: 400, max: 400 }, expiresAt: Infinity };
+      grantBuff(state, PLAYER, { id: 'charm', tags: [{ kind: 'stat-bonus', statId: 'luck', percent: false, amount: { min: 400, max: 400 } }] }, Infinity);
     });
     expect(favoured('gem')).toBeGreaterThan(even('gem'));
     expect(favoured('gem')).toBeGreaterThan(0.9);

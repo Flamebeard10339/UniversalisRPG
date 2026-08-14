@@ -951,7 +951,7 @@ describe('what the engine withholds', () => {
       // it is how `discovered` became a list that is always empty.
       rng: 'withheld',
       visits: 'withheld',
-      activeBuffs: 'withheld',
+      buffs: 'withheld',
       resourceRateRemainders: 'withheld',
       // Which grown copies the player carries, and nothing about what is inside
       // one: a driver has to name what it is equipping, and a plane is read

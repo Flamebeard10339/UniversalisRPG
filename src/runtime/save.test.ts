@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { createGameState, PLAYER, statValue } from './runtime';
+import { buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadModule } from '../content/registry';
 import { answerModal, ModalFrame, openModalNamed } from './modals';
@@ -241,9 +241,11 @@ describe('pruneStateForRegistry', () => {
     state.xp.cooking = 4;
     state.xp.mining = 5;
     restorePools(state, { health: toMilliUnits(6), mana: toMilliUnits(7) });
-    state.activeBuffs['bread:strength'] = { kind: 'added', statId: 'strength', amount: { min: 1, max: 1 }, expiresAt: 10 };
-    state.activeBuffs['mod.meal:strength'] = { kind: 'added', statId: 'strength', amount: { min: 1, max: 1 }, expiresAt: 10 };
-    state.activeBuffs['bread:agility'] = { kind: 'added', statId: 'agility', amount: { min: 1, max: 1 }, expiresAt: 10 };
+    const strength = [{ kind: 'stat-bonus' as const, statId: 'strength', percent: false as const, amount: { min: 1, max: 1 } }];
+    grantBuff(state, PLAYER, { id: 'bread', tags: strength }, 10);
+    grantBuff(state, PLAYER, { id: 'mod.meal', tags: strength }, 10);
+    grantBuff(state, PLAYER, { id: 'helm', tags: [{ kind: 'stat-bonus', statId: 'agility', percent: false, amount: { min: 1, max: 1 } }] }, 10);
+    grantBuff(state, 'ghost', { id: 'bread', tags: strength }, 10);
     state.activeAction = {
       ownerRef: 'item.mod.gem',
       actionLabel: 'eat',
@@ -260,7 +262,8 @@ describe('pruneStateForRegistry', () => {
     expect(state.visits).toEqual({ 'miki.hello': 1 });
     expect(state.xp).toEqual({ cooking: 4 });
     expect(state.resources).toEqual({ health: toMilliUnits(6) });
-    expect(Object.keys(state.activeBuffs)).toEqual(['bread:strength']);
+    expect(Object.keys(state.buffs)).toEqual([PLAYER]);
+    expect(buffsOf(state, PLAYER).map((buff) => buff.source)).toEqual(['bread']);
     expect(state.activeAction).toBeNull();
     expect(warnings.map((warning) => warning.path)).toEqual(
       expect.arrayContaining([
@@ -270,8 +273,9 @@ describe('pruneStateForRegistry', () => {
         'visits.mod.dialogue.hello',
         'xp.mining',
         'resources.mana',
-        'activeBuffs.mod.meal:strength',
-        'activeBuffs.bread:agility',
+        'buffs.player.mod.meal',
+        'buffs.player.helm',
+        'buffs.ghost',
         'activeAction',
       ]),
     );

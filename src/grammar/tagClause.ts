@@ -5,11 +5,16 @@ import { Range } from './range';
 // takes a range, so the two are separate members.
 export type BonusAmount = { percent: false; amount: Range } | { percent: true; amount: number };
 
+// What a `per` counts: a resource's level, or how many stacks of one buff the
+// character is holding. Two live facts about a character, spelled apart because
+// no reader could tell a resource id from a buff's by looking at it.
+export type Counter = { kind: 'resource'; id: string } | { kind: 'stack'; id: string };
+
 // `per` says which counter scales the magnitude, and sits on the clause rather
 // than on BonusAmount because `# skill`'s `per-level:` reads the same magnitude
 // and already has its counter — a bonus that named a second one there would be a
 // field one of the two readers has to refuse.
-export type TagClause = { kind: 'keyword'; value: string } | ({ kind: 'stat-bonus'; statId: string; per?: string } & BonusAmount) | { kind: 'duration'; seconds: number };
+export type TagClause = { kind: 'keyword'; value: string } | ({ kind: 'stat-bonus'; statId: string; per?: Counter } & BonusAmount) | { kind: 'duration'; seconds: number };
 
 const SECONDS_PER_MINUTE = 60;
 
@@ -17,7 +22,7 @@ const AMOUNT = String.raw`(?<sign>[+-])(?<lo>\d+)(?:-(?<hi>\d+))?(?<percent>%?)`
 const NAME = String.raw`[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*`;
 
 const DURATION = /^(?:(?<minutes>\d+)m)?(?:(?<seconds>\d+)s)?$/;
-const STAT_BONUS = new RegExp(`^${AMOUNT}[ \\t]+(?<stat>${NAME})(?:[ \\t]+per[ \\t]+(?<per>${NAME}))?$`);
+const STAT_BONUS = new RegExp(`^${AMOUNT}[ \t]+(?<stat>${NAME})(?:[ \t]+per[ \t]+(?:stack[ \t]+of[ \t]+(?<stack>${NAME})|(?<per>${NAME})))?$`);
 const BARE_AMOUNT = new RegExp(`^${AMOUNT}$`);
 const KEYWORD = /^[a-z][a-z0-9-]*$/;
 
@@ -50,7 +55,8 @@ function parseClause(raw: string, span: Span): TagClause {
   const bonus = STAT_BONUS.exec(raw)?.groups;
   if (bonus) {
     const clause = { kind: 'stat-bonus' as const, statId: bonus.stat!, ...parseAmount(bonus, raw, span) };
-    return bonus.per === undefined ? clause : { ...clause, per: bonus.per };
+    if (bonus.stack !== undefined) return { ...clause, per: { kind: 'stack', id: bonus.stack } };
+    return bonus.per === undefined ? clause : { ...clause, per: { kind: 'resource', id: bonus.per } };
   }
 
   if (KEYWORD.test(raw)) return { kind: 'keyword', value: raw };
