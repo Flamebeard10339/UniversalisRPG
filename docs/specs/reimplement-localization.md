@@ -242,3 +242,124 @@ Proof:
 - `stationless-recipes-dsl-section` also forecasts writing `session.ts`, and the craft label this
   branch keys is one of the entries that branch removes from the choice list. Both grants are
   forecasts, so `tasks plan` grades it a note; whichever starts second should read the other's spec.
+
+## Audit passes
+
+### Pass 1 — 2026-08-14
+
+- base: `ae7232c5e9ab4a157da7ba445270ce0e0ac936c4`
+- head: `6234f809e5b8a11d33f88ea3a27d96d10b9b18ca`
+- proof 1: met — The fixture is real and tsc is what runs it. `src/runtime/localized.test.ts:21-37`
+holds seven `@ts-expect-error` lines assigning string and template literals to
+PlayChoice['label'], PlayChoice['detail'], PlayStatus['location']['title'],
+PlayStatus['location']['description'], PlayStatus['entities'][number]['title'], Localized[]
+(the log) and PruneWarning['message']; `tsconfig.json` includes "src", so `npx tsc --noEmit`
+type-checks the file. Re-runnable check that the fixture can fail: replace
+`export type Localized = string & { readonly [LOCALIZED]: true }` in src/runtime/localized.ts
+with `export type Localized = string` and run `npx tsc --noEmit` -- it reports exactly seven
+TS2578 "Unused '@ts-expect-error' directive" errors at localized.test.ts lines 23,25,27,29,31,33,35,
+and passes again when restored. The brand's escape hatch is closed by two tests in
+`describe('the brand is closed (c1)')`: no file in src outside localizedFixture.ts imports it,
+and no file outside localized.ts/localizedFixture.ts writes `as Localized`.
+- proof 2: unmet — Half of it is proven and half is false. Proven: the shipped English covers the union
+exactly -- mutating `engine.talk.to` to `engine.talk.too` in content/engine-en.dsl was KILLED by
+src/runtime/localized.test.ts "ships an English pattern for every key the union holds, and no other
+key". The literal-union half is proven by tsc rather than by the named vitest target: mutating
+`export type EngineKey = (typeof ENGINE_KEYS)[number]` to `= string` SURVIVED the whole suite
+(0 failed of 2930) but produces two TS2578 errors under `npx tsc --noEmit`.
+False: "none remains as a literal in TypeScript". Two English engine sentences still stand as
+template literals -- `src/runtime/actions.ts:55` `label: \`Travel to ${dest.title}\`` and
+`src/content/registry.ts:143` `label: \`Craft ${humanizeEn(recipe.id)}\``. The second is not
+merely an identifier: `recordActionText` records its output as a base entry, so
+`isla.recipe.barra-de-bronce.craft-barra-de-bronce` = {text:'Craft Barra De Bronce', language:'es'}
+for a `language: es` module, and `publishAction` displays it. The test written to prove this
+half cannot see either one: it filters patterns to `length > 12` after stripping `{params}`,
+which excludes six of the thirty-two keys -- engine.travel.to ('Travel to'), engine.craft.label
+('Craft'), engine.talk.to ('Talk to'), engine.item.examine ('This is  .'), engine.modal.opened
+('modal:') and engine.prune.nowhere ('(nowhere)') -- and the two survivors are in that six.
+- proof 3: met — The no-fallback rule is one line and it is watched. Mutating
+`src/runtime/localized.ts:37` `return base?.language === language ? base.text : undefined;` to
+`return base?.text;` was KILLED twice: by src/runtime/session.test.ts "shows the key for every
+string the played language has no entry for", and again, aimed at "never renders the module's
+own language to a player of another one", by two named tests in that file, each re-run at its own
+file with the mutation still applied. `describe('a missing translation shows its key, in every
+direction')` covers both directions (en module played in es, es module played in en), content keys
+and engine keys, a partially translated locale (`Viaja a island.location.cove.title` -- the
+untranslated destination shows its key inside a translated sentence), and the no-locale-at-all case.
+Caveat filed as a finding, not against this grade: when an engine.prune.* key IS translated, every
+identifier substituted into it is destroyed.
+- proof 4: met — Both halves mutation-proven at their own lines in src/runtime/localized.ts.
+Removing `if (value === undefined) throw new RuntimeError(...)` from `substitute` (line 25) was
+KILLED by src/runtime/localized.test.ts "refuses a pattern naming a parameter the call site did not
+supply". Changing `const PARAM = /\{([a-z][a-z0-9-]*)\}/g` (line 20) to require doubled braces was
+KILLED by "puts a value in by name". The localized-parameter half is covered by "resolves a
+localized parameter in the active language before substituting it" (es.title resolved to 'Cuerda'
+before substitution into 'Viaja a {destination}') and end-to-end by session.test.ts's
+`Viaja a island.location.cove.title`. The deliberate asymmetry (an extra param is allowed) is
+tested by "allows a parameter the pattern does not name".
+- proof 5: unmet — Two of the clause's three halves fail. The `# info language:` half holds: mutating
+`src/content/info.ts` `defaultTitle` to drop its `language === DEFAULT_LANGUAGE` test was KILLED,
+and mutating `src/content/registry.ts:244`'s `field === GENERATED_FIELD && language ===
+DEFAULT_LANGUAGE` gate to drop the language test was KILLED.
+"humanizeEn runs only for a module that declares English" is false. Two call sites run it for every
+module regardless of `language:` -- `src/content/action.ts:20` (`# action` with no title:) and
+`src/content/registry.ts:143` (a recipe's craft label) -- and `recordActionText`
+(src/content/registry.ts:262) records the result as a base entry under the module's own declared
+language with no GENERATED_FIELD/language gate at all. Measured: loading
+`# info isla / language: es / # entity puerta / uses: abrir-puerta / # action abrir-puerta` and
+playing 'es' offers the choice labelled `Abrir Puerta` -- humanizeEn's every-word English title case
+applied to a Spanish id and shown to a Spanish player, which the Decisions call impossible to do
+honestly and promise falls back to keys. A Spanish recipe records
+{text:'Craft Barra De Bronce', language:'es'}. `missingTranslations(locales,'es')` returns [] for
+both, so nothing reports the gap either.
+"article() stops being applied to anything but English" is unproven: removing
+`if (localizer.language === 'en')` from `itemExamine` (src/runtime/localized.ts:90) SURVIVED the
+whole suite, 0 failed of 2930. The test named for it asserts the output is 'engine.item.examine',
+which it is whether or not articleEn ran, because the Spanish pattern is missing.
+- proof 6: met — The equality test is the right shape and is stronger than a list. `src/content/
+locale.test.ts` declares `const FIELDS: Record<keyof Registry, 'content' | 'the locale table'>`,
+so adding a field to Registry stops the file compiling until somebody classifies it; the test then
+compares all twenty-three content fields of a registry loaded with a `# locale es` against one
+loaded without, through `sameValue`, with `namespace.snapshot()` standing in for the Namespace.
+Re-runnable: `npx vitest run src/content/locale.test.ts -t "leaves every content map identical"`.
+Also tested: entries land in `locales.declared` and nowhere else, a non key/value line is refused,
+one key translated twice is refused, and a language-less `# locale` heading is refused.
+Noted as a separate finding: the one line this branch wrote for c6 --
+`if (section.kind === 'locale') continue;` in registry.ts's mergePass, carrying a `(c6)` comment --
+is inert. Removing it SURVIVED the whole suite, because `applySection` has no `locale` case and
+locale sections are read from `module.sections` rather than from `merged`. The property holds
+structurally; the line does not carry it.
+- proof 7: met — Both halves mutation-proven at their own lines in src/content/locale.ts. Replacing
+`if (isEngineKey(key) || locales.base.has(key)) continue;` (line 214) in `unmatchedLocaleKeys` with
+an unconditional `continue` was KILLED by src/content/locale.test.ts "names the key and the locale
+of a translation matching no base string", which asserts the pair
+{language:'es', key:'island.entity.crabb.title'}. Replacing
+`if (entry.language === language || declared?.has(key)) continue;` (line 196) in
+`missingTranslations` with an unconditional `continue` was KILLED by "answers which keys a language
+does not cover, without a view". `missingTranslations` is a pure function over
+(Locales, language) -- no registry, no session, no view -- and the companion test proves a base
+string counts as covered by the language its own module declared.
+- proof 8: met — Both halves mutation-proven at their own lines in src/content/locale.ts. Changing
+`actionSlug`'s `.replace(/[^a-z0-9]+/g, '-')` (line 119) to drop the hyphen was KILLED by
+src/content/locale.test.ts "keys `pick up` as `pick-up`, and leaves the identifier the label",
+which asserts both halves at once: the base entry at `island.entity.crab.pick-up` and
+`entities.get('island.crab').actions[0].label === 'pick up'`. Removing the collision branch
+`if (taken.has(slug)) return ...` (line 132) from `actionSlugProblem` was KILLED by "refuses two
+labels under one owner that reach the same slug". The identifier is untouched: session.ts still
+emits `use:entity.${entityId}.${action.label}` with the raw label, and `npm test` passes over the
+shipped `# test` sections unchanged. Filed as a low finding: the slug rule also refuses at load
+any label the path grammar cannot address, which narrows the authoring grammar in a way the clause
+disclaims.
+- proof 9: met — `npm run tasks -- merge-ready` passes every leg -- tsc ok, npm test ok (2930 tests),
+layer-check ok, audit-status ok, doctor ok (22 pre-existing warnings, none from this branch's
+paths), bytes ok, tree ok, base ok, spec ok -- with the sole failure being
+`clauses reimplement-localization: has no recorded audit pass`, which is this pass. Shipped content
+plays in English unchanged: src/runtime/integration.test.ts and src/ui/shippedContent.test.ts pass
+over content/tutorial-island.dsl, and no `# test` section was edited in this diff. `SAVE_VERSION`
+stays 8; `SaveDiff` and the exhaustive `SAVE_FIELDS` table exclude `language` by name
+(`Exclude<keyof GameState, 'log' | 'language'>`), so adding a state field still fails to compile
+until it is classified. `.title` stays `string` on every registry type -- the branch changed the
+view types, not the registry's. No authored content id moved: `use:<kind>.<objId>.<label>` still
+carries the raw label. One published-shape change that c9 does not freeze and the diff discloses:
+`PlayStatus.location.description` is now `Localized | undefined` where it was `string` defaulting
+to `''`.
