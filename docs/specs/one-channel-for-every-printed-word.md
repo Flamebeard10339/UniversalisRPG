@@ -85,10 +85,20 @@ Proof:
   proof: vitest src/content/locale.test.ts
 - [c8] **What does not change is stated and proven.** Every `# test` over the shipped content passes,
   `scripts/drift.test.ts` still holds the two drivers' transcripts equal entry by entry, and no save
-  field, `SAVE_VERSION` or authored content id moves. Two things a reader sees do move, and they are
-  the whole list: the `say:` and dialogue keys of c6, and a stat's spelling under c9 — `+3 attack`
-  becomes `+3 Attack` on the character sheet and the plane pane. Nothing else player-visible moves.
+  field, `SAVE_VERSION` or authored content id moves. Three things a reader sees do move, and they
+  are the whole list: the `say:` and dialogue keys of c6; a stat's spelling under c9, where
+  `+3 attack` becomes `+3 Attack` on the character sheet and the plane pane; and a slot's under c10,
+  where a declared `mainhand` is read as its `title:`. Nothing else player-visible moves.
   proof: npm test
+- [c10] **A slot is declared, and read by its title.** `# slot <id>` is a section with a `title:`,
+  `slot: ['title']` joins `stat` and `skill` in `TEXT_FIELDS`, and `equipment-slots:` goes on naming
+  ids. The view publishes the title and the equipment page and the REPL read it, so `mainhand` stops
+  being the row name on any player's screen. The declaration is optional and an undeclared slot has
+  no title, so no content that loads today stops loading. A slot is declared once and keyed once,
+  which is the point: `declaredSlots` unions `equipmentSlots` across every entity into one
+  vocabulary (`src/content/references.ts:44`), so a title carried on the entity's own field would
+  give one slot as many keys as it has declarers — the defect c7 removes for actions.
+  proof: vitest src/content/locale.test.ts
 - [c9] **A stat is read by its title, not by its id.** The view publishes a stat's localized title
   beside the dictionary keyed by its id, and the character sheet and the plane pane read it, so
   `bare(statId)` stops putting an identifier in front of a player. Today `src/ui/plane.ts:68` and
