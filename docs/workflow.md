@@ -46,7 +46,10 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    anyone asked for it. `tasks system` / `tasks system "<name>"` / `tasks where <path>` answer
    the architecture.
 4. **`tasks plan`** — grades the set for overlap, unstated dependencies and duplicated
-   interfaces before anyone works it. It reports and refuses nothing.
+   interfaces before anyone works it. It reports and refuses nothing. Then run
+   `tasks work-prompt <slug>` and read what comes back, because it is the brief a dispatcher
+   will hand a worker and a decomposition that grades clean can still put the wrong member in
+   front of one.
 5. **Dispatch a worker with one instruction**: "run `npm run tasks -- work-prompt <id>` and do what
    it says" — symmetric with the auditor's in step 7, and for the same reason: a hand-written brief
    is a copy of the record that drifts from it, and composing one is where a planner smuggles in
