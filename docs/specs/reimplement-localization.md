@@ -546,3 +546,156 @@ caller). Regression check beyond the clauses: every one of the nine `state.log` 
 through the localizer, and the shipped English text each produces is byte-identical to the
 sentence it replaced. `content/engine-en.dsl` is picked up by the shipped glob
 (src/ui/shippedContent.ts:6) and by play-cli's default content list, so the app is unaffected.
+
+### Pass 3 — 2026-08-14
+
+- base: `cfa1eb692c996ed4414390fa5cb492741856a0f2`
+- head: `516a68b6c6325082a44c4e92cd4ba4c0e9ec2cd1`
+- proof 1: met — Re-measured this pass, not inherited. The assertion is the seven `@ts-expect-error`
+lines at src/runtime/localized.test.ts:23-35 and tsc is what runs them. Re-runnable: replace
+`export type Localized = string & { readonly [LOCALIZED]: true };` in src/runtime/localized.ts
+with `export type Localized = string;` and run `npx tsc --noEmit` — it reports exactly seven
+TS2578 "Unused '@ts-expect-error' directive" errors at lines 23,25,27,29,31,33,35 and passes
+again when restored (measured this pass; tree confirmed clean afterwards). Graded, as passes 1
+and 2 were, against the fields the clause enumerates, which are all branded. Two escapes from
+the universal reading measured this pass and filed as findings rather than folded into the
+grade: `PlayView.said` is `string[]`, and `elideMiddle` writes the English engine string
+`… N more lines` into it one line after the branded `state.log` is drained
+(src/runtime/session.ts:104,365); and `ModalOption.label` is `string`, which is what lets
+src/runtime/planeScreen.ts:120 compose an English heading around a localized name.
+- proof 2: met — Both halves measured this pass at their own lines. Union coverage: mutating
+`engine.talk.to: Talk to {entity}` to `engine.talk.too: ...` in content/engine-en.dsl was
+KILLED by src/runtime/localized.test.ts "ships an English pattern for every key the union
+holds, and no other key", re-run at its own file with the mutation still applied. No sentence
+left in TypeScript: replacing session.ts's `travelLabel` body with
+`` `Travel to ${localizer.title('location', target)}` as Localized `` was KILLED by
+src/runtime/localized.test.ts "leaves no engine sentence behind in TypeScript", re-run at its
+own file — a different line from the `craftLabel` pass 2 broke, so the property and not one
+site is what is watched. The literal-union half is proven by tsc rather than by the named
+vitest target: `export type EngineKey = (typeof ENGINE_KEYS)[number];` changed to `= string;`
+produces two TS2578 errors at localized.test.ts:42,44 under `npx tsc --noEmit` (measured this
+pass, restored clean). Thirty-five keys now, and engine-en.dsl covers the union exactly.
+Graded on the reading passes 1 and 2 used — none of the counted engine sentences remains. The
+universal reading is false and I did not fold it in: the test that carries this half matches a
+TypeScript expression against the shipped patterns, so it can only ever find a duplicate of a
+key that exists, and an English engine sentence that never had a key is invisible to it by
+construction. Two exist — `… ${dropped} more lines` (session.ts:365) and the growth refusals
+composed in src/runtime/itemInstance.ts:279-314. Both filed.
+- proof 3: unmet — The rule holds on every surface pass 2 fixed and fails on the next one, which is
+the modal label those fixes render a name into. Proven first: mutating localized.ts:37
+`return base?.language === language ? base.text : undefined;` to `return base?.text;` was
+KILLED by four named session.test.ts tests re-run at their own file; `carriedName.ts:12`
+`const title = localizer.title(kind, id);` changed to `localizer.identifier(id)` was KILLED by
+"names what the player carries in the language being played"; and planeReport.ts:184
+`title: localizer.title('item', template),` changed to `localizer.identifier(template)` was
+KILLED by "names the plane that copy carries the same way, and every title it reports". Pass
+2's three surfaces are genuinely fixed.
+False: "never the module's own language". Measured with `npm run inspect` over an English
+module `# item rope / title: Rope / slot: hand / max-level: 1` plus a `# locale es` supplying
+`isla.item.rope.title: Cuerda`, played in es with the rope carried and a level-capped feed
+refused. `carriedEntries` correctly returns 'Cuerda'. The plane screen opened on the same item
+publishes one option whose label is
+`Cuerda at 0,0 — Rope is already at level 1, which is its maximum` — the noun in the played
+language and the sentence about it in the module's own, with the Spanish entry present and
+ignored. Two mechanisms produce it, both reachable and neither covered by a Decision that
+excuses them. First, src/runtime/itemInstance.ts:305 builds an English engine sentence in
+TypeScript and interpolates `item.title` read straight off the registry, which is the rule
+"every screen a title reaches asks the localizer, not the registry" broken in a file pass 2 did
+not reach. Second, src/runtime/planeScreen.ts:120-122 composes ` at ` and the refusal into a
+`ModalOption.label`, which is a plain `string`, so nothing stops it compiling. The Decisions
+place "a plane's growth refusal" in the prose door, but the prose door is for text the DSL
+carries verbatim; this text is written in TypeScript, and the same refusal reaching `state.log`
+through `prose` at session.ts:674 is shown as the bare marker `engine.text.untranslated`, so
+one fact is said two different wrong ways on two surfaces of one screen.
+The boundary rather than a longer list: c3 has now failed three passes on a surface nobody
+enumerated, and it will keep failing while `ModalOption.label` is `string`. The compiler is
+what the branch chose to carry this rule; branding that field is what puts this class of
+surface back under it.
+- proof 4: met — Two mutations at their own lines in src/runtime/localized.ts, both KILLED and
+re-run at their own file with the mutation still applied. `const PARAM = /\{([a-z][a-z0-9-]*)\}/g;`
+changed to require doubled braces was KILLED by src/runtime/localized.test.ts "puts a value in
+by name". `if (value === undefined) throw new RuntimeError(...)` in `substitute` replaced with
+`return '';` was KILLED by "refuses a pattern naming a parameter the call site did not supply".
+The localized-parameter half is covered end-to-end by session.test.ts's
+`Viaja a island.location.cove.title`, and the deliberate asymmetry (an extra parameter is
+allowed) by "allows a parameter the pattern does not name". Filed as a finding, not against
+this grade: the throw is enforced where the pattern is rendered rather than where it is
+loaded, so a `# locale` value naming `{destino}` for `engine.travel.to` loads with no
+complaint and then throws a RuntimeError out of `view()` for every screen. Measured.
+- proof 5: met — All four halves mutation-proven at their own lines this pass, each KILLED and
+re-run at its own file. src/content/info.ts `defaultTitle` reduced to an unconditional
+`humanizeEn(self.id)` was KILLED by universe.test.ts "leaves the raw id standing in another
+language, rather than an English phrase dressed as content". src/content/registry.ts:254 with
+`&& language === DEFAULT_LANGUAGE` dropped was KILLED by "records a generated title as an
+entry only for a module writing English". registry.ts:274
+`if (action.generatedLabel && language !== DEFAULT_LANGUAGE) continue;` deleted was KILLED by
+"records the generated label only for a module writing English". The article half:
+src/runtime/localized.ts `if (localizer.language === 'en') params.article = articleEn(title)`
+made unconditional was KILLED by localized.test.ts "refuses a language that asks for one,
+rather than handing it English grammar". Grading the gate, not the serializer: the gate holds
+at load and is defeated on the way back out for one kind. Measured with `npm run inspect` —
+a `language: es` module declaring `# stat ataque` has no base entry for
+`isla.stat.ataque.title` before serialization and `{ text: 'ataque', language: 'es' }` after a
+serialize-and-reload, because serialize.ts:511 prints `title: ${stat.title}` without the
+`titleLine` gate every other kind goes through. Filed high.
+- proof 6: met — The equality test is the right shape and the line that carries it is live.
+src/content/locale.test.ts declares `const FIELDS: Record<keyof Registry, 'content' | 'the
+locale table'>`, so a new Registry field stops the file compiling until somebody classifies it,
+and the test compares all content fields through `sameValue` with `namespace.snapshot()`
+standing in for the Namespace. Mutation this pass: deleting
+`if (section.kind === 'locale') continue;` from registry.ts:1001's mergePass was KILLED by
+"leaves every content map identical to loading without it", re-run at its own file with the
+mutation still applied. Re-runnable:
+`npx vitest run src/content/locale.test.ts -t "leaves every content map identical"`.
+- proof 7: met — Pass 2's failure is fixed and the fix is watched at four lines, each KILLED and
+re-run at its own file. Restoring the pre-fix universe —
+`for (const key of [...ENGINE_KEYS, ...locales.addressable])` in `missingTranslations` changed
+back to `...locales.base.keys()` — was KILLED by locale.test.ts "reports a key no module has
+any text for, in every language"; the same restoration in `unmatchedLocaleKeys`
+(`locales.addressable.has(key)` back to `locales.base.has(key)`) was KILLED at file scope by
+"stops reporting it once a locale supplies it"; dropping `field === GENERATED_FIELD ||` from
+registry.ts:252 was KILLED by "reports a key no module has any text for, in every language";
+and deleting `registry.locales.addressable.add(key);` from `recordActionText` was KILLED by
+"answers which keys a language does not cover, without a view". `missingTranslations` is pure
+over (Locales, language). I checked the set in both directions rather than re-confirming the
+fix: every kind a localizer call site asks for (entity, location, item, passive, cluster-jewel,
+recipe, resource, and action slugs on action/entity/location/item) is in `addressable`, and the
+one fallback that is not — an actor or item the registry no longer holds — is the key c3 wants
+shown. Over-reporting in the other direction, filed low rather than against the grade: stat,
+skill, faction and event titles are addressable and no localizer call site asks for any of
+them, so 15 of the 141 keys the shipped island's report asks a translator for change nothing on
+screen.
+- proof 8: met — Measured this pass at the line pass 2 named as the weakness rather than at the two
+it had already killed. `actionLabel: (kind, ownerId, label) => self.content(kind, ownerId,
+actionSlug(label))` in src/runtime/localized.ts changed to look the raw label up SURVIVED
+src/content/locale.test.ts — the clause's own named proof file — and was killed only after the
+run escalated to whole-suite scope, by scripts/play-cli.test.ts "narrates the pools of a fight
+in place of the completion countdown" and src/ui/driver.test.ts "arms a spannable action rather
+than resolving it", both re-run at their own files with the mutation still applied. So the
+property is real and watched, and `proof: vitest src/content/locale.test.ts` is not what
+watches it. The load-time halves are: pass 2 killed `actionSlug`'s
+`.replace(/[^a-z0-9]+/g, '-')` and `actionSlugProblem`'s collision branch at their own lines in
+that file, and both lines are unchanged in this diff. The identifier is untouched — session.ts
+still emits `use:entity.${entityId}.${action.label}` with the raw label and no `# test` moved.
+The proof-file gap is filed low, having now been measured on two consecutive passes.
+- proof 9: met — `npm run tasks -- merge-ready` this pass: tsc ok, npm test ok, layer-check ok,
+audit-status ok, doctor ok (22 pre-existing warnings, none from this branch's paths), bytes ok,
+tree ok, base ok — main has not moved past the merge base since it was merged in at 198f18a.
+The only failing legs are `spec` (the two undelivered clause records for c3 and c7) and
+`clauses` (pass 2's c3 and c7, which this pass re-grades), neither behavioural. Shipped content
+plays in English unchanged: no `# test` section is edited in the diff and integration.test.ts
+and shippedContent.test.ts pass over content/tutorial-island.dsl. `SAVE_VERSION` does not move
+in this diff — it is 9 at the merge base cfa1eb69 and 9 at head, the bump having come from
+main's `buffs-generalized` (a517bcd), not from this branch. `SaveDiff` and the exhaustive
+`SAVE_FIELDS` table still exclude `language` by name (`Exclude<keyof GameState, 'log' |
+'language'>`), so a new state field fails to compile until it is classified. Registry `.title`
+stays `string` on every type; the branch changed the view types, not the registry's. No
+authored content id moved. Merge territory checked rather than assumed: buffs.ts's four
+`engine.prune.buff.*` keys are in the union and covered by engine-en.dsl, and pass 2's
+unexercised combat edge is closed — encounter.ts:252-254 now names both sides when a swing
+lands on the player from the player, so the pattern is `engine.combat.other.*` and no parameter
+is missing. Two published-shape changes the diff discloses and c9 does not freeze remain as
+pass 2 recorded them: `PlayStatus.location.description` is `Localized | undefined`, and
+`Item.examine` is optional. One thing that does get worse and is filed rather than counted
+here: a serialize-and-reload of a `# stat` now materialises its generated title into an
+authored one with `registryDiff` reporting nothing.
