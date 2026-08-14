@@ -1237,3 +1237,28 @@ a render-time crash and the message names what to fix, so it is filed as an undi
 rather than as a regression. Nothing else measured worse: the plane heading's `(untranslated)` and
 the six unkeyed refusal sentences both behave at cfa1eb69 as they do here (verbatim English in every
 language there, verbatim English or the marker here), so they are c3 unmet and not a regression.
+
+### Pass 7 — 2026-08-14
+
+- base: `cfa1eb692c996ed4414390fa5cb492741856a0f2`
+- head: `a91c3d35efc01608c2671127d13e58e07cd37d19`
+- proof 1: unknown
+- proof 2: unknown
+- proof 3: deferred — Deferred by the author onto what-is-stored-or-replayed-is-an-id, which is where it can
+be met. This is a scope decision, not a grade: pass 6 measured c3's two remaining surfaces and both
+are unreachable from inside this spec. PlaneFrame.said is a plain string in the save, so a refusal
+composed by an English session reads as English to a Spanish player however well the composing is
+keyed, and giving the frame a key and its parameters instead moves the save shape - which this
+spec's own c9 forbids by name. The second surface, twenty engine sentences still built in
+TypeScript and handed to the prose door, is reachable here but settles only half of it, and half a
+clause is what the last four passes each bought. The new spec's c3 and c4 are the same property
+stated where the save may move; its c5 is the regression that stops this recurring. The record
+reimplement-localization-clause-3 moves to that spec rather than being created afresh, so passes 2
+through 6 stay its history. Everything else this spec promised is met as of pass 6: fourteen of
+fourteen mutations killed, eight clauses met, and merge-ready green on every behavioural leg.
+- proof 4: unknown
+- proof 5: unknown
+- proof 6: unknown
+- proof 7: unknown
+- proof 8: unknown
+- proof 9: unknown
