@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { actionSlug, actionSlugProblem, missingTranslations, unmatchedLocaleKeys } from './locale';
-import { loadModule, loadUniverse, type Registry } from './registry';
+import { CONTENT_SECTION_MAPS, loadModule, loadUniverse, type Registry } from './registry';
 import { sameValue } from './registryDiff';
 import { serializeRegistryModule } from './serialize';
 import type { ModuleSource } from './universe';
@@ -287,5 +287,209 @@ describe('authored text may not name a parameter either', () => {
 
   it('leaves text with no parameter in it alone', () => {
     expect(authoring('examine: The sign reads plainly.')).not.toThrow();
+  });
+});
+
+// c6. Every line the DSL speaks, in every position the grammar lets one be
+// written: a result list and each of its outcome lists, a wrapper's body, an
+// entity's handler and both hooks, an item's hooks, a location's action, a
+// droptable, a recipe, an action declaration an entity performs, and a
+// dialogue's lines, repeat, choices and effects.
+const SPOKEN_EVERYWHERE = [
+  '# info deep',
+  'version: 1.0.0',
+  '',
+  '# flag lit',
+  '',
+  '# stat vigor-max',
+  'base: 10',
+  '',
+  '# resource vigor',
+  'max: vigor-max',
+  '',
+  '# event death',
+  'resource: vigor',
+  'trigger: on empty',
+  '',
+  '# location camp',
+  'x: 0, y: 0',
+  'starting',
+  'entities:',
+  '  guard',
+  'poke:',
+  '  instant',
+  '  say: The fire pops.',
+  '',
+  '# item charm',
+  'title: Charm',
+  'slot: mainhand',
+  'rub:',
+  '  instant',
+  '  say: The charm hums.',
+  'on hit:',
+  '  say: The charm rings.',
+  'when hit:',
+  '  say: The charm shudders.',
+  '',
+  '# droptable spoils',
+  'say: Something glints.',
+  '',
+  '# recipe stew',
+  'say: The stew thickens.',
+  '',
+  '# action shove',
+  'title: Shove',
+  'instant',
+  'say: You shove.',
+  'on success:',
+  '  say: It staggers.',
+  'on failure:',
+  '  say: You slip.',
+  '',
+  '# entity guard',
+  'title: Guard',
+  'uses:',
+  '  shove',
+  'hail:',
+  '  instant',
+  '  say: Well met.',
+  '  1 in 1:',
+  '    say: And again.',
+  'on death:',
+  '  say: It falls.',
+  'on hit:',
+  '  say: The guard grunts.',
+  '',
+  '# dialogue guard-talk',
+  'owner = guard',
+  'node greet:',
+  '  again: Back again?',
+  '  Well met, traveller.',
+  '  say: An aside.',
+  '  -> Ask the way.',
+  '    say: You ask.',
+  '  -> Leave.',
+].join('\n');
+
+// Found by walking the built registry for anything shaped like a line, rather
+// than by asking the pass that addresses them. A result list that pass never
+// reached fails here instead of passing by agreement with it, which is the
+// difference between a rule and a list.
+function linesIn(value: unknown, where: string, seen: Set<unknown>, found: Array<{ where: string; key: unknown }>): void {
+  if (Array.isArray(value)) {
+    value.forEach((each, index) => linesIn(each, `${where}[${index}]`, seen, found));
+    return;
+  }
+  if (value instanceof Map) {
+    for (const [name, held] of value) linesIn(held, `${where}.${String(name)}`, seen, found);
+    return;
+  }
+  if (typeof value !== 'object' || value === null || seen.has(value)) return;
+  seen.add(value);
+  const record = value as Record<string, unknown>;
+  if ((record.kind === 'say' && typeof record.text === 'string') || Array.isArray(record.segments)) found.push({ where, key: record.key });
+  for (const [name, held] of Object.entries(record)) linesIn(held, `${where}.${name}`, seen, found);
+}
+
+function spokenLines(registry: Registry): Array<{ where: string; key: unknown }> {
+  const found: Array<{ where: string; key: unknown }> = [];
+  const seen = new Set<unknown>();
+  for (const [, field] of CONTENT_SECTION_MAPS) linesIn(registry[field], field, seen, found);
+  linesIn(registry.recipeActions, 'recipeActions', seen, found);
+  return found;
+}
+
+describe('every line the DSL speaks carries an address (c6)', () => {
+  const deep = (): Registry => loadUniverse([{ name: 'deep', text: SPOKEN_EVERYWHERE }]);
+
+  it('leaves no spoken line in the registry without one', () => {
+    const lines = spokenLines(deep());
+
+    expect(lines.length).toBe(19);
+    expect(lines.filter((line) => typeof line.key !== 'string').map((line) => line.where)).toEqual([]);
+  });
+
+  it('registers exactly the keys the lines carry, and nothing no line carries', () => {
+    const registry = deep();
+    const carried = spokenLines(registry).map((line) => line.key as string);
+
+    expect([...new Set(carried)].sort()).toEqual([...registry.locales.prose.keys()].sort());
+    for (const key of carried) {
+      expect(registry.locales.addressable.has(key)).toBe(true);
+      expect(registry.locales.base.get(key)?.language).toBe('en');
+    }
+  });
+
+  it('addresses each by the object that authored it and its place in that object', () => {
+    expect([...deep().locales.prose].sort()).toEqual(
+      [
+        ['deep.action.shove.say.0', 'verbatim'],
+        ['deep.action.shove.say.1', 'verbatim'],
+        ['deep.action.shove.say.2', 'verbatim'],
+        ['deep.dialogue.guard-talk.greet.again', 'segments'],
+        ['deep.dialogue.guard-talk.greet.choice.0', 'segments'],
+        ['deep.dialogue.guard-talk.greet.choice.1', 'segments'],
+        ['deep.dialogue.guard-talk.greet.line.0', 'segments'],
+        ['deep.dialogue.guard-talk.greet.say.0', 'verbatim'],
+        ['deep.dialogue.guard-talk.greet.say.1', 'verbatim'],
+        ['deep.droptable.spoils.say.0', 'verbatim'],
+        ['deep.entity.guard.say.0', 'verbatim'],
+        ['deep.entity.guard.say.1', 'verbatim'],
+        ['deep.entity.guard.say.2', 'verbatim'],
+        ['deep.entity.guard.say.3', 'verbatim'],
+        ['deep.item.charm.say.0', 'verbatim'],
+        ['deep.item.charm.say.1', 'verbatim'],
+        ['deep.item.charm.say.2', 'verbatim'],
+        ['deep.location.camp.say.0', 'verbatim'],
+        ['deep.recipe.stew.say.0', 'verbatim'],
+      ].sort(),
+    );
+  });
+
+  // An action written once is keyed once, however many entities perform it:
+  // the guard `uses:` shove, and the words belong to the declaration.
+  it('keys an action an entity performs under the declaration that wrote it', () => {
+    const performed = deep().entities.get('deep.guard')!.actions.find((action) => action.label === 'Shove')!;
+
+    expect(performed.results).toEqual([{ kind: 'say', text: 'You shove.', key: 'deep.action.shove.say.0' }]);
+  });
+
+  // The cost the author accepted: an index is the only address a line with no
+  // id has, so moving the lines moves what a `# locale` has to name.
+  it('moves the keys when the lines under one owner are reordered', () => {
+    const swapped = loadUniverse([{ name: 'deep', text: SPOKEN_EVERYWHERE.replace('  say: The charm rings.\nwhen hit:\n  say: The charm shudders.', '  say: The charm shudders.\nwhen hit:\n  say: The charm rings.') }]);
+
+    expect(deep().locales.base.get('deep.item.charm.say.1')?.text).toBe('The charm rings.');
+    expect(swapped.locales.base.get('deep.item.charm.say.1')?.text).toBe('The charm shudders.');
+  });
+});
+
+describe('a translation of a spoken line is read by the grammar it was authored in (c6)', () => {
+  const translated =
+    (...entries: string[]): (() => Registry) =>
+    () =>
+      loadUniverse([
+        { name: 'deep', text: SPOKEN_EVERYWHERE },
+        { name: 'deep-es', text: ['# info deep-es', 'version: 1.0.0', 'dependencies:', '  deep', '', '# locale es', ...entries].join('\n') },
+      ]);
+
+  it('takes a line whose fragments the segment grammar can read', () => {
+    const registry = translated('deep.dialogue.guard-talk.greet.line.0: Bien hallado, {player.name}.')();
+
+    expect(registry.locales.declared.get('es')?.get('deep.dialogue.guard-talk.greet.line.0')).toBe('Bien hallado, {player.name}.');
+  });
+
+  it('refuses one it cannot, where the value is written rather than out of a running dialogue', () => {
+    expect(translated('deep.dialogue.guard-talk.greet.line.0: Bien hallado, {player.name.')).toThrow(/greet\.line\.0 is a spoken line, and unterminated fragment/);
+  });
+
+  // A `say:` prints as written, so its braces are the author's punctuation and
+  // the check that refuses an unsupplied parameter has nothing to say about
+  // either half of it.
+  it('leaves a brace in a say: alone in both the authored text and its translation', () => {
+    const registry = translated('deep.droptable.spoils.say.0: Algo brilla {aqui}.')();
+
+    expect(registry.locales.declared.get('es')?.get('deep.droptable.spoils.say.0')).toBe('Algo brilla {aqui}.');
+    expect(() => loadUniverse([{ name: 'deep', text: SPOKEN_EVERYWHERE.replace('say: Something glints.', 'say: Something glints {here}.') }])).not.toThrow();
   });
 });
