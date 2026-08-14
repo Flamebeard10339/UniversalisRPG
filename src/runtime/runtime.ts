@@ -58,7 +58,7 @@ import { Boundary, BoundarySource, requireBoundaryNotPast, requireForwardProgres
 import { Item } from '../content/item';
 import { Recipe } from '../content/recipe';
 import { Registry } from '../content/registry';
-import { Localized, localizerOf } from './localized';
+import { BASE_LANGUAGE, Localized, localizerFor, localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { roadsFrom, routeTo } from './journey';
 import { clearBuffs, expireBuffs, grantBuff, nextBuffExpiry } from './buffs';
@@ -625,11 +625,12 @@ function refuseUnpayableInputs(action: Action, registry: Registry, state: GameSt
 }
 
 export function armAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): ArmResult {
+  const say = localizerFor(registry, BASE_LANGUAGE);
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-  if (!target) throw new RuntimeError(`unknown ${obj}: ${objId}`);
+  if (!target) throw new RuntimeError(say.engine('engine.action.stale.owner', { kind: say.identifier(obj), id: say.identifier(objId) }));
 
   const action = target.actions?.find((a) => a.label === actionId);
-  if (!action) throw new RuntimeError(`unknown action ${JSON.stringify(actionId)} on ${obj}.${objId}`);
+  if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(JSON.stringify(actionId)), owner: say.identifier(`${obj}.${objId}`) }));
   if (!requiresMet(action, state)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
   if (!actionVisible(action, state)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 

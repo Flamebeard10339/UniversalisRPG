@@ -4,7 +4,7 @@ import { Registry } from '../content/registry';
 import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
 import { carriedName } from './carriedName';
 import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';
-import { Localized, Localizer, localizerOf } from './localized';
+import { Localized, localizerOf } from './localized';
 import { skillLevel } from './skills';
 import { GameState } from './state';
 
@@ -26,11 +26,6 @@ export type Destruction = { ok: true; item: string } | Refusal;
 
 const refused = (reason: Localized): Refusal => ({ ok: false, refused: reason });
 
-// A plane's own refusals name a hexagon, a direction and a node, and none of
-// those is keyed, so they take the prose door where they are made rather than
-// where they are shown.
-const plainly = (localizer: Localizer, problem: string | undefined): Localized | undefined => (problem === undefined ? undefined : localizer.prose(problem));
-
 export function isItemInstance(payload: unknown): payload is ItemInstance {
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return false;
   const held = payload as Record<string, unknown>;
@@ -45,7 +40,7 @@ defineInstanceKind<ItemInstance>(ITEM_INSTANCE, {
   templateLoaded: (registry, template) => registry.items.has(template),
   holds: isItemInstance,
   empty: () => false,
-  repair: (payload, registry) => repairPlane(registry, payload.plane),
+  repair: (payload, registry, _live, localizer) => repairPlane(localizer, registry, payload.plane),
 });
 
 function grown(state: GameState, id: string): { template: string; payload: ItemInstance } | undefined {
@@ -240,7 +235,10 @@ export function destroyItem(state: GameState, registry: Registry, id: string): D
     return { ok: true, item: standing.template };
   }
   const source = stackCopy(state, id);
-  if (!source) return refused(localizerOf(registry, state).prose(`you carry no ${id}`));
+  if (!source) {
+    const localizer = localizerOf(registry, state);
+    return refused(localizer.engine('engine.growth.no-copy', { item: localizer.identifier(id) }));
+  }
   const template = itemTemplate(state, id);
   if (source.from === 'slot') delete state.equipped[source.slot];
   else {
@@ -283,14 +281,14 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
   const standing = grown(state, copy);
   const template = itemTemplate(state, target);
   const item = registry.items.get(template);
-  if (!item) return refused(localizer.prose(`there is no item or item instance called ${target}`));
+  if (!item) return refused(localizer.engine('engine.growth.unknown-item', { item: localizer.identifier(target) }));
 
   const plane = basePlane(item);
-  if (!plane) return refused(localizer.prose(`${template} is not a base: only an item you can wear has a plane to grow`));
+  if (!plane) return refused(localizer.engine('engine.growth.not-a-base', { item: localizer.identifier(template) }));
 
   const source = standing ? undefined : stackCopy(state, target);
-  if (!standing && !source) return refused(localizer.prose(`you carry no ${template}`));
-  if (consumes !== undefined && held(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(localizer.prose(`you carry no ${consumes}`));
+  if (!standing && !source) return refused(localizer.engine('engine.growth.no-copy', { item: localizer.identifier(template) }));
+  if (consumes !== undefined && held(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(localizer.engine('engine.growth.no-copy', { item: localizer.identifier(consumes) }));
 
   const payload = standing?.payload ?? { experience: 0, plane };
   const problem = growing.change(payload, item);
@@ -308,7 +306,7 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
 export function feedItem(state: GameState, registry: Registry, target: string, food: string): Growth {
   const localizer = localizerOf(registry, state);
   const experience = registry.items.get(food)?.itemExperience;
-  if (experience === undefined) return refused(localizer.prose(`${food} grants no item experience`));
+  if (experience === undefined) return refused(localizer.engine('engine.growth.no-experience', { item: localizer.identifier(food) }));
   return growItem(state, registry, {
     target,
     consumes: food,
@@ -323,11 +321,11 @@ export function feedItem(state: GameState, registry: Registry, target: string, f
 export function slotJewel(state: GameState, registry: Registry, target: string, jewelItem: string, hex: Hex, direction: Direction): Growth {
   const localizer = localizerOf(registry, state);
   const jewel = registry.items.get(jewelItem)?.clusterJewel;
-  if (jewel === undefined) return refused(localizer.prose(`${jewelItem} is not a cluster jewel`));
+  if (jewel === undefined) return refused(localizer.engine('engine.growth.not-a-jewel', { item: localizer.identifier(jewelItem) }));
   return growItem(state, registry, {
     target,
     consumes: jewelItem,
-    change: (payload) => plainly(localizer, fillSlot(registry, payload.plane, hex, direction, jewel)),
+    change: (payload) => fillSlot(localizer, registry, payload.plane, hex, direction, jewel),
   });
 }
 
@@ -335,6 +333,6 @@ export function allocate(state: GameState, registry: Registry, target: string, n
   const localizer = localizerOf(registry, state);
   return growItem(state, registry, {
     target,
-    change: (payload, item) => plainly(localizer, allocateNode(registry, payload.plane, node, pointsRemaining(payload, item))),
+    change: (payload, item) => allocateNode(localizer, registry, payload.plane, node, pointsRemaining(payload, item)),
   });
 }

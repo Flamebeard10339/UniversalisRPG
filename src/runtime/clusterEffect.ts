@@ -3,7 +3,7 @@ import { BonusAmount } from '../grammar/tagClause';
 import { Hex, hexKey, PlaneNode } from '../content/hex';
 import { clusterAt, isAllocated, placementAt, Plane, planeClusters } from './clusterPlane';
 import { Growth, growItem, ItemInstance } from './itemInstance';
-import { localizerOf } from './localized';
+import { Localized, Localizer, localizerOf } from './localized';
 import { GameState } from './state';
 
 // One allocated payload and what the cluster it sits in makes it worth. The
@@ -71,12 +71,13 @@ export function instancePayloads(registry: Registry, instance: ItemInstance): Sc
 // share them. The duplicate is refused because a cluster's `effects` is a set
 // in the shape a save round-trips: `isPlane` rejects a repeat, so recording
 // one would mint a plane the player could not reload.
-function recordEffect(registry: Registry, plane: Plane, hex: Hex, effectItem: string): string | undefined {
+function recordEffect(localizer: Localizer, registry: Registry, plane: Plane, hex: Hex, effectItem: string): Localized | undefined {
   const cluster = clusterAt(plane, hex);
   const placement = placementAt(registry, plane, hex);
-  if (!cluster || !placement) return `no cluster stands in ${hexKey(hex)}`;
-  if (cluster.effects.includes(effectItem)) return `the cluster at ${hexKey(hex)} already carries ${effectItem}`;
-  if (cluster.effects.length >= placement.jewel.modSlots) return `the cluster at ${hexKey(hex)} fills all ${placement.jewel.modSlots} of its mod slots`;
+  const at = localizer.identifier(hexKey(hex));
+  if (!cluster || !placement) return localizer.engine('engine.plane.no-cluster', { hex: at });
+  if (cluster.effects.includes(effectItem)) return localizer.engine('engine.cluster.effect-repeated', { hex: at, effect: localizer.identifier(effectItem) });
+  if (cluster.effects.length >= placement.jewel.modSlots) return localizer.engine('engine.cluster.slots-full', { hex: at, count: placement.jewel.modSlots });
   cluster.effects.push(effectItem);
   return undefined;
 }
@@ -86,13 +87,10 @@ function recordEffect(registry: Registry, plane: Plane, hex: Hex, effectItem: st
 // and the item is consumed only once the plane has taken it.
 export function applyClusterEffect(state: GameState, registry: Registry, target: string, effectItem: string, hex: Hex): Growth {
   const localizer = localizerOf(registry, state);
-  if (registry.items.get(effectItem)?.clusterEffect === undefined) return { ok: false, refused: localizer.prose(`${effectItem} carries no cluster effect`) };
+  if (registry.items.get(effectItem)?.clusterEffect === undefined) return { ok: false, refused: localizer.engine('engine.cluster.not-an-effect', { item: localizer.identifier(effectItem) }) };
   return growItem(state, registry, {
     target,
     consumes: effectItem,
-    change: (payload) => {
-      const problem = recordEffect(registry, payload.plane, hex, effectItem);
-      return problem === undefined ? undefined : localizer.prose(problem);
-    },
+    change: (payload) => recordEffect(localizer, registry, payload.plane, hex, effectItem),
   });
 }

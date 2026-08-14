@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { applyClusterEffect, instancePayloads } from './clusterEffect';
 import { Hex } from '../content/hex';
 import { clusterAt, ORIGIN } from './clusterPlane';
@@ -101,7 +101,7 @@ cluster-effect: +50% attack
 item-experience: 1000
 `;
 
-const registry = loadModule(MODULE);
+const registry = loadInEnglish(MODULE);
 
 const AT_E: Hex = { q: 1, r: 0 };
 

@@ -5,6 +5,7 @@ import { Location } from '../content/location';
 import { Registry } from '../content/registry';
 import type { ActiveAction } from './encounter';
 import { copiesOf } from './itemInstance';
+import { BASE_LANGUAGE, localizerFor } from './localized';
 import { GameState, RuntimeError } from './state';
 import { travelSecondsPerUnit } from './tuning';
 
@@ -64,11 +65,12 @@ export function parseOwnerRef(ownerRef: string): { obj: string; objId: string } 
 }
 
 export function findActiveAction(active: ActiveAction, registry: Registry): Action {
+  const say = localizerFor(registry, BASE_LANGUAGE);
   const { obj, objId } = parseOwnerRef(active.ownerRef);
   const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-  if (!owner) throw new RuntimeError(`unknown ${obj}: ${objId}`);
+  if (!owner) throw new RuntimeError(say.engine('engine.action.stale.owner', { kind: say.identifier(obj), id: say.identifier(objId) }));
   const action = owner.actions?.find((a) => a.label === active.actionLabel);
-  if (!action) throw new RuntimeError(`unknown action ${JSON.stringify(active.actionLabel)} on ${active.ownerRef}`);
+  if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(JSON.stringify(active.actionLabel)), owner: say.identifier(active.ownerRef) }));
   return action;
 }
 

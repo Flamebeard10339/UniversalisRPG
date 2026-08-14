@@ -123,7 +123,10 @@ function pruneRecord<T>(
   }
 }
 
-function activeActionProblem(state: GameState, registry: Registry): string | null {
+// What was thrown on the way to the owner is relayed as it was written: the
+// engine has no words of its own for a fault it did not compose, and an
+// identifier is what belongs to no language.
+function activeActionProblem(localizer: Localizer, state: GameState, registry: Registry): Localized | null {
   const active = state.activeAction;
   if (!active) return null;
   const { obj, objId } = parseOwnerRef(active.ownerRef);
@@ -131,16 +134,16 @@ function activeActionProblem(state: GameState, registry: Registry): string | nul
   try {
     owner = findActionOwner(obj, objId, registry) as { actions?: { label: string }[] } | undefined;
   } catch (error) {
-    if (error instanceof RuntimeError) return error.message;
+    if (error instanceof RuntimeError) return localizer.identifier(error.message);
     throw error;
   }
-  if (!owner) return `unknown ${obj}: ${objId}`;
-  if (!owner.actions?.some((action) => action.label === active.actionLabel)) return `unknown action ${JSON.stringify(active.actionLabel)} on ${active.ownerRef}`;
+  if (!owner) return localizer.engine('engine.action.stale.owner', { kind: localizer.identifier(obj), id: localizer.identifier(objId) });
+  if (!owner.actions?.some((action) => action.label === active.actionLabel)) return localizer.engine('engine.action.stale.action', { action: localizer.identifier(JSON.stringify(active.actionLabel)), owner: localizer.identifier(active.ownerRef) });
 
-  for (const actorId of Object.keys(active.actors ?? {})) if (!registry.entities.has(templateOf(actorId))) return `unknown encounter actor: ${actorId}`;
-  for (const actorId of Object.keys(active.cadences)) if (actorId !== PLAYER && !registry.entities.has(templateOf(actorId))) return `unknown encounter cadence actor: ${actorId}`;
+  for (const actorId of Object.keys(active.actors ?? {})) if (!registry.entities.has(templateOf(actorId))) return localizer.engine('engine.action.stale.actor', { actor: localizer.identifier(actorId) });
+  for (const actorId of Object.keys(active.cadences)) if (actorId !== PLAYER && !registry.entities.has(templateOf(actorId))) return localizer.engine('engine.action.stale.cadence', { actor: localizer.identifier(actorId) });
   for (const actor of Object.values(active.actors ?? {})) {
-    for (const resourceId of Object.keys(actor.resources)) if (!registry.resources.has(resourceId)) return `unknown encounter resource: ${resourceId}`;
+    for (const resourceId of Object.keys(actor.resources)) if (!registry.resources.has(resourceId)) return localizer.engine('engine.action.stale.resource', { resource: localizer.identifier(resourceId) });
   }
   return null;
 }
@@ -187,7 +190,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   }
 
   for (const { name, reason } of pruneModals(state, registry)) {
-    addWarning(warnings, `modals.${name}`, name, localizer.engine('engine.prune.modal', { modal: named(name), reason: localizer.prose(reason) }));
+    addWarning(warnings, `modals.${name}`, name, localizer.engine('engine.prune.modal', { modal: named(name), reason }));
   }
 
   // A walk whose destination or any of whose legs has gone is a walk to
@@ -201,12 +204,12 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     }
   }
 
-  const activeProblem = activeActionProblem(state, registry);
+  const activeProblem = activeActionProblem(localizer, state, registry);
   if (activeProblem) {
     const active = state.activeAction!;
     const id = `${active.ownerRef}.${active.actionLabel}`;
     endAction(state);
-    addWarning(warnings, 'activeAction', id, localizer.engine('engine.prune.action', { action: named(id), reason: localizer.prose(activeProblem) }));
+    addWarning(warnings, 'activeAction', id, localizer.engine('engine.prune.action', { action: named(id), reason: activeProblem }));
   }
 
   return warnings;

@@ -216,6 +216,14 @@
             "src/content/translation.ts"
           ],
           "note": "produced by a-recording-survives-translation; a # locale module built from a loaded registry that gives every engine pattern and every content title different words, in the base language and in one nothing ships"
+        },
+        {
+          "name": "the engine's refusal vocabulary",
+          "paths": [
+            "content/engine-en.dsl",
+            "src/content/locale.ts"
+          ],
+          "note": "produced by every-engine-sentence-is-keyed; every refusal, stale reason and plane repair the engine says on its own behalf, as keys in the closed union with an English pattern beside each"
         }
       ]
     },

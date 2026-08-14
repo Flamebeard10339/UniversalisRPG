@@ -2,7 +2,7 @@ import { choose, cursorProblem, DialogueCursor, menuTexts } from './dialogue-run
 import { carriedFrame, carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
 import { type PlaneFocus } from './planeReport';
-import { Localized, localizerOf } from './localized';
+import { Localized, Localizer, localizerOf } from './localized';
 import { GameState, RuntimeError } from './state';
 import { Registry } from '../content/registry';
 import type { EngineKey } from '../content/locale';
@@ -64,7 +64,7 @@ interface ModalDefinition<F extends ModalFrame> {
   // What replaces this frame once every option is answered, or null to close.
   submit(frame: F, state: GameState, registry: Registry): ModalFrame | null;
   holds?(value: Record<string, unknown>): boolean;
-  stale?(frame: F, state: GameState, registry: Registry): string | null;
+  stale?(frame: F, state: GameState, registry: Registry): Localized | null;
   same?(a: F, b: F): boolean;
   // Which published plane this screen has in hand, for a member whose subject is
   // one. A member that declares none is a screen with nothing beside its options,
@@ -129,7 +129,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
       return cursor ? dialogueFrame(cursor) : null;
     },
     holds: (value) => isCursor(value.cursor),
-    stale: (frame, _state, registry) => cursorProblem(frame.cursor, registry) ?? null,
+    stale: (frame, state, registry) => cursorProblem(localizerOf(registry, state), frame.cursor, registry),
     same: (a, b) => a.cursor.dialogue === b.cursor.dialogue && a.cursor.node === b.cursor.node && a.cursor.resumeIndex === b.cursor.resumeIndex,
   },
 };
@@ -216,8 +216,8 @@ export function answerModal(state: GameState, registry: Registry, answers: Modal
   // last field leaves the modal exactly as the player found it.
   const options = allOptions(frame, state, registry);
   for (const [key, value] of Object.entries(answers)) {
-    const refusal = optionRefusal(options, key, value);
-    if (refusal) throw new RuntimeError(`modal ${frame.name} ${refusal}`);
+    const refusal = optionRefusal(localizerOf(registry, state), options, key, value);
+    if (refusal) throw new RuntimeError(`modal ${frame.name}: ${refusal}`);
   }
   const asFound = { ...answersOf(frame) };
   Object.assign(answersOf(frame), answers);
@@ -276,22 +276,23 @@ function isCursor(value: unknown): boolean {
 
 // The one place an answer is weighed against the option it names, so what
 // `answerModal` refuses live and what a `# save` may not carry cannot drift.
-function optionRefusal(options: readonly ModalOption[], key: string, value: string): string | null {
+function optionRefusal(localizer: Localizer, options: readonly ModalOption[], key: string, value: string): Localized | null {
   const option = options.find((each) => each.key === key);
-  if (!option) return `has no option ${key}`;
-  if (option.values && !option.values.some((choice) => choice.value === value)) return `has no ${key} that takes ${JSON.stringify(value)}`;
+  if (!option) return localizer.engine('engine.modal.stale.no-option', { option: localizer.identifier(key) });
+  if (option.values && !option.values.some((choice) => choice.value === value)) return localizer.engine('engine.modal.stale.no-value', { option: localizer.identifier(key), value: localizer.identifier(JSON.stringify(value)) });
   return null;
 }
 
-function frameProblem(frame: ModalFrame, state: GameState, registry: Registry): string | null {
+function frameProblem(frame: ModalFrame, state: GameState, registry: Registry): Localized | null {
+  const localizer = localizerOf(registry, state);
   const definition = declaredFor(frame.name);
-  if (!definition) return 'it is not a modal this engine knows';
+  if (!definition) return localizer.engine('engine.modal.stale.unknown');
   const stale = definition.stale?.(frame, state, registry);
   if (stale) return stale;
   const options = allOptions(frame, state, registry);
   for (const [key, value] of Object.entries(frame.answers)) {
-    const refusal = optionRefusal(options, key, value);
-    if (refusal) return `it ${refusal}`;
+    const refusal = optionRefusal(localizer, options, key, value);
+    if (refusal) return refusal;
   }
   // Answering the last option is what closes a modal, so a frame that reaches
   // here already complete was never one this engine put down: it publishes no
@@ -299,13 +300,13 @@ function frameProblem(frame: ModalFrame, state: GameState, registry: Registry): 
   // accepts nothing is the same frame reached from the other side — no answer
   // satisfies it, so answering can never be what takes the frame down.
   const unanswerable = options.find((option) => option.values?.length === 0);
-  if (unanswerable) return `it asks for ${unanswerable.key} and nothing answers it`;
-  if (options.every((option) => option.key in frame.answers)) return 'it was saved with every option already answered';
+  if (unanswerable) return localizer.engine('engine.modal.stale.unanswerable', { option: localizer.identifier(unanswerable.key) });
+  if (options.every((option) => option.key in frame.answers)) return localizer.engine('engine.modal.stale.answered');
   return null;
 }
 
-export function pruneModals(state: GameState, registry: Registry): Array<{ name: string; reason: string }> {
-  const dropped: Array<{ name: string; reason: string }> = [];
+export function pruneModals(state: GameState, registry: Registry): Array<{ name: string; reason: Localized }> {
+  const dropped: Array<{ name: string; reason: Localized }> = [];
   const kept: ModalFrame[] = [];
   for (const frame of state.modals) {
     const problem = frameProblem(frame, state, registry);

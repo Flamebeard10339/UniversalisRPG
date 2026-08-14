@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DslError } from '../grammar/parser';
-import { loadModule } from '../content/registry';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { loadUniverse } from '../content/registry';
 import { grow, growLine } from './growth';
 import { itemInstance } from './itemInstance';
 import { planeReport } from './planeReport';
@@ -43,7 +44,7 @@ cluster-effect: +50% attack
 item-experience: 1000
 `;
 
-const registry = loadModule(MODULE);
+const registry = loadInEnglish(MODULE);
 
 // One fed copy, which is the only way a plane with points to spend exists.
 function fed(extra: Record<string, number> = {}): GameState {
@@ -113,5 +114,40 @@ describe('a growth reached from a line', () => {
     expect(() => growLine(fed(), registry, 'travel: camp')).toThrow(RuntimeError);
     expect(() => growLine(fed(), registry, 'nothing at all')).toThrow(RuntimeError);
     expect(() => growLine(fed(), registry, 'allocate: 1 at nowhere position 1')).toThrow(DslError);
+  });
+});
+
+// c4: a refusal reaches the player through a key, so it reads in the language
+// being played and shows that key where the language has nothing for it. Half
+// of these are translated and half are not, because a screen full of Spanish
+// hides which half the engine is answering from.
+describe('a refusal is a key, not a sentence', () => {
+  const SPANISH = [
+    '# info camp-es',
+    'version: 1.0.0',
+    '',
+    '# locale es',
+    'engine.plane.no-cluster: ningun cumulo esta en {hex}',
+    'engine.growth.no-experience: {item} no da experiencia',
+  ].join('\n');
+  const bilingual = loadUniverse([engineLocale(), { name: 'camp', text: MODULE }, { name: 'camp-es', text: SPANISH }]);
+
+  const refusalIn = (language: string, line: string): string => {
+    const state = initialState(bilingual, language);
+    Object.assign(state.inventory, { blade: 1, whetstone: 1, goad: 1 });
+    const growth = growLine(state, bilingual, line);
+    if (growth.ok) throw new Error(`${line} was not refused`);
+    return growth.refused;
+  };
+
+  it('reads in the language being played', () => {
+    expect(refusalIn('en', 'allocate: blade at 9,9 position 1')).toBe('no cluster stands in 9,9');
+    expect(refusalIn('es', 'allocate: blade at 9,9 position 1')).toBe('ningun cumulo esta en 9,9');
+    expect(refusalIn('es', 'feed: blade with goad')).toBe('goad no da experiencia');
+  });
+
+  it('shows its key where the language being played has no entry for it', () => {
+    expect(refusalIn('en', 'slot: blade at 0,0 e with whetstone')).toBe('whetstone is not a cluster jewel');
+    expect(refusalIn('es', 'slot: blade at 0,0 e with whetstone')).toBe('engine.growth.not-a-jewel');
   });
 });

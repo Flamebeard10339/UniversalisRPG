@@ -1,7 +1,7 @@
 import { evaluateCondition, renderSegments } from './conditions';
 import { Choice, Dialogue, DialogueNode } from '../content/dialogue';
 import { applyResultsNow } from './effects';
-import { localizerOf } from './localized';
+import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';
 import { GameState, RuntimeError } from './state';
 
@@ -23,17 +23,20 @@ function findNode(dialogue: Dialogue, name: string): DialogueNode {
   return node;
 }
 
-export function cursorProblem(cursor: DialogueCursor, registry: Registry): string | null {
+export function cursorProblem(localizer: Localizer, cursor: DialogueCursor, registry: Registry): Localized | null {
+  const named = { dialogue: localizer.identifier(cursor.dialogue), node: localizer.identifier(cursor.node) };
   const dialogue = registry.dialogues.get(cursor.dialogue);
-  if (!dialogue) return `dialogue ${cursor.dialogue} is not loaded`;
+  if (!dialogue) return localizer.engine('engine.dialogue.stale.unloaded', named);
   const node = dialogue.nodes.find((n) => n.name === cursor.node);
-  if (!node) return `dialogue ${cursor.dialogue} has no node ${cursor.node}`;
-  if (node.steps[cursor.resumeIndex - 1]?.kind !== 'menu') return `dialogue ${cursor.dialogue} node ${cursor.node} no longer offers a menu there`;
+  if (!node) return localizer.engine('engine.dialogue.stale.no-node', named);
+  if (node.steps[cursor.resumeIndex - 1]?.kind !== 'menu') return localizer.engine('engine.dialogue.stale.no-menu', named);
   return null;
 }
 
+// A cursor this stale is a fault rather than a screen, so it is stated in the
+// language the engine is written in and never reaches a player.
 function resolveMenu(cursor: DialogueCursor, registry: Registry): { dialogue: Dialogue; node: DialogueNode; choices: Choice[] } {
-  const problem = cursorProblem(cursor, registry);
+  const problem = cursorProblem(localizerFor(registry, BASE_LANGUAGE), cursor, registry);
   if (problem) throw new RuntimeError(`stale dialogue cursor: ${problem}`);
   const dialogue = registry.dialogues.get(cursor.dialogue)!;
   const node = findNode(dialogue, cursor.node);

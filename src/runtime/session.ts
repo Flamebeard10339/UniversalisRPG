@@ -128,6 +128,10 @@ function own(session: PlaySession): SessionInternals {
   return internals;
 }
 
+// The played language reaches a driver through the session it is playing, so a
+// caller outside this file localizes without reaching for the state to do it.
+export const sessionLocalizer = (session: PlaySession): Localizer => localizerOf(session.registry, stateOf(session));
+
 function stateOf(session: PlaySession): GameState {
   return own(session).state;
 }

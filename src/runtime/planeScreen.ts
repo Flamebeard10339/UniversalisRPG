@@ -178,14 +178,15 @@ export function isPlaneFrameBody(value: Record<string, unknown>): boolean {
   return value.said === undefined || typeof value.said === 'string';
 }
 
-export function planeStale(frame: PlaneFrame, state: GameState, registry: Registry): string | null {
+export function planeStale(frame: PlaneFrame, state: GameState, registry: Registry): Localized | null {
+  const localizer = localizerOf(registry, state);
   const report = planeReport(registry, state, frame.target);
   // c16: a slot's spelling is the runtime's own word for whichever copy the slot
   // holds, so a sentence about one that has emptied names the slot rather than
   // printing a spelling the player has never seen.
   const slot = wornCopySlot(frame.target);
-  if (!report) return slot === undefined ? `it grows ${frame.target}, which the player no longer carries` : `it grows what was worn in ${slot}, and that slot is empty`;
-  if (!report.clusters.some((cluster) => cluster.hex === frame.hex)) return `it holds ${frame.hex}, where that plane has no cluster`;
+  if (!report) return slot === undefined ? localizer.engine('engine.plane.stale.uncarried', { item: localizer.identifier(frame.target) }) : localizer.engine('engine.plane.stale.slot', { slot: localizer.identifier(slot) });
+  if (!report.clusters.some((cluster) => cluster.hex === frame.hex)) return localizer.engine('engine.plane.stale.hex', { hex: localizer.identifier(frame.hex) });
   return null;
 }
 

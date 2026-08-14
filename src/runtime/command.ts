@@ -14,6 +14,7 @@ import { resolveCarried, resolveDirective } from '../content/typed';
 import { type ParsedSave } from '../content/saveSection';
 import { describeCondition, RuntimeError } from './runtime';
 import { wornCopySlot } from './itemInstance';
+import { type Localized, type Localizer } from './localized';
 import { type Modal, type ModalOption } from './modals';
 import {
   adoptRegistry,
@@ -24,6 +25,7 @@ import {
   choiceToDirective,
   runSessionTest,
   serializeSession,
+  sessionLocalizer,
   sessionStatus,
   view,
   wait,
@@ -249,7 +251,7 @@ function openInventory(ctx: CommandContext, id: string): CommandResult {
   if (id === '') return runDirective(ctx, opening);
 
   const entry = carriedListing(ctx.session).find((each) => each.id === id);
-  if (!entry) return said('error', nothingIsNamed(id));
+  if (!entry) return said('error', nothingIsNamed(sessionLocalizer(ctx.session), id));
 
   const opened = runDirective(ctx, opening);
   if (opened.recorded.length === 0) return opened;
@@ -261,9 +263,11 @@ function openInventory(ctx: CommandContext, id: string): CommandResult {
 // slot's spelling is the runtime's own — it names whichever copy the slot holds
 // and nothing else spells one that way — so an empty slot is reported as an
 // empty slot rather than printed back at whoever typed it.
-function nothingIsNamed(id: string): string {
+function nothingIsNamed(localizer: Localizer, id: string): Localized {
   const slot = wornCopySlot(id);
-  return slot === undefined ? `you carry no ${id}` : `you wear nothing in ${slot}`;
+  return slot === undefined
+    ? localizer.engine('engine.growth.no-copy', { item: localizer.identifier(id) })
+    : localizer.engine('engine.growth.no-worn', { slot: localizer.identifier(slot) });
 }
 
 function runDirective(ctx: CommandContext, directive: Directive): CommandResult {
