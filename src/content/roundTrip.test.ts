@@ -161,7 +161,7 @@ describe('roundTripUniverse', () => {
   };
 
   it('hands the reload the serializations, never the sources it was given', () => {
-    const source: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\ntitle: Rope\n' };
+    const source: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\n' };
     const result = trip([source]);
     expect(handed).toHaveLength(1);
     expect(handed[0]).toEqual(result.sources);
@@ -170,14 +170,14 @@ describe('roundTripUniverse', () => {
 
   it('hands over one serialization per module, and no original among them', () => {
     const other: ModuleSource = { name: 'more', text: '# info more\nversion: 1.0.0\ndependencies:\n  base\n\n# item ribbon\ntitle: Ribbon\n' };
-    const base: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\ntitle: Rope\n' };
+    const base: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\n' };
     const result = trip([base, other]);
     expect(handed[0]).toHaveLength(2);
     expect(handed[0]).toEqual(result.sources);
     expect(handed[0].map((each) => each.text)).not.toContain(base.text);
   });
 
-  const BASE_TWO: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\ntitle: Rope\n\n# item bread\ntitle: Bread\n' };
+  const BASE_TWO: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\n\n# item bread\ntitle: Bread\n' };
 
   it('round-trips a single module clean', () => {
     expect(trip([BASE_TWO]).differences).toEqual([]);

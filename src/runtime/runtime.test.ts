@@ -4,7 +4,7 @@ import { Condition } from '../grammar/condition';
 import {
   actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, GameState, initResources, renderSegments, resolve, travelSecondsPerUnit, useAction } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
-import { loadModule } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { secondsToMs } from './units';
 import { runTest } from './session';
 
@@ -58,7 +58,7 @@ assert: unlocked
 
 describe('runTest', () => {
   it('passes a script that talks, chooses, uses an action, and composes another test via run:', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     const result = runTest('main', registry, state);
     expect(result).toEqual({ passed: true });
@@ -67,7 +67,7 @@ describe('runTest', () => {
   });
 
   it('fails and reports the unmet condition when an expect does not hold', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     const result = runTest('failing', registry, state);
     expect(result.passed).toBe(false);
@@ -77,17 +77,17 @@ describe('runTest', () => {
 
 describe('travelSecondsPerUnit', () => {
   it('reads the authored travel-seconds-per-unit variable', () => {
-    const registry = loadModule('# variable travel-seconds-per-unit\nvalue: 7');
+    const registry = loadInEnglish('# variable travel-seconds-per-unit\nvalue: 7');
     expect(travelSecondsPerUnit(registry)).toBe(7);
   });
 
   it('falls back to the engine default when content omits the variable', () => {
-    const registry = loadModule('# location camp\nx: 0, y: 0\nstarting');
+    const registry = loadInEnglish('# location camp\nx: 0, y: 0\nstarting');
     expect(travelSecondsPerUnit(registry)).toBe(5);
   });
 
   it('falls back to the default when the variable is declared with an empty value', () => {
-    const registry = loadModule('# variable travel-seconds-per-unit');
+    const registry = loadInEnglish('# variable travel-seconds-per-unit');
     expect(travelSecondsPerUnit(registry)).toBe(5);
   });
 });
@@ -133,7 +133,7 @@ describe('evaluateCondition', () => {
 describe('applyResult', () => {
   // Only a `pool` result reads content; every other verb touches state alone,
   // so these gates run against an empty registry.
-  const registry = loadModule('');
+  const registry = loadInEnglish('');
 
   it('sets and unsets flags', () => {
     const state = createGameState();
@@ -240,7 +240,7 @@ open:
 `;
 
   it('consumes items and fires on success when affordable', () => {
-    const registry = loadModule(TAKE_MODULE);
+    const registry = loadInEnglish(TAKE_MODULE);
     const state = createGameState();
     state.inventory['cooked-shrimp'] = 2;
     useAction('entity', 'brazier', 'light', registry, state);
@@ -250,7 +250,7 @@ open:
   });
 
   it('fires an authored on failure, applies nothing else, and leaves inventory untouched when unaffordable', () => {
-    const registry = loadModule(TAKE_MODULE);
+    const registry = loadInEnglish(TAKE_MODULE);
     const state = createGameState();
     state.inventory['cooked-shrimp'] = 1;
     useAction('entity', 'shrine', 'offer', registry, state);
@@ -260,7 +260,7 @@ open:
   });
 
   it('falls back to a generated message naming the item title when no on failure is authored', () => {
-    const registry = loadModule(TAKE_MODULE);
+    const registry = loadInEnglish(TAKE_MODULE);
     const state = createGameState();
     useAction('entity', 'brazier', 'light', registry, state);
     expect(state.inventory['cooked-shrimp'] ?? 0).toBe(0);
@@ -269,14 +269,14 @@ open:
   });
 
   it('fails atomically: an unaffordable action does not apply its other results', () => {
-    const registry = loadModule(TAKE_MODULE);
+    const registry = loadInEnglish(TAKE_MODULE);
     const state = createGameState();
     useAction('entity', 'shrine', 'offer', registry, state);
     expect(state.flags['shrine.shrine-offered']).toBeUndefined();
   });
 
   it('sums multiple take: results on the same item before checking affordability', () => {
-    const registry = loadModule(TAKE_MODULE);
+    const registry = loadInEnglish(TAKE_MODULE);
 
     const short = createGameState();
     short.inventory['cooked-shrimp'] = 3;
@@ -292,7 +292,7 @@ open:
   });
 
   it('fires on success as before for an action with no take:', () => {
-    const registry = loadModule(TAKE_MODULE);
+    const registry = loadInEnglish(TAKE_MODULE);
     const state = createGameState();
     useAction('entity', 'door', 'open', registry, state);
     expect(state.location).toBe('hallway');
@@ -355,7 +355,7 @@ open:
 `;
 
   it('actionFirstUnit reports the first-unit duration for a spannable action without mutating state', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     const duration = actionFirstUnit('entity', 'oven', 'roast', registry, state);
     expect(duration).toBe(secondsToMs(4));
@@ -364,13 +364,13 @@ open:
   });
 
   it('actionFirstUnit reports 0 for an instant action (no time:)', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     expect(actionFirstUnit('entity', 'door', 'open', registry, state)).toBe(0);
   });
 
   it('actionFirstUnit falls back to 0 for an unknown action or object, mutating nothing', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     expect(actionFirstUnit('entity', 'oven', 'bogus', registry, state)).toBe(0);
     expect(actionFirstUnit('entity', 'no-such-entity', 'anything', registry, state)).toBe(0);
@@ -378,7 +378,7 @@ open:
   });
 
   it('armAction sets activeAction and reports firstUnit WITHOUT resolving any of it', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     const result = armAction('entity', 'oven', 'roast', registry, state);
     expect(result).toEqual({ armed: true, firstUnit: secondsToMs(4) });
@@ -388,7 +388,7 @@ open:
   });
 
   it('useAction (armAction immediately followed by resolve) still completes the first unit instantly, unchanged', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     useAction('entity', 'oven', 'roast', registry, state);
     expect(state.time).toBe(secondsToMs(4));
@@ -413,7 +413,7 @@ out: 1 cooked-shrimp
 `;
 
   it('craftFirstUnit reports the duration without mutating state', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     state.inventory['raw-shrimp'] = 1;
     expect(craftFirstUnit('cook', registry, state)).toBe(secondsToMs(2));
@@ -421,13 +421,13 @@ out: 1 cooked-shrimp
   });
 
   it('craftFirstUnit falls back to 0 for an unknown recipe', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     expect(craftFirstUnit('no-such-recipe', registry, state)).toBe(0);
   });
 
   it('armCraft arms without resolving; craft() (armCraft + resolve) still completes as before', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     state.inventory['raw-shrimp'] = 1;
 
@@ -552,7 +552,7 @@ work:
 
 describe('a deterministic batch settles `on empty:` at the completion that drains the pool', () => {
   function grinding(entity: string, action: string, splits: number[]): GameState {
-    const registry = loadModule(DRAIN_MODULE);
+    const registry = loadInEnglish(DRAIN_MODULE);
     const state = createGameState('den');
     initResources(state, registry);
     armAction('entity', entity, action, registry, state);

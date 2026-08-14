@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
 import { createGameState, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
-import { loadModule } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { answerModal, ModalFrame, openModalNamed } from './modals';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
@@ -39,21 +39,21 @@ open:
 
 describe('initialState', () => {
   it('places a fresh game at the registry starting location, like startSession', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     expect(initialState(registry).location).toBe('camp');
   });
 });
 
 describe('diffState', () => {
   it('is empty for a fresh state against the baseline', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const baseline = initialState(registry);
     const state = initialState(registry);
     expect(diffState(state, baseline)).toEqual({});
   });
 
   it('captures only the inventory entry that changed', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const baseline = initialState(registry);
     const state = initialState(registry);
     state.inventory.bread = 1;
@@ -61,7 +61,7 @@ describe('diffState', () => {
   });
 
   it('captures only location on a relocation', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const baseline = initialState(registry);
     const state = initialState(registry);
     state.location = 'elsewhere';
@@ -71,7 +71,7 @@ describe('diffState', () => {
 
 describe('serializeSave', () => {
   it('is single-line JSON carrying the version and only the changed fields', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     state.inventory.bread = 2;
     const serialized = serializeSave(state, registry);
@@ -80,7 +80,7 @@ describe('serializeSave', () => {
   });
 
   it('serializes a fresh game as just the version', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     expect(JSON.parse(serializeSave(state, registry))).toEqual({ version: SAVE_VERSION });
   });
@@ -88,7 +88,7 @@ describe('serializeSave', () => {
 
 describe('loadSave', () => {
   it('round-trips through serialize -> parseSaveSection -> loadSave', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     state.inventory.gold = 3;
     state.flags.done = true;
@@ -112,7 +112,7 @@ describe('loadSave', () => {
   });
 
   it('clears stale fields not present in the loaded save', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     state.location = 'camp';
     state.inventory.bread = 99;
@@ -126,13 +126,13 @@ describe('loadSave', () => {
   });
 
   it('throws a clear error on a version mismatch', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     expect(() => loadSave(state, { version: SAVE_VERSION + 1, diff: {} }, registry)).toThrow(/version/);
   });
 
   it('carries an open modal stack across a round trip, and refuses a body that is not one', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     openModalNamed(state, 'character-creation');
     answerModal(state, registry, { name: 'Rowan' });
@@ -163,7 +163,7 @@ describe('loadSave', () => {
   // A frame carrying two ids of its own is a frame a `# save` can hold, so what
   // it points at is checked on the way in rather than trusted.
   it('carries a plane screen across a round trip while the copy it grows is still carried', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     state.inventory.charm = 1;
     (state.modals as ModalFrame[]).push({ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' });
@@ -175,7 +175,7 @@ describe('loadSave', () => {
   });
 
   it('closes a modal frame the loaded registry cannot answer, and says so, instead of restoring it', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     for (const [frame, message] of [
       [{ name: 'quest-journal', answers: {} }, 'Closed modal quest-journal because it is not a modal this engine knows.'],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'gone', node: 'greeting', resumeIndex: 1, replay: true } }, 'Closed modal dialogue because dialogue gone is not loaded.'],
@@ -227,7 +227,7 @@ node hello:
 
 describe('pruneStateForRegistry', () => {
   it('removes state entries whose content ids are not loaded', () => {
-    const registry = loadModule(PRUNE_MODULE);
+    const registry = loadInEnglish(PRUNE_MODULE);
     const state = initialState(registry);
     state.location = 'missing-camp';
     state.inventory.bread = 1;
@@ -278,7 +278,7 @@ describe('pruneStateForRegistry', () => {
   });
 
   it('keeps object-owned flags and map discovery, which live only in the namespace', () => {
-    const registry = loadModule(PRUNE_MODULE);
+    const registry = loadInEnglish(PRUNE_MODULE);
     const state = initialState(registry);
     state.flags['camp.lit'] = true;
     state.flags['cave.discovered'] = true;
@@ -292,7 +292,7 @@ describe('pruneStateForRegistry', () => {
   });
 
   it('loadSave prunes restored stale ids and records quiet warnings in the transient log', () => {
-    const registry = loadModule(PRUNE_MODULE);
+    const registry = loadInEnglish(PRUNE_MODULE);
     const state = createGameState();
     const warnings = loadSave(state, { version: SAVE_VERSION, diff: { inventory: { 'mod.gem': 2 }, flags: { 'mod.flag': true } } }, registry);
 
@@ -305,7 +305,7 @@ describe('pruneStateForRegistry', () => {
 
 describe('compareSave', () => {
   it('returns no differences for a matching state', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     state.inventory.bread = 1;
     const saved = { version: SAVE_VERSION, diff: diffState(state, initialState(registry)) };
@@ -313,7 +313,7 @@ describe('compareSave', () => {
   });
 
   it('reports a human-readable mismatch', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     state.inventory.bread = 2;
     const saved = { version: SAVE_VERSION, diff: { inventory: { bread: 1 } } };
@@ -321,14 +321,14 @@ describe('compareSave', () => {
   });
 
   it('reports a flag present in the save but absent from the state', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     const saved = { version: SAVE_VERSION, diff: { flags: { 'tutorial.quest-given': true } } };
     expect(compareSave(state, saved, registry)).toEqual(['flags.tutorial.quest-given: (absent) vs true']);
   });
 
   it('throws a clear error on a version mismatch', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     expect(() => compareSave(state, { version: SAVE_VERSION + 1, diff: {} }, registry)).toThrow(/version/);
   });
@@ -380,7 +380,7 @@ assert: has charm
 // that claim means.
 describe('a # test section records an equip', () => {
   function replaying(testId: string): ReturnType<typeof createGameState> {
-    const registry = loadModule(SAVE_TEST_MODULE);
+    const registry = loadInEnglish(SAVE_TEST_MODULE);
     const state = createGameState('camp');
     state.inventory['charm'] = 1;
     expect(runTest(testId, registry, state)).toEqual({ passed: true });
@@ -390,7 +390,7 @@ describe('a # test section records an equip', () => {
   it('equips by authored id, fills the slot, and moves the stat', () => {
     const state = replaying('equips-a-charm');
     expect(state.equipped).toEqual({ neck: 'charm' });
-    expect(statValue('might', state, loadModule(SAVE_TEST_MODULE))).toBe(5);
+    expect(statValue('might', state, loadInEnglish(SAVE_TEST_MODULE))).toBe(5);
     // c21: equipping moves the copy. The stack it came out of is empty, and the
     // `assert: has charm` the section replays still holds, because having a
     // thing and carrying it are two questions and only one of them is the stack.
@@ -404,13 +404,13 @@ describe('a # test section records an equip', () => {
 
 describe('# save section wired through load: / expect: test directives', () => {
   it('passes when the loaded state still matches the save', () => {
-    const registry = loadModule(SAVE_TEST_MODULE);
+    const registry = loadInEnglish(SAVE_TEST_MODULE);
     const state = createGameState();
     expect(runTest('load-and-match', registry, state)).toEqual({ passed: true });
   });
 
   it('fails with a save-mismatch failure once state diverges after loading', () => {
-    const registry = loadModule(SAVE_TEST_MODULE);
+    const registry = loadInEnglish(SAVE_TEST_MODULE);
     const state = createGameState();
     const result = runTest('load-then-diverge', registry, state);
     expect(result.passed).toBe(false);
@@ -420,7 +420,7 @@ describe('# save section wired through load: / expect: test directives', () => {
 });
 
 describe('a # save body is checked past its version', () => {
-  const registry = loadModule(PRUNE_MODULE);
+  const registry = loadInEnglish(PRUNE_MODULE);
   const load = (diff: Record<string, unknown>) => () => loadSave(createGameState(), { version: SAVE_VERSION, diff }, registry);
 
   it('refuses a scalar of the wrong type', () => {
@@ -456,7 +456,7 @@ describe('a # save body is checked past its version', () => {
 });
 
 describe('equipped survives a registry that no longer matches it', () => {
-  const registry = loadModule(PRUNE_MODULE);
+  const registry = loadInEnglish(PRUNE_MODULE);
 
   function pruned(equipped: Record<string, string>): { state: ReturnType<typeof createGameState>; warnings: ReturnType<typeof pruneStateForRegistry> } {
     const state = createGameState('camp');

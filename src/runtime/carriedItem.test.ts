@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { applyDirective, PlaySession, startSession, view } from './session';
 import { SAVE_VERSION } from './save';
 
@@ -60,7 +60,7 @@ say: You grind the blade to a killing edge.
 {"version":${SAVE_VERSION},"inventory":{"blade":2,"whetstone":1},"equipped":{"mainhand":"blade"}}
 `;
 
-const registry = loadModule(MODULE);
+const registry = loadInEnglish(MODULE);
 
 function choices(session: PlaySession): string[] {
   return view(session).choices.map((choice) => choice.id);

@@ -8,6 +8,7 @@ import { factionSchema } from './faction';
 import { flagSchema } from './flag';
 import { infoSchema } from './info';
 import { itemSchema } from './item';
+import { parseLocaleSection } from './locale';
 import { locationSchema } from './location';
 import { passiveSchema } from './passive';
 import { DslError } from '../grammar/parser';
@@ -48,6 +49,7 @@ const BESPOKE: Record<string, (section: RawSection) => object> = {
   test: parseTest,
   save: parseSaveSection,
   remove: parseRemoval,
+  locale: parseLocaleSection,
 };
 
 const PARSERS: Record<string, (section: RawSection) => object> = {

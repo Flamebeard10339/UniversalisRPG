@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { applyResultsNow, createGameState } from './runtime';
 import { GameState } from './state';
 
 const ITEMS = ['# item bones', '# item coins', '# item gem', '# item tail'];
 
 function fight(...body: string[]) {
-  const registry = loadModule([...ITEMS, '# stat luck', 'base: 60', '# stat ward', 'base: 60', '# flag lit', '# entity giant-rat', 'fight:', ...body.map((line) => `  ${line}`)].join('\n'));
+  const registry = loadInEnglish([...ITEMS, '# stat luck', 'base: 60', '# stat ward', 'base: 60', '# flag lit', '# entity giant-rat', 'fight:', ...body.map((line) => `  ${line}`)].join('\n'));
   const results = registry.entities.get('giant-rat')!.actions[0].results;
   return { registry, results };
 }
@@ -200,7 +200,7 @@ describe('roll: applies a named table', () => {
   const TABLES = ['# droptable rare', 'one of:', '  1x: give: 1 gem', '# droptable common', 'give: 1 bones', '1 in 2:', '  roll: rare'];
 
   it('reaches the table s results, and the table s own wrappers roll', () => {
-    const registry = loadModule([...ITEMS, ...TABLES, '# entity giant-rat', 'fight:', '  roll: common'].join('\n'));
+    const registry = loadInEnglish([...ITEMS, ...TABLES, '# entity giant-rat', 'fight:', '  roll: common'].join('\n'));
     const results = registry.entities.get('giant-rat')!.actions[0].results;
     let gems = 0;
     for (let seed = 1; seed <= 400; seed++) {

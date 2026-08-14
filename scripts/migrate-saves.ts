@@ -107,7 +107,10 @@ function validationProblems(rewrites: readonly Rewrite[], registry: Registry): s
       problems.push(`${rewrite.fixture.id}: ${(error as Error).message}`);
       continue;
     }
-    for (const warning of warnings) problems.push(`${rewrite.fixture.id}: ${warning.message}`);
+    // The path, not the sentence: a report is read by a developer against a
+    // universe that may ship no locale, and a key says nothing about which
+    // record moved. `message` is what a player reads; `path` is the fact.
+    for (const warning of warnings) problems.push(`${rewrite.fixture.id}: ${warning.path} — ${warning.message}`);
   }
   return problems;
 }

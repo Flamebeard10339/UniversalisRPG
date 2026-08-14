@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DISCOVERED } from '../content/location';
+import { engineLocale } from '../content/engineLocale';
 import { loadUniverseWithDiagnostics, type Registry } from '../content/registry';
 import { parseSaveSection } from '../content/saveSection';
 import { reachable, roadsFrom, routeTo } from './journey';
@@ -154,7 +155,7 @@ const TRAPDOOR = [
   '',
 ];
 
-const universe = (lines: readonly string[], name: string): Registry => loadUniverseWithDiagnostics([{ name, text: lines.join('\n') }]).registry;
+const universe = (lines: readonly string[], name: string): Registry => loadUniverseWithDiagnostics([engineLocale(), { name, text: lines.join('\n') }]).registry;
 
 const open = (lines: readonly string[], name: string): PlaySession => startSession(universe(lines, name));
 

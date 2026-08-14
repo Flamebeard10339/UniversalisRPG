@@ -3,7 +3,8 @@ import { armAction, armFightAction, createGameState, GameState, initResources, P
 import { characterHooks } from './hooks';
 import { equip, unequip } from './equipment';
 import { IMPLICIT_TARGET_FULL } from './encounter';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { fromMilliUnits, secondsToMs, toMilliUnits } from './units';
 
 // Three carriers on the player — its own sheet and two slots — and three
@@ -156,7 +157,7 @@ starting
 entities: dummy, biter, boss, minion, wisp, anvil
 `;
 
-const loaded = (): Registry => loadModule(MODULE);
+const loaded = (): Registry => loadInEnglish(MODULE);
 
 function arena(registry: Registry): GameState {
   const state = createGameState('arena');

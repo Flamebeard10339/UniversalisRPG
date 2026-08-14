@@ -27,7 +27,9 @@ import {
 import { formatPlane } from './planeView';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content/tutorial-island.dsl';
+// The engine's own English is a locale module like any other, so a session
+// started without it plays the island with keys where the engine speaks.
+const defaultContent = 'content/engine-en.dsl,content/tutorial-island.dsl';
 const defaultLocalChanges = 'content/local-changes.dsl';
 
 // TODO(quest-journal): quests are emergent from flags, not a DSL kind. See backlog.

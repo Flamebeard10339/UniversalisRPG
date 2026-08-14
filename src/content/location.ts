@@ -1,9 +1,10 @@
+import { defaultTitle } from './info';
 import { Action, actionBody } from '../grammar/action';
 import { Condition, condition } from '../grammar/condition';
 import { list } from '../grammar/list';
 import { DslError, Parser } from '../grammar/parser';
 import { SectionSchema } from '../grammar/section';
-import { humanize, id, number, text } from '../grammar/values';
+import { id, number, text } from '../grammar/values';
 
 // The one flag every location owns without declaring it, because the engine
 // sets it the first time the player arrives.
@@ -127,7 +128,7 @@ export const locationSchema: SectionSchema<Location, 'starting', 'actions'> = {
     x: { parser: number, default: () => 0 },
     y: { parser: number, default: () => 0 },
     z: { parser: number, default: () => 0 },
-    title: { parser: text, default: (self) => humanize(self.id) },
+    title: { parser: text, default: defaultTitle },
     examine: { parser: text },
     entities: { parser: list(population), default: () => [] },
     adjacent: { parser: list(edge), default: () => [] },

@@ -12,6 +12,7 @@ import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
 import { GameEvent, eventSchema } from './event';
 import { Item, itemRoleProblem, itemSchema } from './item';
+import { actionSlug, actionSlugProblem, addLocaleSection, emptyLocales, GENERATED_FIELD, localeKey, Locales, LocaleSection, TEXT_FIELDS } from './locale';
 import { Passive, passiveRangeProblem, passiveSchema } from './passive';
 import { getShape } from './shapes';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
@@ -32,7 +33,7 @@ import { Skill, skillSchema } from './skill';
 import { Stat, statSchema } from './stat';
 import { Test } from './test';
 import { validateTuningVariable } from './tuningVariables';
-import { humanize } from '../grammar/values';
+import { humanizeEn } from '../grammar/values';
 import { Variable, variableSchema } from './variable';
 
 export interface Registry {
@@ -63,6 +64,10 @@ export interface Registry {
   variables: Map<string, Variable>;
   saves: Map<string, ParsedSave>;
   namespace: Namespace;
+  // The text side of the load: what content authored, under the language its
+  // module declared, and what `# locale` sections supplied. Kept apart from
+  // every content map above so that loading a locale cannot reach one (c6).
+  locales: Locales;
 }
 
 // Each DSL section kind beside the registry map that holds it. `recipeActions`
@@ -135,7 +140,7 @@ function recipeAction(recipe: Recipe): Action {
   const rate = typeof recipe.rate === 'string' ? { id: recipe.rate } : recipe.rate;
   const cadence: Pick<Action, 'rate' | 'time'> = rate !== undefined ? { rate } : recipe.time !== undefined ? { time: recipe.time } : {};
   const action: Action = {
-    label: `Craft ${humanize(recipe.id)}`,
+    label: `Craft ${humanizeEn(recipe.id)}`,
     kind: 'rate' in cadence || 'time' in cadence ? 'continuous' : 'instant',
     results,
     ...cadence,
@@ -178,6 +183,7 @@ function emptyRegistry(): Registry {
     variables: new Map(),
     saves: new Map(),
     namespace: new Namespace(),
+    locales: emptyLocales(),
   };
 }
 
@@ -219,6 +225,44 @@ function summarizeDisabled(statuses: readonly ModuleStatus[]): string[] {
 export function formatModuleDiagnostic(value: ModuleDiagnostic): string {
   const at = value.line === undefined ? value.sourceName : `${value.sourceName}:${value.line}:${value.column}`;
   return `${at} [${value.moduleId}] ${value.stage}: ${value.message}`;
+}
+
+// The base entries one section contributes: what it authored, plus the title
+// `humanizeEn` fills in — which is an English entry, so it is one only where the
+// module says it is writing English. A field left unauthored anywhere else has
+// no entry in any language, which is what puts its key on screen (c3, c5).
+function recordBaseText(registry: Registry, kind: string, authored: Record<string, unknown>, namespace: string | null, language: string): void {
+  const fields = TEXT_FIELDS[kind];
+  if (!fields) return;
+  const id = authored.id as string;
+  for (const field of fields) {
+    const authoredValue = authored[field];
+    const text = typeof authoredValue === 'string' ? authoredValue : field === GENERATED_FIELD && language === 'en' ? humanizeEn(id) : undefined;
+    if (text !== undefined) registry.locales.base.set(localeKey(namespace, kind, id, field), { text, language });
+  }
+}
+
+// An action's label doubles as its identifier, so its display is keyed on a slug
+// of it and the label itself is the entry for that key (c8). Run over the built
+// registry because an entity's actions are assembled after its section is.
+function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly { label: string }[]): void {
+  const namespace = registry.namespace.ownerOf(kind, id) ?? null;
+  const taken = new Set<string>();
+  for (const action of actions) {
+    const problem = actionSlugProblem(action.label, taken);
+    if (problem) throw new DslError(`# ${kind} ${id}: ${problem}`);
+    const slug = actionSlug(action.label);
+    taken.add(slug);
+    registry.locales.base.set(localeKey(namespace, kind, id, slug), { text: action.label, language: languages.get(namespace) ?? 'en' });
+  }
+}
+
+function recordEveryActionText(registry: Registry, languages: ReadonlyMap<string | null, string>): void {
+  for (const entity of registry.entities.values()) recordActionText(registry, languages, 'entity', entity.id, entity.actions);
+  for (const location of registry.locations.values()) recordActionText(registry, languages, 'location', location.id, location.actions);
+  for (const item of registry.items.values()) recordActionText(registry, languages, 'item', item.id, item.actions);
+  for (const [id, action] of registry.recipeActions) recordActionText(registry, languages, 'recipe', id, [action]);
+  for (const [id, action] of registry.actions) recordActionText(registry, languages, 'action', id, [action]);
 }
 
 function applySection(registry: Registry, section: ModuleSection): void {
@@ -922,6 +966,9 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
             namespace.undeclare(kind, target);
             continue;
           }
+          // A locale is not content: it never enters the merge, so no id it
+          // names can be added, patched or removed by it (c6).
+          if (section.kind === 'locale') continue;
           if (!owns(section.kind)) continue;
           const byId = merged.get(section.kind) ?? new Map<string, OwnedSection>();
           const id = (section.value as { id: string }).id;
@@ -943,10 +990,18 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   const mergeFailure = mergePass(() => true);
   if (mergeFailure) return { failure: mergeFailure };
   reconcileMembers(namespace, merged, declaredMembers);
+  const languages = new Map<string | null, string>(modules.map((module) => [module.namespace, module.info.language]));
+  registry.locales.moduleLanguages = modules.map((module) => module.info.language);
+  for (const module of modules) {
+    for (const section of module.sections) {
+      if (section.kind === 'locale') addLocaleSection(registry.locales, module.namespace, section.value as LocaleSection);
+    }
+  }
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
       try {
         applySection(registry, { kind, value: section.value });
+        recordBaseText(registry, kind, section.value as Record<string, unknown>, section.module.namespace, section.module.info.language);
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
         return { failure: { module: section.module, stage: 'build', error } };
@@ -955,6 +1010,15 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   }
   const validationFailure = validateBuiltRegistry(registry, owners, danglingRoots);
   if (validationFailure) return { failure: validationFailure };
+  // After validation, because that is where an entity's `uses:` becomes an
+  // action of its own and where an action naming what is gone is pruned: the
+  // labels keyed here are the ones a player will be offered.
+  try {
+    recordEveryActionText(registry, languages);
+  } catch (error) {
+    if (!(error instanceof DslError)) throw error;
+    return { failure: { module: modules[0], stage: 'build', error } };
+  }
   return { registry };
 }
 

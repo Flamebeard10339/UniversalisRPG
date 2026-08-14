@@ -1,9 +1,10 @@
+import { defaultTitle } from './info';
 import { DIRECTIONS, Direction } from './hex';
 import { Shape } from './shapes';
 import { list } from '../grammar/list';
 import { Cursor, DslError, Parser } from '../grammar/parser';
 import { SectionSchema } from '../grammar/section';
-import { humanize, id, number, text } from '../grammar/values';
+import { id, number, text } from '../grammar/values';
 
 const NON_ROOT_DIRECTIONS: readonly Direction[] = DIRECTIONS.filter((direction) => direction !== 'w');
 
@@ -49,7 +50,7 @@ function hydratePositions(parsed: unknown): Record<number, string> {
 export const clusterJewelSchema: SectionSchema<ClusterJewel> = {
   kind: 'cluster-jewel',
   fields: {
-    title: { parser: text, default: (self) => humanize(self.id) },
+    title: { parser: text, default: defaultTitle },
     examine: { parser: text },
     shape: { parser: id },
     openConnections: { parser: list(id), default: () => [], keyword: 'open-connections' },

@@ -60,6 +60,7 @@ import { Boundary, BoundarySource, requireBoundaryNotPast, requireForwardProgres
 import { Item } from '../content/item';
 import { Recipe } from '../content/recipe';
 import { Registry } from '../content/registry';
+import { Localized, localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { roadsFrom, routeTo } from './journey';
 import { advanceTime, endAction, GameState, PLAYER, RuntimeError } from './state';
@@ -622,11 +623,11 @@ function firstUnitSpan(action: Action, state: GameState, registry: Registry): nu
 function refuseUnpayableInputs(action: Action, registry: Registry, state: GameState): ArmResult | undefined {
   const { short, unspendable } = inputLimit(action, state);
   if (short === undefined && unspendable === undefined) return undefined;
-  const title = (id: string): string => registry.items.get(id)?.title ?? id;
+  const localizer = localizerOf(registry, state);
+  const item = (id: string): Localized => localizer.title('item', id);
   if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
-  else if (short !== undefined) state.log.push(`You don't have enough ${title(short)}.`);
-  else if (unspendable!.kind === 'grown') state.log.push(`Your ${title(unspendable!.item)} has grown a plane of its own, and a grown item is never spent.`);
-  else state.log.push(`Your ${title(unspendable!.item)} is the one you are wearing, and what you wear is never spent.`);
+  else if (short !== undefined) state.log.push(localizer.engine('engine.inputs.short', { item: item(short) }));
+  else state.log.push(localizer.engine(unspendable!.kind === 'grown' ? 'engine.inputs.grown' : 'engine.inputs.worn', { item: item(unspendable!.item) }));
   return { armed: false };
 }
 
@@ -722,15 +723,16 @@ export function armTravel(origin: string, dest: string, registry: Registry, stat
 // The one sentence a walk with no route says, so the arming path and the
 // resolving path say the same thing and a caller reading it back reads the
 // sentence the player was shown.
-function noWayTo(dest: string, registry: Registry): string {
-  return `There is no way from here to ${registry.locations.get(dest)?.title ?? dest}.`;
+function noWayTo(dest: string, registry: Registry, state: GameState): Localized {
+  const localizer = localizerOf(registry, state);
+  return localizer.engine('engine.travel.no-way', { destination: localizer.title('location', dest) });
 }
 
 export function armJourney(dest: string, registry: Registry, state: GameState): ArmResult {
   if (!registry.locations.has(dest)) throw new RuntimeError(`unknown location: ${dest}`);
   const route = routeTo(state.location, dest, registry, state);
   if (!route) {
-    state.log.push(noWayTo(dest, registry));
+    state.log.push(noWayTo(dest, registry, state));
     return { armed: false };
   }
   state.journey = { to: dest, legs: route };
@@ -794,7 +796,7 @@ export function useTravel(origin: string, dest: string, registry: Registry, stat
 // Returns the sentence refusing the walk, and nothing when one was made: no
 // route is the one way this leaves the world exactly as it found it, and a
 // caller that can only report what it is told needs telling.
-export function walkTo(dest: string, registry: Registry, state: GameState): string | undefined {
+export function walkTo(dest: string, registry: Registry, state: GameState): Localized | undefined {
   if (!registry.locations.has(dest)) throw new RuntimeError(`unknown location: ${dest}`);
   if (!state.location) {
     useTravel('', dest, registry, state);
@@ -802,7 +804,7 @@ export function walkTo(dest: string, registry: Registry, state: GameState): stri
   }
   const route = routeTo(state.location, dest, registry, state);
   if (!route) {
-    const refused = noWayTo(dest, registry);
+    const refused = noWayTo(dest, registry, state);
     state.log.push(refused);
     return refused;
   }

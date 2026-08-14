@@ -1,6 +1,7 @@
 import { evaluateCondition, renderSegments } from './conditions';
 import { Choice, Dialogue, DialogueNode } from '../content/dialogue';
 import { applyResultsNow } from './effects';
+import { localizerOf } from './localized';
 import { Registry } from '../content/registry';
 import { GameState, RuntimeError } from './state';
 
@@ -46,7 +47,7 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, st
     const step = node.steps[i];
     switch (step.kind) {
       case 'say':
-        if (replay) state.log.push(renderSegments(step.segments, state));
+        if (replay) state.log.push(localizerOf(registry, state).prose(renderSegments(step.segments, state)));
         break;
       case 'effect':
         if (replay) applyResultsNow(state, registry, [step.result]);
@@ -66,7 +67,7 @@ function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, s
   const counter = `${dialogue.id}.${node.name}`;
   const visit = (state.visits[counter] = (state.visits[counter] ?? 0) + 1);
   const replay = visit === 1 || node.sticky === true;
-  if (!replay && node.again) state.log.push(renderSegments(node.again, state));
+  if (!replay && node.again) state.log.push(localizerOf(registry, state).prose(renderSegments(node.again, state)));
   return runSteps(dialogue, node, registry, state, 0, replay);
 }
 

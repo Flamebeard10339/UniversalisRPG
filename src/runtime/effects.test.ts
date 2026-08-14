@@ -3,7 +3,8 @@ import { point } from '../grammar/range';
 import { applyResults, getDelta, newSegment, RESULT_OBSERVERS, ResultApplication, ResultObserver, settlePools } from './effects';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { createGameState, GameState, initResources, PLAYER } from './runtime';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { toMilliUnits } from './units';
 
 const MODULE = `
@@ -35,7 +36,7 @@ function watched(): { seen: ResultApplication[]; observer: ResultObserver } {
 }
 
 function fresh(): { registry: Registry; state: GameState } {
-  const registry = loadModule(MODULE);
+  const registry = loadInEnglish(MODULE);
   const state = createGameState();
   initResources(state, registry);
   return { registry, state };

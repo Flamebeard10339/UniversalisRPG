@@ -40,7 +40,7 @@ function locationDistance(a: Location, b: Location): number {
 // A travel ownerRef packs both ends of the journey into one objId, and a module
 // namespaces its ids with dots, so the pair is joined by a character an id
 // cannot contain.
-const TRAVEL_PAIR = '>';
+export const TRAVEL_PAIR = '>';
 
 export const travelPair = (origin: string, dest: string): string => `${origin}${TRAVEL_PAIR}${dest}`;
 

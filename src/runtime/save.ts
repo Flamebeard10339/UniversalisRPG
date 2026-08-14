@@ -1,3 +1,4 @@
+import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { createGameState, GameState, initResources, RuntimeError } from './runtime';
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
@@ -6,18 +7,21 @@ import { isInstanceTable, pruneInstances } from './instances';
 import { itemTemplate } from './itemInstance';
 import { isPopulations, prunePopulations } from './population';
 import { isModalFrame, pruneModals } from './modals';
+import { Localized, Localizer, localizerOf } from './localized';
 import { PLAYER } from './state';
 import { templateOf } from './encounter';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
 export const SAVE_VERSION = 8;
 
-// A sparse diff against initialState: a new game saves as `{}`, and `log` is not state.
-export type SaveDiff = Partial<Omit<GameState, 'log'>>;
+// A sparse diff against initialState: a new game saves as `{}`, and neither
+// `log` nor `language` is state — one is drained by reading it, the other is
+// the player's setting for the session rather than the world's.
+export type SaveDiff = Partial<Omit<GameState, 'log' | 'language'>>;
 
 // A Record over the exhaustive key type, so adding a GameState field is a type
 // error here until it is classified as diffed key-by-key or carried whole.
-type SaveField = Exclude<keyof GameState, 'log'>;
+type SaveField = Exclude<keyof GameState, 'log' | 'language'>;
 
 interface RecordPrune {
   of: string;
@@ -86,8 +90,8 @@ export function startingLocationId(registry: Registry): string | undefined {
   return [...registry.locations.values()].find((location) => location.starting)?.id;
 }
 
-export function initialState(registry: Registry): GameState {
-  const state = createGameState();
+export function initialState(registry: Registry, language: string = DEFAULT_LANGUAGE): GameState {
+  const state = createGameState('', language);
   const starting = startingLocationId(registry);
   if (starting) state.location = starting;
   initResources(state, registry);
@@ -97,10 +101,10 @@ export function initialState(registry: Registry): GameState {
 export interface PruneWarning {
   path: string;
   id: string;
-  message: string;
+  message: Localized;
 }
 
-function addWarning(warnings: PruneWarning[], path: string, id: string, message: string): void {
+function addWarning(warnings: PruneWarning[], path: string, id: string, message: Localized): void {
   warnings.push({ path, id, message });
 }
 
@@ -110,11 +114,12 @@ function pruneRecord<T>(
   has: (id: string) => boolean,
   kind: string,
   warnings: PruneWarning[],
+  localizer: Localizer,
 ): void {
   for (const id of Object.keys(record)) {
     if (has(id)) continue;
     delete record[id];
-    addWarning(warnings, `${path}.${id}`, id, `Removed ${path} ${id} because its ${kind} is not loaded.`);
+    addWarning(warnings, `${path}.${id}`, id, localizer.engine('engine.prune.record', { path: localizer.prose(path), id: localizer.prose(id), kind: localizer.prose(kind) }));
   }
 }
 
@@ -142,6 +147,8 @@ function activeActionProblem(state: GameState, registry: Registry): string | nul
 
 export function pruneStateForRegistry(state: GameState, registry: Registry): PruneWarning[] {
   const warnings: PruneWarning[] = [];
+  const localizer = localizerOf(registry, state);
+  const said = localizer.prose;
 
   // First, so every rule under it asks a settled table rather than one still
   // being pruned beneath it: a field holding an instance id gets one answer.
@@ -152,19 +159,26 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     const old = state.location;
     const replacement = startingLocationId(registry) ?? '';
     state.location = replacement;
-    addWarning(warnings, 'location', old, `Moved from unavailable location ${old} to ${replacement || '(nowhere)'}.`);
+    const to = replacement ? said(replacement) : localizer.engine('engine.prune.nowhere');
+    addWarning(warnings, 'location', old, localizer.engine('engine.prune.location', { from: said(old), to }));
   }
 
   for (const [field, rule] of RECORD_PRUNES) {
-    pruneRecord(state[field] as unknown as Record<string, unknown>, field, (id) => rule.loaded(registry, id), rule.of, warnings);
+    pruneRecord(state[field] as unknown as Record<string, unknown>, field, (id) => rule.loaded(registry, id), rule.of, warnings, localizer);
   }
 
   for (const [key, buff] of Object.entries(state.activeBuffs)) {
     const itemId = key.includes(':') ? key.slice(0, key.indexOf(':')) : undefined;
-    const missing = !registry.stats.has(buff.statId) ? `stat ${buff.statId}` : itemId && !registry.items.has(itemId) ? `item ${itemId}` : undefined;
-    if (!missing) continue;
+    // Two patterns rather than one with a phrase substituted into it: a
+    // fragment like `stat attack` is a sentence a translator cannot reach.
+    const message = !registry.stats.has(buff.statId)
+      ? localizer.engine('engine.prune.buff.stat', { buff: said(key), stat: said(buff.statId) })
+      : itemId && !registry.items.has(itemId)
+        ? localizer.engine('engine.prune.buff.item', { buff: said(key), item: said(itemId) })
+        : undefined;
+    if (!message) continue;
     delete state.activeBuffs[key];
-    addWarning(warnings, `activeBuffs.${key}`, key, `Removed active buff ${key} because its ${missing} is not loaded.`);
+    addWarning(warnings, `activeBuffs.${key}`, key, message);
   }
 
   // A worn id may spell a grown copy, and pruneInstances has already settled
@@ -173,14 +187,15 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   for (const [slot, wornId] of Object.entries(state.equipped)) {
     const itemId = itemTemplate(state, wornId);
     const item = registry.items.get(itemId);
-    const missing = !item ? `item ${itemId} is not loaded` : item.slot !== slot ? `item ${itemId} no longer declares that slot` : undefined;
-    if (!missing) continue;
+    const params = { slot: said(slot), item: said(itemId) };
+    const message = !item ? localizer.engine('engine.prune.equipped.missing', params) : item.slot !== slot ? localizer.engine('engine.prune.equipped.slot', params) : undefined;
+    if (!message) continue;
     delete state.equipped[slot];
-    addWarning(warnings, `equipped.${slot}`, wornId, `Unequipped ${slot} because its ${missing}.`);
+    addWarning(warnings, `equipped.${slot}`, wornId, message);
   }
 
   for (const { name, reason } of pruneModals(state, registry)) {
-    addWarning(warnings, `modals.${name}`, name, `Closed modal ${name} because ${reason}.`);
+    addWarning(warnings, `modals.${name}`, name, localizer.engine('engine.prune.modal', { modal: said(name), reason: said(reason) }));
   }
 
   // A walk whose destination or any of whose legs has gone is a walk to
@@ -190,7 +205,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     const lost = [journey.to, ...journey.legs].find((place) => !registry.locations.has(place));
     if (lost !== undefined) {
       state.journey = null;
-      addWarning(warnings, 'journey', journey.to, `Stopped the journey to ${journey.to} because location ${lost} is not loaded.`);
+      addWarning(warnings, 'journey', journey.to, localizer.engine('engine.prune.journey', { to: said(journey.to), lost: said(lost) }));
     }
   }
 
@@ -199,7 +214,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     const active = state.activeAction!;
     const id = `${active.ownerRef}.${active.actionLabel}`;
     state.activeAction = null;
-    addWarning(warnings, 'activeAction', id, `Stopped unavailable action ${id}: ${activeProblem}.`);
+    addWarning(warnings, 'activeAction', id, localizer.engine('engine.prune.action', { action: said(id), reason: said(activeProblem) }));
   }
 
   return warnings;

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
 import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, drawnBox, midpoint, newlyFound, panAfterZoom, PER_UNIT, settled, sheetAt, onWalk, spanBetween, tapTarget, TOUCH_FLOOR, walkLine, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
-  title: id.toUpperCase(),
+  title: asLocalized(id.toUpperCase()),
   x,
   y,
   z,
@@ -45,7 +46,7 @@ describe('one plane of the map', () => {
     // Neither on the plane being looked at nor a step from where the player is:
     // the offer is the whole of what puts the attic on the sheet.
     const withAttic = [...HOUSE, place('attic', 5, 5, 1, 'landing')];
-    const walk: PlayView['choices'][number] = { id: 'travel:attic', kind: 'travel', label: 'Travel to Attic', leadsTo: 'attic', legs: 2 };
+    const walk: PlayView['choices'][number] = { id: 'travel:attic', kind: 'travel', label: asLocalized('Travel to Attic'), leadsTo: 'attic', legs: 2 };
 
     const ids = sheetAt(withAttic, 'hall', 0, waysOut([walk])).nodes.map((node) => node.place.id);
 
@@ -168,7 +169,7 @@ describe('where a place is drawn', () => {
 });
 
 describe('which offer is the way to a place', () => {
-  const offer = (id: string, leadsTo?: string): PlayView['choices'][number] => ({ id, kind: leadsTo ? 'travel' : 'action', label: id, leadsTo });
+  const offer = (id: string, leadsTo?: string): PlayView['choices'][number] => ({ id, kind: leadsTo ? 'travel' : 'action', label: asLocalized(id), leadsTo });
 
   it('answers with the position a driver dispatches it at, counting from one', () => {
     const ways = waysOut([offer('look'), offer('travel:beach', 'beach'), offer('travel:cove', 'cove')]);
@@ -178,7 +179,7 @@ describe('which offer is the way to a place', () => {
   });
 
   it('takes a staircase, which publishes an action and not a travel', () => {
-    const stairs: PlayView['choices'][number] = { id: 'use:entity.stairs.ascend', kind: 'action', label: 'ascend', leadsTo: 'landing' };
+    const stairs: PlayView['choices'][number] = { id: 'use:entity.stairs.ascend', kind: 'action', label: asLocalized('ascend'), leadsTo: 'landing' };
 
     expect(waysOut([stairs]).get('landing')).toBe(1);
   });

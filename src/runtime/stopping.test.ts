@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
 import { point } from '../grammar/range';
 import { armAction, armFightAction, createGameState, GameState, initResources, resolve } from './runtime';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { secondsToMs, toMilliUnits } from './units';
 
 // Two independent mechanisms: `requires:`/inputs are re-checked by the resolver,
@@ -168,7 +169,7 @@ const WITHOUT_STOP = MODULE.split('\n')
   .join('\n');
 
 function started(source = MODULE): { registry: Registry; state: GameState } {
-  const registry = loadModule(source);
+  const registry = loadInEnglish(source);
   const state = createGameState('den');
   initResources(state, registry);
   return { registry, state };

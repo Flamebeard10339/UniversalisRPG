@@ -4,7 +4,7 @@ import { SHIPPED_SOURCES } from './shippedContent';
 
 describe('the content the build carries', () => {
   it('bundles the shipped DSL as text, with no path left for the browser to fetch', () => {
-    expect(SHIPPED_SOURCES.map((source) => source.name)).toEqual(['tutorial-island']);
+    expect(SHIPPED_SOURCES.map((source) => source.name)).toEqual(['engine-en', 'tutorial-island']);
     expect(SHIPPED_SOURCES[0].text).toContain('# info');
   });
 

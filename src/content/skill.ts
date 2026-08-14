@@ -1,6 +1,7 @@
+import { defaultTitle } from './info';
 import { SectionSchema } from '../grammar/section';
 import { BonusAmount, bonusAmount } from '../grammar/tagClause';
-import { humanize, id, text } from '../grammar/values';
+import { id, text } from '../grammar/values';
 
 export interface Skill {
   id: string;
@@ -12,7 +13,7 @@ export interface Skill {
 export const skillSchema: SectionSchema<Skill> = {
   kind: 'skill',
   fields: {
-    title: { parser: text, default: (self) => humanize(self.id) },
+    title: { parser: text, default: defaultTitle },
     'stat-id': { parser: id },
     'per-level': { parser: bonusAmount },
   },

@@ -41,7 +41,7 @@ function readable(html: string): string[] {
 function published(view: PlayView): string[] {
   return [
     view.location.title,
-    view.location.description,
+    view.location.description ?? '',
     ...view.entities.flatMap((entity) => [entity.title, entity.examine ?? '']),
     ...view.choices.flatMap((choice) => [choice.label, choice.detail ?? '']),
     ...view.resources.map((resource) => resource.title),

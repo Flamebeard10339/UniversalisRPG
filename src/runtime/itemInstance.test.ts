@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { parseSaveSection } from '../content/saveSection';
 import { Hex, PlaneNode } from '../content/hex';
 import { clusterAt, ORIGIN, pointsSpent } from './clusterPlane';
@@ -61,9 +61,9 @@ cluster-jewel: crossroads
 `;
 
 const MODULE = COMMON + RINGLET + CROSSROADS;
-const registry = loadModule(MODULE);
-const withoutCrossroads = loadModule(COMMON + RINGLET);
-const narrowed = loadModule(COMMON + RINGLET.replace('shape: ring\nopen-connections: e, ne\npassives: 1 hale, 4 stout', 'shape: point\nopen-connections: e\npassives: 1 hale') + CROSSROADS);
+const registry = loadInEnglish(MODULE);
+const withoutCrossroads = loadInEnglish(COMMON + RINGLET);
+const narrowed = loadInEnglish(COMMON + RINGLET.replace('shape: ring\nopen-connections: e, ne\npassives: 1 hale, 4 stout', 'shape: point\nopen-connections: e\npassives: 1 hale') + CROSSROADS);
 
 const position = (hex: Hex, index: number): PlaneNode => ({ hex, kind: 'position', position: index });
 const slot = (hex: Hex): PlaneNode => ({ hex, kind: 'slot', direction: 'e' });
@@ -280,7 +280,7 @@ describe('an instance across a reload', () => {
 
   it('is pruned when its own template goes', () => {
     const state = grownBlade();
-    const warnings = pruneStateForRegistry(state, loadModule(MODULE.replace('# item heartwood-blade\nslot: mainhand\norigin-cluster: ringlet\n', '')));
+    const warnings = pruneStateForRegistry(state, loadInEnglish(MODULE.replace('# item heartwood-blade\nslot: mainhand\norigin-cluster: ringlet\n', '')));
 
     expect(warnings.map((warning) => warning.message)).toContain('Removed instance 1 because its template heartwood-blade is not loaded.');
     expect(instanceIsLive(state, '1')).toBe(false);

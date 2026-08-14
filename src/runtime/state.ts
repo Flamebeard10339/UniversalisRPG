@@ -1,4 +1,6 @@
 import type { Range } from '../grammar/range';
+import { DEFAULT_LANGUAGE } from '../grammar/section';
+import type { Localized } from './localized';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import type { ActiveAction } from './encounter';
 import { createInstanceTable, type InstanceTable } from './instances';
@@ -22,12 +24,16 @@ export type ActiveBuff =
   | (TimedModifier & { kind: 'increased'; amount: number });
 
 export interface GameState extends RngCursor {
+  // The language being played. An input rather than a save field, like `log`
+  // beneath it: it belongs to the player's settings, and every site that writes
+  // a player-visible line has the state in hand and nothing else does.
+  language: string;
   flags: Record<string, boolean | number>;
   inventory: Record<string, number>;
   location: string;
   visits: Record<string, number>;
   xp: Record<string, number>;
-  log: string[];
+  log: Localized[];
   time: number;
   activeAction: ActiveAction | null;
   // The walk under way, and null when the player is not on one. journey.ts owns
@@ -47,8 +53,8 @@ export interface GameState extends RngCursor {
   modals: readonly ModalFrame[];
 }
 
-export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, journey: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
+export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
+  return { language, flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, journey: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
 }
 
 // The one seam through which simulated time advances; nothing reads a real clock.

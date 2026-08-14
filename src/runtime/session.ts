@@ -6,7 +6,7 @@ import { endJourney } from './state';
 import { itemCopies, Growth, grownItems } from './itemInstance';
 import { grow } from './growth';
 import { planeReports, type PlaneFocus, type PlaneReport } from './planeReport';
-import { parseOwnerRef } from './actions';
+import { parseOwnerRef, TRAVEL_PAIR } from './actions';
 import { spreadDiscovery } from './effects';
 import { reachable, type Journey } from './journey';
 import { armedAction, hasPool, playerCadence } from './encounter';
@@ -17,11 +17,12 @@ import { truthy } from './conditions';
 import { answerModal, dialogueFrame, Modal, modalFocus, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
 import { carriedEntries, type CarriedEntry } from './carriedScreen';
 import { Registry } from '../content/registry';
+import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { ResourceDisplay } from '../content/resource';
 import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { Directive } from '../content/test';
 import { printDirective } from '../content/serialize';
-import { humanize } from '../grammar/values';
+import { Localized, Localizer, localizerOf } from './localized';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft';
@@ -29,8 +30,8 @@ export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft';
 export interface PlayChoice {
   id: string;
   kind: PlayChoiceKind;
-  label: string;
-  detail?: string;
+  label: Localized;
+  detail?: Localized;
   // Where taking it puts the player, when taking it does nothing else. A map
   // needs to know which of the offers on the table is the way to a place, and
   // an entity that aliases a road -- a staircase, a door -- publishes an action
@@ -43,7 +44,7 @@ export interface PlayChoice {
 }
 
 export interface PlayAction {
-  label: string;
+  label: Localized;
   // Through the cycle under way, 0 to 1.
   progress: number;
   attempts: number;
@@ -55,11 +56,14 @@ export interface PlayAction {
 // Everything the engine shows, as copies: a driver renders this and reaches
 // past it for nothing.
 export interface PlayStatus {
-  location: { id: string; title: string; description: string };
-  entities: Array<{ id: string; title: string; examine?: string }>;
+  // `description` is absent rather than empty where a place says nothing about
+  // itself: there is no missing translation to report, because there is nothing
+  // to translate.
+  location: { id: string; title: Localized; description?: Localized };
+  entities: Array<{ id: string; title: Localized; examine?: Localized }>;
   choices: PlayChoice[];
   time: number;
-  resources: Array<{ id: string; title: string; current: number; max: number; display: ResourceDisplay }>;
+  resources: Array<{ id: string; title: Localized; current: number; max: number; display: ResourceDisplay }>;
   encounter: EncounterView | null;
   // Bottom of the stack first, so the last one is the one being answered.
   modals: Modal[];
@@ -87,7 +91,7 @@ export interface PlayStatus {
   xp: Record<string, number>;
   stats: Record<string, number>;
   flags: Record<string, boolean | number>;
-  discovered: Array<{ id: string; title: string; x: number; y: number; z: number; adjacent: Array<{ to: string; open: boolean }> }>;
+  discovered: Array<{ id: string; title: Localized; x: number; y: number; z: number; adjacent: Array<{ to: string; open: boolean }> }>;
   // The walk under way: where it is going and which places it has still to
   // cross, in the order it will cross them. A driver lights the route up off
   // this rather than working the route out for itself.
@@ -180,6 +184,7 @@ function fightChoices(registry: Registry, state: GameState, location: Location):
   const choices: PlayChoice[] = [];
   const player = registry.player;
   if (!player) return choices;
+  const localizer = localizerOf(registry, state);
   for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
     if (!entity) continue;
@@ -188,7 +193,7 @@ function fightChoices(registry: Registry, state: GameState, location: Location):
       if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
       if (!requiresMet(action, state) || !actionVisible(action, state)) continue;
       if (action.depletes.side === 'their' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
-      choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: action.label, detail: entity.title });
+      choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action.label), detail: localizer.title('entity', entityId) });
     }
   }
   return choices;
@@ -205,23 +210,24 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   const state = stateOf(session);
   const location = registry.locations.get(state.location);
   if (!location) return [];
+  const localizer = localizerOf(registry, state);
   const choices: PlayChoice[] = [];
 
   for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
     if (!entity) continue;
     if (canTalk(entityId, registry, state)) {
-      choices.push({ id: `talk:${entityId}`, kind: 'talk', label: `Talk to ${entity.title}` });
+      choices.push({ id: `talk:${entityId}`, kind: 'talk', label: localizer.engine('engine.talk.to', { entity: localizer.title('entity', entityId) }) });
     }
     for (const action of availableActions(entity, state)) {
-      choices.push({ id: `use:entity.${entityId}.${action.label}`, kind: 'action', label: action.label, detail: entity.title, leadsTo: movesTo(action) });
+      choices.push({ id: `use:entity.${entityId}.${action.label}`, kind: 'action', label: localizer.actionLabel('entity', entityId, action.label), detail: localizer.title('entity', entityId), leadsTo: movesTo(action) });
     }
   }
 
   choices.push(...fightChoices(registry, state, location));
 
   for (const action of availableActions(location, state)) {
-    choices.push({ id: `use:location.${location.id}.${action.label}`, kind: 'action', label: action.label, detail: location.title });
+    choices.push({ id: `use:location.${location.id}.${action.label}`, kind: 'action', label: localizer.actionLabel('location', location.id, action.label), detail: localizer.title('location', location.id) });
   }
 
   // Item actions are offered per item the player has, however the copies are
@@ -235,25 +241,27 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     const item = registry.items.get(itemId);
     if (!item) continue;
     for (const action of availableActions(item, state)) {
-      choices.push({ id: `use:item.${itemId}.${action.label}`, kind: 'action', label: action.label, detail: item.title });
+      choices.push({ id: `use:item.${itemId}.${action.label}`, kind: 'action', label: localizer.actionLabel('item', itemId, action.label), detail: localizer.title('item', itemId) });
     }
   }
 
     // TODO(inventory-crafting): stationless recipes clutter the room list. See backlog.
   for (const recipe of registry.recipes.values()) {
     if (!recipeCraftable(recipe, registry, state)) continue;
-    const detail = recipe.requiresCapability
-      ? (standingHere(registry, state, location).map((entityId) => registry.entities.get(entityId)).find((entity) => entity?.capabilities.includes(recipe.requiresCapability!))?.title ?? humanize(recipe.requiresCapability))
+    // The station is named by whoever is standing here providing it, and
+    // `recipeCraftable` has already refused the recipe if nobody is.
+    const station = recipe.requiresCapability
+      ? standingHere(registry, state, location).find((entityId) => registry.entities.get(entityId)?.capabilities.includes(recipe.requiresCapability!))
       : undefined;
-    choices.push({ id: `craft:${recipe.id}`, kind: 'craft', label: `Craft ${humanize(recipe.id)}`, detail });
+    const detail = station === undefined ? undefined : localizer.title('entity', station);
+    choices.push({ id: `craft:${recipe.id}`, kind: 'craft', label: localizer.engine('engine.craft.label', { recipe: localizer.title('recipe', recipe.id) }), detail });
   }
 
   for (const edge of location.adjacent) {
     if (edge.condition && !evaluateCondition(edge.condition, state)) continue;
     // Both are the same move, so showing the edge as well duplicates the option.
     if (entityAliasesTravelTo(location, edge.target, registry, state)) continue;
-    const target = registry.locations.get(edge.target);
-    choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: `Travel to ${target?.title ?? edge.target}`, leadsTo: edge.target, legs: 1 });
+    choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: travelLabel(localizer, edge.target), leadsTo: edge.target, legs: 1 });
   }
 
   return choices;
@@ -267,17 +275,21 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 function journeyChoices(session: PlaySession, local: PlayChoice[]): PlayChoice[] {
   const { registry } = session;
   const state = stateOf(session);
+  const localizer = localizerOf(registry, state);
   const already = new Set(local.flatMap((choice) => (choice.leadsTo === undefined ? [] : [choice.leadsTo])));
   const choices: PlayChoice[] = [];
 
   for (const [target, legs] of reachable(state.location, registry, state)) {
     if (already.has(target)) continue;
-    const place = registry.locations.get(target);
-    choices.push({ id: `travel:${target}`, kind: 'travel', label: `Travel to ${place?.title ?? target}`, leadsTo: target, legs });
+    choices.push({ id: `travel:${target}`, kind: 'travel', label: travelLabel(localizer, target), leadsTo: target, legs });
   }
 
   return choices;
 }
+
+// The destination resolves in the language being played before it is put into
+// the pattern, which is what c4's localized parameter means.
+const travelLabel = (localizer: Localizer, target: string): Localized => localizer.engine('engine.travel.to', { destination: localizer.title('location', target) });
 
 // A modal sits atop the world, so what the world offers is withdrawn until it
 // is answered; the modal publishes its own options through `view`.
@@ -309,8 +321,11 @@ export function choiceToDirective(choice: PlayChoice): Directive {
   }
 }
 
-export function startSession(registry: Registry): PlaySession {
-  const state = initialState(registry);
+// The language is an input rather than a setting the engine keeps: there is no
+// settings store yet, and a session that takes it is one a caller can open in
+// any language without one.
+export function startSession(registry: Registry, language: string = DEFAULT_LANGUAGE): PlaySession {
+  const state = initialState(registry, language);
   // Said here rather than at the first `view()`, where it surfaced as
   // "unknown location: " and named nothing an author could act on.
   if (!state.location) throw new RuntimeError('no # location is marked starting, so a new game has nowhere to begin');
@@ -367,14 +382,15 @@ export function sessionStatus(session: PlaySession): PlayStatus {
   const location = registry.locations.get(state.location);
   if (!location) throw new RuntimeError(`unknown location: ${state.location}`);
 
+  const localizer = localizerOf(registry, state);
   const entities: PlayStatus['entities'] = [];
   for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
-    if (entity) entities.push({ id: entity.id, title: entity.title, examine: entity.examine });
+    if (entity) entities.push({ id: entity.id, title: localizer.title('entity', entity.id), examine: entity.examine === undefined ? undefined : localizer.content('entity', entity.id, 'examine') });
   }
 
   return {
-    location: { id: location.id, title: location.title, description: location.examine ?? '' },
+    location: { id: location.id, title: localizer.title('location', location.id), description: location.examine === undefined ? undefined : localizer.content('location', location.id, 'examine') },
     entities,
     choices: computeChoices(session),
     time: msToSeconds(state.time),
@@ -408,11 +424,12 @@ export function carriedListing(session: PlaySession): CarriedEntry[] {
 // readable off the edges leading to it. A condition on an edge gates travelling
 // it, not knowing the road is there, so a shut way is still drawn.
 function publishDiscovered(state: GameState, registry: Registry): PlayStatus['discovered'] {
+  const localizer = localizerOf(registry, state);
   const found = [...registry.locations.values()].filter((each) => truthy(state.flags[`${each.id}.${DISCOVERED}`]));
   const known = new Set(found.map((each) => each.id));
   return found.map((each) => ({
     id: each.id,
-    title: each.title,
+    title: localizer.title('location', each.id),
     x: each.x,
     y: each.y,
     z: each.z,
@@ -425,13 +442,22 @@ function publishDiscovered(state: GameState, registry: Registry): PlayStatus['di
 }
 
 function publishResources(state: GameState, registry: Registry): PlayStatus['resources'] {
+  const localizer = localizerOf(registry, state);
   return [...registry.resources.values()].map((resource) => ({
     id: resource.id,
-    title: resource.title,
+    title: localizer.title('resource', resource.id),
     current: fromMilliUnits(state.resources[resource.id] ?? 0),
     max: statValue(resource.max, state, registry),
     display: resource.display,
   }));
+}
+
+// A travel action is compiled per pair of places rather than declared under
+// one, so there is no owner to key its display on and the engine's own pattern
+// says it — the same one the choice that started the walk was labelled with.
+function actionUnderWay(localizer: Localizer, obj: string, objId: string, label: string): Localized {
+  if (obj !== 'travel') return localizer.actionLabel(obj, objId, label);
+  return travelLabel(localizer, objId.slice(objId.indexOf(TRAVEL_PAIR) + 1));
 }
 
 function publishAction(state: GameState, registry: Registry): PlayAction | null {
@@ -440,8 +466,9 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
   const { obj, objId } = parseOwnerRef(active.ownerRef);
   const cycle = actionFirstUnit(obj, objId, active.actionLabel, registry, state);
   const clock = playerCadence(active);
+  const localizer = localizerOf(registry, state);
   return {
-    label: active.actionLabel,
+    label: actionUnderWay(localizer, obj, objId, active.actionLabel),
     progress: cycle > 0 ? Math.min(1, Math.max(0, clock.progress / cycle)) : 1,
     attempts: clock.attemptsMade,
     targeted: Boolean(armedAction(state, registry).depletes),
@@ -623,10 +650,10 @@ function performDirective(session: PlaySession, directive: Directive): { failure
     case 'slot':
     case 'allocate':
     case 'apply':
-      return grew(state, grow(state, registry, directive));
+      return grew(state, registry, grow(state, registry, directive));
     case 'refuse': {
       const growth = grow(state, registry, directive.inner);
-      grew(state, growth);
+      grew(state, registry, growth);
       return growth.ok ? { failure: `${printDirective(directive.inner)} was not refused` } : {};
     }
   }
@@ -635,9 +662,11 @@ function performDirective(session: PlaySession, directive: Directive): { failure
 // The refusal goes both ways a refused walk's does: into the log, where a
 // player reads what the world said, and back to the caller, which is how a
 // test knows the outcome rather than inferring it from state that did not move.
-function grew(state: GameState, growth: Growth): { failure?: string } {
+function grew(state: GameState, registry: Registry, growth: Growth): { failure?: string } {
   if (growth.ok) return {};
-  state.log.push(growth.refused);
+  // A plane's refusals are assembled from a hex, a direction and a node, and
+  // none of that is keyed yet, so they go through the prose door.
+  state.log.push(localizerOf(registry, state).prose(growth.refused));
   return { failure: growth.refused };
 }
 

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState } from './runtime';
-import { loadModule } from '../content/registry';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { initialLocalChangesModule } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 import { SAVE_VERSION } from './save';
@@ -92,7 +92,7 @@ interface Fixture {
 }
 
 function fixture(text: string, authoring?: AuthoringContext): Fixture {
-  const session = startSession(loadModule(text));
+  const session = startSession(loadInEnglish(text));
   const recorder: Recorder = { history: [], startSave: serializeSession(session) };
   return { session, recorder, ctx: newContext(session, view(session), { recorder, authoring }) };
 }
@@ -683,7 +683,7 @@ describe('a modal is driven by its published name and options', () => {
     expect(blocks.blocks[blocks.blocks.length - 1]).toContain('submit-modal: race=Elf');
 
     const pasted = `${MODAL_MODULE}\n${blocks.blocks.map((block) => block.join('\n')).join('\n\n')}\n`;
-    expect(runTest('crossed', loadModule(pasted), createGameState())).toEqual({ passed: true });
+    expect(runTest('crossed', loadInEnglish(pasted), createGameState())).toEqual({ passed: true });
   });
 });
 
@@ -787,7 +787,7 @@ describe('the live clock', () => {
   // Driven through the table, not around it: a live run is what the `<N>` entry
   // does when the driver says it can advance one.
   function liveFixture(text: string, choiceId: string, speed = 1) {
-    const session = startSession(loadModule(text));
+    const session = startSession(loadInEnglish(text));
     const recorder: Recorder = { history: [], startSave: serializeSession(session) };
     const ctx = newContext(session, view(session), { recorder, speed, driving: true });
     const index = ctx.view.choices.findIndex((choice) => choice.id === choiceId) + 1;
@@ -897,7 +897,7 @@ ring:
   });
 
   it('refuses a choice number no view offers, whether it arrives as a line or as an argument', () => {
-    const session = startSession(loadModule(LIVE_MODULE));
+    const session = startSession(loadInEnglish(LIVE_MODULE));
     const ctx = newContext(session, view(session), { driving: true });
     const typed = runLine(ctx, '99');
     expect(typed.live).toBeUndefined();
@@ -910,7 +910,7 @@ ring:
   });
 
   it('the same entry resolves the choice instantly when the driver cannot advance a run', () => {
-    const session = startSession(loadModule(LIVE_MODULE));
+    const session = startSession(loadInEnglish(LIVE_MODULE));
     const recorder: Recorder = { history: [], startSave: serializeSession(session) };
     const ctx = newContext(session, view(session), { recorder });
     const index = ctx.view.choices.findIndex((choice) => choice.id === 'use:entity.anvil.strike') + 1;
@@ -1056,7 +1056,7 @@ describe('the recorder: /create-test and /create-valid-test', () => {
     // The correctness gate: paste the emitted blocks into a brand-new module,
     // sharing no state with the recording session, and replay them.
     const pasted = `${TRAVEL_MODULE}\n${blocks.map((block) => block.join('\n')).join('\n\n')}\n`;
-    expect(runTest('bar', loadModule(pasted), createGameState()).passed).toBe(true);
+    expect(runTest('bar', loadInEnglish(pasted), createGameState()).passed).toBe(true);
   });
 
   it('does not prepend a second load:/-start save when the history already begins with load:', () => {
@@ -1072,7 +1072,7 @@ describe('the recorder: /create-test and /create-valid-test', () => {
   it('says so rather than throwing when the session began without a start save', () => {
     // What newContext hands a driver that keeps no recorder of its own: an
     // empty start save, which is not a save and is not JSON either.
-    const session = startSession(loadModule(TRAVEL_MODULE));
+    const session = startSession(loadInEnglish(TRAVEL_MODULE));
     const ctx = newContext(session, view(session));
     runLine(ctx, choiceIndex(ctx, 'travel:ruins'));
 
@@ -1115,7 +1115,7 @@ title: Coin
 
 describe('local DSL authoring takes its file as an argument, never reaching for one', () => {
   function authoringFixture() {
-    const baseSources: ModuleSource[] = [{ name: 'base', text: AUTHORING_MODULE }];
+    const baseSources: ModuleSource[] = [engineLocale(), { name: 'base', text: AUTHORING_MODULE }];
     const writes: string[] = [];
     const authoring: AuthoringContext = {
       baseSources,

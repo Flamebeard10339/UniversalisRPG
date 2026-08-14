@@ -2,7 +2,8 @@ import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
 import { feedItem, itemInstance } from './itemInstance';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 import { apply, applyDirective, beginAction, cancelAction, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
@@ -32,7 +33,7 @@ describe('session', () => {
   // around them — which ids are offered and withdrawn, `inDialogue`, the
   // encounter readout, `said` — none of which a `# test` directive can reach.
   it('drives the tutorial-island miki route through the choice-list API', () => {
-    const registry = loadModule(source);
+    const registry = loadInEnglish(source);
     const session = startSession(registry);
 
     let v = view(session);
@@ -151,7 +152,7 @@ describe('session', () => {
   });
 
   it('throws a clear error on an unavailable or unknown choice id', () => {
-    const registry = loadModule(source);
+    const registry = loadInEnglish(source);
     const session = startSession(registry);
     expect(() => apply(session, 'use:entity.tutorial-island.front-door.pick lock')).toThrow();
     expect(() => apply(session, 'travel:tutorial-island.beach')).toThrow();
@@ -167,7 +168,7 @@ starting
 # item bread
 eat: take: 1 bread, say: You eat the bread.
 `;
-    const session = primed(loadModule(module), { inventory: { bread: 1 } });
+    const session = primed(loadInEnglish(module), { inventory: { bread: 1 } });
 
     let v = view(session);
     expect(ids(v)).toContain('use:item.bread.eat');
@@ -200,7 +201,7 @@ node greeting:
   set: greeted
   There you are, {player.name}, {player.race}.
 `;
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
 
     let v = apply(session, 'use:entity.mirror.look in');
@@ -225,7 +226,7 @@ node greeting:
   });
 
   it('shows content-pruning warnings after loading a save with stale ids', () => {
-    const registry = loadModule(`
+    const registry = loadInEnglish(`
 # location camp
 x: 0, y: 0
 starting
@@ -278,7 +279,7 @@ out: 1 mix
 `;
 
   it('leaves a spannable entity action armed — activeAction set, progress 0, time and inventory unchanged', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
 
     const v = beginAction(session, 'use:entity.oven.roast');
@@ -289,7 +290,7 @@ out: 1 mix
   });
 
   it('completes an instant item action (no time:) immediately, same as apply', () => {
-    const session = primed(loadModule(module), { inventory: { bread: 1 } });
+    const session = primed(loadInEnglish(module), { inventory: { bread: 1 } });
 
     const v = beginAction(session, 'use:item.bread.eat');
     expect(v.action).toBeNull();
@@ -298,7 +299,7 @@ out: 1 mix
   });
 
   it('leaves a spannable craft (time: 2) armed without resolving it', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
 
     const v = beginAction(session, 'craft:dough');
@@ -308,7 +309,7 @@ out: 1 mix
   });
 
   it('completes an instant craft (no time:) immediately, same as apply', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
 
     const v = beginAction(session, 'craft:mix');
@@ -317,7 +318,7 @@ out: 1 mix
   });
 
   it('throws on an unavailable or unknown choice id, same as apply', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
     expect(() => beginAction(session, 'nonsense')).toThrow();
   });
@@ -344,7 +345,7 @@ adjacent:
 `;
 
   it('apply relocates instantly in real time while accruing the journey sim-time', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
     const journey = 1 * travelSecondsPerUnit(registry);
 
@@ -355,7 +356,7 @@ adjacent:
   });
 
   it('beginAction arms the journey spannably — location and time unchanged until driven', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
     const journey = 1 * travelSecondsPerUnit(registry);
 
@@ -373,7 +374,7 @@ adjacent:
 
 describe('travel edges aliased by a free entity relocate are hidden', () => {
   it('hides a travel edge that a stairs-like entity already offers as a free relocate', () => {
-    const registry = loadModule(source);
+    const registry = loadInEnglish(source);
     const session = startSession(registry);
 
     const choiceIds = ids(view(session));
@@ -410,7 +411,7 @@ enter:
   take: 1 coin
   relocate: cave
 `;
-    const session = primed(loadModule(module), { inventory: { coin: 1 } });
+    const session = primed(loadInEnglish(module), { inventory: { coin: 1 } });
 
     const choiceIds = ids(view(session));
     // gate.enter relocates to cave but costs a coin, so it is not a free alias —
@@ -422,7 +423,7 @@ enter:
 
 describe('cancelAction', () => {
   it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
-    const session = primed(loadModule(source), { inventory: { 'tutorial-island.dough': 2 } }); // two loaves' worth
+    const session = primed(loadInEnglish(source), { inventory: { 'tutorial-island.dough': 2 } }); // two loaves' worth
 
     beginAction(session, 'craft:tutorial-island.bread');
     const baked = wait(session, 4); // one full 3s bake done, a second one 1s in
@@ -437,7 +438,7 @@ describe('cancelAction', () => {
   });
 
   it('is a no-op when nothing is active', () => {
-    const registry = loadModule(source);
+    const registry = loadInEnglish(source);
     const session = startSession(registry);
     expect(() => cancelAction(session)).not.toThrow();
     expect(sessionStatus(session).action).toBeNull();
@@ -478,7 +479,7 @@ cancel
 `;
 
   it('begin: a repeating action then wait: to completion reproduces the same end state as an instant use:', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
 
     const instantState = createGameState();
     expect(runTest('roast-instant', registry, instantState)).toEqual({ passed: true });
@@ -492,7 +493,7 @@ cancel
   });
 
   it('begin: + a partial wait: + cancel leaves the action stopped mid-flight', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const state = createGameState();
 
     expect(runTest('roast-begin-partial-cancel', registry, state)).toEqual({ passed: true });
@@ -554,7 +555,7 @@ submit-modal: choice=Nod.
 `;
 
   it('fails, naming the modal, and passes once every option of it is answered', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
 
     expect(runTest('leaves-the-modal-open', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: character-creation' });
     expect(runTest('half-answers-the-modal', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: character-creation' });
@@ -565,7 +566,7 @@ submit-modal: choice=Nod.
   });
 
   it('holds a dialogue to the same standard, since a menu left hanging is the same unfinished route', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
 
     expect(runTest('leaves-a-dialogue-open', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: dialogue' });
     expect(runTest('answers-the-dialogue-as-a-modal', registry, createGameState())).toEqual({ passed: true });
@@ -692,7 +693,7 @@ item-experience: 1000
 
 describe('what the engine publishes', () => {
   it('carries stat values, and recomputes them when equipment changes them', () => {
-    const session = primed(loadModule(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
+    const session = primed(loadInEnglish(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
 
     expect(view(session).stats.might).toBe(4);
 
@@ -712,7 +713,7 @@ describe('what the engine publishes', () => {
   // offering them as well put the same act in two places and scoped an item to a
   // location, which nothing about an item is.
   it('offers no room-level way to wear a carried thing or take a worn one off', () => {
-    const session = primed(loadModule(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
+    const session = primed(loadInEnglish(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
 
     expect(ids(view(session)).filter((id) => id.startsWith('equip:'))).toEqual([]);
 
@@ -731,7 +732,7 @@ describe('what the engine publishes', () => {
   // under test is the published view of a copy rather than the verb that made
   // one; the verbs have their own describe below.
   it('names a grown copy beside the stacks, and offers it as its own row to wear', () => {
-    const registry = loadModule(GROWN_MODULE);
+    const registry = loadInEnglish(GROWN_MODULE);
     const grownState = createGameState('camp');
     Object.assign(grownState.inventory, { gauntlet: 2, oil: 1 });
     const grown = feedItem(grownState, registry, 'gauntlet', 'oil');
@@ -765,7 +766,7 @@ describe('what the engine publishes', () => {
   });
 
   it('carries skill xp as it is earned', () => {
-    const registry = loadModule(PUBLISHED_MODULE);
+    const registry = loadInEnglish(PUBLISHED_MODULE);
     const session = startSession(registry);
     applyDirective(session, { kind: 'load', save: 'stocked' });
 
@@ -777,7 +778,7 @@ describe('what the engine publishes', () => {
   });
 
   it('carries where the player is standing and everywhere they could walk to', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     const opening = view(session);
 
@@ -788,7 +789,7 @@ describe('what the engine publishes', () => {
   });
 
   it('fills the map in as the player walks, from wherever they are standing now', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     // The ridge is two roads out, so nothing about it is knowable from the
     // forge; arriving at the overlook is what puts it on the map.
@@ -803,7 +804,7 @@ describe('what the engine publishes', () => {
   // A `# test` opens with no location, which makes its first travel: the one
   // arrival in the engine that reaches no relocate: to spread from.
   it('discovers where a player was put down, and not only where they walked to', () => {
-    const registry = loadModule(PUBLISHED_MODULE);
+    const registry = loadInEnglish(PUBLISHED_MODULE);
     const state = createGameState();
 
     expect(runTest('placed-at-the-forge', registry, state)).toEqual({ passed: true });
@@ -821,7 +822,7 @@ describe('what the engine publishes', () => {
   // recomputed within the same application, which is the rule holding rather
   // than the result failing.
   it('cannot be hidden from a player who can reach it, whatever a result asks', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'ledger', actionId: 'forget' });
 
@@ -829,7 +830,7 @@ describe('what the engine publishes', () => {
   });
 
   it('works out what a save should have known, since a save carries both its inputs at once', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     // Written before any of this existed: it names a location and no discovery
     // at all, and loading it must not leave the player somewhere with a blank
@@ -840,7 +841,7 @@ describe('what the engine publishes', () => {
   });
 
   it('reveals what a way was shutting the moment it opens, without leaving the room', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     const opened = apply(session, 'use:entity.hatch.unlock');
 
@@ -849,7 +850,7 @@ describe('what the engine publishes', () => {
   });
 
   it('still takes a place it was told about from somewhere else', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     const told = apply(session, 'use:entity.window.look through');
 
@@ -860,7 +861,7 @@ describe('what the engine publishes', () => {
   });
 
   it('says a road is shut rather than hiding it, once both of its ends are known', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     // Scouted through the window, so the vault is known before the hatch that
     // leads to it is: knowing a road is there and being able to walk it are two
@@ -879,7 +880,7 @@ describe('what the engine publishes', () => {
   });
 
   it('carries where each place is, since a map is drawn and not listed', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     const found = view(session).discovered;
 
@@ -888,7 +889,7 @@ describe('what the engine publishes', () => {
   });
 
   it('says where a choice leads, so a map can tell which offer is the way to a place', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
     const leads = (id: string): string | undefined => view(session).choices.find((choice) => choice.id === id)?.leadsTo;
 
     // The road itself, and the ladder that is only a way down: a staircase
@@ -902,7 +903,7 @@ describe('what the engine publishes', () => {
   });
 
   it('names each discovered place with the word its author wrote', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     const found = view(session).discovered.find((place) => place.id === 'forge');
 
@@ -910,7 +911,7 @@ describe('what the engine publishes', () => {
   });
 
   it('carries how the discovered places connect, which is the other half of a map', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
     const before = view(session).discovered;
 
     const opened = apply(session, 'use:entity.hatch.unlock');
@@ -933,6 +934,8 @@ describe('what the engine withholds', () => {
     // `instances` reached this repo unpublished with nothing noticing, which is
     // what this exists to stop happening twice.
     const classified: Record<keyof GameState, 'published' | 'withheld'> = {
+      // The player chose it, so the engine does not tell them what it is.
+      language: 'withheld',
       location: 'published',
       time: 'published',
       flags: 'published',
@@ -967,7 +970,7 @@ describe('what the engine withholds', () => {
     expect(Object.keys(createGameState()).sort()).toEqual(Object.keys(classified).sort());
 
     const published = Object.keys(classified).filter((field) => classified[field as keyof GameState] === 'published');
-    const carried = new Set(Object.keys(view(startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n')))));
+    const carried = new Set(Object.keys(view(startSession(loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n')))));
     // Two of them are renamed on the way out and one is drained into `said`.
     const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action', instances: 'grown' };
     for (const field of published) expect(carried.has(renamed[field] ?? field), field).toBe(true);
@@ -1035,7 +1038,7 @@ roast:
   // `registry.saves` is writable and is the only route a driver has to load
   // one, so what a save carries has to stop being the state once it lands.
   it('does not leave the author of a save holding the state it loaded', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
     const mine = { name: 'Rowan', race: 'Elf' };
     registry.saves.set('forged', { version: SAVE_VERSION, diff: { player: mine } });
@@ -1048,7 +1051,7 @@ roast:
   });
 
   it('does not let play rewrite the save it was loaded from', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
     // The clock, not the player: modals.ts answers by replacing `state.player`
     // wholesale, so an alias could never show through it. The engine writes
@@ -1066,7 +1069,7 @@ roast:
   // One missing clock, every path that reads one. publishAction was guarded on
   // its own first and the other two still died on the same input.
   it('plays on through every path when a save left an action with no player clock', () => {
-    const registry = loadModule(FIGHT_MODULE);
+    const registry = loadInEnglish(FIGHT_MODULE);
     const session = startSession(registry);
     registry.saves.set('midfight', {
       version: SAVE_VERSION,
@@ -1085,7 +1088,7 @@ roast:
   });
 
   it('publishes an action a save left without a player clock instead of dying on the next look', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
     // checkSave takes any object here, and pruneStateForRegistry keeps it: the
     // owner and the label both resolve. Only the clock is missing.
@@ -1103,7 +1106,7 @@ roast:
 
 describe('the handle a driver obtains', () => {
   it('carries no route to the state it plays, by enumeration or by key', () => {
-    const session = startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n'));
+    const session = startSession(loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n'));
 
     // `session.state` is the compile-time half and tsc owns it. This is the
     // runtime half: a symbol member satisfied the type and handed the live
@@ -1114,7 +1117,7 @@ describe('the handle a driver obtains', () => {
   });
 
   it('refuses to play a handle it did not hand out, rather than reading undefined', () => {
-    const registry = loadModule('# location camp\nx: 0, y: 0\nstarting\n');
+    const registry = loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n');
     const forged = { registry };
 
     expect(() => view(forged)).toThrow(/not a session startSession handed out/);
@@ -1123,7 +1126,7 @@ describe('the handle a driver obtains', () => {
 
 describe('starting a session with nowhere to begin', () => {
   it('says so instead of failing later with an empty location id', () => {
-    expect(() => startSession(loadModule('# location camp\nx: 0, y: 0'))).toThrow(/no # location is marked starting/);
+    expect(() => startSession(loadInEnglish('# location camp\nx: 0, y: 0'))).toThrow(/no # location is marked starting/);
   });
 });
 
@@ -1172,7 +1175,7 @@ stats: attack 0, max-health 1000000, accuracy 100, evasion 0, swings-per-minute 
 `;
 
   function swinging(): ReturnType<typeof startSession> {
-    const session = startSession(loadModule(arena));
+    const session = startSession(loadInEnglish(arena));
     view(session);
     apply(session, 'fight:hit:dummy');
     return session;
@@ -1257,7 +1260,7 @@ refuse: apply 1 at 0,0 with lesser-orb
 `;
 
 describe('the four growth verbs through the directive surface', () => {
-  const registry = loadModule(GROWTH_MODULE);
+  const registry = loadInEnglish(GROWTH_MODULE);
 
   function stocked(): GameState {
     const state = createGameState('camp');

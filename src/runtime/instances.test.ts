@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import {
   collapseInstance,
   createInstance,
@@ -113,7 +113,7 @@ describe('creating an instance', () => {
   // set on purpose, so the two tests below are the same property from each end:
   // no accepted table mints a collision, and no mint leaves the accepted set.
   it('mints a distinct id from every counter a save is allowed to carry', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     for (const next of [0, 1, Number.MAX_SAFE_INTEGER - 2]) {
       const state = createGameState();
       loadSave(state, { version: SAVE_VERSION, diff: { instances: { next, byId: {} } } }, registry);
@@ -127,7 +127,7 @@ describe('creating an instance', () => {
   });
 
   it('never writes a save it would refuse to load, and refuses to mint rather than break that', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     loadSave(state, { version: SAVE_VERSION, diff: { instances: { next: Number.MAX_SAFE_INTEGER - 1, byId: {} } } }, registry);
     createInstance(state, TOKEN, 'charm', token({ notes: ['the last one'] }));
@@ -164,7 +164,7 @@ describe('liveness is answered in one place', () => {
 
 describe('an instance across a save round trip', () => {
   it('comes back with the same id and the same payload', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     const id = createInstance(state, TOKEN, 'charm', token({ notes: ['worn'], stat: 'might' }));
 
@@ -176,7 +176,7 @@ describe('an instance across a save round trip', () => {
   });
 
   it('is absent from a save that has none, and does not move SAVE_VERSION', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const serialized = JSON.parse(serializeSave(initialState(registry), registry));
     expect(serialized).toEqual({ version: SAVE_VERSION });
 
@@ -187,7 +187,7 @@ describe('an instance across a save round trip', () => {
   });
 
   it('keeps a counter that has run on past the instances it minted', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     removeInstance(state, createInstance(state, TOKEN, 'charm', token({ notes: ['worn'] })));
 
@@ -198,7 +198,7 @@ describe('an instance across a save round trip', () => {
 });
 
 describe('a # save body holding nonsense in the instance table', () => {
-  const registry = loadModule(MODULE);
+  const registry = loadInEnglish(MODULE);
   const load = (instances: unknown) => () => loadSave(createGameState(), { version: SAVE_VERSION, diff: { instances } }, registry);
 
   it('refuses a table that is not one', () => {
@@ -243,25 +243,25 @@ describe('content moving underneath an instance', () => {
   const WITHOUT_CHARM = MODULE.replace('# item charm\ntitle: Charm\n', '');
 
   it('prunes the instance whose template is gone, and warns like every other prune', () => {
-    const state = initialState(loadModule(MODULE));
+    const state = initialState(loadInEnglish(MODULE));
     const id = createInstance(state, TOKEN, 'charm', token({ notes: ['worn'] }));
 
-    const warnings = pruneStateForRegistry(state, loadModule(WITHOUT_CHARM));
+    const warnings = pruneStateForRegistry(state, loadInEnglish(WITHOUT_CHARM));
     expect(warnings).toContainEqual({ path: `instances.${id}`, id, message: `Removed instance ${id} because its template charm is not loaded.` });
     expect(instanceIsLive(state, id)).toBe(false);
   });
 
   it('prunes an instance whose payload kind nothing registered', () => {
-    const state = initialState(loadModule(MODULE));
+    const state = initialState(loadInEnglish(MODULE));
     state.instances = { next: 2, byId: { 1: { kind: 'kind-from-a-module-not-loaded', template: 'charm', payload: 7 } } };
 
-    const warnings = pruneStateForRegistry(state, loadModule(MODULE));
+    const warnings = pruneStateForRegistry(state, loadInEnglish(MODULE));
     expect(warnings.map((warning) => warning.message)).toEqual(['Removed instance 1 because kind-from-a-module-not-loaded is not an instance kind this engine knows.']);
     expect(state.instances.byId).toEqual({});
   });
 
   it('drops a copy a # save wrote already recording nothing, the one route past the refusal at the mint', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     const row = { kind: TOKEN, template: 'charm', payload: token() };
 
@@ -271,20 +271,20 @@ describe('content moving underneath an instance', () => {
   });
 
   it('repairs a payload whose own declaration is gone, through the kind that owns it', () => {
-    const state = initialState(loadModule(MODULE));
+    const state = initialState(loadInEnglish(MODULE));
     const id = createInstance(state, TOKEN, 'charm', token({ notes: ['worn'], stat: 'might' }));
 
-    const warnings = pruneStateForRegistry(state, loadModule(MODULE.replace('# stat might\nbase: 3\n', '')));
+    const warnings = pruneStateForRegistry(state, loadInEnglish(MODULE.replace('# stat might\nbase: 3\n', '')));
     expect(warnings).toContainEqual({ path: `instances.${id}`, id, message: `Repaired instance ${id}: dropped stat might, which is not loaded.` });
     expect(instance(state, id)!.payload).toEqual({ notes: ['worn'], stat: null, linked: [] });
   });
 
   it('repairs a reference to a pruned instance in the same pass that prunes it', () => {
-    const state = initialState(loadModule(MODULE));
+    const state = initialState(loadInEnglish(MODULE));
     const doomed = createInstance(state, TOKEN, 'charm', token({ notes: ['worn'] }));
     const holder = createInstance(state, TOKEN, 'token', token({ notes: ['holds one'], linked: [doomed] }));
 
-    const warnings = pruneStateForRegistry(state, loadModule(WITHOUT_CHARM));
+    const warnings = pruneStateForRegistry(state, loadInEnglish(WITHOUT_CHARM));
     expect(instanceIsLive(state, doomed)).toBe(false);
     expect(instance(state, holder)!.payload).toEqual({ notes: ['holds one'], stat: null, linked: [] });
     expect(warnings.map((warning) => warning.message)).toEqual([
@@ -294,18 +294,18 @@ describe('content moving underneath an instance', () => {
   });
 
   it('drops a copy a repair left recording nothing, and follows the reference that strands', () => {
-    const state = initialState(loadModule(MODULE));
+    const state = initialState(loadInEnglish(MODULE));
     const doomed = createInstance(state, TOKEN, 'charm', token({ notes: ['worn'] }));
     const middle = createInstance(state, TOKEN, 'token', token({ linked: [doomed] }));
     const outer = createInstance(state, TOKEN, 'token', token({ linked: [middle] }));
 
-    pruneStateForRegistry(state, loadModule(WITHOUT_CHARM));
+    pruneStateForRegistry(state, loadInEnglish(WITHOUT_CHARM));
     expect(state.instances.byId).toEqual({});
     expect([doomed, middle, outer].map((id) => instanceIsLive(state, id))).toEqual([false, false, false]);
   });
 
   it('reports a repair once however many rounds the table takes to settle', () => {
-    const state = initialState(loadModule(MODULE));
+    const state = initialState(loadInEnglish(MODULE));
     // Minted against the iteration order on purpose: outer is walked before
     // the middle it points at empties, so its own repair cannot happen until a
     // second round — and the survivor is walked in both of them.
@@ -316,7 +316,7 @@ describe('content moving underneath an instance', () => {
     (instance(state, outer)!.payload as Token).linked.push(middle);
     (instance(state, survivor)!.payload as Token).linked.push(doomed);
 
-    const warnings = pruneStateForRegistry(state, loadModule(WITHOUT_CHARM));
+    const warnings = pruneStateForRegistry(state, loadInEnglish(WITHOUT_CHARM));
     expect(Object.keys(state.instances.byId)).toEqual([survivor, outer]);
     expect((instance(state, outer)!.payload as Token).linked).toEqual([]);
     expect(warnings.filter((warning) => warning.id === survivor)).toEqual([
@@ -325,22 +325,22 @@ describe('content moving underneath an instance', () => {
   });
 
   it('settles the table before any other rule runs, so a field holding an id asks an answer that is final', () => {
-    const state = initialState(loadModule(MODULE));
+    const state = initialState(loadInEnglish(MODULE));
     state.inventory.charm = 2;
     const id = createInstance(state, TOKEN, 'charm', token({ notes: ['worn'] }));
 
-    const warnings = pruneStateForRegistry(state, loadModule(WITHOUT_CHARM));
+    const warnings = pruneStateForRegistry(state, loadInEnglish(WITHOUT_CHARM));
     expect(warnings.map((warning) => warning.path)).toEqual([`instances.${id}`, 'inventory.charm']);
   });
 
   it('leaves a loaded state holding no reference to an instance that is gone', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     const doomed = createInstance(state, TOKEN, 'charm', token({ notes: ['worn'] }));
     createInstance(state, TOKEN, 'token', token({ notes: ['holds one'], linked: [doomed] }));
 
     const target = createGameState();
-    const warnings = loadSave(target, parse(serializeSave(state, registry)), loadModule(WITHOUT_CHARM));
+    const warnings = loadSave(target, parse(serializeSave(state, registry)), loadInEnglish(WITHOUT_CHARM));
 
     expect(warnings.length).toBe(2);
     expect(Object.values(target.instances.byId).flatMap((held) => (held.payload as Token).linked)).toEqual([]);

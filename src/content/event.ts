@@ -1,6 +1,7 @@
+import { defaultTitle } from './info';
 import { DslError, Parser } from '../grammar/parser';
 import { SectionSchema } from '../grammar/section';
-import { humanize, id, text } from '../grammar/values';
+import { id, text } from '../grammar/values';
 
 // The closed set of moments a name may be bound to. It is closed because an
 // entity's `on <name>:` resolves to a declaration rather than to a word, so a
@@ -32,7 +33,7 @@ const triggerValue: Parser<EventTrigger> = {
 export const eventSchema: SectionSchema<GameEvent> = {
   kind: 'event',
   fields: {
-    title: { parser: text, default: (self) => humanize(self.id) },
+    title: { parser: text, default: defaultTitle },
     resource: { parser: id },
     trigger: { parser: triggerValue },
   },

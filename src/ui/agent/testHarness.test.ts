@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { asLocalized } from '../../runtime/localizedFixture';
 import { createSurfaceRegistry, installTestHarness, testState } from './testHarness';
 import type { Driver, DriverSnapshot } from '../driver';
 import { createTransientChannel, type TransientChannel } from '../transient';
@@ -10,14 +11,14 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
     live: null,
     transcript: emptyTranscript(),
     view: {
-      location: { id: 'start', title: 'Start', description: 'Here' },
+      location: { id: 'start', title: asLocalized('Start'), description: asLocalized('Here') },
       entities: [],
       choices: [
-        { id: 'talk:guide', kind: 'talk', label: 'Talk', detail: 'Guide' },
-        { id: 'travel:yard', kind: 'travel', label: 'Yard', leadsTo: 'yard' },
+        { id: 'talk:guide', kind: 'talk', label: asLocalized('Talk'), detail: asLocalized('Guide') },
+        { id: 'travel:yard', kind: 'travel', label: asLocalized('Yard'), leadsTo: 'yard' },
       ],
       time: 12,
-      resources: [{ id: 'energy', title: 'Energy', current: 3, max: 5, display: 'full' }],
+      resources: [{ id: 'energy', title: asLocalized('Energy'), current: 3, max: 5, display: 'full' }],
       encounter: null,
       modals: [],
       journey: null,
@@ -30,7 +31,7 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
       xp: {},
       stats: {},
       flags: {},
-      discovered: [{ id: 'start', title: 'Start', x: 0, y: 0, z: 0, adjacent: [{ to: 'yard', open: true }] }],
+      discovered: [{ id: 'start', title: asLocalized('Start'), x: 0, y: 0, z: 0, adjacent: [{ to: 'yard', open: true }] }],
       player: { name: 'Miri', race: 'human' },
       action: null,
       said: [],

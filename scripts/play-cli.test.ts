@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadModule } from '../src/content/registry';
+import { loadInEnglish } from '../src/content/engineLocale';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { serializeSession, startSession, view } from '../src/runtime/session';
 import { COMMANDS, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
@@ -51,7 +51,7 @@ function onPlaneScreen(save: string, item: string): string[] {
 }
 
 function driver(text: string, speed = 1, driving = false): CommandContext {
-  const session = startSession(loadModule(text));
+  const session = startSession(loadInEnglish(text));
   const recorder: Recorder = { history: [], startSave: serializeSession(session) };
   return newContext(session, view(session), { recorder, speed, driving });
 }

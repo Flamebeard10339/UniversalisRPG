@@ -1,3 +1,4 @@
+import { defaultTitle } from './info';
 import { Action, actionBody } from '../grammar/action';
 import { ActionResult, resultBlock, resultList } from '../grammar/actionResult';
 import { Condition, condition } from '../grammar/condition';
@@ -6,7 +7,7 @@ import { list } from '../grammar/list';
 import { DslError, Parser } from '../grammar/parser';
 import { Range, range } from '../grammar/range';
 import { EntryBody, SectionSchema } from '../grammar/section';
-import { duration, humanize, id, text } from '../grammar/values';
+import { duration, id, text } from '../grammar/values';
 
 export type { Action } from '../grammar/action';
 
@@ -111,7 +112,7 @@ const entityBlock: EntryBody = {
 export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'> = {
   kind: 'entity',
   fields: {
-    title: { parser: text, default: (self) => humanize(self.id) },
+    title: { parser: text, default: defaultTitle },
     examine: { parser: text },
     capabilities: { parser: list(id), keyword: 'stations', default: () => [] },
     stats: {

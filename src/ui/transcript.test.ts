@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { asLocalized } from '../runtime/localizedFixture';
 import type { CommandOutput } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 
 function viewAt(id: string, said: string[] = [], description = ''): PlayView {
   return {
-    location: { id, title: `title of ${id}`, description },
+    location: { id, title: asLocalized(`title of ${id}`), description: asLocalized(description) },
     entities: [],
     choices: [],
     time: 0,

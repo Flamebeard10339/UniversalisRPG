@@ -584,14 +584,28 @@ describe('the authored / derived boundary', () => {
     expect(hydrateSection(gold(), itemSchema).title).toBe('Gold');
   });
 
+  // Over a schema of its own, because no shipped kind reads one default from
+  // another any more: the item sentence that did was English grammar and is a
+  // `# locale` entry now.
   it('resolves a default that reads another default, with nothing ordering them', () => {
-    const mystery = parseOne('# item mystery-box', itemSchema);
-    expect(mystery.title).toBeUndefined();
-    expect(mystery.examine).toBeUndefined();
-    const hydrated = hydrateSection(mystery, itemSchema);
-    expect(hydrated.title).toBe('Mystery Box');
-    expect(hydrated.examine).toBe('This is a Mystery Box.');
-    expect(hydrateSection(parseOne('# item apple', itemSchema), itemSchema).examine).toBe('This is an Apple.');
+    const chained: SectionSchema<{ id: string; a: string; b: string }> = {
+      kind: 'chained',
+      fields: {
+        a: { parser: text, default: (self) => `${self.b}!` },
+        b: { parser: text, default: (self) => self.id.toUpperCase() },
+      },
+    };
+    expect(hydrateSection({ id: 'x' }, chained).a).toBe('X!');
+    expect(hydrateSection({ id: 'x', a: 'authored' }, chained).a).toBe('authored');
+  });
+
+  it('leaves an unauthored examine absent rather than inventing an English sentence for it', () => {
+    expect(hydrateSection(parseOne('# item mystery-box', itemSchema), itemSchema).examine).toBeUndefined();
+  });
+
+  it('reads a default against the language its module declared', () => {
+    expect(hydrateSection(parseOne('# item mystery-box', itemSchema), itemSchema, { language: 'es' }).title).toBe('mystery-box');
+    expect(hydrateSection(parseOne('# item mystery-box', itemSchema), itemSchema, { language: 'en' }).title).toBe('Mystery Box');
   });
 
   it('lets an authored field win over its default', () => {

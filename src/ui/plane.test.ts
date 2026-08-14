@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
 import { createDriver } from './driver';
 import { LABELS } from './labels';
@@ -47,7 +48,7 @@ const plane = (over: Partial<Plane> = {}): Plane => ({
 // what the runtime publishes beside them and what a view has to hold to be one.
 function viewOf(planes: Plane[], focus: PlayView['focus']): PlayView {
   return {
-    location: { id: 'hall', title: 'The Hall', description: '' },
+    location: { id: 'hall', title: asLocalized('The Hall') },
     entities: [],
     choices: [],
     time: 0,

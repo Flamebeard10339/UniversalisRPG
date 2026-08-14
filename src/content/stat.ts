@@ -1,6 +1,7 @@
+import { defaultTitle } from './info';
 import { point, Range, range } from '../grammar/range';
 import { SectionSchema } from '../grammar/section';
-import { humanize, text } from '../grammar/values';
+import { text } from '../grammar/values';
 
 export interface Stat {
   id: string;
@@ -13,7 +14,7 @@ export interface Stat {
 export const statSchema: SectionSchema<Stat> = {
   kind: 'stat',
   fields: {
-    title: { parser: text, default: (self) => humanize(self.id) },
+    title: { parser: text, default: defaultTitle },
     base: { parser: range, default: () => point(0) },
   },
 };
