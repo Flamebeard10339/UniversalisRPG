@@ -28,6 +28,8 @@ base: 60
 
 # stat max-fury
 
+# stat max-spirit
+
 # stat nick
 base: 0.4
 
@@ -37,6 +39,9 @@ max: max-health
 # resource fury
 max: max-fury
 start: 0
+
+# resource spirit
+max: max-spirit
 
 # event death
 resource: health
@@ -85,6 +90,12 @@ rate: my attack-rate
 damage: my attack vs their dr
 depletes: their health
 
+# action sap
+title: sap
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their spirit
+
 # action feint
 title: feint
 rate: my attack-rate
@@ -94,7 +105,7 @@ depletes: their health
 
 # entity player
 title: You
-stats: max-health 100, max-fury 10, attack 1, attack-rate 60, aim 0, dodge 0
+stats: max-health 100, max-fury 10, max-spirit 30, attack 1, attack-rate 60, aim 0, dodge 0
 uses: swing, feint
 on hit: restore: 2 fury
 
@@ -124,6 +135,13 @@ title: Minion
 stats: max-health 5, max-fury 0, attack 1, attack-rate 60, aim 1000, dodge 0
 uses: swing
 
+// Sapped for a pool the wisp itself has no ceiling for, which is the shape
+// that tells the two branches of the reached-character verdict apart.
+# entity wisp
+title: Wisp
+stats: max-health 20, max-fury 0, max-spirit 0, attack 1, attack-rate 60, aim 1000, dodge 0
+uses: sap
+
 # entity anvil
 title: Anvil
 stats: max-health 100, max-fury 0, attack-rate 60, aim 1000, dodge 0
@@ -135,7 +153,7 @@ pry:
 # location arena
 x: 0, y: 0
 starting
-entities: dummy, biter, boss, minion, anvil
+entities: dummy, biter, boss, minion, wisp, anvil
 `;
 
 const loaded = (): Registry => loadModule(MODULE);
@@ -345,6 +363,22 @@ describe('depletion is decided after the hooks, over everyone they reached (c9)'
     // It swung once and never again.
     expect(state.log.filter((line) => line.startsWith('The Minion hits you'))).toHaveLength(1);
     expect(state.log.filter((line) => line.startsWith('The Boss hits you'))).toHaveLength(3);
+  });
+
+  it('does not fell a character a hook reached through a pool that character has no ceiling for', () => {
+    const registry = loaded();
+    const state = arena(registry);
+    wearing(registry, state, 'briar-mail');
+    armFightAction('swing', 'wisp', registry, state);
+
+    // The wisp saps spirit, which it carries none of itself. Its own swing
+    // fires the mail, so the verdict reaches it -- and reads the pool the
+    // fight is measured on, which for the wisp is a ceiling of zero.
+    resolve(state, registry, secondsToMs(1));
+    expect(state.activeAction).not.toBeNull();
+    expect(Object.keys(state.activeAction!.actors!)).toEqual(['wisp']);
+    expect(own(state, 'spirit')).toBe(29);
+    expect(foeHealth(state, 'wisp')).toBe(14);
   });
 
   it('fells a swinger with what it struck, and ends the fight because it was the target', () => {
