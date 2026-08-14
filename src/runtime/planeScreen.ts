@@ -90,7 +90,7 @@ function stacked(state: GameState, registry: Registry, spent: (item: Item) => bo
   const base = localizerFor(registry, BASE_LANGUAGE);
   return [...itemCopies(state)].flatMap(([id, { stack }]) => {
     const item = registry.items.get(id);
-    return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(localizer, 'item', id, false), base: carriedName(base, 'item', id, false) }] : [];
+    return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(localizer, 'item', id, null), base: carriedName(base, 'item', id, null) }] : [];
   });
 }
 

@@ -111,6 +111,21 @@ describe('creating an instance', () => {
     expect(instanceIsLive(state, first)).toBe(false);
   });
 
+  // c1: the ordinal is a counter reading and nothing else, so it is the one
+  // thing about a copy that no later edit to the copy can move. Rewriting the
+  // template through the table is what a transform would do; the copy answers
+  // to the same ordinal on the far side of it.
+  it('mints an ordinal that does not encode what the copy is of, and keeps it when that changes', () => {
+    const state = createGameState();
+    const charm = createInstance(state, TOKEN, 'charm', token({ notes: ['first'] }));
+    const relic = createInstance(state, TOKEN, 'relic', token({ notes: ['second'] }));
+    expect([charm, relic]).toEqual(['1', '2']);
+
+    (state.instances.byId[charm] as { template: string }).template = 'relic';
+    expect(instance(state, charm)).toEqual({ kind: TOKEN, template: 'relic', payload: token({ notes: ['first'] }) });
+    expect(createInstance(state, TOKEN, 'charm', token({ notes: ['third'] }))).toBe('3');
+  });
+
   // The counters a `# save` may carry and the ones a mint may advance are one
   // set on purpose, so the two tests below are the same property from each end:
   // no accepted table mints a collision, and no mint leaves the accepted set.

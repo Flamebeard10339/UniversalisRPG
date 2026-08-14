@@ -182,7 +182,7 @@ export function planeReport(registry: Registry, state: GameState, target: string
     instance: target,
     template,
     title: localizer.title('item', template),
-    name: carriedName(localizer, 'item', template, grown),
+    name: carriedName(localizer, 'item', template, grown ? target : null),
     level: itemLevel(payload, item),
     maxLevel: item.maxLevel,
     spent: pointsSpent(payload.plane),

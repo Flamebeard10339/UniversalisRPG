@@ -45,6 +45,10 @@ export interface Localizer {
   // Content speaking. Addressed by what it is rather than by what it says, so
   // no prose can enter through this door either.
   content(kind: string, id: string, field: string, params?: Params): Localized;
+  // The same, and nothing where the played language has none. Every other door
+  // answers a missing entry with the key, which is the right answer for a thing
+  // that has one; this is for the caller that has something else to show (c1).
+  words(kind: string, id: string, field: string, params?: Params): Localized | undefined;
   title(kind: string, id: string): Localized;
   // An action's display, keyed on a slug of its label; the label stays the
   // identifier (c8).
@@ -67,6 +71,8 @@ export interface Localizer {
 // answer a `# test` replays cannot move with the player's setting.
 export const BASE_LANGUAGE = 'en';
 
+const contentKey = (registry: Registry, kind: string, id: string, field: string): string => localeKey(registry.namespace.ownerOf(kind, id) ?? null, kind, id, field);
+
 export function localizerFor(registry: Registry, language: string): Localizer {
   const { locales } = registry;
   const self: Localizer = {
@@ -75,10 +81,11 @@ export function localizerFor(registry: Registry, language: string): Localizer {
       const found = pattern(locales, language, key);
       return (found === undefined ? key : substitute(found, key, params)) as Localized;
     },
-    content: (kind, id, field, params = {}) => {
-      const key = localeKey(registry.namespace.ownerOf(kind, id) ?? null, kind, id, field);
+    content: (kind, id, field, params = {}) => self.words(kind, id, field, params) ?? (contentKey(registry, kind, id, field) as Localized),
+    words: (kind, id, field, params = {}) => {
+      const key = contentKey(registry, kind, id, field);
       const found = pattern(locales, language, key);
-      return (found === undefined ? key : substitute(found, key, params)) as Localized;
+      return found === undefined ? undefined : (substitute(found, key, params) as Localized);
     },
     title: (kind, id) => self.content(kind, id, 'title'),
     actionLabel: (kind, ownerId, label) => self.content(kind, ownerId, actionSlug(label)),

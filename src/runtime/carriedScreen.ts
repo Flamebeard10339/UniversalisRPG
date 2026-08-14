@@ -112,10 +112,8 @@ export function carriedFrame(answers: ModalAnswers = {}): CarriedFrame {
   return { name: 'carried-items', answers };
 }
 
-// An item the registry no longer holds has no title in any language, so its key
-// stands in — the same answer every other missing string gets (c3).
-function nameOf(template: string, localizer: Localizer, grown: boolean): Localized {
-  return carriedName(localizer, 'item', template, grown);
+function nameOf(template: string, localizer: Localizer, copy: string | null): Localized {
+  return carriedName(localizer, 'item', template, copy);
 }
 
 // Two items may be named alike, and an answer is matched back by the value it
@@ -137,19 +135,20 @@ export function carriedEntries(state: GameState, registry: Registry): CarriedEnt
   const base = localizerFor(registry, BASE_LANGUAGE);
   const entries: CarriedEntry[] = [];
   for (const [template, { stack }] of itemCopies(state)) {
-    const name = nameOf(template, localizer, false);
-    if (stack > 0) entries.push({ id: template, name, count: stack, value: `${nameOf(template, base, false)} x${stack}`, shown: localizer.engine('engine.carried.stack', { item: name, count: stack }), grown: false });
+    const name = nameOf(template, localizer, null);
+    if (stack > 0) entries.push({ id: template, name, count: stack, value: `${nameOf(template, base, null)} x${stack}`, shown: localizer.engine('engine.carried.stack', { item: name, count: stack }), grown: false });
   }
   for (const [id, template] of Object.entries(grownItems(state))) {
     if (wornIn(state, id) !== undefined) continue;
-    const name = nameOf(template, localizer, true);
-    entries.push({ id, name, count: 1, value: nameOf(template, base, true), shown: name, grown: true });
+    const name = nameOf(template, localizer, id);
+    entries.push({ id, name, count: 1, value: nameOf(template, base, id), shown: name, grown: true });
   }
   for (const [slot, id] of Object.entries(state.equipped)) {
     const grown = isGrownCopy(state, id);
     const template = itemTemplate(state, id);
-    const name = nameOf(template, localizer, grown);
-    entries.push({ id: grown ? id : wornCopy(slot), name, count: 1, value: `${nameOf(template, base, grown)} (${slot})`, shown: localizer.engine('engine.carried.worn', { item: name, slot: localizer.identifier(slot) }), grown, slot });
+    const copy = grown ? id : null;
+    const name = nameOf(template, localizer, copy);
+    entries.push({ id: grown ? id : wornCopy(slot), name, count: 1, value: `${nameOf(template, base, copy)} (${slot})`, shown: localizer.engine('engine.carried.worn', { item: name, slot: localizer.identifier(slot) }), grown, slot });
   }
   return distinct(entries);
 }

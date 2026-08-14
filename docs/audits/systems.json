@@ -503,6 +503,13 @@
             "src/runtime/translationSurvival.test.ts"
           ],
           "note": "produced by a-recording-survives-translation; c5's gate, replaying every shipped # test over that universe in both languages and naming the ones that do not survive yet"
+        },
+        {
+          "name": "the name of an instance with no key",
+          "paths": [
+            "src/runtime/carriedName.ts"
+          ],
+          "note": "produced by an-instance-is-named-from-its-template; where the played language has no title for the template, a grown copy is named <template>#<ordinal> rather than the template's key, because a locale addresses only a template"
         }
       ]
     },

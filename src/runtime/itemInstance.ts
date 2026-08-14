@@ -311,7 +311,7 @@ export function feedItem(state: GameState, registry: Registry, target: string, f
     target,
     consumes: food,
     change: (payload, item) => {
-      if (itemLevel(payload, item) >= item.maxLevel) return localizer.engine('engine.growth.max-level', { item: carriedName(localizer, 'item', item.id, false), level: item.maxLevel });
+      if (itemLevel(payload, item) >= item.maxLevel) return localizer.engine('engine.growth.max-level', { item: carriedName(localizer, 'item', item.id, null), level: item.maxLevel });
       payload.experience += experience;
       return undefined;
     },
