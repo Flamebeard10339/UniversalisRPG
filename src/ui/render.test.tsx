@@ -50,14 +50,16 @@ function published(view: PlayView): string[] {
     ...view.choices.flatMap((choice) => [choice.label, choice.detail ?? '']),
     ...view.resources.map((resource) => resource.title),
     ...view.modals.flatMap((modal) => modal.options.flatMap((option) => [option.label as string, ...(option.values ?? []).map((choice) => choice.shown as string)])),
-    // The map and the character sheet. Stats and skills publish keys and not
-    // titles, so a key is what the engine gave and a key is what the sheet may
-    // draw; what the player carries publishes a name, and that is what its rows
-    // and the equipment rows beside them read (c16).
+    // The map and the character sheet. A key is what the engine gave and a key
+    // is what the sheet may draw -- except for a stat, which the engine now
+    // gives a title as well and which the sheet draws by that title (c9,
+    // superseding c16's ruling on stats and no other). What the player carries
+    // publishes a name, and that is what its rows and the equipment rows beside
+    // them read (c16).
     ...view.discovered.flatMap((place) => [place.id, place.title]),
     ...view.carried.map((row) => row.name),
     ...Object.keys(view.xp),
-    ...Object.keys(view.stats),
+    ...Object.values(view.statTitles),
     ...Object.keys(view.equipment),
     ...view.said,
   ];
@@ -372,7 +374,13 @@ describe('what the shell puts on the screen', () => {
 
     expect(Object.keys(view.stats)).toContain('surveyed.might');
     expect(view.carried.map((row) => row.id)).toContain('surveyed.ore');
-    for (const stat of Object.keys(view.stats)) expect(runs).toContain(stat);
+    // c9: every stat reaches the page under the title the engine published for
+    // it and none of them under the id that title was published beside.
+    expect(view.statTitles['surveyed.might']).toBe('Might');
+    for (const [statId, title] of Object.entries(view.statTitles)) {
+      expect(runs).toContain(title);
+      expect(runs).not.toContain(statId);
+    }
     for (const skill of Object.keys(view.xp)) expect(runs).toContain(skill);
 
     // c16 and c18: a carried thing reaches the page under the name the engine

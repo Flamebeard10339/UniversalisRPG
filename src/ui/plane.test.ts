@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
-import { localizerFor } from '../runtime/localized';
+import { localizerFor, type Localized } from '../runtime/localized';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
 import { createDriver } from './driver';
@@ -23,7 +23,11 @@ type Position = Cluster['positions'][number];
 type Slot = Cluster['slots'][number];
 type Payload = Position['payloads'][number];
 
-const flat = (statId: string, amount: number, scale = 1): Payload => ({ statId, effective: { percent: false, amount: { min: amount, max: amount } }, scale });
+// Every fixture stat keyed and named, and named nothing like its key, so a row
+// that spelled the id reads differently from one that spelled the title.
+const TITLE: Record<string, Localized> = { 'mod.attack': asLocalized('Attack'), 'mod.max-health': asLocalized('Max Health'), 'mod.defense': asLocalized('Defense') };
+
+const flat = (statId: string, amount: number, scale = 1): Payload => ({ statId, statTitle: TITLE[statId], effective: { percent: false, amount: { min: amount, max: amount } }, scale });
 
 const position = (over: Partial<Position> = {}): Position => ({ position: 1, passive: 'mod.hale', title: asLocalized('Hale'), standing: 'unreached', free: false, payloads: [], ...over });
 
@@ -75,6 +79,7 @@ function viewOf(planes: Plane[], focus: PlayView['focus']): PlayView {
     equipment: {},
     xp: {},
     stats: {},
+    statTitles: {},
     flags: {},
     discovered: [],
     journey: null,
@@ -180,14 +185,14 @@ describe('the plane the view says is in hand', () => {
   it('states what a position pays as the effective amount, with the factor that made it', () => {
     const payloads = [
       flat('mod.attack', 3),
-      { statId: 'mod.max-health', effective: { percent: true, amount: 12 }, scale: 1 } as Payload,
-      { statId: 'mod.defense', effective: { percent: false, amount: { min: 2, max: 6 } }, scale: 1 } as Payload,
+      { statId: 'mod.max-health', statTitle: TITLE['mod.max-health'], effective: { percent: true, amount: 12 }, scale: 1 } as Payload,
+      { statId: 'mod.defense', statTitle: TITLE['mod.defense'], effective: { percent: false, amount: { min: 2, max: 6 } }, scale: 1 } as Payload,
       flat('mod.attack', 4.5, 1.5),
       flat('mod.attack', -2),
     ];
     const view = drawn([plane({ clusters: [cluster({ positions: [position({ payloads })] })] })], { instance: '1', hex: '0,0' });
 
-    expect(rowsOf(view!)[0][ROW.worth]).toBe('+3 attack, +12% max-health, +2-6 defense, +4.5 attack ×1.5, -2 attack');
+    expect(rowsOf(view!)[0][ROW.worth]).toBe('+3 Attack, +12% Max Health, +2-6 Defense, +4.5 Attack ×1.5, -2 Attack');
   });
 
   it('invents no word: every one it draws is the engine’s or the shell’s own table', () => {
@@ -275,7 +280,7 @@ describe('the route a row opens', () => {
     // The spindle's three positions and its one exit: the root the jewel came
     // with, the node a point may go to next, and two the plane has not reached.
     expect(rowsOf(view)).toEqual([
-      { node: shellWord('position', { position: 1 }), standing: shellWord('free'), what: 'Honed', worth: '+3 attack' },
+      { node: shellWord('position', { position: 1 }), standing: shellWord('free'), what: 'Honed', worth: '+3 Attack' },
       { node: shellWord('position', { position: 2 }), standing: shellWord('ready'), what: null, worth: null },
       { node: shellWord('position', { position: 3 }), standing: shellWord('locked'), what: null, worth: null },
       { node: shellWord('slot', { direction: asLocalized('e') }), standing: shellWord('locked'), what: null, worth: null },

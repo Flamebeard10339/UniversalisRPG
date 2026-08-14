@@ -9,7 +9,11 @@ import { formatPlane } from './planeView';
 // file under test spells none of them (c5).
 const localizer = localizerFor(loadInEnglish(''), 'en');
 
-const flat = (statId: string, amount: number, scale = 1): PayloadReport => ({ statId, effective: { percent: false, amount: { min: amount, max: amount } }, scale });
+// One stat, keyed and named, so a row that spelled the id instead of the title
+// reads differently from one that spelled the title.
+const STAT = { statId: 'mod.attack', statTitle: asLocalized('Attack') };
+
+const flat = (amount: number, scale = 1, statTitle = STAT.statTitle): PayloadReport => ({ statId: STAT.statId, statTitle, effective: { percent: false, amount: { min: amount, max: amount } }, scale });
 
 const position = (over: Partial<PositionReport> = {}): PositionReport => ({
   position: 1,
@@ -71,11 +75,11 @@ describe('formatPlane', () => {
     const carried = cluster({
       modSlots: 2,
       effects: [
-        { id: 'mod.orb', title: asLocalized('Orb of the Edge'), effect: { statId: 'mod.attack', percent: 25 } },
-        { id: 'mod.lesser', title: asLocalized('Lesser Orb'), effect: { statId: 'mod.attack', percent: 10 } },
+        { id: 'mod.orb', title: asLocalized('Orb of the Edge'), statTitle: STAT.statTitle, effect: { statId: 'mod.attack', percent: 25 } },
+        { id: 'mod.lesser', title: asLocalized('Lesser Orb'), statTitle: STAT.statTitle, effect: { statId: 'mod.attack', percent: 10 } },
       ],
     });
-    expect(shown(plane({ clusters: [carried] }))).toContain('mods 2/2\n       Orb of the Edge +25% attack, Lesser Orb +10% attack');
+    expect(shown(plane({ clusters: [carried] }))).toContain('mods 2/2\n       Orb of the Edge +25% Attack, Lesser Orb +10% Attack');
   });
 
   it('spells the four standings a point can be in', () => {
@@ -90,24 +94,24 @@ describe('formatPlane', () => {
   });
 
   it('states the effective payload first and the factor that made it after', () => {
-    const scaled = position({ title: asLocalized('Honed'), standing: 'allocated', payloads: [flat('mod.attack', 4.05, 1.35)] });
-    expect(shown(plane({ clusters: [cluster({ positions: [scaled] })] }))).toContain('Honed  +4.05 attack ×1.35');
+    const scaled = position({ title: asLocalized('Honed'), standing: 'allocated', payloads: [flat(4.05, 1.35)] });
+    expect(shown(plane({ clusters: [cluster({ positions: [scaled] })] }))).toContain('Honed  +4.05 Attack ×1.35');
   });
 
   it('leaves the factor off a payload nothing scaled', () => {
-    const plain = position({ title: asLocalized('Honed'), standing: 'allocated', payloads: [flat('mod.attack', 3)] });
-    expect(shown(plane({ clusters: [cluster({ positions: [plain] })] }))).toContain('Honed  +3 attack');
+    const plain = position({ title: asLocalized('Honed'), standing: 'allocated', payloads: [flat(3)] });
+    expect(shown(plane({ clusters: [cluster({ positions: [plain] })] }))).toContain('Honed  +3 Attack');
     expect(shown(plane({ clusters: [cluster({ positions: [plain] })] }))).not.toContain('×');
   });
 
   it('writes a percent payload as a percent and a negative one with its sign', () => {
     const both = [
-      position({ position: 1, title: asLocalized('Brutal'), payloads: [{ statId: 'mod.attack', effective: { percent: true, amount: 10.8 }, scale: 1.35 }] }),
-      position({ position: 2, title: asLocalized('Cursed'), payloads: [flat('mod.attack', -3)] }),
+      position({ position: 1, title: asLocalized('Brutal'), payloads: [{ ...STAT, effective: { percent: true, amount: 10.8 }, scale: 1.35 }] }),
+      position({ position: 2, title: asLocalized('Cursed'), payloads: [flat(-3)] }),
     ];
     const rows = shown(plane({ clusters: [cluster({ positions: both })] }));
-    expect(rows).toContain('+10.8% attack ×1.35');
-    expect(rows).toContain('-3 attack');
+    expect(rows).toContain('+10.8% Attack ×1.35');
+    expect(rows).toContain('-3 Attack');
   });
 
   it('marks a position the jewel left empty rather than leaving the row bare', () => {
@@ -146,13 +150,13 @@ describe('formatPlane', () => {
 
   it('aligns what a position pays into one column across a cluster', () => {
     const positions = [
-      position({ position: 1, title: asLocalized('Hale'), standing: 'allocated', payloads: [flat('mod.max-health', 15)] }),
-      position({ position: 2, title: asLocalized('Swift Hands'), standing: 'available', payloads: [flat('mod.attack-rate', 2)] }),
+      position({ position: 1, title: asLocalized('Hale'), standing: 'allocated', payloads: [flat(15, 1, asLocalized('Max Health'))] }),
+      position({ position: 2, title: asLocalized('Swift Hands'), standing: 'available', payloads: [flat(2, 1, asLocalized('Attack Rate'))] }),
     ];
     const rows = formatPlane(plane({ clusters: [cluster({ positions })] }), false, null, localizer).slice(3);
     expect(rows).toEqual([
-      '    Spent  Position 1  Hale         +15 max-health',
-      '    Ready  Position 2  Swift Hands  +2 attack-rate',
+      '    Spent  Position 1  Hale         +15 Max Health',
+      '    Ready  Position 2  Swift Hands  +2 Attack Rate',
     ]);
   });
 

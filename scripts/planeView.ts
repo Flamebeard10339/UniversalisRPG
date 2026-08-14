@@ -56,7 +56,7 @@ function magnitude(bonus: BonusAmount): string {
 // never has to multiply to know what a position pays (c19).
 function payload(report: PayloadReport): string {
   const scale = report.scale === 1 ? '' : ` ×${trim(report.scale)}`;
-  return `${magnitude(report.effective)} ${bare(report.statId)}${scale}`;
+  return `${magnitude(report.effective)} ${report.statTitle}${scale}`;
 }
 
 function worth(payloads: readonly PayloadReport[], localizer: Localizer): Localized {
@@ -104,7 +104,7 @@ function clusterHeading(cluster: ClusterReport, focused: boolean, localizer: Loc
   const marked = laidOut(localizer, [localizer.identifier(focused ? '>' : ''), heading], [2]);
   if (cluster.effects.length === 0) return [marked];
   const effects = cluster.effects.map((each) =>
-    localizer.engine('engine.repl.plane.effect', { effect: each.title, amount: localizer.identifier(signed(each.effect.percent)), stat: localizer.identifier(bare(each.effect.statId)) }),
+    localizer.engine('engine.repl.plane.effect', { effect: each.title, amount: localizer.identifier(signed(each.effect.percent)), stat: each.statTitle }),
   );
   return [marked, laidOut(localizer, [localizer.identifier(''), localizer.identifier(effects.join(', '))], [7])];
 }

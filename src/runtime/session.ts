@@ -92,6 +92,10 @@ export interface PlayStatus {
   equipment: Record<Answer, Answer>;
   xp: Record<Answer, number>;
   stats: Record<Answer, number>;
+  // What each of those stats is called, under the id the dictionary above keys
+  // it by, so a page listing them draws a title in the language being played
+  // rather than the id it looked the number up with (c9).
+  statTitles: Record<Answer, Localized>;
   flags: Record<Answer, boolean | number>;
   discovered: Array<{ id: Answer; title: Localized; x: number; y: number; z: number; adjacent: Array<{ to: Answer; open: boolean }> }>;
   // The walk under way: where it is going and which places it has still to
@@ -415,6 +419,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     equipment: { ...state.equipped },
     xp: { ...state.xp },
     stats: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, statValue(stat.id, state, registry)])),
+    statTitles: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, localizer.title('stat', stat.id)])),
     flags: { ...state.flags },
     discovered: publishDiscovered(state, registry),
     journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,

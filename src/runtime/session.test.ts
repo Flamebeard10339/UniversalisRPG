@@ -586,6 +586,10 @@ const PUBLISHED_MODULE = `
 # stat might
 base: 4
 
+# stat grit
+title: Fortitude
+base: 2
+
 # skill smithing
 
 # location forge
@@ -698,6 +702,17 @@ item-experience: 1000
 `;
 
 describe('what the engine publishes', () => {
+  // c9: a stat reaches a page under a title rather than under the id the number
+  // is keyed by, and the title is the localizer's — an authored one where the
+  // content wrote one, and English's own reading of the id where it did not.
+  it('names every stat it counts, beside the id it counted it under', () => {
+    const v = view(startSession(loadInEnglish(PUBLISHED_MODULE)));
+
+    expect(Object.keys(v.statTitles).sort()).toEqual(Object.keys(v.stats).sort());
+    expect(v.statTitles.grit).toBe('Fortitude');
+    expect(v.statTitles.might).toBe('Might');
+  });
+
   it('carries stat values, and recomputes them when equipment changes them', () => {
     const session = primed(loadInEnglish(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
 

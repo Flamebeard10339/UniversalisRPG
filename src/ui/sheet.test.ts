@@ -28,22 +28,43 @@ const plane = (over: Partial<Plane> = {}): Plane => ({
   ...over,
 });
 
-const flat = (statId: string, amount: number): PlayStatus['planes'][number]['contributions'][number] => ({ statId, added: { min: amount, max: amount }, increased: 0 });
+type Contribution = PlayStatus['planes'][number]['contributions'][number];
+
+// One stat, keyed and named, so a row that spelled the id reads differently
+// from one that spelled the title.
+const STAT = { statId: 'mod.attack', statTitle: asLocalized('Attack') };
+
+const flat = (amount: number): Contribution => ({ ...STAT, added: { min: amount, max: amount }, increased: 0 });
 
 describe('a published dictionary as rows', () => {
+  const TITLES = { 'base.attack': asLocalized('Attack'), 'base.guile': asLocalized('Guile') };
+
   it('sorts by name, so a row does not move when its number does', () => {
-    expect(counted({ rope: 2, chestnut: 5, awl: 1 }, localizer).map((entry) => entry.name)).toEqual(['awl', 'chestnut', 'rope']);
+    expect(counted({ rope: 2, chestnut: 5, awl: 1 }, {}, localizer).map((entry) => entry.name)).toEqual(['awl', 'chestnut', 'rope']);
   });
 
   it('reads a whole number as one and a fraction as one place, the way every other readout does', () => {
-    expect(counted({ coins: 12, luck: 0.25 }, localizer)).toEqual([
+    expect(counted({ coins: 12, luck: 0.25 }, {}, localizer)).toEqual([
       { name: 'coins', value: '12' },
       { name: 'luck', value: '0.3' },
     ]);
   });
 
+  // c9: a row is called what the engine published it as, and sorts under that,
+  // so the id it was keyed under never reaches the page.
+  it('names a row by the title published beside its key', () => {
+    expect(counted({ 'base.guile': 3, 'base.attack': 7 }, TITLES, localizer)).toEqual([
+      { name: 'Attack', value: '7' },
+      { name: 'Guile', value: '3' },
+    ]);
+  });
+
+  it('draws a row under its key where the engine published no title for it', () => {
+    expect(counted({ woodcutting: 4 }, TITLES, localizer)).toEqual([{ name: 'woodcutting', value: '4' }]);
+  });
+
   it('has nothing to draw for a player carrying nothing', () => {
-    expect(counted({}, localizer)).toEqual([]);
+    expect(counted({}, {}, localizer)).toEqual([]);
     expect(carried([], [], localizer)).toEqual([]);
     expect(worn([], [], localizer)).toEqual([]);
   });
@@ -72,13 +93,13 @@ describe('what the player carries, as rows', () => {
 
   it('states the stat summary beneath a grown copy, read from the plane the engine published', () => {
     const grown = row({ id: '1', name: asLocalized('Modified Blade'), grown: true });
-    const published = plane({ instance: '1', contributions: [flat('mod.attack', 15), { statId: 'mod.max-health', added: { min: 0, max: 0 }, increased: 25 }] });
-    expect(carried([grown], [published], localizer)[0].detail).toBe('+15 attack, +25% max-health');
+    const published = plane({ instance: '1', contributions: [flat(15), { statId: 'mod.max-health', statTitle: asLocalized('Max Health'), added: { min: 0, max: 0 }, increased: 25 }] });
+    expect(carried([grown], [published], localizer)[0].detail).toBe('+15 Attack, +25% Max Health');
   });
 
   it('leaves a stack without a summary, because a stack copy is what its item already says it is', () => {
     const stack = row({ id: 'blade', name: asLocalized('Blade') });
-    const published = plane({ instance: 'blade', contributions: [flat('mod.attack', 15)] });
+    const published = plane({ instance: 'blade', contributions: [flat(15)] });
     expect(carried([stack], [published], localizer)[0].detail).toBeUndefined();
   });
 
@@ -90,12 +111,12 @@ describe('what the player carries, as rows', () => {
 
 describe('a contribution, as words', () => {
   it('states a range as a range and a percent channel apart from a flat one', () => {
-    expect(contributionText([{ statId: 'mod.attack', added: { min: 2, max: 6 }, increased: 10 }], localizer)).toBe('+2-6 attack, +10% attack');
+    expect(contributionText([{ ...STAT, added: { min: 2, max: 6 }, increased: 10 }], localizer)).toBe('+2-6 Attack, +10% Attack');
   });
 
   it('signs a penalty and says nothing about a channel that is empty', () => {
-    expect(contributionText([{ statId: 'mod.attack', added: { min: -3, max: -3 }, increased: 0 }], localizer)).toBe('-3 attack');
-    expect(contributionText([{ statId: 'mod.attack', added: { min: 0, max: 0 }, increased: 0 }], localizer)).toBe('');
+    expect(contributionText([{ ...STAT, added: { min: -3, max: -3 }, increased: 0 }], localizer)).toBe('-3 Attack');
+    expect(contributionText([{ ...STAT, added: { min: 0, max: 0 }, increased: 0 }], localizer)).toBe('');
   });
 });
 
@@ -116,14 +137,14 @@ describe('what the player is wearing, as rows', () => {
   // them apart has to be here rather than only on the carried page.
   it('states a worn grown copy’s contribution beneath its name', () => {
     const rows = [row({ id: '1', name: asLocalized('Modified Blade'), grown: true, slot: 'mainhand' })];
-    const published = plane({ instance: '1', contributions: [flat('mod.attack', 15)] });
+    const published = plane({ instance: '1', contributions: [flat(15)] });
 
-    expect(worn(rows, [published], localizer)[0].detail).toBe('+15 attack');
+    expect(worn(rows, [published], localizer)[0].detail).toBe('+15 Attack');
   });
 
   it('leaves a worn stack copy without a summary, the way the carried page leaves its stack', () => {
     const rows = [row({ id: 'worn:mainhand', name: asLocalized('Blade'), slot: 'mainhand' })];
-    const published = plane({ instance: 'worn:mainhand', contributions: [flat('mod.attack', 15)] });
+    const published = plane({ instance: 'worn:mainhand', contributions: [flat(15)] });
 
     expect(worn(rows, [published], localizer)[0].detail).toBeUndefined();
   });

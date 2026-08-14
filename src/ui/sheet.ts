@@ -1,13 +1,12 @@
 import type { Answer, Localized, Localizer } from '../runtime/localized';
 import type { PlayStatus } from '../runtime/session';
-import { bare, signed, tidy } from './format';
+import { signed, tidy } from './format';
 
 export interface Entry {
   // What the row is of. Words where the engine published words, and the id or
-  // the count it published where it published one of those: a stat is a key, a
-  // slot is a slot, and both go through `identifier()` because a thing with no
-  // language is spelled the same in every one of them (c1's ruling on that
-  // door).
+  // the count it published where it published one of those: a slot is a slot,
+  // and it goes through `identifier()` because a thing with no language is
+  // spelled the same in every one of them (c1's ruling on that door).
   name: Localized;
   value: Localized;
   // The engine id this row is of, where the page has one: what the row is kept
@@ -28,9 +27,13 @@ type Contribution = Plane['contributions'][number];
 const byName = (left: Entry, right: Entry): number =>
   left.name < right.name ? -1 : left.name > right.name ? 1 : (left.id ?? '') < (right.id ?? '') ? -1 : (left.id ?? '') > (right.id ?? '') ? 1 : 0;
 
-export function counted(held: Record<string, number>, localizer: Localizer): Entry[] {
+// A dictionary the engine keyed by id, as rows. What a row is called is the
+// title published beside it under the same id; a dictionary published without
+// titles is drawn under its keys, and a caller with none says so by handing an
+// empty table rather than by calling a shorter function.
+export function counted(held: Record<Answer, number>, titles: Record<Answer, Localized>, localizer: Localizer): Entry[] {
   return Object.entries(held)
-    .map(([name, value]) => ({ name: localizer.identifier(name), value: localizer.identifier(tidy(value)) }))
+    .map(([id, value]) => ({ name: titles[id] ?? localizer.identifier(id), value: localizer.identifier(tidy(value)) }))
     .sort(byName);
 }
 
@@ -39,9 +42,9 @@ export function counted(held: Record<string, number>, localizer: Localizer): Ent
 // adding them would be this layer inventing arithmetic.
 export function contributionText(contributions: readonly Contribution[], localizer: Localizer): Localized {
   const parts: string[] = [];
-  for (const { statId, added, increased } of contributions) {
-    if (added.min !== 0 || added.max !== 0) parts.push(`${added.min === added.max ? signed(added.min) : `${signed(added.min)}-${tidy(added.max)}`} ${bare(statId)}`);
-    if (increased !== 0) parts.push(`${signed(increased)}% ${bare(statId)}`);
+  for (const { statTitle, added, increased } of contributions) {
+    if (added.min !== 0 || added.max !== 0) parts.push(`${added.min === added.max ? signed(added.min) : `${signed(added.min)}-${tidy(added.max)}`} ${statTitle}`);
+    if (increased !== 0) parts.push(`${signed(increased)}% ${statTitle}`);
   }
   return localizer.identifier(parts.join(', '));
 }

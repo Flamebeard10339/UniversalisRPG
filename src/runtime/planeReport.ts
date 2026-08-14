@@ -19,11 +19,19 @@ export type Standing = 'allocated' | 'available' | 'unreached' | 'blocked';
 
 // The effective magnitude, never the declared one (c19). `scale` is carried
 // beside it so a reader can say where the number came from without being asked
-// to derive it back.
+// to derive it back, and the stat is named as well as keyed so a surface
+// drawing what a position pays spells a title rather than an id (c9).
 export interface PayloadReport {
   readonly statId: Answer;
+  readonly statTitle: Localized;
   readonly effective: BonusAmount;
   readonly scale: number;
+}
+
+// A stat fold as a screen draws it: the fold itself, named the same way a
+// payload is.
+export interface ContributionReport extends StatContribution {
+  readonly statTitle: Localized;
 }
 
 export interface PositionReport {
@@ -53,7 +61,10 @@ export interface ClusterReport {
   // The slot this cluster was slotted through, as the hex and direction the
   // `slot:` verb named — null at the origin, which is never slotted.
   readonly entry: { hex: Answer; direction: Direction } | null;
-  readonly effects: Array<{ id: Answer; title: Localized; effect: ClusterEffect }>;
+  // `effect` is the declaration, which sits below the layer that brands a
+  // localized value; `statTitle` is that declaration's stat as a player reads
+  // it (c9).
+  readonly effects: Array<{ id: Answer; title: Localized; statTitle: Localized; effect: ClusterEffect }>;
   readonly modSlots: number;
   readonly positions: PositionReport[];
   readonly slots: SlotReport[];
@@ -82,7 +93,7 @@ export interface PlaneReport {
   // What wearing this copy is worth, per stat, as the stat fold itself reads it
   // — the item's own tags and its allocated payloads together, so a screen
   // states this rather than adding the clusters up again (c8).
-  readonly contributions: StatContribution[];
+  readonly contributions: ContributionReport[];
 }
 
 function standingOf(registry: Registry, plane: Plane, node: PlaneNode): Standing {
@@ -93,9 +104,10 @@ function standingOf(registry: Registry, plane: Plane, node: PlaneNode): Standing
 
 const step = (hex: Hex, direction: Direction): string => hexKey({ q: hex.q + NEIGHBOR_DELTA[direction].q, r: hex.r + NEIGHBOR_DELTA[direction].r });
 
-function payloadsOf(registry: Registry, plane: Plane, hex: Hex, position: number): PayloadReport[] {
+function payloadsOf(registry: Registry, localizer: Localizer, plane: Plane, hex: Hex, position: number): PayloadReport[] {
   return positionPayloads(registry, plane, hex, position).map((payload) => ({
     statId: payload.statId,
+    statTitle: localizer.title('stat', payload.statId),
     effective: scaledAmount(payload.bonus, payload.scale),
     scale: payload.scale,
   }));
@@ -124,7 +136,7 @@ function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, h
       title: passive === undefined ? null : localizer.title('passive', passive),
       standing,
       free: standing === 'allocated' && !cluster.allocatedPositions.includes(position),
-      payloads: payloadsOf(registry, plane, hex, position),
+      payloads: payloadsOf(registry, localizer, plane, hex, position),
     });
   }
 
@@ -143,7 +155,7 @@ function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, h
   const effects: ClusterReport['effects'] = [];
   for (const id of cluster.effects) {
     const item = registry.items.get(id);
-    if (item?.clusterEffect) effects.push({ id, title: localizer.title('item', id), effect: item.clusterEffect });
+    if (item?.clusterEffect) effects.push({ id, title: localizer.title('item', id), statTitle: localizer.title('stat', item.clusterEffect.statId), effect: item.clusterEffect });
   }
 
   const entry = cluster.entry === null ? null : { hex: step(hex, opposite(cluster.entry)), direction: cluster.entry };
@@ -188,7 +200,7 @@ export function planeReport(registry: Registry, state: GameState, target: string
     spent: pointsSpent(payload.plane),
     remaining: pointsRemaining(payload, item),
     clusters,
-    contributions: itemContribution(registry, item, payload, counterLevels(state)),
+    contributions: itemContribution(registry, item, payload, counterLevels(state)).map((each) => ({ ...each, statTitle: localizer.title('stat', each.statId) })),
   };
 }
 

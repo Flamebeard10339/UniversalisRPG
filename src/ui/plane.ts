@@ -1,6 +1,6 @@
 import type { Answer, Localized, Localizer } from '../runtime/localized';
 import type { PlayView } from '../runtime/session';
-import { bare, signed, tidy } from './format';
+import { signed, tidy } from './format';
 import type { LabelId } from './labels';
 import type { Entry } from './sheet';
 import { wordsOf, type Words } from './words';
@@ -65,7 +65,7 @@ function magnitude(bonus: Payload['effective']): string {
 // never multiplies to know what a position pays.
 function payload(report: Payload): string {
   const scale = report.scale === 1 ? '' : ` ×${tidy(report.scale)}`;
-  return `${magnitude(report.effective)} ${bare(report.statId)}${scale}`;
+  return `${magnitude(report.effective)} ${report.statTitle}${scale}`;
 }
 
 function positionRow(position: Position, words: Words, localizer: Localizer): PlaneRow {
