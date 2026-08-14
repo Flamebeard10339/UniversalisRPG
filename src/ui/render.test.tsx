@@ -71,6 +71,20 @@ function pagesDrawn(view: PlayView): Record<string, number> {
   return { stats: view.stats.length, skills: view.xp.length, equipment: view.equipment.length, carried: view.carried.length, map: view.discovered.length };
 }
 
+// Every id the view hands a driver beside the words for it. Nothing on a screen
+// fails because the permitted set is longer than it needs to be, so the set is
+// held against these as well: an id may never be a permitted screen word, and
+// putting one back is a failure here rather than an entry nobody notices.
+function idsPublished(view: PlayView): string[] {
+  return [
+    ...view.stats.map((row) => row.id),
+    ...view.xp.map((row) => row.id),
+    ...view.equipment.flatMap((row) => [row.slot, row.item]),
+    ...view.carried.map((row) => row.id),
+    ...view.discovered.map((place) => place.id),
+  ];
+}
+
 // The driver's own vocabulary, taken whole rather than by where it is drawn,
 // and read out of the localizer the way a component reads it: after c3 the
 // table names keys, and what lands on the screen is the English the shipped
@@ -257,7 +271,9 @@ describe('what the shell puts on the screen', () => {
     let seen = 0;
 
     const step = (): void => {
-      for (const line of published(driver.snapshot().view!)) engine.add(line);
+      const at = driver.snapshot().view!;
+      for (const line of published(at)) engine.add(line);
+      expect(idsPublished(at).filter((id) => engine.has(id))).toEqual([]);
       const html = renderToStaticMarkup(<App driver={driver} />);
 
       const runs = readable(html);
@@ -294,6 +310,7 @@ describe('what the shell puts on the screen', () => {
     expect(Object.entries(pagesDrawn(view)).filter(([, rows]) => rows === 0)).toEqual([]);
 
     const engine = new Set<string>(published(view));
+    expect(idsPublished(view).filter((id) => engine.has(id))).toEqual([]);
     for (const run of readable(renderToStaticMarkup(<App driver={driver} />))) {
       expect([...engine, ...SHELL_WORDS], `"${run}" is on the screen and no engine value produced it`).toContain(run);
     }
