@@ -344,7 +344,7 @@ describe('the commands a player plays with', () => {
     const opened = runLine(ctx, '/inv');
     expect(kinds(opened)).toEqual(['view']);
     expect(opened.recorded).toEqual(['open-modal: carried-items']);
-    expect(opened.view?.modals.map((modal) => ({ ...modal, options: answered(modal.options) }))).toEqual([{ name: 'carried-items', leaving: 'Close', options: [{ key: 'item', label: 'Item', values: ['Gauntlet x1', 'Close'] }] }]);
+    expect(opened.view?.modals.map((modal) => ({ ...modal, options: answered(modal.options) }))).toEqual([{ name: 'carried-items', leaving: 'close', options: [{ key: 'item', label: 'Item', values: ['gauntlet', 'close'] }] }]);
   });
 
   // c1: the argument a GUI row hands over is the same dispatch a player types,
@@ -355,8 +355,8 @@ describe('the commands a player plays with', () => {
 
     const opened = runLine(ctx, '/inv gauntlet');
     expect(kinds(opened)).toEqual(['view']);
-    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet x1']);
-    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
+    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=gauntlet']);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['grow', 'equip', 'destroy', 'close'] }]);
   });
 
   // c1 and c18: the equipment row dispatches the same command, and the id it
@@ -367,8 +367,8 @@ describe('the commands a player plays with', () => {
     runLine(ctx, '/load armed');
 
     const opened = runLine(ctx, '/inv worn:hand');
-    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet (hand)']);
-    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Unequip', 'Destroy', 'Close'] }]);
+    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=worn:hand']);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['grow', 'unequip', 'destroy', 'close'] }]);
   });
 
   it('/inventory <item> still opens the stack the worn copy left, and offers it Equip', () => {
@@ -376,8 +376,8 @@ describe('the commands a player plays with', () => {
     runLine(ctx, '/load armed');
 
     const opened = runLine(ctx, '/inv gauntlet');
-    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet x1']);
-    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
+    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=gauntlet']);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['grow', 'equip', 'destroy', 'close'] }]);
   });
 
   it('refuses an item the player is not carrying, and opens no screen to say so', () => {
@@ -404,7 +404,7 @@ describe('the commands a player plays with', () => {
     runLine(ctx, '/inv gauntlet');
 
     const equipped = runLine(ctx, '2');
-    expect(equipped.recorded).toEqual(['submit-modal: verb=Equip']);
+    expect(equipped.recorded).toEqual(['submit-modal: verb=equip']);
     expect(sessionStatus(session).equipment).toEqual({ hand: 'gauntlet' });
     expect(equipped.view?.modals).toEqual([]);
   });
@@ -416,10 +416,10 @@ describe('the commands a player plays with', () => {
     runLine(ctx, '/load stocked');
 
     runLine(ctx, '/inv');
-    expect(runLine(ctx, 'submit-modal: item=Close').view?.modals).toEqual([]);
+    expect(runLine(ctx, 'submit-modal: item=close').view?.modals).toEqual([]);
 
     runLine(ctx, '/inv gauntlet');
-    const left = runLine(ctx, 'submit-modal: verb=Close');
+    const left = runLine(ctx, 'submit-modal: verb=close');
     expect(left.view?.modals).toEqual([]);
     expect(sessionStatus(session).equipment).toEqual({});
     expect(sessionStatus(session).inventory).toEqual({ gauntlet: 1 });
@@ -582,7 +582,7 @@ node greeting:
 load: fresh
 use: entity.mirror.look in
 submit-modal: name=Rowan
-submit-modal: race=Elf
+submit-modal: race=elf
 `;
 
 // A dialogue whose own effect raises a second modal underneath it, so the
@@ -620,21 +620,21 @@ describe('a modal is driven by its published name and options', () => {
 
     const named = runLine(ctx, 'submit-modal: name=Rowan');
     expect(named.view?.modals[0].options.map((option) => option.key)).toEqual(['race']);
-    expect(takes(named.view?.modals[0].options[0])).toEqual(['Human', 'Elf', 'Dwarf', 'Orc']);
+    expect(takes(named.view?.modals[0].options[0])).toEqual(['human', 'elf', 'dwarf', 'orc']);
   });
 
   it('answers a listed value by number and records the canonical submit-modal: line either way', () => {
     const { ctx, recorder } = fixture(MODAL_MODULE);
 
     const opened = runLine(ctx, 'talk: sage');
-    expect(takes(opened.view?.modals[0].options[0])).toEqual(['Ask the way.', 'Say nothing.']);
+    expect(takes(opened.view?.modals[0].options[0])).toEqual(['0', '1']);
 
     // The second value, not the first: a driver that answered by position but
     // always handed back the head of the list would pass on `1` alone.
     const answered = runLine(ctx, '2');
-    expect(answered.recorded).toEqual(['submit-modal: choice=Say nothing.']);
+    expect(answered.recorded).toEqual(['submit-modal: choice=1']);
     expect(answered.view?.modals).toEqual([]);
-    expect(recorder.history).toEqual(['talk: sage', 'submit-modal: choice=Say nothing.']);
+    expect(recorder.history).toEqual(['talk: sage', 'submit-modal: choice=1']);
   });
 
   it('asks for the top of the stack, not the bottom, when one modal sits over another', () => {
@@ -646,7 +646,7 @@ describe('a modal is driven by its published name and options', () => {
     // The dialogue is on top, so its menu is what a number answers — the bottom
     // modal's first option is free text and takes no number at all.
     const answered = runLine(ctx, '1');
-    expect(answered.recorded).toEqual(['submit-modal: choice=Ask about the mirror.']);
+    expect(answered.recorded).toEqual(['submit-modal: choice=0']);
     expect(answered.view?.modals.map((modal) => modal.name)).toEqual(['character-creation']);
   });
 
@@ -681,15 +681,15 @@ describe('a modal is driven by its published name and options', () => {
 
     runLine(ctx, 'use: entity.mirror.look in');
     runLine(ctx, 'submit-modal: name=Rowan');
-    const done = runLine(ctx, 'submit-modal: race=Elf');
-    expect(done.view?.player).toEqual({ name: 'Rowan', race: 'Elf' });
+    const done = runLine(ctx, 'submit-modal: race=elf');
+    expect(done.view?.player).toEqual({ name: 'Rowan', race: 'elf' });
 
     const created = runLine(ctx, '/create-valid-test crossed');
     const blocks = created.output.find((out) => out.kind === 'authored');
     expect(blocks?.kind).toBe('authored');
     if (blocks?.kind !== 'authored') return;
     expect(blocks.blocks[blocks.blocks.length - 1]).toContain('submit-modal: name=Rowan');
-    expect(blocks.blocks[blocks.blocks.length - 1]).toContain('submit-modal: race=Elf');
+    expect(blocks.blocks[blocks.blocks.length - 1]).toContain('submit-modal: race=elf');
 
     const pasted = `${MODAL_MODULE}\n${blocks.blocks.map((block) => block.join('\n')).join('\n\n')}\n`;
     expect(runTest('crossed', loadInEnglish(pasted), createGameState())).toEqual({ passed: true });

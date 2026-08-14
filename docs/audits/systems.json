@@ -520,6 +520,14 @@
             "src/runtime/sayFixture.ts"
           ],
           "note": "produced by a-plane-frame-carries-a-key-not-a-sentence; a Said is an engine key and the parameters it takes, unrendered, so a growth refusal can be stored, replayed and read in whichever language loads it"
+        },
+        {
+          "name": "the modal answer wire",
+          "paths": [
+            "src/runtime/modals.ts",
+            "src/runtime/carriedScreen.ts"
+          ],
+          "note": "produced by every-modal-answer-is-an-id; every ModalChoice.value is an id — a content id, an instance ordinal, a slot, a hexagon, a dialogue option's index within its node, or one the engine owns spelled as an id — and the words beside it are the pair's other half"
         }
       ]
     },

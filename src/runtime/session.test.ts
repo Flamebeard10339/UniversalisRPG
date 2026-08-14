@@ -67,7 +67,7 @@ describe('session', () => {
     expect(v.choices).toEqual([]);
     v = submitModal(session, { name: 'Rowan' });
     expect(modalNames(v)).toEqual(['character-creation']);
-    v = submitModal(session, { race: 'Elf' });
+    v = submitModal(session, { race: 'elf' });
     expect(modalNames(v)).toEqual([]);
     expect(ids(v)).not.toContain('use:entity.tutorial-island.mirror.look in');
 
@@ -211,7 +211,7 @@ node greeting:
     let v = apply(session, 'use:entity.mirror.look in');
     expect(v.modals).toEqual([{ name: 'character-creation', leaving: null, options: [
       { key: 'name', label: 'Name', values: null },
-      { key: 'race', label: 'Race', values: ['Human', 'Elf', 'Dwarf', 'Orc'].map((value) => ({ value, shown: value })) },
+      { key: 'race', label: 'Race', values: [['human', 'Human'], ['elf', 'Elf'], ['dwarf', 'Dwarf'], ['orc', 'Orc']].map(([value, shown]) => ({ value, shown })) },
     ] }]);
     expect(v.player).toEqual({ name: '', race: '' });
 
@@ -221,12 +221,12 @@ node greeting:
     expect(v.modals[0].options.map((option) => option.key)).toEqual(['race']);
     expect(v.player).toEqual({ name: '', race: '' });
 
-    v = submitModal(session, { race: 'Elf' });
+    v = submitModal(session, { race: 'elf' });
     expect(v.modals).toEqual([]);
-    expect(v.player).toEqual({ name: 'Rowan', race: 'Elf' });
+    expect(v.player).toEqual({ name: 'Rowan', race: 'elf' });
 
     v = apply(session, 'talk:mirror');
-    expect(v.said).toContain('There you are, Rowan, Elf.');
+    expect(v.said).toContain('There you are, Rowan, elf.');
   });
 
   it('shows content-pruning warnings after loading a save with stale ids', () => {
@@ -546,7 +546,7 @@ submit-modal: name=Rowan
 travel: camp
 use: entity.mirror.look in
 submit-modal: name=Rowan
-submit-modal: race=Elf
+submit-modal: race=elf
 
 # test leaves-a-dialogue-open
 travel: camp
@@ -555,7 +555,7 @@ talk: sage
 # test answers-the-dialogue-as-a-modal
 travel: camp
 talk: sage
-submit-modal: choice=Nod.
+submit-modal: choice=0
 `;
 
   it('fails, naming the modal, and passes once every option of it is answered', () => {
@@ -566,7 +566,7 @@ submit-modal: choice=Nod.
 
     const answered = createGameState();
     expect(runTest('answers-the-modal', registry, answered)).toEqual({ passed: true });
-    expect(answered.player).toEqual({ name: 'Rowan', race: 'Elf' });
+    expect(answered.player).toEqual({ name: 'Rowan', race: 'elf' });
   });
 
   it('holds a dialogue to the same standard, since a menu left hanging is the same unfinished route', () => {
@@ -727,9 +727,9 @@ describe('what the engine publishes', () => {
     // The screen that does own them still does, under the one name every
     // surface spells a carried thing by.
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-    submitModal(session, { item: 'Gauntlet (hand)' });
+    submitModal(session, { item: 'worn:hand' });
     const asked = view(session).modals[0].options;
-    expect(asked[asked.length - 1].values?.map((choice) => choice.value)).toContain('Unequip');
+    expect(asked[asked.length - 1].values?.map((choice) => choice.value)).toContain('unequip');
   });
 
   // Grown against a state and handed to the session as a save, so what is
@@ -753,8 +753,8 @@ describe('what the engine publishes', () => {
     // c16: the world names a copy the one way every screen does — under a
     // descriptor, and never under the id the row itself carries.
     expect(carried.carried).toEqual([
-      { id: 'gauntlet', name: 'Gauntlet', count: 1, value: 'Gauntlet x1', shown: 'Gauntlet x1', grown: false },
-      { id: grown.instance, name: 'Modified Gauntlet', count: 1, value: 'Modified Gauntlet', shown: 'Modified Gauntlet', grown: true },
+      { id: 'gauntlet', name: 'Gauntlet', count: 1, shown: 'Gauntlet x1', grown: false },
+      { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet', grown: true },
     ]);
 
     applyDirective(session, { kind: 'equip', item: grown.instance });
@@ -764,8 +764,8 @@ describe('what the engine publishes', () => {
     // The worn copy leaves the carried side and is named there instead (c21),
     // still under the id that says which of the two the player meant.
     expect(armed.carried).toEqual([
-      { id: 'gauntlet', name: 'Gauntlet', count: 1, value: 'Gauntlet x1', shown: 'Gauntlet x1', grown: false },
-      { id: grown.instance, name: 'Modified Gauntlet', count: 1, value: 'Modified Gauntlet (hand)', shown: 'Modified Gauntlet (hand)', grown: true, slot: 'hand' },
+      { id: 'gauntlet', name: 'Gauntlet', count: 1, shown: 'Gauntlet x1', grown: false },
+      { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet (hand)', grown: true, slot: 'hand' },
     ]);
   });
 
@@ -1044,7 +1044,7 @@ roast:
   it('does not leave the author of a save holding the state it loaded', () => {
     const registry = loadInEnglish(module);
     const session = startSession(registry);
-    const mine = { name: 'Rowan', race: 'Elf' };
+    const mine = { name: 'Rowan', race: 'elf' };
     registry.saves.set('forged', { version: SAVE_VERSION, diff: { player: mine } });
 
     applyDirective(session, { kind: 'load', save: 'forged' });
@@ -1470,7 +1470,7 @@ describe('a modal names what it is about in the language being played', () => {
   const grown = (language: string): PlayView => {
     const session = carrying(language);
     submitModal(session, { item: view(session).modals[0].options[0].values![0].value });
-    return submitModal(session, { verb: 'Grow' });
+    return submitModal(session, { verb: 'grow' });
   };
 
   it('labels the carried screen in it', () => {
@@ -1513,7 +1513,7 @@ describe('an answer is spelled once and read in the language being played', () =
   it('takes the answer a session in another language recorded, because the answer did not move', () => {
     const spanish = carried('es');
 
-    expect(() => submitModal(spanish, { item: 'Blade x1' })).not.toThrow();
+    expect(() => submitModal(spanish, { item: 'forge.blade' })).not.toThrow();
     expect(view(spanish).modals[0].options.map((option) => option.key)).toEqual(['verb']);
   });
 
@@ -1524,7 +1524,7 @@ describe('an answer is spelled once and read in the language being played', () =
     const menu = view(spanish).modals[0].options[0].values!;
 
     expect(menu.map((choice) => choice.shown)).toEqual(['(sin traducir)', '(sin traducir)']);
-    expect(menu.map((choice) => choice.value)).toEqual(['Ask the way.', 'Say nothing.']);
+    expect(menu.map((choice) => choice.value)).toEqual(['0', '1']);
   });
 });
 
@@ -1599,15 +1599,15 @@ describe('a modal answer is spelled in the base language on every screen, and on
   const verbs = (language: string): readonly ModalChoice[] => {
     const session = opened(language);
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-    submitModal(session, { item: choices(session).find((choice) => choice.value.startsWith('Blade'))!.value });
+    submitModal(session, { item: choices(session).find((choice) => choice.value.endsWith('blade'))!.value });
     return choices(session);
   };
 
   const moves = (language: string): readonly ModalChoice[] => {
     const session = opened(language);
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-    submitModal(session, { item: choices(session).find((choice) => choice.value.startsWith('Blade'))!.value });
-    submitModal(session, { verb: 'Grow' });
+    submitModal(session, { item: choices(session).find((choice) => choice.value.endsWith('blade'))!.value });
+    submitModal(session, { verb: 'grow' });
     return choices(session);
   };
 
@@ -1620,7 +1620,7 @@ describe('a modal answer is spelled in the base language on every screen, and on
     // The one the plane screen spelled through the played localizer: a jewel or
     // a food in the value put the player's language into what a `# test` replays.
     expect(answers(moves('es'))).toEqual(answers(moves('en')));
-    expect(answers(moves('en'))).toContain('feed: with Whetstone');
+    expect(answers(moves('en'))).toContain('feed: with forge.whetstone');
   });
 
   it('reads them as the words the engine says in the played language', () => {

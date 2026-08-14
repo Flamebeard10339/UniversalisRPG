@@ -19,14 +19,6 @@ const registry = loadUniverse([...sources, translationOf(shipped)]);
 
 const PLAYED = [BASE_LANGUAGE, TRANSLATED_LANGUAGE];
 
-// The shipped tests that do not survive yet, each beside what is owed before it
-// will. Every later task on this spec removes entries and the last one deletes
-// the list, so an entry that has started surviving fails here rather than
-// sitting on unclaimed progress.
-const NOT_YET: Readonly<Record<string, string>> = {
-  'tutorial-island.growing-through-the-inventory-screen': 'c2: a carried row is answered by the base language name of what it holds',
-};
-
 // A throw is a route that did not replay, which is the same outcome as a
 // refused assertion and is reported beside it rather than taking the run down.
 function replay(id: string, language: string): TestResult {
@@ -60,22 +52,11 @@ describe('a universe with every word replaced', () => {
     expect(localizerFor(shipped, BASE_LANGUAGE).title('item', 'tutorial-island.iron-sword')).toBe('Iron Sword');
     for (const language of PLAYED) expect(localizerFor(registry, language).title('item', 'tutorial-island.iron-sword')).not.toBe('Iron Sword');
   });
-
-  it('lists nothing but shipped tests as not surviving yet', () => {
-    expect(Object.keys(NOT_YET).filter((id) => !registry.tests.has(id))).toEqual([]);
-  });
 });
 
 describe('a recording survives translation', () => {
   for (const id of registry.tests.keys()) {
     for (const language of PLAYED) {
-      const owed = NOT_YET[id];
-      if (owed) {
-        it(`test "${id}" does not survive into ${language} yet, and is owed ${owed}`, () => {
-          expect(replay(id, language).passed).toBe(false);
-        });
-        continue;
-      }
       it(`test "${id}" passes in ${language}`, () => {
         expect(replay(id, language)).toEqual({ passed: true });
       });

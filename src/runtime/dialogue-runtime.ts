@@ -88,20 +88,23 @@ export function talk(entityId: string, registry: Registry, state: GameState): Di
 
 // One gate, one rendering: the offer and the answer are read off the same list,
 // so a choice withheld by its `when:` cannot be reachable by typing its text.
-function offered(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ choice: Choice; text: string }> {
+// c2: the index is the option's place among the choices its node declares, not
+// among the ones offered here, so a choice a `when:` withholds does not shift
+// the answer to every choice after it.
+function offered(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ choice: Choice; index: number; text: string }> {
   return resolveMenu(cursor, registry)
-    .choices.filter((choice) => !choice.when || evaluateCondition(choice.when, state))
-    .map((choice) => ({ choice, text: renderSegments(choice.segments, state) }));
+    .choices.map((choice, index) => ({ choice, index, text: renderSegments(choice.segments, state) }))
+    .filter((entry) => !entry.choice.when || evaluateCondition(entry.choice.when, state));
 }
 
-export function menuTexts(cursor: DialogueCursor, registry: Registry, state: GameState): string[] {
-  return offered(cursor, registry, state).map((entry) => entry.text);
+export function menuChoices(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ index: number; text: string }> {
+  return offered(cursor, registry, state).map((entry) => ({ index: entry.index, text: entry.text }));
 }
 
-export function choose(text: string, cursor: DialogueCursor, registry: Registry, state: GameState): DialogueCursor | null {
+export function choose(answer: string, cursor: DialogueCursor, registry: Registry, state: GameState): DialogueCursor | null {
   const { dialogue, node } = resolveMenu(cursor, registry);
-  const match = offered(cursor, registry, state).find((entry) => entry.text === text)?.choice;
-  if (!match) throw new RuntimeError(`no choice matches: ${JSON.stringify(text)}`);
+  const match = offered(cursor, registry, state).find((entry) => String(entry.index) === answer)?.choice;
+  if (!match) throw new RuntimeError(`no choice matches: ${JSON.stringify(answer)}`);
 
   applyResultsNow(state, registry, match.effects);
   if (match.goto) return enterNode(dialogue, findNode(dialogue, match.goto), registry, state);

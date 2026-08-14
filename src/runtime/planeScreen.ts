@@ -2,7 +2,7 @@ import { hexKey } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
-import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
+import { Localized, Localizer, localizerOf } from './localized';
 import { carriedEntries, carriedFrame } from './carriedScreen';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
@@ -19,7 +19,7 @@ import { GameState } from './state';
 
 // The value that leaves (c15). It goes back to the screen this one replaced
 // rather than closing the world, which is the other half of c3.
-export const BACK = 'Back to inventory';
+export const BACK = 'back';
 
 // The one thing this screen asks. An answer to it is a value it published, so
 // neither driver needs a way to type into it.
@@ -50,28 +50,16 @@ interface PlaneMove {
 // be, the other two grow a hexagon of one — so the fill is written per verb
 // rather than as one shared prefix, and a frame that one day holds more than
 // one hexagon fills more in rather than needing a grammar to say so.
-// The tail is spelled twice over: once in the base language the answer is
-// replayed in and once in the ids the directive takes, because a jewel is named
-// to the parser by its id and to a `# test` by the name it carries in the one
-// language every recording shares. What the player reads is neither of those —
-// it is the move's own `shown`.
-interface Tail {
-  readonly base: string;
-  readonly spelled: string;
+function onCopy(frame: PlaneFrame, verb: string, tail: string, shown: Localized): PlaneMove {
+  return { value: `${verb}: ${tail}`, shown, line: `${verb}: ${frame.target} ${tail}`, focus: frame.hex };
 }
 
-const same = (tail: string): Tail => ({ base: tail, spelled: tail });
-
-function onCopy(frame: PlaneFrame, verb: string, tail: Tail, shown: Localized): PlaneMove {
-  return { value: `${verb}: ${tail.base}`, shown, line: `${verb}: ${frame.target} ${tail.spelled}`, focus: frame.hex };
-}
-
-function onHexagon(frame: PlaneFrame, verb: string, tail: Tail, shown: Localized): PlaneMove {
-  return { value: `${verb}: ${tail.base}`, shown, line: `${verb}: ${frame.target} at ${frame.hex} ${tail.spelled}`, focus: frame.hex };
+function onHexagon(frame: PlaneFrame, verb: string, tail: string, shown: Localized): PlaneMove {
+  return { value: `${verb}: ${tail}`, shown, line: `${verb}: ${frame.target} at ${frame.hex} ${tail}`, focus: frame.hex };
 }
 
 function goes(hex: string, shown: Localized): PlaneMove {
-  return { value: `Go to ${hex}`, shown, line: null, focus: hex };
+  return { value: `go: ${hex}`, shown, line: null, focus: hex };
 }
 
 // The hexagons a step away, whichever side of the slot joining them this one
@@ -86,12 +74,11 @@ function reachable(report: PlaneReport, here: ClusterReport): string[] {
 // What a stack the player can spend holds, by the field that says the item is
 // the kind a growth verb consumes. A grown copy is never taken, so a jewel that
 // has itself been grown is not one to slot.
-function stacked(state: GameState, registry: Registry, spent: (item: Item) => boolean): Array<{ id: string; name: Localized; base: string }> {
+function stacked(state: GameState, registry: Registry, spent: (item: Item) => boolean): Array<{ id: string; name: Localized }> {
   const localizer = localizerOf(registry, state);
-  const base = localizerFor(registry, BASE_LANGUAGE);
   return [...itemCopies(state)].flatMap(([id, { stack }]) => {
     const item = registry.items.get(id);
-    return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(localizer, 'item', id, null), base: carriedName(base, 'item', id, null) }] : [];
+    return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(localizer, 'item', id, null) }] : [];
   });
 }
 
@@ -105,22 +92,22 @@ function movesOn(frame: PlaneFrame, report: PlaneReport | undefined, state: Game
     if (slot.standing !== 'allocated' || slot.beyond !== null) continue;
     for (const jewel of stacked(state, registry, (item) => item.clusterJewel !== undefined)) {
       const shown = localizer.engine('engine.plane.slot', { direction: localizer.identifier(slot.direction), jewel: jewel.name });
-      moves.push(onHexagon(frame, 'slot', { base: `${slot.direction} with ${jewel.base}`, spelled: `${slot.direction} with ${jewel.id}` }, shown));
+      moves.push(onHexagon(frame, 'slot', `${slot.direction} with ${jewel.id}`, shown));
     }
   }
   for (const slot of here.slots) {
     if (slot.standing !== 'available') continue;
-    moves.push(onHexagon(frame, 'allocate', same(`slot ${slot.direction}`), localizer.engine('engine.plane.allocate.slot', { direction: localizer.identifier(slot.direction) })));
+    moves.push(onHexagon(frame, 'allocate', `slot ${slot.direction}`, localizer.engine('engine.plane.allocate.slot', { direction: localizer.identifier(slot.direction) })));
   }
   for (const position of here.positions) {
     if (position.standing !== 'available') continue;
-    moves.push(onHexagon(frame, 'allocate', same(`position ${position.position}`), localizer.engine('engine.plane.allocate.position', { position: position.position })));
+    moves.push(onHexagon(frame, 'allocate', `position ${position.position}`, localizer.engine('engine.plane.allocate.position', { position: position.position })));
   }
   // Last, and on every hexagon, because what a copy is fed is the one growth
   // that is the copy's rather than one hexagon of it — and without it a base
   // still in its stack would publish only values it has no point to spend on.
   for (const food of stacked(state, registry, (item) => item.itemExperience !== undefined)) {
-    moves.push(onCopy(frame, 'feed', { base: `with ${food.base}`, spelled: `with ${food.id}` }, localizer.engine('engine.plane.feed', { item: food.name })));
+    moves.push(onCopy(frame, 'feed', `with ${food.id}`, localizer.engine('engine.plane.feed', { item: food.name })));
   }
   return moves;
 }
@@ -148,7 +135,7 @@ export function planeOptions(frame: PlaneFrame, state: GameState, registry: Regi
 // replaced with the copy it was opened from still chosen.
 function inventory(target: string, state: GameState, registry: Registry): ModalFrame {
   const entry = carriedEntries(state, registry).find((each) => each.id === target);
-  return carriedFrame(entry ? { item: entry.value } : {});
+  return carriedFrame(entry ? { item: entry.id } : {});
 }
 
 export function planeSubmit(frame: PlaneFrame, state: GameState, registry: Registry): ModalFrame | null {

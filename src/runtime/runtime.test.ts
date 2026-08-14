@@ -46,13 +46,13 @@ travel: guide-house
 # test main
 run: enter
 talk: miki
-choose: Sounds good.
+choose: 0
 use: entity.front-door.open
 assert: quest-given
 
 # test failing
 talk: miki
-choose: I would rather not.
+choose: 1
 assert: unlocked
 `;
 

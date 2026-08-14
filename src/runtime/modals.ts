@@ -1,4 +1,4 @@
-import { choose, cursorProblem, DialogueCursor, menuTexts } from './dialogue-runtime';
+import { choose, cursorProblem, DialogueCursor, menuChoices } from './dialogue-runtime';
 import { carriedFrame, carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
 import { type PlaneFocus } from './planeReport';
@@ -80,10 +80,10 @@ interface ModalDefinition<F extends ModalFrame> {
 // A race is answered by its own spelling, which a `# test` replays, and read as
 // the pattern beside it. Adding one is a value here and a key in the union.
 const RACES: ReadonlyArray<{ value: string; shown: EngineKey }> = [
-  { value: 'Human', shown: 'engine.race.human' },
-  { value: 'Elf', shown: 'engine.race.elf' },
-  { value: 'Dwarf', shown: 'engine.race.dwarf' },
-  { value: 'Orc', shown: 'engine.race.orc' },
+  { value: 'human', shown: 'engine.race.human' },
+  { value: 'elf', shown: 'engine.race.elf' },
+  { value: 'dwarf', shown: 'engine.race.dwarf' },
+  { value: 'orc', shown: 'engine.race.orc' },
 ];
 
 export function dialogueFrame(cursor: DialogueCursor): ModalFrame {
@@ -123,7 +123,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     // A menu answer is the dialogue line the player picks, so the answer is the
     // authored text and what is read is that text through the prose door.
     options: (frame, state, registry) => [
-      { key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuTexts(frame.cursor, registry, state).map((text) => ({ value: text, shown: localizerOf(registry, state).prose(text) })) },
+      { key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuChoices(frame.cursor, registry, state).map((choice) => ({ value: String(choice.index), shown: localizerOf(registry, state).prose(choice.text) })) },
     ],
     submit: (frame, state, registry) => {
       const cursor = choose(frame.answers.choice, frame.cursor, registry, state);

@@ -77,36 +77,12 @@ describe('the engine speaks in keys (c2)', () => {
     expect([...(shipped?.keys() ?? [])].sort()).toEqual([...ENGINE_KEYS].sort());
   });
 
-  // One entry per occurrence, not per file: an allowlist keyed to a file exempts
-  // every later sentence in it that matches the same pattern, which is how a
-  // second `{item} ({slot})` sat here unlisted (pass 5).
-  //
-  // Every one of these is English in TypeScript and stays so, because every one
-  // of them is answered rather than read: an action label, what
-  // `use:<kind>.<objId>.<label>` is spelled with, or a modal answer a
-  // `submit-modal:` in a shipped `# test` replays. None is what a player reads
-  // — each is offered through a pattern beside it, which is the other half of
-  // the `ModalChoice` pair — so translating the display never moves a recorded
-  // answer, and editing the locale file never breaks a recording.
-  const IDENTIFIERS = [
-    'src/content/registry.ts: Craft {recipe}',
-    'src/runtime/actions.ts: Travel to {destination}',
-    'src/runtime/carriedScreen.ts: Close',
-    'src/runtime/carriedScreen.ts: Destroy',
-    'src/runtime/carriedScreen.ts: Equip',
-    'src/runtime/carriedScreen.ts: Go ahead',
-    'src/runtime/carriedScreen.ts: Grow',
-    'src/runtime/carriedScreen.ts: Unequip',
-    'src/runtime/carriedScreen.ts: {item} ({slot})',
-    'src/runtime/carriedScreen.ts: {item} ({slot})',
-    'src/runtime/carriedScreen.ts: {item} x{count}',
-    'src/runtime/modals.ts: Dwarf',
-    'src/runtime/modals.ts: Elf',
-    'src/runtime/modals.ts: Human',
-    'src/runtime/modals.ts: Orc',
-    'src/runtime/planeScreen.ts: Back to inventory',
-    'src/runtime/planeScreen.ts: Go to {hex}',
-  ];
+  // c4: what is left is action labels, and nothing else. An action's label is
+  // its identifier — `use:<kind>.<objId>.<label>` is spelled with it — so it
+  // stays English in TypeScript while its display is keyed on a slug of it.
+  // Every modal answer that used to sit here became an id (c2), and every
+  // engine sentence became a key.
+  const IDENTIFIERS = ['src/content/registry.ts: Craft {recipe}', 'src/runtime/actions.ts: Travel to {destination}'];
 
   it('leaves no engine sentence behind in TypeScript', () => {
     // Every pattern, at any length, matched as the shape it would take in

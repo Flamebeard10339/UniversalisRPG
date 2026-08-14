@@ -686,7 +686,7 @@ node snub:
 
 # test tutorial-quest-given
 talk: miki
-choose: Sounds good. Teach me.
+choose: 0
 assert: quest-given
 
 // Opens on a save so the route is walked with the pools a played game has.
@@ -695,7 +695,7 @@ load: miki-route-start
 run: tutorial-quest-given
 use: entity.mirror.look in
 submit-modal: name=Rowan
-submit-modal: race=Elf
+submit-modal: race=elf
 assert: mirror-done
 talk: miki
 assert: has jug-of-water
@@ -733,7 +733,7 @@ expect: miki-route-end
 {"version":10}
 
 # save miki-route-end
-{"version":10,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.beach.discovered":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"Elf"}}
+{"version":10,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.beach.discovered":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"elf"}}
 
 # save dresser-trinket-end
 {"version":10,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}
@@ -857,23 +857,23 @@ expect: growing-a-heartwood-blade-end
 load: growing-a-heartwood-blade-start
 use: entity.smiths-chest.open
 open-modal: carried-items
-submit-modal: item=Iron Sword x1
-submit-modal: verb=Grow
+submit-modal: item=tutorial-island.iron-sword
+submit-modal: verb=grow
 submit-modal: plane=allocate: slot e
-submit-modal: plane=slot: e with Crossroads Jewel
+submit-modal: plane=slot: e with tutorial-island.crossroads-jewel
 // A base still in its stack is minted by the first growth, so the level the
 // next allocation spends is bought after the copy exists rather than before.
-submit-modal: plane=feed: with Master's Whetstone
-submit-modal: plane=Go to 1,0
+submit-modal: plane=feed: with tutorial-island.masters-whetstone
+submit-modal: plane=go: 1,0
 submit-modal: plane=allocate: position 1
 submit-modal: plane=allocate: slot ne
-submit-modal: plane=slot: ne with Keen Edge Jewel
-submit-modal: plane=Go to 2,-1
+submit-modal: plane=slot: ne with tutorial-island.keen-edge-jewel
+submit-modal: plane=go: 2,-1
 submit-modal: plane=allocate: position 1
-submit-modal: plane=Back to inventory
-submit-modal: verb=Equip
+submit-modal: plane=back
+submit-modal: verb=equip
 open-modal: carried-items
-submit-modal: item=Close
+submit-modal: item=close
 expect: growing-through-the-inventory-screen-end
 
 # save growing-through-the-inventory-screen-end

@@ -255,7 +255,7 @@ function openInventory(ctx: CommandContext, id: string): CommandResult {
 
   const opened = runDirective(ctx, opening);
   if (opened.recorded.length === 0) return opened;
-  const selected = runDirective(ctx, { kind: 'submit-modal', key: 'item', value: entry.value });
+  const selected = runDirective(ctx, { kind: 'submit-modal', key: 'item', value: entry.id });
   return { ...selected, recorded: [...opened.recorded, ...selected.recorded] };
 }
 

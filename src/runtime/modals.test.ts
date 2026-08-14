@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Registry } from '../content/registry';
-import { loadInEnglish } from '../content/engineLocale';
+import { loadUniverse, Registry } from '../content/registry';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, dialogueFrame, isModalFrame, Modal, ModalFrame, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
 import { SAVE_VERSION } from './save';
 import { choose, createGameState, DialogueCursor, GameState, RuntimeError, talk } from './runtime';
@@ -215,14 +215,14 @@ describe('the modal stack', () => {
     let v = apply(session, 'talk:sage');
     expect(v.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
 
-    v = submitModal(session, { choice: 'Ask about the mirror.' });
+    v = submitModal(session, { choice: '0' });
     expect(v.flags.asked).toBe(true);
     expect(v.modals.map((modal) => modal.name)).toEqual(['character-creation']);
 
     submitModal(session, { name: 'Rowan' });
-    v = submitModal(session, { race: 'Dwarf' });
+    v = submitModal(session, { race: 'dwarf' });
     expect(v.modals).toEqual([]);
-    expect(v.player).toEqual({ name: 'Rowan', race: 'Dwarf' });
+    expect(v.player).toEqual({ name: 'Rowan', race: 'dwarf' });
   });
 
   it('offers only the options still to be answered, and nothing about how to draw them', () => {
@@ -239,7 +239,7 @@ describe('the modal stack', () => {
     const dialogue = v.modals[1];
 
     expect(dialogue.name).toBe('dialogue');
-    expect(answered(dialogue.options)).toEqual([{ key: 'choice', label: 'Choice', values: ['Ask about the mirror.', 'Say nothing.'] }]);
+    expect(answered(dialogue.options)).toEqual([{ key: 'choice', label: 'Choice', values: ['0', '1'] }]);
   });
 
   it('withdraws every world choice while a modal is open, and gives them back once it closes', () => {
@@ -249,9 +249,9 @@ describe('the modal stack', () => {
     const opened = apply(session, 'talk:sage');
     expect(opened.choices).toEqual([]);
 
-    submitModal(session, { choice: 'Say nothing.' });
+    submitModal(session, { choice: '1' });
     submitModal(session, { name: 'Rowan' });
-    const closed = submitModal(session, { race: 'Human' });
+    const closed = submitModal(session, { race: 'human' });
     expect(closed.choices.map((choice) => choice.id)).toEqual([]);
     // The dialogue has no reachable node left, so `talk:` is gone rather than
     // withheld — what matters is that the withdrawal was the modal's doing.
@@ -316,10 +316,10 @@ describe('opening and answering', () => {
     const module = loadInEnglish(THROWING_CHOICE_MODULE);
     const state = talking(module);
 
-    expect(() => answerModal(state, module, { choice: 'Ask about the mirror.' })).toThrow(/unknown modal: no-such-screen/);
+    expect(() => answerModal(state, module, { choice: '0' })).toThrow(/unknown modal: no-such-screen/);
     expect(names(state)).toEqual(['dialogue']);
     expect(topModal(state)?.answers).toEqual({});
-    expect(takes(publishModal(topModal(state)!, state, module).options[0])).toEqual(['Ask about the mirror.', 'Say nothing.']);
+    expect(takes(publishModal(topModal(state)!, state, module).options[0])).toEqual(['0', '1']);
   });
 
   it('stacks a second dialogue rather than dropping it after its effects have already run', () => {
@@ -331,13 +331,13 @@ describe('opening and answering', () => {
     applyDirective(session, { kind: 'talk', entity: 'scholar' });
     const both = view(session);
     expect(modalNames(both)).toEqual(['dialogue', 'dialogue']);
-    expect(takes(both.modals[1].options[0])).toEqual(['Leave the scholar.']);
+    expect(takes(both.modals[1].options[0])).toEqual(['0']);
     expect(both.flags['scholar-seen']).toBe(true);
 
     // Answering the scholar hands the sage's own menu back, cursor intact.
-    const back = submitModal(session, { choice: 'Leave the scholar.' });
+    const back = submitModal(session, { choice: '0' });
     expect(back.modals.map((modal) => modal.name)).toEqual(['dialogue']);
-    expect(takes(back.modals[0].options[0])).toEqual(['Leave the sage.']);
+    expect(takes(back.modals[0].options[0])).toEqual(['0']);
   });
 
   it('closes a dialogue whose content is gone rather than carrying a cursor into a registry without it', () => {
@@ -373,13 +373,13 @@ describe('opening and answering', () => {
     const session = startSession(loadInEnglish(TWO_NPC_MODULE));
 
     const gated = apply(session, 'talk:sage');
-    expect(takes(gated.modals[0].options[0])).toEqual(['Leave the sage.']);
-    expect(() => submitModal(session, { choice: 'Ask about the secret.' })).toThrow(/has no choice that takes "Ask about the secret."/);
+    expect(takes(gated.modals[0].options[0])).toEqual(['0']);
+    expect(() => submitModal(session, { choice: '1' })).toThrow(/has no choice that takes "1"/);
 
     // Through the directive, which walks past the choice list a modal has
     // withdrawn — the only way to move the world while a menu is up.
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'rumour', actionId: 'tell' });
-    expect(takes(view(session).modals[0].options[0])).toEqual(['Leave the sage.', 'Ask about the secret.']);
+    expect(takes(view(session).modals[0].options[0])).toEqual(['0', '1']);
   });
 
   // Every route to a menu offering nothing: talked into, emptied under the
@@ -406,7 +406,7 @@ describe('opening and answering', () => {
     // The GUI's own answer path, which does not run through applyDirective.
     const answered = startSession(registry);
     expect(modalNames(apply(answered, 'talk:sage'))).toEqual(['dialogue']);
-    const sealed = submitModal(answered, { choice: 'Ask about the mirror.' });
+    const sealed = submitModal(answered, { choice: '0' });
     expect(modalNames(sealed)).toEqual([]);
     expect(sealed.choices.length).toBeGreaterThan(0);
 
@@ -419,7 +419,7 @@ describe('opening and answering', () => {
   it('closes a frame a save left unanswerable — every option already answered, or one holding a value it refuses', () => {
     const registry = loadInEnglish(STACKING_MODULE);
     for (const [answers, reason] of [
-      [{ name: 'Rowan', race: 'Elf' }, 'it was saved with every option already answered'],
+      [{ name: 'Rowan', race: 'elf' }, 'it was saved with every option already answered'],
       [{ name: 'Rowan', race: 'Wombat' }, 'it has no race that takes "Wombat"'],
       [{ title: 'Ser' }, 'it has no option title'],
     ] as const) {
@@ -437,9 +437,9 @@ describe('opening and answering', () => {
 
     // The choice's own effects raise a modal and its goto opens a second menu:
     // both must land above the spent frame, not under it or in place of it.
-    const after = submitModal(session, { choice: 'Look at the mirror.' });
+    const after = submitModal(session, { choice: '0' });
     expect(after.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
-    expect(takes(after.modals[1].options[0])).toEqual(['Nod.']);
+    expect(takes(after.modals[1].options[0])).toEqual(['0']);
     expect(after.modals.filter((modal) => modal.name === 'dialogue')).toHaveLength(1);
   });
 
@@ -451,16 +451,16 @@ describe('opening and answering', () => {
     const state = talking(registry);
     const { cursor } = state.modals[1] as { cursor: DialogueCursor };
 
-    expect(() => choose('Ask about the weather.', cursor, registry, state)).toThrow(/no choice matches: "Ask about the weather."/);
-    expect(choose('Say nothing.', cursor, registry, state)).toBeNull();
+    expect(() => choose('7', cursor, registry, state)).toThrow(/no choice matches: "7"/);
+    expect(choose('1', cursor, registry, state)).toBeNull();
   });
 
   it('keeps the dialogue spelling from answering a modal that is not a dialogue', () => {
     const session = stackingSession();
     apply(session, 'talk:sage');
-    expect(modalNames(submitModal(session, { choice: 'Say nothing.' }))).toEqual(['character-creation']);
+    expect(modalNames(submitModal(session, { choice: '1' }))).toEqual(['character-creation']);
 
-    expect(() => applyDirective(session, { kind: 'choose', text: 'Say nothing.' })).toThrow(/choose with no active dialogue/);
+    expect(() => applyDirective(session, { kind: 'choose', text: '1' })).toThrow(/choose with no active dialogue/);
     // Nothing was taken as an answer, so both options are still being asked for.
     expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['name', 'race']);
   });
@@ -503,8 +503,8 @@ describe('the carried-items screen, as a frame like any other', () => {
     const session = startSession(loadInEnglish(CARRIED_MODULE));
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
 
-    expect(answered(view(session).modals[0].options)).toEqual([{ key: 'item', label: 'Item', values: ['Close'] }]);
-    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Close' });
+    expect(answered(view(session).modals[0].options)).toEqual([{ key: 'item', label: 'Item', values: ['close'] }]);
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'close' });
     expect(view(session).modals).toEqual([]);
   });
 
@@ -512,7 +512,7 @@ describe('the carried-items screen, as a frame like any other', () => {
     const registry = loadInEnglish(CARRIED_MODULE);
     const half = (): GameState => {
       const state = createGameState('camp');
-      (state.modals as ModalFrame[]).push({ name: 'carried-items', answers: { item: 'Rope x1' } });
+      (state.modals as ModalFrame[]).push({ name: 'carried-items', answers: { item: 'rope' } });
       return state;
     };
 
@@ -522,7 +522,7 @@ describe('the carried-items screen, as a frame like any other', () => {
     expect(names(carrying)).toEqual(['carried-items']);
 
     const empty = half();
-    expect(pruneModals(empty, registry)).toEqual([{ name: 'carried-items', reason: 'it has no item that takes "Rope x1"' }]);
+    expect(pruneModals(empty, registry)).toEqual([{ name: 'carried-items', reason: 'it has no item that takes "rope"' }]);
     expect(empty.modals).toEqual([]);
   });
 
@@ -536,14 +536,14 @@ describe('the carried-items screen, as a frame like any other', () => {
     const session = startSession(loadInEnglish(GROWING_MODULE));
     applyDirective(session, { kind: 'load', save: 'stocked' });
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-    submitModal(session, { item: 'Blade x1' });
-    submitModal(session, { verb: 'Grow' });
-    submitModal(session, { plane: 'feed: with Whetstone' });
-    submitModal(session, { plane: 'Back to inventory' });
+    submitModal(session, { item: 'blade' });
+    submitModal(session, { verb: 'grow' });
+    submitModal(session, { plane: 'feed: with whetstone' });
+    submitModal(session, { plane: 'back' });
 
-    expect(submitModal(session, { verb: 'Destroy' }).modals[0].options.map((option) => option.key)).toEqual(['confirm']);
+    expect(submitModal(session, { verb: 'destroy' }).modals[0].options.map((option) => option.key)).toEqual(['confirm']);
 
-    const answered = submitModal(session, { item: 'Rope x1' });
+    const answered = submitModal(session, { item: 'rope' });
     expect(answered.modals).toEqual([]);
     expect(answered.inventory.rope).toBeUndefined();
   });
@@ -606,7 +606,7 @@ function openOnBlade(): PlaySession {
   const session = startSession(loadInEnglish(PLANE_MODULE));
   applyDirective(session, { kind: 'load', save: 'stocked' });
   applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-  applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Blade x1' });
+  applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'blade' });
   return session;
 }
 
@@ -618,10 +618,10 @@ describe('the plane screen, as a frame like any other', () => {
     const session = openOnBlade();
 
     expect(modalNames(view(session))).toEqual(['carried-items']);
-    submitModal(session, { verb: 'Grow' });
+    submitModal(session, { verb: 'grow' });
     expect(modalNames(view(session))).toEqual(['item-plane']);
 
-    submitModal(session, { plane: 'Back to inventory' });
+    submitModal(session, { plane: 'back' });
     expect(modalNames(view(session))).toEqual(['carried-items']);
     expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['verb']);
   });
@@ -631,10 +631,10 @@ describe('the plane screen, as a frame like any other', () => {
   // player who had to scroll under the screen to find out would not be told.
   it('states a refused growth on the screen it was refused on, and puts nothing under it', () => {
     const session = openOnBlade();
-    submitModal(session, { verb: 'Grow' });
-    expect(takes(view(session).modals[0].options[0])).toContain('feed: with Whetstone');
+    submitModal(session, { verb: 'grow' });
+    expect(takes(view(session).modals[0].options[0])).toContain('feed: with whetstone');
 
-    const refused = submitModal(session, { plane: 'feed: with Whetstone' });
+    const refused = submitModal(session, { plane: 'feed: with whetstone' });
     expect(modalNames(refused)).toEqual(['item-plane']);
     expect(refused.modals[0].options[0].label).toBe('Blade at 0,0 — Blade is already at level 1, which is its maximum');
     expect(refused.said).toEqual([]);
@@ -690,7 +690,7 @@ describe('the plane screen, as a frame like any other', () => {
   // in its stack is a plane the screen can be opened on, so it is among them.
   it('publishes which plane is in hand as a focus into the planes the view already publishes', () => {
     const session = openOnBlade();
-    submitModal(session, { verb: 'Grow' });
+    submitModal(session, { verb: 'grow' });
 
     const shown = view(session);
     expect(shown.focus).toEqual({ instance: 'blade', hex: '0,0' });
@@ -701,8 +701,8 @@ describe('the plane screen, as a frame like any other', () => {
     const session = openOnBlade();
     expect(view(session).focus).toBeNull();
 
-    submitModal(session, { verb: 'Grow' });
-    submitModal(session, { plane: 'Back to inventory' });
+    submitModal(session, { verb: 'grow' });
+    submitModal(session, { plane: 'back' });
     expect(view(session).focus).toBeNull();
   });
 
@@ -710,7 +710,7 @@ describe('the plane screen, as a frame like any other', () => {
   // another screen is not what is in hand.
   it('publishes no focus while another screen covers the plane', () => {
     const session = openOnBlade();
-    submitModal(session, { verb: 'Grow' });
+    submitModal(session, { verb: 'grow' });
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
 
     expect(modalNames(view(session))).toEqual(['item-plane', 'carried-items']);
@@ -746,21 +746,21 @@ describe('the value a screen leaves by', () => {
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
 
     expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['item']);
-    expect(leaves(view(session))).toEqual({ leaving: 'Close', listed: true });
+    expect(leaves(view(session))).toEqual({ leaving: 'close', listed: true });
 
-    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Rope x1' });
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'rope' });
     expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['verb']);
-    expect(leaves(view(session))).toEqual({ leaving: 'Close', listed: true });
+    expect(leaves(view(session))).toEqual({ leaving: 'close', listed: true });
 
-    applyDirective(session, { kind: 'submit-modal', key: 'verb', value: 'Close' });
+    applyDirective(session, { kind: 'submit-modal', key: 'verb', value: 'close' });
     expect(view(session).modals).toEqual([]);
   });
 
   it('is the word the plane screen leaves by, and goes back rather than closing the world', () => {
     const session = openOnBlade();
-    submitModal(session, { verb: 'Grow' });
+    submitModal(session, { verb: 'grow' });
 
-    expect(leaves(view(session))).toEqual({ leaving: 'Back to inventory', listed: true });
+    expect(leaves(view(session))).toEqual({ leaving: 'back', listed: true });
 
     submitModal(session, { plane: view(session).modals[0].leaving! });
     expect(modalNames(view(session))).toEqual(['carried-items']);
@@ -776,5 +776,125 @@ describe('the value a screen leaves by', () => {
       ['character-creation', null],
       ['dialogue', null],
     ]);
+  });
+});
+
+// c2: nothing a player answers with carries words. Proven by enumerating what
+// every modal publishes against the locale that is loaded, in both the language
+// it was authored in and one somebody translated, rather than by reading the
+// source or keeping a list of the values by hand.
+describe('nothing a player answers with carries words', () => {
+  const WORDED = [
+    '# info forge',
+    'version: 1.0.0',
+    '',
+    '# location camp',
+    'x: 0, y: 0',
+    'starting',
+    'entities:',
+    '  sage',
+    '',
+    '# cluster-jewel core',
+    'shape: point',
+    'open-connections: e',
+    '',
+    '# item blade',
+    'title: Blade',
+    'slot: mainhand',
+    'max-level: 4',
+    'origin-cluster: core',
+    '',
+    '# item whetstone',
+    'title: Whetstone',
+    'item-experience: 1000',
+    '',
+    '# entity sage',
+    'title: Sage',
+    '',
+    '# flag greeted',
+    '',
+    '# dialogue sage-talk',
+    'owner = sage',
+    'node greeting:',
+    '  when: not greeted',
+    '  -> Ask about the mirror.',
+    '  -> Say nothing.',
+    '',
+    '# save stocked',
+    `{"version":${SAVE_VERSION},"inventory":{"forge.blade":1,"forge.whetstone":2}}`,
+  ].join('\n');
+
+  const SPANISH = [
+    '# info forge-es',
+    'version: 1.0.0',
+    'dependencies:',
+    '  forge',
+    '',
+    '# locale es',
+    'forge.item.blade.title: Espada',
+    'forge.item.whetstone.title: Piedra',
+    'forge.entity.sage.title: Sabio',
+    'engine.carried.verb.grow: Cultiva',
+    'engine.carried.close: Cierra',
+    'engine.race.elf: Elfo',
+    'engine.plane.back: Vuelve',
+  ].join('\n');
+
+  const registry = loadUniverse([engineLocale(), { name: 'forge', text: WORDED }, { name: 'forge-es', text: SPANISH }]);
+
+  // Every string this universe can put on a screen: what a `# locale` declared
+  // in any language, and what a module authored. A value equal to one of these
+  // is a value drawn from words.
+  const everyWord = (): Set<string> => {
+    const words = new Set<string>();
+    for (const table of registry.locales.declared.values()) for (const value of table.values()) words.add(value);
+    for (const entry of registry.locales.base.values()) words.add(entry.text);
+    words.add('Ask about the mirror.');
+    words.add('Say nothing.');
+    return words;
+  };
+
+  // Every screen the engine declares, each carried far enough to publish: the
+  // inventory with nothing chosen and with a grown copy chosen, the plane that
+  // copy opens, the dialogue the sage raises, and character creation.
+  const everyValue = (language: string): string[] => {
+    const session = startSession(registry, language);
+    applyDirective(session, { kind: 'load', save: 'forge.stocked' });
+    const values: string[] = [];
+    const published = (): void => {
+      for (const modal of view(session).modals) for (const option of modal.options) for (const choice of option.values ?? []) values.push(choice.value);
+    };
+
+    applyDirective(session, { kind: 'open-modal', modal: 'character-creation' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'name', value: 'Rowan' });
+    applyDirective(session, { kind: 'submit-modal', key: 'race', value: 'elf' });
+
+    applyDirective(session, { kind: 'feed', target: 'forge.blade', food: 'forge.whetstone' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: '1' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'verb', value: 'grow' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'plane', value: 'back' });
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'close' });
+
+    applyDirective(session, { kind: 'talk', entity: 'forge.sage' });
+    published();
+    return values;
+  };
+
+  it('publishes no value that is a title, an authored line or a locale entry', () => {
+    const words = everyWord();
+    for (const language of ['en', 'es']) {
+      const values = everyValue(language);
+      expect(values.length, language).toBeGreaterThan(10);
+      expect(values.filter((value) => words.has(value)), language).toEqual([]);
+    }
+  });
+
+  it('publishes the same values in every language, so a recording replays in each', () => {
+    expect(everyValue('es')).toEqual(everyValue('en'));
   });
 });

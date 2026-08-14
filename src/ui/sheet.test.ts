@@ -6,7 +6,7 @@ import { carried, contributionText, counted, worn } from './sheet';
 type CarriedRow = PlayStatus['carried'][number];
 type Plane = PlayStatus['planes'][number];
 
-const row = (over: Partial<CarriedRow> = {}): CarriedRow => ({ id: 'rope', name: asLocalized('Rope'), count: 1, value: 'Rope x1', shown: asLocalized('Rope x1'), grown: false, ...over });
+const row = (over: Partial<CarriedRow> = {}): CarriedRow => ({ id: 'rope', name: asLocalized('Rope'), count: 1, shown: asLocalized('Rope x1'), grown: false, ...over });
 
 const plane = (over: Partial<Plane> = {}): Plane => ({
   instance: '1',
@@ -97,7 +97,7 @@ describe('what the player is wearing, as rows', () => {
   it('names the slot and the thing in it, never the id the slot holds', () => {
     const rows = [
       row({ id: '1', name: asLocalized('Modified Blade'), grown: true, slot: 'mainhand' }),
-      row({ id: 'worn:back', name: asLocalized('Cloak'), value: 'Cloak (back)', slot: 'back' }),
+      row({ id: 'worn:back', name: asLocalized('Cloak'), slot: 'back' }),
     ];
     expect(worn(rows, [])).toEqual([
       { id: 'worn:back', name: 'back', value: 'Cloak' },
@@ -116,7 +116,7 @@ describe('what the player is wearing, as rows', () => {
   });
 
   it('leaves a worn stack copy without a summary, the way the carried page leaves its stack', () => {
-    const rows = [row({ id: 'worn:mainhand', name: asLocalized('Blade'), value: 'Blade (mainhand)', slot: 'mainhand' })];
+    const rows = [row({ id: 'worn:mainhand', name: asLocalized('Blade'), slot: 'mainhand' })];
     const published = plane({ instance: 'worn:mainhand', contributions: [flat('mod.attack', 15)] });
 
     expect(worn(rows, [published])[0].detail).toBeUndefined();
@@ -128,8 +128,8 @@ describe('what the player is wearing, as rows', () => {
   // press each page sends reaches the copy that page drew.
   it('leaves the worn rows to this page and off the one that lists what is carried', () => {
     const rows = [
-      row({ id: 'blade', name: asLocalized('Blade'), count: 2, value: 'Blade x2' }),
-      row({ id: 'worn:mainhand', name: asLocalized('Blade'), value: 'Blade (mainhand)', slot: 'mainhand' }),
+      row({ id: 'blade', name: asLocalized('Blade'), count: 2 }),
+      row({ id: 'worn:mainhand', name: asLocalized('Blade'), slot: 'mainhand' }),
     ];
 
     expect(carried(rows, []).map((entry) => entry.id)).toEqual(['blade']);

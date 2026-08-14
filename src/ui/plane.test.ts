@@ -255,7 +255,7 @@ describe('the route a row opens', () => {
     // growing is what puts a plane in hand.
     const asking = driver.snapshot().view!.modals[0].options[0];
     expect(asking.key).toBe('verb');
-    driver.answer(asking.key, asking.values!.find((choice) => choice.value.startsWith('G'))!.value);
+    driver.answer(asking.key, asking.values!.find((choice) => choice.value === 'grow')!.value);
 
     const view = focusedPlane(driver.snapshot().view)!;
     expect(view.title).toBe('The Blade');

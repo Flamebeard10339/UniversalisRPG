@@ -70,18 +70,18 @@ function inStep(repl: Repl, gui: Driver, line: string, dispatch: () => void = ()
 // measures. It is the route `growing-through-the-inventory-screen` replays over
 // shipped content; here it is walked twice at once.
 const CRAFTING_ROUTE: ReadonlyArray<readonly [string, string]> = [
-  ['verb', 'Grow'],
+  ['verb', 'grow'],
   ['plane', 'allocate: slot e'],
-  ['plane', 'slot: e with Crossroads Jewel'],
-  ['plane', "feed: with Master's Whetstone"],
-  ['plane', 'Go to 1,0'],
+  ['plane', 'slot: e with tutorial-island.crossroads-jewel'],
+  ['plane', "feed: with tutorial-island.masters-whetstone"],
+  ['plane', 'go: 1,0'],
   ['plane', 'allocate: position 1'],
   ['plane', 'allocate: slot ne'],
-  ['plane', 'slot: ne with Keen Edge Jewel'],
-  ['plane', 'Go to 2,-1'],
+  ['plane', 'slot: ne with tutorial-island.keen-edge-jewel'],
+  ['plane', 'go: 2,-1'],
   ['plane', 'allocate: position 1'],
-  ['plane', 'Back to inventory'],
-  ['verb', 'Equip'],
+  ['plane', 'back'],
+  ['verb', 'equip'],
 ];
 
 interface SerializedGrowth {

@@ -52,18 +52,18 @@ function stocked(): PlaySession {
 function onBlade(): PlaySession {
   const session = stocked();
   applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-  applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Blade x1' });
+  applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'blade' });
   return session;
 }
 
 describe('what a click away from a screen answers', () => {
   it('is the value the screen published as the one that leaves it', () => {
     const inventory = view(onBlade());
-    expect(dismissal(inventory.modals)).toEqual({ key: 'verb', value: 'Close' });
+    expect(dismissal(inventory.modals)).toEqual({ key: 'verb', value: 'close' });
 
     const session = onBlade();
-    submitModal(session, { verb: 'Grow' });
-    expect(dismissal(view(session).modals)).toEqual({ key: 'plane', value: 'Back to inventory' });
+    submitModal(session, { verb: 'grow' });
+    expect(dismissal(view(session).modals)).toEqual({ key: 'plane', value: 'back' });
   });
 
   // The gesture is the same answer the prompt types, so it takes the screen
@@ -71,7 +71,7 @@ describe('what a click away from a screen answers', () => {
   // the plane goes back to the inventory (c11, c19).
   it('leaves the screen where answering it leaves it', () => {
     const session = onBlade();
-    submitModal(session, { verb: 'Grow' });
+    submitModal(session, { verb: 'grow' });
 
     const back = dismissal(view(session).modals)!;
     submitModal(session, { [back.key]: back.value });
@@ -101,7 +101,7 @@ describe('what a click away from a screen answers', () => {
     applyDirective(covering, { kind: 'open-modal', modal: 'carried-items' });
 
     expect(view(covering).modals.map((modal) => modal.name)).toEqual(['character-creation', 'carried-items']);
-    expect(dismissal(view(covering).modals)).toEqual({ key: 'item', value: 'Close' });
+    expect(dismissal(view(covering).modals)).toEqual({ key: 'item', value: 'close' });
 
     const covered = onBlade();
     applyDirective(covered, { kind: 'talk', entity: 'sage' });
@@ -114,7 +114,7 @@ describe('what a click away from a screen answers', () => {
   // not offer, and a click that answered it would be answering a value the
   // engine is not listing.
   it('is nothing where the question being asked does not list it', () => {
-    const asked: PlayView['modals'] = [{ name: 'held', leaving: 'Close', options: [{ key: 'item', label: asLocalized('Item'), values: [{ value: 'Blade x1', shown: asLocalized('Blade x1') }] }] }];
+    const asked: PlayView['modals'] = [{ name: 'held', leaving: 'close', options: [{ key: 'item', label: asLocalized('Item'), values: [{ value: 'blade', shown: asLocalized('Blade x1') }] }] }];
 
     expect(dismissal(asked)).toBeNull();
   });
