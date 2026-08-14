@@ -109,3 +109,103 @@ display were one string and no pass had standing to separate them.
 ## Open questions
 
 None.
+
+## Audit passes
+
+### Pass 1 — 2026-08-14
+
+- base: `cfa1eb692c996ed4414390fa5cb492741856a0f2`
+- head: `7ad6f3accaf9fcfe4b6e35bc6d19b50ac8f34321`
+- proof 1: met — An ordinal is a counter reading and nothing else, and the naming rule is proven at
+both ends. src/runtime/instances.test.ts "mints an ordinal that does not encode what the copy is
+of, and keeps it when that changes" rewrites a live instance's template through the table and the
+copy answers to the same ordinal, and the next mint is still 3. src/runtime/carriedName.test.ts
+covers the four cases the clause names: a stack is its title, a grown copy is the title under
+engine.item.modified, two ordinals of one template are one name, and a language with no title for
+the template gives forge.iron-sword#18273 / forge.iron-sword#4. Re-run:
+npx vitest run src/runtime/carriedName.test.ts src/runtime/instances.test.ts.
+Mutation, mine, not from a manifest this brief wrote: replacing
+localizer.identifier(`${template}#${copy}`) in src/runtime/carriedName.ts:15 with
+localizer.title(kind, template) is KILLED by "names a copy by its template and its ordinal where
+the played language has no title for the template", re-measured at its own file with the mutation
+still applied.
+- proof 2: met — Proven by enumeration rather than by reading the source, as the clause asks.
+src/runtime/modals.test.ts "publishes no value that is a title, an authored line or a locale
+entry" walks all four declared modals far enough to publish -- character creation, the inventory
+with nothing chosen and with a grown copy chosen, the plane that copy opens, and the sage's
+dialogue -- collects every ModalChoice.value, and intersects them with every string the universe
+can put on a screen (every declared locale entry in both languages, every base entry, and the two
+authored dialogue lines); the intersection is empty in en and in es, over more than ten values.
+"publishes the same values in every language, so a recording replays in each" asserts the two
+value lists are identical. The engine's own are ids: grow/equip/unequip/destroy, close, go-ahead,
+back, human/elf/dwarf/orc, and a dialogue answer is String(choice.index). distinct() is gone from
+src/runtime/carriedScreen.ts (it is present at cfa1eb69:src/runtime/carriedScreen.ts:106 and
+nowhere at HEAD). Re-run: npx vitest run src/runtime/modals.test.ts. Two mutations of mine, both
+KILLED and re-measured with the mutation still applied: value: String(choice.index) ->
+value: choice.text in src/runtime/modals.ts:126 (10 of 38 failed), and
+value: entry.id -> value: entry.shown in src/runtime/carriedScreen.ts:154 (11 of 38 failed).
+- proof 3: unmet — The named half is met and mutation-proven: PlaneFrame.said is a Said, isSaid checks
+its key against the closed union, and src/runtime/planeScreen.test.ts "a frame carries a key, not
+a sentence" writes a refusal in each language and renders it in the other, both directions
+(Modified Blade at 1,0 -- position 1 of 1,0 costs a point and none remain / Hoja modificada en 1,0
+and posicion 1 de 1,0 cuesta un punto y no queda ninguno), with the stored value asserted to be
+{engine, params} and equal across the two writers. Two mutations of mine are KILLED there:
+dropping growth.refused from the frame planeSubmit returns, and collapsing the copy arm of
+say() to the template id.
+The clause's own first sentence is what fails. "No save field holds text the engine composed" is
+false for activeAction.actionLabel and for activeAction.roster[].actionLabel: a walk under way
+saves as "actionLabel":"Travel to Far Beach", composed by src/runtime/actions.ts:56 out of a
+location's title, and src/runtime/save.ts:141 re-derives it and compares string equality, so a
+rename of the English title alone stops the saved walk. Re-run, via the repo's own resolution:
+npm run inspect -- - with a body that starts a session on a two-location island titled "Far
+Beach", begins a travel, serializes, then reopens flags/activeAction/journey against the same
+island retitled "Distant Beach" and calls pruneStateForRegistry. Unchanged title: no warnings,
+still walking. Renamed title: ["Stopped unavailable action travel.isla.shore>isla.far.Travel to
+Far Beach: unknown action \"Travel to Far Beach\" on travel.isla.shore>isla.far."] and the action
+is gone. That is the Deliverable's own headline -- "no rename of an English title can change what
+a recording replays" -- falsified on a shipped surface, and it is the same root cause the Goal
+names rather than a new one.
+- proof 4: unmet — The structural half holds and is strong: Localized is a branded type, every
+player-visible field is branded, the only three doors into it are engine() over the closed union,
+prose() and identifier(), and src/runtime/localized.test.ts "the brand is closed (c1)" keeps
+asLocalized out of src. prose() has exactly four call sites, all DSL-authored text
+(dialogue-runtime.ts:53, :73, effects.ts:205, modals.ts:126), and the sentence-scan allowlist is
+two action labels and nothing else. Every log push in src/runtime is keyed.
+What fails is the first sentence, through identifier(). src/runtime/actions.ts:54 builds
+`unknown travel destination: ${destId}` as a bare template literal with no key;
+src/runtime/save.ts:137 relays that RuntimeError's message into a PruneWarning through
+localizer.identifier, and save.ts:275 pushes every warning into state.log. Re-run: npm run
+inspect -- - loading engine-en plus a one-location module declaring language: es,
+with a # locale es entry for engine.prune.action, then setting
+activeAction.ownerRef = 'travel.isla.shore>isla.gone' and calling pruneStateForRegistry. The
+Spanish session's log line is "Detenida la accion travel.isla.shore>isla.gone.Travel to Gone:
+unknown travel destination: isla.gone." -- an English sentence built in TypeScript, on a screen,
+in a language that is not English. The sentence scan cannot see it because it has no key to
+match against, which is the shape of hole the scan is blind to by construction.
+- proof 5: met — src/runtime/translationSurvival.test.ts loads the shipped universe (engine-en plus
+tutorial-island) and then reloads it with translationOf() layered on: a # locale module giving
+every key the universe can address -- every ENGINE_KEYS entry and every locales.addressable
+content key -- a Caesar-shifted replacement in the base language and in zz, two different shifts
+so the two languages differ from the English and from each other. Four gate tests assert the
+replacement is total (every key declared in both languages; no key still reading its authored
+English except engine.carried.worn, which is "{item} ({slot})" and has no word to replace; the two
+languages differ for every worded key; and a shipped title no longer says what it said). All six
+shipped # test sections are then replayed in both languages: 16 tests, all passing. Re-run:
+npx vitest run src/runtime/translationSurvival.test.ts. Two mutations of mine, both KILLED and
+re-measured at their own file: collapsing the zz shift to 13 so the two languages agree, and
+dropping locales.addressable from everyKey so only engine patterns are replaced.
+- proof 6: unmet — Everything the clause promises about behaviour holds and is checkable: SAVE_VERSION
+is 10, the six # save fixtures carry only the version bump, no fixture's instances or equipment
+moved, "race":"Elf" became "race":"elf", the submit-modal: values in
+growing-through-the-inventory-screen became ids, and npm run tasks -- merge-ready is green on
+every behavioural leg (tsc, npm test, layer-check, audit-status, doctor, bytes, tree, base) with
+only "clauses what-is-stored-or-replayed-is-an-id has no recorded audit pass" outstanding, which
+is this pass. The visible English is unmoved: Grow, Equip, Unequip, Destroy, Close, Go ahead,
+Go to {hex}, Back to inventory and slot:/allocate:/feed: read at cfa1eb69 exactly as
+content/engine-en.dsl now spells them.
+"named here in full" is what fails. A third authored thing moved and is not named:
+content/tutorial-island.dsl:689 in # test tutorial-quest-given went from
+"choose: Sounds good. Teach me." to "choose: 0". That is a choose: directive, not a submit-modal:,
+and the Decisions block states as settled fact that "no shipped # test answers a dialogue choice,
+so nothing authored moves" -- which git show cfa1eb69:content/tutorial-island.dsl:688 refutes.
+Re-run: git diff cfa1eb69..HEAD -- content/tutorial-island.dsl.
