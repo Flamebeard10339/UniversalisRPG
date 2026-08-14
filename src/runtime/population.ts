@@ -100,10 +100,10 @@ export function applyRespawns(state: GameState): boolean {
 export function prunePopulations(state: GameState, registry: Registry): { path: string; id: string; message: Localized }[] {
   const warnings: { path: string; id: string; message: Localized }[] = [];
   const localizer = localizerOf(registry, state);
-  const said = localizer.prose;
+  const named = localizer.identifier;
   for (const [locationId, byEntity] of Object.entries(state.populations)) {
     for (const entityId of Object.keys(byEntity)) {
-      const params = { entity: said(entityId), location: said(locationId) };
+      const params = { entity: named(entityId), location: named(locationId) };
       const message = !registry.locations.has(locationId)
         ? localizer.engine('engine.prune.population.location', params)
         : !registry.entities.has(entityId)

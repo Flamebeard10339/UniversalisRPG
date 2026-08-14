@@ -80,7 +80,7 @@ export const GENERATED_FIELD = 'title';
 
 // What a key is written as: the same path grammar an id follows, so a locale
 // file is addressable by the language the rest of the DSL already speaks.
-const KEY = /^(?<key>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*):[ \t]?(?<value>.*)$/;
+const KEY = /^(?<key>[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)*):[ \t]?(?<value>.*)$/;
 
 export function parseLocaleSection(section: RawSection): LocaleSection {
   if (!section.id) throw new DslError('# locale requires a language, as in `# locale en`', section.span);
@@ -124,10 +124,12 @@ const FIELD_NAMES: ReadonlySet<string> = new Set(Object.values(TEXT_FIELDS).flat
 
 // A slug that the path grammar cannot address, or that collides with a field of
 // the object that owns it, is not a key — and two labels reaching one slug are
-// one key with two meanings, which is the same fault said about a pair.
+// one key with two meanings, which is the same fault said about a pair. A key
+// segment may begin with a digit, so `3 Card Monte` addresses fine; what has no
+// key is a label with neither a letter nor a digit in it.
 export function actionSlugProblem(label: string, taken: ReadonlySet<string>): string | undefined {
   const slug = actionSlug(label);
-  if (!/^[a-z][a-z0-9-]*$/.test(slug)) return `action ${JSON.stringify(label)} has no display key: it keys as ${JSON.stringify(slug)}, which is not a name`;
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return `action ${JSON.stringify(label)} has no display key: it keys as ${JSON.stringify(slug)}, so give it a label with a letter or a digit in it`;
   if (FIELD_NAMES.has(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which is already a field of the object that owns it`;
   if (taken.has(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which another action here already keys as`;
   return undefined;

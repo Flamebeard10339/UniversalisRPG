@@ -1368,3 +1368,32 @@ describe('a missing translation shows its key, in every direction', () => {
     expect(v.choices.map((choice) => choice.label)).toEqual(['engine.travel.to']);
   });
 });
+
+// pass 1: the choice that starts a craft and the bar that reports it were keyed
+// separately, so translating one left the other in English.
+describe('a craft is one string with one key', () => {
+  const KITCHEN = ['# info kitchen', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# item flour', '', '# item bread', '', '# recipe bread', 'in: flour', 'out: bread', 'time: 4'].join('\n');
+  const SPANISH = ['# info kitchen-es', 'version: 1.0.0', 'dependencies:', '  kitchen', '', '# locale es', 'engine.craft.label: Prepara {recipe}', 'kitchen.recipe.bread.title: Pan'].join('\n');
+
+  const cooking = (language: string): PlayView => {
+    const registry = loadUniverse([engineLocale(), { name: 'kitchen', text: KITCHEN }, { name: 'kitchen-es', text: SPANISH }]);
+    registry.saves.set('stocked', { version: SAVE_VERSION, diff: { inventory: { 'kitchen.flour': 2 } } });
+    const session = startSession(registry, language);
+    applyDirective(session, { kind: 'load', save: 'stocked' });
+    return beginAction(session, 'craft:kitchen.bread');
+  };
+
+  it('labels the offer and the action under way with the same words', () => {
+    expect(cooking('en').action?.label).toBe('Craft Bread');
+    expect(cooking('es').action?.label).toBe('Prepara Pan');
+  });
+
+  it('offers it under those words too, so one translation moves both', () => {
+    const registry = loadUniverse([engineLocale(), { name: 'kitchen', text: KITCHEN }, { name: 'kitchen-es', text: SPANISH }]);
+    registry.saves.set('stocked', { version: SAVE_VERSION, diff: { inventory: { 'kitchen.flour': 2 } } });
+    const session = startSession(registry, 'es');
+    applyDirective(session, { kind: 'load', save: 'stocked' });
+
+    expect(view(session).choices.map((choice) => choice.label)).toContain('Prepara Pan');
+  });
+});

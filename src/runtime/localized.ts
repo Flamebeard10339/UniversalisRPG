@@ -55,6 +55,11 @@ export interface Localizer {
   // would be the cross-language fallback c3 exists to forbid: the marker is
   // shown instead unless every module loaded is writing this language.
   prose(text: string): Localized;
+  // A value that is an id rather than words: a slot, an instance, a path into
+  // the save. It belongs to no language, so it goes into the pattern verbatim
+  // in every one of them — which is what keeps a translated warning naming the
+  // record it is about.
+  identifier(id: string): Localized;
 }
 
 export function localizerFor(registry: Registry, language: string): Localizer {
@@ -73,6 +78,7 @@ export function localizerFor(registry: Registry, language: string): Localizer {
     title: (kind, id) => self.content(kind, id, 'title'),
     actionLabel: (kind, ownerId, label) => self.content(kind, ownerId, actionSlug(label)),
     prose: (text) => (locales.moduleLanguages.every((declared) => declared === language) ? (text as Localized) : self.engine('engine.text.untranslated')),
+    identifier: (id) => id as Localized,
   };
   return self;
 }

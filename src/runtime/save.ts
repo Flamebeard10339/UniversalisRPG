@@ -119,7 +119,7 @@ function pruneRecord<T>(
   for (const id of Object.keys(record)) {
     if (has(id)) continue;
     delete record[id];
-    addWarning(warnings, `${path}.${id}`, id, localizer.engine('engine.prune.record', { path: localizer.prose(path), id: localizer.prose(id), kind: localizer.prose(kind) }));
+    addWarning(warnings, `${path}.${id}`, id, localizer.engine('engine.prune.record', { path: localizer.identifier(path), id: localizer.identifier(id), kind: localizer.identifier(kind) }));
   }
 }
 
@@ -148,7 +148,9 @@ function activeActionProblem(state: GameState, registry: Registry): string | nul
 export function pruneStateForRegistry(state: GameState, registry: Registry): PruneWarning[] {
   const warnings: PruneWarning[] = [];
   const localizer = localizerOf(registry, state);
-  const said = localizer.prose;
+  // An id survives translation; the reason a modal or an action was dropped is
+  // an English diagnostic and does not.
+  const named = localizer.identifier;
 
   // First, so every rule under it asks a settled table rather than one still
   // being pruned beneath it: a field holding an instance id gets one answer.
@@ -159,8 +161,8 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     const old = state.location;
     const replacement = startingLocationId(registry) ?? '';
     state.location = replacement;
-    const to = replacement ? said(replacement) : localizer.engine('engine.prune.nowhere');
-    addWarning(warnings, 'location', old, localizer.engine('engine.prune.location', { from: said(old), to }));
+    const to = replacement ? named(replacement) : localizer.engine('engine.prune.nowhere');
+    addWarning(warnings, 'location', old, localizer.engine('engine.prune.location', { from: named(old), to }));
   }
 
   for (const [field, rule] of RECORD_PRUNES) {
@@ -172,9 +174,9 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     // Two patterns rather than one with a phrase substituted into it: a
     // fragment like `stat attack` is a sentence a translator cannot reach.
     const message = !registry.stats.has(buff.statId)
-      ? localizer.engine('engine.prune.buff.stat', { buff: said(key), stat: said(buff.statId) })
+      ? localizer.engine('engine.prune.buff.stat', { buff: named(key), stat: named(buff.statId) })
       : itemId && !registry.items.has(itemId)
-        ? localizer.engine('engine.prune.buff.item', { buff: said(key), item: said(itemId) })
+        ? localizer.engine('engine.prune.buff.item', { buff: named(key), item: named(itemId) })
         : undefined;
     if (!message) continue;
     delete state.activeBuffs[key];
@@ -187,7 +189,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   for (const [slot, wornId] of Object.entries(state.equipped)) {
     const itemId = itemTemplate(state, wornId);
     const item = registry.items.get(itemId);
-    const params = { slot: said(slot), item: said(itemId) };
+    const params = { slot: named(slot), item: named(itemId) };
     const message = !item ? localizer.engine('engine.prune.equipped.missing', params) : item.slot !== slot ? localizer.engine('engine.prune.equipped.slot', params) : undefined;
     if (!message) continue;
     delete state.equipped[slot];
@@ -195,7 +197,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   }
 
   for (const { name, reason } of pruneModals(state, registry)) {
-    addWarning(warnings, `modals.${name}`, name, localizer.engine('engine.prune.modal', { modal: said(name), reason: said(reason) }));
+    addWarning(warnings, `modals.${name}`, name, localizer.engine('engine.prune.modal', { modal: named(name), reason: localizer.prose(reason) }));
   }
 
   // A walk whose destination or any of whose legs has gone is a walk to
@@ -205,7 +207,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     const lost = [journey.to, ...journey.legs].find((place) => !registry.locations.has(place));
     if (lost !== undefined) {
       state.journey = null;
-      addWarning(warnings, 'journey', journey.to, localizer.engine('engine.prune.journey', { to: said(journey.to), lost: said(lost) }));
+      addWarning(warnings, 'journey', journey.to, localizer.engine('engine.prune.journey', { to: named(journey.to), lost: named(lost) }));
     }
   }
 
@@ -214,7 +216,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     const active = state.activeAction!;
     const id = `${active.ownerRef}.${active.actionLabel}`;
     state.activeAction = null;
-    addWarning(warnings, 'activeAction', id, localizer.engine('engine.prune.action', { action: said(id), reason: said(activeProblem) }));
+    addWarning(warnings, 'activeAction', id, localizer.engine('engine.prune.action', { action: named(id), reason: localizer.prose(activeProblem) }));
   }
 
   return warnings;

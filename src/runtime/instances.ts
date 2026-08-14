@@ -122,7 +122,7 @@ export function pruneInstances(state: GameState, registry: Registry): PruneWarni
   const table = writable(state.instances);
   const warnings: PruneWarning[] = [];
   const localizer = localizerOf(registry, state);
-  const said = localizer.prose;
+  const named = localizer.identifier;
   const warn = (id: string, message: Localized): void => {
     warnings.push({ path: `instances.${id}`, id, message });
   };
@@ -133,8 +133,8 @@ export function pruneInstances(state: GameState, registry: Registry): PruneWarni
 
   for (const [id, held] of Object.entries(table.byId)) {
     const definition = kindOf(held.kind);
-    if (!definition) drop(id, localizer.engine('engine.prune.instance.kind', { instance: said(id), kind: said(held.kind) }));
-    else if (!definition.templateLoaded(registry, held.template)) drop(id, localizer.engine('engine.prune.instance.template', { instance: said(id), template: said(held.template) }));
+    if (!definition) drop(id, localizer.engine('engine.prune.instance.kind', { instance: named(id), kind: named(held.kind) }));
+    else if (!definition.templateLoaded(registry, held.template)) drop(id, localizer.engine('engine.prune.instance.template', { instance: named(id), template: named(held.template) }));
   }
 
   // A repair can drop the reference that another drop in this same pass made
@@ -145,10 +145,11 @@ export function pruneInstances(state: GameState, registry: Registry): PruneWarni
     for (const [id, held] of Object.entries(table.byId)) {
       const definition = kindOf(held.kind)!;
       for (const repaired of definition.repair(held.payload as never, registry, (ref) => instanceIsLive(state, ref))) {
-        warn(id, localizer.engine('engine.prune.instance.repaired', { instance: said(id), repair: said(repaired) }));
+        // What a kind repaired is that kind's own English sentence, not an id.
+        warn(id, localizer.engine('engine.prune.instance.repaired', { instance: named(id), repair: localizer.prose(repaired) }));
       }
       if (definition.empty(held.payload as never)) {
-        drop(id, localizer.engine('engine.prune.instance.empty', { instance: said(id) }));
+        drop(id, localizer.engine('engine.prune.instance.empty', { instance: named(id) }));
         settled = false;
       }
     }

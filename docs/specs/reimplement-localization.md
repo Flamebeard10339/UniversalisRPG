@@ -222,6 +222,23 @@ Proof:
   a `submit-modal:` directive replays — so localizing them would move an authored id, which c9
   forbids. Splitting a modal option's display from its value is the GUI's task, and the two keys the
   deliverable listed are left out of the union rather than added and left dead.
+- **An id is a second door, not prose.** `Localizer.identifier` carries a slot, an instance, a
+  path into the save or a modal's name into a pattern verbatim in every language, because an id
+  belongs to none. Pass 1 measured what the single door cost: a translated prune warning read "Se
+  eliminó (untranslated) (untranslated) porque su (untranslated) no está cargado" — grammatical and
+  factless, which is worse than the key c3 argues for. `prose` keeps only what is words: a `say:`,
+  a dialogue line, a growth refusal, and the English diagnostic naming why a modal or an action was
+  dropped.
+- **Nothing is printed that the loader would generate for itself.** Serialization used to write
+  every `title:` out, including the one hydration filled in, so one trip through the contribution
+  flow turned a non-English module's keys into authored raw ids with `registryDiff` reporting
+  nothing. A generated title and a generated `# action` label are both omitted now, which is also
+  what keeps `generatedLabel` from having to survive a round trip.
+- **c8's slug narrows the authoring grammar in one case, and that is stated rather than hidden.** A
+  key segment may open with a digit, so `3 Card Monte` keys as `3-card-monte` and stays loadable;
+  what is newly refused is a label with neither a letter nor a digit in it, which keys as nothing at
+  all, and a label whose slug is already a field of the object that owns it. Both are one key with
+  two meanings or none, and the error says what a legal label looks like.
 - **`engine.item.examine` has one reader, `itemExamine`, and the schema default is gone.** Nothing
   displayed an item's examine before this branch either; what mattered was that the English sentence
   and its `article()` left the schema, which is what c2 and c5 ask for.

@@ -254,7 +254,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
       ? standingHere(registry, state, location).find((entityId) => registry.entities.get(entityId)?.capabilities.includes(recipe.requiresCapability!))
       : undefined;
     const detail = station === undefined ? undefined : localizer.title('entity', station);
-    choices.push({ id: `craft:${recipe.id}`, kind: 'craft', label: localizer.engine('engine.craft.label', { recipe: localizer.title('recipe', recipe.id) }), detail });
+    choices.push({ id: `craft:${recipe.id}`, kind: 'craft', label: craftLabel(localizer, recipe.id), detail });
   }
 
   for (const edge of location.adjacent) {
@@ -290,6 +290,10 @@ function journeyChoices(session: PlaySession, local: PlayChoice[]): PlayChoice[]
 // The destination resolves in the language being played before it is put into
 // the pattern, which is what c4's localized parameter means.
 const travelLabel = (localizer: Localizer, target: string): Localized => localizer.engine('engine.travel.to', { destination: localizer.title('location', target) });
+
+// One string, one key, wherever a craft is shown: the choice that starts it and
+// the action bar that reports it read the same two entries.
+const craftLabel = (localizer: Localizer, recipe: string): Localized => localizer.engine('engine.craft.label', { recipe: localizer.title('recipe', recipe) });
 
 // A modal sits atop the world, so what the world offers is withdrawn until it
 // is answered; the modal publishes its own options through `view`.
@@ -456,8 +460,9 @@ function publishResources(state: GameState, registry: Registry): PlayStatus['res
 // one, so there is no owner to key its display on and the engine's own pattern
 // says it — the same one the choice that started the walk was labelled with.
 function actionUnderWay(localizer: Localizer, obj: string, objId: string, label: string): Localized {
-  if (obj !== 'travel') return localizer.actionLabel(obj, objId, label);
-  return travelLabel(localizer, objId.slice(objId.indexOf(TRAVEL_PAIR) + 1));
+  if (obj === 'travel') return travelLabel(localizer, objId.slice(objId.indexOf(TRAVEL_PAIR) + 1));
+  if (obj === 'recipe') return craftLabel(localizer, objId);
+  return localizer.actionLabel(obj, objId, label);
 }
 
 function publishAction(state: GameState, registry: Registry): PlayAction | null {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { actionSlug, missingTranslations, unmatchedLocaleKeys } from './locale';
 import { loadModule, loadUniverse, type Registry } from './registry';
 import { sameValue } from './registryDiff';
+import { serializeRegistryModule } from './serialize';
 import type { ModuleSource } from './universe';
 
 const ISLAND = [
@@ -154,7 +155,41 @@ describe("an action's display key is a slug of its label (c8)", () => {
     expect(() => loadModule('# action look\ntitle: Examine\ninstant\n')).toThrow(/already a field of the object that owns it/);
   });
 
-  it('refuses a label the path grammar cannot address', () => {
-    expect(() => loadModule('# action monte\ntitle: 3 Card Monte\ninstant\n')).toThrow(/which is not a name/);
+  // A key segment may open with a digit, so the slug rule takes every label the
+  // authoring grammar already took rather than narrowing it (pass 1, c8).
+  it('keys a label the id grammar would have refused', () => {
+    const loaded = loadModule('# action monte\ntitle: 3 Card Monte\ninstant\n');
+
+    expect(loaded.locales.base.get('action.monte.3-card-monte')).toEqual({ text: '3 Card Monte', language: 'en' });
+  });
+
+  it('refuses a label with neither a letter nor a digit in it, which keys as nothing', () => {
+    expect(() => loadModule('# action shrug\ntitle: ...\ninstant\n')).toThrow(/give it a label with a letter or a digit in it/);
+  });
+});
+
+// pass 1: serialize printed every title, including the one hydration generates,
+// so one trip through the contribution flow turned a Spanish module's keys into
+// authored raw ids and registryDiff called it clean.
+describe('text survives the trip a contribution makes', () => {
+  const trip = (text: string, language: string): Registry => {
+    const info = { id: 'isla', version: [1, 0, 0] as [number, number, number], language };
+    const printed = serializeRegistryModule(loadUniverse([{ name: 'isla', text }]), { info });
+    return loadUniverse([{ name: 'isla', text: printed }]);
+  };
+
+  const SPANISH_MODULE = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# entity rata-gigante'].join('\n');
+  const ENGLISH_MODULE = ['# info isla', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# entity giant-rat', 'title: The Rat'].join('\n');
+
+  it('leaves a module writing another language with no entry it did not author', () => {
+    expect([...trip(SPANISH_MODULE, 'es').locales.base.keys()]).toEqual([]);
+  });
+
+  it('keeps every entry a module writing English has, generated or authored', () => {
+    const before = loadUniverse([{ name: 'isla', text: ENGLISH_MODULE }]);
+
+    const entries = (registry: Registry): string[] => [...registry.locales.base].map(([key, entry]) => `${key} = ${entry.language} ${entry.text}`).sort();
+
+    expect(entries(trip(ENGLISH_MODULE, 'en'))).toEqual(entries(before));
   });
 });

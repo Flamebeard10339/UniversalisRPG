@@ -22,7 +22,7 @@ import { Resource } from './resource';
 import { ParsedSave } from './saveSection';
 import { Test, Directive } from './test';
 import { hexKey } from './hex';
-import { ModuleInfo } from './info';
+import { defaultTitle, ModuleInfo } from './info';
 import { moduleLocaleSections } from './locale';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 
@@ -320,14 +320,22 @@ function moduleLocalId(moduleId: string, id: string): string {
   return id.startsWith(`${moduleId}.`) ? id.slice(moduleId.length + 1) : id;
 }
 
-function titled(lines: Lines, value: { title?: string; examine?: string }): void {
-  if (value.title !== undefined) lines.push(`title: ${value.title}`);
+// A title the loader would fill in for itself is not printed. Printing it makes
+// a generated placeholder authored on the next load, which for a module that is
+// not writing English turns a key the player was supposed to see into a raw id
+// nobody translated.
+function titleLine(language: string, value: { id: string; title?: string }): Lines {
+  return value.title === undefined || value.title === defaultTitle(value, { language }) ? [] : [`title: ${value.title}`];
+}
+
+function titled(lines: Lines, language: string, value: { id: string; title?: string; examine?: string }): void {
+  lines.push(...titleLine(language, value));
   if (value.examine !== undefined) lines.push(`examine: ${value.examine}`);
 }
 
-function itemSection(moduleId: string, item: Item): string {
+function itemSection(moduleId: string, language: string, item: Item): string {
   const lines = [`# item ${moduleLocalId(moduleId, item.id)}`];
-  titled(lines, item);
+  titled(lines, language, item);
   if (item.slot) lines.push(`slot: ${item.slot}`);
   if (item.tags && item.tags.length > 0) lines.push(item.tags.map(tag).join(', '));
   if (item.clusterJewel) lines.push(`cluster-jewel: ${item.clusterJewel}`);
@@ -340,16 +348,16 @@ function itemSection(moduleId: string, item: Item): string {
   return lines.join('\n');
 }
 
-function passiveSection(moduleId: string, passive: Passive): string {
+function passiveSection(moduleId: string, language: string, passive: Passive): string {
   const lines = [`# passive ${moduleLocalId(moduleId, passive.id)}`];
-  titled(lines, passive);
+  titled(lines, language, passive);
   if (passive.tags.length > 0) lines.push(passive.tags.map(tag).join(', '));
   return lines.join('\n');
 }
 
-function clusterJewelSection(moduleId: string, jewel: ClusterJewel): string {
+function clusterJewelSection(moduleId: string, language: string, jewel: ClusterJewel): string {
   const lines = [`# cluster-jewel ${moduleLocalId(moduleId, jewel.id)}`];
-  titled(lines, jewel);
+  titled(lines, language, jewel);
   lines.push(`shape: ${jewel.shape}`);
   lines.push(`open-connections: ${jewel.openConnections.join(', ')}`);
   const positions = Object.keys(jewel.positions)
@@ -362,22 +370,25 @@ function clusterJewelSection(moduleId: string, jewel: ClusterJewel): string {
 
 function actionSection(moduleId: string, action: ActionDeclaration): string {
   const [, ...body] = actionLines({ ...action, label: action.label });
-  return [`# action ${moduleLocalId(moduleId, action.id)}`, `title: ${action.label}`, ...body.map((line) => line.replace(/^ {2}/, ''))].join('\n');
+  // A generated label is `humanizeEn` of the id, which the loader makes again;
+  // printing it would make the placeholder authored on the next load.
+  const title = action.generatedLabel ? [] : [`title: ${action.label}`];
+  return [`# action ${moduleLocalId(moduleId, action.id)}`, ...title, ...body.map((line) => line.replace(/^ {2}/, ''))].join('\n');
 }
 
-function eventSection(moduleId: string, event: GameEvent): string {
-  return [`# event ${moduleLocalId(moduleId, event.id)}`, `title: ${event.title}`, `resource: ${event.resource}`, `trigger: ${event.trigger}`].join('\n');
+function eventSection(moduleId: string, language: string, event: GameEvent): string {
+  return [`# event ${moduleLocalId(moduleId, event.id)}`, ...titleLine(language, event), `resource: ${event.resource}`, `trigger: ${event.trigger}`].join('\n');
 }
 
-function factionSection(moduleId: string, faction: Faction): string {
-  return [`# faction ${moduleLocalId(moduleId, faction.id)}`, `title: ${faction.title}`].join('\n');
+function factionSection(moduleId: string, language: string, faction: Faction): string {
+  return [`# faction ${moduleLocalId(moduleId, faction.id)}`, ...titleLine(language, faction)].join('\n');
 }
 
 const population = (value: Population): string => (value.count === undefined ? value.entity : `${n(value.count)} ${value.entity}`);
 
-function entitySection(moduleId: string, entity: Entity): string {
+function entitySection(moduleId: string, language: string, entity: Entity): string {
   const lines = [`# entity ${moduleLocalId(moduleId, entity.id)}`];
-  titled(lines, entity);
+  titled(lines, language, entity);
   if (entity.aggressive) lines.push('aggressive');
   if (entity.hiddenIf) lines.push(`hidden if: ${condition(entity.hiddenIf)}`);
   if (entity.respawnAfter !== undefined) lines.push(`respawn after: ${duration(entity.respawnAfter)}`);
@@ -397,11 +408,11 @@ function entitySection(moduleId: string, entity: Entity): string {
   return lines.join('\n');
 }
 
-function locationSection(moduleId: string, location: Location): string {
+function locationSection(moduleId: string, language: string, location: Location): string {
   const lines = [`# location ${moduleLocalId(moduleId, location.id)}`];
   if (location.relative) lines.push(`${location.relative.direction} of ${location.relative.of}`);
   else lines.push(`x: ${n(location.x)}, y: ${n(location.y)}, z: ${n(location.z)}`);
-  titled(lines, location);
+  titled(lines, language, location);
   if (location.starting) lines.push('starting');
   block(lines, 'entities', location.entities.map(population));
   block(
@@ -429,9 +440,9 @@ function recipeSection(moduleId: string, recipe: Recipe): string {
   return lines.join('\n');
 }
 
-function resourceSection(moduleId: string, resource: Resource): string {
+function resourceSection(moduleId: string, language: string, resource: Resource): string {
   const lines = [`# resource ${moduleLocalId(moduleId, resource.id)}`];
-  lines.push(`title: ${resource.title}`);
+  lines.push(...titleLine(language, resource));
   if (resource.rate) lines.push(`rate: ${resource.rate}`);
   lines.push(`max: ${resource.max}`);
   if (resource.start !== undefined) lines.push(`start: ${n(resource.start)}`);
@@ -493,23 +504,24 @@ function inModule(moduleId: string, id: string): boolean {
 
 export function serializeRegistryModule(registry: Registry, options: SerializeModuleOptions): string {
   const moduleId = options.info.id;
+  const language = options.info.language ?? DEFAULT_LANGUAGE;
   const sections: string[] = [];
   for (const stat of registry.stats.values()) if (inModule(moduleId, stat.id)) sections.push([`# stat ${moduleLocalId(moduleId, stat.id)}`, `title: ${stat.title}`, `base: ${range(stat.base)}`].join('\n'));
   for (const skill of registry.skills.values())
     if (inModule(moduleId, skill.id))
       sections.push(
-        [`# skill ${moduleLocalId(moduleId, skill.id)}`, `title: ${skill.title}`, ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : []), ...(skill['per-level'] ? [`per-level: ${bonusAmount(skill['per-level'])}`] : [])].join('\n'),
+        [`# skill ${moduleLocalId(moduleId, skill.id)}`, ...titleLine(language, skill), ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : []), ...(skill['per-level'] ? [`per-level: ${bonusAmount(skill['per-level'])}`] : [])].join('\n'),
       );
-  for (const item of registry.items.values()) if (inModule(moduleId, item.id)) sections.push(itemSection(moduleId, item));
-  for (const passive of registry.passives.values()) if (inModule(moduleId, passive.id)) sections.push(passiveSection(moduleId, passive));
-  for (const jewel of registry.clusterJewels.values()) if (inModule(moduleId, jewel.id)) sections.push(clusterJewelSection(moduleId, jewel));
-  for (const faction of registry.factions.values()) if (inModule(moduleId, faction.id)) sections.push(factionSection(moduleId, faction));
-  for (const event of registry.events.values()) if (inModule(moduleId, event.id)) sections.push(eventSection(moduleId, event));
+  for (const item of registry.items.values()) if (inModule(moduleId, item.id)) sections.push(itemSection(moduleId, language, item));
+  for (const passive of registry.passives.values()) if (inModule(moduleId, passive.id)) sections.push(passiveSection(moduleId, language, passive));
+  for (const jewel of registry.clusterJewels.values()) if (inModule(moduleId, jewel.id)) sections.push(clusterJewelSection(moduleId, language, jewel));
+  for (const faction of registry.factions.values()) if (inModule(moduleId, faction.id)) sections.push(factionSection(moduleId, language, faction));
+  for (const event of registry.events.values()) if (inModule(moduleId, event.id)) sections.push(eventSection(moduleId, language, event));
   for (const action of registry.actions.values()) if (inModule(moduleId, action.id)) sections.push(actionSection(moduleId, action));
-  for (const entity of registry.entities.values()) if (inModule(moduleId, entity.id)) sections.push(entitySection(moduleId, entity));
-  for (const location of registry.locations.values()) if (inModule(moduleId, location.id)) sections.push(locationSection(moduleId, location));
+  for (const entity of registry.entities.values()) if (inModule(moduleId, entity.id)) sections.push(entitySection(moduleId, language, entity));
+  for (const location of registry.locations.values()) if (inModule(moduleId, location.id)) sections.push(locationSection(moduleId, language, location));
   for (const recipe of registry.recipes.values()) if (inModule(moduleId, recipe.id)) sections.push(recipeSection(moduleId, recipe));
-  for (const resource of registry.resources.values()) if (inModule(moduleId, resource.id)) sections.push(resourceSection(moduleId, resource));
+  for (const resource of registry.resources.values()) if (inModule(moduleId, resource.id)) sections.push(resourceSection(moduleId, language, resource));
   for (const table of registry.dropTables.values()) if (inModule(moduleId, table.id)) sections.push(dropTableSection(moduleId, table));
   for (const dialogue of registry.dialogues.values()) if (inModule(moduleId, dialogue.id)) sections.push(dialogueSection(moduleId, dialogue));
   for (const flag of registry.flags.values()) if (inModule(moduleId, flag.id)) sections.push(`# flag ${moduleLocalId(moduleId, flag.id)}`);

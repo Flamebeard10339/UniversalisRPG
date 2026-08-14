@@ -7,7 +7,7 @@ import { loadUniverse } from '../content/registry';
 import { itemExamine, localizerFor, type Localized } from './localized';
 import { RuntimeError } from './state';
 import type { PlayChoice, PlayStatus } from './session';
-import type { PruneWarning } from './save';
+import { initialState, pruneStateForRegistry, type PruneWarning } from './save';
 
 const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope', '', '# item apple'].join('\n');
 
@@ -52,16 +52,23 @@ describe('the engine speaks in keys (c2)', () => {
     expect([...(shipped?.keys() ?? [])].sort()).toEqual([...ENGINE_KEYS].sort());
   });
 
+  // Two labels that are English and stay so, because each is an identifier
+  // rather than a display: the label is what `use:<kind>.<objId>.<label>` and
+  // `activeAction.actionLabel` are spelled with, and both are shown through
+  // `engine.travel.to` and `engine.craft.label` instead.
+  const IDENTIFIERS = ['src/content/registry.ts: Craft {recipe}', 'src/runtime/actions.ts: Travel to {destination}'];
+
   it('leaves no engine sentence behind in TypeScript', () => {
-    // The patterns are the strings; finding one of them in a source file means a
-    // second copy exists and the two can disagree.
-    const patterns = [...(loadInEnglish('').locales.declared.get('en')?.values() ?? [])].map((value) => value.replace(/\{[a-z-]+\}/g, '').trim()).filter((value) => value.length > 12);
+    // Every pattern, at any length, matched as the shape it would take in
+    // TypeScript: its literal parts with a template hole where each parameter
+    // is. A length filter is what let two of these hide (pass 1).
+    const patterns = [...(loadInEnglish('').locales.declared.get('en')?.entries() ?? [])];
     const offenders = sourceFiles('src').flatMap((file) => {
       const text = readFileSync(file, 'utf8');
-      return patterns.filter((pattern) => text.includes(pattern)).map((pattern) => `${file}: ${pattern}`);
+      return patterns.filter(([, value]) => asTemplate(value).test(text)).map(([, value]) => `${file}: ${value}`);
     });
 
-    expect(offenders).toEqual([]);
+    expect(offenders.sort()).toEqual(IDENTIFIERS);
   });
 
   it('renders the key itself when the language being played has no entry', () => {
@@ -101,20 +108,36 @@ describe('an item with no examine of its own', () => {
     expect(itemExamine(localizer, registry.items.get('island.rope')!)).toBe('This is a Rope.');
   });
 
-  it('asks no other language for an English article', () => {
-    const registry = loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, SPANISH]);
+  // Against a Spanish `engine.item.examine` that does have an entry, so the
+  // pattern is reached and the article's absence is what the assertion turns
+  // on. Asserting the key alone could not tell the guard from its absence.
+  const withExamine = (pattern: string) =>
+    loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, { name: 'island-es', text: ['# info island-es', 'version: 1.0.0', 'dependencies:', '  island', '', '# locale es', `engine.item.examine: ${pattern}`].join('\n') }]);
 
-    // `engine.item.examine` has no Spanish entry, so the key stands, and the
-    // article was never computed for it.
-    expect(itemExamine(localizerFor(registry, 'es'), registry.items.get('island.apple')!)).toBe('engine.item.examine');
+  it('asks no other language for an English article', () => {
+    const registry = withExamine('Esto es un {item}.');
+
+    expect(itemExamine(localizerFor(registry, 'es'), registry.items.get('island.apple')!)).toBe('Esto es un island.item.apple.title.');
+  });
+
+  it('refuses a language that asks for one, rather than handing it English grammar', () => {
+    const registry = withExamine('Esto es {article} {item}.');
+
+    expect(() => itemExamine(localizerFor(registry, 'es'), registry.items.get('island.apple')!)).toThrow(/takes a \{article\}/);
   });
 });
+
+const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// A pattern as TypeScript would spell it: the literal parts verbatim, and a
+// template hole wherever the pattern names a parameter.
+const asTemplate = (pattern: string): RegExp => new RegExp(pattern.split(/\{[a-z-]+\}/).map(escaped).join('\\$\\{[^}]+\\}'));
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
     const full = path.join(directory, entry);
     if (statSync(full).isDirectory()) return sourceFiles(full);
-    return /\.tsx?$/.test(entry) && !entry.endsWith('.test.ts') && !entry.endsWith('.test.tsx') ? [full] : [];
+    return /\.tsx?$/.test(entry) && !entry.endsWith('.test.ts') && !entry.endsWith('.test.tsx') ? [full.split(path.sep).join('/')] : [];
   });
 }
 
@@ -137,3 +160,35 @@ describe('the brand is closed (c1)', () => {
 
 void rawTextDoesNotCompile;
 void unkeyedEngineTextDoesNotCompile;
+
+// pass 1: `prose` was being used as the cast that turned ids into Localized, so
+// a translated warning named nothing at all. An id belongs to no language.
+describe('an id survives translation, and prose does not', () => {
+  const ISLAND_WITH_GHOSTS = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope'].join('\n');
+  const PRUNE_ES = [
+    '# info island-es',
+    'version: 1.0.0',
+    'dependencies:',
+    '  island',
+    '',
+    '# locale es',
+    'engine.prune.record: Se eliminó {path} {id} porque su {kind} no está cargado.',
+    'engine.prune.equipped.missing: Se quitó {slot} porque su objeto {item} no está cargado.',
+  ].join('\n');
+
+  const pruned = (language: string): string[] => {
+    const registry = loadUniverse([engineLocale(), { name: 'island', text: ISLAND_WITH_GHOSTS }, { name: 'island-es', text: PRUNE_ES }]);
+    const state = initialState(registry, language);
+    state.inventory = { 'island.ghost': 1 };
+    state.equipped = { hand: 'island.phantom' };
+    return pruneStateForRegistry(state, registry).map((warning) => warning.message);
+  };
+
+  it('names the record it is about in the language the module was authored in', () => {
+    expect(pruned('en')).toEqual(['Removed inventory island.ghost because its item is not loaded.', 'Unequipped hand because its item island.phantom is not loaded.']);
+  });
+
+  it('names the same record in a language the module was not authored in', () => {
+    expect(pruned('es')).toEqual(['Se eliminó inventory island.ghost porque su item no está cargado.', 'Se quitó hand porque su objeto island.phantom no está cargado.']);
+  });
+});

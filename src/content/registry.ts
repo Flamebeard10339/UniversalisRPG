@@ -140,7 +140,11 @@ function recipeAction(recipe: Recipe): Action {
   const rate = typeof recipe.rate === 'string' ? { id: recipe.rate } : recipe.rate;
   const cadence: Pick<Action, 'rate' | 'time'> = rate !== undefined ? { rate } : recipe.time !== undefined ? { time: recipe.time } : {};
   const action: Action = {
+    // English by construction, so it is the recipe's identifier and never its
+    // display: a craft is shown through `engine.craft.label` over the recipe's
+    // own title key, in the choice list and once it is under way alike.
     label: `Craft ${humanizeEn(recipe.id)}`,
+    generatedLabel: true,
     kind: 'rate' in cadence || 'time' in cadence ? 'continuous' : 'instant',
     results,
     ...cadence,
@@ -249,28 +253,39 @@ function recordBaseText(registry: Registry, languages: ReadonlyMap<string | null
 // An action's label doubles as its identifier, so its display is keyed on a slug
 // of it and the label itself is the entry for that key (c8). Run over the built
 // registry because an entity's actions are assembled after its section is.
-function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly { label: string }[]): void {
+function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly Action[]): void {
   const namespace = registry.namespace.ownerOf(kind, id) ?? null;
+  const language = languages.get(namespace) ?? DEFAULT_LANGUAGE;
   const taken = new Set<string>();
   for (const action of actions) {
     const problem = actionSlugProblem(action.label, taken);
     if (problem) throw new DslError(`# ${kind} ${id}: ${problem}`);
     const slug = actionSlug(action.label);
     taken.add(slug);
-    registry.locales.base.set(localeKey(namespace, kind, id, slug), { text: action.label, language: languages.get(namespace) ?? 'en' });
+    // A generated label is `humanizeEn` of an id, so it is an entry for English
+    // and for nothing else — the same gate `defaultTitle` applies, applied
+    // where the other generator runs (c5).
+    if (action.generatedLabel && language !== DEFAULT_LANGUAGE) continue;
+    registry.locales.base.set(localeKey(namespace, kind, id, slug), { text: action.label, language });
   }
 }
 
+// A recipe is absent: its craft is shown through `engine.craft.label` over the
+// recipe's own title key, so keying the compiled label as well would be one
+// visible string with two keys that a translator has to fill in twice.
 function recordEveryActionText(registry: Registry, languages: ReadonlyMap<string | null, string>): void {
   for (const entity of registry.entities.values()) recordActionText(registry, languages, 'entity', entity.id, entity.actions);
   for (const location of registry.locations.values()) recordActionText(registry, languages, 'location', location.id, location.actions);
   for (const item of registry.items.values()) recordActionText(registry, languages, 'item', item.id, item.actions);
-  for (const [id, action] of registry.recipeActions) recordActionText(registry, languages, 'recipe', id, [action]);
   for (const [id, action] of registry.actions) recordActionText(registry, languages, 'action', id, [action]);
 }
 
 function applySection(registry: Registry, section: ModuleSection, context: HydrateContext): void {
   switch (section.kind) {
+    // Not skipped where it would be harmless: a locale reaching the content
+    // build is the failure c6 forbids, so the one route to it says so.
+    case 'locale':
+      throw new DslError('a # locale is not content and cannot be built into the registry');
     case 'entity': {
       const entity = hydrateSection(section.value as Authored<AuthoredEntity>, entitySchema, context);
       // `actions` and `handlers` are what `blocks` becomes once `uses:` can be

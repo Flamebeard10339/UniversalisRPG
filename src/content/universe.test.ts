@@ -337,3 +337,26 @@ describe('a module declares the language it is written in (c5)', () => {
     expect(parseModuleSource(module('island', '# info island', 'language: pt-br')).info.language).toBe('pt-br');
   });
 });
+
+// pass 1: `humanizeEn` also generates an action's label, and that half had no
+// gate — a Spanish module offered `Abrir Puerta` and reported nothing missing.
+describe('a generated action label is an English entry too (c5)', () => {
+  const isla = (language: string) =>
+    loadUniverse([module('isla', '# info isla', 'version: 1.0.0', `language: ${language}`, '# location orilla', 'x: 0, y: 0', 'starting', 'entities:', '  puerta', '# entity puerta', 'uses: abrir-puerta', '# action abrir-puerta', 'instant', 'say: se abre')]);
+
+  it('records the generated label only for a module writing English', () => {
+    expect(isla('en').locales.base.get('isla.action.abrir-puerta.abrir-puerta')).toEqual({ text: 'Abrir Puerta', language: 'en' });
+    expect(isla('es').locales.base.has('isla.action.abrir-puerta.abrir-puerta')).toBe(false);
+    expect(isla('es').locales.base.has('isla.entity.puerta.abrir-puerta')).toBe(false);
+  });
+
+  it('leaves the label itself alone, because it is the identifier a use: names', () => {
+    expect(isla('es').actions.get('isla.abrir-puerta')?.label).toBe('Abrir Puerta');
+  });
+
+  it('records an authored label whatever language it is in', () => {
+    const titled = loadUniverse([module('isla', '# info isla', 'version: 1.0.0', 'language: es', '# location orilla', 'x: 0, y: 0', 'starting', '# action abrir', 'title: Abrir la puerta', 'instant', 'say: se abre')]);
+
+    expect(titled.locales.base.get('isla.action.abrir.abrir-la-puerta')).toEqual({ text: 'Abrir la puerta', language: 'es' });
+  });
+});

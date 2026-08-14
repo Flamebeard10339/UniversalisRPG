@@ -53,7 +53,7 @@ export type ResultObserver = (segment: Segment, application: ResultApplication) 
 const narrateModal: ResultObserver = ({ state, registry }, { result, lead }) => {
   if (result.kind !== 'open-modal' || !lead) return;
   const localizer = localizerOf(registry, state);
-  state.log.push(localizer.engine('engine.modal.opened', { modal: localizer.prose(result.modal) }));
+  state.log.push(localizer.engine('engine.modal.opened', { modal: localizer.identifier(result.modal) }));
 };
 
 // Every result a segment applies is offered to each of these, in application

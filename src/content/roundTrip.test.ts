@@ -83,8 +83,8 @@ describe('roundTripModule', () => {
   });
 
   it('reports a value the reload changed, not only one it dropped', () => {
-    const result = roundTripModule(loadModule(BASE), { info }, (printed) => reloadAlone(printed.replace('title: Bread', 'title: Toast')));
-    expect(result.differences).toEqual(['  items: changed base.bread']);
+    const result = roundTripModule(loadModule(BASE), { info }, (printed) => reloadAlone(printed.replace('x: 0, y: 0', 'x: 1, y: 0')));
+    expect(result.differences).toEqual(['  locations: changed base.camp']);
   });
 
   it('stops at diagnostics and does not diff a registry that never loaded', () => {
@@ -161,7 +161,7 @@ describe('roundTripUniverse', () => {
   };
 
   it('hands the reload the serializations, never the sources it was given', () => {
-    const source: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\n' };
+    const source: ModuleSource = { name: 'base', text: '// a rope\n# info base\nversion: 1.0.0\n\n# item rope\n' };
     const result = trip([source]);
     expect(handed).toHaveLength(1);
     expect(handed[0]).toEqual(result.sources);
@@ -170,7 +170,7 @@ describe('roundTripUniverse', () => {
 
   it('hands over one serialization per module, and no original among them', () => {
     const other: ModuleSource = { name: 'more', text: '# info more\nversion: 1.0.0\ndependencies:\n  base\n\n# item ribbon\ntitle: Ribbon\n' };
-    const base: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\n' };
+    const base: ModuleSource = { name: 'base', text: '// a rope\n# info base\nversion: 1.0.0\n\n# item rope\n' };
     const result = trip([base, other]);
     expect(handed[0]).toHaveLength(2);
     expect(handed[0]).toEqual(result.sources);
