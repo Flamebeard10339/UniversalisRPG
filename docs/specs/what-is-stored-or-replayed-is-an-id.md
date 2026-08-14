@@ -135,6 +135,22 @@ display were one string and no pass had standing to separate them.
   shipped recordings. Equality was the wrong relation: every reopening of this clause has
   been an embedded title. The check is containment, and the walk goes one step further so
   the two verbs whose values embed a carried id — `slot:` and `feed:` — are published at all.
+- **The third owner of an action label is named as a boundary, not fixed here.** An action
+  section's `title:` line *is* its label (`src/content/action.ts:20`), and a label is what
+  `activeAction.actionLabel` stores and what `save.ts` compares by string equality — so renaming
+  `title: Fight` to `Combat` stops the fight under way and puts the English word into a Spanish
+  player's log. Pass 3 reproduced it and it is the same root cause as pass 1's travel label and
+  pass 2's craft label, on the last of the three owners: the one an author writes rather than one
+  the engine composes. Two of this Deliverable's sentences are false on it — "Everything the
+  engine stores, replays or compares is an id" and "no rename of an English title can change what
+  a recording replays" — and that is recorded here rather than argued away. No clause's own
+  sentence reaches it: c3 is about text the engine composed and the engine composed nothing here,
+  c4 is about sentences built in TypeScript and this is built in the DSL. The fix is
+  `action-labels-as-members`, which is already specified and already derives the slug this needs,
+  and whose recorded claim that "Nothing is broken today" pass 3 refutes. It is the next branch
+  rather than this one because it moves the `use:<kind>.<objId>.<label>` contract and the shipped
+  `# test` recordings that spell it, which is a different system's diff.
+
 - **Two surfaces this branch does not reach, named rather than left to be found.** Both are
   outside `src/runtime`'s brand, which is why neither is a hole in it. The GUI shell keeps
   its own twenty-word English vocabulary in `src/ui/labels.ts`, composes shapes from it in
