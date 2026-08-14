@@ -40,7 +40,7 @@ Audits are the one gate that has repeatedly caught real defects, so they stay. R
 1. **DSL load path** — `src/grammar` (text to syntax) and `src/content` (syntax to registry, incl. load-time reference resolution)
 2. **Runtime** — `src/runtime`: state, travel, actions, encounters, resources, stats, skills, flags, dialogue, saves; `session.ts` is the entry point everything above plays through
 3. **Contribution system** — unbuilt: editor, validation/merge engine
-4. **User interface** — `src/ui`, pending the GUI rebuild. Main tabs: Map, Home, Character, Settings, Edit. Modals: dialogue, skills, stats. Experience: floating text
+4. **User interface** — `src/ui`, the shell `gui-rebuild` delivered. Main tabs: Map, Home, Character, Settings, Edit. Modals: dialogue, skills, stats. Experience: floating text
 5. **Task system** — `scripts/tasks.ts` (entry) over `scripts/tasks/` (command families) and the task-workflow libs in `scripts/lib` (`taskStore`, `eventLog`, `specDoc`, `planCheck`, `producers`, `auditImport`, `commitContract`, `architecture`). The store, the spec machinery, the event log, the architecture queries, and the audit/triage workflow
 6. **Testing procedure**
   1. `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
@@ -72,7 +72,7 @@ The auditor's brief is generated, never hand-written: `npm run tasks -- audit-pr
 - travel actions without cost or reward are treated as pathfinding edges for multi step map navigation
 - progress signals get lightweight UI acknowledgement (e.g. map tab flashing on location discovery)
 - record a regression as a `# test` section via `/create-test` rather than writing an ad-hoc script
-- the dev-only `window.__test` browser harness (batched checks via `window.__test.batch([...])`) was removed with the legacy GUI; pending the GUI rebuild, reintroduce it rather than reaching for ad-hoc `page.evaluate`/screenshot loops
+- the dev-only `window.__test` browser harness (`src/ui/agent/testHarness.ts`, batched checks via `window.__test.batch([...])`) is how the GUI is driven; reach for it rather than ad-hoc `page.evaluate`/screenshot loops
 - there is no browser storage to clear and no reset command: `play-cli` starts fresh every run, and a `# save` fixture is how a session starts anywhere else. `single-dev-mode` is where a reset lands once there is a store to reset
 
 
