@@ -91,30 +91,40 @@ Proof:
   a surface still draws as a word, which is a skill's on the character sheet and a declared slot's
   on the equipment page. Nothing else player-visible moves.
   proof: npm test
-- [c10] **No surface draws an id where a player expects a word, and the rule can see it.** Every
-  remaining one goes, not a named few: a skill on the character sheet, an equipment slot on the
-  equipment page, and any other the enforcement below turns up. A slot gets the declaration it
-  lacks — `# slot <id>` with a `title:`, and `slot: ['title']` joining `stat` and `skill` in
-  `TEXT_FIELDS` — while `equipment-slots:` goes on naming ids; the declaration is optional, so no
-  content that loads today stops loading. A slot is declared once and keyed once, because
-  `declaredSlots` unions `equipmentSlots` across every entity into one vocabulary
-  (`src/content/references.ts:44`), so a title on the entity's own field would give one slot as many
-  keys as it has declarers — the defect c7 removes for actions. A skill needs no new declaration:
-  `skill: ['title']` is already in `TEXT_FIELDS` and only the publishing and the reading are missing.
+- [c10] **An id never reaches a driver alone.** Every published value a driver draws carries its own
+  words beside its own id, in one row, so a driver never holds an identifier it has no words for and
+  cannot draw one. This is the whole rule and it is enforced by shape rather than by inspection: a
+  published field may not be a map keyed by an `Answer`, because a key is not a field and c1's walk
+  is structurally blind to it — which is exactly how three of these survived seven audit passes and
+  a fourth was about to be found by hand. `PlayStatus.resources` and `.discovered` are already this
+  shape and have never needed a decision; `stats`, `xp` and `equipment` are the three that are not,
+  and `statTitles` — a second map to be kept in step with the first by hand — is retired rather than
+  extended, because CLAUDE.md forbids two systems that must be manually kept in sync and c9 built one.
 
-  The enforcement is the half that keeps this closed. `published()` in `src/ui/render.test.tsx`
-  stops offering raw ids as permissible screen text — today it passes `Object.keys(view.xp)`,
-  `Object.keys(view.equipment)` and `place.id`, which is a licence to draw an identifier — and the
-  walk that rule runs over visits the pages that draw them. Measured 2026-08-14: deleting all three
-  id entries leaves every test in that file passing, because the walk never opens the Skills,
-  Equipment or Map pages, so the one rule in this repository that says a driver may invent no word
-  has never looked at three of its screens.
-  proof: vitest src/ui/render.test.tsx
-- [c9] **A stat is read by its title, not by its id.** The view publishes a stat's localized title
-  beside the dictionary keyed by its id, and the character sheet and the plane pane read it, so
-  `bare(statId)` stops putting an identifier in front of a player. Today `src/ui/plane.ts:68` and
-  `src/ui/sheet.ts:43-44` render the raw id, which is the one surface where a player of any language
-  reads an identifier where every other surface reads a title.
+  A slot is the one id with nowhere to keep its words, so it gets the declaration it lacks:
+  `# slot <id>` with a `title:`, and `slot: ['title']` joining `stat` and `skill` in `TEXT_FIELDS`,
+  while `equipment-slots:` goes on naming ids. The declaration is optional, so nothing that loads
+  today stops loading, and a slot is declared once and keyed once because `declaredSlots` unions
+  `equipmentSlots` across every entity into one vocabulary (`src/content/references.ts:44`) — a
+  title on the entity's own field would give one slot as many keys as it has declarers, the defect
+  c7 removes for actions. A skill needs no declaration: `skill: ['title']` is already in
+  `TEXT_FIELDS` and only the publishing and the reading are missing.
+
+  Two enforcements, because the rule above is only worth what notices it: c1's walk refuses a
+  published map keyed by an `Answer`, so the next dictionary is caught at the type rather than at an
+  audit; and `published()` in `src/ui/render.test.tsx` stops offering raw ids as permissible screen
+  text while its walk visits the pages that draw them. Measured 2026-08-14: deleting the three id
+  entries from `published()` leaves every test in that file passing, because the walk never opens
+  the Skills, Equipment or Map pages — so the one rule in this repository saying a driver may invent
+  no word has never looked at three of its screens.
+  proof: vitest src/runtime/published.test.ts
+- [c9] **A stat is read by its title, not by its id.** The character sheet, the plane pane and the
+  REPL read a stat's localized title, so `bare(statId)` stops putting an identifier in front of a
+  player. Delivered first as a `statTitles` map published beside `stats`; c10 retires that map and
+  carries the title on the stat's own row instead, because a second map kept in step with the first
+  by hand is the shape CLAUDE.md forbids. The property this clause asserts is unchanged and c10 is
+  where it now lives — recorded here rather than edited away, since the map is what the branch built
+  and an auditor reading the diff will find it.
   proof: vitest src/ui/sheet.test.ts
 
 ## Goal
