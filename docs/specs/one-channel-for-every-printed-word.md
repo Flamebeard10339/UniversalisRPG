@@ -83,11 +83,18 @@ Proof:
   action used by an entity in a module declaring another language renders its raw key to a player of
   either one, with no `# locale` line able to repair it.
   proof: vitest src/content/locale.test.ts
-- [c8] **What does not change is stated and proven.** Shipped content plays in English with the same
-  player-visible text as today, every `# test` over it passes, `scripts/drift.test.ts` still holds
-  the two drivers' transcripts equal entry by entry, and no save field, `SAVE_VERSION` or authored
-  content id moves. The one authored thing that does move is named in c6.
+- [c8] **What does not change is stated and proven.** Every `# test` over the shipped content passes,
+  `scripts/drift.test.ts` still holds the two drivers' transcripts equal entry by entry, and no save
+  field, `SAVE_VERSION` or authored content id moves. Two things a reader sees do move, and they are
+  the whole list: the `say:` and dialogue keys of c6, and a stat's spelling under c9 — `+3 attack`
+  becomes `+3 Attack` on the character sheet and the plane pane. Nothing else player-visible moves.
   proof: npm test
+- [c9] **A stat is read by its title, not by its id.** The view publishes a stat's localized title
+  beside the dictionary keyed by its id, and the character sheet and the plane pane read it, so
+  `bare(statId)` stops putting an identifier in front of a player. Today `src/ui/plane.ts:68` and
+  `src/ui/sheet.ts:43-44` render the raw id, which is the one surface where a player of any language
+  reads an identifier where every other surface reads a title.
+  proof: vitest src/ui/sheet.test.ts
 
 ## Goal
 
@@ -129,6 +136,18 @@ sentence as the surface written today, with nobody having to remember it.
   `a-carried-thing-s-displayed-name-is-assembled-in-code-so-not` are triaged before anything is
   built, because both look closed by `reimplement-localization`'s own passes and this branch has
   already shipped one finding for a defect it had itself fixed.
+- **c8 was amended by the author to let a stat's spelling move, and c9 is what moves it.** As first
+  written c8 pinned every player-visible English string, and c3's worker found that this forbids
+  fixing the one surface where a player reads a raw id: `+3 attack` on the character sheet and the
+  plane pane. The two could not both stand. The author ruled for c9 on 2026-08-14, and the reason is
+  that the decision had already been taken elsewhere — the 2026-08-14 ruling on `src/content/locale.ts`
+  put a stat's title in the missing-translations set precisely because "the GUI rebuild puts a stats
+  sheet and a skills list on screen, at which point a translator who skipped them would have been
+  asked too late". The view simply never caught up. Shipped stats author no `title:`, so `humanizeEn`
+  supplies `Attack` and the English change is a capitalisation. The alternative — authoring lowercase
+  `title:` lines to pin the current display — was rejected as baking a display choice into content to
+  protect a test. `render.test.tsx`'s c16 note that "a key is what the engine gave and a key is what
+  the sheet may draw" is superseded for stats: under c9 the engine gives a title too.
 - **Authored prose is in scope, on the author's design.** The earlier reading was that a `say:`
   nested in a result list has no id to key on and so needs a design; the design is that it inherits
   its owner's key and its index. Reordering is a breaking edit to the recordings that name it, and
