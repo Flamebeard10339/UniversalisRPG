@@ -74,16 +74,21 @@ describe('the engine speaks in keys (c2)', () => {
     expect([...(shipped?.keys() ?? [])].sort()).toEqual([...ENGINE_KEYS].sort());
   });
 
-  // Four strings that are English and stay so, because each is an identifier
+  // One entry per occurrence, not per file: an allowlist keyed to a file exempts
+  // every later sentence in it that matches the same pattern, which is how a
+  // second `{item} ({slot})` sat here unlisted (pass 5).
+  // Five occurrences that are English and stay so, because each is an identifier
   // rather than a display. Two are action labels — what `use:<kind>.<objId>.
-  // <label>` and `activeAction.actionLabel` are spelled with — and two are the
+  // <label>` and `activeAction.actionLabel` are spelled with — and three are the
   // carried screen's answer values, what a `submit-modal:` in a `# test`
-  // replays. Every one of them is shown through a pattern instead:
+  // replays: a worn row, the suffix that tells two alike rows apart, and a
+  // stack. Every one of them is shown through a pattern instead:
   // `engine.travel.to`, `engine.craft.label`, `engine.carried.stack` and
   // `engine.carried.worn`.
   const IDENTIFIERS = [
     'src/content/registry.ts: Craft {recipe}',
     'src/runtime/actions.ts: Travel to {destination}',
+    'src/runtime/carriedScreen.ts: {item} ({slot})',
     'src/runtime/carriedScreen.ts: {item} ({slot})',
     'src/runtime/carriedScreen.ts: {item} x{count}',
   ];
@@ -95,7 +100,7 @@ describe('the engine speaks in keys (c2)', () => {
     const patterns = [...(loadInEnglish('').locales.declared.get('en')?.entries() ?? [])];
     const offenders = sourceFiles('src').flatMap((file) => {
       const text = readFileSync(file, 'utf8');
-      return patterns.filter(([, value]) => asTemplate(value).test(text)).map(([, value]) => `${file}: ${value}`);
+      return patterns.flatMap(([, value]) => [...text.matchAll(asTemplate(value))].map(() => `${file}: ${value}`));
     });
 
     expect(offenders.sort()).toEqual(IDENTIFIERS);
@@ -167,7 +172,7 @@ const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\
 // otherwise match every occurrence of the word.
 const asTemplate = (pattern: string): RegExp => {
   const parts = pattern.split(/\{[a-z-]+\}/).map(escaped);
-  return parts.length === 1 ? new RegExp(String.raw`(['"\`])${parts[0]}\1`) : new RegExp('`' + parts.join(String.raw`\$\{[^}]+\}`) + '`');
+  return parts.length === 1 ? new RegExp(String.raw`(['"\`])${parts[0]}\1`, 'g') : new RegExp('`' + parts.join(String.raw`\$\{[^}]+\}`) + '`', 'g');
 };
 
 function sourceFiles(directory: string): string[] {

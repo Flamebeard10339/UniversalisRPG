@@ -5,6 +5,7 @@ import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { initialLocalChangesModule } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 import { SAVE_VERSION } from './save';
+import type { ModalOption } from './modals';
 import { runTest, serializeSession, sessionStatus, startSession, view, type PlaySession } from './session';
 import {
   COMMANDS,
@@ -125,7 +126,6 @@ function choiceIndex(ctx: CommandContext, id: string): string {
   return String(index + 1);
 }
 
-import type { ModalOption } from './modals';
 
 // What a screen offers, as the answers alone: the words beside each are asserted
 // where the language they are in is the point, and everywhere else they are
