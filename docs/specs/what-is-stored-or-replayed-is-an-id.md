@@ -359,3 +359,124 @@ PlaneFrame.said's new shape", and it also had to move because a saved modal fram
 domain (`race` is `elf`, a carried answer is an id). Every authored consequence of that is named;
 only the stated reason is short.
 
+### Pass 3 — 2026-08-14
+
+- base: `cfa1eb692c996ed4414390fa5cb492741856a0f2`
+- head: `fd9309e1a11b830c1ad9840e5d8196baaadeadda`
+- proof 1: met — Unchanged since pass 2 and re-proven rather than carried over. Both halves broken and
+watched. Mutation c1-the-ordinal-encodes-what-the-copy-is-of at src/runtime/instances.ts:90,
+`const id = String(table.next);` to `const id = `${template}.${table.next}`;` (the per-template
+form the Decisions reject by name), is KILLED by src/runtime/instances.test.ts "mints an ordinal
+that does not encode what the copy is of, and keeps it when that changes" and three more in that
+file, re-measured at src/runtime/instances.test.ts with the mutation still applied. Mutation
+c1-the-no-locale-fallback-drops-the-ordinal at src/runtime/carriedName.ts:15,
+localizer.identifier(`${template}#${copy}`) to localizer.identifier(template), is KILLED by
+src/runtime/carriedName.test.ts "names a copy by its template and its ordinal where the played
+language has no title for the template", re-measured at its own file. distinct() is still absent
+from src/runtime/carriedScreen.ts, so two copies of one template stay named alike and nothing
+repairs it. Re-run: npm run mutate --
+C:\Users\yonat\AppData\Local\Temp\audit-what-is-stored-or-replayed-is-an-id-pass3-mutations.json
+(entries c1-the-ordinal-encodes-what-the-copy-is-of, c1-the-no-locale-fallback-drops-the-ordinal).
+- proof 2: met — Pass 2's caveat is closed and I broke the same line to check. The enumeration in
+src/runtime/modals.test.ts "publishes no value that is a title, an authored line or a locale
+entry" now tests containment rather than equality, and the walk was extended with a second
+cluster jewel, a save fixture that stocks it and an `allocate: slot e` step so that the two verbs
+whose values embed a carried id are published at all; the test asserts that they are, per
+language, before it asserts nothing holds a word. Mutation
+c2-a-slot-value-embeds-the-jewels-title-instead-of-its-id at src/runtime/planeScreen.ts:95,
+`${slot.direction} with ${jewel.id}` to `${slot.direction} with ${jewel.name}` (the reproduction
+that SURVIVED this same named test at pass 2) is now KILLED by it, re-measured at
+src/runtime/modals.test.ts with the mutation still applied. So is
+c2-a-feed-value-embeds-the-foods-title-instead-of-its-id at planeScreen.ts:110,
+`with ${food.id}` to `with ${food.name}`. The engine's own values are ids by source:
+human/elf/dwarf/orc (modals.ts:82-87), entry.id / verb.value / LEAVE / CONFIRMED in
+carriedScreen.ts, `<verb>: <tail>` over directions, hexagons and item ids plus BACK in
+planeScreen.ts, and String(choice.index) for a dialogue. distinct() is gone from
+src/runtime/carriedScreen.ts. Re-run: npm run mutate --
+C:\Users\yonat\AppData\Local\Temp\audit-what-is-stored-or-replayed-is-an-id-pass3-mutations.json
+(entries c2-a-slot-value-embeds-the-jewels-title-instead-of-its-id,
+c2-a-feed-value-embeds-the-foods-title-instead-of-its-id). One caveat filed rather than graded:
+the walk hand-lists the four modals it visits and is tied to nothing, so a fifth declared modal
+would leave the clause unproven silently.
+- proof 3: met — Pass 2's stated boundary is withdrawn and the clause's first sentence is now literally
+true of engine-composed text. PlaneFrame.said is a Said, isSaid checks its key against the closed
+union, and src/runtime/planeScreen.test.ts "renders a frame written by one player in the language
+of the other, both directions" writes the refusal in each language and reads it in the other;
+mutation c3-a-frame-stores-the-sentence-instead-of-the-key at src/runtime/planeScreen.ts:152,
+planeFrame(frame.target, frame.hex, growth.refused) to planeFrame(frame.target, frame.hex,
+{ id: say(localizerOf(registry, state), growth.refused) }), is KILLED by it and re-measured at its
+own file. Both compiled labels are ids and both are watched: mutation
+c3-a-craft-is-labelled-by-the-sentence-a-player-reads at src/content/registry.ts:145, label:
+CRAFT_LABEL back to the composed `Craft ${humanizeEn(recipe.id)}`, is KILLED by
+src/runtime/save.test.ts "stores an id rather than the sentence a player reads", and
+c4-a-walk-is-labelled-by-its-destinations-title at src/runtime/actions.ts:68 is KILLED by three
+tests in the same file, both re-measured there. I checked the remaining save fields by hand: the
+only one still holding words is activeAction.actionLabel for an action an author declared with a
+`title:` line, which the engine did not compose but which is a display string doing an
+identifier's job. Reproduced and filed as a finding rather than graded here, because the clause's
+sentence is about text the engine composed. Re-run: npm run mutate --
+C:\Users\yonat\AppData\Local\Temp\audit-what-is-stored-or-replayed-is-an-id-pass3-mutations.json
+(entries c3-a-frame-stores-the-sentence-instead-of-the-key,
+c3-a-craft-is-labelled-by-the-sentence-a-player-reads,
+c4-a-walk-is-labelled-by-its-destinations-title).
+- proof 4: met — Pass 2's one failure is closed at its source rather than allowlisted. The compiled
+recipe action is `label: CRAFT_LABEL` where CRAFT_LABEL is 'craft' (src/content/registry.ts:127
+and :145), the IDENTIFIERS allowlist in src/runtime/localized.test.ts is deleted, and the scan now
+asserts offenders equals the empty array. Two mutations put an engine sentence back into
+TypeScript and both are KILLED by src/runtime/localized.test.ts "leaves no engine sentence behind
+in TypeScript", re-measured at that file with the mutation still applied:
+c4-the-craft-label-reaches-a-translated-log-as-english (registry.ts:145 back to the composed
+Craft label) and c4-an-engine-sentence-is-built-in-typescript-again (actions.ts:54 back to the
+bare `unknown travel destination: ${destId}` template literal). The behavioural half is proven
+separately: src/runtime/save.test.ts "says the craft is gone with no word the played language did
+not supply" asserts the Spanish log line is 'Detenida la accion recipe.cocina.pan.craft: no hay
+ningun recipe cocina.pan..', where pass 2 measured 'Detenida la accion recipe.cocina.pan.Craft
+Bake Bread.'. The structural half I re-checked independently of the scan, which is blind by
+construction to a sentence that has no key: Localized is a branded type, `as Localized` appears in
+no file but localized.ts, localizedFixture is imported by no file in src, and the three doors are
+engine() over the closed union, prose() and identifier(). prose() has exactly four call sites and
+all four carry DSL-authored text (dialogue-runtime.ts:53 and :73, effects.ts:205, modals.ts:124);
+every one of the fourteen log pushes in src/runtime goes through engine() or prose(); every
+identifier() call site in src passes an id, a slot, a hexagon, a path or an ordinal; and the
+growth, plane and cluster refusals are all Said values built with says() over the union
+(itemInstance.ts:238-326, clusterEffect.ts:78-89). Re-run: npx vitest run
+src/runtime/localized.test.ts src/runtime/save.test.ts, and npm run mutate --
+C:\Users\yonat\AppData\Local\Temp\audit-what-is-stored-or-replayed-is-an-id-pass3-mutations.json
+(entries c4-the-craft-label-reaches-a-translated-log-as-english,
+c4-an-engine-sentence-is-built-in-typescript-again).
+- proof 5: met — Unchanged since pass 2 and re-proven. src/runtime/translationSurvival.test.ts loads the
+shipped universe (engine-en plus tutorial-island) and reloads it with translationOf() layered on,
+then replays all six shipped recordings in the base language and in zz: 16 tests, all passing. Two
+mutations, both KILLED and re-measured at src/runtime/translationSurvival.test.ts with the
+mutation still applied. c5-the-base-language-keeps-the-english-a-test-was-written-beside at
+src/content/translation.ts:14, the en shift 13 to 0, is killed by "leaves no key reading the
+English it was authored in" and "says nothing a shipped title says".
+c5-an-answer-is-matched-against-the-words-it-is-offered-as at src/runtime/modals.ts:281,
+`choice.value === value` to `choice.shown === value`, is killed by six replays by name including
+test "tutorial-island.growing-through-the-inventory-screen", which is the clause's own property: a
+recording that depended on words stops replaying and the suite says so. Re-run: npx vitest run
+src/runtime/translationSurvival.test.ts, and npm run mutate --
+C:\Users\yonat\AppData\Local\Temp\audit-what-is-stored-or-replayed-is-an-id-pass3-mutations.json
+(entries c5-the-base-language-keeps-the-english-a-test-was-written-beside,
+c5-an-answer-is-matched-against-the-words-it-is-offered-as).
+- proof 6: met — Checked against git over the whole range rather than against the prose, and re-checked
+over pass 2's head to HEAD for anything the craft-label fix moved. A diffstat of
+cfa1eb69..fd9309e over content/ touches two files: content/engine-en.dsl, whose diff has zero
+deleted lines,
+so no shipped English moved; and content/tutorial-island.dsl, whose entire diff is the three
+things the clause names (the submit-modal: values in growing-through-the-inventory-screen, the one
+choose: line at :689, and "race":"Elf" becoming "race":"elf") plus the version 9 to 10 stamp on
+all six save fixtures. No fixture's instances or equipped bytes moved. `git diff
+c76a0af..fd9309e -- content/` is empty, so the craft-label fix moved no authored content at all.
+SAVE_VERSION is 10 and breaking it (save.ts:15, 10 to 9) is KILLED by
+scripts/migrate-saves.test.ts, src/runtime/integration.test.ts and
+src/runtime/translationSurvival.test.ts, re-measured at their own files (mutation
+c6-save-version-did-not-move). `npm run tasks -- merge-ready` is green on every behavioural leg
+(tsc, npm test, layer-check, audit-status, doctor, bytes, tree, base), on both spec legs and on
+reimplement-localization's clauses leg, with only this spec's own clauses leg outstanding, which
+is this pass. Two movements I record rather than file, both inside what the clause allows: the
+compiled recipe label moved from "Craft Bake Bread" to "craft", which changes the English a prune
+warning names, but that string was never keyed and moving it is the c4 defect being fixed rather
+than shipped display text; and the DSL cadence diagnostic moved from `# recipe dig action "Craft
+Dig"` to `# recipe dig action "craft"` (src/content/parse.test.ts:450), which is author-facing and
+still names the recipe.
