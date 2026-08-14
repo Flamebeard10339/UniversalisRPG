@@ -199,6 +199,15 @@ function talking(registry: Registry): GameState {
   return state;
 }
 
+import type { ModalOption } from './modals';
+
+// What a screen offers, as the answers alone: the words beside each are asserted
+// where the language they are in is the point, and everywhere else they are
+// noise between an option and the answers it takes.
+const answered = (options: readonly ModalOption[] | undefined) => (options ?? []).map((option) => ({ ...option, values: option.values?.map((choice) => choice.value) ?? null }));
+const takes = (option: { values?: readonly { value: string }[] | null } | undefined) => option?.values?.map((choice) => choice.value);
+
+
 describe('the modal stack', () => {
   it('leaves both when one opens over another, and reveals the one beneath when the top is answered', () => {
     const session = stackingSession();
@@ -230,7 +239,7 @@ describe('the modal stack', () => {
     const dialogue = v.modals[1];
 
     expect(dialogue.name).toBe('dialogue');
-    expect(dialogue.options).toEqual([{ key: 'choice', label: 'Choice', values: ['Ask about the mirror.', 'Say nothing.'] }]);
+    expect(answered(dialogue.options)).toEqual([{ key: 'choice', label: 'Choice', values: ['Ask about the mirror.', 'Say nothing.'] }]);
   });
 
   it('withdraws every world choice while a modal is open, and gives them back once it closes', () => {
@@ -310,7 +319,7 @@ describe('opening and answering', () => {
     expect(() => answerModal(state, module, { choice: 'Ask about the mirror.' })).toThrow(/unknown modal: no-such-screen/);
     expect(names(state)).toEqual(['dialogue']);
     expect(topModal(state)?.answers).toEqual({});
-    expect(publishModal(topModal(state)!, state, module).options[0].values).toEqual(['Ask about the mirror.', 'Say nothing.']);
+    expect(takes(publishModal(topModal(state)!, state, module).options[0])).toEqual(['Ask about the mirror.', 'Say nothing.']);
   });
 
   it('stacks a second dialogue rather than dropping it after its effects have already run', () => {
@@ -322,13 +331,13 @@ describe('opening and answering', () => {
     applyDirective(session, { kind: 'talk', entity: 'scholar' });
     const both = view(session);
     expect(modalNames(both)).toEqual(['dialogue', 'dialogue']);
-    expect(both.modals[1].options[0].values).toEqual(['Leave the scholar.']);
+    expect(takes(both.modals[1].options[0])).toEqual(['Leave the scholar.']);
     expect(both.flags['scholar-seen']).toBe(true);
 
     // Answering the scholar hands the sage's own menu back, cursor intact.
     const back = submitModal(session, { choice: 'Leave the scholar.' });
     expect(back.modals.map((modal) => modal.name)).toEqual(['dialogue']);
-    expect(back.modals[0].options[0].values).toEqual(['Leave the sage.']);
+    expect(takes(back.modals[0].options[0])).toEqual(['Leave the sage.']);
   });
 
   it('closes a dialogue whose content is gone rather than carrying a cursor into a registry without it', () => {
@@ -364,13 +373,13 @@ describe('opening and answering', () => {
     const session = startSession(loadInEnglish(TWO_NPC_MODULE));
 
     const gated = apply(session, 'talk:sage');
-    expect(gated.modals[0].options[0].values).toEqual(['Leave the sage.']);
+    expect(takes(gated.modals[0].options[0])).toEqual(['Leave the sage.']);
     expect(() => submitModal(session, { choice: 'Ask about the secret.' })).toThrow(/has no choice that takes "Ask about the secret."/);
 
     // Through the directive, which walks past the choice list a modal has
     // withdrawn — the only way to move the world while a menu is up.
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'rumour', actionId: 'tell' });
-    expect(view(session).modals[0].options[0].values).toEqual(['Leave the sage.', 'Ask about the secret.']);
+    expect(takes(view(session).modals[0].options[0])).toEqual(['Leave the sage.', 'Ask about the secret.']);
   });
 
   // Every route to a menu offering nothing: talked into, emptied under the
@@ -430,7 +439,7 @@ describe('opening and answering', () => {
     // both must land above the spent frame, not under it or in place of it.
     const after = submitModal(session, { choice: 'Look at the mirror.' });
     expect(after.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
-    expect(after.modals[1].options[0].values).toEqual(['Nod.']);
+    expect(takes(after.modals[1].options[0])).toEqual(['Nod.']);
     expect(after.modals.filter((modal) => modal.name === 'dialogue')).toHaveLength(1);
   });
 
@@ -494,7 +503,7 @@ describe('the carried-items screen, as a frame like any other', () => {
     const session = startSession(loadInEnglish(CARRIED_MODULE));
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
 
-    expect(view(session).modals[0].options).toEqual([{ key: 'item', label: 'Item', values: ['Close'] }]);
+    expect(answered(view(session).modals[0].options)).toEqual([{ key: 'item', label: 'Item', values: ['Close'] }]);
     applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Close' });
     expect(view(session).modals).toEqual([]);
   });
@@ -623,7 +632,7 @@ describe('the plane screen, as a frame like any other', () => {
   it('states a refused growth on the screen it was refused on, and puts nothing under it', () => {
     const session = openOnBlade();
     submitModal(session, { verb: 'Grow' });
-    expect(view(session).modals[0].options[0].values).toContain('feed: with Whetstone');
+    expect(takes(view(session).modals[0].options[0])).toContain('feed: with Whetstone');
 
     const refused = submitModal(session, { plane: 'feed: with Whetstone' });
     expect(modalNames(refused)).toEqual(['item-plane']);
@@ -727,7 +736,7 @@ describe('the value a screen leaves by', () => {
   // of the answers to that one.
   const leaves = (status: PlayStatus): { leaving: string | null; listed: boolean } => {
     const modal = status.modals[status.modals.length - 1];
-    return { leaving: modal.leaving, listed: modal.options.every((option) => option.values?.includes(modal.leaving ?? '') ?? false) };
+    return { leaving: modal.leaving, listed: modal.options.every((option) => option.values?.some((choice) => choice.value === (modal.leaving ?? '')) ?? false) };
   };
 
   it('is listed on every question the inventory asks, and takes it down from any of them', () => {

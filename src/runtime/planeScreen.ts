@@ -7,7 +7,7 @@ import { carriedEntries, carriedFrame } from './carriedScreen';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
 import { itemCopies, wornCopySlot } from './itemInstance';
-import { type ModalFrame, type ModalOption } from './modals';
+import { spelled, type ModalFrame, type ModalOption } from './modals';
 import { ClusterReport, PlaneFocus, PlaneReport, planeReport } from './planeReport';
 import { GameState } from './state';
 
@@ -114,11 +114,11 @@ function movesOn(frame: PlaneFrame, report: PlaneReport | undefined, state: Game
   return moves;
 }
 
-// The label is the whole of what this screen says beside its values, so a
-// refusal the frame came back holding reaches the player here (c7).
-// What the screen is of, where on it, and what it last said. A plane a report
-// cannot be built for is named by the id the verb addressed it with, which is an
-// id and not words.
+// What the screen is of, where on it, and what it last said — the label being
+// the whole of what this screen says beside its values, so a refusal the frame
+// came back holding reaches the player here (c7). A plane no report can be
+// built for is named by the id the verb addressed it with, which is an id and
+// not words.
 function heading(localizer: Localizer, frame: PlaneFrame, report: PlaneReport | undefined): Localized {
   const plane = report?.name ?? localizer.identifier(frame.target);
   const hex = localizer.identifier(frame.hex);
@@ -129,7 +129,7 @@ function heading(localizer: Localizer, frame: PlaneFrame, report: PlaneReport | 
 export function planeOptions(frame: PlaneFrame, state: GameState, registry: Registry): ModalOption[] {
   const report = planeReport(registry, state, frame.target);
   const values = movesOn(frame, report, state, registry).map((move) => move.value);
-  return [{ key: PLANE, label: heading(localizerOf(registry, state), frame, report), values: [...values, BACK] }];
+  return [{ key: PLANE, label: heading(localizerOf(registry, state), frame, report), values: spelled(localizerOf(registry, state), [...values, BACK]) }];
 }
 
 // c3: leaving a plane is not closing a screen, it is going back to the one this

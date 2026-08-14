@@ -48,7 +48,9 @@ function withGrownBlade(): GameState {
 }
 
 const values = (answers: Record<string, string>, state: GameState, key: string): readonly string[] | null =>
-  carriedOptions(answers, state, registry).find((option) => option.key === key)?.values ?? null;
+  carriedOptions(answers, state, registry)
+    .find((option) => option.key === key)
+    ?.values?.map((choice) => choice.value) ?? null;
 
 const last = <T,>(list: readonly T[] | null | undefined): T | undefined => (list ? list[list.length - 1] : undefined);
 
@@ -60,9 +62,9 @@ describe('what the screen lists', () => {
     Object.assign(state.inventory, { 'iron-sword': 3 });
 
     expect(carriedEntries(state, registry)).toEqual([
-      { id: 'heartwood-blade', name: 'Heartwood Blade', count: 1, value: 'Heartwood Blade x1', grown: false },
-      { id: 'iron-sword', name: 'Iron Sword', count: 3, value: 'Iron Sword x3', grown: false },
-      { id: '1', name: 'Modified Heartwood Blade', count: 1, value: 'Modified Heartwood Blade', grown: true },
+      { id: 'heartwood-blade', name: 'Heartwood Blade', count: 1, value: 'Heartwood Blade x1', shown: 'Heartwood Blade x1', grown: false },
+      { id: 'iron-sword', name: 'Iron Sword', count: 3, value: 'Iron Sword x3', shown: 'Iron Sword x3', grown: false },
+      { id: '1', name: 'Modified Heartwood Blade', count: 1, value: 'Modified Heartwood Blade', shown: 'Modified Heartwood Blade', grown: true },
     ]);
   });
 
@@ -117,8 +119,8 @@ describe('what the screen lists', () => {
     equip(state, registry, 'iron-sword');
 
     expect(carriedEntries(state, registry)).toEqual([
-      { id: 'iron-sword', name: 'Iron Sword', count: 2, value: 'Iron Sword x2', grown: false },
-      { id: 'worn:mainhand', name: 'Iron Sword', count: 1, value: 'Iron Sword (mainhand)', grown: false, slot: 'mainhand' },
+      { id: 'iron-sword', name: 'Iron Sword', count: 2, value: 'Iron Sword x2', shown: 'Iron Sword x2', grown: false },
+      { id: 'worn:mainhand', name: 'Iron Sword', count: 1, value: 'Iron Sword (mainhand)', shown: 'Iron Sword (mainhand)', grown: false, slot: 'mainhand' },
     ]);
   });
 
@@ -127,8 +129,8 @@ describe('what the screen lists', () => {
     equip(state, registry, '1');
 
     expect(carriedEntries(state, registry)).toEqual([
-      { id: 'heartwood-blade', name: 'Heartwood Blade', count: 1, value: 'Heartwood Blade x1', grown: false },
-      { id: '1', name: 'Modified Heartwood Blade', count: 1, value: 'Modified Heartwood Blade (mainhand)', grown: true, slot: 'mainhand' },
+      { id: 'heartwood-blade', name: 'Heartwood Blade', count: 1, value: 'Heartwood Blade x1', shown: 'Heartwood Blade x1', grown: false },
+      { id: '1', name: 'Modified Heartwood Blade', count: 1, value: 'Modified Heartwood Blade (mainhand)', shown: 'Modified Heartwood Blade (mainhand)', grown: true, slot: 'mainhand' },
     ]);
   });
 });
@@ -192,11 +194,11 @@ describe('what the screen asks', () => {
   it('asks a grown copy’s destruction once more, naming the copy, and asks a stack nothing', () => {
     const state = withGrownBlade();
 
-    expect(last(carriedOptions({ item: 'Modified Heartwood Blade', verb: 'Destroy' }, state, registry))).toEqual({
-      key: 'confirm',
-      label: 'Destroy Modified Heartwood Blade for good?',
-      values: [CONFIRMED, LEAVE],
-    });
+    const confirm = last(carriedOptions({ item: 'Modified Heartwood Blade', verb: 'Destroy' }, state, registry));
+
+    expect(confirm?.key).toBe('confirm');
+    expect(confirm?.label).toBe('Destroy Modified Heartwood Blade for good?');
+    expect(confirm?.values?.map((choice) => choice.value)).toEqual([CONFIRMED, LEAVE]);
     expect(carriedOptions({ item: 'Heartwood Blade x1', verb: 'Destroy' }, state, registry).map((option) => option.key)).toEqual(['item', 'verb']);
   });
 

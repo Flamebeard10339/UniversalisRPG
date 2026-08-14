@@ -248,3 +248,24 @@ describe('no kind prints a title the loader would make for itself', () => {
     expect(loadUniverse([{ name: 'isla', text: printed }]).locales.base.has('isla.stat.ataque.title')).toBe(false);
   });
 });
+
+// pass 4: the check covered one reproduction and neither neighbour — a
+// contributed `# locale en` and a key of a module writing a language nobody has
+// translated, which is every content key c5's gate leaves without English.
+describe('the parameter check reaches every locale, English included', () => {
+  const ENGINE = ['# info engine-en', 'version: 1.0.0', '', '# locale en', 'engine.travel.to: Travel to {destination}'].join('\n');
+  const ISLA = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting'].join('\n');
+  const beside = (...lines: string[]) => () => loadUniverse([{ name: 'engine-en', text: ENGINE }, { name: 'isla', text: ISLA }, { name: 'more', text: ['# info more', 'version: 1.0.0', 'dependencies:', '  isla', '', ...lines].join('\n') }]);
+
+  it('refuses a contributed English value naming a parameter nothing supplies', () => {
+    expect(beside('# locale en', 'engine.travel.to: Off to {place}')).toThrow(/engine.travel.to names \{place\}/);
+  });
+
+  it('refuses a content key translated with a parameter, in any language, because a title takes none', () => {
+    expect(beside('# locale es', 'isla.location.orilla.title: La {clase} orilla')).toThrow(/isla.location.orilla.title names \{clase\}/);
+  });
+
+  it('stands aside where the English it would compare against is not loaded', () => {
+    expect(() => loadUniverse([{ name: 'es', text: ['# info es', 'version: 1.0.0', '', '# locale es', 'engine.travel.to: Viaja a {destination}'].join('\n') }])).not.toThrow();
+  });
+});

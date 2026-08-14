@@ -2,9 +2,9 @@ import { isBase, Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
 import { equip, unequip } from './equipment';
-import { Localized, Localizer, localizerOf } from './localized';
+import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { itemCopies, destroyItem, grownItems, isGrownCopy, itemTemplate, wornCopy, wornIn } from './itemInstance';
-import { type ModalAnswers, type ModalFrame, type ModalOption } from './modals';
+import { spelled, type ModalAnswers, type ModalChoice, type ModalFrame, type ModalOption } from './modals';
 import { planeFrame } from './planeScreen';
 import { GameState } from './state';
 
@@ -34,8 +34,14 @@ export interface CarriedEntry {
   // How many the player has: a stack's count, and one for a grown copy or a
   // worn one, neither of which is counted in a stack.
   readonly count: number;
-  // What the screen publishes and an answer comes back as.
+  // What the screen publishes and an answer comes back as. Built from the item's
+  // base name rather than its localized one, because it is the string a
+  // `submit-modal:` in a `# test` replays and an answer that moved with the
+  // language would be an authored id that moves with it.
   readonly value: string;
+  // The same row, in the language being played. `name` is what a surface calls
+  // the thing; this is `name` with the count or the slot the row is listed by.
+  readonly shown: Localized;
   readonly grown: boolean;
   // The slot this entry is worn in, and undefined for a carried one: c21 puts
   // every entry on exactly one of those two sides, so this is what a page
@@ -117,20 +123,22 @@ function distinct(entries: CarriedEntry[]): CarriedEntry[] {
 // and is on neither of the first two lists.
 export function carriedEntries(state: GameState, registry: Registry): CarriedEntry[] {
   const localizer = localizerOf(registry, state);
+  const base = localizerFor(registry, BASE_LANGUAGE);
   const entries: CarriedEntry[] = [];
   for (const [template, { stack }] of itemCopies(state)) {
     const name = nameOf(template, localizer, false);
-    if (stack > 0) entries.push({ id: template, name, count: stack, value: `${name} x${stack}`, grown: false });
+    if (stack > 0) entries.push({ id: template, name, count: stack, value: `${nameOf(template, base, false)} x${stack}`, shown: localizer.engine('engine.carried.stack', { item: name, count: stack }), grown: false });
   }
   for (const [id, template] of Object.entries(grownItems(state))) {
     if (wornIn(state, id) !== undefined) continue;
     const name = nameOf(template, localizer, true);
-    entries.push({ id, name, count: 1, value: name, grown: true });
+    entries.push({ id, name, count: 1, value: nameOf(template, base, true), shown: name, grown: true });
   }
   for (const [slot, id] of Object.entries(state.equipped)) {
     const grown = isGrownCopy(state, id);
-    const name = nameOf(itemTemplate(state, id), localizer, grown);
-    entries.push({ id: grown ? id : wornCopy(slot), name, count: 1, value: `${name} (${slot})`, grown, slot });
+    const template = itemTemplate(state, id);
+    const name = nameOf(template, localizer, grown);
+    entries.push({ id: grown ? id : wornCopy(slot), name, count: 1, value: `${nameOf(template, base, grown)} (${slot})`, shown: localizer.engine('engine.carried.worn', { item: name, slot: localizer.identifier(slot) }), grown, slot });
   }
   return distinct(entries);
 }
@@ -140,8 +148,11 @@ function verbsFor(entry: CarriedEntry, state: GameState, registry: Registry): re
   return VERBS.filter((verb) => verb.applies(item, entry));
 }
 
-function listed(values: readonly string[]): readonly string[] {
-  return [...values, LEAVE];
+// Every row a screen offers is answered by its own spelling — an item's base
+// name, a verb — and read as the words beside it, which for an item is the name
+// the played language gives it.
+function listed(localizer: Localizer, choices: readonly ModalChoice[]): readonly ModalChoice[] {
+  return [...choices, ...spelled(localizer, [LEAVE])];
 }
 
 // Each answer widens what the screen asks, which is what leaves the verbs to be
@@ -149,18 +160,18 @@ function listed(values: readonly string[]): readonly string[] {
 export function carriedOptions(answers: ModalAnswers, state: GameState, registry: Registry): ModalOption[] {
   const entries = carriedEntries(state, registry);
   const localizer = localizerOf(registry, state);
-  const item: ModalOption = { key: 'item', label: localizer.engine('engine.modal.item'), values: listed(entries.map((entry) => entry.value)) };
+  const item: ModalOption = { key: 'item', label: localizer.engine('engine.modal.item'), values: listed(localizer, entries.map((entry) => ({ value: entry.value, shown: entry.shown }))) };
 
   const chosen = entries.find((entry) => entry.value === answers.item);
   if (!chosen) return [item];
 
   const applicable = verbsFor(chosen, state, registry);
-  const verb: ModalOption = { key: 'verb', label: chosen.name, values: listed(applicable.map((each) => each.value)) };
+  const verb: ModalOption = { key: 'verb', label: chosen.name, values: listed(localizer, spelled(localizer, applicable.map((each) => each.value))) };
 
   const taking = applicable.find((each) => each.value === answers.verb);
   if (!taking?.confirms(chosen)) return [item, verb];
   // The verb is an answer value rather than words, so it goes in as an id.
-  return [item, verb, { key: 'confirm', label: localizer.engine('engine.modal.confirm', { verb: localizer.identifier(taking.value), item: chosen.name }), values: listed([CONFIRMED]) }];
+  return [item, verb, { key: 'confirm', label: localizer.engine('engine.modal.confirm', { verb: localizer.identifier(taking.value), item: chosen.name }), values: listed(localizer, spelled(localizer, [CONFIRMED])) }];
 }
 
 // The frame that replaces this one: itself with the answer kept while it still

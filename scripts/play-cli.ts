@@ -109,7 +109,7 @@ function formatModals(v: PlayView): string[] {
   const asking = askedOption(v.modals);
   if (!asking) return lines;
   lines.push(`${asking.label}:`);
-  if (asking.values) asking.values.forEach((value, index) => lines.push(`  ${index + 1}) ${value}`));
+  if (asking.values) asking.values.forEach((choice, index) => lines.push(`  ${index + 1}) ${choice.shown}`));
   else lines.push(`  submit-modal: ${asking.key}=<text>`);
   return lines;
 }

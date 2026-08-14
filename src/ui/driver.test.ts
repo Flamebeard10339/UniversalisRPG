@@ -94,7 +94,7 @@ describe('the GUI driver', () => {
     driver.choose(position(driver, 'talk:tutorial-island.miki'));
 
     const asked = shown(driver).modals[0].options[0];
-    driver.answer(asked.key, asked.values![0]);
+    driver.answer(asked.key, asked.values![0].value);
 
     expect(shown(driver).modals).toEqual([]);
     expect(shown(driver).choices.map((choice) => choice.id)).toContain('talk:tutorial-island.miki');
@@ -104,13 +104,13 @@ describe('the GUI driver', () => {
     const driver = createDriver(SHIPPED_SOURCES);
     driver.choose(position(driver, 'talk:tutorial-island.miki'));
     const menu = shown(driver).modals[0].options[0];
-    driver.answer(menu.key, menu.values![0]);
+    driver.answer(menu.key, menu.values![0].value);
     driver.choose(position(driver, 'use:entity.tutorial-island.mirror.look in'));
 
     const name = shown(driver).modals[0].options[0];
     driver.answer(name.key, 'Sir Robin');
     const race = shown(driver).modals[0].options[0];
-    driver.answer(race.key, race.values![0]);
+    driver.answer(race.key, race.values![0].value);
 
     expect(shown(driver).modals).toEqual([]);
     expect(shown(driver).player.name).toBe('Sir Robin');

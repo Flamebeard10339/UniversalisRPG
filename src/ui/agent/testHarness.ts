@@ -166,7 +166,7 @@ export function testState(snapshot: DriverSnapshot, surfaces: Record<string, unk
             name: modal.name,
             key: option.key,
             label: option.label,
-            values: option.values ? [...option.values] : undefined,
+            values: option.values ? option.values.map((choice) => choice.value) : undefined,
           }
         : null,
   };

@@ -6,7 +6,7 @@ import { carried, contributionText, counted, worn } from './sheet';
 type CarriedRow = PlayStatus['carried'][number];
 type Plane = PlayStatus['planes'][number];
 
-const row = (over: Partial<CarriedRow> = {}): CarriedRow => ({ id: 'rope', name: asLocalized('Rope'), count: 1, value: 'Rope x1', grown: false, ...over });
+const row = (over: Partial<CarriedRow> = {}): CarriedRow => ({ id: 'rope', name: asLocalized('Rope'), count: 1, value: 'Rope x1', shown: asLocalized('Rope x1'), grown: false, ...over });
 
 const plane = (over: Partial<Plane> = {}): Plane => ({
   instance: '1',

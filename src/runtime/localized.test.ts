@@ -6,7 +6,11 @@ import { ENGINE_KEYS } from '../content/locale';
 import { loadUniverse } from '../content/registry';
 import { itemExamine, localizerFor, type Localized } from './localized';
 import { RuntimeError } from './state';
-import type { PlayChoice, PlayStatus } from './session';
+import type { PlayChoice, PlayStatus, PlayView } from './session';
+import type { ModalChoice, ModalOption } from './modals';
+import type { CarriedEntry } from './carriedScreen';
+import type { ClusterReport, PlaneReport } from './planeReport';
+import type { EncounterFoe } from './encounter';
 import { initialState, pruneStateForRegistry, type PruneWarning } from './save';
 
 const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope', '', '# item apple'].join('\n');
@@ -34,7 +38,25 @@ function rawTextDoesNotCompile(): void {
   const log: Localized[] = ['You hit the Giant Rat for 3.'];
   // @ts-expect-error a prune warning does not take a string
   const warning: PruneWarning['message'] = 'Removed inventory gem because its item is not loaded.';
-  void [label, detail, title, description, entity, log, warning];
+  // Every field a later pass had to brand, listed here so that unbranding one
+  // is a build failure rather than a fourth reopening of c3.
+  // @ts-expect-error what a modal option is read as is not a string
+  const option: ModalOption['label'] = 'Item';
+  // @ts-expect-error what an answer is read as is not a string either
+  const choice: ModalChoice['shown'] = 'Rope x1';
+  // @ts-expect-error the lines a view hands back are not strings
+  const said: PlayView['said'] = ['You hit the Giant Rat for 3.'];
+  // @ts-expect-error a carried row's name is not a string
+  const carried: CarriedEntry['name'] = 'Rope';
+  // @ts-expect-error a carried row's words are not a string
+  const shown: CarriedEntry['shown'] = 'Rope x1';
+  // @ts-expect-error a plane's name is not a string
+  const plane: PlaneReport['name'] = 'Blade';
+  // @ts-expect-error a cluster's title is not a string
+  const cluster: ClusterReport['title'] = 'Core';
+  // @ts-expect-error an encounter foe's title is not a string
+  const foe: EncounterFoe['title'] = 'Giant Rat';
+  void [label, detail, title, description, entity, log, warning, option, choice, said, carried, shown, plane, cluster, foe];
 }
 
 function unkeyedEngineTextDoesNotCompile(): void {
@@ -52,11 +74,19 @@ describe('the engine speaks in keys (c2)', () => {
     expect([...(shipped?.keys() ?? [])].sort()).toEqual([...ENGINE_KEYS].sort());
   });
 
-  // Two labels that are English and stay so, because each is an identifier
-  // rather than a display: the label is what `use:<kind>.<objId>.<label>` and
-  // `activeAction.actionLabel` are spelled with, and both are shown through
-  // `engine.travel.to` and `engine.craft.label` instead.
-  const IDENTIFIERS = ['src/content/registry.ts: Craft {recipe}', 'src/runtime/actions.ts: Travel to {destination}'];
+  // Four strings that are English and stay so, because each is an identifier
+  // rather than a display. Two are action labels — what `use:<kind>.<objId>.
+  // <label>` and `activeAction.actionLabel` are spelled with — and two are the
+  // carried screen's answer values, what a `submit-modal:` in a `# test`
+  // replays. Every one of them is shown through a pattern instead:
+  // `engine.travel.to`, `engine.craft.label`, `engine.carried.stack` and
+  // `engine.carried.worn`.
+  const IDENTIFIERS = [
+    'src/content/registry.ts: Craft {recipe}',
+    'src/runtime/actions.ts: Travel to {destination}',
+    'src/runtime/carriedScreen.ts: {item} ({slot})',
+    'src/runtime/carriedScreen.ts: {item} x{count}',
+  ];
 
   it('leaves no engine sentence behind in TypeScript', () => {
     // Every pattern, at any length, matched as the shape it would take in

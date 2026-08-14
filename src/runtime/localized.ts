@@ -62,6 +62,11 @@ export interface Localizer {
   identifier(id: string): Localized;
 }
 
+// The language every engine pattern is written in and the one a module declares
+// by default. What is answered rather than read is spelled in it, because an
+// answer a `# test` replays cannot move with the player's setting.
+export const BASE_LANGUAGE = 'en';
+
 export function localizerFor(registry: Registry, language: string): Localizer {
   const { locales } = registry;
   const self: Localizer = {
@@ -93,6 +98,6 @@ export function itemExamine(localizer: Localizer, item: { id: string; title: str
   if (item.examine !== undefined) return localizer.content('item', item.id, 'examine');
   const title = localizer.title('item', item.id);
   const params: Record<string, Localized> = { item: title };
-  if (localizer.language === 'en') params.article = articleEn(title) as Localized;
+  if (localizer.language === BASE_LANGUAGE) params.article = articleEn(title) as Localized;
   return localizer.engine('engine.item.examine', params);
 }

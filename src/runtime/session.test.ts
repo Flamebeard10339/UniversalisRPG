@@ -53,7 +53,7 @@ describe('session', () => {
     expect(menu.key).toBe('choice');
     expect(menu.values).toHaveLength(2);
 
-    v = submitModal(session, { choice: menu.values![0] });
+    v = submitModal(session, { choice: menu.values![0].value });
     expect(modalNames(v)).toEqual([]);
     expect(v.flags['tutorial-island.quest-given']).toBe(true);
 
@@ -209,7 +209,7 @@ node greeting:
     let v = apply(session, 'use:entity.mirror.look in');
     expect(v.modals).toEqual([{ name: 'character-creation', leaving: null, options: [
       { key: 'name', label: 'Name', values: null },
-      { key: 'race', label: 'Race', values: ['Human', 'Elf', 'Dwarf', 'Orc'] },
+      { key: 'race', label: 'Race', values: ['Human', 'Elf', 'Dwarf', 'Orc'].map((value) => ({ value, shown: value })) },
     ] }]);
     expect(v.player).toEqual({ name: '', race: '' });
 
@@ -727,7 +727,7 @@ describe('what the engine publishes', () => {
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
     submitModal(session, { item: 'Gauntlet (hand)' });
     const asked = view(session).modals[0].options;
-    expect(asked[asked.length - 1].values).toContain('Unequip');
+    expect(asked[asked.length - 1].values?.map((choice) => choice.value)).toContain('Unequip');
   });
 
   // Grown against a state and handed to the session as a save, so what is
@@ -751,8 +751,8 @@ describe('what the engine publishes', () => {
     // c16: the world names a copy the one way every screen does — under a
     // descriptor, and never under the id the row itself carries.
     expect(carried.carried).toEqual([
-      { id: 'gauntlet', name: 'Gauntlet', count: 1, value: 'Gauntlet x1', grown: false },
-      { id: grown.instance, name: 'Modified Gauntlet', count: 1, value: 'Modified Gauntlet', grown: true },
+      { id: 'gauntlet', name: 'Gauntlet', count: 1, value: 'Gauntlet x1', shown: 'Gauntlet x1', grown: false },
+      { id: grown.instance, name: 'Modified Gauntlet', count: 1, value: 'Modified Gauntlet', shown: 'Modified Gauntlet', grown: true },
     ]);
 
     applyDirective(session, { kind: 'equip', item: grown.instance });
@@ -762,8 +762,8 @@ describe('what the engine publishes', () => {
     // The worn copy leaves the carried side and is named there instead (c21),
     // still under the id that says which of the two the player meant.
     expect(armed.carried).toEqual([
-      { id: 'gauntlet', name: 'Gauntlet', count: 1, value: 'Gauntlet x1', grown: false },
-      { id: grown.instance, name: 'Modified Gauntlet', count: 1, value: 'Modified Gauntlet (hand)', grown: true, slot: 'hand' },
+      { id: 'gauntlet', name: 'Gauntlet', count: 1, value: 'Gauntlet x1', shown: 'Gauntlet x1', grown: false },
+      { id: grown.instance, name: 'Modified Gauntlet', count: 1, value: 'Modified Gauntlet (hand)', shown: 'Modified Gauntlet (hand)', grown: true, slot: 'hand' },
     ]);
   });
 
@@ -1448,7 +1448,7 @@ describe('a modal names what it is about in the language being played', () => {
 
   const grown = (language: string): PlayView => {
     const session = carrying(language);
-    submitModal(session, { item: view(session).modals[0].options[0].values![0] });
+    submitModal(session, { item: view(session).modals[0].options[0].values![0].value });
     return submitModal(session, { verb: 'Grow' });
   };
 

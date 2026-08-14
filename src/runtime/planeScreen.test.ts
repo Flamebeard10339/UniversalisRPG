@@ -62,7 +62,7 @@ function carrying(inventory: Record<string, number>): GameState {
   return state;
 }
 
-const values = (frame: PlaneFrame, state: GameState): readonly string[] => planeOptions(frame, state, registry)[0].values ?? [];
+const values = (frame: PlaneFrame, state: GameState): readonly string[] => (planeOptions(frame, state, registry)[0].values ?? []).map((choice) => choice.value);
 
 const label = (frame: PlaneFrame, state: GameState): string => planeOptions(frame, state, registry)[0].label;
 

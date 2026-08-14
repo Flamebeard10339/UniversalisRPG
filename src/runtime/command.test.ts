@@ -125,6 +125,15 @@ function choiceIndex(ctx: CommandContext, id: string): string {
   return String(index + 1);
 }
 
+import type { ModalOption } from './modals';
+
+// What a screen offers, as the answers alone: the words beside each are asserted
+// where the language they are in is the point, and everywhere else they are
+// noise between an option and the answers it takes.
+const answered = (options: readonly ModalOption[] | undefined) => (options ?? []).map((option) => ({ ...option, values: option.values?.map((choice) => choice.value) ?? null }));
+const takes = (option: { values?: readonly { value: string }[] | null } | undefined) => option?.values?.map((choice) => choice.value);
+
+
 describe('the command table is the one definition of the command set', () => {
   it('names every command once, and every spelling reaches its own entry', () => {
     const names = COMMANDS.map((spec) => spec.name);
@@ -335,7 +344,7 @@ describe('the commands a player plays with', () => {
     const opened = runLine(ctx, '/inv');
     expect(kinds(opened)).toEqual(['view']);
     expect(opened.recorded).toEqual(['open-modal: carried-items']);
-    expect(opened.view?.modals).toEqual([{ name: 'carried-items', leaving: 'Close', options: [{ key: 'item', label: 'Item', values: ['Gauntlet x1', 'Close'] }] }]);
+    expect(opened.view?.modals.map((modal) => ({ ...modal, options: answered(modal.options) }))).toEqual([{ name: 'carried-items', leaving: 'Close', options: [{ key: 'item', label: 'Item', values: ['Gauntlet x1', 'Close'] }] }]);
   });
 
   // c1: the argument a GUI row hands over is the same dispatch a player types,
@@ -347,7 +356,7 @@ describe('the commands a player plays with', () => {
     const opened = runLine(ctx, '/inv gauntlet');
     expect(kinds(opened)).toEqual(['view']);
     expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet x1']);
-    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
   });
 
   // c1 and c18: the equipment row dispatches the same command, and the id it
@@ -359,7 +368,7 @@ describe('the commands a player plays with', () => {
 
     const opened = runLine(ctx, '/inv worn:hand');
     expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet (hand)']);
-    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Unequip', 'Destroy', 'Close'] }]);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Unequip', 'Destroy', 'Close'] }]);
   });
 
   it('/inventory <item> still opens the stack the worn copy left, and offers it Equip', () => {
@@ -368,7 +377,7 @@ describe('the commands a player plays with', () => {
 
     const opened = runLine(ctx, '/inv gauntlet');
     expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet x1']);
-    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
   });
 
   it('refuses an item the player is not carrying, and opens no screen to say so', () => {
@@ -611,14 +620,14 @@ describe('a modal is driven by its published name and options', () => {
 
     const named = runLine(ctx, 'submit-modal: name=Rowan');
     expect(named.view?.modals[0].options.map((option) => option.key)).toEqual(['race']);
-    expect(named.view?.modals[0].options[0].values).toEqual(['Human', 'Elf', 'Dwarf', 'Orc']);
+    expect(takes(named.view?.modals[0].options[0])).toEqual(['Human', 'Elf', 'Dwarf', 'Orc']);
   });
 
   it('answers a listed value by number and records the canonical submit-modal: line either way', () => {
     const { ctx, recorder } = fixture(MODAL_MODULE);
 
     const opened = runLine(ctx, 'talk: sage');
-    expect(opened.view?.modals[0].options[0].values).toEqual(['Ask the way.', 'Say nothing.']);
+    expect(takes(opened.view?.modals[0].options[0])).toEqual(['Ask the way.', 'Say nothing.']);
 
     // The second value, not the first: a driver that answered by position but
     // always handed back the head of the list would pass on `1` alone.

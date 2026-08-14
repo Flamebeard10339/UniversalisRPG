@@ -30,6 +30,8 @@ export const ENGINE_KEYS = [
   'engine.combat.other.miss',
   'engine.item.examine',
   'engine.item.modified',
+  'engine.carried.stack',
+  'engine.carried.worn',
   'engine.modal.name',
   'engine.modal.race',
   'engine.modal.choice',
@@ -176,6 +178,10 @@ export interface Locales {
   sections: LocaleDeclaration[];
   // The same entries flattened for lookup, later section winning.
   declared: Map<string, Map<string, string>>;
+  // The first English an engine key was given, which is the one that fixes what
+  // parameters every translation of it may name. Not the merged entry: a module
+  // overriding the pattern would otherwise be checked against itself.
+  english: Map<string, string>;
 }
 
 export interface LocaleDeclaration {
@@ -184,7 +190,7 @@ export interface LocaleDeclaration {
   entries: ReadonlyArray<{ key: string; value: string }>;
 }
 
-export const emptyLocales = (): Locales => ({ addressable: new Set(), base: new Map(), moduleLanguages: [], sections: [], declared: new Map() });
+export const emptyLocales = (): Locales => ({ addressable: new Set(), base: new Map(), english: new Map(), moduleLanguages: [], sections: [], declared: new Map() });
 
 const PARAM = /\{([a-z][a-z0-9-]*)\}/g;
 
@@ -194,10 +200,21 @@ export const parametersOf = (pattern: string): string[] => [...pattern.matchAll(
 // `{article}` — but it cannot invent one, because nothing supplies it and the
 // render throws. Enforced here, where the value is assembled, rather than on the
 // screen it would have taken down.
-export function unsuppliedParameters(locales: Locales, language: string, key: string, value: string): string[] {
-  const supplied = locales.declared.get(DEFAULT_LOCALE)?.get(key) ?? locales.base.get(key)?.text;
-  if (supplied === undefined || language === DEFAULT_LOCALE) return [];
-  const known = new Set(parametersOf(supplied));
+//
+// What an engine key supplies is fixed by the English pattern the engine ships,
+// whatever language the translation is written in — including English, where a
+// contributed `# locale en` is exactly as able to name a parameter nothing
+// passes. Where that English is not loaded there is nothing to compare against
+// and the check stands aside.
+//
+// A content key supplies nothing at all in any language: no caller passes a
+// parameter to a title. So it is checked whether or not any module has text for
+// it, which is every key of a module writing a language nobody has translated.
+export function unsuppliedParameters(locales: Locales, key: string, value: string): string[] {
+  if (!isEngineKey(key)) return parametersOf(value);
+  const english = locales.english.get(key);
+  if (english === undefined) return [];
+  const known = new Set(parametersOf(english));
   return parametersOf(value).filter((name) => !known.has(name));
 }
 
@@ -208,7 +225,10 @@ const DEFAULT_LOCALE = 'en';
 export function addLocaleSection(locales: Locales, module: string | null, section: LocaleSection): void {
   locales.sections.push({ module, language: section.id, entries: section.entries });
   const table = locales.declared.get(section.id) ?? new Map<string, string>();
-  for (const { key, value } of section.entries) table.set(key, value);
+  for (const { key, value } of section.entries) {
+    table.set(key, value);
+    if (section.id === DEFAULT_LOCALE && !locales.english.has(key)) locales.english.set(key, value);
+  }
   locales.declared.set(section.id, table);
 }
 

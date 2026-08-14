@@ -485,7 +485,7 @@ function numberedModalAnswer(current: PlayView, trimmed: string): string | null 
   if (!asking?.values) return null;
   const index = Number(trimmed);
   if (!Number.isInteger(index) || index < 1 || index > asking.values.length) return null;
-  return `submit-modal: ${asking.key}=${asking.values[index - 1]}`;
+  return `submit-modal: ${asking.key}=${asking.values[index - 1].value}`;
 }
 
 // --- the table ------------------------------------------------------------

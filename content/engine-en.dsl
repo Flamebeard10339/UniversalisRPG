@@ -26,6 +26,8 @@ engine.combat.other.hit: The {attacker} hits the {target} for {damage}.
 engine.combat.other.miss: The {attacker} misses the {target}.
 engine.item.examine: This is {article} {item}.
 engine.item.modified: Modified {item}
+engine.carried.stack: {item} x{count}
+engine.carried.worn: {item} ({slot})
 engine.modal.name: Name
 engine.modal.race: Race
 engine.modal.choice: Choice

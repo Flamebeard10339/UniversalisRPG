@@ -1066,7 +1066,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   const byNamespace = new Map(modules.map((module) => [module.namespace, module]));
   for (const declared of registry.locales.sections) {
     for (const { key, value } of declared.entries) {
-      const unsupplied = unsuppliedParameters(registry.locales, declared.language, key, value);
+      const unsupplied = unsuppliedParameters(registry.locales, key, value);
       if (unsupplied.length === 0) continue;
       const error = new DslError(`# locale ${declared.language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
       return { failure: { module: byNamespace.get(declared.module) ?? modules[0], stage: 'build', error } };

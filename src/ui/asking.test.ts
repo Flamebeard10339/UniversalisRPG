@@ -114,7 +114,7 @@ describe('what a click away from a screen answers', () => {
   // not offer, and a click that answered it would be answering a value the
   // engine is not listing.
   it('is nothing where the question being asked does not list it', () => {
-    const asked: PlayView['modals'] = [{ name: 'held', leaving: 'Close', options: [{ key: 'item', label: asLocalized('Item'), values: ['Blade x1'] }] }];
+    const asked: PlayView['modals'] = [{ name: 'held', leaving: 'Close', options: [{ key: 'item', label: asLocalized('Item'), values: [{ value: 'Blade x1', shown: asLocalized('Blade x1') }] }] }];
 
     expect(dismissal(asked)).toBeNull();
   });

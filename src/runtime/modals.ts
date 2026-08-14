@@ -2,7 +2,7 @@ import { choose, cursorProblem, DialogueCursor, menuTexts } from './dialogue-run
 import { carriedFrame, carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
 import { type PlaneFocus } from './planeReport';
-import { Localized, localizerOf } from './localized';
+import { Localized, Localizer, localizerOf } from './localized';
 import { GameState, RuntimeError } from './state';
 import { Registry } from '../content/registry';
 
@@ -11,15 +11,26 @@ import { Registry } from '../content/registry';
 // says how one is drawn: a rendering layer is handed a name and a list of
 // options and decides the rest for itself.
 
+// One answer, and the words a player reads to pick it. Kept as a pair rather
+// than as two lists, because the whole reason c3 kept reopening is that a value
+// is both — read on the screen and replayed by a `submit-modal:` — and no
+// branding of one field can hold while the other carries the same text.
+export interface ModalChoice {
+  readonly value: string;
+  readonly shown: Localized;
+}
+
 export interface ModalOption {
   key: string;
-  // Branded, because a label is read and a value is answered: three screens
-  // rendered the base language while their room was translated, and nothing
-  // but the type stopped them (pass 2, pass 3).
   label: Localized;
   // What this option will accept, or null where it takes free text.
-  values: readonly string[] | null;
+  values: readonly ModalChoice[] | null;
 }
+
+// An answer whose spelling is its own: a directive a `# test` replays, a hex, a
+// verb. The played language does not change it, so it is shown as it is
+// answered — which is what `identifier` means everywhere else.
+export const spelled = (localizer: Localizer, values: readonly string[]): ModalChoice[] => values.map((value) => ({ value, shown: localizer.identifier(value) }));
 
 // The whole of what leaves src/runtime: a name, the options still to be
 // answered, and the value that answering any of them with takes the screen
@@ -80,7 +91,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     open: () => ({ name: 'character-creation', answers: {} }),
     options: (_frame, state, registry) => [
       { key: 'name', label: localizerOf(registry, state).engine('engine.modal.name'), values: null },
-      { key: 'race', label: localizerOf(registry, state).engine('engine.modal.race'), values: RACES },
+      { key: 'race', label: localizerOf(registry, state).engine('engine.modal.race'), values: spelled(localizerOf(registry, state), RACES) },
     ],
     submit: (frame, state) => {
       state.player = { name: frame.answers.name, race: frame.answers.race };
@@ -105,7 +116,11 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
   },
   dialogue: {
     open: () => null,
-    options: (frame, state, registry) => [{ key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuTexts(frame.cursor, registry, state) }],
+    // A menu answer is the dialogue line the player picks, so the answer is the
+    // authored text and what is read is that text through the prose door.
+    options: (frame, state, registry) => [
+      { key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuTexts(frame.cursor, registry, state).map((text) => ({ value: text, shown: localizerOf(registry, state).prose(text) })) },
+    ],
     submit: (frame, state, registry) => {
       const cursor = choose(frame.answers.choice, frame.cursor, registry, state);
       return cursor ? dialogueFrame(cursor) : null;
@@ -261,7 +276,7 @@ function isCursor(value: unknown): boolean {
 function optionRefusal(options: readonly ModalOption[], key: string, value: string): string | null {
   const option = options.find((each) => each.key === key);
   if (!option) return `has no option ${key}`;
-  if (option.values && !option.values.includes(value)) return `has no ${key} that takes ${JSON.stringify(value)}`;
+  if (option.values && !option.values.some((choice) => choice.value === value)) return `has no ${key} that takes ${JSON.stringify(value)}`;
   return null;
 }
 

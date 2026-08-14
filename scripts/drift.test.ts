@@ -143,7 +143,7 @@ describe('the two drivers cannot drift', () => {
 
     const asked = gui.snapshot().view!.modals[0].options[0];
     // The GUI's own route in, held to the line the REPL would have typed.
-    inStep(repl, gui, `submit-modal: ${asked.key}=${asked.values![0]}`, () => gui.answer(asked.key, asked.values![0]));
+    inStep(repl, gui, `submit-modal: ${asked.key}=${asked.values![0].value}`, () => gui.answer(asked.key, asked.values![0].value));
 
     expect(gui.snapshot().view!.modals).toEqual([]);
   });

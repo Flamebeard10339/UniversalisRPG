@@ -260,6 +260,17 @@ Proof:
 - **A translation is refused at load for naming a parameter nothing supplies.** It may drop one — a
   Spanish `engine.item.examine` needs no `{article}` — but inventing one made every screen in that
   language throw at render time. Enforced where the value is assembled rather than where it is read.
+- **A modal option's answer and the words that offer it are one pair, not two lists.** This is what
+  finally closed c3, after branding the label alone moved the leak to `values` on the same interface.
+  The Decision that fix rested on — a label is read and a value is answered — is false in both
+  directions: a dialogue menu's *answer* is the whole of what that screen says, and the carried
+  screen built its answer out of the localized name, so a `submit-modal:` recorded in English threw
+  in Spanish. `ModalChoice` carries both, the answer is spelled in the base language because it is
+  what a `# test` replays, and what is read is the played language's.
+- **The brand's boundary is a compile fixture, not a convention.** Pass 4 measured that reverting
+  `ModalOption.label` and `PlayView.said` to `string` left `tsc` clean, because the c1 fixture still
+  enumerated only the seven fields pass 1 wrote. It enumerates every branded field now, so unbranding
+  one fails the build rather than reopening c3 a fifth time.
 - **`engine.item.examine` has one reader, `itemExamine`, and the schema default is gone.** Nothing
   displayed an item's examine before this branch either; what mattered was that the English sentence
   and its `article()` left the schema, which is what c2 and c5 ask for.

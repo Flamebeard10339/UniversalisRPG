@@ -46,7 +46,7 @@ function published(view: PlayView): string[] {
     ...view.entities.flatMap((entity) => [entity.title, entity.examine ?? '']),
     ...view.choices.flatMap((choice) => [choice.label, choice.detail ?? '']),
     ...view.resources.map((resource) => resource.title),
-    ...view.modals.flatMap((modal) => modal.options.flatMap((option) => [option.label, ...(option.values ?? [])])),
+    ...view.modals.flatMap((modal) => modal.options.flatMap((option) => [option.label as string, ...(option.values ?? []).map((choice) => choice.shown as string)])),
     // The map and the character sheet. Stats and skills publish keys and not
     // titles, so a key is what the engine gave and a key is what the sheet may
     // draw; what the player carries publishes a name, and that is what its rows
@@ -232,7 +232,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, TALK));
     step();
     const menu = driver.snapshot().view!.modals[0].options[0];
-    driver.answer(menu.key, menu.values![1]);
+    driver.answer(menu.key, menu.values![1].value);
     step();
     driver.choose(position(driver, ROAST));
     step();
@@ -435,9 +435,9 @@ describe('what the shell puts on the screen', () => {
 
     const asked = renderToStaticMarkup(<App driver={driver} />);
     expect(asking(asked)).toBe(true);
-    for (const value of menu.values!) expect(readable(asked)).toContain(value);
+    for (const choice of menu.values!) expect(readable(asked)).toContain(choice.shown);
 
-    driver.answer(menu.key, menu.values![0]);
+    driver.answer(menu.key, menu.values![0].value);
     const answered = renderToStaticMarkup(<App driver={driver} />);
 
     // The sheet itself, not merely the words that were on it: a shell holding
@@ -446,11 +446,11 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('renders a modal it has never heard of from the option alone', () => {
-    const unheard = { key: 'heading', label: asLocalized('Which way from here'), values: ['widdershins', 'deosil'] };
+    const unheard = { key: 'heading', label: asLocalized('Which way from here'), values: [{ value: 'widdershins', shown: asLocalized('widdershins') }, { value: 'deosil', shown: asLocalized('deosil') }] };
 
     const html = renderToStaticMarkup(<ModalSheet option={unheard} onAnswer={() => undefined} />);
 
-    expect(readable(html)).toEqual([unheard.label, ...unheard.values]);
+    expect(readable(html)).toEqual([unheard.label, ...unheard.values.map((choice) => choice.shown)]);
   });
 
   it('renders a free-text option as a field with no listed answer', () => {
