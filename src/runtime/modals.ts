@@ -2,7 +2,7 @@ import { choose, cursorProblem, DialogueCursor, menuChoices } from './dialogue-r
 import { carriedFrame, carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
 import { type PlaneFocus } from './planeReport';
-import { Localized, Localizer, localizerOf } from './localized';
+import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { GameState, RuntimeError } from './state';
 import { Registry } from '../content/registry';
 import type { EngineKey } from '../content/locale';
@@ -18,12 +18,12 @@ import type { Said } from './said';
 // is both — read on the screen and replayed by a `submit-modal:` — and no
 // branding of one field can hold while the other carries the same text.
 export interface ModalChoice {
-  readonly value: string;
+  readonly value: Answer;
   readonly shown: Localized;
 }
 
 export interface ModalOption {
-  key: string;
+  key: Answer;
   label: Localized;
   // What this option will accept, or null where it takes free text.
   values: readonly ModalChoice[] | null;
@@ -34,14 +34,14 @@ export interface ModalOption {
 // down. A driver can render a modal it has never heard of from this alone, and
 // can offer the way out of one without knowing which screen it is looking at.
 export interface Modal {
-  name: string;
+  name: Answer;
   options: readonly ModalOption[];
   // c15's leaving value, as a word rather than as a rule: null for a screen
   // that publishes none, which is a screen no gesture can take down either.
-  leaving: string | null;
+  leaving: Answer | null;
 }
 
-export type ModalAnswers = Readonly<Record<string, string>>;
+export type ModalAnswers = Readonly<Record<Answer, Answer>>;
 
 export type ModalFrame =
   | { readonly name: 'character-creation'; readonly answers: ModalAnswers }
@@ -74,12 +74,12 @@ interface ModalDefinition<F extends ModalFrame> {
   // The value this screen leaves by (c15), listed on every option it publishes.
   // A member that declares none is a screen answering cannot leave, which is
   // what a driver reads to know there is nothing for a way out to say.
-  leaves?: string;
+  leaves?: Answer;
 }
 
 // A race is answered by its own spelling, which a `# test` replays, and read as
 // the pattern beside it. Adding one is a value here and a key in the union.
-const RACES: ReadonlyArray<{ value: string; shown: EngineKey }> = [
+const RACES: ReadonlyArray<{ value: Answer; shown: EngineKey }> = [
   { value: 'human', shown: 'engine.race.human' },
   { value: 'elf', shown: 'engine.race.elf' },
   { value: 'dwarf', shown: 'engine.race.dwarf' },

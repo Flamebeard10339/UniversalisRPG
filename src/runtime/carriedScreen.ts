@@ -3,7 +3,7 @@ import type { EngineKey } from '../content/locale';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
 import { equip, unequip } from './equipment';
-import { Localized, Localizer, localizerOf } from './localized';
+import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { itemCopies, destroyItem, grownItems, isGrownCopy, itemTemplate, wornCopy, wornIn } from './itemInstance';
 import { type ModalAnswers, type ModalChoice, type ModalFrame, type ModalOption } from './modals';
 import { planeFrame } from './planeScreen';
@@ -17,13 +17,13 @@ import { GameState } from './state';
 // The value that leaves the screen (c15). It is published beside every question
 // the frame asks, because a modal comes down on the answer that completes it and
 // a screen with no such answer is one the world stays withdrawn behind.
-export const LEAVE = 'close';
+export const LEAVE: Answer = 'close';
 const LEAVE_SHOWN: EngineKey = 'engine.carried.close';
 
 // The other answer to the second question a grown copy's destruction asks. What
 // is lost is named by that question's own label, so this stays the same word
 // however the copy is titled and a recorded route replays whatever it was.
-export const CONFIRMED = 'go-ahead';
+export const CONFIRMED: Answer = 'go-ahead';
 const CONFIRMED_SHOWN: EngineKey = 'engine.carried.confirmed';
 
 export interface CarriedEntry {
@@ -31,7 +31,7 @@ export interface CarriedEntry {
   // other: an item id for a stack, the minted id for a grown copy, and the slot
   // for the stack copy worn in one — which has left its stack and so is not the
   // row its item id names.
-  readonly id: string;
+  readonly id: Answer;
   // The one name for it (c16). Every surface spells a carried thing this way.
   readonly name: Localized;
   // How many the player has: a stack's count, and one for a grown copy or a
@@ -44,14 +44,14 @@ export interface CarriedEntry {
   // The slot this entry is worn in, and undefined for a carried one: c21 puts
   // every entry on exactly one of those two sides, so this is what a page
   // listing one side and not the other reads, and what says which verbs apply.
-  readonly slot?: string;
+  readonly slot?: Answer;
 }
 
 interface CarriedVerb {
   // What answering with it is spelled as, and the key for the words offered
   // beside it. The first is a directive a `# test` replays and does not move
   // with the language; the second is all the player reads and does.
-  readonly value: string;
+  readonly value: Answer;
   readonly shown: EngineKey;
   applies(item: Item | undefined, entry: CarriedEntry): boolean;
   // Whether taking it asks once more, naming what is lost, before it happens (c12).

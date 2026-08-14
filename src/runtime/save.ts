@@ -10,7 +10,7 @@ import { isInstanceTable, pruneInstances } from './instances';
 import { itemTemplate } from './itemInstance';
 import { isPopulations, prunePopulations } from './population';
 import { isModalFrame, pruneModals } from './modals';
-import { Localized, Localizer, localizerOf } from './localized';
+import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { PLAYER, templateOf } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
@@ -101,8 +101,8 @@ export function initialState(registry: Registry, language: string = DEFAULT_LANG
 }
 
 export interface PruneWarning {
-  path: string;
-  id: string;
+  path: Answer;
+  id: Answer;
   message: Localized;
 }
 

@@ -6,7 +6,7 @@ import { declaredId, Entity } from '../content/entity';
 import { hostile, Registry } from '../content/registry';
 import { actionVisible, findActiveAction, findActionOwner, requiresMet } from './actions';
 import { GameState, PLAYER, RuntimeError, templateOf } from './state';
-import { Localized, localizerOf, Params } from './localized';
+import { Answer, Localized, localizerOf, Params } from './localized';
 import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
 
 // Where one participant's swing comes from and who it lands on. Every
@@ -181,9 +181,9 @@ export function opposes(registry: Registry, a: string, b: string): boolean {
 }
 
 export interface EncounterFoe {
-  id: string;
+  id: Answer;
   title: Localized;
-  resource: string;
+  resource: Answer;
   current: number;
   max: number;
   cadence: number | null;

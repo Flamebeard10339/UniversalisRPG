@@ -963,3 +963,77 @@ describe('nothing a player answers with carries words', () => {
     expect([...walked].sort()).toEqual([...MODAL_NAMES].sort());
   });
 });
+
+// Two hands holding the same two things, gathered the other way round.
+const GATHERED_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# item rope
+title: Rope
+
+# item flask
+title: Flask
+
+# save rope-first
+{"version":${SAVE_VERSION},"inventory":{"rope":1,"flask":1}}
+
+# save flask-first
+{"version":${SAVE_VERSION},"inventory":{"flask":1,"rope":1}}
+`;
+
+describe('a recorded answer is the value and never where it sat (c2)', () => {
+  const gathered = (save: string): PlaySession => {
+    const session = startSession(loadInEnglish(GATHERED_MODULE));
+    applyDirective(session, { kind: 'load', save });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    return session;
+  };
+
+  // A list of what the player carries is in the order they picked it up, so one
+  // position is two different objects across two sessions holding the same two
+  // things. A recording that named the position would replay green in both and
+  // act on whichever had moved into it.
+  it('lists what is carried in the order it was gathered, so no position names one thing', () => {
+    expect(takes(view(gathered('rope-first')).modals[0].options[0])).toEqual(['rope', 'flask', 'close']);
+    expect(takes(view(gathered('flask-first')).modals[0].options[0])).toEqual(['flask', 'rope', 'close']);
+  });
+
+  it('reaches the same object from either order, because the value is what was recorded', () => {
+    for (const save of ['rope-first', 'flask-first']) {
+      const session = gathered(save);
+
+      applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'rope' });
+
+      expect(view(session).modals[0].options[0].label).toBe('Rope');
+    }
+  });
+
+  // The engine's side of the same rule: a position is not a spelling of the
+  // answer at it, so a recording that named one is refused rather than replayed
+  // against whatever has moved into that place.
+  it('refuses an answer that names a position rather than the value standing at it', () => {
+    const session = gathered('rope-first');
+
+    expect(() => applyDirective(session, { kind: 'submit-modal', key: 'item', value: '0' })).toThrow(/takes "0"/);
+    expect(takes(view(session).modals[0].options[0])).toEqual(['rope', 'flask', 'close']);
+  });
+
+  // The other half: where the answer is typed there is no list at all, so there
+  // is no position for a recording to name.
+  it('publishes no list to index where the answer is typed', () => {
+    const session = stackingSession();
+    apply(session, 'talk:sage');
+
+    const creation = view(session).modals[0];
+    expect(creation.name).toBe('character-creation');
+    expect(creation.options.map((option) => [option.key, option.values === null])).toEqual([
+      ['name', true],
+      ['race', false],
+    ]);
+    expect(submitModal(session, { choice: '1' }).modals[0].options[0].values).toBeNull();
+    expect(submitModal(session, { name: 'Rowan' }).player.name).toBe('');
+    expect(submitModal(session, { race: 'orc' }).player).toEqual({ name: 'Rowan', race: 'orc' });
+  });
+});

@@ -5,6 +5,7 @@ import { BonusAmount, Counter } from '../grammar/tagClause';
 import { instancePayloads } from './clusterEffect';
 import { basePlane } from './clusterPlane';
 import { ItemInstance } from './itemInstance';
+import type { Answer } from './localized';
 
 // The one multiplication of a BonusAmount there is. A surface that shows what a
 // payload is worth calls this rather than scaling for itself, so the number on
@@ -23,7 +24,7 @@ export type CounterLevel = (counter: Counter) => number;
 // in percent points, the units the bonus was authored in, so a reader states it
 // without dividing and the actor fold divides once.
 export interface StatContribution {
-  readonly statId: string;
+  readonly statId: Answer;
   readonly added: Range;
   readonly increased: number;
 }

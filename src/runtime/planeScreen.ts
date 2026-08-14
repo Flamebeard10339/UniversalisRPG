@@ -2,7 +2,7 @@ import { hexKey } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
-import { Localized, Localizer, localizerOf } from './localized';
+import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { carriedEntries, carriedFrame } from './carriedScreen';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
@@ -19,11 +19,11 @@ import { GameState } from './state';
 
 // The value that leaves (c15). It goes back to the screen this one replaced
 // rather than closing the world, which is the other half of c3.
-export const BACK = 'back';
+export const BACK: Answer = 'back';
 
 // The one thing this screen asks. An answer to it is a value it published, so
 // neither driver needs a way to type into it.
-export const PLANE = 'plane';
+export const PLANE: Answer = 'plane';
 
 export type PlaneFrame = Extract<ModalFrame, { name: 'item-plane' }>;
 
@@ -36,7 +36,7 @@ export function planeFrame(target: string, hex: string = hexKey(ORIGIN), said?: 
 // value with the target and the focused hexagon the frame holds filled back in
 // — and is null for a value that only moves the focus (c5).
 interface PlaneMove {
-  readonly value: string;
+  readonly value: Answer;
   // The words offered for it, which move with the played language while the
   // value does not — the two halves of one `ModalChoice`.
   readonly shown: Localized;

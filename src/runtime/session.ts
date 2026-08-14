@@ -23,14 +23,14 @@ import { ResourceDisplay } from '../content/resource';
 import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { Directive, parseUseChoiceId, useChoiceId } from '../content/test';
 import { printDirective } from '../content/serialize';
-import { Localized, Localizer, localizerOf } from './localized';
+import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 import { say } from './said';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft';
 
 export interface PlayChoice {
-  id: string;
+  id: Answer;
   kind: PlayChoiceKind;
   label: Localized;
   detail?: Localized;
@@ -38,7 +38,7 @@ export interface PlayChoice {
   // needs to know which of the offers on the table is the way to a place, and
   // an entity that aliases a road -- a staircase, a door -- publishes an action
   // and not a travel, so the id cannot be read for it.
-  leadsTo?: string;
+  leadsTo?: Answer;
   // How many roads away the place it leads to is, on a travel. One is next
   // door; more is a walk the engine will queue the legs of. A driver reads it
   // to tell what belongs to the room from what belongs to the map.
@@ -61,19 +61,19 @@ export interface PlayStatus {
   // `description` is absent rather than empty where a place says nothing about
   // itself: there is no missing translation to report, because there is nothing
   // to translate.
-  location: { id: string; title: Localized; description?: Localized };
-  entities: Array<{ id: string; title: Localized; examine?: Localized }>;
+  location: { id: Answer; title: Localized; description?: Localized };
+  entities: Array<{ id: Answer; title: Localized; examine?: Localized }>;
   choices: PlayChoice[];
   time: number;
-  resources: Array<{ id: string; title: Localized; current: number; max: number; display: ResourceDisplay }>;
+  resources: Array<{ id: Answer; title: Localized; current: number; max: number; display: ResourceDisplay }>;
   encounter: EncounterView | null;
   // Bottom of the stack first, so the last one is the one being answered.
   modals: Modal[];
-  inventory: Record<string, number>;
+  inventory: Record<Answer, number>;
   // Grown copies the player has, carried or worn, by the instance id each is
   // named by. They are counted nowhere in `inventory`, so a surface listing what
   // the player has reads both records.
-  grown: Record<string, string>;
+  grown: Record<Answer, Answer>;
   // Every row a page draws, on either side of c21: named once below every
   // screen, counted, and each under the id a verb addresses it by, so a surface
   // states the engine's answer rather than reading a dictionary's keys as names
@@ -89,16 +89,16 @@ export interface PlayStatus {
   // names a plane rather than carrying one, so a surface draws it by looking the
   // id up in `planes` and never by recognising the screen that holds it.
   focus: PlaneFocus | null;
-  equipment: Record<string, string>;
-  xp: Record<string, number>;
-  stats: Record<string, number>;
-  flags: Record<string, boolean | number>;
-  discovered: Array<{ id: string; title: Localized; x: number; y: number; z: number; adjacent: Array<{ to: string; open: boolean }> }>;
+  equipment: Record<Answer, Answer>;
+  xp: Record<Answer, number>;
+  stats: Record<Answer, number>;
+  flags: Record<Answer, boolean | number>;
+  discovered: Array<{ id: Answer; title: Localized; x: number; y: number; z: number; adjacent: Array<{ to: Answer; open: boolean }> }>;
   // The walk under way: where it is going and which places it has still to
   // cross, in the order it will cross them. A driver lights the route up off
   // this rather than working the route out for itself.
   journey: Journey | null;
-  player: { name: string; race: string };
+  player: { name: Answer; race: Answer };
   action: PlayAction | null;
 }
 

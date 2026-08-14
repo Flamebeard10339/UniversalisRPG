@@ -4,7 +4,7 @@ import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';
 import { BonusAmount } from '../grammar/tagClause';
 import { carriedName } from './carriedName';
-import { Localized, Localizer, localizerOf } from './localized';
+import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { positionPayloads } from './clusterEffect';
 import { basePlane, isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
@@ -21,14 +21,14 @@ export type Standing = 'allocated' | 'available' | 'unreached' | 'blocked';
 // beside it so a reader can say where the number came from without being asked
 // to derive it back.
 export interface PayloadReport {
-  readonly statId: string;
+  readonly statId: Answer;
   readonly effective: BonusAmount;
   readonly scale: number;
 }
 
 export interface PositionReport {
   readonly position: number;
-  readonly passive: string | null;
+  readonly passive: Answer | null;
   readonly title: Localized | null;
   readonly standing: Standing;
   // Allocated without a point having been spent: the origin cluster's root.
@@ -42,18 +42,18 @@ export interface SlotReport {
   // The hex beyond this edge when a cluster stands in it, whether this slot let
   // it in or another one did — which is the whole difference between filled and
   // blocked, and the reason both name the same neighbour.
-  readonly beyond: string | null;
+  readonly beyond: Answer | null;
 }
 
 export interface ClusterReport {
-  readonly hex: string;
-  readonly jewel: string;
+  readonly hex: Answer;
+  readonly jewel: Answer;
   readonly title: Localized;
-  readonly shape: string;
+  readonly shape: Answer;
   // The slot this cluster was slotted through, as the hex and direction the
   // `slot:` verb named — null at the origin, which is never slotted.
-  readonly entry: { hex: string; direction: Direction } | null;
-  readonly effects: Array<{ id: string; title: Localized; effect: ClusterEffect }>;
+  readonly entry: { hex: Answer; direction: Direction } | null;
+  readonly effects: Array<{ id: Answer; title: Localized; effect: ClusterEffect }>;
   readonly modSlots: number;
   readonly positions: PositionReport[];
   readonly slots: SlotReport[];
@@ -63,14 +63,14 @@ export interface ClusterReport {
 // growth verbs spell — never the plane itself, so a surface that draws one
 // draws the report the view already publishes rather than a second copy of it.
 export interface PlaneFocus {
-  readonly instance: string;
-  readonly hex: string;
+  readonly instance: Answer;
+  readonly hex: Answer;
 }
 
 export interface PlaneReport {
   // The id the four verbs address this plane by.
-  readonly instance: string;
-  readonly template: string;
+  readonly instance: Answer;
+  readonly template: Answer;
   readonly title: Localized;
   // What a screen holding this plane calls the copy it is growing (c16).
   readonly name: Localized;

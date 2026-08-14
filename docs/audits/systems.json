@@ -291,6 +291,7 @@
         "src/runtime/planeScreen.test.ts",
         "src/runtime/planeScreen.ts",
         "src/runtime/population.ts",
+        "src/runtime/published.test.ts",
         "src/runtime/recipe.test.ts",
         "src/runtime/resolve.test.ts",
         "src/runtime/resource.test.ts",
@@ -537,6 +538,14 @@
             "src/runtime/carriedScreen.ts"
           ],
           "note": "produced by every-modal-answer-is-an-id; every ModalChoice.value is an id — a content id, an instance ordinal, a slot, a hexagon, a dialogue option's index within its node, or one the engine owns spelled as an id — and the words beside it are the pair's other half"
+        },
+        {
+          "name": "the derived brand rule",
+          "paths": [
+            "src/runtime/published.test.ts",
+            "src/runtime/localized.ts"
+          ],
+          "note": "produced by the-published-surface-declares-what-is-words-and-what-is-an-"
         }
       ]
     },

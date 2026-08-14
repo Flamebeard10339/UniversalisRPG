@@ -7,13 +7,7 @@ import { ENGINE_KEYS } from '../content/locale';
 import { loadUniverse } from '../content/registry';
 import { itemExamine, localizerFor, type Localized } from './localized';
 import { RuntimeError } from './state';
-import type { PlayChoice, PlayStatus, PlayView } from './session';
-import type { ModalChoice, ModalOption } from './modals';
-import type { CarriedEntry } from './carriedScreen';
-import type { Refusal } from './itemInstance';
-import type { ClusterReport, PlaneReport } from './planeReport';
-import type { EncounterFoe } from './encounter';
-import { initialState, pruneStateForRegistry, type PruneWarning } from './save';
+import { initialState, pruneStateForRegistry } from './save';
 
 const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope', '', '# item apple'].join('\n');
 
@@ -22,46 +16,11 @@ const SPANISH = { name: 'island-es', text: ['# info island-es', 'version: 1.0.0'
 const english = () => localizerFor(loadInEnglish(ISLAND), 'en');
 const spanish = () => localizerFor(loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, SPANISH]), 'es');
 
-// c1. Every one of these lines must be an error, and `@ts-expect-error` fails
-// the build if it is not — so `npx tsc --noEmit`, which CI already runs, is the
-// assertion. Nothing here executes; the fixture is the compile.
-function rawTextDoesNotCompile(): void {
-  // @ts-expect-error a choice label is not a string
-  const label: PlayChoice['label'] = 'Travel to Beach';
-  // @ts-expect-error a choice detail is not a string
-  const detail: PlayChoice['detail'] = `Miki`;
-  // @ts-expect-error a view title is not a string
-  const title: PlayStatus['location']['title'] = 'Guide House';
-  // @ts-expect-error a view description is not a string
-  const description: PlayStatus['location']['description'] = 'A low room.';
-  // @ts-expect-error an entity title is not a string
-  const entity: PlayStatus['entities'][number]['title'] = 'Giant Rat';
-  // @ts-expect-error the log does not take a string
-  const log: Localized[] = ['You hit the Giant Rat for 3.'];
-  // @ts-expect-error a prune warning does not take a string
-  const warning: PruneWarning['message'] = 'Removed inventory gem because its item is not loaded.';
-  // Every field a later pass had to brand, listed here so that unbranding one
-  // is a build failure rather than a fourth reopening of c3.
-  // @ts-expect-error what a modal option is read as is not a string
-  const option: ModalOption['label'] = 'Item';
-  // @ts-expect-error what an answer is read as is not a string either
-  const choice: ModalChoice['shown'] = 'Rope x1';
-  // @ts-expect-error the lines a view hands back are not strings
-  const said: PlayView['said'] = ['You hit the Giant Rat for 3.'];
-  // @ts-expect-error a carried row's name is not a string
-  const carried: CarriedEntry['name'] = 'Rope';
-  // @ts-expect-error a carried row's words are not a string
-  const shown: CarriedEntry['shown'] = 'Rope x1';
-  // @ts-expect-error a plane's name is not a string
-  const plane: PlaneReport['name'] = 'Blade';
-  // @ts-expect-error a cluster's title is not a string
-  const cluster: ClusterReport['title'] = 'Core';
-  // @ts-expect-error an encounter foe's title is not a string
-  const foe: EncounterFoe['title'] = 'Giant Rat';
-  // @ts-expect-error what a refused verb tells the player is not a string
-  const refused: Refusal['refused'] = 'you carry no whetstone';
-  void [label, detail, title, description, entity, log, warning, option, choice, said, carried, shown, plane, cluster, foe, refused];
-}
+// c1's compile fixture stood here: sixteen `@ts-expect-error` lines, one per
+// branded field, which is a list of what somebody remembered rather than a rule
+// about the surface. It had missed seven fields. `published.test.ts` walks the
+// published types from their roots instead, so a field is covered by being on
+// the surface rather than by being named.
 
 function unkeyedEngineTextDoesNotCompile(): void {
   const localizer = english();
@@ -185,7 +144,6 @@ describe('the brand is closed (c1)', () => {
   });
 });
 
-void rawTextDoesNotCompile;
 void unkeyedEngineTextDoesNotCompile;
 
 // pass 1: `prose` was being used as the cast that turned ids into Localized, so

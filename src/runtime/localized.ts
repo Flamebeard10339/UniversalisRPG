@@ -11,6 +11,16 @@ declare const LOCALIZED: unique symbol;
 // writing prose into one of those fields does not compile.
 export type Localized = string & { readonly [LOCALIZED]: true };
 
+// The other half of what a published field may hold: a value that is a protocol
+// rather than words — a content id, an engine verb, a directive tail, a
+// dialogue index, or free text the player typed. It is spelled the same in
+// every language, which is why nothing localizes one and why a `# test` can
+// replay one. Plainly `string`, because an instance id, a slot and a save path
+// are all genuinely strings and a wrapper around each would be ceremony: what
+// this declares is which of the two a field is, at the field, by whoever built
+// it.
+export type Answer = string;
+
 // What a pattern substitutes. A localized value, because a name inside a
 // sentence is as translatable as the sentence; or a number, which no language
 // spells with letters here.
