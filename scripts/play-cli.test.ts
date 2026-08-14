@@ -103,7 +103,7 @@ starting
 
   it('indents the diagnostics under the error that carries them', () => {
     const ctx = driver('# location camp\nx: 0, y: 0\nstarting\n');
-    const failed = formatOutput({ kind: 'message', tone: 'error', text: 'local changes did not load.', detail: ['first', 'second'] });
+    const failed = formatOutput({ kind: 'message', words: 'tool', tone: 'error', text: 'local changes did not load.', detail: ['first', 'second'] });
     expect(failed).toEqual(['Error: local changes did not load.', '  first', '  second']);
     expect(formatResult(runLine(ctx, '/state'))[0]).toBe('Location: camp');
   });

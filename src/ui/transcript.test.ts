@@ -65,7 +65,7 @@ describe('the narration column', () => {
   });
 
   it('keeps a message and its detail as the engine worded them', () => {
-    const transcript = appendOutputs(emptyTranscript(), [{ kind: 'message', tone: 'error', text: 'no.', detail: ['because', 'of this'] }]);
+    const transcript = appendOutputs(emptyTranscript(), [{ kind: 'message', words: 'tool', tone: 'error', text: 'no.', detail: ['because', 'of this'] }]);
 
     expect(transcript.entries).toEqual([
       { id: 1, kind: 'message', tone: 'error', text: 'no.' },

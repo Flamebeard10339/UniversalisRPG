@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { engineLocale } from '../content/engineLocale';
 import { loadUniverseWithDiagnostics } from '../content/registry';
 import { newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
@@ -30,6 +31,11 @@ const WORKSHOP = {
     '',
   ].join('\n'),
 };
+
+// Beside the engine's own English, because a universe loading no `# locale en`
+// renders every engine key as itself and these tests read the words a player
+// would have seen.
+const LATHE = [engineLocale(), WORKSHOP];
 
 const SPINDLE = 'use:entity.workshop.lathe.turn-a-spindle';
 
@@ -128,7 +134,7 @@ describe('the GUI driver', () => {
   });
 
   it('arms a spannable action rather than resolving it, and reports the run before any time passes', () => {
-    const driver = createDriver([WORKSHOP], { ticker: handTicker() });
+    const driver = createDriver(LATHE, { ticker: handTicker() });
 
     driver.choose(position(driver, SPINDLE));
 
@@ -138,7 +144,7 @@ describe('the GUI driver', () => {
 
   it('advances simulated time from the elapsed milliseconds it is handed', () => {
     const ticker = handTicker();
-    const driver = createDriver([WORKSHOP], { ticker });
+    const driver = createDriver(LATHE, { ticker });
     driver.choose(position(driver, SPINDLE));
 
     ticker.advance(1_000);
@@ -150,7 +156,7 @@ describe('the GUI driver', () => {
 
   it('closes the run when the action finishes, stops the ticker and gives the choices back', () => {
     const ticker = handTicker();
-    const driver = createDriver([WORKSHOP], { ticker });
+    const driver = createDriver(LATHE, { ticker });
     driver.choose(position(driver, SPINDLE));
 
     ticker.advance(4_000);
@@ -164,7 +170,7 @@ describe('the GUI driver', () => {
 
   it('cancels on request, keeping the time already spent and saying so in the engine words', () => {
     const ticker = handTicker();
-    const driver = createDriver([WORKSHOP], { ticker });
+    const driver = createDriver(LATHE, { ticker });
     driver.choose(position(driver, SPINDLE));
     ticker.advance(1_000);
 
@@ -180,7 +186,7 @@ describe('the GUI driver', () => {
 
   it('replaces the run under way with the next thing dispatched, keeping the time it spent', () => {
     const ticker = handTicker();
-    const driver = createDriver([WORKSHOP], { ticker });
+    const driver = createDriver(LATHE, { ticker });
     driver.choose(position(driver, SPINDLE));
     ticker.advance(1_000);
 
@@ -196,7 +202,7 @@ describe('the GUI driver', () => {
 
   it('stops the run under way before a command that is not a choice at all', () => {
     const ticker = handTicker();
-    const driver = createDriver([WORKSHOP], { ticker });
+    const driver = createDriver(LATHE, { ticker });
     driver.choose(position(driver, SPINDLE));
 
     driver.send('/look');
@@ -218,7 +224,7 @@ describe('the GUI driver', () => {
     armed.live!.end(false);
 
     const ticker = handTicker();
-    const driver = createDriver([WORKSHOP], { ticker });
+    const driver = createDriver(LATHE, { ticker });
     driver.choose(1);
     for (const span of spans) ticker.advance(span);
 

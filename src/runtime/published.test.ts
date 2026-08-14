@@ -18,6 +18,7 @@ import type { Localized } from './localized';
 const ROOTS: ReadonlyArray<{ file: string; type: string; why: string }> = [
   { file: 'src/runtime/session.ts', type: 'PlayView', why: 'the whole of what a driver renders a turn from, and what every screen reads' },
   { file: 'src/runtime/save.ts', type: 'PruneWarning', why: 'what a load reports about content that has gone, reaching the player through a driver rather than through the view' },
+  { file: 'src/runtime/command.ts', type: 'PlayerMessage', why: 'what a command answers the player, which both drivers put in the transcript beside the view (c4). Its sibling `ToolMessage` is deliberately not here: the authoring tool speaks its own English and the type says which of the two a reader is holding' },
 ];
 
 // Where the walk crosses out of src/runtime, and what its strings are there.

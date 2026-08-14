@@ -121,6 +121,9 @@ export const ENGINE_KEYS = [
   'engine.prune.population.location',
   'engine.prune.population.entity',
   'engine.text.untranslated',
+  'engine.command.invalid-choice',
+  'engine.command.speed',
+  'engine.command.stopped',
 ] as const;
 
 export type EngineKey = (typeof ENGINE_KEYS)[number];

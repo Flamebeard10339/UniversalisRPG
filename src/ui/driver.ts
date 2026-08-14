@@ -52,7 +52,7 @@ function open(sources: readonly ModuleSource[]): Opening {
     // choices and resolve the rest.
     context: newContext(session, first, { driving: true, recorder: { history: [], startSave: serializeSession(session) } }),
     output: [
-      ...loaded.diagnostics.map((diagnostic): CommandOutput => ({ kind: 'message', tone: 'warn', text: formatModuleDiagnostic(diagnostic) })),
+      ...loaded.diagnostics.map((diagnostic): CommandOutput => ({ kind: 'message', words: 'tool', tone: 'warn', text: formatModuleDiagnostic(diagnostic) })),
       { kind: 'view', view: first, reread: false },
     ],
   };
@@ -73,7 +73,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     current = { view: opening.context.view, transcript: appendOutputs(emptyTranscript(), opening.output), live: null, fault: null };
   } catch (error) {
     const fault = error instanceof Error ? error.message : String(error);
-    current = { view: null, transcript: appendOutputs(emptyTranscript(), [{ kind: 'message', tone: 'error', text: fault }]), live: null, fault };
+    current = { view: null, transcript: appendOutputs(emptyTranscript(), [{ kind: 'message', words: 'tool', tone: 'error', text: fault }]), live: null, fault };
   }
 
   const ticker = options.ticker ?? createTicker();
