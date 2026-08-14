@@ -6,13 +6,13 @@ import { HOOK_LABELS } from '../grammar/hook';
 import { ClusterJewel, clusterJewelProblem, clusterJewelSchema } from './clusterJewel';
 import { Dialogue } from './dialogue';
 import { DropTable } from './dropTable';
-import { ActionDeclaration } from './action';
+import { actionAddress, ActionDeclaration } from './action';
 import { AuthoredEntity, Entity, EntityBlock, entitySchema, Handler, isHandlerBlock } from './entity';
 import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
 import { GameEvent, eventSchema } from './event';
 import { Item, itemRoleProblem, itemSchema } from './item';
-import { actionSlug, actionSlugProblem, addLocaleSection, BaseEntry, emptyLocales, GENERATED_FIELD, localeKey, Locales, LocaleSection, TEXT_FIELDS, unsuppliedParameters } from './locale';
+import { actionSlugProblem, addLocaleSection, BaseEntry, emptyLocales, GENERATED_FIELD, localeKey, Locales, LocaleSection, TEXT_FIELDS, unsuppliedParameters } from './locale';
 import { Passive, passiveRangeProblem, passiveSchema } from './passive';
 import { getShape } from './shapes';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
@@ -263,17 +263,17 @@ function recordBaseText(registry: Registry, languages: ReadonlyMap<string | null
   }
 }
 
-// An action's label doubles as its identifier, so its display is keyed on a slug
-// of it and the label itself is the entry for that key (c8). Run over the built
-// registry because an entity's actions are assembled after its section is.
+// An action is keyed on what addresses it, so its label is the entry under that
+// key and nothing else. Run over the built registry because an entity's actions
+// are assembled after its section is.
 function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly Action[]): void {
   const namespace = registry.namespace.ownerOf(kind, id) ?? null;
   const language = languages.get(namespace) ?? DEFAULT_LANGUAGE;
   const taken = new Set<string>();
   for (const action of actions) {
-    const problem = actionSlugProblem(action.label, taken);
+    const slug = actionAddress(action);
+    const problem = actionSlugProblem(slug, action.label, taken);
     if (problem) throw new DslError(`# ${kind} ${id}: ${problem}`);
-    const slug = actionSlug(action.label);
     taken.add(slug);
     const key = localeKey(namespace, kind, id, slug);
     registry.locales.addressable.add(key);

@@ -1,4 +1,4 @@
-import { actionSlug, EngineKey, localeKey, Locales } from '../content/locale';
+import { EngineKey, localeKey, Locales } from '../content/locale';
 import { Registry } from '../content/registry';
 import { articleEn } from '../grammar/values';
 import { GameState, RuntimeError } from './state';
@@ -50,9 +50,8 @@ export interface Localizer {
   // that has one; this is for the caller that has something else to show (c1).
   words(kind: string, id: string, field: string, params?: Params): Localized | undefined;
   title(kind: string, id: string): Localized;
-  // An action's display, keyed on a slug of its label; the label stays the
-  // identifier (c8).
-  actionLabel(kind: string, ownerId: string, label: string): Localized;
+  // An action's display, keyed on what addresses it under its owner.
+  actionLabel(kind: string, ownerId: string, slug: string): Localized;
   // The one door for prose the DSL carries verbatim into the log — a `say:`
   // result, a dialogue line, a growth refusal. None of those carries a key, so
   // none can be translated, and showing one to a player of another language
@@ -88,7 +87,7 @@ export function localizerFor(registry: Registry, language: string): Localizer {
       return found === undefined ? undefined : (substitute(found, key, params) as Localized);
     },
     title: (kind, id) => self.content(kind, id, 'title'),
-    actionLabel: (kind, ownerId, label) => self.content(kind, ownerId, actionSlug(label)),
+    actionLabel: (kind, ownerId, slug) => self.content(kind, ownerId, slug),
     prose: (text) => (locales.moduleLanguages.every((declared) => declared === language) ? (text as Localized) : self.engine('engine.text.untranslated')),
     identifier: (id) => id as Localized,
   };

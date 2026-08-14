@@ -45,14 +45,14 @@ describe('tutorial-island content', () => {
     const state = createGameState('tutorial-island.guide-house');
     state.inventory['tutorial-island.lockpick'] = 1;
 
-    useAction('entity', 'tutorial-island.front-door', 'pick lock', registry, state);
+    useAction('entity', 'tutorial-island.front-door', 'pick-lock', registry, state);
     expect(state.time).toBe(secondsToMs(4));
     expect(state.flags['tutorial-island.front-door.unlocked']).toBe(true);
   });
 
   it('hands out one lockpick from the dresser, not one per search', () => {
     const state = createGameState();
-    const search = () => useAction('entity', 'tutorial-island.dresser', 'search drawer', registry, state);
+    const search = () => useAction('entity', 'tutorial-island.dresser', 'search-drawer', registry, state);
 
     search();
     expect(state.inventory['tutorial-island.lockpick']).toBe(1);

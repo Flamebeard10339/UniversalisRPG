@@ -353,13 +353,13 @@ describe('a generated action label is an English entry too (c5)', () => {
     expect(isla('es').locales.base.has('isla.entity.puerta.abrir-puerta')).toBe(false);
   });
 
-  it('leaves the label itself alone, because it is the identifier a use: names', () => {
+  it('leaves the label itself alone, because it is what a player is shown', () => {
     expect(isla('es').actions.get('isla.abrir-puerta')?.label).toBe('Abrir Puerta');
   });
 
   it('records an authored label whatever language it is in', () => {
     const titled = loadUniverse([module('isla', '# info isla', 'version: 1.0.0', 'language: es', '# location orilla', 'x: 0, y: 0', 'starting', '# action abrir', 'title: Abrir la puerta', 'instant', 'say: se abre')]);
 
-    expect(titled.locales.base.get('isla.action.abrir.abrir-la-puerta')).toEqual({ text: 'Abrir la puerta', language: 'es' });
+    expect(titled.locales.base.get('isla.action.abrir.abrir')).toEqual({ text: 'Abrir la puerta', language: 'es' });
   });
 });

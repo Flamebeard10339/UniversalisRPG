@@ -261,7 +261,7 @@ ${line}
     const test = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
     expect(test('use: creature.training-dummy.eat')).toThrow(/# test walk use: names an unknown kind: creature/);
     expect(test('use: entity.training-dumy.eat')).toThrow(/# test walk use: names an unknown entity: training-dumy/);
-    expect(test('use: entity.training-dummy.eat')).toThrow(/# test walk use: names an unknown entity action: eat/);
+    expect(test('use: entity.training-dummy.eat')).toThrow(/# test walk use: names an unknown action-slug: training-dummy.eat/);
   });
 
   // The two-sided spelling, checked on both halves: the action by id and the

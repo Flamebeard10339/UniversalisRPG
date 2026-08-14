@@ -6,6 +6,7 @@ import { endJourney } from './state';
 import { itemCopies, Growth, grownItems } from './itemInstance';
 import { grow } from './growth';
 import { planeReports, type PlaneFocus, type PlaneReport } from './planeReport';
+import { actionAddress } from '../content/action';
 import { parseOwnerRef, TRAVEL_PAIR } from './actions';
 import { spreadDiscovery } from './effects';
 import { reachable, type Journey } from './journey';
@@ -20,7 +21,7 @@ import { Registry } from '../content/registry';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { ResourceDisplay } from '../content/resource';
 import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
-import { Directive } from '../content/test';
+import { Directive, parseUseChoiceId, useChoiceId } from '../content/test';
 import { printDirective } from '../content/serialize';
 import { Localized, Localizer, localizerOf } from './localized';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
@@ -198,7 +199,7 @@ function fightChoices(registry: Registry, state: GameState, location: Location):
       if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
       if (!requiresMet(action, state) || !actionVisible(action, state)) continue;
       if (action.depletes.side === 'their' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
-      choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action.label), detail: localizer.title('entity', entityId) });
+      choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, actionAddress(action)), detail: localizer.title('entity', entityId) });
     }
   }
   return choices;
@@ -225,14 +226,16 @@ function locationChoices(session: PlaySession): PlayChoice[] {
       choices.push({ id: `talk:${entityId}`, kind: 'talk', label: localizer.engine('engine.talk.to', { entity: localizer.title('entity', entityId) }) });
     }
     for (const action of availableActions(entity, state)) {
-      choices.push({ id: `use:entity.${entityId}.${action.label}`, kind: 'action', label: localizer.actionLabel('entity', entityId, action.label), detail: localizer.title('entity', entityId), leadsTo: movesTo(action) });
+      const slug = actionAddress(action);
+      choices.push({ id: useChoiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, slug), detail: localizer.title('entity', entityId), leadsTo: movesTo(action) });
     }
   }
 
   choices.push(...fightChoices(registry, state, location));
 
   for (const action of availableActions(location, state)) {
-    choices.push({ id: `use:location.${location.id}.${action.label}`, kind: 'action', label: localizer.actionLabel('location', location.id, action.label), detail: localizer.title('location', location.id) });
+    const slug = actionAddress(action);
+    choices.push({ id: useChoiceId({ kind: 'use', obj: 'location', objId: location.id, actionId: slug }), kind: 'action', label: localizer.actionLabel('location', location.id, slug), detail: localizer.title('location', location.id) });
   }
 
   // Item actions are offered per item the player has, however the copies are
@@ -246,7 +249,8 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     const item = registry.items.get(itemId);
     if (!item) continue;
     for (const action of availableActions(item, state)) {
-      choices.push({ id: `use:item.${itemId}.${action.label}`, kind: 'action', label: localizer.actionLabel('item', itemId, action.label), detail: localizer.title('item', itemId) });
+      const slug = actionAddress(action);
+      choices.push({ id: useChoiceId({ kind: 'use', obj: 'item', objId: itemId, actionId: slug }), kind: 'action', label: localizer.actionLabel('item', itemId, slug), detail: localizer.title('item', itemId) });
     }
   }
 
@@ -316,12 +320,9 @@ export function choiceToDirective(choice: PlayChoice): Directive {
     case 'action': {
       const fight = /^fight:([a-z0-9.-]+):([a-z0-9.-]+)$/.exec(choice.id);
       if (fight) return { kind: 'use-on', action: fight[1], target: fight[2] };
-      // The objId is namespaced, so it carries dots of its own; the greedy match
-      // hands the last one to the action label.
-      const match = /^use:([a-z]+)\.([a-z0-9.-]+)\.(.+)$/.exec(choice.id);
-      if (!match) throw new RuntimeError(`malformed action choice id: ${choice.id}`);
-      const [, obj, objId, actionId] = match;
-      return { kind: 'use', obj, objId, actionId };
+      const use = parseUseChoiceId(choice.id);
+      if (!use) throw new RuntimeError(`malformed action choice id: ${choice.id}`);
+      return use;
     }
     case 'travel':
       return { kind: 'travel', location: choice.id.slice('travel:'.length) };
@@ -464,21 +465,21 @@ function publishResources(state: GameState, registry: Registry): PlayStatus['res
 // A travel action is compiled per pair of places rather than declared under
 // one, so there is no owner to key its display on and the engine's own pattern
 // says it — the same one the choice that started the walk was labelled with.
-function actionUnderWay(localizer: Localizer, obj: string, objId: string, label: string): Localized {
+function actionUnderWay(localizer: Localizer, obj: string, objId: string, slug: string): Localized {
   if (obj === 'travel') return travelLabel(localizer, objId.slice(objId.indexOf(TRAVEL_PAIR) + 1));
   if (obj === 'recipe') return craftLabel(localizer, objId);
-  return localizer.actionLabel(obj, objId, label);
+  return localizer.actionLabel(obj, objId, slug);
 }
 
 function publishAction(state: GameState, registry: Registry): PlayAction | null {
   const active = state.activeAction;
   if (!active) return null;
   const { obj, objId } = parseOwnerRef(active.ownerRef);
-  const cycle = actionFirstUnit(obj, objId, active.actionLabel, registry, state);
+  const cycle = actionFirstUnit(obj, objId, active.actionSlug, registry, state);
   const clock = playerCadence(active);
   const localizer = localizerOf(registry, state);
   return {
-    label: actionUnderWay(localizer, obj, objId, active.actionLabel),
+    label: actionUnderWay(localizer, obj, objId, active.actionSlug),
     progress: cycle > 0 ? Math.min(1, Math.max(0, clock.progress / cycle)) : 1,
     attempts: clock.attemptsMade,
     targeted: Boolean(armedAction(state, registry).depletes),
@@ -559,7 +560,7 @@ export function submitModal(session: PlaySession, answers: Record<string, string
 function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'use-on' | 'travel' | 'craft' }>): string {
   switch (inner.kind) {
     case 'use':
-      return `use:${inner.obj}.${inner.objId}.${inner.actionId}`;
+      return useChoiceId(inner);
     case 'use-on':
       return `fight:${inner.action}:${inner.target}`;
     case 'travel':

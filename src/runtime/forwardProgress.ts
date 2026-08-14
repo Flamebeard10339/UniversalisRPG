@@ -3,7 +3,7 @@ import { RuntimeError } from './state';
 export type BoundarySource =
   | { kind: 'requested' }
   | { kind: 'buff'; actorId: string; source: string }
-  | { kind: 'action'; ownerRef: string; actionLabel: string }
+  | { kind: 'action'; ownerRef: string; actionSlug: string }
   | { kind: 'resource'; resourceId: string };
 
 export interface Boundary {
@@ -20,7 +20,7 @@ export function boundarySourceName(source: BoundarySource): string {
     case 'buff':
       return `buff ${source.source} on ${source.actorId}`;
     case 'action':
-      return `action ${source.ownerRef}.${source.actionLabel}`;
+      return `action ${source.ownerRef}.${source.actionSlug}`;
     case 'resource':
       return `resource ${source.resourceId}`;
   }

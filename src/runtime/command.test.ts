@@ -580,7 +580,7 @@ node greeting:
 
 # test crosses-a-modal
 load: fresh
-use: entity.mirror.look in
+use: entity.mirror.look-in
 submit-modal: name=Rowan
 submit-modal: race=elf
 `;
@@ -613,7 +613,7 @@ describe('a modal is driven by its published name and options', () => {
   it('publishes the open modal and the option it is waiting on', () => {
     const { ctx } = fixture(MODAL_MODULE);
 
-    const opened = runLine(ctx, 'use: entity.mirror.look in');
+    const opened = runLine(ctx, 'use: entity.mirror.look-in');
     expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation']);
     expect(opened.view?.modals[0].options.map((option) => option.key)).toEqual(['name', 'race']);
     expect(opened.view?.modals[0].options[0].values).toBeNull();
@@ -653,7 +653,7 @@ describe('a modal is driven by its published name and options', () => {
   it('refuses a bare line while a modal is open instead of taking it as the field being asked for', () => {
     const { ctx, session, recorder } = fixture(MODAL_MODULE);
 
-    runLine(ctx, 'use: entity.mirror.look in');
+    runLine(ctx, 'use: entity.mirror.look-in');
     // The line the old prompt would have swallowed as the name.
     expect(errors(runLine(ctx, 'Rowan'))).toEqual(['invalid choice: "Rowan"']);
     expect(statusOf(runLine(ctx, '/state')).status.location.id).toBe('camp');
@@ -661,7 +661,7 @@ describe('a modal is driven by its published name and options', () => {
     const still = sessionStatus(session);
     expect(still.player).toEqual({ name: '', race: '' });
     expect(still.modals.map((modal) => modal.name)).toEqual(['character-creation']);
-    expect(recorder.history).toEqual(['use: entity.mirror.look in']);
+    expect(recorder.history).toEqual(['use: entity.mirror.look-in']);
   });
 
   it('never takes a line as a modal field: a command after a /test that crossed a modal is still a command', () => {
@@ -679,7 +679,7 @@ describe('a modal is driven by its published name and options', () => {
   it('emits a replayable # test from a session that crossed a modal, with no hand-editing', () => {
     const { ctx } = fixture(MODAL_MODULE);
 
-    runLine(ctx, 'use: entity.mirror.look in');
+    runLine(ctx, 'use: entity.mirror.look-in');
     runLine(ctx, 'submit-modal: name=Rowan');
     const done = runLine(ctx, 'submit-modal: race=elf');
     expect(done.view?.player).toEqual({ name: 'Rowan', race: 'elf' });

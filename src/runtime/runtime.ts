@@ -49,6 +49,7 @@ import {
   targetLevel,
 } from './encounter';
 import { applyRespawns, downOne, isStanding, nextRespawn, standing } from './population';
+import { actionAddress } from '../content/action';
 import { Action, declaredId } from '../content/entity';
 import { actionKind, isTwoSided } from '../grammar/action';
 import { fireHooks } from './hooks';
@@ -186,7 +187,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): Bou
   if (expiry && expiry.at < boundary.at) boundary = { at: expiry.at, source: { kind: 'buff', actorId: expiry.actorId, source: expiry.source } };
   if (state.activeAction) {
     const active = state.activeAction;
-    const source: BoundarySource = { kind: 'action', ownerRef: active.ownerRef, actionLabel: active.actionLabel };
+    const source: BoundarySource = { kind: 'action', ownerRef: active.ownerRef, actionSlug: active.actionSlug };
     const action = armedAction(state, registry);
     if (!resolvesPerAttempt(action)) {
       const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
@@ -231,7 +232,7 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
   const { duration, abilityAmount, attemptsToResolve, outcome } = fightPlan(action, state, registry);
 
   if (active.repeating && duration <= 0) {
-    throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a rate: that reads positive`);
+    throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionSlug} resolved a non-positive duration (${duration}) — give it a positive time: or a rate: that reads positive`);
   }
 
   const player = playerCadence(active);
@@ -541,7 +542,7 @@ function joinAllies(active: ActiveAction, state: GameState, registry: Registry, 
 export function armFight(state: GameState, registry: Registry, actionId: string, action: Action, targetId: string): ActiveAction {
   const active: ActiveAction = {
     ownerRef: `action.${actionId}`,
-    actionLabel: action.label,
+    actionSlug: actionAddress(action),
     repeating: actionKind(action) === 'continuous',
     implicitTarget: IMPLICIT_TARGET_FULL,
     // First in, so the player wins a tie between cadences due at the same instant.
@@ -629,8 +630,8 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   if (!target) throw new RuntimeError(say.engine('engine.action.stale.owner', { kind: say.identifier(obj), id: say.identifier(objId) }));
 
-  const action = target.actions?.find((a) => a.label === actionId);
-  if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(JSON.stringify(actionId)), owner: say.identifier(`${obj}.${objId}`) }));
+  const action = target.actions?.find((each) => actionAddress(each) === actionId);
+  if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(actionId), owner: say.identifier(`${obj}.${objId}`) }));
   if (!requiresMet(action, state)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
   if (!actionVisible(action, state)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
@@ -647,11 +648,11 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   // First in, so the player wins a tie between cadences due at the same instant.
   const active: ActiveAction = {
     ownerRef: `${obj}.${objId}`,
-    actionLabel: actionId,
+    actionSlug: actionId,
     repeating,
     implicitTarget: IMPLICIT_TARGET_FULL,
     cadences: { [PLAYER]: newCadence() },
-    roster: { [PLAYER]: { ownerRef: `${obj}.${objId}`, actionLabel: actionId, target: objId } },
+    roster: { [PLAYER]: { ownerRef: `${obj}.${objId}`, actionSlug: actionId, target: objId } },
   };
   state.activeAction = active;
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
@@ -663,7 +664,7 @@ export function armAction(obj: string, objId: string, actionId: string, registry
 // an action already in flight.
 export function actionFirstUnit(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): number {
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-  const action = target?.actions?.find((a) => a.label === actionId);
+  const action = target?.actions?.find((each) => actionAddress(each) === actionId);
   if (!action) return 0;
   return firstUnitSpan(action, state, registry);
 }

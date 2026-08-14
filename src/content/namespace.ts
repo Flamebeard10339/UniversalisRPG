@@ -4,7 +4,21 @@ import { DslError } from '../grammar/parser';
 // are deliberately absent: a station is a contract between modules that never
 // met, and a tuning variable is a knob the engine reads by name, so `oven` and
 // `min-damage` must mean the same thing in every module that says them.
-export const NAMESPACED_KINDS: readonly string[] = ['stat', 'skill', 'item', 'entity', 'action', 'event', 'faction', 'location', 'recipe', 'resource', 'droptable', 'dialogue', 'test', 'save', 'flag', 'node', 'passive', 'cluster-jewel'];
+// One action of one object, hanging under that object the way its flags do
+// rather than standing beside it the way a `# action` declaration does. Its own
+// kind, so that shortening `uses: swing` still names the declaration and never
+// some entity's own block of that name.
+export const ACTION_MEMBER = 'action-slug';
+
+// The kinds that own one, which are the kinds a player is offered an action
+// from and so the kinds a `use:` leads with.
+export const ACTION_OWNER_KINDS = ['entity', 'location', 'item'] as const;
+
+export type ActionOwnerKind = (typeof ACTION_OWNER_KINDS)[number];
+
+export const isActionOwnerKind = (kind: string): kind is ActionOwnerKind => (ACTION_OWNER_KINDS as readonly string[]).includes(kind);
+
+export const NAMESPACED_KINDS: readonly string[] = ['stat', 'skill', 'item', 'entity', 'action', 'event', 'faction', 'location', 'recipe', 'resource', 'droptable', 'dialogue', 'test', 'save', 'flag', 'node', 'passive', 'cluster-jewel', ACTION_MEMBER];
 
 // A namespace is a prefix of segments; a module without one contributes none,
 // which is the empty case of the same rule rather than an exception to it.

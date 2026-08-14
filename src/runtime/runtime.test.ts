@@ -382,7 +382,7 @@ open:
     const state = createGameState();
     const result = armAction('entity', 'oven', 'roast', registry, state);
     expect(result).toEqual({ armed: true, firstUnit: secondsToMs(4) });
-    expect(state.activeAction).toEqual({ ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'entity.oven', actionLabel: 'roast', target: 'oven' } } });
+    expect(state.activeAction).toEqual({ ownerRef: 'entity.oven', actionSlug: 'roast', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'entity.oven', actionSlug: 'roast', target: 'oven' } } });
     expect(state.time).toBe(0);
     expect(state.inventory['roasted-chestnut'] ?? 0).toBe(0);
   });

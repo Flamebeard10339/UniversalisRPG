@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actionSlug, missingTranslations, unmatchedLocaleKeys } from './locale';
+import { actionSlug, actionSlugProblem, missingTranslations, unmatchedLocaleKeys } from './locale';
 import { loadModule, loadUniverse, type Registry } from './registry';
 import { sameValue } from './registryDiff';
 import { serializeRegistryModule } from './serialize';
@@ -130,8 +130,8 @@ describe('what a locale covers, and what it invents (c7)', () => {
   });
 });
 
-describe("an action's display key is a slug of its label (c8)", () => {
-  it('keys `pick up` as `pick-up`, and leaves the identifier the label', () => {
+describe('an action is keyed on what addresses it, not on what it says', () => {
+  it('keys an inline block on a slug of the label it is headed with', () => {
     const loaded = base();
 
     expect(loaded.locales.base.get('island.entity.crab.pick-up')).toEqual({ text: 'pick up', language: 'en' });
@@ -149,22 +149,18 @@ describe("an action's display key is a slug of its label (c8)", () => {
     expect(() => loadModule(clashing)).toThrow(/keys as pick-lock, which another action here already keys as/);
   });
 
-  // Reachable through `# action`, whose label is a free-text `title:` rather
-  // than the section key an entity's own actions are written as.
-  it('refuses a label whose slug is a field of the object that owns it', () => {
-    expect(() => loadModule('# action look\ntitle: Examine\ninstant\n')).toThrow(/already a field of the object that owns it/);
+  // Reachable through a declaration, whose address is its id rather than its
+  // `title:`. An entry label and a section id are two grammars, and this is
+  // where their product is asked whether it can be a key at all.
+  it('refuses an action whose address is a field of the object that owns it', () => {
+    expect(() => loadModule('# action examine\ninstant\nsay: hm\n')).toThrow(/keys as examine, which is already a field of the object that owns it/);
   });
 
-  // A key segment may open with a digit, so the slug rule takes every label the
-  // authoring grammar already took rather than narrowing it (pass 1, c8).
-  it('keys a label the id grammar would have refused', () => {
-    const loaded = loadModule('# action monte\ntitle: 3 Card Monte\ninstant\n');
-
-    expect(loaded.locales.base.get('action.monte.3-card-monte')).toEqual({ text: '3 Card Monte', language: 'en' });
-  });
-
-  it('refuses a label with neither a letter nor a digit in it, which keys as nothing', () => {
-    expect(() => loadModule('# action shrug\ntitle: ...\ninstant\n')).toThrow(/give it a label with a letter or a digit in it/);
+  // A key segment may open with a digit, so the rule takes every address the
+  // two grammars can produce rather than narrowing it (pass 1, c8).
+  it('takes an address opening with a digit, and refuses one that is no key at all', () => {
+    expect(actionSlugProblem('3-card-monte', '3 card monte', new Set())).toBeUndefined();
+    expect(actionSlugProblem('', '...', new Set())).toMatch(/give it a label with a letter or a digit in it/);
   });
 });
 

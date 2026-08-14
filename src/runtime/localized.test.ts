@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
+import { actionAddress } from '../content/action';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { ENGINE_KEYS } from '../content/locale';
 import { loadUniverse } from '../content/registry';
@@ -235,21 +236,22 @@ describe('the prose door asks the modules that carry prose', () => {
   });
 });
 
-// c8's proof lives in the content layer, where nothing calls the localizer, so
+// The proof lives in the content layer, where nothing calls the localizer, so
 // on two passes a mutation to the slug lookup survived that file (pass 3). The
-// property is that the display is keyed on the slug and the label stays the
-// identifier, and only a lookup can show it.
-describe('an action is displayed by its slug and identified by its label (c8)', () => {
+// property is that the display is looked up under what addresses the action,
+// and only a lookup can show it.
+describe('an action is displayed under the address it is identified by', () => {
   const DOOR = ['# info hall', 'version: 1.0.0', '', '# location porch', 'x: 0, y: 0', 'starting', 'entities:', '  door', '', '# entity door', 'pick lock:', '  instant', '  say: click'].join('\n');
   const DOOR_ES = ['# info hall-es', 'version: 1.0.0', 'dependencies:', '  hall', '', '# locale es', 'hall.entity.door.pick-lock: Forzar la cerradura'].join('\n');
 
   const registry = loadUniverse([engineLocale(), { name: 'hall', text: DOOR }, { name: 'hall-es', text: DOOR_ES }]);
 
-  it('looks the display up under the slug, not under the label', () => {
-    expect(localizerFor(registry, 'es').actionLabel('entity', 'hall.door', 'pick lock')).toBe('Forzar la cerradura');
+  it('looks the display up under the slug a use: and a # test spell', () => {
+    expect(localizerFor(registry, 'es').actionLabel('entity', 'hall.door', 'pick-lock')).toBe('Forzar la cerradura');
+    expect(actionAddress(registry.entities.get('hall.door')!.actions[0])).toBe('pick-lock');
   });
 
-  it('leaves the label the identifier a use: and a # test spell', () => {
+  it('leaves the label the display text and nothing else', () => {
     expect(registry.entities.get('hall.door')?.actions[0].label).toBe('pick lock');
   });
 });

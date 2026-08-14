@@ -1,3 +1,5 @@
+import { Action } from '../content/entity';
+import { actionAddress } from '../content/action';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { createGameState, endAction, GameState, initResources, RuntimeError } from './runtime';
 import { Registry } from '../content/registry';
@@ -12,7 +14,7 @@ import { Localized, Localizer, localizerOf } from './localized';
 import { PLAYER, templateOf } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 // A sparse diff against initialState: a new game saves as `{}`, and neither
 // `log` nor `language` is state — one is drained by reading it, the other is
@@ -135,9 +137,9 @@ function activeActionProblem(localizer: Localizer, state: GameState, registry: R
     const stale = travelEndProblem(localizer, origin ?? '', dest ?? '', registry);
     if (stale) return stale;
   }
-  const owner = findActionOwner(obj, objId, registry) as { actions?: { label: string }[] } | undefined;
+  const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   if (!owner) return localizer.engine('engine.action.stale.owner', { kind: localizer.identifier(obj), id: localizer.identifier(objId) });
-  if (!owner.actions?.some((action) => action.label === active.actionLabel)) return localizer.engine('engine.action.stale.action', { action: localizer.identifier(JSON.stringify(active.actionLabel)), owner: localizer.identifier(active.ownerRef) });
+  if (!owner.actions?.some((action) => actionAddress(action) === active.actionSlug)) return localizer.engine('engine.action.stale.action', { action: localizer.identifier(active.actionSlug), owner: localizer.identifier(active.ownerRef) });
 
   for (const actorId of Object.keys(active.actors ?? {})) if (!registry.entities.has(templateOf(actorId))) return localizer.engine('engine.action.stale.actor', { actor: localizer.identifier(actorId) });
   for (const actorId of Object.keys(active.cadences)) if (actorId !== PLAYER && !registry.entities.has(templateOf(actorId))) return localizer.engine('engine.action.stale.cadence', { actor: localizer.identifier(actorId) });
@@ -204,7 +206,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   const activeProblem = activeActionProblem(localizer, state, registry);
   if (activeProblem) {
     const active = state.activeAction!;
-    const id = `${active.ownerRef}.${active.actionLabel}`;
+    const id = `${active.ownerRef}.${active.actionSlug}`;
     endAction(state);
     addWarning(warnings, 'activeAction', id, localizer.engine('engine.prune.action', { action: named(id), reason: activeProblem }));
   }

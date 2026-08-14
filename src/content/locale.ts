@@ -184,9 +184,9 @@ export function localId(namespace: string | null, id: string): string {
   return namespace !== null && id.startsWith(`${namespace}.`) ? id.slice(namespace.length + 1) : id;
 }
 
-// An action's display key is a slug of its label, by the rule ids already
-// follow: `pick lock` keys as `pick-lock`. The identifier stays the label —
-// only the display becomes a lookup — so nothing authored moves (c8).
+// A label made into an id, by the rule ids already follow: `pick lock` becomes
+// `pick-lock`. What an action is addressed by is `actionAddress`, which reaches
+// for this only where an inline block has no id of its own.
 export function actionSlug(label: string): string {
   return label
     .toLowerCase()
@@ -196,14 +196,14 @@ export function actionSlug(label: string): string {
 
 const FIELD_NAMES: ReadonlySet<string> = new Set(Object.values(TEXT_FIELDS).flat());
 
-// A slug that the path grammar cannot address, or that collides with a field of
-// the object that owns it, is not a key — and two labels reaching one slug are
-// one key with two meanings, which is the same fault said about a pair. A key
-// segment may begin with a digit, so `3 Card Monte` addresses fine; what has no
-// key is a label with neither a letter nor a digit in it.
-export function actionSlugProblem(label: string, taken: ReadonlySet<string>): string | undefined {
-  const slug = actionSlug(label);
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return `action ${JSON.stringify(label)} has no display key: it keys as ${JSON.stringify(slug)}, so give it a label with a letter or a digit in it`;
+// An address the path grammar cannot spell, or that collides with a field of
+// the object that owns it, is neither a key nor a member — and two actions
+// reaching one address are one name with two meanings, which is the same fault
+// said about a pair. A segment may begin with a digit, so `3 Card Monte`
+// addresses fine; what has no address is a label with neither a letter nor a
+// digit in it.
+export function actionSlugProblem(slug: string, label: string, taken: ReadonlySet<string>): string | undefined {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return `action ${JSON.stringify(label)} has no address: it keys as ${JSON.stringify(slug)}, so give it a label with a letter or a digit in it`;
   if (FIELD_NAMES.has(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which is already a field of the object that owns it`;
   if (taken.has(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which another action here already keys as`;
   return undefined;

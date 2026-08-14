@@ -263,7 +263,7 @@ describe('pruneStateForRegistry', () => {
     grantBuff(state, 'ghost', wider.items.get('bread')!, 10);
     state.activeAction = {
       ownerRef: 'item.mod.gem',
-      actionLabel: 'eat',
+      actionSlug: 'eat',
       repeating: false,
       implicitTarget: IMPLICIT_TARGET_FULL,
       cadences: { [PLAYER]: { progress: 0, attemptsMade: 0 } },
@@ -504,7 +504,7 @@ describe('equipped survives a registry that no longer matches it', () => {
 });
 
 // The Deliverable's headline sentence on the one save field that was still a
-// sentence: `activeAction.actionLabel` held `Travel to <title>`, and a rename
+// sentence: `activeAction.actionSlug` held `Travel to <title>`, and a rename
 // of that title alone stopped the walk it was under.
 describe('a walk under way survives its destination being retitled', () => {
   const ISLAND = (far: string): string => ['# info isla', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'adjacent:', '  far', '', '# location far', `title: ${far}`, 'x: 30, y: 0', 'adjacent:', '  shore'].join('\n');
@@ -518,8 +518,8 @@ describe('a walk under way survives its destination being retitled', () => {
   };
 
   it('stores an id rather than the sentence a player reads', () => {
-    expect(walking().activeAction!.actionLabel).toBe(TRAVEL_LABEL);
-    expect(JSON.parse(serializeSave(walking(), loadInEnglish(ISLAND('Far Beach')))).activeAction.actionLabel).toBe(TRAVEL_LABEL);
+    expect(walking().activeAction!.actionSlug).toBe(TRAVEL_LABEL);
+    expect(JSON.parse(serializeSave(walking(), loadInEnglish(ISLAND('Far Beach')))).activeAction.actionSlug).toBe(TRAVEL_LABEL);
   });
 
   it('keeps the walk when the destination is retitled underneath it', () => {
@@ -570,8 +570,8 @@ describe('a craft under way stores an id, not the sentence it is offered as', ()
   };
 
   it('stores an id rather than the sentence a player reads', () => {
-    expect(cooking().activeAction!.actionLabel).toBe(CRAFT_LABEL);
-    expect(JSON.parse(serializeSave(cooking(), universe('pan'))).activeAction.actionLabel).toBe(CRAFT_LABEL);
+    expect(cooking().activeAction!.actionSlug).toBe(CRAFT_LABEL);
+    expect(JSON.parse(serializeSave(cooking(), universe('pan'))).activeAction.actionSlug).toBe(CRAFT_LABEL);
   });
 
   it('keeps the craft when the recipe is retitled underneath it', () => {

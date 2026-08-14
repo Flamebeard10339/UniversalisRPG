@@ -44,7 +44,7 @@ describe('session', () => {
     expect(v.location.id).toBe('tutorial-island.guide-house');
     expect(v.said).toEqual([]);
     expect(ids(v)).toContain('talk:tutorial-island.miki');
-    expect(ids(v)).not.toContain('use:entity.tutorial-island.front-door.pick lock');
+    expect(ids(v)).not.toContain('use:entity.tutorial-island.front-door.pick-lock');
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual(['dialogue']);
@@ -59,7 +59,7 @@ describe('session', () => {
     expect(modalNames(v)).toEqual([]);
     expect(v.flags['tutorial-island.quest-given']).toBe(true);
 
-    v = apply(session, 'use:entity.tutorial-island.mirror.look in');
+    v = apply(session, 'use:entity.tutorial-island.mirror.look-in');
     expect(v.said).toContain('modal:character-creation');
     expect(v.flags['tutorial-island.mirror-done']).toBe(true);
     // A modal sits atop the world, so nothing in the room is offered until it
@@ -69,7 +69,7 @@ describe('session', () => {
     expect(modalNames(v)).toEqual(['character-creation']);
     v = submitModal(session, { race: 'elf' });
     expect(modalNames(v)).toEqual([]);
-    expect(ids(v)).not.toContain('use:entity.tutorial-island.mirror.look in');
+    expect(ids(v)).not.toContain('use:entity.tutorial-island.mirror.look-in');
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual([]);
@@ -86,14 +86,14 @@ describe('session', () => {
 
     v = apply(session, 'use:entity.tutorial-island.stairs.ascend');
     expect(v.location.id).toBe('tutorial-island.guide-house-upstairs');
-    expect(ids(v)).toContain('use:entity.tutorial-island.dresser.search drawer');
+    expect(ids(v)).toContain('use:entity.tutorial-island.dresser.search-drawer');
 
-    v = apply(session, 'use:entity.tutorial-island.dresser.search drawer');
+    v = apply(session, 'use:entity.tutorial-island.dresser.search-drawer');
     expect(v.inventory['tutorial-island.lockpick']).toBe(1);
 
     v = apply(session, 'use:entity.tutorial-island.stairs-down.descend');
     expect(v.location.id).toBe('tutorial-island.guide-house');
-    expect(ids(v)).toContain('use:entity.tutorial-island.front-door.pick lock');
+    expect(ids(v)).toContain('use:entity.tutorial-island.front-door.pick-lock');
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual([]);
@@ -158,7 +158,7 @@ describe('session', () => {
   it('throws a clear error on an unavailable or unknown choice id', () => {
     const registry = loadInEnglish(source);
     const session = startSession(registry);
-    expect(() => apply(session, 'use:entity.tutorial-island.front-door.pick lock')).toThrow();
+    expect(() => apply(session, 'use:entity.tutorial-island.front-door.pick-lock')).toThrow();
     expect(() => apply(session, 'travel:tutorial-island.beach')).toThrow();
     expect(() => apply(session, 'nonsense')).toThrow();
   });
@@ -208,7 +208,7 @@ node greeting:
     const registry = loadInEnglish(module);
     const session = startSession(registry);
 
-    let v = apply(session, 'use:entity.mirror.look in');
+    let v = apply(session, 'use:entity.mirror.look-in');
     expect(v.modals).toEqual([{ name: 'character-creation', leaving: null, options: [
       { key: 'name', label: 'Name', values: null },
       { key: 'race', label: 'Race', values: [['human', 'Human'], ['elf', 'Elf'], ['dwarf', 'Dwarf'], ['orc', 'Orc']].map(([value, shown]) => ({ value, shown })) },
@@ -535,16 +535,16 @@ node greeting:
 
 # test leaves-the-modal-open
 travel: camp
-use: entity.mirror.look in
+use: entity.mirror.look-in
 
 # test half-answers-the-modal
 travel: camp
-use: entity.mirror.look in
+use: entity.mirror.look-in
 submit-modal: name=Rowan
 
 # test answers-the-modal
 travel: camp
-use: entity.mirror.look in
+use: entity.mirror.look-in
 submit-modal: name=Rowan
 submit-modal: race=elf
 
@@ -856,7 +856,7 @@ describe('what the engine publishes', () => {
   it('still takes a place it was told about from somewhere else', () => {
     const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
-    const told = apply(session, 'use:entity.window.look through');
+    const told = apply(session, 'use:entity.window.look-through');
 
     // No road runs to it from anywhere the player has stood, so this one can
     // only have arrived by being scouted.
@@ -870,7 +870,7 @@ describe('what the engine publishes', () => {
     // Scouted through the window, so the vault is known before the hatch that
     // leads to it is: knowing a road is there and being able to walk it are two
     // different facts and the map draws both.
-    const scouted = apply(session, 'use:entity.window.look through');
+    const scouted = apply(session, 'use:entity.window.look-through');
     const opened = apply(session, 'use:entity.hatch.unlock');
 
     expect(scouted.discovered.find((place) => place.id === 'forge')?.adjacent).toEqual([
@@ -899,7 +899,7 @@ describe('what the engine publishes', () => {
     // The road itself, and the ladder that is only a way down: a staircase
     // publishes an action, so a map reading the choice's kind would miss it.
     expect(leads('travel:overlook')).toBe('overlook');
-    expect(leads('use:entity.ladder.climb down')).toBe('vault');
+    expect(leads('use:entity.ladder.climb-down')).toBe('vault');
     // The same move with a flag hung on it is not only a move, so it leads
     // nowhere as far as a map is concerned.
     expect(leads('use:entity.ladder.kick')).toBeUndefined();
@@ -1060,7 +1060,7 @@ roast:
     // The clock, not the player: modals.ts answers by replacing `state.player`
     // wholesale, so an alias could never show through it. The engine writes
     // progress into the cadence in place, which is what an alias would move.
-    const fixture = { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'entity.oven', actionLabel: 'roast', target: '' } } };
+    const fixture = { ownerRef: 'entity.oven', actionSlug: 'roast', repeating: true, implicitTarget: 1000, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'entity.oven', actionSlug: 'roast', target: '' } } };
     registry.saves.set('midbake', { version: SAVE_VERSION, diff: { activeAction: fixture } });
 
     applyDirective(session, { kind: 'load', save: 'midbake' });
@@ -1077,7 +1077,7 @@ roast:
     const session = startSession(registry);
     registry.saves.set('midfight', {
       version: SAVE_VERSION,
-      diff: { activeAction: { ownerRef: 'action.hit', actionLabel: 'hit', repeating: true, implicitTarget: 1000, cadences: {}, roster: { player: { ownerRef: 'action.hit', actionLabel: 'hit', target: 'dummy' } }, actors: { dummy: { resources: { health: 12000 }, rateRemainders: {} } } } },
+      diff: { activeAction: { ownerRef: 'action.hit', actionSlug: 'hit', repeating: true, implicitTarget: 1000, cadences: {}, roster: { player: { ownerRef: 'action.hit', actionSlug: 'hit', target: 'dummy' } }, actors: { dummy: { resources: { health: 12000 }, rateRemainders: {} } } } },
     });
 
     applyDirective(session, { kind: 'load', save: 'midfight' });
@@ -1098,7 +1098,7 @@ roast:
     // owner and the label both resolve. Only the clock is missing.
     registry.saves.set('midbake', {
       version: SAVE_VERSION,
-      diff: { activeAction: { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: {}, roster: { player: { ownerRef: 'entity.oven', actionLabel: 'roast', target: '' } } } },
+      diff: { activeAction: { ownerRef: 'entity.oven', actionSlug: 'roast', repeating: true, implicitTarget: 1000, cadences: {}, roster: { player: { ownerRef: 'entity.oven', actionSlug: 'roast', target: '' } } } },
     });
 
     applyDirective(session, { kind: 'load', save: 'midbake' });

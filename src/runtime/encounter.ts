@@ -1,6 +1,7 @@
 import { Action, isTwoSided, Sided } from '../grammar/action';
 import { attemptDuration, statValue } from './stats';
 import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
+import { actionAddress } from '../content/action';
 import { declaredId, Entity } from '../content/entity';
 import { hostile, Registry } from '../content/registry';
 import { actionVisible, findActiveAction, findActionOwner, requiresMet } from './actions';
@@ -13,13 +14,14 @@ import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
 // identity.
 export interface Seat {
   ownerRef: string;
-  actionLabel: string;
+  actionSlug: string;
   target: string;
 }
 
 export interface ActiveAction {
   ownerRef: string; // "<obj>.<objId>", e.g. "entity.oven" or "action.melee-combat"
-  actionLabel: string;
+  // What addresses the action under that owner, never the label it is shown as.
+  actionSlug: string;
   repeating: boolean;
   implicitTarget: number;
   // Insertion order breaks ties between clocks due at the same instant.
@@ -89,7 +91,7 @@ export function retaliation(state: GameState, registry: Registry, actorId: strin
 // player is offered a choice.
 export const performable = (action: Action, state: GameState): boolean => requiresMet(action, state) && actionVisible(action, state);
 
-export const seatOf = (id: string, action: Action, target: string): Seat => ({ ownerRef: `action.${id}`, actionLabel: action.label, target });
+export const seatOf = (id: string, action: Action, target: string): Seat => ({ ownerRef: `action.${id}`, actionSlug: actionAddress(action), target });
 
 // The actor's own max, not initResources' `start`, a player-lifecycle concept.
 export function enterEncounter(active: ActiveAction, actorId: string, state: GameState, registry: Registry, attackerId: string): void {
@@ -141,7 +143,7 @@ function seatedAction(seat: Seat, registry: Registry, actorId: string): Action |
     if (own) return own;
   }
   const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-  return owner?.actions?.find((each) => each.label === seat.actionLabel);
+  return owner?.actions?.find((each) => actionAddress(each) === seat.actionSlug);
 }
 
 // What the performer of the armed action actually brings: its own copy, with

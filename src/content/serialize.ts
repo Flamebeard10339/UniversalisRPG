@@ -20,7 +20,7 @@ import { Recipe } from './recipe';
 import { Registry } from './registry';
 import { Resource } from './resource';
 import { ParsedSave } from './saveSection';
-import { Test, Directive } from './test';
+import { Test, Directive, usePayload } from './test';
 import { hexKey } from './hex';
 import { ModuleInfo } from './info';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
@@ -278,7 +278,7 @@ export function printDirective(value: Directive): string {
     case 'choose':
       return `choose: ${value.text}`;
     case 'use':
-      return `use: ${value.obj}.${value.objId}.${value.actionId}`;
+      return `use: ${usePayload(value)}`;
     case 'use-on':
       return `use: ${value.action} on ${value.target}`;
     case 'travel':

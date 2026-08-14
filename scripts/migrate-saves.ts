@@ -38,9 +38,10 @@ export const noFieldMoved = (writtenFor: number): ShapeChange => ({ writtenFor, 
 // it; `git log -p` on this file is the history of every bump's shape change.
 // null is "nobody said", not "nothing moved" — migrate refuses it, and a bump
 // that moved no field says so with noFieldMoved.
-// c3: PlaneFrame.said stopped being a rendered sentence and became the key it
-// was said with. No shipped fixture carries a modal frame, so no body moves.
-export const SHAPE_CHANGE: ShapeChange | null = noFieldMoved(10);
+// c5: activeAction.actionLabel became actionSlug, holding what addresses an
+// action under its owner rather than the title it is shown under. No shipped
+// fixture carries an action under way, so no body moves.
+export const SHAPE_CHANGE: ShapeChange | null = noFieldMoved(11);
 
 export function isStaleDeclaration(change: ShapeChange | null): boolean {
   return change !== null && change.writtenFor !== SAVE_VERSION;

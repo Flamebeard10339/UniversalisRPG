@@ -57,7 +57,7 @@ describe('applyResults: the actor a result applies to', () => {
     const { registry, state } = fresh();
     state.activeAction = {
       ownerRef: 'entity.brute',
-      actionLabel: 'fight',
+      actionSlug: 'fight',
       repeating: false,
       implicitTarget: IMPLICIT_TARGET_FULL,
       cadences: { [PLAYER]: newCadence() },

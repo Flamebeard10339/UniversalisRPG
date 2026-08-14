@@ -44,7 +44,7 @@ function loaded(): Registry {
   return loadModule(MODULE);
 }
 
-const striking = (): ActiveAction => ({ ownerRef: 'entity.dummy', actionLabel: 'strike', repeating: false, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.dummy', actionLabel: 'strike', target: 'dummy' } } });
+const striking = (): ActiveAction => ({ ownerRef: 'entity.dummy', actionSlug: 'strike', repeating: false, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.dummy', actionSlug: 'strike', target: 'dummy' } } });
 
 function withStrike(): GameState {
   const state = createGameState('nowhere');
@@ -269,11 +269,11 @@ describe('a stat bonus scaled by a counter', () => {
     restorePools(state, { fury: toMilliUnits(3) });
     state.activeAction = {
       ownerRef: 'entity.ogre',
-      actionLabel: 'swing',
+      actionSlug: 'swing',
       repeating: false,
       implicitTarget: IMPLICIT_TARGET_FULL,
       cadences: { ogre: newCadence() },
-      roster: { ogre: { ownerRef: 'entity.ogre', actionLabel: 'swing', target: PLAYER } },
+      roster: { ogre: { ownerRef: 'entity.ogre', actionSlug: 'swing', target: PLAYER } },
       actors: { ogre: { resources: { fury: toMilliUnits(4) }, rateRemainders: {} } },
     };
 

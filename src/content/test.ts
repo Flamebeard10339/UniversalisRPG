@@ -49,7 +49,8 @@ export interface Test {
 
 // Factored out so `begin:` can take the same payload with the verb inline.
 const PATH = '[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*';
-const USE_PAYLOAD = `(?<obj>[a-z][a-z0-9-]*)\\.(?<objId>${PATH})\\.(?<actionId>.+)`;
+const SLUG = '[a-z0-9][a-z0-9-]*';
+const USE_PAYLOAD = `(?<obj>[a-z][a-z0-9-]*)\\.(?<objId>${PATH})\\.(?<actionId>${SLUG})`;
 const USE_ON_PAYLOAD = `(?<action>${PATH})[ \\t]+on[ \\t]+(?<target>${PATH})`;
 const TRAVEL_PAYLOAD = `(?<id>${PATH})`;
 const CRAFT_PAYLOAD = `(?<id>${PATH})`;
@@ -57,13 +58,11 @@ const CRAFT_PAYLOAD = `(?<id>${PATH})`;
 const RUN = new RegExp(`^run:[ \\t]*(?<id>${PATH})$`);
 const TALK = new RegExp(`^talk:[ \\t]*(?<id>${PATH})$`);
 const CHOOSE = /^choose:[ \t]*(?<text>.*)$/;
-const USE = new RegExp(`^use:[ \\t]*${USE_PAYLOAD}$`);
-const USE_ON = new RegExp(`^use:[ \\t]*${USE_ON_PAYLOAD}$`);
+const USE_VERB = 'use:';
+const USE = new RegExp(`^${USE_VERB}[ \\t]*${USE_PAYLOAD}$`);
+const USE_ON = new RegExp(`^${USE_VERB}[ \\t]*${USE_ON_PAYLOAD}$`);
 const TRAVEL = new RegExp(`^travel:[ \\t]*${TRAVEL_PAYLOAD}$`);
 const CRAFT = new RegExp(`^craft:[ \\t]*${CRAFT_PAYLOAD}$`);
-// The kinds an object reference names. A line whose leading segment is one of
-// these is the dotted form, whatever else it holds.
-const OBJECT_KINDS: ReadonlySet<string> = new Set(['entity', 'item', 'location', 'recipe', 'travel']);
 const BEGIN = /^begin:[ \t]*(?<verb>use|travel|craft)[ \t]+(?<rest>.+)$/;
 const BEGIN_USE = new RegExp(`^${USE_PAYLOAD}$`);
 const BEGIN_USE_ON = new RegExp(`^${USE_ON_PAYLOAD}$`);
@@ -113,6 +112,24 @@ export function isGrowthDirective(value: Directive): value is GrowthDirective {
   return (GROWTH_VERBS as string[]).includes(value.kind);
 }
 
+export type UseDirective = Extract<Directive, { kind: 'use' }>;
+
+// The one shape a `use:` payload takes, whether an author writes it as a
+// directive or the runtime offers it as a choice id: the kind, the object under
+// it, and the action's address under that. Written and read back here, so the
+// two are the same string by construction rather than by two regexes that
+// happen to agree.
+export const usePayload = (value: UseDirective): string => `${value.obj}.${value.objId}.${value.actionId}`;
+
+export function parseUsePayload(payload: string): UseDirective | null {
+  const groups = BEGIN_USE.exec(payload)?.groups;
+  return groups ? { kind: 'use', obj: groups.obj, objId: groups.objId, actionId: groups.actionId } : null;
+}
+
+export const useChoiceId = (value: UseDirective): string => `${USE_VERB}${usePayload(value)}`;
+
+export const parseUseChoiceId = (choiceId: string): UseDirective | null => (choiceId.startsWith(USE_VERB) ? parseUsePayload(choiceId.slice(USE_VERB.length)) : null);
+
 type Groups = Record<string, string | undefined>;
 
 function growth(verb: GrowthVerb, text: string, groups: Groups): GrowthDirective {
@@ -142,9 +159,9 @@ const SUBMIT_MODAL = /^submit-modal:[ \t]*(?<key>[a-z][a-z0-9-]*)=(?<value>.*)$/
 
 function parseBegin(text: string, verb: string, rest: string): Directive {
   if (verb === 'use') {
-    const m = BEGIN_USE.exec(rest)?.groups;
+    const inner = parseUsePayload(rest);
+    if (inner) return { kind: 'begin', inner };
     const on = BEGIN_USE_ON.exec(rest)?.groups;
-    if (m && (OBJECT_KINDS.has(m.obj) || !on)) return { kind: 'begin', inner: { kind: 'use', obj: m.obj, objId: m.objId, actionId: m.actionId } };
     if (!on) throw new DslError(`malformed begin: use payload (expected obj.objId.actionId, or <action> on <target>): ${text}`);
     return { kind: 'begin', inner: { kind: 'use-on', action: on.action, target: on.target } };
   }
@@ -172,13 +189,11 @@ export function parseDirectiveLine(text: string): Directive | null {
   const choose = CHOOSE.exec(text)?.groups;
   if (choose) return { kind: 'choose', text: choose.text };
 
-  // Both readings can match one line — an action LABEL may hold the word "on",
-  // and an action ID may hold dots. What decides is the leading segment: only
-  // the dotted form names an object kind there, so `entity.mirror.look on
-  // shelf` is one-sided and `orc-pack.swing on rat` is two-sided.
+  // The two readings are disjoint rather than ranked: an action is addressed by
+  // a slug, which holds no space, and the two-sided form is spelled with one.
   const use = USE.exec(text)?.groups;
+  if (use) return { kind: 'use', obj: use.obj, objId: use.objId, actionId: use.actionId };
   const useOn = USE_ON.exec(text)?.groups;
-  if (use && (OBJECT_KINDS.has(use.obj) || !useOn)) return { kind: 'use', obj: use.obj, objId: use.objId, actionId: use.actionId };
   if (useOn) return { kind: 'use-on', action: useOn.action, target: useOn.target };
 
   const travel = TRAVEL.exec(text)?.groups;

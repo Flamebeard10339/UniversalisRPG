@@ -17,7 +17,7 @@ import { LAYERS, OPENING, toLayer } from './nav';
 // is drawn wants: no timer, and the same frame however long the test takes.
 const noTicks: Ticker = () => () => undefined;
 
-const ROAST = 'use:entity.tutorial-island.oven.roast chestnuts';
+const ROAST = 'use:entity.tutorial-island.oven.roast-chestnuts';
 const TALK = 'talk:tutorial-island.miki';
 
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'", '&#39;': "'" };
@@ -207,7 +207,7 @@ const SURVEYED = {
   ].join('\n'),
 };
 
-const LOOK_OUT = 'use:entity.surveyed.window.look out';
+const LOOK_OUT = 'use:entity.surveyed.window.look-out';
 
 describe('what the shell puts on the screen', () => {
   // The engine's own words are gathered as it publishes them, so this is a
@@ -237,7 +237,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, ROAST));
     step();
     driver.cancel();
-    driver.choose(position(driver, 'use:entity.tutorial-island.mirror.look in'));
+    driver.choose(position(driver, 'use:entity.tutorial-island.mirror.look-in'));
     step();
 
     // A shell that rendered nothing would satisfy every line above.

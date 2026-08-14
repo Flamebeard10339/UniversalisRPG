@@ -1,13 +1,25 @@
 import { Action, actionBody, actionProblem, assembledActionProblem } from '../grammar/action';
+import { actionSlug } from './locale';
+import { declaredId } from './entity';
 import { DslError } from '../grammar/parser';
+import { humanizeEn, lastSegment } from '../grammar/values';
 import { RawSection } from '../grammar/structure';
-import { humanizeEn } from '../grammar/values';
 
 // An action written once and named by everything that performs it. Its `label`
 // is its title, which is what an inline action's label already is, so both forms
 // hold the same shape and nothing downstream asks which one it came from.
 export interface ActionDeclaration extends Action {
   id: string;
+}
+
+// What an action is addressed by, everywhere one is named: under its owner in
+// the namespace, in a `use:`, in a choice id and in a save. A declaration is
+// addressed by the id it was written under, so its `title:` is display and
+// moves freely; an inline block has no id but the label it is headed with, so a
+// slug of that label is the only address there is.
+export function actionAddress(action: Action): string {
+  const id = declaredId(action);
+  return id === undefined ? actionSlug(action.label) : lastSegment(id);
 }
 
 const TITLE = /^title:[ \t]*/;

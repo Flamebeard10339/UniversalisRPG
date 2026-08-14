@@ -1,6 +1,7 @@
 import { ActionResult } from '../grammar/actionResult';
 import { evaluateCondition } from './conditions';
 import { Action } from '../content/entity';
+import { actionAddress } from '../content/action';
 import { Location } from '../content/location';
 import { Registry } from '../content/registry';
 import type { ActiveAction } from './encounter';
@@ -77,8 +78,8 @@ export function findActiveAction(active: ActiveAction, registry: Registry): Acti
   const { obj, objId } = parseOwnerRef(active.ownerRef);
   const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   if (!owner) throw new RuntimeError(say.engine('engine.action.stale.owner', { kind: say.identifier(obj), id: say.identifier(objId) }));
-  const action = owner.actions?.find((a) => a.label === active.actionLabel);
-  if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(JSON.stringify(active.actionLabel)), owner: say.identifier(active.ownerRef) }));
+  const action = owner.actions?.find((each) => actionAddress(each) === active.actionSlug);
+  if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(active.actionSlug), owner: say.identifier(active.ownerRef) }));
   return action;
 }
 

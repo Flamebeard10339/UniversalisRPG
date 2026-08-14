@@ -6,11 +6,13 @@ import { Directive } from './test';
 import { Ally, EntityBlock, isHandlerBlock } from './entity';
 import { Edge, Population, Relative } from './location';
 import { isFieldEdits, listMembers } from '../grammar/section';
+import { ACTION_MEMBER, isActionOwnerKind } from './namespace';
+import { lastSegment } from '../grammar/values';
 import { mayBeInstanceId } from './instanceId';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
-export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'action' | 'event' | 'faction' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node' | 'passive' | 'cluster-jewel';
+export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'action' | 'event' | 'faction' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node' | 'passive' | 'cluster-jewel' | typeof ACTION_MEMBER;
 
 // Returns what the id should become. Resolution rewrites it into a namespaced
 // key; validation hands it back and throws if it names nothing.
@@ -231,10 +233,15 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'begin':
       visitDirective(value.inner, `${where} begin:`, visit);
       return;
-    case 'use':
-      // `obj` names the kind, so the object it addresses is resolved as one.
-      if (value.obj === 'entity' || value.obj === 'location' || value.obj === 'item') put(value, 'objId', value.obj, `${where} use:`, visit);
+    case 'use': {
+      // `obj` names the kind, so the object it addresses is resolved as one,
+      // and the action after it is that object's member — resolved second,
+      // because the key it hangs under is the one the object settled on.
+      if (!isActionOwnerKind(value.obj)) return;
+      put(value, 'objId', value.obj, `${where} use:`, visit);
+      value.actionId = lastSegment(visit(ACTION_MEMBER, `${value.objId}.${value.actionId}`, `${where} use:`));
       return;
+    }
     case 'use-on':
       put(value, 'action', 'action', `${where} use:`, visit);
       put(value, 'target', 'entity', `${where} use: on`, visit);

@@ -31,7 +31,7 @@ const WORKSHOP = {
   ].join('\n'),
 };
 
-const SPINDLE = 'use:entity.workshop.lathe.turn a spindle';
+const SPINDLE = 'use:entity.workshop.lathe.turn-a-spindle';
 
 // A ticker a test drives by hand, so elapsed milliseconds arrive on demand
 // rather than whenever a real timer got around to it.
@@ -105,7 +105,7 @@ describe('the GUI driver', () => {
     driver.choose(position(driver, 'talk:tutorial-island.miki'));
     const menu = shown(driver).modals[0].options[0];
     driver.answer(menu.key, menu.values![0].value);
-    driver.choose(position(driver, 'use:entity.tutorial-island.mirror.look in'));
+    driver.choose(position(driver, 'use:entity.tutorial-island.mirror.look-in'));
 
     const name = shown(driver).modals[0].options[0];
     driver.answer(name.key, 'Sir Robin');
