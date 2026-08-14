@@ -3,9 +3,9 @@ import { DISCOVERED, Location } from '../content/location';
 import {
   actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { endJourney } from './state';
-import { allocate, carriedItems, feedItem, Growth, grownItems, itemTemplate, slotJewel } from './itemInstance';
-import { planeReports, type PlaneReport } from './planeReport';
-import { applyClusterEffect } from './clusterEffect';
+import { itemCopies, Growth, grownItems } from './itemInstance';
+import { grow } from './growth';
+import { planeReports, type PlaneFocus, type PlaneReport } from './planeReport';
 import { parseOwnerRef } from './actions';
 import { spreadDiscovery } from './effects';
 import { reachable, type Journey } from './journey';
@@ -14,16 +14,17 @@ import { declaredId } from '../content/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
-import { answerModal, dialogueFrame, Modal, openModal, pruneModals, publishModal, topModal } from './modals';
+import { answerModal, dialogueFrame, Modal, modalFocus, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { carriedEntries, type CarriedEntry } from './carriedScreen';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
 import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
-import { Directive, GrowthDirective } from '../content/test';
+import { Directive } from '../content/test';
 import { printDirective } from '../content/serialize';
 import { humanize } from '../grammar/values';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 
-export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'equip' | 'unequip';
+export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft';
 
 export interface PlayChoice {
   id: string;
@@ -63,14 +64,25 @@ export interface PlayStatus {
   // Bottom of the stack first, so the last one is the one being answered.
   modals: Modal[];
   inventory: Record<string, number>;
-  // Grown copies the player carries, by the instance id each is named by. They
-  // are counted nowhere in `inventory`, so a surface listing what the player has
-  // reads both records.
+  // Grown copies the player has, carried or worn, by the instance id each is
+  // named by. They are counted nowhere in `inventory`, so a surface listing what
+  // the player has reads both records.
   grown: Record<string, string>;
-  // One per grown copy, in the order `grown` names them: the plane behind the
+  // Every row a page draws, on either side of c21: named once below every
+  // screen, counted, and each under the id a verb addresses it by, so a surface
+  // states the engine's answer rather than reading a dictionary's keys as names
+  // (c16, c18). A row worn in a slot names it; a row without one is carried, and
+  // a page that lists one side filters on that rather than on a second record.
+  carried: CarriedEntry[];
+  // One per plane the player carries, grown copies first in the order `grown`
+  // names them and then the bases still in their stacks: the plane behind the
   // id, already scaled, for a surface that shows one rather than a stat it
   // arrived in.
   planes: PlaneReport[];
+  // Which of those planes is in hand and where on it, or null when none is. It
+  // names a plane rather than carrying one, so a surface draws it by looking the
+  // id up in `planes` and never by recognising the screen that holds it.
+  focus: PlaneFocus | null;
   equipment: Record<string, string>;
   xp: Record<string, number>;
   stats: Record<string, number>;
@@ -212,32 +224,19 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     choices.push({ id: `use:location.${location.id}.${action.label}`, kind: 'action', label: action.label, detail: location.title });
   }
 
-  // Item actions are offered per item the player carries, however the copies are
-  // spelled; equipping is offered per copy, and a stack the player has emptied
-  // by growing its last copy is not one of them.
-  for (const [itemId, { stack }] of carriedItems(state)) {
+  // Item actions are offered per item the player has, however the copies are
+  // spelled and whichever side of c21 they are on — wearing a thing is not a way
+  // to stop being able to use it. Wearing and taking off are not among them:
+  // they are what a copy takes rather than what it does, and the carried-items
+  // screen is where a copy is named and its verbs taken, so a room offering them
+  // as well would put the same act in two places and scope to a location what an
+  // item is not scoped by.
+  for (const [itemId] of itemCopies(state)) {
     const item = registry.items.get(itemId);
     if (!item) continue;
     for (const action of availableActions(item, state)) {
       choices.push({ id: `use:item.${itemId}.${action.label}`, kind: 'action', label: action.label, detail: item.title });
     }
-    if (item.slot && stack > 0 && state.equipped[item.slot] !== itemId) {
-      choices.push({ id: `equip:${itemId}`, kind: 'equip', label: `Equip ${item.title}`, detail: item.slot });
-    }
-  }
-
-  // A grown copy is named by its instance id in the choice as well as in the
-  // slot, because a player holding both it and its stack has to be able to say
-  // which one they mean.
-  for (const [grownId, template] of Object.entries(grownItems(state))) {
-    const item = registry.items.get(template);
-    if (!item?.slot || state.equipped[item.slot] === grownId) continue;
-    choices.push({ id: `equip:${grownId}`, kind: 'equip', label: `Equip ${item.title} #${grownId}`, detail: item.slot });
-  }
-
-  for (const [slot, wornId] of Object.entries(state.equipped)) {
-    const item = registry.items.get(itemTemplate(state, wornId));
-    choices.push({ id: `unequip:${slot}`, kind: 'unequip', label: `Unequip ${item?.title ?? slot}`, detail: slot });
   }
 
     // TODO(inventory-crafting): stationless recipes clutter the room list. See backlog.
@@ -307,10 +306,6 @@ export function choiceToDirective(choice: PlayChoice): Directive {
       return { kind: 'travel', location: choice.id.slice('travel:'.length) };
     case 'craft':
       return { kind: 'craft', recipe: choice.id.slice('craft:'.length) };
-    case 'equip':
-      return { kind: 'equip', item: choice.id.slice('equip:'.length) };
-    case 'unequip':
-      return { kind: 'unequip', slot: choice.id.slice('unequip:'.length) };
   }
 }
 
@@ -386,9 +381,11 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     resources: publishResources(state, registry),
     encounter: encounterView(state, registry),
     modals: state.modals.map((frame) => publishModal(frame, state, registry)),
-    inventory: Object.fromEntries([...carriedItems(state)].flatMap(([id, { stack }]) => (stack > 0 ? [[id, stack] as const] : []))),
+    inventory: Object.fromEntries([...itemCopies(state)].flatMap(([id, { stack }]) => (stack > 0 ? [[id, stack] as const] : []))),
     grown: grownItems(state),
+    carried: carriedEntries(state, registry),
     planes: planeReports(registry, state),
+    focus: modalFocus(state),
     equipment: { ...state.equipped },
     xp: { ...state.xp },
     stats: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, statValue(stat.id, state, registry)])),
@@ -398,6 +395,12 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     player: { ...state.player },
     action: publishAction(state, registry),
   };
+}
+
+// What the inventory screen lists, for a driver that holds an id and needs the
+// value that screen publishes it as.
+export function carriedListing(session: PlaySession): CarriedEntry[] {
+  return carriedEntries(stateOf(session), session.registry);
 }
 
 // The map, as far as the player has found it. Adjacency is kept to places that
@@ -560,6 +563,9 @@ function performDirective(session: PlaySession, directive: Directive): { failure
       answerModal(state, registry, { choice: directive.text });
       return {};
     }
+    case 'open-modal':
+      openModalNamed(state, directive.modal);
+      return {};
     case 'submit-modal':
       answerModal(state, registry, { [directive.key]: directive.value });
       return {};
@@ -623,22 +629,6 @@ function performDirective(session: PlaySession, directive: Directive): { failure
       grew(state, growth);
       return growth.ok ? { failure: `${printDirective(directive.inner)} was not refused` } : {};
     }
-  }
-}
-
-// Every rule and every refusal is inside these four; what is here is which one
-// the verb names and what it is handed, and a check appearing beside it would
-// be a check the plane could not enforce for a caller that is not a directive.
-function grow(state: GameState, registry: Registry, directive: GrowthDirective): Growth {
-  switch (directive.kind) {
-    case 'feed':
-      return feedItem(state, registry, directive.target, directive.food);
-    case 'slot':
-      return slotJewel(state, registry, directive.target, directive.jewel, directive.hex, directive.direction);
-    case 'allocate':
-      return allocate(state, registry, directive.target, directive.node);
-    case 'apply':
-      return applyClusterEffect(state, registry, directive.target, directive.effect, directive.hex);
   }
 }
 

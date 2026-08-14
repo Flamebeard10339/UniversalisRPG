@@ -15,7 +15,9 @@ function viewAt(id: string, said: string[] = [], description = ''): PlayView {
     journey: null,
     inventory: {},
     grown: {},
+    carried: [],
     planes: [],
+    focus: null,
     equipment: {},
     xp: {},
     stats: {},
@@ -74,7 +76,6 @@ describe('the narration column', () => {
     const before = emptyTranscript();
     const after = appendOutputs(before, [
       { kind: 'status', status: viewAt('hall') },
-      { kind: 'inventory', status: viewAt('hall') },
       { kind: 'choices', choices: [] },
     ]);
 

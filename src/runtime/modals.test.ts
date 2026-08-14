@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule, Registry } from '../content/registry';
-import { answerModal, dialogueFrame, Modal, ModalFrame, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { answerModal, dialogueFrame, isModalFrame, Modal, ModalFrame, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { SAVE_VERSION } from './save';
 import { choose, createGameState, DialogueCursor, GameState, RuntimeError, talk } from './runtime';
 import { applyResultsNow } from './effects';
 import { apply, applyDirective, PlaySession, PlayStatus, startSession, submitModal, view } from './session';
@@ -150,6 +151,31 @@ node greeting:
   -> Speak. (when not secret)
 `;
 
+// A menu choice the engine can only refuse once it is taken: a screen name
+// nothing defines loads, because only the layer that raises one knows which
+// names there are. Answering it is the shortest route to a submit that throws.
+const THROWING_CHOICE_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  sage
+
+# flag greeted
+
+# entity sage
+title: Sage
+
+# dialogue sage-talk
+owner = sage
+
+node greeting:
+  when: not greeted
+  -> Ask about the mirror.
+    open modal: no-such-screen
+  -> Say nothing.
+`;
+
 function stackingSession(): PlaySession {
   return startSession(loadModule(STACKING_MODULE));
 }
@@ -193,7 +219,7 @@ describe('the modal stack', () => {
     const session = stackingSession();
     const published: Modal = apply(session, 'talk:sage').modals[0];
 
-    expect(Object.keys(published).sort()).toEqual(['name', 'options']);
+    expect(Object.keys(published).sort()).toEqual(['leaving', 'name', 'options']);
     for (const option of published.options) expect(Object.keys(option).sort()).toEqual(['key', 'label', 'values']);
   });
 
@@ -271,6 +297,19 @@ describe('opening and answering', () => {
     expect(() => answerModal(state, registry, { name: 'Rowan', race: 'Wyvern' })).toThrow(/has no race that takes "Wyvern"/);
     expect(topModal(state)?.answers).toEqual({});
     expect(publishModal(topModal(state)!, state, registry).options.map((option) => option.key)).toEqual(['name', 'race']);
+  });
+
+  // c7: a refusal reaches the player where they are. The frame is popped before
+  // submit runs so that what an answer opens stacks on what is left, which
+  // leaves a throw out of submit with nothing between it and an empty world.
+  it('puts the frame back when acting on the answer throws, rather than leaving the screen popped and gone', () => {
+    const module = loadModule(THROWING_CHOICE_MODULE);
+    const state = talking(module);
+
+    expect(() => answerModal(state, module, { choice: 'Ask about the mirror.' })).toThrow(/unknown modal: no-such-screen/);
+    expect(names(state)).toEqual(['dialogue']);
+    expect(topModal(state)?.answers).toEqual({});
+    expect(publishModal(topModal(state)!, state, module).options[0].values).toEqual(['Ask about the mirror.', 'Say nothing.']);
   });
 
   it('stacks a second dialogue rather than dropping it after its effects have already run', () => {
@@ -414,5 +453,317 @@ describe('opening and answering', () => {
     expect(() => applyDirective(session, { kind: 'choose', text: 'Say nothing.' })).toThrow(/choose with no active dialogue/);
     // Nothing was taken as an answer, so both options are still being asked for.
     expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['name', 'race']);
+  });
+});
+
+const CARRIED_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# item rope
+title: Rope
+
+# save coiled
+{"version":${SAVE_VERSION},"inventory":{"rope":1}}
+`;
+
+// c2: the screen is a member of the closed union, so what proves it is a modal
+// at all is the machinery `first-class-modals` already ships driving it.
+describe('the carried-items screen, as a frame like any other', () => {
+  it('is raised by name, and raising it again raises no second screen', () => {
+    const session = startSession(loadModule(CARRIED_MODULE));
+
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+
+    expect(modalNames(view(session))).toEqual(['carried-items']);
+  });
+
+  it('refuses a screen no definition knows, wherever the name came from', () => {
+    const session = startSession(loadModule(CARRIED_MODULE));
+
+    expect(() => applyDirective(session, { kind: 'open-modal', modal: 'carried' })).toThrow(/unknown modal: carried/);
+    expect(view(session).modals).toEqual([]);
+  });
+
+  // c15: a screen listing nothing still publishes the answer that takes it down,
+  // so empty hands are not a screen the player can be left standing on.
+  it('is answerable with nothing to list', () => {
+    const session = startSession(loadModule(CARRIED_MODULE));
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+
+    expect(view(session).modals[0].options).toEqual([{ key: 'item', label: 'Item', values: ['Close'] }]);
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Close' });
+    expect(view(session).modals).toEqual([]);
+  });
+
+  it('survives a load half-answered, and closes when its answer names what the player has stopped carrying', () => {
+    const registry = loadModule(CARRIED_MODULE);
+    const half = (): GameState => {
+      const state = createGameState('camp');
+      (state.modals as ModalFrame[]).push({ name: 'carried-items', answers: { item: 'Rope x1' } });
+      return state;
+    };
+
+    const carrying = half();
+    carrying.inventory.rope = 1;
+    expect(pruneModals(carrying, registry)).toEqual([]);
+    expect(names(carrying)).toEqual(['carried-items']);
+
+    const empty = half();
+    expect(pruneModals(empty, registry)).toEqual([{ name: 'carried-items', reason: 'it has no item that takes "Rope x1"' }]);
+    expect(empty.modals).toEqual([]);
+  });
+
+  // A frame is either answerable or gone. An answer can retract the question the
+  // one before it raised — pointing a standing destruction at a stack copy, which
+  // needs no confirming — so what is left to ask is read off the frame as it now
+  // stands. Read off the list the answer was weighed against, the frame is left
+  // with every option answered: it publishes nothing, no gesture can take it
+  // down (c15), and the next load deletes it without a word.
+  it('leaves no screen with nothing to publish when an answer retracts the question under it', () => {
+    const session = startSession(loadModule(GROWING_MODULE));
+    applyDirective(session, { kind: 'load', save: 'stocked' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    submitModal(session, { item: 'Blade x1' });
+    submitModal(session, { verb: 'Grow' });
+    submitModal(session, { plane: 'feed: with Whetstone' });
+    submitModal(session, { plane: 'Back to inventory' });
+
+    expect(submitModal(session, { verb: 'Destroy' }).modals[0].options.map((option) => option.key)).toEqual(['confirm']);
+
+    const answered = submitModal(session, { item: 'Rope x1' });
+    expect(answered.modals).toEqual([]);
+    expect(answered.inventory.rope).toBeUndefined();
+  });
+});
+
+// A base that can actually be grown and a second thing to carry, which is the
+// smallest world a confirmation can be raised in and then pointed elsewhere.
+const GROWING_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# cluster-jewel core
+shape: point
+open-connections: e
+
+# item blade
+title: Blade
+slot: mainhand
+max-level: 10
+origin-cluster: core
+
+# item rope
+title: Rope
+
+# item whetstone
+title: Whetstone
+item-experience: 1000
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"blade":1,"rope":1,"whetstone":1}}
+`;
+
+const PLANE_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# cluster-jewel core
+shape: point
+open-connections: e
+
+# item blade
+title: Blade
+slot: mainhand
+max-level: 1
+origin-cluster: core
+
+# item whetstone
+title: Whetstone
+item-experience: 1000
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"blade":1,"whetstone":1}}
+`;
+
+// The inventory screen, with the copy already chosen, which is the one route
+// onto a plane screen there is.
+function openOnBlade(): PlaySession {
+  const session = startSession(loadModule(PLANE_MODULE));
+  applyDirective(session, { kind: 'load', save: 'stocked' });
+  applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+  applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Blade x1' });
+  return session;
+}
+
+describe('the plane screen, as a frame like any other', () => {
+  // c3: the screen replaces the one it was opened from rather than stacking a
+  // second one, and leaving it puts that one back with the copy still chosen.
+  // `submit` returning a frame is the whole mechanism; nothing else is built.
+  it('replaces the inventory frame, and returns one with that copy still selected', () => {
+    const session = openOnBlade();
+
+    expect(modalNames(view(session))).toEqual(['carried-items']);
+    submitModal(session, { verb: 'Grow' });
+    expect(modalNames(view(session))).toEqual(['item-plane']);
+
+    submitModal(session, { plane: 'Back to inventory' });
+    expect(modalNames(view(session))).toEqual(['carried-items']);
+    expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['verb']);
+  });
+
+  // c7: the refusal reaches the player on the screen they are looking at. The
+  // line grew() puts in the log is the directive path's and stays there; a
+  // player who had to scroll under the screen to find out would not be told.
+  it('states a refused growth on the screen it was refused on, and puts nothing under it', () => {
+    const session = openOnBlade();
+    submitModal(session, { verb: 'Grow' });
+    expect(view(session).modals[0].options[0].values).toContain('feed: with Whetstone');
+
+    const refused = submitModal(session, { plane: 'feed: with Whetstone' });
+    expect(modalNames(refused)).toEqual(['item-plane']);
+    expect(refused.modals[0].options[0].label).toBe('Blade at 0,0 — Blade is already at level 1, which is its maximum');
+    expect(refused.said).toEqual([]);
+    expect(refused.inventory).toEqual({ blade: 1, whetstone: 1 });
+  });
+
+  it('is not a screen a name alone can raise, because a name cannot say which copy', () => {
+    const session = startSession(loadModule(PLANE_MODULE));
+
+    expect(() => applyDirective(session, { kind: 'open-modal', modal: 'item-plane' })).toThrow(/not opened by name/);
+    expect(view(session).modals).toEqual([]);
+  });
+
+  it('tells two plane screens apart by the copy and the hexagon each holds', () => {
+    const state = createGameState('camp');
+
+    openModal(state, { name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' });
+    openModal(state, { name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' });
+    expect(state.modals).toHaveLength(1);
+
+    openModal(state, { name: 'item-plane', answers: {}, target: 'blade', hex: '1,0' });
+    openModal(state, { name: 'item-plane', answers: {}, target: 'other', hex: '0,0' });
+    expect(state.modals).toHaveLength(3);
+  });
+
+  it('closes a saved frame whose copy or hexagon the world no longer has', () => {
+    const registry = loadModule(PLANE_MODULE);
+    for (const [frame, reason] of [
+      [{ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' }, 'it grows blade, which the player no longer carries'],
+      [{ name: 'item-plane', answers: {}, target: 'rope', hex: '0,0' }, 'it grows rope, which the player no longer carries'],
+    ] as const) {
+      const state = createGameState('camp');
+      (state.modals as ModalFrame[]).push(frame);
+
+      expect(pruneModals(state, registry), JSON.stringify(frame)).toEqual([{ name: 'item-plane', reason }]);
+      expect(state.modals).toEqual([]);
+    }
+  });
+
+  it('keeps a saved frame whose copy is still carried', () => {
+    const registry = loadModule(PLANE_MODULE);
+    const state = createGameState('camp');
+    state.inventory.blade = 1;
+    (state.modals as ModalFrame[]).push({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' });
+
+    expect(pruneModals(state, registry)).toEqual([]);
+    expect(names(state)).toEqual(['item-plane']);
+  });
+
+  // c10: what the screen shows beyond its options leaves as ordinary published
+  // data — the plane among the ones the view already publishes, and where on it
+  // — so a driver draws it without ever asking which screen is up. A base still
+  // in its stack is a plane the screen can be opened on, so it is among them.
+  it('publishes which plane is in hand as a focus into the planes the view already publishes', () => {
+    const session = openOnBlade();
+    submitModal(session, { verb: 'Grow' });
+
+    const shown = view(session);
+    expect(shown.focus).toEqual({ instance: 'blade', hex: '0,0' });
+    expect(shown.planes.map((plane) => plane.instance)).toContain('blade');
+  });
+
+  it('publishes no focus for a screen that has no plane in hand, nor for none at all', () => {
+    const session = openOnBlade();
+    expect(view(session).focus).toBeNull();
+
+    submitModal(session, { verb: 'Grow' });
+    submitModal(session, { plane: 'Back to inventory' });
+    expect(view(session).focus).toBeNull();
+  });
+
+  // The screen the player is answering is the top one, so a plane covered by
+  // another screen is not what is in hand.
+  it('publishes no focus while another screen covers the plane', () => {
+    const session = openOnBlade();
+    submitModal(session, { verb: 'Grow' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+
+    expect(modalNames(view(session))).toEqual(['item-plane', 'carried-items']);
+    expect(view(session).focus).toBeNull();
+  });
+
+  it('refuses a saved body that is not a plane frame', () => {
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' })).toBe(true);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0', said: 'no' })).toBe(true);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade' })).toBe(false);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, hex: '0,0' })).toBe(false);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: 7 })).toBe(false);
+    expect(isModalFrame({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0', said: 7 })).toBe(false);
+  });
+});
+
+// c15 as a published word rather than a rule each screen keeps to itself: what
+// leaves a screen has to be readable off the screen, or a driver offering the
+// way out is a driver holding a table of which screen leaves by which word.
+describe('the value a screen leaves by', () => {
+  // The invariant that makes it answerable at all: every question the screen is
+  // still asking lists it, so whichever one the player is on, the way out is one
+  // of the answers to that one.
+  const leaves = (status: PlayStatus): { leaving: string | null; listed: boolean } => {
+    const modal = status.modals[status.modals.length - 1];
+    return { leaving: modal.leaving, listed: modal.options.every((option) => option.values?.includes(modal.leaving ?? '') ?? false) };
+  };
+
+  it('is listed on every question the inventory asks, and takes it down from any of them', () => {
+    const session = startSession(loadModule(CARRIED_MODULE));
+    applyDirective(session, { kind: 'load', save: 'coiled' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+
+    expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['item']);
+    expect(leaves(view(session))).toEqual({ leaving: 'Close', listed: true });
+
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'Rope x1' });
+    expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['verb']);
+    expect(leaves(view(session))).toEqual({ leaving: 'Close', listed: true });
+
+    applyDirective(session, { kind: 'submit-modal', key: 'verb', value: 'Close' });
+    expect(view(session).modals).toEqual([]);
+  });
+
+  it('is the word the plane screen leaves by, and goes back rather than closing the world', () => {
+    const session = openOnBlade();
+    submitModal(session, { verb: 'Grow' });
+
+    expect(leaves(view(session))).toEqual({ leaving: 'Back to inventory', listed: true });
+
+    submitModal(session, { plane: view(session).modals[0].leaving! });
+    expect(modalNames(view(session))).toEqual(['carried-items']);
+  });
+
+  // The other half of c19: a screen no answer leaves publishes nothing for a way
+  // out to say, so there is nothing a gesture could answer on its behalf.
+  it('is nothing for a screen answering cannot leave', () => {
+    const session = stackingSession();
+    const opened = apply(session, 'talk:sage');
+
+    expect(opened.modals.map((modal) => [modal.name, modal.leaving])).toEqual([
+      ['character-creation', null],
+      ['dialogue', null],
+    ]);
   });
 });

@@ -3,6 +3,7 @@ import { loadModule } from '../content/registry';
 import { Direction } from '../content/hex';
 import { applyClusterEffect } from './clusterEffect';
 import { ORIGIN } from './clusterPlane';
+import { equip } from './equipment';
 import { allocate, feedItem, Growth, slotJewel } from './itemInstance';
 import { ClusterReport, PlaneReport, planeReport, planeReports, PositionReport, SlotReport } from './planeReport';
 import { initialState } from './save';
@@ -118,6 +119,16 @@ describe('planeReport', () => {
     expect(plane).toMatchObject({ instance: '1', template: 'blade', title: 'Blade', level: 3, maxLevel: 20, spent: 0, remaining: 3 });
   });
 
+  // c16: the report carries the name every screen holding this plane spells, so
+  // a surface never works out from `instance` and `template` what to call it.
+  it('names a grown copy under the descriptor and a base still in its stack by its title', () => {
+    const state = initialState(registry);
+    Object.assign(state.inventory, { blade: 1 });
+
+    expect(planeReport(registry, state, 'blade')?.name).toBe('Blade');
+    expect(report(fed('blade', 3)).name).toBe('Modified Blade');
+  });
+
   it('names an origin cluster with no entry and a slotted one by the slot it came through', () => {
     const plane = report(hub({ 'junction-jewel': 1 }, [['ne', 'junction-jewel']]));
     expect(clusterAt(plane, '0,0')).toMatchObject({ jewel: 'junction', shape: 'point', entry: null });
@@ -191,15 +202,101 @@ describe('planeReport', () => {
     expect(planeReport(registry, fed('blade', 1), '9')).toBeUndefined();
   });
 
-  it('reports one plane per grown copy, in the order they were grown', () => {
+  // A growth verb spells its target either way a base is carried, so the report
+  // answers for both: a base still in its stack has the plane growing it mints.
+  it('reports the plane a base still in its stack would mint', () => {
     const state = initialState(registry);
-    Object.assign(state.inventory, { blade: 1, 'plain-blade': 1, whetstone: 2 });
+    Object.assign(state.inventory, { blade: 1, 'plain-blade': 1 });
+
+    expect(planeReport(registry, state, 'blade')).toMatchObject({
+      instance: 'blade',
+      template: 'blade',
+      level: 1,
+      spent: 0,
+      remaining: 1,
+      clusters: [expect.objectContaining({ hex: '0,0', jewel: 'core' })],
+    });
+    expect(planeReport(registry, state, 'plain-blade')?.clusters[0]).toMatchObject({ hex: '0,0', jewel: 'base' });
+
+    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['blade', 'plain-blade']);
+  });
+
+  it('reports nothing for a stack the player has none of, and nothing for an item that is no base', () => {
+    const state = initialState(registry);
+    Object.assign(state.inventory, { whetstone: 1 });
+
+    expect(planeReport(registry, state, 'blade')).toBeUndefined();
+    expect(planeReport(registry, state, 'whetstone')).toBeUndefined();
+  });
+
+  it('reports the grown copies in the order they were grown, before the stacks left carried', () => {
+    const state = initialState(registry);
+    Object.assign(state.inventory, { blade: 2, 'plain-blade': 1, whetstone: 2 });
     ok(feedItem(state, registry, 'blade', 'whetstone'));
     ok(feedItem(state, registry, 'plain-blade', 'whetstone'));
-    expect(planeReports(registry, state).map((plane) => plane.template)).toEqual(['blade', 'plain-blade']);
+    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['1', '2', 'blade']);
+  });
+
+  // A plane screen can be opened on a base still in its stack, and a focus names
+  // the plane it points at rather than carrying one, so every plane the player
+  // could be looking at has to be among the published ones.
+  it('reports the plane of a stack the player carries, and drops it when the last one leaves', () => {
+    const state = initialState(registry);
+    Object.assign(state.inventory, { blade: 1, whetstone: 3 });
+    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['blade']);
+
+    state.inventory.blade = 0;
+    expect(planeReports(registry, state)).toEqual([]);
   });
 
   it('reports an empty list when nothing has been grown', () => {
     expect(planeReports(registry, initialState(registry))).toEqual([]);
+  });
+
+  // c21 took the worn copy out of its stack, so a base whose only copy is on the
+  // player is a plane a screen can still be opened on and one no other read here
+  // would reach. The slot's spelling is the one its equipment row opens, so a
+  // focus on it has a published plane to be drawn from.
+  it('reports the plane of a base the player is wearing, with no stack left behind it', () => {
+    const state = initialState(registry);
+    Object.assign(state.inventory, { blade: 1 });
+    equip(state, registry, 'blade');
+
+    expect(state.inventory.blade).toBe(0);
+    expect(planeReport(registry, state, 'blade')).toMatchObject({ instance: 'blade', template: 'blade', spent: 0 });
+    expect(planeReport(registry, state, 'worn:mainhand')).toMatchObject({ instance: 'worn:mainhand', template: 'blade', spent: 0 });
+    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['blade', 'worn:mainhand']);
+  });
+
+  // The worn copy and the stack it left are two copies of one item, so the slot
+  // is what tells its plane from the stack's — an item id names the stack, and
+  // reaching the worn one through it would depend on the stack being empty.
+  it('reports the worn copy’s plane apart from the stack standing behind it', () => {
+    const state = fed('blade', 3);
+    ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position: 2 }));
+    Object.assign(state.inventory, { blade: 2 });
+    equip(state, registry, 'blade');
+
+    expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['1', 'blade', 'worn:mainhand']);
+    expect(planeReport(registry, state, 'worn:mainhand')).toMatchObject({ instance: 'worn:mainhand', template: 'blade', spent: 0 });
+    expect(planeReport(registry, state, '1')).toMatchObject({ instance: '1', spent: 1 });
+  });
+
+  it('publishes what the copy is worth per stat, so a screen states it rather than adding the clusters up', () => {
+    const state = fed('blade', 3);
+    for (const position of [2, 3]) ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position }));
+
+    expect(report(state).contributions).toEqual([
+      { statId: 'attack', added: { min: 4, max: 4 }, increased: 0 },
+      { statId: 'max-health', added: { min: 10, max: 10 }, increased: 0 },
+    ]);
+  });
+
+  it('publishes the effective contribution, so an effect on the cluster moves the summary', () => {
+    const state = fed('blade', 3, { goad: 1 });
+    for (const position of [2, 3]) ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position }));
+    ok(applyClusterEffect(state, registry, '1', 'goad', ORIGIN));
+
+    expect(report(state).contributions).toContainEqual({ statId: 'attack', added: { min: 6, max: 6 }, increased: 0 });
   });
 });

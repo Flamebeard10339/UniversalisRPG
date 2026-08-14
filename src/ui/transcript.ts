@@ -71,7 +71,6 @@ function fromOutput(output: CommandOutput, cursor: Cursor): Written[] {
     case 'authored':
       return output.blocks.flat().map((text) => ({ kind: 'detail', tone: 'plain', text }));
     case 'status':
-    case 'inventory':
     case 'choices':
       return [];
   }

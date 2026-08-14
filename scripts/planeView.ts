@@ -18,7 +18,6 @@ interface Row {
   node: string;
   what: string;
   worth: string;
-  command: string;
 }
 
 function trim(value: number): string {
@@ -46,24 +45,13 @@ function worth(payloads: readonly PayloadReport[]): string {
   return payloads.map(payload).join(', ');
 }
 
-function positionRow(plane: PlaneReport, cluster: ClusterReport, position: PositionReport): Row {
-  const address = `${plane.instance} at ${cluster.hex} position ${position.position}`;
+function positionRow(position: PositionReport): Row {
   return {
     standing: position.free ? 'free' : STANDING[position.standing],
     node: `pos ${position.position}`,
     what: position.title ?? '(empty)',
     worth: worth(position.payloads),
-    command: position.standing === 'available' ? `allocate: ${address}` : '',
   };
-}
-
-// A slot the player has paid for but not filled is the one place the next verb
-// is `slot:` rather than `allocate:`, and it is the step a plane is most easily
-// left stalled on, so it names the verb with the jewel left blank.
-function slotCommand(plane: PlaneReport, cluster: ClusterReport, slot: SlotReport): string {
-  if (slot.standing === 'available') return `allocate: ${plane.instance} at ${cluster.hex} slot ${slot.direction}`;
-  if (slot.standing === 'allocated' && slot.beyond === null) return `slot: ${plane.instance} at ${cluster.hex} ${slot.direction} with <jewel>`;
-  return '';
 }
 
 function beyond(slot: SlotReport): string {
@@ -71,19 +59,20 @@ function beyond(slot: SlotReport): string {
   return slot.standing === 'blocked' ? `blocked by ${slot.beyond}` : `holds ${slot.beyond}`;
 }
 
-function slotRow(plane: PlaneReport, cluster: ClusterReport, slot: SlotReport): Row {
+function slotRow(slot: SlotReport): Row {
   return {
     standing: STANDING[slot.standing],
     node: `slot ${slot.direction}`,
     what: beyond(slot),
     worth: '',
-    command: slotCommand(plane, cluster, slot),
   };
 }
 
-function clusterHeading(cluster: ClusterReport): string[] {
+// The hexagon in hand is marked in the margin, so which of three things a
+// growth line names is read off the screen rather than remembered.
+function clusterHeading(cluster: ClusterReport, focused: boolean): string[] {
   const from = cluster.entry === null ? 'origin' : `via ${cluster.entry.hex} ${cluster.entry.direction}`;
-  const heading = `  ${cluster.hex}  ${bare(cluster.jewel)} · ${cluster.shape} · ${from} · mods ${cluster.effects.length}/${cluster.modSlots}`;
+  const heading = `${focused ? '> ' : '  '}${cluster.hex}  ${bare(cluster.jewel)} · ${cluster.shape} · ${from} · mods ${cluster.effects.length}/${cluster.modSlots}`;
   if (cluster.effects.length === 0) return [heading];
   const effects = cluster.effects.map((each) => `${each.title} ${signed(each.effect.percent)}% ${bare(each.effect.statId)}`);
   return [heading, `       ${effects.join(', ')}`];
@@ -91,31 +80,23 @@ function clusterHeading(cluster: ClusterReport): string[] {
 
 function heading(plane: PlaneReport, worn: boolean): string {
   const points = plane.remaining === 1 ? '1 point left' : `${plane.remaining} points left`;
-  return `${plane.title} — ${plane.instance} (${bare(plane.template)})${worn ? ' — worn' : ''} — level ${plane.level}/${plane.maxLevel}, ${plane.spent} spent, ${points}`;
+  return `${plane.name}${worn ? ' — worn' : ''} — level ${plane.level}/${plane.maxLevel}, ${plane.spent} spent, ${points}`;
 }
 
 function pad(rows: readonly Row[]): string[] {
   const what = Math.max(0, ...rows.map((row) => row.what.length));
-  const value = Math.max(0, ...rows.map((row) => row.worth.length));
-  return rows.map((row) =>
-    `    ${row.standing.padEnd(COLUMNS[0])}${row.node.padEnd(COLUMNS[1])}${row.what.padEnd(what + 2)}${row.worth.padEnd(value + 2)}${row.command}`.trimEnd(),
-  );
+  return rows.map((row) => `    ${row.standing.padEnd(COLUMNS[0])}${row.node.padEnd(COLUMNS[1])}${row.what.padEnd(what + 2)}${row.worth}`.trimEnd());
 }
 
-// One plane, and every hex and direction spelled the way the four verbs take
-// them, so the line a player reads is the line they type back.
-export function formatPlane(plane: PlaneReport, worn: boolean): string[] {
+// One plane, as what standing on it is worth. c17: no row spells the directive
+// that would act on it, because the screen this is drawn above publishes that
+// act as an option a number answers. `focused` is the hexagon a screen holding
+// this plane has in hand, or null where it is read without one.
+export function formatPlane(plane: PlaneReport, worn: boolean, focused: string | null): string[] {
   const lines = [heading(plane, worn)];
   for (const cluster of plane.clusters) {
-    const rows = [
-      ...cluster.positions.map((position) => positionRow(plane, cluster, position)),
-      ...cluster.slots.map((slot) => slotRow(plane, cluster, slot)),
-    ];
-    lines.push('', ...clusterHeading(cluster), ...pad(rows));
+    const rows = [...cluster.positions.map(positionRow), ...cluster.slots.map(slotRow)];
+    lines.push('', ...clusterHeading(cluster, cluster.hex === focused), ...pad(rows));
   }
   return lines;
-}
-
-export function formatPlanes(planes: readonly PlaneReport[], worn: readonly string[]): string[] {
-  return planes.flatMap((plane) => ['', ...formatPlane(plane, worn.includes(plane.instance))]);
 }

@@ -13,6 +13,15 @@ export const LABELS = {
   inventory: 'Inventory',
   command: 'Command',
   run: 'Run',
+  level: 'Level',
+  points: 'Points',
+  position: 'Position',
+  slot: 'Slot',
+  spent: 'Spent',
+  ready: 'Ready',
+  locked: 'Locked',
+  dead: 'Dead',
+  free: 'Free',
 } as const;
 
 export type LabelId = keyof typeof LABELS;
