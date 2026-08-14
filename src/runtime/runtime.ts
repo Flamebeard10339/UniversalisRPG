@@ -36,9 +36,7 @@ import {
   IMPLICIT_TARGET_FULL,
   logSwing,
   newCadence,
-  FIGHT_SCOPED,
   hasPool,
-  isFightScoped,
   opposes,
   Participant,
   participants,
@@ -63,7 +61,7 @@ import { Registry } from '../content/registry';
 import { nextRandom } from './rng';
 import { roadsFrom, routeTo } from './journey';
 import { clearBuffs, expireBuffs, grantBuff, nextBuffExpiry } from './buffs';
-import { advanceTime, endAction, GameState, PLAYER, RuntimeError } from './state';
+import { advanceTime, endAction, FIGHT_SCOPED, GameState, isFightScoped, PLAYER, RuntimeError } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { TagClause } from '../grammar/tagClause';
 import { msUntilEmpty, secondsToMs, toMilliUnits } from './units';

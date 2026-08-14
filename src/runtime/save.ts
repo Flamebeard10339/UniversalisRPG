@@ -7,8 +7,7 @@ import { isInstanceTable, pruneInstances } from './instances';
 import { itemTemplate } from './itemInstance';
 import { isPopulations, prunePopulations } from './population';
 import { isModalFrame, pruneModals } from './modals';
-import { PLAYER } from './state';
-import { templateOf } from './encounter';
+import { PLAYER, templateOf } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
 export const SAVE_VERSION = 9;

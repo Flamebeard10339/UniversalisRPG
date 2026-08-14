@@ -93,8 +93,23 @@ export function isBuffList(value: unknown): boolean {
   );
 }
 
+// Every id a clause names that has to still resolve: the stat it moves, and the
+// counter its magnitude is multiplied by. A counter resolving to nothing scales
+// the bonus to nothing rather than failing, so an unresolvable one has to be
+// found here — the load path refuses it, and a `# save` body is the one reader
+// the load path never sees.
+function missingReference(tag: TagClause, registry: Registry): string | undefined {
+  if (tag.kind !== 'stat-bonus') return undefined;
+  if (!registry.stats.has(tag.statId)) return `stat ${tag.statId}`;
+  if (tag.per === undefined) return undefined;
+  if (tag.per.kind === 'stack') return registry.items.has(tag.per.id) ? undefined : `item ${tag.per.id}`;
+  return registry.resources.has(tag.per.id) ? undefined : `resource ${tag.per.id}`;
+}
+
 // `actorLoaded` because who counts as a character is the encounter's to say and
 // not this module's; what a buff is made of is this module's, and is the rest.
+// Every holder is written back through `set` whether or not it lost anything,
+// because a hand-written `# save` is the one table nothing else here assembled.
 export function pruneBuffs(state: GameState, registry: Registry, actorLoaded: (actorId: string) => boolean): PruneWarning[] {
   const warnings: PruneWarning[] = [];
   for (const [actorId, held] of Object.entries(state.buffs)) {
@@ -105,19 +120,16 @@ export function pruneBuffs(state: GameState, registry: Registry, actorLoaded: (a
     }
     const kept: BuffInstance[] = [];
     for (const buff of held) {
-      const missingStat = buff.tags.find((tag) => tag.kind === 'stat-bonus' && !registry.stats.has(tag.statId));
-      const missing = !registry.items.has(buff.source)
-        ? `item ${buff.source}`
-        : missingStat
-          ? `stat ${(missingStat as Extract<TagClause, { kind: 'stat-bonus' }>).statId}`
-          : undefined;
+      const missing = registry.items.has(buff.source)
+        ? buff.tags.map((tag) => missingReference(tag, registry)).find((problem) => problem !== undefined)
+        : `item ${buff.source}`;
       if (!missing) {
         kept.push(buff);
         continue;
       }
       warnings.push({ path: `buffs.${actorId}.${buff.source}`, id: buff.source, message: `Removed buff ${buff.source} on ${actorId} because its ${missing} is not loaded.` });
     }
-    if (kept.length !== held.length) set(state, actorId, kept);
+    set(state, actorId, kept);
   }
   return warnings;
 }

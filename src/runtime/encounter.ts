@@ -4,7 +4,7 @@ import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
 import { declaredId, Entity } from '../content/entity';
 import { hostile, Registry } from '../content/registry';
 import { actionVisible, findActiveAction, findActionOwner, requiresMet } from './actions';
-import { GameState, PLAYER, RuntimeError } from './state';
+import { GameState, PLAYER, RuntimeError, templateOf } from './state';
 import { humanize } from '../grammar/values';
 import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
 
@@ -52,16 +52,6 @@ export function playerCadence(active: ActiveAction): Cadence {
 }
 
 export const IMPLICIT_TARGET_FULL = MILLI_UNITS;
-
-// A fight-scoped copy's key is its type and which copy it is. No syntax anywhere
-// names one — an author writes counts — so this separator never reaches a page.
-export const FIGHT_SCOPED = '#';
-
-export const templateOf = (actorId: string): string => actorId.split(FIGHT_SCOPED)[0];
-
-// A copy minted for the fight stands in no location at all, so no question
-// about a place can be asked of it — it is present while the fight is.
-export const isFightScoped = (actorId: string): boolean => actorId !== templateOf(actorId);
 
 // The sheet an actor is measured by. `player` is a well-known id rather than a
 // privileged one: what it names declares its stats the way a rat does.

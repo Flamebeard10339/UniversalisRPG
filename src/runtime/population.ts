@@ -1,6 +1,6 @@
 import { Location, populationCount } from '../content/location';
 import { Registry } from '../content/registry';
-import { templateOf } from './encounter';
+import { templateOf } from './state';
 import { evaluateCondition } from './conditions';
 import { GameState } from './state';
 import { secondsToMs } from './units';

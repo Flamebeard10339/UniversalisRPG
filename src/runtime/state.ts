@@ -13,6 +13,18 @@ export type PoolLevels = { readonly [resourceId: string]: number };
 
 export const PLAYER = 'player';
 
+// A fight-scoped copy's key is its type and which copy it is. No syntax anywhere
+// names one — an author writes counts — so this separator never reaches a page.
+// Here beside `PLAYER` because how an actor id is spelled is one question, and
+// everything that asks it sits above this file.
+export const FIGHT_SCOPED = '#';
+
+export const templateOf = (actorId: string): string => actorId.split(FIGHT_SCOPED)[0];
+
+// A copy minted for the fight stands in no location at all, so no question
+// about a place can be asked of it — it is present while the fight is.
+export const isFightScoped = (actorId: string): boolean => actorId !== templateOf(actorId);
+
 export interface GameState extends RngCursor {
   flags: Record<string, boolean | number>;
   inventory: Record<string, number>;
@@ -52,9 +64,10 @@ export function advanceTime(state: GameState, milliseconds: number): void {
 }
 
 export function endAction(state: GameState): void {
-  // A fight-scoped copy vanishes with the fight it was minted for, so what was
-  // buffing it has nobody left to buff.
-  if (state.activeAction) clearBuffs(state, Object.keys(state.activeAction.actors ?? {}));
+  // A copy minted for the fight vanishes with it, so what was buffing it has
+  // nobody left to buff. A standing entity that fought keeps what it holds,
+  // because the fight ending is not it leaving the world.
+  if (state.activeAction) clearBuffs(state, Object.keys(state.activeAction.actors ?? {}).filter(isFightScoped));
   state.activeAction = null;
 }
 
