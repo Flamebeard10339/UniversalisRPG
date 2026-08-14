@@ -17,6 +17,8 @@ export interface LocaleSection {
 export const ENGINE_KEYS = [
   'engine.travel.to',
   'engine.travel.no-way',
+  'engine.travel.unknown-origin',
+  'engine.travel.unknown-destination',
   'engine.craft.label',
   'engine.talk.to',
   'engine.inputs.short',

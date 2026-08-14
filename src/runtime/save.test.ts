@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
+import { armTravel, buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadInEnglish } from '../content/engineLocale';
 import { answerModal, ModalFrame, openModalNamed } from './modals';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
+import { TRAVEL_LABEL } from './actions';
+import { GameState } from './state';
 import { toMilliUnits } from './units';
 
 const MODULE = `
@@ -497,5 +499,43 @@ describe('equipped survives a registry that no longer matches it', () => {
     const { state, warnings } = pruned({ tail: 'helm' });
     expect(state.equipped).toEqual({});
     expect(warnings.map((w) => w.message)).toEqual(['Unequipped tail because its item helm no longer declares that slot.']);
+  });
+});
+
+// The Deliverable's headline sentence on the one save field that was still a
+// sentence: `activeAction.actionLabel` held `Travel to <title>`, and a rename
+// of that title alone stopped the walk it was under.
+describe('a walk under way survives its destination being retitled', () => {
+  const ISLAND = (far: string): string => ['# info isla', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'adjacent:', '  far', '', '# location far', `title: ${far}`, 'x: 30, y: 0', 'adjacent:', '  shore'].join('\n');
+
+  const walking = (): GameState => {
+    const registry = loadInEnglish(ISLAND('Far Beach'));
+    const state = initialState(registry);
+    armTravel('isla.shore', 'isla.far', registry, state);
+    expect(state.activeAction, 'the walk did not arm').not.toBeNull();
+    return state;
+  };
+
+  it('stores an id rather than the sentence a player reads', () => {
+    expect(walking().activeAction!.actionLabel).toBe(TRAVEL_LABEL);
+    expect(JSON.parse(serializeSave(walking(), loadInEnglish(ISLAND('Far Beach')))).activeAction.actionLabel).toBe(TRAVEL_LABEL);
+  });
+
+  it('keeps the walk when the destination is retitled underneath it', () => {
+    const state = walking();
+
+    expect(pruneStateForRegistry(state, loadInEnglish(ISLAND('Distant Beach')))).toEqual([]);
+    expect(state.activeAction).not.toBeNull();
+  });
+
+  // The other half: a destination that is gone still stops the walk, and says
+  // so through a key rather than by relaying what the lookup threw.
+  it('stops the walk when the destination is gone, and says so from a key', () => {
+    const state = walking();
+    const registry = loadInEnglish(['# info isla', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting'].join('\n'));
+
+    const warnings = pruneStateForRegistry(state, registry);
+    expect(warnings.map((warning) => warning.message)).toEqual(['Stopped unavailable action travel.isla.shore>isla.far.travel: unknown travel destination: isla.far.']);
+    expect(state.activeAction).toBeNull();
   });
 });

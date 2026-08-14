@@ -41,12 +41,13 @@ Proof:
   This is the property the whole branch exists to buy: after it, a `# test` that breaks is a
   `# test` about behaviour, and nothing a translator or an editor does can break one.
 - [c6] What changes is only what had to, and it is named here in full. `SAVE_VERSION` moves 9
-  to 10 for `PlaneFrame.said`'s new shape. Two authored things move with it and nothing else
-  does: the `submit-modal:` values in shipped `# test` sections, and the one `# save` fixture
-  carrying `"race":"Elf"`, because a race answer is a stored field and becomes an id with the
-  rest. No fixture's instances or equipment moves, since an ordinal is what they already hold.
-  No content id, no field name and no player-visible English string moves, every `# test`
-  passes, and `npm run tasks -- merge-ready` is green on every behavioural leg.
+  to 10 for `PlaneFrame.said`'s new shape. Three authored things move with it and nothing else
+  does: the `submit-modal:` values in shipped `# test` sections, the one `choose:` line in
+  `tutorial-quest-given`, which is the dialogue-facing spelling of the same answer, and the one
+  `# save` fixture carrying `"race":"Elf"`, because a race answer is a stored field and becomes
+  an id with the rest. No fixture's instances or equipment moves, since an ordinal is what they
+  already hold. No content id, no field name and no player-visible English string moves, every
+  `# test` passes, and `npm run tasks -- merge-ready` is green on every behavioural leg.
 
 ## Goal
 
@@ -67,6 +68,11 @@ display were one string and no pass had standing to separate them.
   showing an id too. The rule this branch works to instead: reference everything by id
   internally, and let a locale be the only source of words. Without that, none of the rest
   holds. c16's naming function survives untouched and is where the fallback in c1 lives.
+- **A travel action's label is an id, because a save holds it.** An action's label doubles as
+  its identifier and `activeAction.actionLabel` stores the one a walk is under, so a compiled
+  `Travel to <title>` put a sentence built from a title into the save and made a rename stop
+  the walk. The label is `travel`; the pair is the ownerRef's to say and the words are
+  `engine.travel.to`'s. Found by pass 1, whose reproduction is the regression to re-run.
 - **This is where `reimplement-localization`'s c3 lands.** That clause — a missing translation
   shows its key, in every direction — was graded unmet on passes 2 through 6 and is deferred
   onto this branch rather than dropped. It is unmeetable there: `PlaneFrame.said` is a plain
@@ -87,9 +93,14 @@ display were one string and no pass had standing to separate them.
 - **A dialogue answer is the option's index within its node.** The right answer is a mix —
   an authored id where one is wanted, and a slug falling back to it so a cosmetic edit does
   not invalidate every recording — but that is a lot of authoring surface and migration
-  machinery for a problem nobody has had yet. The index is an id, it satisfies c2 today, and
-  no shipped `# test` answers a dialogue choice, so nothing authored moves. Revisit when
-  reordering options actually breaks something.
+  machinery for a problem nobody has had yet. The index is an id and it satisfies c2 today.
+  One shipped `# test` does answer a dialogue choice — `tutorial-quest-given`'s `choose:` —
+  so the cost is real and is named rather than assumed away: inserting an option before
+  Miki's first one makes that recording replay a different line, and it keeps passing as
+  long as the new line also sets `quest-given`. The index is counted over the choices the
+  node declares rather than the ones a `when:` leaves standing, so gating one does not shift
+  the answer to every choice after it. Revisit when reordering options actually breaks
+  something.
 - **No save migration.** This is the second consecutive `SAVE_VERSION` bump and there is no
   point building a migration path while the shape underneath it is still moving.
   `save-migration-system` stays open and untouched; a stale save is rejected, which is this

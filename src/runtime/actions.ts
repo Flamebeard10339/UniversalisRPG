@@ -5,7 +5,7 @@ import { Location } from '../content/location';
 import { Registry } from '../content/registry';
 import type { ActiveAction } from './encounter';
 import { copiesOf } from './itemInstance';
-import { BASE_LANGUAGE, localizerFor } from './localized';
+import { BASE_LANGUAGE, localizerFor, type Localized, type Localizer } from './localized';
 import { GameState, RuntimeError } from './state';
 import { travelSecondsPerUnit } from './tuning';
 
@@ -45,17 +45,29 @@ export const TRAVEL_PAIR = '>';
 
 export const travelPair = (origin: string, dest: string): string => `${origin}${TRAVEL_PAIR}${dest}`;
 
+// c3: a label is an action's identifier and a save holds the one a walk is
+// under, so this one is a word the engine owns rather than a sentence built
+// from a title. The pair the walk is between is the ownerRef's to say, and
+// what a player reads is `engine.travel.to` over the destination's own key.
+export const TRAVEL_LABEL = 'travel';
+
+// The two ends of a pair, and what is said about either of them being gone.
+// Asked rather than thrown wherever the answer reaches a player.
+export function travelEndProblem(localizer: Localizer, originId: string, destId: string, registry: Registry): Localized | null {
+  if (!registry.locations.has(originId)) return localizer.engine('engine.travel.unknown-origin', { location: localizer.identifier(originId) });
+  if (!registry.locations.has(destId)) return localizer.engine('engine.travel.unknown-destination', { location: localizer.identifier(destId) });
+  return null;
+}
+
 // Shaped as a one-attempt fight so a journey spans like any other action. The
 // origin comes from the ownerRef: state.location holds it until relocate fires.
 export function travelAction(originId: string, destId: string, registry: Registry): Action {
-  const origin = registry.locations.get(originId);
-  const dest = registry.locations.get(destId);
-  if (!origin) throw new RuntimeError(`unknown travel origin: ${originId}`);
-  if (!dest) throw new RuntimeError(`unknown travel destination: ${destId}`);
+  const problem = travelEndProblem(localizerFor(registry, BASE_LANGUAGE), originId, destId, registry);
+  if (problem) throw new RuntimeError(problem);
   return {
-    label: `Travel to ${dest.title}`,
+    label: TRAVEL_LABEL,
     results: [{ kind: 'relocate', location: destId }],
-    time: locationDistance(origin, dest) * travelSecondsPerUnit(registry),
+    time: locationDistance(registry.locations.get(originId)!, registry.locations.get(destId)!) * travelSecondsPerUnit(registry),
   };
 }
 

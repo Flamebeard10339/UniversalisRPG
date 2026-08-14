@@ -120,8 +120,6 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
   },
   dialogue: {
     open: () => null,
-    // A menu answer is the dialogue line the player picks, so the answer is the
-    // authored text and what is read is that text through the prose door.
     options: (frame, state, registry) => [
       { key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuChoices(frame.cursor, registry, state).map((choice) => ({ value: String(choice.index), shown: localizerOf(registry, state).prose(choice.text) })) },
     ],

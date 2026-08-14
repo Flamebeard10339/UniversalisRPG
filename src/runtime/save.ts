@@ -2,7 +2,7 @@ import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { createGameState, endAction, GameState, initResources, RuntimeError } from './runtime';
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
-import { findActionOwner, parseOwnerRef } from './actions';
+import { findActionOwner, parseOwnerRef, travelEndProblem, TRAVEL_PAIR } from './actions';
 import { isBuffList, pruneBuffs } from './buffs';
 import { isInstanceTable, pruneInstances } from './instances';
 import { itemTemplate } from './itemInstance';
@@ -123,20 +123,19 @@ function pruneRecord<T>(
   }
 }
 
-// What was thrown on the way to the owner is relayed as it was written: the
-// engine has no words of its own for a fault it did not compose, and an
-// identifier is what belongs to no language.
+// A travel pair is the one owner ref naming two things, and the only one whose
+// lookup throws, so it is asked about before the lookup rather than caught out
+// of it: what a player reads here comes from a key like everything else.
 function activeActionProblem(localizer: Localizer, state: GameState, registry: Registry): Localized | null {
   const active = state.activeAction;
   if (!active) return null;
   const { obj, objId } = parseOwnerRef(active.ownerRef);
-  let owner: { actions?: { label: string }[] } | undefined;
-  try {
-    owner = findActionOwner(obj, objId, registry) as { actions?: { label: string }[] } | undefined;
-  } catch (error) {
-    if (error instanceof RuntimeError) return localizer.identifier(error.message);
-    throw error;
+  if (obj === 'travel') {
+    const [origin, dest] = objId.split(TRAVEL_PAIR);
+    const stale = travelEndProblem(localizer, origin ?? '', dest ?? '', registry);
+    if (stale) return stale;
   }
+  const owner = findActionOwner(obj, objId, registry) as { actions?: { label: string }[] } | undefined;
   if (!owner) return localizer.engine('engine.action.stale.owner', { kind: localizer.identifier(obj), id: localizer.identifier(objId) });
   if (!owner.actions?.some((action) => action.label === active.actionLabel)) return localizer.engine('engine.action.stale.action', { action: localizer.identifier(JSON.stringify(active.actionLabel)), owner: localizer.identifier(active.ownerRef) });
 

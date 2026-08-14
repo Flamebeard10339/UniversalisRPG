@@ -13,6 +13,8 @@ language: en
 # locale en
 engine.travel.to: Travel to {destination}
 engine.travel.no-way: There is no way from here to {destination}.
+engine.travel.unknown-origin: unknown travel origin: {location}
+engine.travel.unknown-destination: unknown travel destination: {location}
 engine.craft.label: Craft {recipe}
 engine.talk.to: Talk to {entity}
 engine.inputs.short: You don't have enough {item}.
