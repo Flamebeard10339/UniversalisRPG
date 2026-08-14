@@ -13,14 +13,14 @@ type Payload = Position['payloads'][number];
 
 const flat = (statId: string, amount: number, scale = 1): Payload => ({ statId, effective: { percent: false, amount: { min: amount, max: amount } }, scale });
 
-const position = (over: Partial<Position> = {}): Position => ({ position: 1, passive: 'mod.hale', title: 'Hale', standing: 'unreached', free: false, payloads: [], ...over });
+const position = (over: Partial<Position> = {}): Position => ({ position: 1, passive: 'mod.hale', title: asLocalized('Hale'), standing: 'unreached', free: false, payloads: [], ...over });
 
 const slot = (over: Partial<Slot> = {}): Slot => ({ direction: 'e', standing: 'unreached', beyond: null, ...over });
 
 const cluster = (over: Partial<Cluster> = {}): Cluster => ({
   hex: '0,0',
   jewel: 'mod.core',
-  title: 'Core',
+  title: asLocalized('Core'),
   shape: 'spindle',
   entry: null,
   effects: [],
@@ -33,8 +33,8 @@ const cluster = (over: Partial<Cluster> = {}): Cluster => ({
 const plane = (over: Partial<Plane> = {}): Plane => ({
   instance: '1',
   template: 'mod.blade',
-  title: 'Blade',
-  name: 'Blade',
+  title: asLocalized('Blade'),
+  name: asLocalized('Blade'),
   level: 3,
   maxLevel: 20,
   spent: 1,
@@ -112,7 +112,7 @@ describe('the plane the view says is in hand', () => {
   });
 
   it('draws the plane the focus names and not the first one published', () => {
-    const view = drawn([plane({ instance: '1', title: 'Blade' }), plane({ instance: '2', title: 'Shield' })], { instance: '2', hex: '0,0' });
+    const view = drawn([plane({ instance: '1', title: asLocalized('Blade') }), plane({ instance: '2', title: asLocalized('Shield') })], { instance: '2', hex: '0,0' });
 
     expect(view?.instance).toBe('2');
     expect(view?.title).toBe('Shield');
@@ -136,7 +136,7 @@ describe('the plane the view says is in hand', () => {
 
   it('lists a hexagon by the jewel standing in it, positions before slots', () => {
     const view = drawn(
-      [plane({ clusters: [cluster({ title: 'Keen Edge', positions: [position({ position: 1 }), position({ position: 2 })], slots: [slot({ direction: 'ne' })] })] })],
+      [plane({ clusters: [cluster({ title: asLocalized('Keen Edge'), positions: [position({ position: 1 }), position({ position: 2 })], slots: [slot({ direction: 'ne' })] })] })],
       { instance: '1', hex: '0,0' },
     );
 
@@ -158,7 +158,7 @@ describe('the plane the view says is in hand', () => {
   });
 
   it('names what a position carries, and the hexagon on the far side of a slot that has one', () => {
-    const positions = [position({ title: 'Hale' }), position({ position: 2, passive: null, title: null })];
+    const positions = [position({ title: asLocalized('Hale') }), position({ position: 2, passive: null, title: null })];
     const slots = [slot({ direction: 'e', standing: 'allocated', beyond: '1,0' }), slot({ direction: 'ne' })];
     const view = drawn([plane({ clusters: [cluster({ positions, slots })] })], { instance: '1', hex: '0,0' });
 
@@ -181,7 +181,7 @@ describe('the plane the view says is in hand', () => {
   it('invents no word: every one it draws is the engine’s or the shell’s own table', () => {
     const positions = [position({ standing: 'allocated', free: true, payloads: [flat('mod.attack', 3, 1.5)] }), position({ position: 2, standing: 'available' })];
     const slots = [slot({ standing: 'blocked', beyond: '1,0' }), slot({ direction: 'ne' })];
-    const report = plane({ clusters: [cluster({ positions, slots }), cluster({ hex: '1,0', title: 'Causeway' })] });
+    const report = plane({ clusters: [cluster({ positions, slots }), cluster({ hex: '1,0', title: asLocalized('Causeway') })] });
     const view = drawn([report], { instance: '1', hex: '1,0' })!;
 
     const allowed = new Set([...publishedWords(report), ...Object.values(LABELS).flatMap(words)]);

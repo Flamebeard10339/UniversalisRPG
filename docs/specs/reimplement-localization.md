@@ -239,6 +239,19 @@ Proof:
   what is newly refused is a label with neither a letter nor a digit in it, which keys as nothing at
   all, and a label whose slug is already a field of the object that owns it. Both are one key with
   two meanings or none, and the error says what a legal label looks like.
+- **Every screen a title reaches asks the localizer, not the registry.** Pass 2 measured three that
+  did not: the carried list, the plane report and the modal built from them read `.title` off the
+  record, so a Spanish player was shown the base language on them while the room around them was
+  right. `carriedName` takes a localizer now and `Modified` is `engine.item.modified` — a pattern, so
+  a language that puts the descriptor after the noun may.
+- **The set of keys a report answers about is every key the engine asks for, not every key some
+  module has text for.** A module writing a language nobody translated has no base entries at all,
+  and drawing the report from those said nothing was missing while the player was shown a key on
+  every screen. `Locales.addressable` holds the keys; `base` holds the text. A title is addressable
+  whatever anybody authored, and an unauthored `examine:` is not, because nothing renders one.
+- **The prose door asks the modules that carry prose.** Asking every loaded module could never open
+  it for anybody, since the shipped engine locale declares `en`; a module that is nothing but
+  translations says nothing about what language a `say:` is in.
 - **`engine.item.examine` has one reader, `itemExamine`, and the schema default is gone.** Nothing
   displayed an item's examine before this branch either; what mattered was that the English sentence
   and its `article()` left the schema, which is what c2 and c5 ask for.

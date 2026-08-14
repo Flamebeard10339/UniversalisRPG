@@ -4,6 +4,7 @@ import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';
 import { BonusAmount } from '../grammar/tagClause';
 import { carriedName } from './carriedName';
+import { Localized, Localizer, localizerOf } from './localized';
 import { positionPayloads } from './clusterEffect';
 import { basePlane, isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
@@ -28,7 +29,7 @@ export interface PayloadReport {
 export interface PositionReport {
   readonly position: number;
   readonly passive: string | null;
-  readonly title: string | null;
+  readonly title: Localized | null;
   readonly standing: Standing;
   // Allocated without a point having been spent: the origin cluster's root.
   readonly free: boolean;
@@ -47,12 +48,12 @@ export interface SlotReport {
 export interface ClusterReport {
   readonly hex: string;
   readonly jewel: string;
-  readonly title: string;
+  readonly title: Localized;
   readonly shape: string;
   // The slot this cluster was slotted through, as the hex and direction the
   // `slot:` verb named — null at the origin, which is never slotted.
   readonly entry: { hex: string; direction: Direction } | null;
-  readonly effects: Array<{ id: string; title: string; effect: ClusterEffect }>;
+  readonly effects: Array<{ id: string; title: Localized; effect: ClusterEffect }>;
   readonly modSlots: number;
   readonly positions: PositionReport[];
   readonly slots: SlotReport[];
@@ -70,9 +71,9 @@ export interface PlaneReport {
   // The id the four verbs address this plane by.
   readonly instance: string;
   readonly template: string;
-  readonly title: string;
+  readonly title: Localized;
   // What a screen holding this plane calls the copy it is growing (c16).
-  readonly name: string;
+  readonly name: Localized;
   readonly level: number;
   readonly maxLevel: number;
   readonly spent: number;
@@ -106,7 +107,7 @@ function distance(hex: Hex): number {
   return (Math.abs(hex.q) + Math.abs(hex.r) + Math.abs(hex.q + hex.r)) / 2;
 }
 
-function clusterReport(registry: Registry, plane: Plane, hex: Hex): ClusterReport | undefined {
+function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, hex: Hex): ClusterReport | undefined {
   const cluster = plane[hexKey(hex)];
   const placement = placementAt(registry, plane, hex);
   if (!cluster || !placement) return undefined;
@@ -116,12 +117,11 @@ function clusterReport(registry: Registry, plane: Plane, hex: Hex): ClusterRepor
   const positions: PositionReport[] = [];
   for (let position = 1; position <= shape.positionCount; position++) {
     const passive: string | undefined = jewel.positions[position];
-    const declared = passive === undefined ? undefined : registry.passives.get(passive);
     const standing = standingOf(registry, plane, { hex, kind: 'position', position });
     positions.push({
       position,
       passive: passive ?? null,
-      title: declared?.title ?? null,
+      title: passive === undefined ? null : localizer.title('passive', passive),
       standing,
       free: standing === 'allocated' && !cluster.allocatedPositions.includes(position),
       payloads: payloadsOf(registry, plane, hex, position),
@@ -143,11 +143,11 @@ function clusterReport(registry: Registry, plane: Plane, hex: Hex): ClusterRepor
   const effects: ClusterReport['effects'] = [];
   for (const id of cluster.effects) {
     const item = registry.items.get(id);
-    if (item?.clusterEffect) effects.push({ id, title: item.title, effect: item.clusterEffect });
+    if (item?.clusterEffect) effects.push({ id, title: localizer.title('item', id), effect: item.clusterEffect });
   }
 
   const entry = cluster.entry === null ? null : { hex: step(hex, opposite(cluster.entry)), direction: cluster.entry };
-  return { hex: hexKey(hex), jewel: jewel.id, title: jewel.title, shape: jewel.shape, entry, effects, modSlots: jewel.modSlots, positions, slots };
+  return { hex: hexKey(hex), jewel: jewel.id, title: localizer.title('cluster-jewel', jewel.id), shape: jewel.shape, entry, effects, modSlots: jewel.modSlots, positions, slots };
 }
 
 // A growth verb spells its target either way an item is carried, and both have
@@ -172,16 +172,17 @@ export function planeReport(registry: Registry, state: GameState, target: string
   const targets = targeted(registry, state, target);
   if (!targets) return undefined;
   const { item, template, grown, payload } = targets;
+  const localizer = localizerOf(registry, state);
 
   const clusters = planeClusters(payload.plane)
     .sort((a, b) => distance(a.hex) - distance(b.hex) || a.hex.q - b.hex.q || a.hex.r - b.hex.r)
-    .flatMap(({ hex }) => clusterReport(registry, payload.plane, hex) ?? []);
+    .flatMap(({ hex }) => clusterReport(registry, localizer, payload.plane, hex) ?? []);
 
   return {
     instance: target,
     template,
-    title: item.title,
-    name: carriedName(item.title, grown),
+    title: localizer.title('item', template),
+    name: carriedName(localizer, 'item', template, grown),
     level: itemLevel(payload, item),
     maxLevel: item.maxLevel,
     spent: pointsSpent(payload.plane),

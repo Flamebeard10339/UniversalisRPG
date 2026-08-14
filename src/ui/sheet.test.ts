@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayStatus } from '../runtime/session';
 import { carried, contributionText, counted, worn } from './sheet';
 
 type CarriedRow = PlayStatus['carried'][number];
 type Plane = PlayStatus['planes'][number];
 
-const row = (over: Partial<CarriedRow> = {}): CarriedRow => ({ id: 'rope', name: 'Rope', count: 1, value: 'Rope x1', grown: false, ...over });
+const row = (over: Partial<CarriedRow> = {}): CarriedRow => ({ id: 'rope', name: asLocalized('Rope'), count: 1, value: 'Rope x1', grown: false, ...over });
 
 const plane = (over: Partial<Plane> = {}): Plane => ({
   instance: '1',
   template: 'blade',
-  title: 'Blade',
-  name: 'Modified Blade',
+  title: asLocalized('Blade'),
+  name: asLocalized('Modified Blade'),
   level: 3,
   maxLevel: 20,
   spent: 1,
@@ -44,39 +45,39 @@ describe('a published dictionary as rows', () => {
 
 describe('what the player carries, as rows', () => {
   it('states the engine name and puts the count in the count column', () => {
-    const rows = carried([row({ id: 'awl', name: 'Awl', count: 3 })], []);
+    const rows = carried([row({ id: 'awl', name: asLocalized('Awl'), count: 3 })], []);
     expect(rows).toEqual([{ id: 'awl', name: 'Awl', value: '3' }]);
   });
 
   it('counts a grown copy as one, and never as the item it grew from', () => {
-    const rows = carried([row({ id: '1', name: 'Modified Blade', count: 1, grown: true })], []);
+    const rows = carried([row({ id: '1', name: asLocalized('Modified Blade'), count: 1, grown: true })], []);
     expect(rows[0].value).toBe('1');
     expect(rows[0].name).toBe('Modified Blade');
   });
 
   it('sorts by name and keeps two copies of one name apart by the id they are of', () => {
     const two = [
-      row({ id: '3', name: 'Modified Blade', grown: true }),
-      row({ id: '1', name: 'Modified Blade', grown: true }),
-      row({ id: 'awl', name: 'Awl' }),
+      row({ id: '3', name: asLocalized('Modified Blade'), grown: true }),
+      row({ id: '1', name: asLocalized('Modified Blade'), grown: true }),
+      row({ id: 'awl', name: asLocalized('Awl') }),
     ];
     expect(carried(two, []).map((entry) => entry.id)).toEqual(['awl', '1', '3']);
   });
 
   it('states the stat summary beneath a grown copy, read from the plane the engine published', () => {
-    const grown = row({ id: '1', name: 'Modified Blade', grown: true });
+    const grown = row({ id: '1', name: asLocalized('Modified Blade'), grown: true });
     const published = plane({ instance: '1', contributions: [flat('mod.attack', 15), { statId: 'mod.max-health', added: { min: 0, max: 0 }, increased: 25 }] });
     expect(carried([grown], [published])[0].detail).toBe('+15 attack, +25% max-health');
   });
 
   it('leaves a stack without a summary, because a stack copy is what its item already says it is', () => {
-    const stack = row({ id: 'blade', name: 'Blade' });
+    const stack = row({ id: 'blade', name: asLocalized('Blade') });
     const published = plane({ instance: 'blade', contributions: [flat('mod.attack', 15)] });
     expect(carried([stack], [published])[0].detail).toBeUndefined();
   });
 
   it('leaves a grown copy whose plane is worth nothing without an empty line beneath it', () => {
-    const grown = row({ id: '1', name: 'Modified Blade', grown: true });
+    const grown = row({ id: '1', name: asLocalized('Modified Blade'), grown: true });
     expect(carried([grown], [plane({ instance: '1' })])[0].detail).toBeUndefined();
   });
 });
@@ -95,8 +96,8 @@ describe('a contribution, as words', () => {
 describe('what the player is wearing, as rows', () => {
   it('names the slot and the thing in it, never the id the slot holds', () => {
     const rows = [
-      row({ id: '1', name: 'Modified Blade', grown: true, slot: 'mainhand' }),
-      row({ id: 'worn:back', name: 'Cloak', value: 'Cloak (back)', slot: 'back' }),
+      row({ id: '1', name: asLocalized('Modified Blade'), grown: true, slot: 'mainhand' }),
+      row({ id: 'worn:back', name: asLocalized('Cloak'), value: 'Cloak (back)', slot: 'back' }),
     ];
     expect(worn(rows, [])).toEqual([
       { id: 'worn:back', name: 'back', value: 'Cloak' },
@@ -108,14 +109,14 @@ describe('what the player is wearing, as rows', () => {
   // the only page a worn one is listed on — so the summary that tells two of
   // them apart has to be here rather than only on the carried page.
   it('states a worn grown copy’s contribution beneath its name', () => {
-    const rows = [row({ id: '1', name: 'Modified Blade', grown: true, slot: 'mainhand' })];
+    const rows = [row({ id: '1', name: asLocalized('Modified Blade'), grown: true, slot: 'mainhand' })];
     const published = plane({ instance: '1', contributions: [flat('mod.attack', 15)] });
 
     expect(worn(rows, [published])[0].detail).toBe('+15 attack');
   });
 
   it('leaves a worn stack copy without a summary, the way the carried page leaves its stack', () => {
-    const rows = [row({ id: 'worn:mainhand', name: 'Blade', value: 'Blade (mainhand)', slot: 'mainhand' })];
+    const rows = [row({ id: 'worn:mainhand', name: asLocalized('Blade'), value: 'Blade (mainhand)', slot: 'mainhand' })];
     const published = plane({ instance: 'worn:mainhand', contributions: [flat('mod.attack', 15)] });
 
     expect(worn(rows, [published])[0].detail).toBeUndefined();
@@ -127,8 +128,8 @@ describe('what the player is wearing, as rows', () => {
   // press each page sends reaches the copy that page drew.
   it('leaves the worn rows to this page and off the one that lists what is carried', () => {
     const rows = [
-      row({ id: 'blade', name: 'Blade', count: 2, value: 'Blade x2' }),
-      row({ id: 'worn:mainhand', name: 'Blade', value: 'Blade (mainhand)', slot: 'mainhand' }),
+      row({ id: 'blade', name: asLocalized('Blade'), count: 2, value: 'Blade x2' }),
+      row({ id: 'worn:mainhand', name: asLocalized('Blade'), value: 'Blade (mainhand)', slot: 'mainhand' }),
     ];
 
     expect(carried(rows, []).map((entry) => entry.id)).toEqual(['blade']);

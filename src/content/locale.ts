@@ -29,6 +29,7 @@ export const ENGINE_KEYS = [
   'engine.combat.other.hit',
   'engine.combat.other.miss',
   'engine.item.examine',
+  'engine.item.modified',
   'engine.modal.opened',
   'engine.prune.record',
   'engine.prune.location',
@@ -140,12 +141,20 @@ export interface BaseEntry {
   // The language the module that authored it declared, which is the only
   // language this text is an entry for. There is no fallback to another.
   language: string;
+  // Made from the id by `humanizeEn` rather than written by anybody, which is
+  // what serialization must not print back out as if it had been.
+  generated?: true;
 }
 
 // What a load hands the localizer: the text content authored, under the
 // language of the module that authored it, and whatever `# locale` sections
 // supplied, by language.
 export interface Locales {
+  // Every key the engine will ask for, whether or not any module has text for
+  // it. A key with no entry is exactly the one a player is shown and a
+  // translator has to fill in, so a report drawn from `base` alone would miss
+  // the whole of a module writing a language nobody has translated.
+  addressable: Set<string>;
   base: Map<string, BaseEntry>;
   // The language each loaded module declared. A `say:` carries no key naming
   // the module that wrote it, so this is what the one prose door asks before
@@ -165,7 +174,7 @@ export interface LocaleDeclaration {
   entries: ReadonlyArray<{ key: string; value: string }>;
 }
 
-export const emptyLocales = (): Locales => ({ base: new Map(), moduleLanguages: [], sections: [], declared: new Map() });
+export const emptyLocales = (): Locales => ({ addressable: new Set(), base: new Map(), moduleLanguages: [], sections: [], declared: new Map() });
 
 export function addLocaleSection(locales: Locales, module: string | null, section: LocaleSection): void {
   locales.sections.push({ module, language: section.id, entries: section.entries });
@@ -193,9 +202,8 @@ export function localeLines(locales: Locales): string[] {
 export function missingTranslations(locales: Locales, language: string): string[] {
   const declared = locales.declared.get(language);
   const missing: string[] = [];
-  for (const key of ENGINE_KEYS) if (!declared?.has(key)) missing.push(key);
-  for (const [key, entry] of locales.base) {
-    if (entry.language === language || declared?.has(key)) continue;
+  for (const key of [...ENGINE_KEYS, ...locales.addressable]) {
+    if (declared?.has(key) || locales.base.get(key)?.language === language) continue;
     missing.push(key);
   }
   return missing;
@@ -213,7 +221,7 @@ export function unmatchedLocaleKeys(locales: Locales): UnmatchedKey[] {
   const unmatched: UnmatchedKey[] = [];
   for (const [language, table] of locales.declared) {
     for (const key of table.keys()) {
-      if (isEngineKey(key) || locales.base.has(key)) continue;
+      if (isEngineKey(key) || locales.addressable.has(key)) continue;
       unmatched.push({ language, key });
     }
   }

@@ -3,6 +3,7 @@ import { armFightAction, createGameState, GameState, initResources, PLAYER, reso
 import { hostile, Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
+import { logSwing } from './encounter';
 import { isPopulations } from './population';
 import { secondsToMs, toMilliUnits } from './units';
 
@@ -462,5 +463,20 @@ describe('the populations save field', () => {
     const registry = loaded();
     const state = createGameState();
     expect(() => loadSave(state, { version: SAVE_VERSION, diff: { populations: { shore: { crab: { down: 'lots' } } } } as never }, registry)).toThrow(/save field populations/);
+  });
+});
+
+// Four patterns cover three cases; a swing whose swinger and target are the
+// same player is the fourth, and before pass 2 the localizer threw for want of
+// a {target} rather than saying anything at all.
+describe('a swing the player lands on themselves', () => {
+  it('is said the way one between two others is, rather than refused', () => {
+    const registry = loadInEnglish(MODULE);
+    const state = initialState(registry);
+
+    logSwing(state, registry, PLAYER, PLAYER, toMilliUnits(3));
+    logSwing(state, registry, PLAYER, PLAYER, null);
+
+    expect(state.log).toEqual(['The Player hits the Player for 3.', 'The Player misses the Player.']);
   });
 });

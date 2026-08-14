@@ -323,8 +323,11 @@ describe('a module declares the language it is written in (c5)', () => {
     const en = loadUniverse([module('island', '# info island', 'version: 1.0.0', '# entity giant-rat', '# location shore', 'x: 0, y: 0', 'starting')]);
     const es = loadUniverse([module('island', '# info island', 'version: 1.0.0', 'language: es', '# entity giant-rat', '# location shore', 'x: 0, y: 0', 'starting')]);
 
-    expect(en.locales.base.get('island.entity.giant-rat.title')).toEqual({ text: 'Giant Rat', language: 'en' });
+    expect(en.locales.base.get('island.entity.giant-rat.title')).toEqual({ text: 'Giant Rat', language: 'en', generated: true });
     expect(es.locales.base.has('island.entity.giant-rat.title')).toBe(false);
+    // Addressable either way: the Spanish player is shown the key, which is
+    // exactly the gap a translator has to be told about (pass 2, c7).
+    expect(es.locales.addressable.has('island.entity.giant-rat.title')).toBe(true);
   });
 
   it('records an authored title under whatever language its module declared', () => {
@@ -345,7 +348,7 @@ describe('a generated action label is an English entry too (c5)', () => {
     loadUniverse([module('isla', '# info isla', 'version: 1.0.0', `language: ${language}`, '# location orilla', 'x: 0, y: 0', 'starting', 'entities:', '  puerta', '# entity puerta', 'uses: abrir-puerta', '# action abrir-puerta', 'instant', 'say: se abre')]);
 
   it('records the generated label only for a module writing English', () => {
-    expect(isla('en').locales.base.get('isla.action.abrir-puerta.abrir-puerta')).toEqual({ text: 'Abrir Puerta', language: 'en' });
+    expect(isla('en').locales.base.get('isla.action.abrir-puerta.abrir-puerta')).toEqual({ text: 'Abrir Puerta', language: 'en', generated: true });
     expect(isla('es').locales.base.has('isla.action.abrir-puerta.abrir-puerta')).toBe(false);
     expect(isla('es').locales.base.has('isla.entity.puerta.abrir-puerta')).toBe(false);
   });

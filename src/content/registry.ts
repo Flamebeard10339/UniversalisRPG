@@ -244,9 +244,14 @@ function recordBaseText(registry: Registry, languages: ReadonlyMap<string | null
   const namespace = registry.namespace.ownerOf(kind, id) ?? null;
   const language = languages.get(namespace) ?? DEFAULT_LANGUAGE;
   for (const field of fields) {
+    const key = localeKey(namespace, kind, id, field);
     const authoredValue = authored[field];
-    const text = typeof authoredValue === 'string' ? authoredValue : field === GENERATED_FIELD && language === DEFAULT_LANGUAGE ? humanizeEn(id) : undefined;
-    if (text !== undefined) registry.locales.base.set(localeKey(namespace, kind, id, field), { text, language });
+    // A title is asked for whatever anybody authored, so its key is addressable
+    // even where no module has text for it; an unauthored `examine:` is nothing
+    // the engine ever renders and so is not a gap in any language.
+    if (field === GENERATED_FIELD || typeof authoredValue === 'string') registry.locales.addressable.add(key);
+    if (typeof authoredValue === 'string') registry.locales.base.set(key, { text: authoredValue, language });
+    else if (field === GENERATED_FIELD && language === DEFAULT_LANGUAGE) registry.locales.base.set(key, { text: humanizeEn(id), language, generated: true });
   }
 }
 
@@ -262,22 +267,28 @@ function recordActionText(registry: Registry, languages: ReadonlyMap<string | nu
     if (problem) throw new DslError(`# ${kind} ${id}: ${problem}`);
     const slug = actionSlug(action.label);
     taken.add(slug);
+    const key = localeKey(namespace, kind, id, slug);
+    registry.locales.addressable.add(key);
     // A generated label is `humanizeEn` of an id, so it is an entry for English
     // and for nothing else — the same gate `defaultTitle` applies, applied
     // where the other generator runs (c5).
     if (action.generatedLabel && language !== DEFAULT_LANGUAGE) continue;
-    registry.locales.base.set(localeKey(namespace, kind, id, slug), { text: action.label, language });
+    registry.locales.base.set(key, { text: action.label, ...(action.generatedLabel ? { generated: true as const } : {}), language });
   }
 }
 
 // A recipe is absent: its craft is shown through `engine.craft.label` over the
 // recipe's own title key, so keying the compiled label as well would be one
 // visible string with two keys that a translator has to fill in twice.
-function recordEveryActionText(registry: Registry, languages: ReadonlyMap<string | null, string>): void {
-  for (const entity of registry.entities.values()) recordActionText(registry, languages, 'entity', entity.id, entity.actions);
-  for (const location of registry.locations.values()) recordActionText(registry, languages, 'location', location.id, location.actions);
-  for (const item of registry.items.values()) recordActionText(registry, languages, 'item', item.id, item.actions);
-  for (const [id, action] of registry.actions) recordActionText(registry, languages, 'action', id, [action]);
+// Every table of actions a player can be offered one from, each beside the id
+// that owns it — which is what lets a refusal name the module to blame.
+function everyActionTable(registry: Registry): Array<[string, string, readonly Action[]]> {
+  return [
+    ...[...registry.entities.values()].map((entity) => ['entity', entity.id, entity.actions] as [string, string, readonly Action[]]),
+    ...[...registry.locations.values()].map((location) => ['location', location.id, location.actions] as [string, string, readonly Action[]]),
+    ...[...registry.items.values()].map((item) => ['item', item.id, item.actions] as [string, string, readonly Action[]]),
+    ...[...registry.actions].map(([id, action]) => ['action', id, [action]] as [string, string, readonly Action[]]),
+  ];
 }
 
 function applySection(registry: Registry, section: ModuleSection, context: HydrateContext): void {
@@ -1010,7 +1021,11 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   if (mergeFailure) return { failure: mergeFailure };
   reconcileMembers(namespace, merged, declaredMembers);
   const languages = new Map<string | null, string>(modules.map((module) => [module.namespace, module.info.language]));
-  registry.locales.moduleLanguages = modules.map((module) => module.info.language);
+  // Only the modules that declare content: a locale-only module writing English
+  // beside a Spanish island says nothing about what language its prose is in,
+  // and counting it would shut the prose door for every player of every
+  // language, since the shipped engine locale declares `en`.
+  registry.locales.moduleLanguages = modules.filter((module) => module.sections.some((section) => section.kind !== 'locale')).map((module) => module.info.language);
   for (const module of modules) {
     for (const section of module.sections) {
       if (section.kind === 'locale') addLocaleSection(registry.locales, module.namespace, section.value as LocaleSection);
@@ -1038,11 +1053,13 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
       if (registry.namespace.has(kind, id)) recordBaseText(registry, languages, kind, section.value as Record<string, unknown>);
     }
   }
-  try {
-    recordEveryActionText(registry, languages);
-  } catch (error) {
-    if (!(error instanceof DslError)) throw error;
-    return { failure: { module: modules[0], stage: 'build', error } };
+  for (const [kind, id, actions] of everyActionTable(registry)) {
+    try {
+      recordActionText(registry, languages, kind, id, actions);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return { failure: { module: sectionOwner(owners, kind, id) ?? modules[0], stage: 'build', error } };
+    }
   }
   return { registry };
 }

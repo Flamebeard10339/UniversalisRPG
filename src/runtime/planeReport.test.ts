@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from '../content/registry';
+import { } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { Direction } from '../content/hex';
 import { applyClusterEffect } from './clusterEffect';
 import { ORIGIN } from './clusterPlane';
@@ -67,7 +68,7 @@ cluster-effect: +50% attack
 item-experience: 1000
 `;
 
-const registry = loadModule(MODULE);
+const registry = loadInEnglish(MODULE);
 
 function ok(outcome: Growth): string {
   if (!outcome.ok) throw new Error(outcome.refused);

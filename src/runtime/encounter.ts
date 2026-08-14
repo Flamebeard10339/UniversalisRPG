@@ -256,8 +256,11 @@ function spoken(milliAmount: number): number {
 // the amount wherever it puts them.
 export function logSwing(state: GameState, registry: Registry, self: string, other: string, damage: number | null): void {
   const localizer = localizerOf(registry, state);
-  const attacker = self === PLAYER ? undefined : actorTitle(self, registry, state);
-  const target = other === PLAYER ? undefined : actorTitle(other, registry, state);
+  // A swing the player lands on themselves is neither of the two sides the
+  // patterns name, so it is said the way one between two others is: whoever
+  // swings is named, and so is whoever it lands on.
+  const attacker = self === PLAYER && other !== PLAYER ? undefined : actorTitle(self, registry, state);
+  const target = other === PLAYER && self !== PLAYER ? undefined : actorTitle(other, registry, state);
   const side = attacker === undefined ? 'player' : target === undefined ? 'foe' : 'other';
   const params: Params = { ...(attacker === undefined ? {} : { attacker }), ...(target === undefined ? {} : { target }) };
   const hit = `engine.combat.${side}.hit` as const;

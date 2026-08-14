@@ -1397,3 +1397,35 @@ describe('a craft is one string with one key', () => {
     expect(view(session).choices.map((choice) => choice.label)).toContain('Prepara Pan');
   });
 });
+
+// pass 2: three surfaces read `.title` off the registry instead of asking the
+// localizer, so a Spanish player was shown the base language on the carried
+// screen, the plane screen and the modal built from them.
+describe('every screen a title reaches is played in one language', () => {
+  const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# cluster-jewel core', 'shape: point', 'open-connections: e', '', '# item blade', 'title: Blade', 'slot: mainhand', 'origin-cluster: core'].join('\n');
+  const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada'].join('\n');
+
+  const carrying = (language: string): PlayView => {
+    const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
+    registry.saves.set('armed', { version: SAVE_VERSION, diff: { inventory: { 'forge.blade': 1 } } });
+    const session = startSession(registry, language);
+    applyDirective(session, { kind: 'load', save: 'armed' });
+    return view(session);
+  };
+
+  it('names what the player carries in the language being played', () => {
+    expect(carrying('en').carried.map((entry) => entry.name)).toEqual(['Blade']);
+    expect(carrying('es').carried.map((entry) => entry.name)).toEqual(['Espada']);
+  });
+
+  it('names the plane that copy carries the same way, and every title it reports', () => {
+    expect(carrying('en').planes.map((plane) => [plane.name, plane.title, plane.clusters[0].title])).toEqual([['Blade', 'Blade', 'Core']]);
+    expect(carrying('es').planes.map((plane) => [plane.name, plane.title, plane.clusters[0].title])).toEqual([['Espada', 'Espada', 'forge.cluster-jewel.core.title']]);
+  });
+
+  it('shows the key on those screens too where the played language has none', () => {
+    expect(carrying('fr').carried.map((entry) => entry.name)).toEqual(['forge.item.blade.title']);
+    expect(carrying('fr').planes.map((plane) => plane.name)).toEqual(['forge.item.blade.title']);
+    expect(carrying('fr').planes.map((plane) => plane.title)).toEqual(['forge.item.blade.title']);
+  });
+});

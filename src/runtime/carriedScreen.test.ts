@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { carriedEntries, carriedOptions, carriedSubmit, CONFIRMED, LEAVE } from './carriedScreen';
 import { equip } from './equipment';
 import { carriedCount, feedItem } from './itemInstance';
@@ -30,7 +31,7 @@ item-experience: 1000
 title: Rope
 `;
 
-const registry = loadModule(MODULE);
+const registry = loadInEnglish(MODULE);
 
 function carrying(inventory: Record<string, number>, over: Registry = registry): GameState {
   const state = initialState(over);
@@ -81,7 +82,7 @@ describe('what the screen lists', () => {
   // An answer comes back as the value it was published as, so two items titled
   // alike would resolve to whichever of them was listed first.
   it('tells two entries of the same title apart by the id each is named by', () => {
-    const twins = loadModule(`${MODULE}\n# item cord\ntitle: Rope\n`);
+    const twins = loadInEnglish(`${MODULE}\n# item cord\ntitle: Rope\n`);
     const state = carrying({ rope: 2, cord: 2 }, twins);
 
     expect(carriedEntries(state, twins).map((entry) => entry.value)).toEqual(['Rope x2 (rope)', 'Rope x2 (cord)']);
@@ -101,8 +102,10 @@ describe('what the screen lists', () => {
     expect(new Set(copies.map((entry) => entry.value)).size).toBe(2);
   });
 
+  // An item nothing declares has a title in no language, so its key stands in —
+  // and the key is built from the id the player is still carrying it under (c3).
   it('names an item the registry has lost by the id the player still carries it under', () => {
-    expect(carriedEntries(carrying({ 'gone.relic': 1 }), registry)[0].value).toBe('gone.relic x1');
+    expect(carriedEntries(carrying({ 'gone.relic': 1 }), registry)[0].value).toBe('item.gone.relic.title x1');
   });
 
   // c21: one copy, one row. The stack it came out of keeps its own row with one

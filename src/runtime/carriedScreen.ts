@@ -2,6 +2,7 @@ import { isBase, Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
 import { equip, unequip } from './equipment';
+import { Localized, Localizer, localizerOf } from './localized';
 import { itemCopies, destroyItem, grownItems, isGrownCopy, itemTemplate, wornCopy, wornIn } from './itemInstance';
 import { type ModalAnswers, type ModalFrame, type ModalOption } from './modals';
 import { planeFrame } from './planeScreen';
@@ -29,7 +30,7 @@ export interface CarriedEntry {
   // row its item id names.
   readonly id: string;
   // The one name for it (c16). Every surface spells a carried thing this way.
-  readonly name: string;
+  readonly name: Localized;
   // How many the player has: a stack's count, and one for a grown copy or a
   // worn one, neither of which is counted in a stack.
   readonly count: number;
@@ -94,9 +95,10 @@ export function carriedFrame(answers: ModalAnswers = {}): CarriedFrame {
   return { name: 'carried-items', answers };
 }
 
-function nameOf(template: string, registry: Registry, grown: boolean): string {
-  const title = registry.items.get(template)?.title;
-  return title === undefined ? template : carriedName(title, grown);
+// An item the registry no longer holds has no title in any language, so its key
+// stands in — the same answer every other missing string gets (c3).
+function nameOf(template: string, localizer: Localizer, grown: boolean): Localized {
+  return carriedName(localizer, 'item', template, grown);
 }
 
 // Two items may be named alike, and an answer is matched back by the value it
@@ -114,19 +116,20 @@ function distinct(entries: CarriedEntry[]): CarriedEntry[] {
 // adds the third side: what is worn is listed once, under the slot wearing it,
 // and is on neither of the first two lists.
 export function carriedEntries(state: GameState, registry: Registry): CarriedEntry[] {
+  const localizer = localizerOf(registry, state);
   const entries: CarriedEntry[] = [];
   for (const [template, { stack }] of itemCopies(state)) {
-    const name = nameOf(template, registry, false);
+    const name = nameOf(template, localizer, false);
     if (stack > 0) entries.push({ id: template, name, count: stack, value: `${name} x${stack}`, grown: false });
   }
   for (const [id, template] of Object.entries(grownItems(state))) {
     if (wornIn(state, id) !== undefined) continue;
-    const name = nameOf(template, registry, true);
+    const name = nameOf(template, localizer, true);
     entries.push({ id, name, count: 1, value: name, grown: true });
   }
   for (const [slot, id] of Object.entries(state.equipped)) {
     const grown = isGrownCopy(state, id);
-    const name = nameOf(itemTemplate(state, id), registry, grown);
+    const name = nameOf(itemTemplate(state, id), localizer, grown);
     entries.push({ id: grown ? id : wornCopy(slot), name, count: 1, value: `${name} (${slot})`, grown, slot });
   }
   return distinct(entries);

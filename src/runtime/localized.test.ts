@@ -192,3 +192,19 @@ describe('an id survives translation, and prose does not', () => {
     expect(pruned('es')).toEqual(['Se eliminó inventory island.ghost porque su item no está cargado.', 'Se quitó hand porque su objeto island.phantom no está cargado.']);
   });
 });
+
+// pass 2: the door asked every loaded module, and the shipped engine locale
+// always declares `en`, so it could never open for a player of anything else.
+describe('the prose door asks the modules that carry prose', () => {
+  const SPANISH_ISLAND = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting'].join('\n');
+
+  const said = (language: string): string => localizerFor(loadUniverse([engineLocale(), { name: 'isla', text: SPANISH_ISLAND }]), language).prose('se abre la puerta');
+
+  it('opens for a player of the language every content module is written in', () => {
+    expect(said('es')).toBe('se abre la puerta');
+  });
+
+  it('stays shut for a player of another one, however the locale modules are written', () => {
+    expect(said('en')).toBe('(untranslated)');
+  });
+});

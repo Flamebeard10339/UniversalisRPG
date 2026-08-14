@@ -193,3 +193,31 @@ describe('text survives the trip a contribution makes', () => {
     expect(entries(trip(ENGLISH_MODULE, 'en'))).toEqual(entries(before));
   });
 });
+
+// pass 2: the report was drawn from the entries that have text, so a module
+// writing a language nobody had translated reported nothing missing while the
+// player was shown keys on every screen.
+describe('the report covers every key the engine asks for (c7)', () => {
+  const SPANISH_MODULE = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# entity puerta', 'abrir:', '  instant', '  say: se abre'].join('\n');
+
+  it('reports a key no module has any text for, in every language', () => {
+    const loaded = loadUniverse([{ name: 'isla', text: SPANISH_MODULE }]);
+
+    // Its one entry is the label it did author, in the language it declared.
+    expect([...loaded.locales.base]).toEqual([['isla.entity.puerta.abrir', { text: 'abrir', language: 'es' }]]);
+    expect(missingTranslations(loaded.locales, 'es')).toContain('isla.entity.puerta.title');
+    expect(missingTranslations(loaded.locales, 'en')).toContain('isla.entity.puerta.title');
+  });
+
+  it('stops reporting it once a locale supplies it', () => {
+    const translated = ['# info isla-es', 'version: 1.0.0', 'dependencies:', '  isla', '', '# locale es', 'isla.entity.puerta.title: Puerta'].join('\n');
+    const loaded = loadUniverse([{ name: 'isla', text: SPANISH_MODULE }, { name: 'isla-es', text: translated }]);
+
+    expect(missingTranslations(loaded.locales, 'es')).not.toContain('isla.entity.puerta.title');
+    expect(unmatchedLocaleKeys(loaded.locales)).toEqual([]);
+  });
+
+  it('leaves an examine nobody authored out of it, because nothing renders one', () => {
+    expect(missingTranslations(loadUniverse([{ name: 'isla', text: SPANISH_MODULE }]).locales, 'es')).not.toContain('isla.entity.puerta.examine');
+  });
+});

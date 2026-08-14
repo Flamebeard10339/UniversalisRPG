@@ -2,6 +2,7 @@ import { hexKey } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
+import { Localized, localizerOf } from './localized';
 import { carriedEntries, carriedFrame } from './carriedScreen';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
@@ -79,10 +80,11 @@ function reachable(report: PlaneReport, here: ClusterReport): string[] {
 // What a stack the player can spend holds, by the field that says the item is
 // the kind a growth verb consumes. A grown copy is never taken, so a jewel that
 // has itself been grown is not one to slot.
-function stacked(state: GameState, registry: Registry, spent: (item: Item) => boolean): Array<{ id: string; name: string }> {
+function stacked(state: GameState, registry: Registry, spent: (item: Item) => boolean): Array<{ id: string; name: Localized }> {
+  const localizer = localizerOf(registry, state);
   return [...itemCopies(state)].flatMap(([id, { stack }]) => {
     const item = registry.items.get(id);
-    return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(item.title, false) }] : [];
+    return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(localizer, 'item', id, false) }] : [];
   });
 }
 

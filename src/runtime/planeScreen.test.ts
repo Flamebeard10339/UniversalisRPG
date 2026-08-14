@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseDirectiveLine } from '../content/test';
-import { loadModule } from '../content/registry';
+import { } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { carriedFrame } from './carriedScreen';
 import { equip } from './equipment';
 import { growLine } from './growth';
@@ -53,7 +54,7 @@ item-experience: 1000
 title: Rope
 `;
 
-const registry = loadModule(MODULE);
+const registry = loadInEnglish(MODULE);
 
 function carrying(inventory: Record<string, number>): GameState {
   const state = initialState(registry);
