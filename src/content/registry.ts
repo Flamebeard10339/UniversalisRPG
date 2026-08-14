@@ -124,9 +124,6 @@ export interface UniverseLoadResult {
   disabledModules: string[];
 }
 
-// A recipe owns one action, and a label is an action's identifier that a save
-// holds, so this one is a word the engine owns. Which recipe is the ownerRef's
-// to say; what a player reads is `engine.craft.label` over the recipe's title.
 export const CRAFT_LABEL = 'craft';
 
 // Compiled to an Action so a craft runs through the same resolve() machinery

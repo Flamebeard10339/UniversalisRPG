@@ -45,10 +45,6 @@ export const TRAVEL_PAIR = '>';
 
 export const travelPair = (origin: string, dest: string): string => `${origin}${TRAVEL_PAIR}${dest}`;
 
-// c3: a label is an action's identifier and a save holds the one a walk is
-// under, so this one is a word the engine owns rather than a sentence built
-// from a title. The pair the walk is between is the ownerRef's to say, and
-// what a player reads is `engine.travel.to` over the destination's own key.
 export const TRAVEL_LABEL = 'travel';
 
 // The two ends of a pair, and what is said about either of them being gone.

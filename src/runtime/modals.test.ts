@@ -798,6 +798,14 @@ describe('nothing a player answers with carries words', () => {
     'shape: point',
     'open-connections: e',
     '',
+    '# cluster-jewel bough',
+    'shape: point',
+    'open-connections: e',
+    '',
+    '# item bough-jewel',
+    'title: Bough',
+    'cluster-jewel: bough',
+    '',
     '# item blade',
     'title: Blade',
     'slot: mainhand',
@@ -821,7 +829,7 @@ describe('nothing a player answers with carries words', () => {
     '  -> Say nothing.',
     '',
     '# save stocked',
-    `{"version":${SAVE_VERSION},"inventory":{"forge.blade":1,"forge.whetstone":2}}`,
+    `{"version":${SAVE_VERSION},"inventory":{"forge.blade":1,"forge.whetstone":2,"forge.bough-jewel":1}}`,
   ].join('\n');
 
   const SPANISH = [
@@ -833,6 +841,7 @@ describe('nothing a player answers with carries words', () => {
     '# locale es',
     'forge.item.blade.title: Espada',
     'forge.item.whetstone.title: Piedra',
+    'forge.item.bough-jewel.title: Rama',
     'forge.entity.sage.title: Sabio',
     'engine.carried.verb.grow: Cultiva',
     'engine.carried.close: Cierra',
@@ -843,8 +852,8 @@ describe('nothing a player answers with carries words', () => {
   const registry = loadUniverse([engineLocale(), { name: 'forge', text: WORDED }, { name: 'forge-es', text: SPANISH }]);
 
   // Every string this universe can put on a screen: what a `# locale` declared
-  // in any language, and what a module authored. A value equal to one of these
-  // is a value drawn from words.
+  // in any language, and what a module authored. A value holding one of these
+  // anywhere inside it is a value drawn from words.
   const everyWord = (): Set<string> => {
     const words = new Set<string>();
     for (const table of registry.locales.declared.values()) for (const value of table.values()) words.add(value);
@@ -877,6 +886,8 @@ describe('nothing a player answers with carries words', () => {
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'verb', value: 'grow' });
     published();
+    applyDirective(session, { kind: 'submit-modal', key: 'plane', value: 'allocate: slot e' });
+    published();
     applyDirective(session, { kind: 'submit-modal', key: 'plane', value: 'back' });
     applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'close' });
 
@@ -885,12 +896,22 @@ describe('nothing a player answers with carries words', () => {
     return values;
   };
 
+  // Containment, not equality: every reopening of this clause has been a value
+  // that carried a title inside a shape rather than being one, so a value
+  // holding a word is reported with the word it holds.
+  const wordsInside = (value: string, words: Iterable<string>): string[] => [...words].filter((word) => value.includes(word));
+
   it('publishes no value that is a title, an authored line or a locale entry', () => {
     const words = everyWord();
     for (const language of ['en', 'es']) {
       const values = everyValue(language);
       expect(values.length, language).toBeGreaterThan(10);
-      expect(values.filter((value) => words.has(value)), language).toEqual([]);
+      // The two verbs whose values hold a carried id inside a shape rather
+      // than being one. They are what the equality check was blind to, so a
+      // walk that never publishes them leaves the check above watching
+      // nothing.
+      for (const verb of ['slot: ', 'feed: ']) expect(values.filter((value) => value.startsWith(verb)), `${language} published no ${verb.trim()} value`).not.toEqual([]);
+      expect(values.flatMap((value) => wordsInside(value, words).map((word) => `${value} holds ${word}`)), language).toEqual([]);
     }
   });
 
