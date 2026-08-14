@@ -62,6 +62,7 @@
         "src/content/stat.ts",
         "src/content/test.test.ts",
         "src/content/test.ts",
+        "src/content/translation.ts",
         "src/content/tuningVariables.ts",
         "src/content/typed.ts",
         "src/content/universe.test.ts",
@@ -208,6 +209,13 @@
             "src/content/engineLocale.ts"
           ],
           "note": "produced by the-locale-section-and-its-missing-key-report"
+        },
+        {
+          "name": "a universe with every word replaced",
+          "paths": [
+            "src/content/translation.ts"
+          ],
+          "note": "produced by a-recording-survives-translation; a # locale module built from a loaded registry that gives every engine pattern and every content title different words, in the base language and in one nothing ships"
         }
       ]
     },
@@ -284,6 +292,7 @@
         "src/runtime/stats.ts",
         "src/runtime/stopping.test.ts",
         "src/runtime/time.test.ts",
+        "src/runtime/translationSurvival.test.ts",
         "src/runtime/tuning.ts",
         "src/runtime/units.ts"
       ],
@@ -479,6 +488,13 @@
             "src/runtime/localized.ts"
           ],
           "note": "produced by reimplement-localization"
+        },
+        {
+          "name": "the translation-survival gate",
+          "paths": [
+            "src/runtime/translationSurvival.test.ts"
+          ],
+          "note": "produced by a-recording-survives-translation; c5's gate, replaying every shipped # test over that universe in both languages and naming the ones that do not survive yet"
         }
       ]
     },
