@@ -6,6 +6,7 @@ import { Registry } from '../content/registry';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { loadUniverse } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
+import type { ModalChoice } from './modals';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 import { apply, applyDirective, beginAction, cancelAction, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
@@ -1501,7 +1502,10 @@ describe('an answer is spelled once and read in the language being played', () =
   const offered = (session: PlaySession) => view(session).modals[0].options[0].values!;
 
   it('reads a carried row in the played language and answers it in the base one', () => {
-    expect(offered(carried('es')).map((choice) => choice.shown)).toEqual(['Espada x1', 'Close']);
+    // The way out is the engine's own word, so a player of a language nobody
+    // translated it into is shown its key while the answer stays `Close`.
+    expect(offered(carried('es')).map((choice) => choice.shown)).toEqual(['Espada x1', 'engine.carried.close']);
+    expect(offered(carried('en')).map((choice) => choice.shown)).toEqual(['Blade x1', 'Close']);
     expect(offered(carried('es')).map((choice) => choice.value)).toEqual(offered(carried('en')).map((choice) => choice.value));
   });
 
@@ -1520,5 +1524,114 @@ describe('an answer is spelled once and read in the language being played', () =
 
     expect(menu.map((choice) => choice.shown)).toEqual(['(sin traducir)', '(sin traducir)']);
     expect(menu.map((choice) => choice.value)).toEqual(['Ask the way.', 'Say nothing.']);
+  });
+});
+
+// pass 5: `spelled()` set the words to the answer on three of the four modals,
+// so every word the engine offers was read verbatim in every language; and the
+// plane screen spelled its answers through the played localizer, so an answer
+// recorded in one language named nothing in another.
+describe('a modal answer is spelled in the base language on every screen, and only the words move', () => {
+  const FORGE = [
+    '# info forge',
+    'version: 1.0.0',
+    '',
+    '# location camp',
+    'x: 0, y: 0',
+    'starting',
+    '',
+    '# stat attack',
+    'base: 4',
+    '',
+    '# passive keen',
+    '+4 attack',
+    '',
+    '# cluster-jewel core',
+    'shape: point',
+    'open-connections: e, ne',
+    'passives: 1 keen',
+    '',
+    '# item blade',
+    'title: Blade',
+    'slot: mainhand',
+    'max-level: 20',
+    'origin-cluster: core',
+    '',
+    '# item whetstone',
+    'title: Whetstone',
+    'item-experience: 1000',
+  ].join('\n');
+  // Some of the engine's words translated and some left alone, because what an
+  // untranslated one shows is the half of c3 a screen full of translations hides.
+  const FORGE_ES = [
+    '# info forge-es',
+    'version: 1.0.0',
+    'dependencies:',
+    '  forge',
+    '',
+    '# locale es',
+    'forge.item.whetstone.title: Piedra',
+    'engine.carried.verb.grow: Cultiva',
+    'engine.race.elf: Elfo',
+    'engine.plane.feed: alimenta: con {item}',
+  ].join('\n');
+
+  const opened = (language: string): PlaySession => {
+    const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
+    registry.saves.set('armed', { version: SAVE_VERSION, diff: { inventory: { 'forge.blade': 1, 'forge.whetstone': 2 } } });
+    const session = startSession(registry, language);
+    applyDirective(session, { kind: 'load', save: 'armed' });
+    return session;
+  };
+
+  const choices = (session: PlaySession): readonly ModalChoice[] => {
+    const options = view(session).modals[0].options;
+    return options[options.length - 1].values!;
+  };
+
+  const races = (language: string): readonly ModalChoice[] => {
+    const session = opened(language);
+    applyDirective(session, { kind: 'open-modal', modal: 'character-creation' });
+    return choices(session);
+  };
+
+  const verbs = (language: string): readonly ModalChoice[] => {
+    const session = opened(language);
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    submitModal(session, { item: choices(session).find((choice) => choice.value.startsWith('Blade'))!.value });
+    return choices(session);
+  };
+
+  const moves = (language: string): readonly ModalChoice[] => {
+    const session = opened(language);
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    submitModal(session, { item: choices(session).find((choice) => choice.value.startsWith('Blade'))!.value });
+    submitModal(session, { verb: 'Grow' });
+    return choices(session);
+  };
+
+  const answers = (offered: readonly ModalChoice[]): string[] => offered.map((choice) => choice.value);
+  const words = (offered: readonly ModalChoice[]): string[] => offered.map((choice) => choice.shown);
+
+  it('offers the same answers in every language, on every screen', () => {
+    expect(answers(races('es'))).toEqual(answers(races('en')));
+    expect(answers(verbs('es'))).toEqual(answers(verbs('en')));
+    // The one the plane screen spelled through the played localizer: a jewel or
+    // a food in the value put the player's language into what a `# test` replays.
+    expect(answers(moves('es'))).toEqual(answers(moves('en')));
+    expect(answers(moves('en'))).toContain('feed: with Whetstone');
+  });
+
+  it('reads them as the words the engine says in the played language', () => {
+    expect(words(races('en'))).toEqual(['Human', 'Elf', 'Dwarf', 'Orc']);
+    expect(words(verbs('en'))).toEqual(['Grow', 'Equip', 'Destroy', 'Close']);
+    expect(words(moves('en'))).toContain('feed: with Whetstone');
+  });
+
+  it('shows the key for every engine word the played language has no entry for', () => {
+    expect(words(races('es'))).toEqual(['engine.race.human', 'Elfo', 'engine.race.dwarf', 'engine.race.orc']);
+    expect(words(verbs('es'))).toEqual(['Cultiva', 'engine.carried.verb.equip', 'engine.carried.verb.destroy', 'engine.carried.close']);
+    expect(words(moves('es'))).toContain('alimenta: con Piedra');
+    expect(words(moves('es'))).toContain('engine.plane.back');
   });
 });

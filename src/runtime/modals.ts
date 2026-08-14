@@ -2,9 +2,10 @@ import { choose, cursorProblem, DialogueCursor, menuTexts } from './dialogue-run
 import { carriedFrame, carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
 import { type PlaneFocus } from './planeReport';
-import { Localized, Localizer, localizerOf } from './localized';
+import { Localized, localizerOf } from './localized';
 import { GameState, RuntimeError } from './state';
 import { Registry } from '../content/registry';
+import type { EngineKey } from '../content/locale';
 
 // A modal is a named screen that presents options, sits atop whatever is
 // beneath it, and is cleared once every option has an answer. Nothing here
@@ -26,11 +27,6 @@ export interface ModalOption {
   // What this option will accept, or null where it takes free text.
   values: readonly ModalChoice[] | null;
 }
-
-// An answer whose spelling is its own: a directive a `# test` replays, a hex, a
-// verb. The played language does not change it, so it is shown as it is
-// answered — which is what `identifier` means everywhere else.
-export const spelled = (localizer: Localizer, values: readonly string[]): ModalChoice[] => values.map((value) => ({ value, shown: localizer.identifier(value) }));
 
 // The whole of what leaves src/runtime: a name, the options still to be
 // answered, and the value that answering any of them with takes the screen
@@ -80,7 +76,14 @@ interface ModalDefinition<F extends ModalFrame> {
   leaves?: string;
 }
 
-const RACES = ['Human', 'Elf', 'Dwarf', 'Orc'];
+// A race is answered by its own spelling, which a `# test` replays, and read as
+// the pattern beside it. Adding one is a value here and a key in the union.
+const RACES: ReadonlyArray<{ value: string; shown: EngineKey }> = [
+  { value: 'Human', shown: 'engine.race.human' },
+  { value: 'Elf', shown: 'engine.race.elf' },
+  { value: 'Dwarf', shown: 'engine.race.dwarf' },
+  { value: 'Orc', shown: 'engine.race.orc' },
+];
 
 export function dialogueFrame(cursor: DialogueCursor): ModalFrame {
   return { name: 'dialogue', answers: {}, cursor };
@@ -91,7 +94,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     open: () => ({ name: 'character-creation', answers: {} }),
     options: (_frame, state, registry) => [
       { key: 'name', label: localizerOf(registry, state).engine('engine.modal.name'), values: null },
-      { key: 'race', label: localizerOf(registry, state).engine('engine.modal.race'), values: spelled(localizerOf(registry, state), RACES) },
+      { key: 'race', label: localizerOf(registry, state).engine('engine.modal.race'), values: RACES.map((race) => ({ value: race.value, shown: localizerOf(registry, state).engine(race.shown) })) },
     ],
     submit: (frame, state) => {
       state.player = { name: frame.answers.name, race: frame.answers.race };

@@ -2,12 +2,12 @@ import { hexKey } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
-import { Localized, Localizer, localizerOf } from './localized';
+import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { carriedEntries, carriedFrame } from './carriedScreen';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
 import { itemCopies, wornCopySlot } from './itemInstance';
-import { spelled, type ModalFrame, type ModalOption } from './modals';
+import { type ModalChoice, type ModalFrame, type ModalOption } from './modals';
 import { ClusterReport, PlaneFocus, PlaneReport, planeReport } from './planeReport';
 import { GameState } from './state';
 
@@ -36,6 +36,9 @@ export function planeFrame(target: string, hex: string = hexKey(ORIGIN), said?: 
 // — and is null for a value that only moves the focus (c5).
 interface PlaneMove {
   readonly value: string;
+  // The words offered for it, which move with the played language while the
+  // value does not — the two halves of one `ModalChoice`.
+  readonly shown: Localized;
   readonly line: string | null;
   readonly focus: string;
 }
@@ -46,26 +49,28 @@ interface PlaneMove {
 // be, the other two grow a hexagon of one — so the fill is written per verb
 // rather than as one shared prefix, and a frame that one day holds more than
 // one hexagon fills more in rather than needing a grammar to say so.
-// The tail is said twice over: once in the words the screen offers and once in
-// the ids the directive takes, because a jewel is named to the player by the one
-// naming function (c16) and to the parser by its id.
+// The tail is spelled twice over: once in the base language the answer is
+// replayed in and once in the ids the directive takes, because a jewel is named
+// to the parser by its id and to a `# test` by the name it carries in the one
+// language every recording shares. What the player reads is neither of those —
+// it is the move's own `shown`.
 interface Tail {
-  readonly said: string;
+  readonly base: string;
   readonly spelled: string;
 }
 
-const same = (tail: string): Tail => ({ said: tail, spelled: tail });
+const same = (tail: string): Tail => ({ base: tail, spelled: tail });
 
-function onCopy(frame: PlaneFrame, verb: string, tail: Tail): PlaneMove {
-  return { value: `${verb}: ${tail.said}`, line: `${verb}: ${frame.target} ${tail.spelled}`, focus: frame.hex };
+function onCopy(frame: PlaneFrame, verb: string, tail: Tail, shown: Localized): PlaneMove {
+  return { value: `${verb}: ${tail.base}`, shown, line: `${verb}: ${frame.target} ${tail.spelled}`, focus: frame.hex };
 }
 
-function onHexagon(frame: PlaneFrame, verb: string, tail: Tail): PlaneMove {
-  return { value: `${verb}: ${tail.said}`, line: `${verb}: ${frame.target} at ${frame.hex} ${tail.spelled}`, focus: frame.hex };
+function onHexagon(frame: PlaneFrame, verb: string, tail: Tail, shown: Localized): PlaneMove {
+  return { value: `${verb}: ${tail.base}`, shown, line: `${verb}: ${frame.target} at ${frame.hex} ${tail.spelled}`, focus: frame.hex };
 }
 
-function goes(hex: string): PlaneMove {
-  return { value: `Go to ${hex}`, line: null, focus: hex };
+function goes(hex: string, shown: Localized): PlaneMove {
+  return { value: `Go to ${hex}`, shown, line: null, focus: hex };
 }
 
 // The hexagons a step away, whichever side of the slot joining them this one
@@ -80,11 +85,12 @@ function reachable(report: PlaneReport, here: ClusterReport): string[] {
 // What a stack the player can spend holds, by the field that says the item is
 // the kind a growth verb consumes. A grown copy is never taken, so a jewel that
 // has itself been grown is not one to slot.
-function stacked(state: GameState, registry: Registry, spent: (item: Item) => boolean): Array<{ id: string; name: Localized }> {
+function stacked(state: GameState, registry: Registry, spent: (item: Item) => boolean): Array<{ id: string; name: Localized; base: string }> {
   const localizer = localizerOf(registry, state);
+  const base = localizerFor(registry, BASE_LANGUAGE);
   return [...itemCopies(state)].flatMap(([id, { stack }]) => {
     const item = registry.items.get(id);
-    return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(localizer, 'item', id, false) }] : [];
+    return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(localizer, 'item', id, false), base: carriedName(base, 'item', id, false) }] : [];
   });
 }
 
@@ -92,24 +98,28 @@ function movesOn(frame: PlaneFrame, report: PlaneReport | undefined, state: Game
   const here = report?.clusters.find((cluster) => cluster.hex === frame.hex);
   if (!report || !here) return [];
 
-  const moves = reachable(report, here).map(goes);
+  const localizer = localizerOf(registry, state);
+  const moves = reachable(report, here).map((hex) => goes(hex, localizer.engine('engine.plane.go', { hex: localizer.identifier(hex) })));
   for (const slot of here.slots) {
     if (slot.standing !== 'allocated' || slot.beyond !== null) continue;
     for (const jewel of stacked(state, registry, (item) => item.clusterJewel !== undefined)) {
-      moves.push(onHexagon(frame, 'slot', { said: `${slot.direction} with ${jewel.name}`, spelled: `${slot.direction} with ${jewel.id}` }));
+      const shown = localizer.engine('engine.plane.slot', { direction: localizer.identifier(slot.direction), jewel: jewel.name });
+      moves.push(onHexagon(frame, 'slot', { base: `${slot.direction} with ${jewel.base}`, spelled: `${slot.direction} with ${jewel.id}` }, shown));
     }
   }
   for (const slot of here.slots) {
-    if (slot.standing === 'available') moves.push(onHexagon(frame, 'allocate', same(`slot ${slot.direction}`)));
+    if (slot.standing !== 'available') continue;
+    moves.push(onHexagon(frame, 'allocate', same(`slot ${slot.direction}`), localizer.engine('engine.plane.allocate.slot', { direction: localizer.identifier(slot.direction) })));
   }
   for (const position of here.positions) {
-    if (position.standing === 'available') moves.push(onHexagon(frame, 'allocate', same(`position ${position.position}`)));
+    if (position.standing !== 'available') continue;
+    moves.push(onHexagon(frame, 'allocate', same(`position ${position.position}`), localizer.engine('engine.plane.allocate.position', { position: position.position })));
   }
   // Last, and on every hexagon, because what a copy is fed is the one growth
   // that is the copy's rather than one hexagon of it — and without it a base
   // still in its stack would publish only values it has no point to spend on.
   for (const food of stacked(state, registry, (item) => item.itemExperience !== undefined)) {
-    moves.push(onCopy(frame, 'feed', { said: `with ${food.name}`, spelled: `with ${food.id}` }));
+    moves.push(onCopy(frame, 'feed', { base: `with ${food.base}`, spelled: `with ${food.id}` }, localizer.engine('engine.plane.feed', { item: food.name })));
   }
   return moves;
 }
@@ -128,8 +138,9 @@ function heading(localizer: Localizer, frame: PlaneFrame, report: PlaneReport | 
 
 export function planeOptions(frame: PlaneFrame, state: GameState, registry: Registry): ModalOption[] {
   const report = planeReport(registry, state, frame.target);
-  const values = movesOn(frame, report, state, registry).map((move) => move.value);
-  return [{ key: PLANE, label: heading(localizerOf(registry, state), frame, report), values: spelled(localizerOf(registry, state), [...values, BACK]) }];
+  const localizer = localizerOf(registry, state);
+  const offered: ModalChoice[] = movesOn(frame, report, state, registry).map((move) => ({ value: move.value, shown: move.shown }));
+  return [{ key: PLANE, label: heading(localizer, frame, report), values: [...offered, { value: BACK, shown: localizer.engine('engine.plane.back') }] }];
 }
 
 // c3: leaving a plane is not closing a screen, it is going back to the one this

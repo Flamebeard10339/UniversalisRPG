@@ -33,7 +33,23 @@ engine.modal.race: Race
 engine.modal.choice: Choice
 engine.modal.item: Item
 engine.modal.confirm: {verb} {item} for good?
+engine.carried.verb.grow: Grow
+engine.carried.verb.equip: Equip
+engine.carried.verb.unequip: Unequip
+engine.carried.verb.destroy: Destroy
+engine.carried.close: Close
+engine.carried.confirmed: Go ahead
+engine.race.human: Human
+engine.race.elf: Elf
+engine.race.dwarf: Dwarf
+engine.race.orc: Orc
 engine.growth.max-level: {item} is already at level {level}, which is its maximum
+engine.plane.go: Go to {hex}
+engine.plane.slot: slot: {direction} with {jewel}
+engine.plane.allocate.slot: allocate: slot {direction}
+engine.plane.allocate.position: allocate: position {position}
+engine.plane.feed: feed: with {item}
+engine.plane.back: Back to inventory
 engine.plane.heading: {plane} at {hex}
 engine.plane.heading.said: {plane} at {hex} — {said}
 engine.said.elided: … {dropped} more lines

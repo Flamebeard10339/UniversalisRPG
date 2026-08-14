@@ -1,10 +1,11 @@
 import { isBase, Item } from '../content/item';
+import type { EngineKey } from '../content/locale';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
 import { equip, unequip } from './equipment';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { itemCopies, destroyItem, grownItems, isGrownCopy, itemTemplate, wornCopy, wornIn } from './itemInstance';
-import { spelled, type ModalAnswers, type ModalChoice, type ModalFrame, type ModalOption } from './modals';
+import { type ModalAnswers, type ModalChoice, type ModalFrame, type ModalOption } from './modals';
 import { planeFrame } from './planeScreen';
 import { GameState } from './state';
 
@@ -17,11 +18,13 @@ import { GameState } from './state';
 // the frame asks, because a modal comes down on the answer that completes it and
 // a screen with no such answer is one the world stays withdrawn behind.
 export const LEAVE = 'Close';
+const LEAVE_SHOWN: EngineKey = 'engine.carried.close';
 
 // The other answer to the second question a grown copy's destruction asks. What
 // is lost is named by that question's own label, so this stays the same word
 // however the copy is titled and a recorded route replays whatever it was.
 export const CONFIRMED = 'Go ahead';
+const CONFIRMED_SHOWN: EngineKey = 'engine.carried.confirmed';
 
 export interface CarriedEntry {
   // What a verb names this by, and what names this one row apart from every
@@ -50,7 +53,11 @@ export interface CarriedEntry {
 }
 
 interface CarriedVerb {
+  // What answering with it is spelled as, and the key for the words offered
+  // beside it. The first is a directive a `# test` replays and does not move
+  // with the language; the second is all the player reads and does.
   readonly value: string;
+  readonly shown: EngineKey;
   applies(item: Item | undefined, entry: CarriedEntry): boolean;
   // Whether taking it asks once more, naming what is lost, before it happens (c12).
   confirms(entry: CarriedEntry): boolean;
@@ -60,6 +67,7 @@ interface CarriedVerb {
 const VERBS: readonly CarriedVerb[] = [
   {
     value: 'Grow',
+    shown: 'engine.carried.verb.grow',
     applies: (item) => item !== undefined && isBase(item),
     confirms: () => false,
     // c3: the plane screen replaces this one rather than stacking on it, which
@@ -68,6 +76,7 @@ const VERBS: readonly CarriedVerb[] = [
   },
   {
     value: 'Equip',
+    shown: 'engine.carried.verb.equip',
     applies: (item, entry) => item?.slot !== undefined && entry.slot === undefined,
     confirms: () => false,
     take: (entry, state, registry) => {
@@ -77,6 +86,7 @@ const VERBS: readonly CarriedVerb[] = [
   },
   {
     value: 'Unequip',
+    shown: 'engine.carried.verb.unequip',
     applies: (_item, entry) => entry.slot !== undefined,
     confirms: () => false,
     take: (entry, state) => {
@@ -86,6 +96,7 @@ const VERBS: readonly CarriedVerb[] = [
   },
   {
     value: 'Destroy',
+    shown: 'engine.carried.verb.destroy',
     applies: () => true,
     confirms: (entry) => entry.grown,
     take: (entry, state, registry) => {
@@ -150,9 +161,9 @@ function verbsFor(entry: CarriedEntry, state: GameState, registry: Registry): re
 
 // Every row a screen offers is answered by its own spelling — an item's base
 // name, a verb — and read as the words beside it, which for an item is the name
-// the played language gives it.
+// the played language gives it and for anything the engine says is a pattern.
 function listed(localizer: Localizer, choices: readonly ModalChoice[]): readonly ModalChoice[] {
-  return [...choices, ...spelled(localizer, [LEAVE])];
+  return [...choices, { value: LEAVE, shown: localizer.engine(LEAVE_SHOWN) }];
 }
 
 // Each answer widens what the screen asks, which is what leaves the verbs to be
@@ -166,12 +177,12 @@ export function carriedOptions(answers: ModalAnswers, state: GameState, registry
   if (!chosen) return [item];
 
   const applicable = verbsFor(chosen, state, registry);
-  const verb: ModalOption = { key: 'verb', label: chosen.name, values: listed(localizer, spelled(localizer, applicable.map((each) => each.value))) };
+  const verb: ModalOption = { key: 'verb', label: chosen.name, values: listed(localizer, applicable.map((each) => ({ value: each.value, shown: localizer.engine(each.shown) }))) };
 
   const taking = applicable.find((each) => each.value === answers.verb);
   if (!taking?.confirms(chosen)) return [item, verb];
   // The verb is an answer value rather than words, so it goes in as an id.
-  return [item, verb, { key: 'confirm', label: localizer.engine('engine.modal.confirm', { verb: localizer.identifier(taking.value), item: chosen.name }), values: listed(localizer, spelled(localizer, [CONFIRMED])) }];
+  return [item, verb, { key: 'confirm', label: localizer.engine('engine.modal.confirm', { verb: localizer.engine(taking.shown), item: chosen.name }), values: listed(localizer, [{ value: CONFIRMED, shown: localizer.engine(CONFIRMED_SHOWN) }]) }];
 }
 
 // The frame that replaces this one: itself with the answer kept while it still

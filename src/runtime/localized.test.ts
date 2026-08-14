@@ -77,20 +77,32 @@ describe('the engine speaks in keys (c2)', () => {
   // One entry per occurrence, not per file: an allowlist keyed to a file exempts
   // every later sentence in it that matches the same pattern, which is how a
   // second `{item} ({slot})` sat here unlisted (pass 5).
-  // Five occurrences that are English and stay so, because each is an identifier
-  // rather than a display. Two are action labels — what `use:<kind>.<objId>.
-  // <label>` and `activeAction.actionLabel` are spelled with — and three are the
-  // carried screen's answer values, what a `submit-modal:` in a `# test`
-  // replays: a worn row, the suffix that tells two alike rows apart, and a
-  // stack. Every one of them is shown through a pattern instead:
-  // `engine.travel.to`, `engine.craft.label`, `engine.carried.stack` and
-  // `engine.carried.worn`.
+  //
+  // Every one of these is English in TypeScript and stays so, because every one
+  // of them is answered rather than read: an action label, what
+  // `use:<kind>.<objId>.<label>` is spelled with, or a modal answer a
+  // `submit-modal:` in a shipped `# test` replays. None is what a player reads
+  // — each is offered through a pattern beside it, which is the other half of
+  // the `ModalChoice` pair — so translating the display never moves a recorded
+  // answer, and editing the locale file never breaks a recording.
   const IDENTIFIERS = [
     'src/content/registry.ts: Craft {recipe}',
     'src/runtime/actions.ts: Travel to {destination}',
+    'src/runtime/carriedScreen.ts: Close',
+    'src/runtime/carriedScreen.ts: Destroy',
+    'src/runtime/carriedScreen.ts: Equip',
+    'src/runtime/carriedScreen.ts: Go ahead',
+    'src/runtime/carriedScreen.ts: Grow',
+    'src/runtime/carriedScreen.ts: Unequip',
     'src/runtime/carriedScreen.ts: {item} ({slot})',
     'src/runtime/carriedScreen.ts: {item} ({slot})',
     'src/runtime/carriedScreen.ts: {item} x{count}',
+    'src/runtime/modals.ts: Dwarf',
+    'src/runtime/modals.ts: Elf',
+    'src/runtime/modals.ts: Human',
+    'src/runtime/modals.ts: Orc',
+    'src/runtime/planeScreen.ts: Back to inventory',
+    'src/runtime/planeScreen.ts: Go to {hex}',
   ];
 
   it('leaves no engine sentence behind in TypeScript', () => {
