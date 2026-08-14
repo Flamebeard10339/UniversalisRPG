@@ -62,6 +62,14 @@ export class Namespace {
     }
   }
 
+  // Every declaration, flattened and ordered, so that two namespaces can be
+  // compared for equality by something that is not the Namespace itself.
+  snapshot(): string[] {
+    const lines: string[] = [];
+    for (const [kind, keys] of this.declared) for (const [key, namespace] of keys) lines.push(`${kind} ${key} ${namespace ?? '(root)'}`);
+    return lines.sort();
+  }
+
   has(kind: string, key: string): boolean {
     return this.declared.get(kind)?.has(key) === true;
   }

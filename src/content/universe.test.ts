@@ -303,3 +303,37 @@ describe('the parsed modules a load hands back', () => {
     expect(loadUniverseWithDiagnostics([]).parsed).toEqual([]);
   });
 });
+
+describe('a module declares the language it is written in (c5)', () => {
+  const titled = (language: string): string => {
+    const sources = [module('island', '# info island', 'version: 1.0.0', `language: ${language}`, '# entity giant-rat', '# location shore', 'x: 0, y: 0', 'starting')];
+    return loadUniverse(sources).entities.get('island.giant-rat')!.title;
+  };
+
+  it('defaults to en, which is where humanizeEn supplies an unauthored title', () => {
+    expect(parseModuleSource(module('island', '# info island')).info.language).toBe('en');
+    expect(titled('en')).toBe('Giant Rat');
+  });
+
+  it('leaves the raw id standing in another language, rather than an English phrase dressed as content', () => {
+    expect(titled('es')).toBe('giant-rat');
+  });
+
+  it('records a generated title as an entry only for a module writing English', () => {
+    const en = loadUniverse([module('island', '# info island', 'version: 1.0.0', '# entity giant-rat', '# location shore', 'x: 0, y: 0', 'starting')]);
+    const es = loadUniverse([module('island', '# info island', 'version: 1.0.0', 'language: es', '# entity giant-rat', '# location shore', 'x: 0, y: 0', 'starting')]);
+
+    expect(en.locales.base.get('island.entity.giant-rat.title')).toEqual({ text: 'Giant Rat', language: 'en' });
+    expect(es.locales.base.has('island.entity.giant-rat.title')).toBe(false);
+  });
+
+  it('records an authored title under whatever language its module declared', () => {
+    const es = loadUniverse([module('island', '# info island', 'version: 1.0.0', 'language: es', '# entity rata-gigante', 'title: Rata Gigante', '# location shore', 'x: 0, y: 0', 'starting')]);
+
+    expect(es.locales.base.get('island.entity.rata-gigante.title')).toEqual({ text: 'Rata Gigante', language: 'es' });
+  });
+
+  it('takes a tag it has never heard of, because nothing but the humanizeEn gate reads one', () => {
+    expect(parseModuleSource(module('island', '# info island', 'language: pt-br')).info.language).toBe('pt-br');
+  });
+});

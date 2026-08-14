@@ -23,11 +23,13 @@ import { ParsedSave } from './saveSection';
 import { Test, Directive } from './test';
 import { hexKey } from './hex';
 import { ModuleInfo } from './info';
+import { moduleLocaleSections } from './locale';
+import { DEFAULT_LANGUAGE } from '../grammar/section';
 
 type Lines = string[];
 
 export interface SerializeModuleOptions {
-  info: Pick<ModuleInfo, 'id'> & Partial<Pick<ModuleInfo, 'version' | 'dependencies' | 'pack'>>;
+  info: Pick<ModuleInfo, 'id'> & Partial<Pick<ModuleInfo, 'version' | 'dependencies' | 'pack' | 'language'>>;
   globalVariables?: readonly string[];
 }
 
@@ -480,6 +482,7 @@ function infoLines(info: SerializeModuleOptions['info']): Lines {
   const version: Version = info.version ?? [0, 0, 0];
   lines.push(`version: ${formatVersion(version)}`);
   if (info.pack) lines.push(`pack: ${info.pack}`);
+  if (info.language !== undefined && info.language !== DEFAULT_LANGUAGE) lines.push(`language: ${info.language}`);
   if (info.dependencies && info.dependencies.length > 0) lines.push('dependencies:', ...indented(info.dependencies.map(formatDependency)));
   return lines;
 }
@@ -513,6 +516,11 @@ export function serializeRegistryModule(registry: Registry, options: SerializeMo
   for (const variableId of options.globalVariables ?? []) {
     const variable = registry.variables.get(variableId);
     if (variable) sections.push([`# variable ${variable.id}`, ...(variable.value !== undefined ? [`value: ${n(variable.value)}`] : [])].join('\n'));
+  }
+  // A locale belongs to the module that wrote it rather than to any id, so it
+  // is printed by attribution and never by `inModule`.
+  for (const declared of moduleLocaleSections(registry.locales, moduleId)) {
+    sections.push([`# locale ${declared.language}`, ...declared.entries.map((entry) => `${entry.key}: ${entry.value}`)].join('\n'));
   }
   for (const [id, save] of registry.saves) if (inModule(moduleId, id)) sections.push(saveSection(moduleId, id, save));
   for (const test of registry.tests.values()) if (inModule(moduleId, test.id)) sections.push(testSection(moduleId, test));

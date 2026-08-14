@@ -28,7 +28,7 @@ import { Removal } from './removal';
 import { declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
-import { Authored, hydrateSection } from '../grammar/section';
+import { Authored, DEFAULT_LANGUAGE, hydrateSection, HydrateContext } from '../grammar/section';
 import { Skill, skillSchema } from './skill';
 import { Stat, statSchema } from './stat';
 import { Test } from './test';
@@ -231,13 +231,17 @@ export function formatModuleDiagnostic(value: ModuleDiagnostic): string {
 // `humanizeEn` fills in — which is an English entry, so it is one only where the
 // module says it is writing English. A field left unauthored anywhere else has
 // no entry in any language, which is what puts its key on screen (c3, c5).
-function recordBaseText(registry: Registry, kind: string, authored: Record<string, unknown>, namespace: string | null, language: string): void {
+function recordBaseText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, authored: Record<string, unknown>): void {
   const fields = TEXT_FIELDS[kind];
   if (!fields) return;
   const id = authored.id as string;
+  // The module that owns the id, not the one that last patched the section: a
+  // patch writes text into somebody else's object, and the key names the object.
+  const namespace = registry.namespace.ownerOf(kind, id) ?? null;
+  const language = languages.get(namespace) ?? DEFAULT_LANGUAGE;
   for (const field of fields) {
     const authoredValue = authored[field];
-    const text = typeof authoredValue === 'string' ? authoredValue : field === GENERATED_FIELD && language === 'en' ? humanizeEn(id) : undefined;
+    const text = typeof authoredValue === 'string' ? authoredValue : field === GENERATED_FIELD && language === DEFAULT_LANGUAGE ? humanizeEn(id) : undefined;
     if (text !== undefined) registry.locales.base.set(localeKey(namespace, kind, id, field), { text, language });
   }
 }
@@ -265,10 +269,10 @@ function recordEveryActionText(registry: Registry, languages: ReadonlyMap<string
   for (const [id, action] of registry.actions) recordActionText(registry, languages, 'action', id, [action]);
 }
 
-function applySection(registry: Registry, section: ModuleSection): void {
+function applySection(registry: Registry, section: ModuleSection, context: HydrateContext): void {
   switch (section.kind) {
     case 'entity': {
-      const entity = hydrateSection(section.value as Authored<AuthoredEntity>, entitySchema);
+      const entity = hydrateSection(section.value as Authored<AuthoredEntity>, entitySchema, context);
       // `actions` and `handlers` are what `blocks` becomes once `uses:` can be
       // read against the actions it names, which is after every section is in.
       registry.entities.set(entity.id, { ...entity, actions: [], handlers: [] });
@@ -280,7 +284,7 @@ function applySection(registry: Registry, section: ModuleSection): void {
       break;
     }
     case 'event': {
-      const event = hydrateSection(section.value as Authored<GameEvent>, eventSchema);
+      const event = hydrateSection(section.value as Authored<GameEvent>, eventSchema, context);
       if (!event.resource) throw new DslError(`# event ${event.id} requires a resource: to watch`);
       if (!event.trigger) throw new DslError(`# event ${event.id} requires a trigger:`);
       // An entity answers an event by writing `on <its name>:`, and a hook has
@@ -293,17 +297,17 @@ function applySection(registry: Registry, section: ModuleSection): void {
       break;
     }
     case 'faction': {
-      const faction = hydrateSection(section.value as Authored<Faction>, factionSchema);
+      const faction = hydrateSection(section.value as Authored<Faction>, factionSchema, context);
       registry.factions.set(faction.id, faction);
       break;
     }
     case 'location': {
-      const location = hydrateSection(section.value as Authored<Location>, locationSchema);
+      const location = hydrateSection(section.value as Authored<Location>, locationSchema, context);
       registry.locations.set(location.id, location);
       break;
     }
     case 'item': {
-      const item = hydrateSection(section.value as Authored<Item>, itemSchema);
+      const item = hydrateSection(section.value as Authored<Item>, itemSchema, context);
       const problem = itemRoleProblem(item);
       if (problem) throw new DslError(`# item ${item.id}: ${problem}`);
       registry.items.set(item.id, item);
@@ -311,7 +315,7 @@ function applySection(registry: Registry, section: ModuleSection): void {
     }
     case 'passive': {
       const authored = section.value as Authored<Passive>;
-      const passive = hydrateSection(authored, passiveSchema);
+      const passive = hydrateSection(authored, passiveSchema, context);
       const problem = passiveRangeProblem(passive);
       if (problem) throw new DslError(`# passive ${authored.id}: ${problem}`);
       registry.passives.set(passive.id, passive);
@@ -320,7 +324,7 @@ function applySection(registry: Registry, section: ModuleSection): void {
     case 'cluster-jewel': {
       const authored = section.value as Authored<ClusterJewel>;
       try {
-        const clusterJewel = hydrateSection(authored, clusterJewelSchema);
+        const clusterJewel = hydrateSection(authored, clusterJewelSchema, context);
         const shape = getShape(clusterJewel.shape);
         const problem = clusterJewelProblem(clusterJewel, shape);
         if (problem) throw new DslError(problem);
@@ -332,18 +336,18 @@ function applySection(registry: Registry, section: ModuleSection): void {
       break;
     }
     case 'stat': {
-      const stat = hydrateSection(section.value as Authored<Stat>, statSchema);
+      const stat = hydrateSection(section.value as Authored<Stat>, statSchema, context);
       registry.stats.set(stat.id, stat);
       break;
     }
     case 'skill': {
-      const skill = hydrateSection(section.value as Authored<Skill>, skillSchema);
+      const skill = hydrateSection(section.value as Authored<Skill>, skillSchema, context);
       if (skill['per-level'] && !skill['stat-id']) throw new DslError(`# skill ${skill.id}: per-level: needs a stat-id: to raise`);
       registry.skills.set(skill.id, skill);
       break;
     }
     case 'recipe': {
-      const recipe = hydrateSection(section.value as Authored<Recipe>, recipeSchema);
+      const recipe = hydrateSection(section.value as Authored<Recipe>, recipeSchema, context);
       // `burnt:` is what a failed attempt yields, and only `accuracy:` gives an
       // attempt a way to fail; without it the outputs are silently unreachable.
       if (recipe.burnt.length > 0 && !recipe.accuracy) {
@@ -354,7 +358,7 @@ function applySection(registry: Registry, section: ModuleSection): void {
       break;
     }
     case 'resource': {
-      const resource = hydrateSection(section.value as Authored<Resource>, resourceSchema);
+      const resource = hydrateSection(section.value as Authored<Resource>, resourceSchema, context);
       if (!resource.max) throw new DslError(`# resource ${resource.id} requires a max: stat`);
       registry.resources.set(resource.id, resource);
       break;
@@ -376,12 +380,12 @@ function applySection(registry: Registry, section: ModuleSection): void {
       break;
     }
     case 'flag': {
-      const flag = hydrateSection(section.value as Authored<Flag>, flagSchema);
+      const flag = hydrateSection(section.value as Authored<Flag>, flagSchema, context);
       registry.flags.set(flag.id, flag);
       break;
     }
     case 'variable': {
-      const variable = hydrateSection(section.value as Authored<Variable>, variableSchema);
+      const variable = hydrateSection(section.value as Authored<Variable>, variableSchema, context);
       registry.variables.set(variable.id, variable);
       break;
     }
@@ -1000,8 +1004,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
       try {
-        applySection(registry, { kind, value: section.value });
-        recordBaseText(registry, kind, section.value as Record<string, unknown>, section.module.namespace, section.module.info.language);
+        applySection(registry, { kind, value: section.value }, { language: languages.get(registry.namespace.ownerOf(kind, (section.value as { id: string }).id) ?? null) ?? DEFAULT_LANGUAGE });
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
         return { failure: { module: section.module, stage: 'build', error } };
@@ -1013,6 +1016,13 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   // After validation, because that is where an entity's `uses:` becomes an
   // action of its own and where an action naming what is gone is pruned: the
   // labels keyed here are the ones a player will be offered.
+  // After validation, so that content dropped for a dangling reference leaves
+  // no key behind for a translator to answer.
+  for (const [kind, byId] of merged) {
+    for (const [id, section] of byId) {
+      if (registry.namespace.has(kind, id)) recordBaseText(registry, languages, kind, section.value as Record<string, unknown>);
+    }
+  }
   try {
     recordEveryActionText(registry, languages);
   } catch (error) {

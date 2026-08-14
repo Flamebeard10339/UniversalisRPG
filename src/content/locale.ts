@@ -177,10 +177,10 @@ export function moduleLocaleSections(locales: Locales, module: string | null): L
   return locales.sections.filter((section) => section.module === module);
 }
 
-// Every base string, and every translation of one, as flat lines a diff can
-// compare — the registry's text content, which a round trip must not lose.
+// Every translation a `# locale` supplied, as flat lines a diff can compare.
+// Base text is left out: it is the content maps' own text, read back.
 export function localeLines(locales: Locales): string[] {
-  const lines = [...locales.base].map(([key, entry]) => `${entry.language} ${key} = ${entry.text}`);
+  const lines: string[] = [];
   for (const [language, table] of locales.declared) for (const [key, value] of table) lines.push(`${language} ${key} = ${value}`);
   return lines.sort();
 }

@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
 import { feedItem, itemInstance } from './itemInstance';
 import { Registry } from '../content/registry';
-import { loadInEnglish } from '../content/engineLocale';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { loadUniverse } from '../content/registry';
+import type { ModuleSource } from '../content/universe';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 import { apply, applyDirective, beginAction, cancelAction, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
@@ -1306,5 +1308,63 @@ describe('the four growth verbs through the directive surface', () => {
     expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
     expect(Object.keys(state.instances.byId)).toEqual(['1']);
     expect(state.instances.next).toBe(2);
+  });
+});
+
+// c3. Playing a language a module was not authored in, with no entry for a
+// key, puts the key on screen — never the module's own language, never a
+// humanized id — and it does so for content keys and engine keys alike.
+describe('a missing translation shows its key, in every direction', () => {
+  const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'examine: Shingle and a drawn-up boat.', 'entities:', '  crab', 'adjacent:', '  cove', '', '# entity crab', 'title: Giant Crab', '', '# location cove', 'x: 1, y: 0'].join('\n');
+  const SPANISH = ['# info island-es', 'version: 1.0.0', 'dependencies:', '  island', '', '# locale es', 'island.location.shore.title: Orilla', 'engine.travel.to: Viaja a {destination}'].join('\n');
+
+  const played = (language: string, ...extra: ModuleSource[]): PlayView =>
+    view(startSession(loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, ...extra]), language));
+
+  it('plays the language the module declared with the text the module authored', () => {
+    const v = played('en');
+
+    expect(v.location.title).toBe('Shore');
+    expect(v.location.description).toBe('Shingle and a drawn-up boat.');
+    expect(v.entities[0].title).toBe('Giant Crab');
+    expect(v.choices.map((choice) => choice.label)).toContain('Travel to Cove');
+  });
+
+  it('shows the key for every string the played language has no entry for', () => {
+    const v = played('es');
+
+    expect(v.location.title).toBe('island.location.shore.title');
+    expect(v.location.description).toBe('island.location.shore.examine');
+    expect(v.entities[0].title).toBe('island.entity.crab.title');
+    expect(v.choices.map((choice) => choice.label)).toContain('engine.travel.to');
+  });
+
+  it('shows what the locale does translate, and the key for what it does not', () => {
+    const v = played('es', { name: 'island-es', text: SPANISH });
+
+    expect(v.location.title).toBe('Orilla');
+    expect(v.location.description).toBe('island.location.shore.examine');
+    // The destination is looked up in the played language before it is put into
+    // the pattern, so an untranslated place shows its key inside a translated
+    // sentence rather than dragging English in with it.
+    expect(v.choices.map((choice) => choice.label)).toContain('Viaja a island.location.cove.title');
+  });
+
+  it('never renders the module’s own language to a player of another one', () => {
+    const spanishModule = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# entity rata-gigante', 'title: Rata Gigante'].join('\n');
+    const v = view(startSession(loadUniverse([engineLocale(), { name: 'isla', text: spanishModule }]), 'en'));
+
+    // Neither direction: the English player gets the key rather than Spanish,
+    // and the Spanish player gets it too, because `humanizeEn` never ran to
+    // make an entry out of an id that is not English.
+    expect(v.location.title).toBe('isla.location.orilla.title');
+    expect(view(startSession(loadUniverse([engineLocale(), { name: 'isla', text: spanishModule }]), 'es')).location.title).toBe('isla.location.orilla.title');
+  });
+
+  it('leaves a readable screen when no locale file loaded at all', () => {
+    const v = view(startSession(loadUniverse([{ name: 'island', text: ISLAND }]), 'en'));
+
+    expect(v.location.title).toBe('Shore');
+    expect(v.choices.map((choice) => choice.label)).toEqual(['engine.travel.to']);
   });
 });

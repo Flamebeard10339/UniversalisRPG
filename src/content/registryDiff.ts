@@ -1,3 +1,4 @@
+import { localeLines } from './locale';
 import { CONTENT_SECTION_MAPS, Registry } from './registry';
 
 export const REGISTRY_DIFF_MAPS: readonly (keyof Registry)[] = [...CONTENT_SECTION_MAPS.map(([, map]) => map), 'flags', 'variables', 'saves'];
@@ -18,6 +19,15 @@ export const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(sta
 
 export function registryDiff(before: Registry, after: Registry): string[] {
   const lines: string[] = [];
+  // The `# locale` sections, which a round trip loses as silently as any other
+  // content if nothing compares them. Base text is not compared here: it is
+  // derived from the content maps below, so a difference in it is one of theirs
+  // reported twice.
+  const left = localeLines(before.locales);
+  const right = new Set(localeLines(after.locales));
+  for (const line of left) if (!right.has(line)) lines.push(`  locales: missing ${line}`);
+  const held = new Set(left);
+  for (const line of right) if (!held.has(line)) lines.push(`  locales: added ${line}`);
   for (const name of REGISTRY_DIFF_MAPS) {
     const left = before[name] as ReadonlyMap<string, unknown>;
     const right = after[name] as ReadonlyMap<string, unknown>;
