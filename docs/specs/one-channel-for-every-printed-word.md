@@ -39,11 +39,13 @@ that list rather than five separate repairs.
 Proof:
 
 - [c1] **The rule is derived, not listed.** One test walks the published surface types transitively
-  from a named set of roots and fails on any `string`-typed field that is neither `Localized` nor
-  declared an answer under c2. Adding a player-visible field without branding it fails that test
-  with nobody editing it, which is the property the sixteen `@ts-expect-error` lines could not have.
-  Those lines retire, and the seven fields they never reached are covered by construction. The root
-  set is the one hand-maintained thing that remains, and it is named in the test with the reason.
+  and fails on any `string`-typed field that is neither `Localized` nor declared an answer under c2.
+  Adding a player-visible field without branding it fails that test with nobody editing it, which is
+  the property the sixteen `@ts-expect-error` lines could not have. Those lines retire, and the seven
+  fields they never reached are covered by construction. The root set is derived too, on the author's
+  ruling of 2026-08-14: a hand-written one was shipped first and is corrected here, because a list
+  does not grow when the code does and this one had missed eight types. What is hand-maintained is
+  what is *not* published, and a type nobody has ruled on is walked rather than skipped.
   proof: vitest src/runtime/published.test.ts
 - [c2] **An answer is declared where it is built, not judged where it is read.** The values a
   `# test` replays — a race, an item id, a directive tail, a typed name, a dialogue index — are
@@ -135,11 +137,18 @@ sentence as the surface written today, with nobody having to remember it.
 
 ## Decisions
 
-- **The check is derived from the types, and the root set is the residue.** A list of fields was
-  tried and is what this spec replaces: it went stale within one release, missing seven fields while
-  reading as though it covered everything. Walking the published types transitively means a new
-  *field* is free; a new *root* is not, and that is the honest remainder rather than a claim to have
-  eliminated maintenance. The roots are few, change rarely, and adding one is a visible line.
+- **The check is derived from the types, and so is the root set.** A list of fields was tried and is
+  what this spec replaces: it went stale within one release, missing seven fields while reading as
+  though it covered everything. The first attempt at c1 kept a hand-written root set for the same
+  reason it had rejected the field list — "the roots are few, change rarely, and adding one is a
+  visible line" — and the author refused that on 2026-08-14, on the ground that it is the same shape
+  that had just failed twice. "Published" has a mechanical definition: every type `src/ui` or
+  `scripts` imports from `src/runtime`, and every type either declares that spells `Localized`.
+  Measured against the ten hand-written roots it replaces, the derivation reaches 51 declarations
+  where they reached 43, and two of the eight uncovered types held a bare `string` on the published
+  surface with nothing red: `CommandResult.recorded` and `Localizer.language`. The residue is now an
+  exclusion list of five — a parameter bag, a replay log, the authoring sources, a command handle and
+  the command table — and it fails loudly, because a type nobody has ruled on is walked.
 - **`identifier()` keeps its door open, and c1 is why that is safe.** Narrowing it to a type that
   proves a string is an id was considered and rejected: an instance id, a slot and a save path are
   all genuinely strings, and a wrapper around each would be ceremony that moves the same convention
@@ -188,7 +197,9 @@ sentence as the surface written today, with nobody having to remember it.
 
 - Whether the c1 walk is implemented over the TypeScript compiler API or over a narrower structural
   reflection is the worker's call once the region is read; c1 fixes the property, not the mechanism.
-  The five-minute rule in CLAUDE.md 6.6 binds it either way.
+  The five-minute rule in CLAUDE.md 6.6 binds it either way. Settled: a parse-only walk over
+  `ts.createSourceFile`, deriving its own roots from the import graph the same way, whole file under
+  a second.
 - Whether the authoring-tool messages of c4 become keys or become a separate arm of `CommandOutput`
   is the worker's call. c4 fixes that the type distinguishes them, not which shape does it.
 - Whether an entity that overloads a `use:`d action gets its own display key under c7. The grammar
