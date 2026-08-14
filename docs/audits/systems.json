@@ -224,6 +224,15 @@
             "src/content/locale.ts"
           ],
           "note": "produced by every-engine-sentence-is-keyed; every refusal, stale reason and plane repair the engine says on its own behalf, as keys in the closed union with an English pattern beside each"
+        },
+        {
+          "name": "action slug members",
+          "paths": [
+            "src/content/resolve.ts",
+            "src/content/namespace.ts",
+            "src/content/action.ts"
+          ],
+          "note": "produced by action-labels-as-members"
         }
       ]
     },
