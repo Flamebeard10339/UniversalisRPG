@@ -12,7 +12,7 @@ import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
 import { GameEvent, eventSchema } from './event';
 import { Item, itemRoleProblem, itemSchema } from './item';
-import { actionSlug, actionSlugProblem, addLocaleSection, emptyLocales, GENERATED_FIELD, localeKey, Locales, LocaleSection, TEXT_FIELDS, unsuppliedParameters } from './locale';
+import { actionSlug, actionSlugProblem, addLocaleSection, BaseEntry, emptyLocales, GENERATED_FIELD, localeKey, Locales, LocaleSection, TEXT_FIELDS, unsuppliedParameters } from './locale';
 import { Passive, passiveRangeProblem, passiveSchema } from './passive';
 import { getShape } from './shapes';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
@@ -235,6 +235,16 @@ export function formatModuleDiagnostic(value: ModuleDiagnostic): string {
 // `humanizeEn` fills in — which is an English entry, so it is one only where the
 // module says it is writing English. A field left unauthored anywhere else has
 // no entry in any language, which is what puts its key on screen (c3, c5).
+// The one place a base entry is written, so a value naming a parameter nothing
+// supplies is refused the same whether it was authored as content or written as
+// a `# locale` line. No caller passes a parameter to a title or an examine, so
+// for a content key every parameter it names is one nothing supplies.
+function recordBase(registry: Registry, key: string, entry: BaseEntry): void {
+  const unsupplied = unsuppliedParameters(registry.locales, key, entry.text);
+  if (unsupplied.length > 0) throw new DslError(`${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
+  registry.locales.base.set(key, entry);
+}
+
 function recordBaseText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, authored: Record<string, unknown>): void {
   const fields = TEXT_FIELDS[kind];
   if (!fields) return;
@@ -250,8 +260,8 @@ function recordBaseText(registry: Registry, languages: ReadonlyMap<string | null
     // even where no module has text for it; an unauthored `examine:` is nothing
     // the engine ever renders and so is not a gap in any language.
     if (field === GENERATED_FIELD || typeof authoredValue === 'string') registry.locales.addressable.add(key);
-    if (typeof authoredValue === 'string') registry.locales.base.set(key, { text: authoredValue, language });
-    else if (field === GENERATED_FIELD && language === DEFAULT_LANGUAGE) registry.locales.base.set(key, { text: humanizeEn(id), language, generated: true });
+    if (typeof authoredValue === 'string') recordBase(registry, key, { text: authoredValue, language });
+    else if (field === GENERATED_FIELD && language === DEFAULT_LANGUAGE) recordBase(registry, key, { text: humanizeEn(id), language, generated: true });
   }
 }
 
@@ -273,7 +283,7 @@ function recordActionText(registry: Registry, languages: ReadonlyMap<string | nu
     // and for nothing else — the same gate `defaultTitle` applies, applied
     // where the other generator runs (c5).
     if (action.generatedLabel && language !== DEFAULT_LANGUAGE) continue;
-    registry.locales.base.set(key, { text: action.label, ...(action.generatedLabel ? { generated: true as const } : {}), language });
+    recordBase(registry, key, { text: action.label, ...(action.generatedLabel ? { generated: true as const } : {}), language });
   }
 }
 
@@ -1049,7 +1059,13 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   // validation is where an entity's `uses:` becomes an action of its own.
   for (const [kind, byId] of merged) {
     for (const [id, section] of byId) {
-      if (registry.namespace.has(kind, id)) recordBaseText(registry, languages, kind, section.value as Record<string, unknown>);
+      if (!registry.namespace.has(kind, id)) continue;
+      try {
+        recordBaseText(registry, languages, kind, section.value as Record<string, unknown>);
+      } catch (error) {
+        if (!(error instanceof DslError)) throw error;
+        return { failure: { module: section.module, stage: 'build', error } };
+      }
     }
   }
   for (const [kind, id, actions] of everyActionTable(registry)) {

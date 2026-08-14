@@ -269,3 +269,23 @@ describe('the parameter check reaches every locale, English included', () => {
     expect(() => loadUniverse([{ name: 'es', text: ['# info es', 'version: 1.0.0', '', '# locale es', 'engine.travel.to: Viaja a {destination}'].join('\n') }])).not.toThrow();
   });
 });
+
+// pass 5: the refusal covered the `# locale` half only, so the two places a
+// value is written were enforced differently and it was the unchecked one that
+// shipped — a legal module loaded clean and then threw out of every `view()`,
+// in its own declared language, with no locale file anywhere in the universe.
+describe('authored text may not name a parameter either', () => {
+  const authoring = (...lines: string[]) => () => loadUniverse([{ name: 'isla', text: ['# info isla', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', ...lines].join('\n') }]);
+
+  it('refuses an authored examine that names one, naming the key and the parameter', () => {
+    expect(authoring('examine: The sign reads {open} and nothing else.')).toThrow(/isla.location.camp.examine names \{open\}, which nothing supplies/);
+  });
+
+  it('refuses an authored title that names one', () => {
+    expect(authoring('', '# item rope', 'title: Rope of {maker}')).toThrow(/isla.item.rope.title names \{maker\}/);
+  });
+
+  it('leaves text with no parameter in it alone', () => {
+    expect(authoring('examine: The sign reads plainly.')).not.toThrow();
+  });
+});
