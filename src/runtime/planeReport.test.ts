@@ -174,7 +174,7 @@ describe('planeReport', () => {
     expect(clusterAt(plane, '0,0').effects).toEqual([{ id: 'goad', title: 'Goad', statTitle: 'Attack', effect: { statId: 'attack', percent: 50 } }]);
     expect(positionAt(plane, '0,0', 3)).toMatchObject({
       standing: 'unreached',
-      payloads: [{ statId: 'attack', effective: { percent: false, amount: { min: 6, max: 6 } }, scale: 1.5 }],
+      payloads: [{ statId: 'attack', statTitle: 'Attack', effective: { percent: false, amount: { min: 6, max: 6 } }, scale: 1.5 }],
     });
   });
 
@@ -185,7 +185,7 @@ describe('planeReport', () => {
     ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position: 3 }));
     expect(positionAt(report(state), '0,0', 3)).toMatchObject({
       standing: 'allocated',
-      payloads: [{ statId: 'attack', effective: { percent: false, amount: { min: 6, max: 6 } }, scale: 1.5 }],
+      payloads: [{ statId: 'attack', statTitle: 'Attack', effective: { percent: false, amount: { min: 6, max: 6 } }, scale: 1.5 }],
     });
   });
 
