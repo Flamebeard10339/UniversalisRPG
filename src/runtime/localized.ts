@@ -59,7 +59,7 @@ function pattern(locales: Locales, language: string, key: string): string | unde
 }
 
 export interface Localizer {
-  readonly language: string;
+  readonly language: Answer;
   // The engine speaking for itself. The key comes from a closed union, so a
   // string with no key does not compile and a mistyped one does not either (c2).
   engine(key: EngineKey, params?: Params): Localized;

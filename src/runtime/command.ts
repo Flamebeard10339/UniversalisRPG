@@ -14,7 +14,7 @@ import { resolveCarried, resolveDirective } from '../content/typed';
 import { type ParsedSave } from '../content/saveSection';
 import { describeCondition, RuntimeError } from './runtime';
 import { wornCopySlot } from './itemInstance';
-import { type Localized, type Localizer } from './localized';
+import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal, type ModalOption } from './modals';
 import { anId, say, says, type Said } from './said';
 import {
@@ -75,16 +75,20 @@ export type CommandOutput =
   | { kind: 'view'; view: PlayView; reread: boolean }
   | { kind: 'status'; status: PlayStatus }
   | { kind: 'choices'; choices: PlayChoice[] }
-  | { kind: 'help'; entries: CommandHelp[] }
-  | { kind: 'source'; lines: string[] }
-  | { kind: 'authored'; blocks: string[][] };
+  // The tool's own words too, and they say so the way `ToolMessage` does: the
+  // command table's English, the DSL a module is written in, and the DSL a
+  // recorder just wrote. Without the discriminant these three were the arms
+  // that carried raw text and nothing said whose it was.
+  | { kind: 'help'; words: 'tool'; entries: CommandHelp[] }
+  | { kind: 'source'; words: 'tool'; lines: string[] }
+  | { kind: 'authored'; words: 'tool'; blocks: string[][] };
 
 export interface CommandResult {
   view?: PlayView;
   output: CommandOutput[];
   quit: boolean;
   // The colon-form directives just performed, in order; empty for read-only commands.
-  recorded: string[];
+  recorded: Answer[];
   // Set when the command armed something for a driver to advance in real time.
   live?: LiveRun;
 }
@@ -421,14 +425,14 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
       try {
         const headings = localSectionHeadings(authoring.localSource.text);
         return headings.length > 0
-          ? { output: [{ kind: 'source', lines: headings }], quit: false, recorded: [] }
+          ? { output: [{ kind: 'source', words: 'tool', lines: headings }], quit: false, recorded: [] }
           : noted('plain', 'No local changes staged.');
       } catch (error) {
         if (error instanceof DslError) return noted('error', error.message);
         throw error;
       }
     case 'show':
-      return { output: [{ kind: 'source', lines: authoring.localSource.text.trimEnd().split('\n') }], quit: false, recorded: [] };
+      return { output: [{ kind: 'source', words: 'tool', lines: authoring.localSource.text.trimEnd().split('\n') }], quit: false, recorded: [] };
     case 'clear':
       return commitLocalChanges(ctx, authoring, clearLocalSections(authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
     case 'delete':
@@ -499,7 +503,7 @@ function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean
   blocks.push([`# test ${id}`, ...lines]);
 
   return {
-    output: [note('plain', `Created test '${id}' (${recorder.history.length} steps).`), { kind: 'authored', blocks }],
+    output: [note('plain', `Created test '${id}' (${recorder.history.length} steps).`), { kind: 'authored', words: 'tool', blocks }],
     quit: false,
     recorded: [],
   };
@@ -730,7 +734,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'none',
     summary: 'show this help',
     parse: nothing,
-    run: () => ({ output: [{ kind: 'help', entries: helpEntries() }], quit: false, recorded: [] }),
+    run: () => ({ output: [{ kind: 'help', words: 'tool', entries: helpEntries() }], quit: false, recorded: [] }),
   }),
   define({
     name: '/quit',

@@ -196,7 +196,7 @@ starting
   });
 
   it('separates each authored block with a blank line, so the emission pastes into a module', () => {
-    expect(drawn({ kind: 'authored', blocks: [['# save foo-start', '{}'], ['# test foo', 'wait: 1']] })).toEqual([
+    expect(drawn({ kind: 'authored', words: 'tool', blocks: [['# save foo-start', '{}'], ['# test foo', 'wait: 1']] })).toEqual([
       '',
       '# save foo-start',
       '{}',

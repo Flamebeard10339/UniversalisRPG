@@ -6,31 +6,78 @@ import type { Answer, AnswerTable, Localized } from './localized';
 
 // c1. Every string a driver can put in front of a player is either words the
 // localizer produced (`Localized`) or a protocol value nobody translates
-// (`Answer`). This walks the published types from the roots below and reports
-// any field that is a bare `string`, so adding an unbranded field to the
-// surface fails here with nobody editing this file. It replaces sixteen
+// (`Answer`). This walks the published types from the roots it derives below
+// and reports any field that is a bare `string`, so adding an unbranded field
+// to the surface fails here with nobody editing this file. It replaces sixteen
 // `@ts-expect-error` lines that named fields one at a time and had missed seven
 // of them.
 
-// The roots are the residue: a new field is free, a new root is a line here.
-// Each is a value that leaves src/runtime without another published type
-// carrying it.
-const ROOTS: ReadonlyArray<{ file: string; type: string; why: string }> = [
-  { file: 'src/runtime/session.ts', type: 'PlayView', why: 'the whole of what a driver renders a turn from, and what every screen reads' },
-  { file: 'src/runtime/save.ts', type: 'PruneWarning', why: 'what a load reports about content that has gone, reaching the player through a driver rather than through the view' },
-  { file: 'src/runtime/command.ts', type: 'PlayerMessage', why: 'what a command answers the player, which both drivers put in the transcript beside the view (c4). Its sibling `ToolMessage` is deliberately not here: the authoring tool speaks its own English and the type says which of the two a reader is holding' },
-  { file: 'src/runtime/command.ts', type: 'LiveProgress', why: 'what a run under way reports of itself, which no view carries: both drivers draw it beside the choices rather than in them' },
-  // The GUI's surfaces (c3). Each is a value src/ui assembles out of engine
-  // fields and its own vocabulary, and each is what a component draws from.
-  { file: 'src/ui/transcript.ts', type: 'PlayerLine', why: "the log column, which is where every localized value in the app used to be laundered back to a plain string. Its sibling `ToolLine` is deliberately not here, for `ToolMessage`'s reason" },
-  { file: 'src/ui/choices.ts', type: 'OfferGroup', why: 'the choice sheet, as the buttons under whatever offers them' },
-  { file: 'src/ui/sheet.ts', type: 'Entry', why: 'one row of the ledger, which stats, skills, equipment and what the player carries are four readings of' },
-  { file: 'src/ui/plane.ts', type: 'PlaneView', why: 'the plane pane, which is the one surface that draws its own words for a standing and a node rather than an engine value' },
-  // The REPL's (c5). Leaving these out would localize the two drivers to
-  // different degrees, which is the fragmentation the spec exists to end.
-  { file: 'scripts/play-cli.ts', type: 'PlayerLine', why: "one line the terminal prints to the player, whatever command produced it. Its sibling `ToolLine` is deliberately not here, for `ToolMessage`'s reason" },
-  { file: 'scripts/planeView.ts', type: 'PlaneLines', why: 'the plane as the terminal draws it, which is the REPL surface with the most words of its own' },
+// Where a driver lives. Everything under one of these that is not a test is a
+// file whose output a person reads.
+const DRIVERS = ['src/ui', 'scripts'];
+
+// The roots are derived, not listed. "Published" has a mechanical definition and
+// two halves: what a driver can hold is every type it imports from src/runtime,
+// and what a driver publishes of its own is every type it declares that spells
+// `Localized`. A hand-written root set was tried and is what this replaces — ten
+// entries that had missed eleven imported types, which is the same failure as
+// the sixteen `@ts-expect-error` lines c1 replaced and as `published()`'s dead
+// id permissions in render.test.tsx. A list does not grow when the code does.
+//
+// So the only thing anybody maintains is what is *not* published, below, and a
+// type nobody has ruled on is walked rather than skipped.
+function derivedRoots(): Array<{ file: string; type: string }> {
+  const roots = new Map<string, { file: string; type: string }>();
+  const add = (file: string, type: string): void => {
+    // A brand is the ruler this check is written in rather than something it
+    // measures: `Localized` is a branded `string` and would report itself.
+    if (BRANDS.has(type)) return;
+    const found = declarationOf(file, type);
+    if (found) roots.set(`${found.file}#${type}`, { file: found.file, type });
+  };
+  for (const directory of DRIVERS) {
+    for (const file of sourceFiles(directory)) {
+      const module = moduleAt(file);
+      for (const brought of module.imported.values()) if (brought.file.startsWith(`${RUNTIME}/`)) add(brought.file, brought.exported);
+      for (const [name, statement] of module.declared) if (/\bLocalized\b/.test(statement.getText())) add(file, name);
+    }
+  }
+  return [...roots.values()].sort((left, right) => `${left.file}#${left.type}`.localeCompare(`${right.file}#${right.type}`));
+}
+
+// A declaration the walk does not look inside, wherever it reaches one. This is
+// the whole of what is hand-maintained about the root set, and each entry is a
+// value a person never reads: a function, a protocol, or a handle whose own
+// published values are reached without it. The authoring tool's English is not
+// here — c4 declares that at the type, with `words: 'tool'`, which is read below
+// rather than restated as names.
+const NOT_PUBLISHED: ReadonlyArray<{ type: string; why: string }> = [
+  { type: 'src/runtime/localized.ts#Params', why: 'the bag a call site hands the localizer, keyed by the parameter names a pattern spells. It goes into a render and never comes out of one' },
+  { type: 'src/runtime/command.ts#Recorder', why: 'the replay log: directive lines and the save bytes a replay starts from, which is the protocol a `# test` is written in' },
+  { type: 'src/runtime/command.ts#AuthoringContext', why: 'the module sources an authoring command edits. Their text is DSL, which is `src/content`\'s and is drawn as a tool line where it is drawn at all' },
+  { type: 'src/runtime/command.ts#CommandContext', why: 'the handle a driver runs a line through — a session, a recorder and two dials. Every value it publishes reaches this walk on its own: the view as `PlayView`, the answer as `CommandResult`' },
+  { type: 'src/runtime/command.ts#CommandHelp', why: "the command table, whose name, aliases and summary are the tool's own English (c4): both drivers print one as a tool line, and the `help` arm that carries it says so" },
 ];
+
+const UNPUBLISHED = new Set(NOT_PUBLISHED.map((each) => each.type));
+
+// c4's discriminant, read rather than restated: an arm or a line that says its
+// words are the tool's carries the tool's own English by declaration, and the
+// walk stops at it wherever it is reached from. That is what keeps
+// `CommandOutput` and `CommandResult` walkable roots while `ToolMessage`,
+// `ToolLine` and the three arms carrying raw DSL are passed over.
+function speaksForTheTool(members: ts.NodeArray<ts.TypeElement>): boolean {
+  return members.some(
+    (member) =>
+      ts.isPropertySignature(member) &&
+      ts.isIdentifier(member.name) &&
+      member.name.text === 'words' &&
+      member.type !== undefined &&
+      ts.isLiteralTypeNode(member.type) &&
+      ts.isStringLiteral(member.type.literal) &&
+      member.type.literal.text === 'tool',
+  );
+}
 
 // Where the walk crosses out of src/runtime, and what its strings are there.
 // The layer order puts `Localized` above `src/content` and `src/grammar`, so a
@@ -38,7 +85,7 @@ const ROOTS: ReadonlyArray<{ file: string; type: string; why: string }> = [
 // Listing the field rather than the type keeps the exception to what was read:
 // a second string on the same type still fails.
 const BELOW_THE_BRAND: ReadonlyArray<{ field: string; why: string }> = [
-  { field: 'PlayView.planes[].clusters[].effects[].effect.statId', why: 'a stat id, declared by `ClusterEffect` in src/content/item.ts, which sits under the layer that declares the brand' },
+  { field: 'ClusterEffect.statId', why: 'a stat id, declared by `ClusterEffect` in src/content/item.ts, which sits under the layer that declares the brand' },
 ];
 
 // A runtime type holding a `Localized` that no root reaches, and where the
@@ -186,7 +233,10 @@ function walkType(node: ts.TypeNode, file: string, where: string, walk: Walk): v
     for (const each of node.elements) walkType(each, file, `${where}[]`, walk);
     return;
   }
-  if (ts.isTypeLiteralNode(node)) return walkMembers(node.members, file, where, walk);
+  // A call is not a published value: what it answers is, and the answer is a
+  // type of its own that this walk reaches wherever it is published.
+  if (ts.isFunctionTypeNode(node) || ts.isConstructorTypeNode(node)) return;
+  if (ts.isTypeLiteralNode(node)) return speaksForTheTool(node.members) ? undefined : walkMembers(node.members, file, where, walk);
   if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) return walkReference(node.typeName.text, node.typeArguments, file, where, walk);
   if (ts.isIndexedAccessTypeNode(node)) return walkIndexedAccess(node, file, where, walk);
 
@@ -246,17 +296,19 @@ function walkNamed(name: string, file: string, where: string, walk: Walk): void 
   }
 
   const seen = `${found.file}#${name}`;
+  if (UNPUBLISHED.has(seen)) return;
   if (walk.reached.has(seen)) return;
   walk.reached.add(seen);
 
   const { statement } = found;
   if (ts.isEnumDeclaration(statement)) return;
-  if (ts.isTypeAliasDeclaration(statement)) return walkType(statement.type, found.file, where, walk);
+  if (ts.isTypeAliasDeclaration(statement)) return walkType(statement.type, found.file, name, walk);
   if (!ts.isInterfaceDeclaration(statement)) return;
+  if (speaksForTheTool(statement.members)) return;
   for (const clause of statement.heritageClauses ?? []) {
-    for (const parent of clause.types) if (ts.isIdentifier(parent.expression)) walkNamed(parent.expression.text, found.file, where, walk);
+    for (const parent of clause.types) if (ts.isIdentifier(parent.expression)) walkNamed(parent.expression.text, found.file, name, walk);
   }
-  walkMembers(statement.members, found.file, where, walk);
+  walkMembers(statement.members, found.file, name, walk);
 }
 
 function walkMembers(members: ts.NodeArray<ts.TypeElement>, file: string, where: string, walk: Walk): void {
@@ -271,6 +323,7 @@ function walkMembers(members: ts.NodeArray<ts.TypeElement>, file: string, where:
       walkType(member.type, file, `${where}{}`, walk);
       continue;
     }
+    if (ts.isMethodSignature(member)) continue;
     walk.unread.push(`${where}: ${ts.SyntaxKind[member.kind]}`);
   }
 }
@@ -290,10 +343,19 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe('every published string says which of the two it is (c1)', () => {
-  const walk = walkRoots(ROOTS);
+  const roots = derivedRoots();
+  const walk = walkRoots(roots);
 
-  it('resolves every root it names', () => {
-    expect(ROOTS.filter((root) => !declarationOf(root.file, root.type)).map((root) => `${root.file}#${root.type}`)).toEqual([]);
+  // A derivation that found nothing would leave every assertion below green
+  // over an empty walk, which is the failure mode a hand-written list has by
+  // construction and this one has to be checked for.
+  it('derives a root set that reaches the surface both drivers draw', () => {
+    const named = new Set(roots.map((root) => `${root.file}#${root.type}`));
+
+    expect([...named].filter((root) => UNPUBLISHED.has(root)).sort()).toEqual([...UNPUBLISHED].sort());
+    for (const reached of ['src/runtime/session.ts#PlayView', 'src/runtime/save.ts#PruneWarning', 'src/ui/sheet.ts#Entry', 'scripts/planeView.ts#PlaneLines']) {
+      expect(named, `${reached} is published and the derivation missed it`).toContain(reached);
+    }
   });
 
   it('reads every type it reaches, rather than passing over what it cannot parse', () => {

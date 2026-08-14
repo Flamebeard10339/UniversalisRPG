@@ -7,7 +7,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { splitSections } from '../src/grammar/structure';
 import type { Span } from '../src/grammar/parser';
 import { createGameState } from '../src/runtime/runtime';
-import { SAVE_VERSION, loadSave } from '../src/runtime/save';
+import { SAVE_VERSION, loadSave, type PruneWarning } from '../src/runtime/save';
 
 export interface ContentFile {
   path: string;
@@ -102,7 +102,7 @@ const declareIt = `Set SHAPE_CHANGE in scripts/migrate-saves.ts, stamped written
 function validationProblems(rewrites: readonly Rewrite[], registry: Registry): string[] {
   const problems: string[] = [];
   for (const rewrite of rewrites) {
-    let warnings;
+    let warnings: PruneWarning[];
     try {
       const { version, ...diff } = JSON.parse(rewrite.text) as { version: number } & SaveBody;
       warnings = loadSave(createGameState(), { version, diff }, registry);
