@@ -76,6 +76,12 @@ export class Namespace {
     }
   }
 
+  // Every key declared under one kind, taken as a copy so a caller may undeclare
+  // while it walks.
+  declaredKeys(kind: string): string[] {
+    return [...(this.declared.get(kind)?.keys() ?? [])];
+  }
+
   // Every declaration, flattened and ordered, so that two namespaces can be
   // compared for equality by something that is not the Namespace itself.
   snapshot(): string[] {

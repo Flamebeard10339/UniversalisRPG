@@ -20,12 +20,12 @@ import { mergeSection } from './merge';
 import { ModuleSection } from './module';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
-import { Namespace } from './namespace';
+import { ACTION_MEMBER, isActionOwnerKind, Namespace } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
 import { registryCapabilities, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
 import { ReferenceKind, Visit, visitAction, visitResults, visitSection, visitTags } from './referenceSites';
 import { Removal } from './removal';
-import { declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
+import { actionAddresses, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
 import { Authored, DEFAULT_LANGUAGE, hydrateSection, HydrateContext } from '../grammar/section';
@@ -527,6 +527,30 @@ function dropContent(registry: Registry, kind: string, id: string, pruned: Set<s
   pruned.add(ownerKey(kind, id));
 }
 
+const ACTION_OWNER_MAPS = CONTENT_SECTION_MAPS.filter(([kind]) => isActionOwnerKind(kind));
+
+// Pruning an object's actions is done by rebuilding the object, so no site that
+// drops one is in a position to take its member with it — and a member left
+// behind is a `use:` that resolves at load and finds nothing at runtime. Asked
+// of the whole universe rather than of the object being rebuilt, because a
+// member key carries no owner kind: an entity and an item sharing an id share
+// their members' keys, and one's loss is not the other's.
+function pruneStrandedActionMembers(registry: Registry, pruned: Set<string>): boolean {
+  const surviving = new Set<string>();
+  for (const [kind, map] of ACTION_OWNER_MAPS) {
+    for (const owner of (registry[map] as ReadonlyMap<string, MemberOwner>).values()) {
+      for (const address of actionAddresses(kind, owner)) surviving.add(`${owner.id}.${address}`);
+    }
+  }
+  let dropped = false;
+  for (const key of registry.namespace.declaredKeys(ACTION_MEMBER)) {
+    if (surviving.has(key)) continue;
+    dropContent(registry, ACTION_MEMBER, key, pruned, []);
+    dropped = true;
+  }
+  return dropped;
+}
+
 function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: ReadonlySet<string>): void {
   const pruned = new Set<string>();
   for (;;) {
@@ -628,6 +652,8 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
       dropContent(registry, 'test', id, pruned, [registry.tests]);
       changed = true;
     }
+
+    if (pruneStrandedActionMembers(registry, pruned)) changed = true;
 
     if (!changed) {
       registry.dialoguesByOwner.clear();

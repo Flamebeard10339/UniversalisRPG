@@ -216,6 +216,75 @@ describe('loadUniverseWithDiagnostics', () => {
     expect(registry.namespace.has('flag', 'base.camp.discovered')).toBe(false);
   });
 
+  it('takes an action-slug member with the action, at every site that prunes one, so a use: naming it cannot load clean', () => {
+    const ghost: ModuleSource = { ...module('ghost', '# info ghost', '# item gem'), enabled: false };
+    const base = module(
+      'base',
+      '# info base',
+      'dependencies: ? ghost',
+      '# action swing',
+      'give: ghost.gem',
+      '# entity brute',
+      'uses: swing',
+      '# entity dresser',
+      'search drawer:',
+      '  give: ghost.gem',
+      '# item lamp',
+      'polish:',
+      '  give: ghost.gem',
+      '# location shore',
+      'x: 0, y: 0',
+      'starting',
+      'entities: brute, dresser',
+      'light beacon:',
+      '  give: ghost.gem',
+    );
+    const walker = (name: string, use: string): ModuleSource => module(name, `# info ${name}`, 'dependencies: base', `# test ${name}`, `use: ${use}`);
+
+    for (const [name, address] of [
+      ['t1', 'entity.base.brute.swing'],
+      ['t2', 'entity.base.dresser.search-drawer'],
+      ['t3', 'item.base.lamp.polish'],
+      ['t4', 'location.base.shore.light-beacon'],
+    ]) {
+      const { registry, loadedModules, diagnostics } = loadUniverseWithDiagnostics([base, ghost, walker(name, address)]);
+
+      // A section naming what was pruned is dropped, never fatal: undeclaring
+      // the member without pruning it disabled the walker instead.
+      expect({ address, loadedModules, diagnostics }).toEqual({ address, loadedModules: ['base', name], diagnostics: [] });
+      expect({ address, tests: [...registry.tests.keys()] }).toEqual({ address, tests: [] });
+      expect(registry.namespace.declaredKeys('action-slug')).toEqual([]);
+    }
+  });
+
+  it('reads the survivors off the whole universe, so pruning one object does not take an identically named object of another kind with it', () => {
+    const ghost: ModuleSource = { ...module('ghost', '# info ghost', '# item gem'), enabled: false };
+    const base = module(
+      'base',
+      '# info base',
+      'dependencies: ? ghost',
+      '# entity dresser',
+      'search drawer:',
+      '  give: ghost.gem',
+      '# item dresser',
+      'search drawer:',
+      '  say: rattle',
+      '# location shore',
+      'x: 0, y: 0',
+      'starting',
+      'entities: dresser',
+    );
+    const walker = module('walk', '# info walk', 'dependencies: base', '# test walk', 'use: item.base.dresser.search-drawer');
+
+    const { registry, loadedModules, diagnostics } = loadUniverseWithDiagnostics([base, ghost, walker]);
+
+    expect({ loadedModules, diagnostics }).toEqual({ loadedModules: ['base', 'walk'], diagnostics: [] });
+    expect(registry.entities.get('base.dresser')!.blocks).toEqual([]);
+    expect(registry.items.get('base.dresser')!.actions).toHaveLength(1);
+    expect(registry.namespace.declaredKeys('action-slug')).toEqual(['base.dresser.search-drawer']);
+    expect([...registry.tests.keys()]).toEqual(['walk.walk']);
+  });
+
   it('disables only the module whose source does not parse', () => {
     const result = loadUniverseWithDiagnostics([module('base', '# info base', '# item rope'), { name: 'broken', text: '# item' }]);
 

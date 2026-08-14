@@ -86,7 +86,7 @@ export interface Member {
 // the whole path, so the last segment is what survives resolution either way,
 // and a block whose label names a used action is that entity's overload of it
 // rather than an action of its own.
-function actionAddresses(kind: string, value: MemberOwner): string[] {
+export function actionAddresses(kind: string, value: MemberOwner): string[] {
   if (!isActionOwnerKind(kind)) return [];
   const used = addedMembers<string>(value.uses).map(lastSegment);
   const inline = [...addedMembers<Action>(value.actions), ...addedMembers<EntityBlock>(value.blocks).filter((block) => !isHandlerBlock(block))] as Action[];
