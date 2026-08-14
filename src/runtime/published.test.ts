@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import type { Localized } from './localized';
+import type { Answer, AnswerTable, Localized } from './localized';
 
 // c1. Every string a driver can put in front of a player is either words the
 // localizer produced (`Localized`) or a protocol value nobody translates
@@ -118,8 +118,39 @@ function declarationOf(file: string, name: string): { file: string; statement: t
   return brought ? declarationOf(brought.file, brought.exported) : undefined;
 }
 
+// The one way to publish a map keyed by an id: a declaration at the field that
+// nothing in it is words. Its value is read here rather than walked, so the
+// declaration cannot be made and then contradicted.
+const ANSWER_TABLE = 'AnswerTable';
+
+const TABLE_VALUES = new Set([ts.SyntaxKind.NumberKeyword, ts.SyntaxKind.BooleanKeyword]);
+
+function walkTableValue(node: ts.TypeNode, where: string, walk: Walk): void {
+  if (ts.isUnionTypeNode(node)) {
+    for (const each of node.types) walkTableValue(each, where, walk);
+    return;
+  }
+  const named = ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) ? node.typeName.text : undefined;
+  if (named === 'Answer' || TABLE_VALUES.has(node.kind)) return;
+  walk.offenders.push(`${where}{}`);
+}
+
+// Whether a type node is one of the two brands, followed through the imports the
+// way a named type is. Written against the resolved declaration rather than the
+// spelling, so an alias of `Answer` is one.
+function isBrand(node: ts.TypeNode, file: string, brand: string): boolean {
+  if (!ts.isTypeReferenceNode(node) || !ts.isIdentifier(node.typeName)) return false;
+  const name = node.typeName.text;
+  if (name === brand) return true;
+  const found = declarationOf(file, name);
+  return found !== undefined && ts.isTypeAliasDeclaration(found.statement) && isBrand(found.statement.type, found.file, brand);
+}
+
 interface Walk {
   readonly offenders: string[];
+  // A published field that is a map keyed by an `Answer` and has not declared
+  // itself an `AnswerTable`.
+  readonly dictionaries: string[];
   // A node kind the walk does not know how to read is reported rather than
   // passed over, because a check that silently skips what it cannot parse
   // reports nothing and reads as though it covered everything.
@@ -127,7 +158,7 @@ interface Walk {
   readonly reached: Set<string>;
 }
 
-const emptyWalk = (): Walk => ({ offenders: [], unread: [], reached: new Set() });
+const emptyWalk = (): Walk => ({ offenders: [], dictionaries: [], unread: [], reached: new Set() });
 
 function walkType(node: ts.TypeNode, file: string, where: string, walk: Walk): void {
   switch (node.kind) {
@@ -187,7 +218,15 @@ function constantList(name: string, file: string): ts.NodeArray<ts.Expression> |
 
 function walkReference(name: string, args: ts.NodeArray<ts.TypeNode> | undefined, file: string, where: string, walk: Walk): void {
   if (BRANDS.has(name)) return;
+  if (name === ANSWER_TABLE && args?.length === 1) return walkTableValue(args[0], where, walk);
   if (name === 'Record' && args?.length === 2) {
+    // c10. A `Record` keyed by an `Answer` is a dictionary a driver holds ids
+    // in and has no words for, and the walk below is structurally blind to it
+    // because a key is not a field — which is how `stats`, `xp` and `equipment`
+    // sat on the published surface through seven passes of the rule that they
+    // broke. What is genuinely protocol on both sides says so at the field, by
+    // being an `AnswerTable`.
+    if (isBrand(args[0], file, 'Answer')) walk.dictionaries.push(where);
     walkType(args[0], file, `${where}{key}`, walk);
     walkType(args[1], file, `${where}{}`, walk);
     return;
@@ -261,6 +300,13 @@ describe('every published string says which of the two it is (c1)', () => {
     expect(walk.unread).toEqual([]);
   });
 
+  // c10's enforcement. A key is not a field, so nothing above this line looks
+  // at one, and three published dictionaries a driver drew ids out of survived
+  // every pass of the rule they broke.
+  it('publishes no map keyed by an id that has not said nothing in it is words', () => {
+    expect([...walk.dictionaries].sort()).toEqual([]);
+  });
+
   it('leaves no field on the published surface a bare string', () => {
     expect([...walk.offenders].sort()).toEqual(BELOW_THE_BRAND.map((crossing) => crossing.field).sort());
   });
@@ -288,11 +334,29 @@ export interface UnbrandedFixture {
   readonly under: Record<string, string>;
 }
 
+// The same for c10: the shape `stats` had, a table that keeps its word, and a
+// table that declared nothing in it is words and then held some.
+export interface DictionaryFixture {
+  readonly counted: Record<Answer, number>;
+  readonly held: AnswerTable<Answer>;
+  readonly switches: AnswerTable<boolean | number>;
+  readonly named: AnswerTable<Localized>;
+}
+
 describe('the walk reports what it is looking for', () => {
   it('names every bare string under a root and nothing else', () => {
     const walk = walkRoots([{ file: 'src/runtime/published.test.ts', type: 'UnbrandedFixture' }]);
 
     expect(walk.offenders).toEqual(['UnbrandedFixture.title', 'UnbrandedFixture.rows[].id', 'UnbrandedFixture.under{key}', 'UnbrandedFixture.under{}']);
+    expect(walk.dictionaries).toEqual([]);
+    expect(walk.unread).toEqual([]);
+  });
+
+  it('names every published map keyed by an id, and every word smuggled into one', () => {
+    const walk = walkRoots([{ file: 'src/runtime/published.test.ts', type: 'DictionaryFixture' }]);
+
+    expect(walk.dictionaries).toEqual(['DictionaryFixture.counted']);
+    expect(walk.offenders).toEqual(['DictionaryFixture.named{}']);
     expect(walk.unread).toEqual([]);
   });
 });

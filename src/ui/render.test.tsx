@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { loadInEnglish } from '../content/engineLocale';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { localizerFor } from '../runtime/localized';
 import { asLocalized } from '../runtime/localizedFixture';
 import { loadUniverseWithDiagnostics } from '../content/registry';
@@ -50,19 +50,25 @@ function published(view: PlayView): string[] {
     ...view.choices.flatMap((choice) => [choice.label, choice.detail ?? '']),
     ...view.resources.map((resource) => resource.title),
     ...view.modals.flatMap((modal) => modal.options.flatMap((option) => [option.label as string, ...(option.values ?? []).map((choice) => choice.shown as string)])),
-    // The map and the character sheet. A key is what the engine gave and a key
-    // is what the sheet may draw -- except for a stat, which the engine now
-    // gives a title as well and which the sheet draws by that title (c9,
-    // superseding c16's ruling on stats and no other). What the player carries
-    // publishes a name, and that is what its rows and the equipment rows beside
-    // them read (c16).
-    ...view.discovered.flatMap((place) => [place.id, place.title]),
+    // The map and the character sheet. Every one of these is words the engine
+    // produced, and there is no id among them: under c10 a stat, a skill and a
+    // slot each arrive with their own title beside their own id, so c16's "a key
+    // is what the sheet may draw" has nothing left to cover and is retired.
+    ...view.discovered.map((place) => place.title),
     ...view.carried.map((row) => row.name),
-    ...Object.keys(view.xp),
-    ...Object.values(view.statTitles),
-    ...Object.keys(view.equipment),
+    ...view.stats.map((row) => row.title),
+    ...view.xp.map((row) => row.title),
+    ...view.equipment.flatMap((row) => [row.title, row.name]),
     ...view.said,
   ];
+}
+
+// What a walk had on its screens, so a permission above is only ever granted to
+// a page the walk opened. Three of them were dead for seven passes because
+// nothing that ran ever reached Skills, Equipment or the Map, and no assertion
+// about what is on the screen can tell an empty page from a clean one.
+function pagesDrawn(view: PlayView): Record<string, number> {
+  return { stats: view.stats.length, skills: view.xp.length, equipment: view.equipment.length, carried: view.carried.length, map: view.discovered.length };
 }
 
 // The driver's own vocabulary, taken whole rather than by where it is drawn,
@@ -208,6 +214,13 @@ const SURVEYED = {
     '# item ore',
     'examine: Streaked with red.',
     '',
+    '# slot mainhand',
+    'title: Main Hand',
+    '',
+    '# item awl',
+    'title: Awl',
+    'slot: mainhand',
+    '',
     '# entity window',
     'title: Window',
     'look out:',
@@ -216,12 +229,24 @@ const SURVEYED = {
     '  discover: cove',
     '  discover: shed',
     '  give: 1 ore',
+    '  give: 1 awl',
     '  xp: surveying 3',
     '',
   ].join('\n'),
 };
 
 const LOOK_OUT = 'use:entity.surveyed.window.look-out';
+
+// A session with a row on every page, reached the way a player reaches one: the
+// window fills the map, the sheet and the inventory, and the carried screen's
+// own verb fills the equipment page.
+function everyPageFilled(): Driver {
+  const driver = createDriver([engineLocale(), SURVEYED]);
+  driver.choose(position(driver, LOOK_OUT));
+  driver.open('surveyed.awl');
+  driver.answer('verb', 'equip');
+  return driver;
+}
 
 describe('what the shell puts on the screen', () => {
   // The engine's own words are gathered as it publishes them, so this is a
@@ -256,6 +281,22 @@ describe('what the shell puts on the screen', () => {
 
     // A shell that rendered nothing would satisfy every line above.
     expect(seen).toBeGreaterThan(20);
+  });
+
+  // The same rule over a session with something on every page. The walk above
+  // runs the shipped island, where the player has learned nothing and is wearing
+  // nothing, so Skills and Equipment are blank for the whole of it and a
+  // permission granted to either was answering no question (c10).
+  it('renders nothing a player can read that the engine did not publish, with a row on every page', () => {
+    const driver = everyPageFilled();
+    const view = driver.snapshot().view!;
+
+    expect(Object.entries(pagesDrawn(view)).filter(([, rows]) => rows === 0)).toEqual([]);
+
+    const engine = new Set<string>(published(view));
+    for (const run of readable(renderToStaticMarkup(<App driver={driver} />))) {
+      expect([...engine, ...SHELL_WORDS], `"${run}" is on the screen and no engine value produced it`).toContain(run);
+    }
   });
 
   // The clause above only refuses what should not be there, so a shell that
@@ -366,33 +407,35 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('draws what the player is carrying, and what they are made of, on the sheet', () => {
-    const driver = createDriver([SURVEYED]);
-    driver.choose(position(driver, LOOK_OUT));
+    const driver = everyPageFilled();
     const view = driver.snapshot().view!;
 
     const runs = engineRuns(renderToStaticMarkup(<App driver={driver} />));
 
-    expect(Object.keys(view.stats)).toContain('surveyed.might');
+    expect(view.stats.map((row) => row.id)).toContain('surveyed.might');
     expect(view.carried.map((row) => row.id)).toContain('surveyed.ore');
-    // c9: every stat reaches the page under the title the engine published for
-    // it and none of them under the id that title was published beside.
-    expect(view.statTitles['surveyed.might']).toBe('Might');
-    for (const [statId, title] of Object.entries(view.statTitles)) {
-      expect(runs).toContain(title);
-      expect(runs).not.toContain(statId);
+    // c9, c10: every stat and every skill reaches the page under the title the
+    // engine published on its row, and none of them under the id that title
+    // travelled beside.
+    expect(view.stats.find((row) => row.id === 'surveyed.might')?.title).toBe('Might');
+    for (const row of [...view.stats, ...view.xp]) {
+      expect(runs).toContain(row.title);
+      expect(runs).not.toContain(row.id);
     }
-    for (const skill of Object.keys(view.xp)) expect(runs).toContain(skill);
 
     // c16 and c18: a carried thing reaches the page under the name the engine
     // published and beside its count, never under the id a verb addresses it by.
-    const named = new Map(view.carried.map((row) => [row.id, row.name]));
     for (const row of view.carried) {
       expect(runs).toContain(row.name);
       expect(runs).not.toContain(row.id);
     }
-    for (const [slot, item] of Object.entries(view.equipment)) {
-      expect(runs).toContain(slot);
-      expect(runs).toContain(named.get(item));
+    // c10: a slot is a word with a key, so the equipment page draws its title
+    // and never the id `equipment-slots:` named it by.
+    expect(view.equipment.map((row) => [row.slot, row.title])).toEqual([['mainhand', 'Main Hand']]);
+    for (const row of view.equipment) {
+      expect(runs).toContain(row.title);
+      expect(runs).toContain(row.name);
+      expect(runs).not.toContain(row.slot);
     }
   });
 

@@ -83,8 +83,8 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
       return subpage.id === 'edit' ? <Console onSend={driver.send} words={words} /> : null;
     }
     if (layer.id === 'map') return <MapPane view={view} arrivals={arrivals} generation={generation} onChoose={driver.choose} />;
-    if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? {}, view?.statTitles ?? {}, localizer)} />;
-    if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? {}, {}, localizer)} />;
+    if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? [], localizer)} />;
+    if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? [], localizer)} />;
     // Both sides of what the player has are rows that act, because c21 puts a
     // worn copy on this page and nowhere else and the verbs it offers are
     // reachable from nowhere else either.

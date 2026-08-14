@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
 import { localizerFor } from '../runtime/localized';
 import { asLocalized } from '../runtime/localizedFixture';
-import type { PlayStatus } from '../runtime/session';
+import type { CountedRow, PlayStatus } from '../runtime/session';
 import { carried, contributionText, counted, worn } from './sheet';
 
 // A row's ids and counts belong to no language, so what they are read through is
@@ -36,35 +36,33 @@ const STAT = { statId: 'mod.attack', statTitle: asLocalized('Attack') };
 
 const flat = (amount: number): Contribution => ({ ...STAT, added: { min: amount, max: amount }, increased: 0 });
 
-describe('a published dictionary as rows', () => {
-  const TITLES = { 'base.attack': asLocalized('Attack'), 'base.guile': asLocalized('Guile') };
+describe('the counted rows the engine publishes, as a sheet draws them', () => {
+  const number = (id: string, title: string, value: number): CountedRow => ({ id, title: asLocalized(title), value });
 
   it('sorts by name, so a row does not move when its number does', () => {
-    expect(counted({ rope: 2, chestnut: 5, awl: 1 }, {}, localizer).map((entry) => entry.name)).toEqual(['awl', 'chestnut', 'rope']);
+    const rows = [number('r', 'rope', 2), number('c', 'chestnut', 5), number('a', 'awl', 1)];
+
+    expect(counted(rows, localizer).map((entry) => entry.name)).toEqual(['awl', 'chestnut', 'rope']);
   });
 
   it('reads a whole number as one and a fraction as one place, the way every other readout does', () => {
-    expect(counted({ coins: 12, luck: 0.25 }, {}, localizer)).toEqual([
-      { name: 'coins', value: '12' },
-      { name: 'luck', value: '0.3' },
+    expect(counted([number('coins', 'coins', 12), number('luck', 'luck', 0.25)], localizer)).toEqual([
+      { id: 'coins', name: 'coins', value: '12' },
+      { id: 'luck', name: 'luck', value: '0.3' },
     ]);
   });
 
-  // c9: a row is called what the engine published it as, and sorts under that,
-  // so the id it was keyed under never reaches the page.
-  it('names a row by the title published beside its key', () => {
-    expect(counted({ 'base.guile': 3, 'base.attack': 7 }, TITLES, localizer)).toEqual([
-      { name: 'Attack', value: '7' },
-      { name: 'Guile', value: '3' },
+  // c9, c10: a row is called what the engine published it as, and sorts under
+  // that, so the id it was keyed under never reaches the page.
+  it('names a row by the title the engine published on it', () => {
+    expect(counted([number('base.guile', 'Guile', 3), number('base.attack', 'Attack', 7)], localizer)).toEqual([
+      { id: 'base.attack', name: 'Attack', value: '7' },
+      { id: 'base.guile', name: 'Guile', value: '3' },
     ]);
-  });
-
-  it('draws a row under its key where the engine published no title for it', () => {
-    expect(counted({ woodcutting: 4 }, TITLES, localizer)).toEqual([{ name: 'woodcutting', value: '4' }]);
   });
 
   it('has nothing to draw for a player carrying nothing', () => {
-    expect(counted({}, {}, localizer)).toEqual([]);
+    expect(counted([], localizer)).toEqual([]);
     expect(carried([], [], localizer)).toEqual([]);
     expect(worn([], [], localizer)).toEqual([]);
   });
@@ -121,14 +119,14 @@ describe('a contribution, as words', () => {
 });
 
 describe('what the player is wearing, as rows', () => {
-  it('names the slot and the thing in it, never the id the slot holds', () => {
+  it('names the slot by its title and the thing in it by its name, never by an id', () => {
     const rows = [
-      row({ id: '1', name: asLocalized('Modified Blade'), grown: true, slot: 'mainhand' }),
-      row({ id: 'worn:back', name: asLocalized('Cloak'), slot: 'back' }),
+      row({ id: '1', name: asLocalized('Modified Blade'), grown: true, worn: { slot: 'mainhand', title: asLocalized('Main Hand') } }),
+      row({ id: 'worn:back', name: asLocalized('Cloak'), worn: { slot: 'back', title: asLocalized('Back') } }),
     ];
     expect(worn(rows, [], localizer)).toEqual([
-      { id: 'worn:back', name: 'back', value: 'Cloak' },
-      { id: '1', name: 'mainhand', value: 'Modified Blade' },
+      { id: 'worn:back', name: 'Back', value: 'Cloak' },
+      { id: '1', name: 'Main Hand', value: 'Modified Blade' },
     ]);
   });
 
@@ -136,14 +134,14 @@ describe('what the player is wearing, as rows', () => {
   // the only page a worn one is listed on — so the summary that tells two of
   // them apart has to be here rather than only on the carried page.
   it('states a worn grown copy’s contribution beneath its name', () => {
-    const rows = [row({ id: '1', name: asLocalized('Modified Blade'), grown: true, slot: 'mainhand' })];
+    const rows = [row({ id: '1', name: asLocalized('Modified Blade'), grown: true, worn: { slot: 'mainhand', title: asLocalized('Main Hand') } })];
     const published = plane({ instance: '1', contributions: [flat(15)] });
 
     expect(worn(rows, [published], localizer)[0].detail).toBe('+15 Attack');
   });
 
   it('leaves a worn stack copy without a summary, the way the carried page leaves its stack', () => {
-    const rows = [row({ id: 'worn:mainhand', name: asLocalized('Blade'), slot: 'mainhand' })];
+    const rows = [row({ id: 'worn:mainhand', name: asLocalized('Blade'), worn: { slot: 'mainhand', title: asLocalized('Main Hand') } })];
     const published = plane({ instance: 'worn:mainhand', contributions: [flat(15)] });
 
     expect(worn(rows, [published], localizer)[0].detail).toBeUndefined();
@@ -156,10 +154,10 @@ describe('what the player is wearing, as rows', () => {
   it('leaves the worn rows to this page and off the one that lists what is carried', () => {
     const rows = [
       row({ id: 'blade', name: asLocalized('Blade'), count: 2 }),
-      row({ id: 'worn:mainhand', name: asLocalized('Blade'), slot: 'mainhand' }),
+      row({ id: 'worn:mainhand', name: asLocalized('Blade'), worn: { slot: 'mainhand', title: asLocalized('Main Hand') } }),
     ];
 
     expect(carried(rows, [], localizer).map((entry) => entry.id)).toEqual(['blade']);
-    expect(worn(rows, [], localizer)).toEqual([{ id: 'worn:mainhand', name: 'mainhand', value: 'Blade' }]);
+    expect(worn(rows, [], localizer)).toEqual([{ id: 'worn:mainhand', name: 'Main Hand', value: 'Blade' }]);
   });
 });

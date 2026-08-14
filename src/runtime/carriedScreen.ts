@@ -44,7 +44,19 @@ export interface CarriedEntry {
   // The slot this entry is worn in, and undefined for a carried one: c21 puts
   // every entry on exactly one of those two sides, so this is what a page
   // listing one side and not the other reads, and what says which verbs apply.
-  readonly slot?: Answer;
+  // The id and the words for it travel together, because a verb takes the one
+  // and a page draws the other (c10).
+  readonly worn?: { readonly slot: Answer; readonly title: Localized };
+}
+
+// What is worn, slot by slot. `item` is the spelling the state holds — what a
+// plane report and a save name the copy by — which is not the row `carried`
+// lists it as, because c21 mints that one from the slot.
+export interface WornRow {
+  readonly slot: Answer;
+  readonly title: Localized;
+  readonly item: Answer;
+  readonly name: Localized;
 }
 
 interface CarriedVerb {
@@ -72,7 +84,7 @@ const VERBS: readonly CarriedVerb[] = [
   {
     value: 'equip',
     shown: 'engine.carried.verb.equip',
-    applies: (item, entry) => item?.slot !== undefined && entry.slot === undefined,
+    applies: (item, entry) => item?.slot !== undefined && entry.worn === undefined,
     confirms: () => false,
     take: (entry, state, registry) => {
       equip(state, registry, entry.id);
@@ -82,10 +94,10 @@ const VERBS: readonly CarriedVerb[] = [
   {
     value: 'unequip',
     shown: 'engine.carried.verb.unequip',
-    applies: (_item, entry) => entry.slot !== undefined,
+    applies: (_item, entry) => entry.worn !== undefined,
     confirms: () => false,
     take: (entry, state) => {
-      if (entry.slot !== undefined) unequip(state, entry.slot);
+      if (entry.worn) unequip(state, entry.worn.slot);
       return null;
     },
   },
@@ -126,12 +138,28 @@ export function carriedEntries(state: GameState, registry: Registry): CarriedEnt
     if (wornIn(state, id) !== undefined) continue;
     entries.push({ id, name: nameOf(template, localizer, id), count: 1, shown: nameOf(template, localizer, id), grown: true });
   }
-  for (const [slot, id] of Object.entries(state.equipped)) {
-    const grown = isGrownCopy(state, id);
-    const name = nameOf(itemTemplate(state, id), localizer, grown ? id : null);
-    entries.push({ id: grown ? id : wornCopy(slot), name, count: 1, shown: localizer.engine('engine.carried.worn', { item: name, slot: localizer.identifier(slot) }), grown, slot });
+  for (const row of wornRows(state, registry)) {
+    const grown = isGrownCopy(state, row.item);
+    entries.push({
+      id: grown ? row.item : wornCopy(row.slot),
+      name: row.name,
+      count: 1,
+      shown: localizer.engine('engine.carried.worn', { item: row.name, slot: row.title }),
+      grown,
+      worn: { slot: row.slot, title: row.title },
+    });
   }
   return entries;
+}
+
+export function wornRows(state: GameState, registry: Registry): WornRow[] {
+  const localizer = localizerOf(registry, state);
+  return Object.entries(state.equipped).map(([slot, id]) => ({
+    slot,
+    title: localizer.title('slot', slot),
+    item: id,
+    name: nameOf(itemTemplate(state, id), localizer, isGrownCopy(state, id) ? id : null),
+  }));
 }
 
 function verbsFor(entry: CarriedEntry, state: GameState, registry: Registry): readonly CarriedVerb[] {

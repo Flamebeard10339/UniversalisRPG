@@ -123,7 +123,7 @@ describe('what the screen lists', () => {
 
     expect(carriedEntries(state, registry)).toEqual([
       { id: 'iron-sword', name: 'Iron Sword', count: 2, shown: 'Iron Sword x2', grown: false },
-      { id: 'worn:mainhand', name: 'Iron Sword', count: 1, shown: 'Iron Sword (mainhand)', grown: false, slot: 'mainhand' },
+      { id: 'worn:mainhand', name: 'Iron Sword', count: 1, shown: 'Iron Sword (Mainhand)', grown: false, worn: { slot: 'mainhand', title: 'Mainhand' } },
     ]);
   });
 
@@ -133,7 +133,7 @@ describe('what the screen lists', () => {
 
     expect(carriedEntries(state, registry)).toEqual([
       { id: 'heartwood-blade', name: 'Heartwood Blade', count: 1, shown: 'Heartwood Blade x1', grown: false },
-      { id: '1', name: 'Modified Heartwood Blade', count: 1, shown: 'Modified Heartwood Blade (mainhand)', grown: true, slot: 'mainhand' },
+      { id: '1', name: 'Modified Heartwood Blade', count: 1, shown: 'Modified Heartwood Blade (Mainhand)', grown: true, worn: { slot: 'mainhand', title: 'Mainhand' } },
     ]);
   });
 });

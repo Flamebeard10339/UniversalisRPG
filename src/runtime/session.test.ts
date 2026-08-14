@@ -29,6 +29,8 @@ function ids(v: PlayView): string[] {
   return v.choices.map((c) => c.id);
 }
 
+const statValueOf = (v: PlayView, id: string): number | undefined => v.stats.find((row) => row.id === id)?.value;
+
 function modalNames(v: PlayView): string[] {
   return v.modals.map((modal) => modal.name);
 }
@@ -705,28 +707,30 @@ describe('what the engine publishes', () => {
   // c9: a stat reaches a page under a title rather than under the id the number
   // is keyed by, and the title is the localizer's — an authored one where the
   // content wrote one, and English's own reading of the id where it did not.
-  it('names every stat it counts, beside the id it counted it under', () => {
+  it('names every stat it counts, on the row it counted it on', () => {
     const v = view(startSession(loadInEnglish(PUBLISHED_MODULE)));
 
-    expect(Object.keys(v.statTitles).sort()).toEqual(Object.keys(v.stats).sort());
-    expect(v.statTitles.grit).toBe('Fortitude');
-    expect(v.statTitles.might).toBe('Might');
+    expect(v.stats.map((row) => [row.id, row.title])).toEqual([
+      ['might', 'Might'],
+      ['grit', 'Fortitude'],
+    ]);
   });
 
   it('carries stat values, and recomputes them when equipment changes them', () => {
     const session = primed(loadInEnglish(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
 
-    expect(view(session).stats.might).toBe(4);
+    expect(statValueOf(view(session), 'might')).toBe(4);
 
     applyDirective(session, { kind: 'equip', item: 'gauntlet' });
     const armed = view(session);
-    expect(armed.equipment).toEqual({ hand: 'gauntlet' });
-    expect(armed.stats.might).toBe(7);
+    // c10: the slot arrives with the words for it, and so does what fills it.
+    expect(armed.equipment).toEqual([{ slot: 'hand', title: 'Hand', item: 'gauntlet', name: 'Gauntlet' }]);
+    expect(statValueOf(armed, 'might')).toBe(7);
 
     applyDirective(session, { kind: 'unequip', slot: 'hand' });
     const bare = view(session);
-    expect(bare.equipment).toEqual({});
-    expect(bare.stats.might).toBe(4);
+    expect(bare.equipment).toEqual([]);
+    expect(statValueOf(bare, 'might')).toBe(4);
   });
 
   // Wearing a thing and taking it off are what a copy takes rather than what it
@@ -765,7 +769,7 @@ describe('what the engine publishes', () => {
     const carried = view(session);
     expect(carried.inventory).toEqual({ gauntlet: 1 });
     expect(carried.grown).toEqual({ [grown.instance]: 'gauntlet' });
-    expect(carried.stats.might).toBe(4);
+    expect(statValueOf(carried, 'might')).toBe(4);
 
     // c16: the world names a copy the one way every screen does — under a
     // descriptor, and never under the id the row itself carries.
@@ -776,13 +780,13 @@ describe('what the engine publishes', () => {
 
     applyDirective(session, { kind: 'equip', item: grown.instance });
     const armed = view(session);
-    expect(armed.equipment).toEqual({ hand: grown.instance });
-    expect(armed.stats.might).toBe(7);
+    expect(armed.equipment).toEqual([{ slot: 'hand', title: 'Hand', item: grown.instance, name: 'Modified Gauntlet' }]);
+    expect(statValueOf(armed, 'might')).toBe(7);
     // The worn copy leaves the carried side and is named there instead (c21),
     // still under the id that says which of the two the player meant.
     expect(armed.carried).toEqual([
       { id: 'gauntlet', name: 'Gauntlet', count: 1, shown: 'Gauntlet x1', grown: false },
-      { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet (hand)', grown: true, slot: 'hand' },
+      { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet (Hand)', grown: true, worn: { slot: 'hand', title: 'Hand' } },
     ]);
   });
 
@@ -791,10 +795,10 @@ describe('what the engine publishes', () => {
     const session = startSession(registry);
     applyDirective(session, { kind: 'load', save: 'stocked' });
 
-    expect(view(session).xp).toEqual({});
+    expect(view(session).xp).toEqual([]);
 
     const forged = apply(session, 'craft:ingot');
-    expect(forged.xp).toEqual({ smithing: 5 });
+    expect(forged.xp).toEqual([{ id: 'smithing', title: 'Smithing', value: 5 }]);
     expect(forged.inventory).toEqual({ ingot: 1, gauntlet: 1 });
   });
 

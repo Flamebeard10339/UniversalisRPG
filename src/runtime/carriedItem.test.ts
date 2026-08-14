@@ -78,7 +78,7 @@ describe('a grown copy is still a carried blade', () => {
     const played = view(grownFrom('one-blade'));
     expect(played.inventory.blade).toBeUndefined();
     expect(played.grown).toEqual({ '1': 'blade' });
-    expect(played.equipment.mainhand).toBe('1');
+    expect(played.equipment).toEqual([{ slot: 'mainhand', title: 'Mainhand', item: '1', name: 'Modified Blade' }]);
   });
 
   it('still satisfies a requires: has gate', () => {
@@ -126,7 +126,7 @@ describe('a grown copy is never spent', () => {
     expect(played.said).toContain('Your Blade is the one you are wearing, and what you wear is never spent.');
     expect(played.said).not.toContain('She quenches the blade and hands it back.');
     expect(played.grown).toEqual({ '1': 'blade' });
-    expect(played.equipment.mainhand).toBe('1');
+    expect(played.equipment).toEqual([{ slot: 'mainhand', title: 'Mainhand', item: '1', name: 'Modified Blade' }]);
   });
 
   // The same refusal without a plane behind it: c21 is what takes a plain stack
@@ -138,7 +138,7 @@ describe('a grown copy is never spent', () => {
 
     const played = view(session);
     expect(played.said).toContain('Your Blade is the one you are wearing, and what you wear is never spent.');
-    expect(played.equipment.mainhand).toBe('blade');
+    expect(played.equipment).toEqual([{ slot: 'mainhand', title: 'Mainhand', item: 'blade', name: 'Blade' }]);
   });
 
   it('stops a repeating action when the stack runs dry, rather than running on nothing', () => {

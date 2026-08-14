@@ -16,14 +16,14 @@ import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
 import { answerModal, dialogueFrame, Modal, modalFocus, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
-import { carriedEntries, type CarriedEntry } from './carriedScreen';
+import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carriedScreen';
 import { Registry } from '../content/registry';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { ResourceDisplay } from '../content/resource';
 import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { Directive, parseUseChoiceId, useChoiceId } from '../content/test';
 import { printDirective } from '../content/serialize';
-import { Answer, Localized, Localizer, localizerOf } from './localized';
+import { Answer, AnswerTable, Localized, Localizer, localizerOf } from './localized';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 import { say } from './said';
 
@@ -55,6 +55,14 @@ export interface PlayAction {
   completion: number;
 }
 
+// A number the player is shown, under the name they are shown it by. Stats and
+// skills are two readings of it and a sheet draws them the one way.
+export interface CountedRow {
+  id: Answer;
+  title: Localized;
+  value: number;
+}
+
 // Everything the engine shows, as copies: a driver renders this and reaches
 // past it for nothing.
 export interface PlayStatus {
@@ -69,11 +77,11 @@ export interface PlayStatus {
   encounter: EncounterView | null;
   // Bottom of the stack first, so the last one is the one being answered.
   modals: Modal[];
-  inventory: Record<Answer, number>;
+  inventory: AnswerTable<number>;
   // Grown copies the player has, carried or worn, by the instance id each is
   // named by. They are counted nowhere in `inventory`, so a surface listing what
   // the player has reads both records.
-  grown: Record<Answer, Answer>;
+  grown: AnswerTable<Answer>;
   // Every row a page draws, on either side of c21: named once below every
   // screen, counted, and each under the id a verb addresses it by, so a surface
   // states the engine's answer rather than reading a dictionary's keys as names
@@ -89,14 +97,17 @@ export interface PlayStatus {
   // names a plane rather than carrying one, so a surface draws it by looking the
   // id up in `planes` and never by recognising the screen that holds it.
   focus: PlaneFocus | null;
-  equipment: Record<Answer, Answer>;
-  xp: Record<Answer, number>;
-  stats: Record<Answer, number>;
-  // What each of those stats is called, under the id the dictionary above keys
-  // it by, so a page listing them draws a title in the language being played
-  // rather than the id it looked the number up with (c9).
-  statTitles: Record<Answer, Localized>;
-  flags: Record<Answer, boolean | number>;
+  // One row per filled slot: what the slot is addressed as, what it is called in
+  // the language being played, and the same pair for the copy worn in it. A page
+  // draws the words and a verb takes the id, and neither has to go looking for
+  // the other (c10).
+  equipment: WornRow[];
+  // What the player has learned and what the world has made of them: a row each,
+  // carrying the title the page draws beside the number, so no page reads a
+  // dictionary's keys as row names (c9, c10).
+  xp: CountedRow[];
+  stats: CountedRow[];
+  flags: AnswerTable<boolean | number>;
   discovered: Array<{ id: Answer; title: Localized; x: number; y: number; z: number; adjacent: Array<{ to: Answer; open: boolean }> }>;
   // The walk under way: where it is going and which places it has still to
   // cross, in the order it will cross them. A driver lights the route up off
@@ -416,10 +427,9 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     carried: carriedEntries(state, registry),
     planes: planeReports(registry, state),
     focus: modalFocus(state),
-    equipment: { ...state.equipped },
-    xp: { ...state.xp },
-    stats: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, statValue(stat.id, state, registry)])),
-    statTitles: Object.fromEntries([...registry.stats.values()].map((stat) => [stat.id, localizer.title('stat', stat.id)])),
+    equipment: wornRows(state, registry),
+    xp: Object.entries(state.xp).map(([id, value]) => ({ id, title: localizer.title('skill', id), value })),
+    stats: [...registry.stats.values()].map((stat) => ({ id: stat.id, title: localizer.title('stat', stat.id), value: statValue(stat.id, state, registry) })),
     flags: { ...state.flags },
     discovered: publishDiscovered(state, registry),
     journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,

@@ -1,5 +1,5 @@
 import type { Answer, Localized, Localizer } from '../runtime/localized';
-import type { PlayStatus } from '../runtime/session';
+import type { CountedRow, PlayStatus } from '../runtime/session';
 import { signed, tidy } from './format';
 
 export interface Entry {
@@ -27,14 +27,10 @@ type Contribution = Plane['contributions'][number];
 const byName = (left: Entry, right: Entry): number =>
   left.name < right.name ? -1 : left.name > right.name ? 1 : (left.id ?? '') < (right.id ?? '') ? -1 : (left.id ?? '') > (right.id ?? '') ? 1 : 0;
 
-// A dictionary the engine keyed by id, as rows. What a row is called is the
-// title published beside it under the same id; a dictionary published without
-// titles is drawn under its keys, and a caller with none says so by handing an
-// empty table rather than by calling a shorter function.
-export function counted(held: Record<Answer, number>, titles: Record<Answer, Localized>, localizer: Localizer): Entry[] {
-  return Object.entries(held)
-    .map(([id, value]) => ({ name: titles[id] ?? localizer.identifier(id), value: localizer.identifier(tidy(value)) }))
-    .sort(byName);
+// Rows the engine already named, drawn under those names. Stats and skills are
+// two readings of one shape, and neither reaches this page as an id (c9, c10).
+export function counted(rows: readonly CountedRow[], localizer: Localizer): Entry[] {
+  return rows.map((row) => ({ id: row.id, name: row.title, value: localizer.identifier(tidy(row.value)) })).sort(byName);
 }
 
 // What one item is worth, per stat, from the fold the engine already published:
@@ -65,7 +61,7 @@ function detailOf(row: CarriedRow, planes: readonly Plane[], localizer: Localize
 // page's.
 export function carried(rows: readonly CarriedRow[], planes: readonly Plane[], localizer: Localizer): Entry[] {
   return rows
-    .filter((row) => row.slot === undefined)
+    .filter((row) => row.worn === undefined)
     .map((row) => ({ id: row.id, name: row.name, value: localizer.identifier(tidy(row.count)), ...detailOf(row, planes, localizer) }))
     .sort(byName);
 }
@@ -77,7 +73,6 @@ export function carried(rows: readonly CarriedRow[], planes: readonly Plane[], l
 // the id that names that copy and not the item behind it.
 export function worn(rows: readonly CarriedRow[], planes: readonly Plane[], localizer: Localizer): Entry[] {
   return rows
-    .filter((row) => row.slot !== undefined)
-    .map((row) => ({ id: row.id, name: localizer.identifier(row.slot as string), value: row.name, ...detailOf(row, planes, localizer) }))
+    .flatMap((row) => (row.worn ? [{ id: row.id, name: row.worn.title, value: row.name, ...detailOf(row, planes, localizer) }] : []))
     .sort(byName);
 }

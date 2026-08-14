@@ -22,6 +22,16 @@ export type Localized = string & { readonly [LOCALIZED]: true };
 // it.
 export type Answer = string;
 
+// A published dictionary in which nothing is words: an id to a count, an id to
+// another id, a flag to what it holds. Declared at the field rather than read
+// off the shape, because `stats` had exactly this shape and its keys were the
+// row names on a screen — so which of the two a map is, is the builder's to say
+// (c10). A published `Record` keyed by an `Answer` is refused, because a key is
+// not a field and the walk that checks the published surface cannot see one; a
+// value a driver draws as a word travels in a row beside the id it belongs to
+// instead.
+export type AnswerTable<V extends Answer | number | boolean> = Readonly<Record<Answer, V>>;
+
 // What a pattern substitutes. A localized value, because a name inside a
 // sentence is as translatable as the sentence; or a number, which no language
 // spells with letters here.

@@ -138,7 +138,7 @@ function formatFocus(v: PlayView, localizer: Localizer): PlayerLine[] {
   const plane = v.planes.find((each) => each.instance === focus.instance);
   if (!plane) return [];
   const blank = localizer.identifier('');
-  return [blank, ...formatPlane(plane, Object.values(v.equipment).includes(plane.instance), focus.hex, localizer), blank].map((line) => say(line));
+  return [blank, ...formatPlane(plane, v.equipment.some((row) => row.item === plane.instance), focus.hex, localizer), blank].map((line) => say(line));
 }
 
 // Rendered from the published name and options alone, so a modal this driver
@@ -199,8 +199,8 @@ function formatInventory(status: PlayStatus, localizer: Localizer): PlayerLine[]
   // copy is not interchangeable with its stack, and the id here is the handle a
   // player equips it by.
   if (Object.keys(status.grown).length > 0) lines.push(dumped(localizer, 'engine.repl.state.grown', status.grown));
-  lines.push(dumped(localizer, 'engine.repl.state.xp', status.xp));
-  if (Object.keys(status.equipment).length > 0) lines.push(dumped(localizer, 'engine.repl.state.equipped', status.equipment));
+  lines.push(dumped(localizer, 'engine.repl.state.xp', Object.fromEntries(status.xp.map((row) => [row.id, row.value]))));
+  if (status.equipment.length > 0) lines.push(dumped(localizer, 'engine.repl.state.equipped', Object.fromEntries(status.equipment.map((row) => [row.slot, row.item]))));
   return lines;
 }
 

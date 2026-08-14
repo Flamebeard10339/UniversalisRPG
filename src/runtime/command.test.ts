@@ -408,7 +408,7 @@ describe('the commands a player plays with', () => {
 
     const equipped = runLine(ctx, '2');
     expect(equipped.recorded).toEqual(['submit-modal: verb=equip']);
-    expect(sessionStatus(session).equipment).toEqual({ hand: 'gauntlet' });
+    expect(sessionStatus(session).equipment).toEqual([{ slot: 'hand', title: 'Hand', item: 'gauntlet', name: 'Gauntlet' }]);
     expect(equipped.view?.modals).toEqual([]);
   });
 
@@ -424,7 +424,7 @@ describe('the commands a player plays with', () => {
     runLine(ctx, '/inv gauntlet');
     const left = runLine(ctx, 'submit-modal: verb=close');
     expect(left.view?.modals).toEqual([]);
-    expect(sessionStatus(session).equipment).toEqual({});
+    expect(sessionStatus(session).equipment).toEqual([]);
     expect(sessionStatus(session).inventory).toEqual({ gauntlet: 1 });
     expect(sessionStatus(session).time).toBe(0);
   });
