@@ -1050,3 +1050,183 @@ the same defect pass 4 filed and this branch fixed on the carried screen — `ca
 spells `value` through a base-language localizer and `planeScreen.movesOn` does not — and at
 cfa1eb69 that screen's values were language-free (`carriedName(item.title, false)`), so it is a
 regression this branch introduced and half-fixed.
+
+### Pass 6 — 2026-08-14
+
+- base: `cfa1eb692c996ed4414390fa5cb492741856a0f2`
+- head: `b8c620d58a3a56f4fa687436d53b66c9baf848cb`
+- proof 1: met — Re-measured this pass, not inherited. The assertion is the `@ts-expect-error` block at
+src/runtime/localized.test.ts:26-58 and `npx tsc --noEmit` is what runs it. Re-runnable: replace
+`export type Localized = string & { readonly [LOCALIZED]: true };` in src/runtime/localized.ts with
+`export type Localized = string;` and run `npx tsc --noEmit` — it reports exactly fifteen TS2578
+"Unused '@ts-expect-error' directive" errors at localized.test.ts lines
+27,29,31,33,35,37,39,43,45,47,49,51,53,55,57 and passes again when restored (measured this pass;
+`git status --porcelain` empty afterwards). The fifteen fields are the original seven plus
+ModalOption.label, ModalChoice.shown, PlayView.said, CarriedEntry.name, CarriedEntry.shown,
+PlaneReport.name, ClusterReport.title and EncounterFoe.title, unchanged in this diff. The brand's
+escape hatch stays closed by `describe('the brand is closed (c1)')`, and grep confirms no file in
+src or scripts writes `as Localized` outside localized.ts and localizedFixture.ts.
+Graded, as passes 1-5 were, against the fields the clause enumerates. The enumeration's boundary
+this pass, measured rather than assumed: `Refusal.refused` in src/runtime/itemInstance.ts became
+`Localized` in this diff and is NOT in the fixture, so the fixture's own stated rule — "Every field
+a later pass had to brand, listed here so that unbranding one is a build failure" — is not kept for
+it. Reverting it to `string` does fail tsc, but by one incidental call site
+(`state.log.push(growth.refused)` at session.ts:672, TS2345) rather than by the fixture. Filed low,
+not against this grade. `Modal.leaving`, `CarriedEntry.value`, `ModalChoice.value`,
+`PlaneFrame.said` and `PlayStatus.player` remain plain strings; the first four by design, and
+`PlaneFrame.said` is where c3 fails this pass.
+- proof 2: met — Both halves measured this pass at lines no earlier pass broke. Union coverage:
+`engine.plane.back: Back to inventory` in content/engine-en.dsl — a key this diff adds — mutated to
+`engine.plane.backe:` was KILLED by src/runtime/localized.test.ts "ships an English pattern for
+every key the union holds, and no other key", re-run at its own file with the mutation still
+applied. No sentence left in TypeScript: src/runtime/itemInstance.ts's new
+`localizer.engine('engine.growth.max-level', { item: carriedName(...), level: item.maxLevel })`
+replaced with the equivalent template literal cast to Localized was KILLED by
+src/runtime/localized.test.ts "leaves no engine sentence behind in TypeScript", re-run at its own
+file — a fifth distinct site after pass 2's craftLabel, pass 3's travelLabel, pass 4's confirm
+label and pass 5's plane heading, so what is watched is the property rather than one line.
+Sixty-two keys now and content/engine-en.dsl covers the union exactly.
+Pass 5's medium finding on this half is fixed and I re-measured the fix rather than reading it: the
+`IDENTIFIERS` allowlist is one entry per occurrence rather than per (file, pattern) — it lists
+`src/runtime/carriedScreen.ts: {item} ({slot})` twice, which is the exact shape pass 5 measured as
+invisible — and the assertion is `toEqual` against the sorted offender list, so an eighteenth
+occurrence anywhere in src fails it. The literal-union half is proven by tsc rather than by the
+named vitest target, unchanged from passes 1-5: `export type EngineKey = (typeof ENGINE_KEYS)
+[number];` changed to `= string;` produces TS2578 errors at localized.test.ts:64,66 (measured this pass, restored clean).
+Graded on the reading passes 1-5 used. The universal reading is still false and still not folded
+in: the engine's own refusal sentences in itemInstance.ts and clusterEffect.ts have no key at all,
+so no scan built from the shipped patterns can see them — filed against c3, where they land.
+- proof 3: unmet — Pass 5's two named mechanisms are genuinely fixed and I re-measured both; the clause
+fails on the same refusal reaching a second surface, which is the neighbour rather than the finding.
+Fixed and mutation-proven this pass, each KILLED and re-run at its own file with the mutation still
+applied: src/runtime/itemInstance.ts's max-level refusal reverted to
+`localizer.prose(\`${item.title} is already ...\`)` was KILLED by src/runtime/session.test.ts "shows
+the key on what a refused growth says, and the translation where a locale supplies one";
+src/runtime/carriedScreen.ts's `shown: localizer.engine(each.shown)` reverted to
+`localizer.identifier(each.value)` — pass 5's `spelled()` — was KILLED by "shows the key for every
+engine word the played language has no entry for"; src/runtime/planeScreen.ts's `base:
+carriedName(base, ...)` changed back to the played localizer was KILLED by "offers the same answers
+in every language, on every screen"; and the core no-fallback line
+`return base?.language === language ? base.text : undefined;` changed to `return base?.text;` was
+KILLED by four named session.test.ts tests. Measured independently: the shipped island played in
+`zz` publishes keys and nothing else on location, entities, choices, resources, the
+character-creation modal and the carried modal; and pass 5's own reproduction — `# info isla /
+language: es`, `# item cuerda-larga` with no title, played in es — now says
+`["engine.growth.max-level"]` where pass 5 measured the raw id.
+False: "renders the fully qualified key", on the plane screen, and "never the module's own
+language" in the other direction. `Growth.refused` became `Localized` in this diff, but
+`PlaneFrame.said` is still a plain `string` and `planeScreen.ts:136`'s `heading` renders it with
+`localizer.prose(frame.said)` — the door for un-keyed DSL text, applied to text that has already
+been through the localizer. Measured with `npm run inspect`, a module `# info isla / language: es`
+holding `# item cuerda` (max-level 1) and `# item miga`, loaded beside the shipped engine locale
+and played in `en`: the log line is `isla.item.cuerda.title is already at level 1, which is its
+maximum` — the key inside the English pattern, exactly what the clause asks for — while the plane
+screen the growth was taken on shows `isla.item.cuerda.title at 0,0 — (untranslated)`. The same
+refusal, two surfaces, and the one the player is looking at is the one that loses the key a
+translator needs. The other direction, with a `# locale es` supplying `engine.plane.heading.said`
+and the frame's `said` written by an English session (it is a save field): the heading reads
+`Cuerda en 0,0 — isla.item.cuerda.title is already at level 1, which is its maximum` — a whole
+English engine sentence to a Spanish player.
+Second, and the reason the first is not the only one: six growth refusals are English sentences
+built in TypeScript with no key, handed to `prose` — `you carry no {id}` (itemInstance.ts:243,292,
+293), `there is no item or item instance called ...` (286), `... is not a base: only an item you can
+wear has a plane to grow` (289), `... grants no item experience` (311), `... is not a cluster jewel`
+(326), `... carries no cluster effect` (clusterEffect.ts:89). The prose door opens when every
+content module declares the played language, which is a sound proxy for a `say:` and exactly
+backwards for engine-built English: the case where the door opens is precisely the case where the
+player reads the module's language. Measured, an `es` module played in es:
+`["isla.cuerda-larga grants no item experience"]` and `["isla.miga is not a base: only an item you
+can wear has a plane to grow"]`. This pass keyed one of the seven refusals and left six; the
+Decision that blesses a growth refusal as prose argues it from a hex, a direction and a node, which
+describes `plainly()`'s two callers and not these.
+Both filed high. Neither is a regression against cfa1eb69 — that tree showed `frame.said` verbatim
+in every language and built the same six sentences — so this is a clause that has not yet been met
+rather than something this branch broke.
+- proof 4: met — Both halves mutation-proven this pass at their own lines, each KILLED and re-run at its
+own file with the mutation still applied. `if (value === undefined) throw new RuntimeError(...)` in
+`substitute` (src/runtime/localized.ts:25) replaced with `return '';` was KILLED by
+src/runtime/localized.test.ts "refuses a pattern naming a parameter the call site did not supply".
+Pass 5's high finding on the second place a value is written is fixed and measured at its own new
+line: `if (unsupplied.length > 0) throw new DslError(...)` in registry.ts's new `recordBase`
+neutralised was KILLED by src/content/locale.test.ts "refuses an authored examine that names one,
+naming the key and the parameter". Re-measured end to end with `npm run inspect`: `# location camp /
+examine: The sign reads {open} and nothing else.` — pass 5's exact reproduction, which loaded with
+no complaint and then threw out of every view — is now refused at load with
+`isla.location.camp.examine names {open}, which nothing supplies`, naming the key and the parameter.
+Both places a base entry is written route through `recordBase`, and both loops in `compileModules`
+catch the DslError and attribute it to the module that wrote the section rather than to modules[0].
+The named-substitution half is watched by "puts a value in by name", the localized-parameter half by
+"resolves a localized parameter in the active language before substituting it" and end-to-end by
+session.test.ts's `Viaja a island.location.cove.title`, and the deliberate asymmetry by "allows a
+parameter the pattern does not name". Over-strictness checked rather than assumed: the refusal is
+`/\{[a-z][a-z0-9-]*\}/`, so `{Hello}` and `{ x }` still load and only a lowercase token is refused;
+`npm test` passes over the shipped island unchanged. The narrowing is real and is not recorded in
+`## Decided while building it`, which still reads as covering `# locale` values alone — filed low.
+- proof 5: met — Both recording gates mutation-proven this pass at their own lines, each KILLED and
+re-run at its own file with the mutation still applied. src/content/registry.ts's
+`else if (field === GENERATED_FIELD && language === DEFAULT_LANGUAGE) recordBase(...)` with the
+language test dropped was KILLED by src/content/universe.test.ts "records a generated title as an
+entry only for a module writing English"; `if (action.generatedLabel && language !==
+DEFAULT_LANGUAGE) continue;` neutralised was KILLED by "records the generated label only for a
+module writing English". Both lines moved in this diff (they now call `recordBase` rather than
+`registry.locales.base.set`), so this is a measurement of the current text and not an inheritance.
+The `# info language:` half is carried by info.ts's `defaultTitle`, killed at its own line by
+passes 2-5 and unchanged here; the article half by src/runtime/localized.ts's
+`if (localizer.language === BASE_LANGUAGE) params.article = articleEn(title) as Localized;`, killed
+at its own line by pass 5 and unchanged here. Grep confirms info.ts, action.ts and registry.ts's
+recipe label are still the only `humanizeEn` call sites. Corroborated by measurement rather than by
+the tests alone: a `language: es` module's untitled item shows `isla.item.cuerda-larga.title` on
+carried[].name, planes[].title and planes[].name, never an English phrase.
+- proof 6: met — The equality test is the right shape and the line that carries it is live, re-measured
+this pass. src/content/locale.test.ts declares `const FIELDS: Record<keyof Registry, 'content' |
+'the locale table'>`, so a new Registry field stops the file compiling until somebody classifies it,
+and the test compares every content field through `sameValue` with `namespace.snapshot()` standing
+in for the Namespace. Mutation: deleting `if (section.kind === 'locale') continue;` from
+src/content/registry.ts's `mergePass` was KILLED by src/content/locale.test.ts "leaves every content
+map identical to loading without it", re-run at its own file with the mutation still applied.
+Re-runnable: `npx vitest run src/content/locale.test.ts -t "leaves every content map identical"`.
+Nothing in this diff touches the merge path.
+- proof 7: met — Both halves mutation-proven at their own lines this pass, each KILLED and re-run at its
+own file with the mutation still applied. Restoring the pre-pass-2 universe in `missingTranslations`
+— `for (const key of [...ENGINE_KEYS, ...locales.addressable])` in src/content/locale.ts changed
+back to `...locales.base.keys()` — was KILLED by src/content/locale.test.ts "reports a key no module
+has any text for, in every language". The same restoration in `unmatchedLocaleKeys` —
+`locales.addressable.has(key)` back to `locales.base.has(key)` — was KILLED by "stops reporting it
+once a locale supplies it". `missingTranslations` is pure over (Locales, language): no registry, no
+session, no view. The seventeen keys this diff adds to ENGINE_KEYS enter the report's universe
+through `ENGINE_KEYS` itself, so the report grew with the set rather than needing a second list. The
+known over-report stands as passes 3-5 recorded it and its record is open, so it is not re-filed.
+- proof 8: met — Mutation-proven at the clause's own named proof file this pass. `actionSlug`'s
+`.replace(/[^a-z0-9]+/g, '-')` in src/content/locale.ts with the hyphen dropped was KILLED by
+src/content/locale.test.ts "keys `pick up` as `pick-up`, and leaves the identifier the label",
+re-run at its own file with the mutation still applied — one test asserting both halves at once, the
+base entry at `island.entity.crab.pick-up` and `actions[0].label === 'pick up'`. The collision
+branch in `actionSlugProblem` and the `actionLabel` lookup are unchanged in this diff and were
+killed at their own lines by passes 2 and 4. The identifier is untouched: `git diff
+cfa1eb69..b8c620d -- content/` is the new engine-en.dsl and nothing else, no `# test` line is added
+or removed anywhere in the diff, and `npm test` passes over the shipped `# test` sections.
+- proof 9: met — `npm run tasks -- merge-ready` this pass: tsc ok, npm test ok (2994 tests, 125 files),
+layer-check ok, audit-status ok, doctor ok (22 pre-existing warnings, none from this branch's
+paths), bytes ok, tree ok, base ok. The only failing legs are `spec` (the one open clause record,
+c3) and `clauses` (pass 5's c3, which this pass re-grades) — neither behavioural. Shipped content
+plays in English unchanged: `git diff cfa1eb69..b8c620d -- content/` is the new engine-en.dsl and
+nothing else, and I measured the English plane screen end to end — item values `Rope x1 / Crumb x5 /
+Close`, verbs `Grow / Equip / Destroy / Close`, plane values `allocate: slot e / feed: with Crumb /
+Back to inventory` and the heading `Rope at 0,0 — Rope is already at level 1, which is its maximum`,
+all identical to what cfa1eb69 produces. `SAVE_VERSION` is 9 at cfa1eb69 and 9 at head. `SaveDiff`
+and the exhaustive `SAVE_FIELDS` table still exclude `language` by name
+(`Exclude<keyof GameState, 'log' | 'language'>`). Registry `.title` stays `string` on every type. No
+authored content id moved. The published-shape changes passes 1-5 disclosed all stand, and this pass
+records one more the diff discloses and c9 does not freeze: `destroyItem` now takes the registry,
+and `Growth.refused` is `Localized` where it was `string`.
+The regression question, answered against behaviour rather than against the clauses. Nothing in
+shipped English moves. Pass 5's two named regressions are both closed, and I re-measured both rather
+than reading the commits: authored base text carrying a `{name}` no longer takes every view down —
+it is refused at load, naming the key and the parameter — and the plane screen's answers no longer
+move with the played language (`answers(moves('es'))` equals `answers(moves('en'))`, mutation-proven
+above). One behaviour is stricter than cfa1eb69 rather than worse than it: content whose authored
+text contains a `{lowercase-token}` loaded there and does not load here. That is the alternative to
+a render-time crash and the message names what to fix, so it is filed as an undisclosed narrowing
+rather than as a regression. Nothing else measured worse: the plane heading's `(untranslated)` and
+the six unkeyed refusal sentences both behave at cfa1eb69 as they do here (verbatim English in every
+language there, verbatim English or the marker here), so they are c3 unmet and not a regression.
