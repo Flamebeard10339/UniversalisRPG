@@ -2,37 +2,22 @@
 
 ## Deliverable
 
-Flags and dialogue nodes hang under the object that owns them, as paths in the namespace tree. Action
-labels do not, and the gap is filled by a bespoke check: `validateTestReferences` reads the owner's
-built `actions` and asserts a `use:` directive names one of their labels. Nothing is broken — that
-check works, and it catches an action a later module removed because it runs post-build against the
-built registry. This branch buys uniformity, and it is worth doing only because two other branches
-have already paid its price.
+An action is addressed by a slug and displayed by a label, and the two stop being one string.
+Today an action section's `title:` line *is* its label (`src/content/action.ts:20`), and that
+label is what `activeAction.actionLabel` stores, what `findActiveAction` and `save.ts` compare by
+string equality, what a `use:` directive spells and what a choice id carries. So renaming
+`title: Fight` to `Combat` stops the fight under way and puts the English word into a Spanish
+player's log — reproduced by `what-is-stored-or-replayed-is-an-id` pass 3, which is why this
+spec's own recorded premise, that nothing is broken today, is struck rather than edited quietly.
 
-`reimplement-localization` derives a namespace-legal slug for every action, because it needs a path
-segment for the action's display key and `pick-lock` costs it nothing over `pick lock`. That is the
-expensive half — a stable identifier distinct from display text — and it lands there whether or not
-this branch exists. `dangling-reference-on-field-edit` reconciles the namespace against the merged
-section rather than against flags specifically, so an action removed by a later module takes its
-declared member with it the moment that lands, with nothing written here.
-
-What is left is small: declare the slug where flags and dialogue nodes are already declared, let
-`use:` resolve through the namespace like every other reference, and retire the bespoke validator
-that exists only because actions were the one addressable thing the namespace could not hold.
-
-The record's own plan was to defer this to `gui-rebuild`, which redefines the
-`use:<kind>.<objId>.<label>` choice-id contract anyway, rather than churning it twice. That reasoning
-was right when written and no longer holds: localization separates the display role from the
-identifier role first, so the contract is already being touched by a branch that must touch it, and
-waiting for the GUI would mean the slug exists for a year with a bespoke validator standing beside it.
-
-| the content                                                   | today                                          | after |
-| --------------------------------------------------------------- | ---------------------------------------------- | ----- |
-| `use: entity.front-door.pick lock`, the action exists            | passes the bespoke label check                  | resolves through the namespace |
-| `use: entity.front-door.no-such-action`                          | errors — `names an unknown entity action`        | errors, through the namespace, naming the unknown member |
-| a later module removes `pick lock` by label, a test still uses it | errors post-build, from the built registry      | errors, and the member is gone from the namespace with it |
-| two actions on one owner whose labels derive the same slug       | both load; the second wins whatever reads first | load error, raised by localization's derivation |
-| an action label containing spaces or capitals                    | used verbatim as an identifier                  | unchanged as display; addressed by its slug |
+This is the third and last owner of an action label. `travelAction` composed one from a
+location's title and pass 1 found it; the recipe loader composed one from a recipe's id and pass 2
+found it; this is the one an author writes, and no clause of that branch could reach it — its c3
+is about text the engine composed and the engine composed nothing here, its c4 about sentences
+built in TypeScript and this is built in the DSL. The slug those branches already derive for the
+display key becomes the identifier, the label becomes display text and nothing else, and the
+uniformity this spec was originally written for — a namespace member, `use:` resolving like every
+other reference, the bespoke validator retiring — comes with it rather than being its point.
 
 Proof:
 
@@ -47,22 +32,46 @@ Proof:
 - [c3] An action removed by a later module takes its member with it, through the reconciliation
   `dangling-reference-on-field-edit` already built, with no removal logic written here.
   proof: vitest src/content/flags.test.ts
-- [c4] Nothing authored changes and no directive is respelled. Every `# test` in shipped content
-  passes byte-identical, `use:` keeps its written form, and an action's label is still the label the
-  author wrote.
-  proof: npm test
-- [c5] The choice-id contract is stated once, where it is built. `use:<kind>.<objId>.<slug>` is
+- [c4] What is stored, replayed and compared is the slug, and the label reaches no field that
+  outlives the frame it is drawn in. `activeAction` holds the slug under a field name that says
+  so, `findActiveAction`, `pruneStateForRegistry` and the encounter roster compare slugs, and a
+  choice id carries one. Proven the way its two neighbours were: a save written against an action
+  titled one thing is replayed against the same action retitled, in another language, and the
+  action is still under way with no English in the log.
+  proof: vitest src/runtime/save.test.ts
+- [c5] What changes is only what had to, and it is named here in full. `SAVE_VERSION` moves 10 to
+  11, because `activeAction`'s action field changes both name and domain; the six `# save`
+  fixtures carry the version stamp and nothing else, since none holds an action. Two authored
+  lines move and no others: `use: entity.mirror.look in` and `use: entity.dresser.search drawer`
+  in shipped `# test` sections become their slugs, which is this spec's original promise that no
+  directive is respelled being withdrawn rather than quietly broken. No `title:` moves, no
+  content id moves, and no player-visible English moves.
+- [c6] The choice-id contract is stated once, where it is built. `use:<kind>.<objId>.<slug>` is
   produced and parsed in one agreed shape across `session.ts` and `test.ts`, rather than a regex in
   each that happens to match the other.
   proof: vitest src/runtime/session.test.ts
 
 ## Decisions
 
-- **This is uniformity, and it is only worth doing because its cost was paid elsewhere.** The record
-  says so plainly — nothing is broken, labels are validated, objId is already namespaced. A refactor
-  that fixes nothing earns its place only when it is nearly free, and it became nearly free when
-  localization took on the slug and `dangling-reference-on-field-edit` took on removal. Neither was
-  done for this task's sake, which is exactly why this one stays small.
+- **"Nothing is broken today" is struck, not softened.** This spec was written as uniformity on
+  the recorded premise that the bespoke label check works and nothing fails. `what-is-stored-or-
+  replayed-is-an-id` pass 3 refuted it against the repository's own module resolution: a save
+  holds `"actionLabel":"Fight"`, changing only `title: Fight` to `Combat` yields `Detenida la
+  accion action.isla.melee-combat.Fight: no existe la accion "Fight" en action.isla.melee-combat.`
+  and drops the action. The shipped content has exactly that shape at
+  `content/tutorial-island.dsl:120-121`, driven by two shipped recordings. The uniformity is still
+  bought and is still nearly free; it is no longer the reason.
+- **The stored field is renamed, not just retyped.** `activeAction.actionLabel` holding a slug
+  would be a field whose name says the opposite of what it holds, which is the confusion that
+  produced this defect in the first place. It is renamed with its domain, and that is what moves
+  `SAVE_VERSION`.
+- **`use:` spells the slug.** The alternative — accepting the written label and resolving it to a
+  slug at load — was rejected: it keeps a recording depending on display text, so a `title:`
+  rename still breaks it, which is the whole defect. Two shipped lines are respelled and named in
+  c5. This is the same bargain every id in this DSL already makes.
+- **No save migration.** Third consecutive `SAVE_VERSION` bump; `save-migration-system` stays open
+  and untouched and a stale save is rejected, which is standing policy rather than a decision of
+  this branch.
 - **The deferral to `gui-rebuild` is retired, and the reason is recorded rather than reversed
   silently.** Its logic was that the GUI redefines the choice-id contract, so touching it twice is
   waste. Localization now touches it first and must, so the second touch is already happening; and
@@ -76,11 +85,12 @@ Proof:
 - **The identifier and the display are separated by localization, not here.** After that branch, the
   label is display text resolved through a key and the identifier is the slug. This branch does not
   re-litigate that split; it takes the slug as given and gives it a home in the namespace.
-- **Not merged into `reimplement-localization`.** It would be tempting, since that branch creates the
-  slug. It is refused because that branch's proof is that raw text cannot be rendered, and folding a
-  namespace refactor into it would put two unrelated failures behind one audit — and because this can
-  be dropped entirely without costing localization anything, which is only true while they are
-  separate.
+- **Carried on the same branch as `what-is-stored-or-replayed-is-an-id`, and audited separately.**
+  The earlier reasoning — two unrelated failures behind one audit — assumed they were unrelated,
+  and pass 3 showed they are one failure on three owners. They stay separate specs with separate
+  audits, which is what keeps the grading honest; they share a branch because the store diff, not
+  the checkout, is what makes a branch owe a spec, and because this one moves the choice-id
+  contract that the localization work above it reads.
 
 ## Open questions
 
