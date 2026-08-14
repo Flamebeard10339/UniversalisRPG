@@ -18,6 +18,7 @@ import { DEFAULT_MAX_LEVEL, Item } from './item';
 import { Location, Population } from './location';
 import { Recipe } from './recipe';
 import { Registry } from './registry';
+import { Slot } from './slot';
 import { Resource } from './resource';
 import { ParsedSave } from './saveSection';
 import { Test, Directive, usePayload } from './test';
@@ -30,7 +31,9 @@ type Lines = string[];
 
 export interface SerializeModuleOptions {
   info: Pick<ModuleInfo, 'id'> & Partial<Pick<ModuleInfo, 'version' | 'dependencies' | 'pack' | 'language'>>;
-  globalVariables?: readonly string[];
+  // The ids of the global sections this module declared. A global id belongs to
+  // nobody, so `inModule` cannot find one and the caller says which it wrote.
+  globals?: readonly string[];
 }
 
 const n = (value: number): string => String(value);
@@ -334,6 +337,14 @@ function titleLine(registry: Registry, moduleId: string, kind: string, value: { 
   return value.title === undefined || entry === undefined || entry.generated ? [] : [`title: ${value.title}`];
 }
 
+// A slot's key is written under nobody, so `titleLine`'s module-scoped lookup
+// cannot find it: the same rule and the same generated-title test, one segment
+// shorter.
+function slotTitleLine(registry: Registry, slot: Slot): Lines {
+  const entry = registry.locales.base.get(localeKey(null, 'slot', slot.id, 'title'));
+  return entry === undefined || entry.generated ? [] : [`title: ${slot.title}`];
+}
+
 function titled(lines: Lines, registry: Registry, moduleId: string, kind: string, value: { id: string; title?: string; examine?: string }): void {
   lines.push(...titleLine(registry, moduleId, kind, value));
   if (value.examine !== undefined) lines.push(`examine: ${value.examine}`);
@@ -530,8 +541,10 @@ export function serializeRegistryModule(registry: Registry, options: SerializeMo
   for (const table of registry.dropTables.values()) if (inModule(moduleId, table.id)) sections.push(dropTableSection(moduleId, table));
   for (const dialogue of registry.dialogues.values()) if (inModule(moduleId, dialogue.id)) sections.push(dialogueSection(moduleId, dialogue));
   for (const flag of registry.flags.values()) if (inModule(moduleId, flag.id)) sections.push(`# flag ${moduleLocalId(moduleId, flag.id)}`);
-  for (const variableId of options.globalVariables ?? []) {
-    const variable = registry.variables.get(variableId);
+  for (const globalId of options.globals ?? []) {
+    const slot = registry.slots.get(globalId);
+    if (slot) sections.push([`# slot ${slot.id}`, ...slotTitleLine(registry, slot)].join('\n'));
+    const variable = registry.variables.get(globalId);
     if (variable) sections.push([`# variable ${variable.id}`, ...(variable.value !== undefined ? [`value: ${n(variable.value)}`] : [])].join('\n'));
   }
   // A locale belongs to the module that wrote it rather than to any id, so it

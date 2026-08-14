@@ -205,6 +205,9 @@ export const TEXT_FIELDS: Readonly<Record<string, readonly string[]>> = {
   resource: ['title'],
   skill: ['title'],
   stat: ['title'],
+  // A slot's key is minted from the vocabulary `equipment-slots:` names rather
+  // than from a section, so `# slot` is optional and supplies only the words.
+  slot: ['title'],
 };
 
 // The one field whose absence the engine fills in, and so the one whose entry a

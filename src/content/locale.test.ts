@@ -52,6 +52,7 @@ const FIELDS: Record<keyof Registry, 'content' | 'the locale table'> = {
   clusterJewels: 'content',
   stats: 'content',
   skills: 'content',
+  slots: 'content',
   recipes: 'content',
   recipeActions: 'content',
   resources: 'content',

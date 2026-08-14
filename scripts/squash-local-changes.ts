@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
 import { ModuleSource, parseModuleSource, ParsedModule } from '../src/content/universe';
-import { declaredVariableIds, roundTripModule } from '../src/content/roundTrip';
+import { declaredGlobalIds, roundTripModule } from '../src/content/roundTrip';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -101,18 +101,19 @@ if (!target) fail([`No loaded source declares module id ${targetId}`]);
 const loaded = loadUniverseWithDiagnostics([...baseSources, localSource]);
 if (loaded.diagnostics.length > 0) fail(['Cannot squash while diagnostics are present:', ...loaded.diagnostics.map((diagnostic) => `  ${formatModuleDiagnostic(diagnostic)}`)]);
 
-const globals = new Set<string>(declaredVariableIds(target));
+const globals = new Set<string>(declaredGlobalIds(target));
 const localParsed = parsedModules.find((module) => module.source === localSource);
-// Variables are global tuning knobs rather than module-owned content, so a
-// local-created variable can become part of the squashed module's globals. A
-// local-created item/entity/etc. is still refused by registryDiff below.
-if (localParsed && localParsed.info.id !== targetId) for (const id of declaredVariableIds(localParsed)) globals.add(id);
+// A variable is a global tuning knob and a slot is a global vocabulary, neither
+// of them module-owned content, so one created locally can become part of the
+// squashed module's globals. A local-created item/entity/etc. is still refused
+// by registryDiff below.
+if (localParsed && localParsed.info.id !== targetId) for (const id of declaredGlobalIds(localParsed)) globals.add(id);
 
 const validationSources = parsedModules
   .filter((module) => module.info.id !== targetId)
   .map((module) => module.source)
   .filter((source) => source !== localSource);
-const trip = roundTripModule(loaded.registry, { info: target.info, globalVariables: [...globals].sort() }, (printed) =>
+const trip = roundTripModule(loaded.registry, { info: target.info, globals: [...globals].sort() }, (printed) =>
   loadUniverseWithDiagnostics([...validationSources, { ...target.source, text: printed }]),
 );
 if (trip.diagnostics.length > 0) {

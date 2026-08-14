@@ -1,7 +1,7 @@
 import { localeLines } from './locale';
 import { CONTENT_SECTION_MAPS, Registry } from './registry';
 
-export const REGISTRY_DIFF_MAPS: readonly (keyof Registry)[] = [...CONTENT_SECTION_MAPS.map(([, map]) => map), 'flags', 'variables', 'saves'];
+export const REGISTRY_DIFF_MAPS: readonly (keyof Registry)[] = [...CONTENT_SECTION_MAPS.map(([, map]) => map), 'flags', 'variables', 'slots', 'saves'];
 
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable);

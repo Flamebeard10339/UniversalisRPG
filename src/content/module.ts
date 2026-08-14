@@ -18,6 +18,7 @@ import { resourceSchema } from './resource';
 import { parseSaveSection } from './saveSection';
 import { AnySchema, parseAnySection } from '../grammar/section';
 import { skillSchema } from './skill';
+import { slotSchema } from './slot';
 import { statSchema } from './stat';
 import { RawSection, splitSections } from '../grammar/structure';
 import { parseTest } from './test';
@@ -28,6 +29,7 @@ export const SCHEMAS: Record<string, AnySchema> = {
   item: itemSchema,
   stat: statSchema,
   skill: skillSchema,
+  slot: slotSchema,
   location: locationSchema,
   entity: entitySchema,
   event: eventSchema,

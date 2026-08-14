@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadModule, loadUniverseWithDiagnostics, type ModuleDiagnostic, type UniverseLoadResult } from './registry';
-import { canSerialize, declaredVariableIds, roundTripModule, roundTripUniverse } from './roundTrip';
+import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from './roundTrip';
 import { parseUniverse, type ModuleSource } from './universe';
 
 const BASE = ['# info base', 'version: 1.0.0', '', '# item bread', 'title: Bread', '', '# location camp', 'x: 0, y: 0', 'starting'].join('\n');
@@ -109,23 +109,23 @@ describe('roundTripModule', () => {
     expect(undeclared.printed).not.toContain('# variable');
     expect(undeclared.differences).toEqual(['  variables: missing travel-seconds-per-unit']);
 
-    const declared = roundTripModule(withVariable, { info, globalVariables: ['travel-seconds-per-unit'] }, reloadAlone);
+    const declared = roundTripModule(withVariable, { info, globals: ['travel-seconds-per-unit'] }, reloadAlone);
     expect(declared.printed).toContain('# variable travel-seconds-per-unit');
     expect(declared.differences).toEqual([]);
   });
 });
 
-describe('declaredVariableIds', () => {
+describe('declaredGlobalIds', () => {
   it('answers in a stable order, so the serializer prints the same bytes whatever order they were authored in', () => {
     const one = parseUniverse([{ name: 'm', text: '# info m\nversion: 1.0.0\n\n# variable zebra\nvalue: 1\n\n# variable alpha\nvalue: 2\n' }])[0];
     const other = parseUniverse([{ name: 'm', text: '# info m\nversion: 1.0.0\n\n# variable alpha\nvalue: 2\n\n# variable zebra\nvalue: 1\n' }])[0];
-    expect(declaredVariableIds(one)).toEqual(['alpha', 'zebra']);
-    expect(declaredVariableIds(one)).toEqual(declaredVariableIds(other));
+    expect(declaredGlobalIds(one)).toEqual(['alpha', 'zebra']);
+    expect(declaredGlobalIds(one)).toEqual(declaredGlobalIds(other));
   });
 
   it('names only variables, not every section that has an id', () => {
     const module = parseUniverse([{ name: 'm', text: '# info m\nversion: 1.0.0\n\n# item rock\n\n# variable pace\nvalue: 3\n' }])[0];
-    expect(declaredVariableIds(module)).toEqual(['pace']);
+    expect(declaredGlobalIds(module)).toEqual(['pace']);
   });
 });
 

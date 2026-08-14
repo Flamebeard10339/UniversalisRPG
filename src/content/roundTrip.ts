@@ -1,6 +1,7 @@
 import type { ModuleDiagnostic, Registry, UniverseLoadResult } from './registry';
 import { registryDiff } from './registryDiff';
 import { serializeRegistryModule, type SerializeModuleOptions } from './serialize';
+import { GLOBAL_SECTION_KINDS } from './namespace';
 import type { ModuleSource, ParsedModule } from './universe';
 
 export interface RoundTrip {
@@ -9,9 +10,9 @@ export interface RoundTrip {
   differences: string[];
 }
 
-export function declaredVariableIds(module: ParsedModule): string[] {
+export function declaredGlobalIds(module: ParsedModule): string[] {
   return module.sections
-    .filter((section) => section.kind === 'variable')
+    .filter((section) => GLOBAL_SECTION_KINDS.includes(section.kind))
     .map((section) => (section.value as { id: string }).id)
     .sort();
 }
@@ -42,7 +43,7 @@ export interface UniverseRoundTrip {
 // registry, so it already carries what other modules did to its ids; leaving any
 // original source in the reload would apply those edits a second time.
 export function roundTripUniverse(loaded: Registry, modules: readonly ParsedModule[], reload: (printed: readonly ModuleSource[]) => UniverseLoadResult): UniverseRoundTrip {
-  const sources = modules.map((module) => ({ ...module.source, text: serializeRegistryModule(loaded, { info: module.info, globalVariables: declaredVariableIds(module) }) }));
+  const sources = modules.map((module) => ({ ...module.source, text: serializeRegistryModule(loaded, { info: module.info, globals: declaredGlobalIds(module) }) }));
   const { diagnostics, differences } = compare(loaded, '', reload(sources));
   return { sources, diagnostics, differences };
 }

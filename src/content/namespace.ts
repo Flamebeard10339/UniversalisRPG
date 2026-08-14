@@ -18,6 +18,11 @@ export type ActionOwnerKind = (typeof ACTION_OWNER_KINDS)[number];
 
 export const isActionOwnerKind = (kind: string): kind is ActionOwnerKind => (ACTION_OWNER_KINDS as readonly string[]).includes(kind);
 
+// The section kinds whose ids belong to nobody, which is the same list read from
+// the other end: a module declares one but owns none, so serialize's own-module
+// filter cannot find it and the caller says which it declared.
+export const GLOBAL_SECTION_KINDS: readonly string[] = ['variable', 'slot'];
+
 export const NAMESPACED_KINDS: readonly string[] = ['stat', 'skill', 'item', 'entity', 'action', 'event', 'faction', 'location', 'recipe', 'resource', 'droptable', 'dialogue', 'test', 'save', 'flag', 'node', 'passive', 'cluster-jewel', ACTION_MEMBER];
 
 // A namespace is a prefix of segments; a module without one contributes none,

@@ -37,9 +37,9 @@ import { mergeSection } from './merge';
 import { ModuleSection } from './module';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
-import { ACTION_MEMBER, isActionOwnerKind, Namespace } from './namespace';
+import { ACTION_MEMBER, isActionOwnerKind, Namespace, NAMESPACED_KINDS } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
-import { registryCapabilities, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
+import { registryCapabilities, registrySlots, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
 import { ReferenceKind, Visit, visitAction, visitResults, visitSection, visitTags } from './referenceSites';
 import { Removal } from './removal';
 import { printSegments } from './serialize';
@@ -48,6 +48,7 @@ import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
 import { Authored, DEFAULT_LANGUAGE, hydrateSection, HydrateContext } from '../grammar/section';
 import { Skill, skillSchema } from './skill';
+import { Slot, slotSchema } from './slot';
 import { Stat, statSchema } from './stat';
 import { Test } from './test';
 import { validateTuningVariable } from './tuningVariables';
@@ -71,6 +72,9 @@ export interface Registry {
   clusterJewels: Map<string, ClusterJewel>;
   stats: Map<string, Stat>;
   skills: Map<string, Skill>;
+  // Only the slots somebody declared words for. The vocabulary itself is the
+  // union of every `equipment-slots:`, which `registrySlots` answers.
+  slots: Map<string, Slot>;
   recipes: Map<string, Recipe>;
   recipeActions: Map<string, Action>;
   resources: Map<string, Resource>;
@@ -200,6 +204,7 @@ function emptyRegistry(): Registry {
     dialoguesByOwner: new Map(),
     tests: new Map(),
     flags: new Map(),
+    slots: new Map(),
     variables: new Map(),
     saves: new Map(),
     namespace: new Namespace(),
@@ -261,14 +266,14 @@ function recordBase(registry: Registry, key: string, entry: BaseEntry): void {
   registry.locales.base.set(key, entry);
 }
 
-function recordBaseText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, authored: Record<string, unknown>): void {
+// `namespace` is the one the key is written under and `language` the one the
+// words are in. They are the same module for anything a module owns, and are
+// not for a global id: a `# slot` is keyed under nobody and written in whatever
+// its declarer speaks, so the caller says which is which.
+function recordBaseText(registry: Registry, kind: string, authored: Record<string, unknown>, namespace: string | null, language: string): void {
   const fields = TEXT_FIELDS[kind];
   if (!fields) return;
   const id = authored.id as string;
-  // The module that owns the id, not the one that last patched the section: a
-  // patch writes text into somebody else's object, and the key names the object.
-  const namespace = registry.namespace.ownerOf(kind, id) ?? null;
-  const language = languages.get(namespace) ?? DEFAULT_LANGUAGE;
   for (const field of fields) {
     const key = localeKey(namespace, kind, id, field);
     const authoredValue = authored[field];
@@ -535,6 +540,11 @@ function applySection(registry: Registry, section: ModuleSection, context: Hydra
     case 'flag': {
       const flag = hydrateSection(section.value as Authored<Flag>, flagSchema, context);
       registry.flags.set(flag.id, flag);
+      break;
+    }
+    case 'slot': {
+      const slot = hydrateSection(section.value as Authored<Slot>, slotSchema, context);
+      registry.slots.set(slot.id, slot);
       break;
     }
     case 'variable': {
@@ -1201,14 +1211,26 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   // validation is where an entity's `uses:` becomes an action of its own.
   for (const [kind, byId] of merged) {
     for (const [id, section] of byId) {
-      if (!registry.namespace.has(kind, id)) continue;
+      // A global id is in no namespace to have been dropped from one: the guard
+      // is about content that went with a dangling reference, and the key such
+      // an id is written under is nobody's.
+      const owned = NAMESPACED_KINDS.includes(kind);
+      if (owned && !registry.namespace.has(kind, id)) continue;
+      const namespace = owned ? registry.namespace.ownerOf(kind, id) ?? null : null;
       try {
-        recordBaseText(registry, languages, kind, section.value as Record<string, unknown>);
+        recordBaseText(registry, kind, section.value as Record<string, unknown>, namespace, languages.get(owned ? namespace : section.module.namespace) ?? DEFAULT_LANGUAGE);
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
         return { failure: { module: section.module, stage: 'build', error } };
       }
     }
+  }
+  // Every slot the vocabulary holds that no `# slot` declared. `equipment-slots:`
+  // names the ids and the declaration is optional, so the key is minted from the
+  // vocabulary and `humanizeEn` fills it — `defaultTitle`'s rule, applied where
+  // there is no section to hang a default on.
+  for (const id of registrySlots(registry)) {
+    if (!registry.slots.has(id)) recordBaseText(registry, 'slot', { id }, null, DEFAULT_LANGUAGE);
   }
   for (const [kind, id, actions] of everyActionTable(registry)) {
     try {
