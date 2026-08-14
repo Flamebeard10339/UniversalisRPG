@@ -59,6 +59,8 @@
         "src/content/shapes.test.ts",
         "src/content/shapes.ts",
         "src/content/skill.ts",
+        "src/content/slot.test.ts",
+        "src/content/slot.ts",
         "src/content/stat.ts",
         "src/content/test.test.ts",
         "src/content/test.ts",
@@ -233,6 +235,13 @@
             "src/content/action.ts"
           ],
           "note": "produced by action-labels-as-members"
+        },
+        {
+          "name": "a slot's words",
+          "paths": [
+            "src/content/slot.ts"
+          ],
+          "note": "produced by an-equipment-slot-is-a-word-with-no-key-so-no-locale-can-rea: # slot <id> with a title:, optional, and global rather than namespaced for capability's reason. The vocabulary stays equipment-slots: and the key is minted from it, so a slot nobody declared still has words. Registered over slot.ts alone because the pass that mints the key lives in registry.ts, already claimed by 'the registry'"
         }
       ]
     },
