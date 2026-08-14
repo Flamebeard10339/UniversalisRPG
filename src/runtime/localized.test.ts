@@ -9,6 +9,7 @@ import { RuntimeError } from './state';
 import type { PlayChoice, PlayStatus, PlayView } from './session';
 import type { ModalChoice, ModalOption } from './modals';
 import type { CarriedEntry } from './carriedScreen';
+import type { Refusal } from './itemInstance';
 import type { ClusterReport, PlaneReport } from './planeReport';
 import type { EncounterFoe } from './encounter';
 import { initialState, pruneStateForRegistry, type PruneWarning } from './save';
@@ -56,7 +57,9 @@ function rawTextDoesNotCompile(): void {
   const cluster: ClusterReport['title'] = 'Core';
   // @ts-expect-error an encounter foe's title is not a string
   const foe: EncounterFoe['title'] = 'Giant Rat';
-  void [label, detail, title, description, entity, log, warning, option, choice, said, carried, shown, plane, cluster, foe];
+  // @ts-expect-error what a refused verb tells the player is not a string
+  const refused: Refusal['refused'] = 'you carry no whetstone';
+  void [label, detail, title, description, entity, log, warning, option, choice, said, carried, shown, plane, cluster, foe, refused];
 }
 
 function unkeyedEngineTextDoesNotCompile(): void {

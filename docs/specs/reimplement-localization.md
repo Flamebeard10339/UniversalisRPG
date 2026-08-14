@@ -218,10 +218,13 @@ Proof:
   bypassed. Keying them is its own task: a dialogue line's value is not a flat pattern but a segment
   list with `{path}` interpolation and `{cond: text}` conditionals, so a locale entry for one has to
   be re-parsed by the dialogue grammar, and a `say:` nested inside a result list has no id at all.
-- **`Equip` and `Unequip` stay English.** They are the carried screen's answer *values* — the string
-  a `submit-modal:` directive replays — so localizing them would move an authored id, which c9
-  forbids. Splitting a modal option's display from its value is the GUI's task, and the two keys the
-  deliverable listed are left out of the union rather than added and left dead.
+- **`Equip` and `Unequip` stay English — superseded.** It read: they are the carried screen's answer
+  *values*, so localizing them would move an authored id, which c9 forbids; splitting a modal
+  option's display from its value is the GUI's task, and the two keys are left out of the union
+  rather than added and left dead. Pass 5 did the splitting here instead, because c3 could not be
+  met without it. `engine.carried.verb.equip` and `engine.carried.verb.unequip` are in `ENGINE_KEYS`
+  and ship patterns, read through `CarriedVerb.shown`; what stays English is the *value* beside
+  them, which is what c9 actually protects.
 - **An id is a second door, not prose.** `Localizer.identifier` carries a slot, an instance, a
   path into the save or a modal's name into a pattern verbatim in every language, because an id
   belongs to none. Pass 1 measured what the single door cost: a translated prune warning read "Se
@@ -257,9 +260,13 @@ Proof:
   value stays the string a `submit-modal:` replays. Branding it is what finally closed c3 — the plane
   screen was still composing its heading out of the registry's title and an English refusal, and no
   amount of fixing screens one at a time would have stopped the next one.
-- **A translation is refused at load for naming a parameter nothing supplies.** It may drop one — a
-  Spanish `engine.item.examine` needs no `{article}` — but inventing one made every screen in that
-  language throw at render time. Enforced where the value is assembled rather than where it is read.
+- **Any text is refused at load for naming a parameter nothing supplies.** A translation may drop
+  one — a Spanish `engine.item.examine` needs no `{article}` — but inventing one made every screen
+  in that language throw at render time. Enforced where the value is assembled rather than where it
+  is read, which pass 5 found meant both places a value is written and not only `# locale`: an
+  authored `examine:` naming `{open}` loaded clean and threw out of every view, so `recordBase` in
+  registry.ts now holds base text to the same rule. No caller passes a parameter to a title, an
+  examine or an action label, so for a content key every parameter it names is unsupplied.
 - **A modal option's answer and the words that offer it are one pair, not two lists.** This is what
   finally closed c3, after branding the label alone moved the leak to `values` on the same interface.
   The Decision that fix rested on — a label is read and a value is answered — is false in both
