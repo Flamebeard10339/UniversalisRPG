@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { askedOption } from '../runtime/command';
+import { dismissal } from './asking';
 import { Console } from './Console';
 import type { Driver } from './driver';
 import { FloatingText } from './FloatingText';
@@ -11,7 +12,9 @@ import { newlyFound, type Place } from './discovery';
 import { ModalSheet } from './ModalSheet';
 import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
-import { counted, named } from './sheet';
+import { focusedPlane } from './plane';
+import { PlanePane } from './PlanePane';
+import { carried, counted, worn } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
 import { useTestSurface } from './testSurface';
@@ -41,15 +44,31 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
   const [where, setWhere] = useState(opening);
   const view = snapshot.view;
   const asking = view ? askedOption(view.modals) : undefined;
+  // Drawn because the engine says one is in hand, never because the shell
+  // recognised the screen holding it: the focus is a published field and the
+  // screen's name is not a thing this layer can read.
+  const plane = focusedPlane(view);
   const { arrivals, generation } = useArrivals(view?.discovered ?? []);
+
+  // The one answer a gesture away from the open screen makes: the value that
+  // screen published as the way out of itself, or nothing where it published
+  // none (c19). Both gestures this shell has go through it, so a click on the
+  // sheet's ground and a move to another page say the same thing and neither
+  // has a way out the other has not got.
+  const leaving = view ? dismissal(view.modals) : null;
+  const leave = leaving ? () => driver.answer(leaving.key, leaving.value) : undefined;
 
   // Assembled once and both drawn from and handed over, the way the map's is:
   // where the nav is standing is one value, and there is no second statement of
-  // it for a registration to get wrong. The handlers still call setWhere with a
-  // function, because what they read has to be the latest state and not the
-  // render's — the seam is about what is drawn, and a nav that loses a tap to
-  // batching would be a real defect bought for a test.
-  const shell = { where, go: setWhere };
+  // it for a registration to get wrong. Every handler goes through the one `go`,
+  // and passes it a function, because what they read has to be the latest state
+  // and not the render's — the seam is about what is drawn, and a nav that lost
+  // a tap to batching would be a real defect bought for a test.
+  const go = (next: Where | ((held: Where) => Where)): void => {
+    leave?.();
+    setWhere(next);
+  };
+  const shell = { where, go };
 
   useTestSurface('shell', shell);
 
@@ -61,15 +80,18 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
     if (layer.id === 'map') return <MapPane view={view} arrivals={arrivals} generation={generation} onChoose={driver.choose} />;
     if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? {})} />;
     if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? {})} />;
-    if (subpage.id === 'equipment') return <Ledger entries={named(view?.equipment ?? {})} />;
-    return <Ledger entries={counted(view?.inventory ?? {})} />;
+    // Both sides of what the player has are rows that act, because c21 puts a
+    // worn copy on this page and nowhere else and the verbs it offers are
+    // reachable from nowhere else either.
+    if (subpage.id === 'equipment') return <Ledger entries={worn(view?.carried ?? [], view?.planes ?? [])} onOpen={driver.open} />;
+    return <Ledger entries={carried(view?.carried ?? [], view?.planes ?? [])} onOpen={driver.open} />;
   };
 
   const bodies = LAYERS.map((layer, at) => (
     <Pager
       key={layer.id}
       index={shell.where.subpage[at]}
-      onIndex={(index) => setWhere((held) => toSubpage(held, at, index))}
+      onIndex={(index) => go((held) => toSubpage(held, at, index))}
       panes={layer.subpages.map((subpage) => pane(layer, subpage))}
     />
   ));
@@ -80,7 +102,7 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
         <main className="relative flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
           <VStack
             layer={shell.where.layer}
-            onLayer={(layer) => setWhere((held) => toLayer(held, layer))}
+            onLayer={(layer) => go((held) => toLayer(held, layer))}
             banners={[
               // Re-keyed on a discovery, so the banner that is the handle to the
               // Map plays the same arrival the Map's own row does. That is the
@@ -92,8 +114,12 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
           />
           <FloatingText channel={driver.transient} />
         </main>
-        <TabBar tabs={LAYERS[shell.where.layer].subpages} active={subpageOf(shell.where)} onSelect={(index) => setWhere((held) => toSubpage(held, held.layer, index))} />
-        {asking ? <ModalSheet key={asking.key} option={asking} onAnswer={driver.answer} /> : null}
+        <TabBar tabs={LAYERS[shell.where.layer].subpages} active={subpageOf(shell.where)} onSelect={(index) => go((held) => toSubpage(held, held.layer, index))} />
+        {asking ? (
+          <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave}>
+            {plane ? <PlanePane plane={plane} /> : null}
+          </ModalSheet>
+        ) : null}
       </div>
     </TransientProvider>
   );

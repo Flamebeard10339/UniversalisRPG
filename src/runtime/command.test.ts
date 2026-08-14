@@ -27,6 +27,26 @@ import {
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
+// One wearable stack, and a save that puts it in the player's hands, which is the
+// smallest world the inventory screen has anything to list.
+const CARRYING_MODULE = `
+# skill smithing
+
+# location forge
+x: 0, y: 0
+starting
+
+# item gauntlet
+title: Gauntlet
+slot: hand
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"gauntlet":1},"xp":{"smithing":5}}
+
+# save armed
+{"version":${SAVE_VERSION},"inventory":{"gauntlet":1},"equipped":{"hand":"gauntlet"}}
+`;
+
 // tutorial-island.dsl has no `# save` section, so /load and /expect need their own.
 const SAVE_MODULE = `
 # location camp
@@ -145,7 +165,7 @@ describe('the command table is the one definition of the command set', () => {
   it('gives a command no argument it does not declare, over every entry that declares none', () => {
     const { ctx, session } = fixture(SAVE_MODULE);
     const argumentless = COMMANDS.filter((spec) => spec.match === 'name' && spec.arg === 'none');
-    expect(argumentless.map((spec) => spec.name)).toEqual(['/look', '/inventory', '/state', '/cancel', '/help', '/quit']);
+    expect(argumentless.map((spec) => spec.name)).toEqual(['/look', '/state', '/cancel', '/help', '/quit']);
 
     for (const spec of argumentless) {
       for (const spelling of [spec.name, ...spec.aliases]) {
@@ -306,34 +326,95 @@ describe('the commands a player plays with', () => {
     expect(sessionStatus(session).time).toBe(42);
   });
 
-  it('/inventory publishes what is carried, worn and learned', () => {
-    const { ctx } = fixture(`
-# skill smithing
-
-# location forge
-x: 0, y: 0
-starting
-
-# item gauntlet
-title: Gauntlet
-slot: hand
-
-# save stocked
-{"version":${SAVE_VERSION},"inventory":{"gauntlet":1},"xp":{"smithing":5}}
-`);
-
-    const bare = runLine(ctx, '/inventory').output[0];
-    expect(bare.kind === 'inventory' && bare.status.inventory).toEqual({});
-    expect(bare.kind === 'inventory' && bare.status.equipment).toEqual({});
-
+  // c1: the screen is the only thing /inv produces, and the line that opens it is
+  // recorded, so the route is a directive a `# test` replays and not a gesture.
+  it('/inventory opens the screen and prints nothing beside it', () => {
+    const { ctx } = fixture(CARRYING_MODULE);
     runLine(ctx, '/load stocked');
-    runLine(ctx, 'equip: gauntlet');
-    const carried = runLine(ctx, '/inv').output[0];
-    expect(carried.kind).toBe('inventory');
-    if (carried.kind !== 'inventory') return;
-    expect(carried.status.inventory).toEqual({ gauntlet: 1 });
-    expect(carried.status.xp).toEqual({ smithing: 5 });
-    expect(carried.status.equipment).toEqual({ hand: 'gauntlet' });
+
+    const opened = runLine(ctx, '/inv');
+    expect(kinds(opened)).toEqual(['view']);
+    expect(opened.recorded).toEqual(['open-modal: carried-items']);
+    expect(opened.view?.modals).toEqual([{ name: 'carried-items', leaving: 'Close', options: [{ key: 'item', label: 'Item', values: ['Gauntlet x1', 'Close'] }] }]);
+  });
+
+  // c1: the argument a GUI row hands over is the same dispatch a player types,
+  // and selecting is answering the screen's own first question.
+  it('/inventory <item> opens the same screen with that item already selected', () => {
+    const { ctx } = fixture(CARRYING_MODULE);
+    runLine(ctx, '/load stocked');
+
+    const opened = runLine(ctx, '/inv gauntlet');
+    expect(kinds(opened)).toEqual(['view']);
+    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet x1']);
+    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
+  });
+
+  // c1 and c18: the equipment row dispatches the same command, and the id it
+  // hands over names the copy in the slot rather than the stack that copy left —
+  // so the screen opens on the worn one and offers it Unequip.
+  it('/inventory <slot> opens the copy that is worn while its stack still stands', () => {
+    const { ctx } = fixture(CARRYING_MODULE);
+    runLine(ctx, '/load armed');
+
+    const opened = runLine(ctx, '/inv worn:hand');
+    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet (hand)']);
+    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Unequip', 'Destroy', 'Close'] }]);
+  });
+
+  it('/inventory <item> still opens the stack the worn copy left, and offers it Equip', () => {
+    const { ctx } = fixture(CARRYING_MODULE);
+    runLine(ctx, '/load armed');
+
+    const opened = runLine(ctx, '/inv gauntlet');
+    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet x1']);
+    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
+  });
+
+  it('refuses an item the player is not carrying, and opens no screen to say so', () => {
+    const { ctx } = fixture(CARRYING_MODULE);
+
+    expect(errors(runLine(ctx, '/inv gauntlet'))).toEqual(['you carry no gauntlet']);
+    expect(errors(runLine(ctx, '/inv bracer'))[0]).toContain('bracer');
+    expect(ctx.view.modals).toEqual([]);
+  });
+
+  // c16: the slot spelling is the runtime's own and names nothing a player has
+  // met, so an empty slot is refused as an empty slot rather than printed back.
+  it('refuses an empty slot by naming the slot, and never by the spelling for it', () => {
+    const { ctx } = fixture(CARRYING_MODULE);
+    runLine(ctx, '/load stocked');
+
+    expect(errors(runLine(ctx, '/inv worn:hand'))).toEqual(['you wear nothing in hand']);
+    expect(ctx.view.modals).toEqual([]);
+  });
+
+  it('equips what the screen was opened on, through the directive equip: already goes through', () => {
+    const { ctx, session } = fixture(CARRYING_MODULE);
+    runLine(ctx, '/load stocked');
+    runLine(ctx, '/inv gauntlet');
+
+    const equipped = runLine(ctx, '2');
+    expect(equipped.recorded).toEqual(['submit-modal: verb=Equip']);
+    expect(sessionStatus(session).equipment).toEqual({ hand: 'gauntlet' });
+    expect(equipped.view?.modals).toEqual([]);
+  });
+
+  // c15: the last listed value of every question this screen asks leaves it, and
+  // taking it moves nothing.
+  it('closes on the value that leaves, from either question, and moves no state', () => {
+    const { ctx, session } = fixture(CARRYING_MODULE);
+    runLine(ctx, '/load stocked');
+
+    runLine(ctx, '/inv');
+    expect(runLine(ctx, 'submit-modal: item=Close').view?.modals).toEqual([]);
+
+    runLine(ctx, '/inv gauntlet');
+    const left = runLine(ctx, 'submit-modal: verb=Close');
+    expect(left.view?.modals).toEqual([]);
+    expect(sessionStatus(session).equipment).toEqual({});
+    expect(sessionStatus(session).inventory).toEqual({ gauntlet: 1 });
+    expect(sessionStatus(session).time).toBe(0);
   });
 
   it('a blank line re-lists the choices without touching the world', () => {
@@ -583,7 +664,7 @@ describe('a modal is driven by its published name and options', () => {
 
     // The two lines that used to be eaten as the name and the race.
     expect(statusOf(runLine(ctx, '/state')).status.location.id).toBe('camp');
-    expect(kinds(runLine(ctx, '/inventory'))).toEqual(['inventory']);
+    expect(kinds(runLine(ctx, '/inventory'))).toEqual(['view']);
   });
 
   it('emits a replayable # test from a session that crossed a modal, with no hand-editing', () => {

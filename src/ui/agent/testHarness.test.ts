@@ -23,7 +23,9 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
       journey: null,
       inventory: {},
       grown: {},
+      carried: [],
       planes: [],
+      focus: null,
       equipment: {},
       xp: {},
       stats: {},
@@ -45,6 +47,7 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     send: (line) => void calls.push(`send:${line}`),
     choose: (position) => void calls.push(`choose:${position}`),
     answer: (key, value) => void calls.push(`answer:${key}=${value}`),
+    open: (item) => void calls.push(`open:${item}`),
     cancel: () => void calls.push('cancel'),
     serialized: () => null,
   };

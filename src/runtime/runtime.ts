@@ -616,16 +616,17 @@ function firstUnitSpan(action: Action, state: GameState, registry: Registry): nu
   return resolvesPerAttempt(action) ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
 }
 
-// A cost the player cannot pay stops the action before it arms. Carrying an
-// input only as grown copies is its own refusal: the cost is afforded, so the
-// action is offered, and paying it would take a plane.
+// A cost the player cannot pay stops the action before it arms. Having an input
+// only out of its stack is its own refusal: the cost is afforded, so the action
+// is offered, and paying it would take a plane or empty a slot.
 function refuseUnpayableInputs(action: Action, registry: Registry, state: GameState): ArmResult | undefined {
-  const { short, grownOnly } = inputLimit(action, state);
-  if (short === undefined && grownOnly === undefined) return undefined;
+  const { short, unspendable } = inputLimit(action, state);
+  if (short === undefined && unspendable === undefined) return undefined;
   const title = (id: string): string => registry.items.get(id)?.title ?? id;
   if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
   else if (short !== undefined) state.log.push(`You don't have enough ${title(short)}.`);
-  else state.log.push(`Your ${title(grownOnly!)} has grown a plane of its own, and a grown item is never spent.`);
+  else if (unspendable!.kind === 'grown') state.log.push(`Your ${title(unspendable!.item)} has grown a plane of its own, and a grown item is never spent.`);
+  else state.log.push(`Your ${title(unspendable!.item)} is the one you are wearing, and what you wear is never spent.`);
   return { armed: false };
 }
 

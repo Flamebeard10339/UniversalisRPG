@@ -2,6 +2,7 @@ import { clampZoom, type Point, type Sheet } from '../discovery';
 import { clampIndex } from '../gesture';
 import type { LabelId } from '../labels';
 import { LAYERS, subpageOf, toLayer, toSubpage, type LayerId, type Where } from '../nav';
+import type { PlaneView } from '../plane';
 import type { TestSurface } from '../testSurface';
 
 // Everything here exists to be driven and nothing here is drawn, so the whole
@@ -136,14 +137,25 @@ export function mapSurface(map: MapView, controls: MapControls): TestSurface {
   };
 }
 
+// The rows the pane drew, which is the one thing about a focused plane the view
+// does not already carry: the view publishes the report, and which of it reached
+// the screen and under which words is the pane's reading of it. Nothing to
+// drive — every answer a plane screen takes is a value the option publishes, so
+// the sheet is where an agent presses.
+export function planeSurface(plane: PlaneView): TestSurface {
+  return { state: () => plane };
+}
+
 // What each component hands over: the values it already holds and the callbacks
 // it already has, with no surface built at the call site.
 export interface AgentSurfaces {
   shell: { where: Where; go: (where: Where) => void };
   map: { map: MapView; controls: MapControls };
+  plane: { plane: PlaneView };
 }
 
 export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurfaces[K]) => TestSurface } = {
   shell: ({ where, go }) => shellSurface(where, go),
   map: ({ map, controls }) => mapSurface(map, controls),
+  plane: ({ plane }) => planeSurface(plane),
 };

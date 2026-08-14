@@ -838,3 +838,43 @@ expect: growing-a-heartwood-blade-end
 
 # save growing-a-heartwood-blade-end
 {"version":8,"inventory":{"tutorial-island.heartwood-blade":0,"tutorial-island.iron-sword":0,"tutorial-island.whetstone":2,"tutorial-island.masters-whetstone":1,"tutorial-island.keen-edge-jewel":0,"tutorial-island.stout-heart-jewel":1,"tutorial-island.tempered-will-jewel":1,"tutorial-island.great-work-jewel":1,"tutorial-island.causeway-jewel":0,"tutorial-island.crossroads-jewel":0,"tutorial-island.orb-of-vitality":0,"tutorial-island.orb-of-the-edge":1,"tutorial-island.lesser-orb-of-the-edge":0,"tutorial-island.orb-of-the-bulwark":1,"tutorial-island.orb-of-renewal":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"tutorial-island.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"tutorial-island.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["tutorial-island.orb-of-vitality"]},"1,-1":{"jewel":"tutorial-island.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["tutorial-island.orb-of-the-edge","tutorial-island.lesser-orb-of-the-edge"]},"1,0":{"jewel":"tutorial-island.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"tutorial-island.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"tutorial-island.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+
+// --- growing an item through the inventory screen ---
+//
+// The same growth the test above spells as directives, walked the way a player
+// reaches it: every line below is a screen being answered. Recorded from a live
+// session with /create-valid-test and regenerated the same way when this content
+// changes on purpose.
+//
+// It opens the inventory, opens the Iron Sword's plane, slots a jewel into the
+// bare east slot every base has, walks out to the hexagon that jewel put there
+// and to the one slotted beyond that, allocates on both, leaves the plane for
+// the inventory it was opened from, and equips the copy it just grew. The
+// closing `expect:` is what says the route ended somewhere: the copy is worn in
+// mainhand and, by c21, is no longer in the inventory it was grown from.
+
+# test growing-through-the-inventory-screen
+load: growing-a-heartwood-blade-start
+use: entity.smiths-chest.open
+open-modal: carried-items
+submit-modal: item=Iron Sword x1
+submit-modal: verb=Grow
+submit-modal: plane=allocate: slot e
+submit-modal: plane=slot: e with Crossroads Jewel
+// A base still in its stack is minted by the first growth, so the level the
+// next allocation spends is bought after the copy exists rather than before.
+submit-modal: plane=feed: with Master's Whetstone
+submit-modal: plane=Go to 1,0
+submit-modal: plane=allocate: position 1
+submit-modal: plane=allocate: slot ne
+submit-modal: plane=slot: ne with Keen Edge Jewel
+submit-modal: plane=Go to 2,-1
+submit-modal: plane=allocate: position 1
+submit-modal: plane=Back to inventory
+submit-modal: verb=Equip
+open-modal: carried-items
+submit-modal: item=Close
+expect: growing-through-the-inventory-screen-end
+
+# save growing-through-the-inventory-screen-end
+{"version":8,"inventory":{"tutorial-island.heartwood-blade":1,"tutorial-island.iron-sword":0,"tutorial-island.whetstone":6,"tutorial-island.masters-whetstone":3,"tutorial-island.keen-edge-jewel":0,"tutorial-island.stout-heart-jewel":1,"tutorial-island.tempered-will-jewel":1,"tutorial-island.great-work-jewel":1,"tutorial-island.causeway-jewel":1,"tutorial-island.crossroads-jewel":0,"tutorial-island.orb-of-vitality":1,"tutorial-island.orb-of-the-edge":2,"tutorial-island.lesser-orb-of-the-edge":1,"tutorial-island.orb-of-the-bulwark":1,"tutorial-island.orb-of-renewal":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"tutorial-island.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"tutorial-island.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"tutorial-island.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}

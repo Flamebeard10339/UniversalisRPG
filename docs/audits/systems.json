@@ -197,6 +197,10 @@
         "src/runtime/actions.ts",
         "src/runtime/cadence.test.ts",
         "src/runtime/carriedItem.test.ts",
+        "src/runtime/carriedName.test.ts",
+        "src/runtime/carriedName.ts",
+        "src/runtime/carriedScreen.test.ts",
+        "src/runtime/carriedScreen.ts",
         "src/runtime/clusterEffect.test.ts",
         "src/runtime/clusterEffect.ts",
         "src/runtime/clusterPlane.test.ts",
@@ -216,11 +220,15 @@
         "src/runtime/equipment.ts",
         "src/runtime/fight.test.ts",
         "src/runtime/forwardProgress.ts",
+        "src/runtime/growth.test.ts",
+        "src/runtime/growth.ts",
         "src/runtime/hooks.test.ts",
         "src/runtime/hooks.ts",
         "src/runtime/instances.test.ts",
         "src/runtime/instances.ts",
         "src/runtime/integration.test.ts",
+        "src/runtime/itemContribution.test.ts",
+        "src/runtime/itemContribution.ts",
         "src/runtime/itemInstance.test.ts",
         "src/runtime/itemInstance.ts",
         "src/runtime/journey.test.ts",
@@ -230,6 +238,8 @@
         "src/runtime/modals.ts",
         "src/runtime/planeReport.test.ts",
         "src/runtime/planeReport.ts",
+        "src/runtime/planeScreen.test.ts",
+        "src/runtime/planeScreen.ts",
         "src/runtime/population.ts",
         "src/runtime/recipe.test.ts",
         "src/runtime/resolve.test.ts",
@@ -376,6 +386,60 @@
             "src/runtime/hooks.ts"
           ],
           "note": "produced by combat-hook-firing"
+        },
+        {
+          "name": "item stat contribution",
+          "paths": [
+            "src/runtime/itemContribution.ts",
+            "src/runtime/itemContribution.test.ts"
+          ],
+          "note": "produced by item-contribution-fold: what one carried item is worth per stat, its own tags and its plane's allocated payloads folded once and scaled by the cluster effects on them, plus scaledAmount, the one multiplication of a BonusAmount. planeReport publishes it and statRange spends it."
+        },
+        {
+          "name": "destroying a carried item",
+          "paths": [
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by destroy-a-carried-item: destroyItem is the one verb that ends a carried copy, and the only one that ends a plane"
+        },
+        {
+          "name": "the inventory screen",
+          "paths": [
+            "src/runtime/carriedScreen.ts",
+            "src/runtime/carriedScreen.test.ts"
+          ],
+          "note": "produced by inventory-frame"
+        },
+        {
+          "name": "the plane screen",
+          "paths": [
+            "src/runtime/planeScreen.ts",
+            "src/runtime/planeScreen.test.ts"
+          ],
+          "note": "produced by plane-frame: the item-plane ModalFrame member, its listed values as growth directives with what the frame holds prefilled, its refusal, and its return to the inventory frame"
+        },
+        {
+          "name": "the growth dispatch",
+          "paths": [
+            "src/runtime/growth.ts",
+            "src/runtime/growth.test.ts"
+          ],
+          "note": "produced by plane-frame: which of the four growth verbs a directive names, reached from a parsed directive or from a line through the one parser, below every caller"
+        },
+        {
+          "name": "the name of a carried thing",
+          "paths": [
+            "src/runtime/carriedName.ts"
+          ],
+          "note": "produced by one-name-for-a-carried-thing-on-every-surface: the one function every screen reads to name a stack or a grown copy (c16), and the seam reimplement-localization routes"
+        },
+        {
+          "name": "the carried and worn partition",
+          "paths": [
+            "src/runtime/equipment.ts",
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by carried-and-worn-are-disjoint: equip() takes the copy off the carried side as it fills the slot and unequip() puts it back, and itemCopies is the one read that says where every copy of an item is - carriedCount for what an inventory row states, heldCount for what a gate asks"
         }
       ]
     },
@@ -469,6 +533,7 @@
         "src/ui/Meter.tsx",
         "src/ui/ModalSheet.tsx",
         "src/ui/Pager.tsx",
+        "src/ui/PlanePane.tsx",
         "src/ui/Splitter.tsx",
         "src/ui/StatusBanner.tsx",
         "src/ui/TabBar.tsx",
@@ -477,6 +542,8 @@
         "src/ui/agent/surfaces.ts",
         "src/ui/agent/testHarness.test.ts",
         "src/ui/agent/testHarness.ts",
+        "src/ui/asking.test.ts",
+        "src/ui/asking.ts",
         "src/ui/bundle.test.ts",
         "src/ui/choices.test.ts",
         "src/ui/choices.ts",
@@ -495,6 +562,8 @@
         "src/ui/nav.test.ts",
         "src/ui/nav.ts",
         "src/ui/phone.test.tsx",
+        "src/ui/plane.test.ts",
+        "src/ui/plane.ts",
         "src/ui/render.test.tsx",
         "src/ui/sheet.test.ts",
         "src/ui/sheet.ts",
@@ -614,6 +683,21 @@
             "src/ui/surface.test.ts"
           ],
           "note": "produced by a-control-names-its-driver-on-its-own-tag for an-agent-needs-no-screenshot c2: every button, input, select and textarea under src/ui carries data-drive naming the action, or none: with a reason; the rule reads the set off the tree with the control scanner and checks the name against what installTestHarness plus the surface builders actually offer"
+        },
+        {
+          "name": "the plane pane",
+          "paths": [
+            "src/ui/plane.ts",
+            "src/ui/PlanePane.tsx"
+          ],
+          "note": "produced by gui-draws-the-focused-plane: the focused plane read into rows and drawn above the option sheet, off PlayStatus.focus and never off a screen's name (c9/c10)"
+        },
+        {
+          "name": "what leaving a screen answers",
+          "paths": [
+            "src/ui/asking.ts"
+          ],
+          "note": "produced by a-row-acts-in-one-click-and-clicking-away-leaves-the-screen for crafting-modal c19: one decision taken off published fields alone - what a gesture away from the open screen answers, which is the leaving value the Modal itself publishes and nothing where it publishes none. Both gestures the GUI shell has, a click on the sheet's ground and a move to another page, go through it. The concept was registered with a second half, the row that owned its own question, and revert-the-inline-row-question-and-five-bugs-the-author-foun struck it with c20: src/ui/Question.tsx went back inside ModalSheet, which is the one thing drawing an option again"
         }
       ]
     },

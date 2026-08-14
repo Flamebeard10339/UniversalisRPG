@@ -307,6 +307,8 @@ export function printDirective(value: Directive): string {
       return `allocate: ${value.target} at ${hexKey(value.node.hex)} ${value.node.kind === 'position' ? `position ${value.node.position}` : `slot ${value.node.direction}`}`;
     case 'apply':
       return `apply: ${value.target} at ${hexKey(value.hex)} with ${value.effect}`;
+    case 'open-modal':
+      return `open-modal: ${value.modal}`;
     case 'submit-modal':
       return `submit-modal: ${value.key}=${value.value}`;
   }

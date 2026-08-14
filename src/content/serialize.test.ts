@@ -141,6 +141,8 @@ allocate: 1 at 1,-1 position 4
 allocate: 1 at -2,3 slot ne
 apply: 1 at 0,1 with ingot
 refuse: feed 1 with snack
+open-modal: character-creation
+submit-modal: race=Elf
 expect: blank
 `;
 

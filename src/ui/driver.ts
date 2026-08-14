@@ -21,6 +21,10 @@ export interface Driver {
   send(line: string): void;
   choose(position: number): void;
   answer(key: string, value: string): void;
+  // What a row on the inventory ledger does, as the line the REPL types to do
+  // the same thing: the screen it opens is the shared command's, so neither
+  // driver reaches one the other has not got.
+  open(item: string): void;
   cancel(): void;
   // What a save of this session would write, and null when there is no session
   // to save. The bytes are the whole of what the two drivers are compared on,
@@ -149,6 +153,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     send,
     choose: (position) => send(String(position)),
     answer: (key, value) => send(`submit-modal: ${key}=${value}`),
+    open: (item) => send(`/inv ${item}`),
     cancel: () => close(true),
     serialized: () => (context ? serializeSession(context.session) : null),
   };

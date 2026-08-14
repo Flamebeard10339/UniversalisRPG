@@ -15,3 +15,15 @@ export function fillPercent(current: number, max: number): number {
 export function tidy(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
+
+// Ids arrive namespaced and every surface spells the short name, so a stat is
+// read the way the verbs and the DSL write it.
+export function bare(id: string): string {
+  return id.split('.').pop() ?? id;
+}
+
+// A bonus reads as what it does to the number it lands on, so the sign is
+// always there and a gain is not left to look like a total.
+export function signed(value: number): string {
+  return value < 0 ? tidy(value) : `+${tidy(value)}`;
+}

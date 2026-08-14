@@ -47,8 +47,14 @@ in: 1 blade
 out: sharp-blade
 say: You grind the blade to a killing edge.
 
+// The one blade, worn. Re-recorded for c21: written under the invariant it
+// replaced, this fixture carried the blade and wore it at once, which now spells
+// two blades and is not what any test below is about.
 # save one-blade
-{"version":${SAVE_VERSION},"inventory":{"blade":1,"whetstone":1},"equipped":{"mainhand":"blade"}}
+{"version":${SAVE_VERSION},"inventory":{"whetstone":1},"equipped":{"mainhand":"blade"}}
+
+# save carried-blade
+{"version":${SAVE_VERSION},"inventory":{"blade":1,"whetstone":1}}
 
 # save two-blades
 {"version":${SAVE_VERSION},"inventory":{"blade":2,"whetstone":1},"equipped":{"mainhand":"blade"}}
@@ -101,7 +107,7 @@ describe('a grown copy is still a carried blade', () => {
 
 describe('a grown copy is never spent', () => {
   it('refuses a craft that would have to consume it, and leaves the plane standing', () => {
-    const session = grownFrom('one-blade');
+    const session = grownFrom('carried-blade');
     applyDirective(session, { kind: 'craft', recipe: 'sharpen' });
 
     const played = view(session);
@@ -110,15 +116,29 @@ describe('a grown copy is never spent', () => {
     expect(played.grown).toEqual({ '1': 'blade' });
   });
 
-  it('refuses an action whose cost it alone covers, and says why', () => {
+  // c21: the copy is out of its stack twice over, and the sentence names the
+  // reason the player can act on — take it off and it is theirs to spend.
+  it('refuses an action whose cost only the copy in the slot covers, and says why', () => {
     const session = grownFrom('one-blade');
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'smith', actionId: 'temper' });
 
     const played = view(session);
-    expect(played.said).toContain('Your Blade has grown a plane of its own, and a grown item is never spent.');
+    expect(played.said).toContain('Your Blade is the one you are wearing, and what you wear is never spent.');
     expect(played.said).not.toContain('She quenches the blade and hands it back.');
     expect(played.grown).toEqual({ '1': 'blade' });
     expect(played.equipment.mainhand).toBe('1');
+  });
+
+  // The same refusal without a plane behind it: c21 is what takes a plain stack
+  // copy out of the stack, so wearing one is enough to make it unspendable.
+  it('refuses a cost a worn stack copy alone covers, and leaves it on', () => {
+    const session = startSession(registry);
+    applyDirective(session, { kind: 'load', save: 'one-blade' });
+    applyDirective(session, { kind: 'use', obj: 'entity', objId: 'smith', actionId: 'temper' });
+
+    const played = view(session);
+    expect(played.said).toContain('Your Blade is the one you are wearing, and what you wear is never spent.');
+    expect(played.equipment.mainhand).toBe('blade');
   });
 
   it('stops a repeating action when the stack runs dry, rather than running on nothing', () => {

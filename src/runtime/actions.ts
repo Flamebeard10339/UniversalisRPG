@@ -4,7 +4,7 @@ import { Action } from '../content/entity';
 import { Location } from '../content/location';
 import { Registry } from '../content/registry';
 import type { ActiveAction } from './encounter';
-import { carried } from './itemInstance';
+import { copiesOf } from './itemInstance';
 import { GameState, RuntimeError } from './state';
 import { travelSecondsPerUnit } from './tuning';
 
@@ -105,26 +105,27 @@ export function perCompletionCost(action: Action): Map<string, number> {
 export interface InputLimit {
   // What the stack can pay for, which is what the action may actually run.
   completions: number;
-  // An input the player does not carry at all, however it is spelled.
+  // An input the player does not have at all, however it is spelled.
   short?: string;
-  // An input the player carries only as grown copies. It affords the cost, so
-  // the action is offered and the recipe is craftable, and it is refused at the
-  // moment of spending because a grown copy is never taken.
-  grownOnly?: string;
+  // An input the player has only out of its stack — grown, worn, or both. It
+  // affords the cost, so the action is offered and the recipe is craftable, and
+  // it is refused at the moment of spending because neither is ever taken. Which
+  // of the two is named, because the sentence refusing it says why.
+  unspendable?: { item: string; kind: 'grown' | 'worn' };
 }
 
 export function inputLimit(action: Action, state: GameState): InputLimit {
   let completions = Infinity;
   let short: string | undefined;
-  let grownOnly: string | undefined;
+  let unspendable: InputLimit['unspendable'];
   for (const [item, need] of perCompletionCost(action)) {
     if (need <= 0) continue;
-    const { stack, grown } = carried(state, item);
-    if (stack + grown < need) short ??= item;
-    else if (stack < need) grownOnly ??= item;
+    const { stack, grown, worn } = copiesOf(state, item);
+    if (stack + grown + worn < need) short ??= item;
+    else if (stack < need) unspendable ??= { item, kind: grown > 0 ? 'grown' : 'worn' };
     completions = Math.min(completions, Math.floor(stack / need));
   }
-  return { completions, short, grownOnly };
+  return { completions, short, unspendable };
 }
 
 export function outcomeResults(action: Action, outcome: FightOutcome): ActionResult[] {

@@ -10,15 +10,17 @@ import {
 } from '../content/localChanges';
 import { isGrowthDirective, parseDirectiveLine, type Directive } from '../content/test';
 import { printDirective } from '../content/serialize';
-import { resolveDirective } from '../content/typed';
+import { resolveCarried, resolveDirective } from '../content/typed';
 import { type ParsedSave } from '../content/saveSection';
 import { describeCondition, RuntimeError } from './runtime';
+import { wornCopySlot } from './itemInstance';
 import { type Modal, type ModalOption } from './modals';
 import {
   adoptRegistry,
   apply,
   applyDirective,
   beginAction,
+  carriedListing,
   choiceToDirective,
   runSessionTest,
   serializeSession,
@@ -40,7 +42,6 @@ export type CommandOutput =
   | { kind: 'message'; tone: MessageTone; text: string; detail?: string[] }
   | { kind: 'view'; view: PlayView; reread: boolean }
   | { kind: 'status'; status: PlayStatus }
-  | { kind: 'inventory'; status: PlayStatus }
   | { kind: 'choices'; choices: PlayChoice[] }
   | { kind: 'help'; entries: CommandHelp[] }
   | { kind: 'source'; lines: string[] }
@@ -237,6 +238,32 @@ function runNamedTest(ctx: CommandContext, testId: string): CommandResult {
   } catch (error) {
     return refused(error);
   }
+}
+
+// The one route onto the inventory screen, so the row a GUI draws and the line a
+// player types are the same dispatch. Naming an item selects it by answering the
+// screen's own first question, which is what leaves the route two recorded lines
+// a `# test` replays rather than a gesture only one driver has.
+function openInventory(ctx: CommandContext, id: string): CommandResult {
+  const opening: Directive = { kind: 'open-modal', modal: 'carried-items' };
+  if (id === '') return runDirective(ctx, opening);
+
+  const entry = carriedListing(ctx.session).find((each) => each.id === id);
+  if (!entry) return said('error', nothingIsNamed(id));
+
+  const opened = runDirective(ctx, opening);
+  if (opened.recorded.length === 0) return opened;
+  const selected = runDirective(ctx, { kind: 'submit-modal', key: 'item', value: entry.value });
+  return { ...selected, recorded: [...opened.recorded, ...selected.recorded] };
+}
+
+// c16: a player is refused in the words they would have met the thing by. A
+// slot's spelling is the runtime's own — it names whichever copy the slot holds
+// and nothing else spells one that way — so an empty slot is reported as an
+// empty slot rather than printed back at whoever typed it.
+function nothingIsNamed(id: string): string {
+  const slot = wornCopySlot(id);
+  return slot === undefined ? `you carry no ${id}` : `you wear nothing in ${slot}`;
 }
 
 function runDirective(ctx: CommandContext, directive: Directive): CommandResult {
@@ -446,7 +473,7 @@ function parseDirective(line: string, ctx: CommandContext): Directive | null | C
 
 // The one option a driver is waiting on: the first unanswered of the topmost
 // modal, since the ones beneath it are covered over until that is cleared.
-export function askedOption(modals: Modal[]): ModalOption | undefined {
+export function askedOption(modals: readonly Modal[]): ModalOption | undefined {
   return modals[modals.length - 1]?.options[0];
 }
 
@@ -506,10 +533,22 @@ export const COMMANDS: readonly CommandSpec[] = [
   define({
     name: '/inventory',
     aliases: ['/inv'],
-    arg: 'none',
-    summary: 'show your inventory and skill xp',
-    parse: nothing,
-    run: (ctx) => ({ output: [{ kind: 'inventory', status: sessionStatus(ctx.session) }], quit: false, recorded: [] }),
+    arg: 'id',
+    argHint: '[<item>]',
+    summary: 'open the inventory screen, on <item> when one is named',
+    parse: (rest, ctx) => {
+      // A slot's spelling is the runtime's own and names no item, so it reaches
+      // the screen unresolved: the load path resolves what an author could have
+      // written, and a slot is not something anyone writes.
+      if (rest === '' || wornCopySlot(rest) !== undefined) return rest;
+      try {
+        return resolveCarried(rest, ctx.session.registry, '/inventory');
+      } catch (error) {
+        if (error instanceof RuntimeError || error instanceof DslError) return { problem: error.message };
+        throw error;
+      }
+    },
+    run: openInventory,
   }),
   define({
     name: '/wait',

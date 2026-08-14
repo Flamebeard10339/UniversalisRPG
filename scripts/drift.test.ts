@@ -63,6 +63,32 @@ function inStep(repl: Repl, gui: Driver, line: string, dispatch: () => void = ()
   return { result, carved };
 }
 
+// The whole crafting route as the answers a player gives, each of which is a
+// value the screen it is given to published. The GUI answers through its own
+// gesture and the REPL through the line the shared table parses, so a screen
+// only one driver can walk is a step that fails rather than a difference nobody
+// measures. It is the route `growing-through-the-inventory-screen` replays over
+// shipped content; here it is walked twice at once.
+const CRAFTING_ROUTE: ReadonlyArray<readonly [string, string]> = [
+  ['verb', 'Grow'],
+  ['plane', 'allocate: slot e'],
+  ['plane', 'slot: e with Crossroads Jewel'],
+  ['plane', "feed: with Master's Whetstone"],
+  ['plane', 'Go to 1,0'],
+  ['plane', 'allocate: position 1'],
+  ['plane', 'allocate: slot ne'],
+  ['plane', 'slot: ne with Keen Edge Jewel'],
+  ['plane', 'Go to 2,-1'],
+  ['plane', 'allocate: position 1'],
+  ['plane', 'Back to inventory'],
+  ['verb', 'Equip'],
+];
+
+interface SerializedGrowth {
+  equipped: Record<string, string>;
+  instances: { byId: Record<string, { payload: { plane: Record<string, unknown> } }> };
+}
+
 describe('the two drivers cannot drift', () => {
   it('reaches byte-identical state and says the same things, over a scripted sequence', () => {
     const script = ['/look', '/inventory', '/state', '1', '/wait 3', '/speed 2', '/look', '/bogus', '/assert time >= 3', '/expect empty', '/dsl location tutorial-island.guide-house', '/help'];
@@ -120,5 +146,21 @@ describe('the two drivers cannot drift', () => {
     inStep(repl, gui, `submit-modal: ${asked.key}=${asked.values![0]}`, () => gui.answer(asked.key, asked.values![0]));
 
     expect(gui.snapshot().view!.modals).toEqual([]);
+  });
+
+  it('walks the crafting route through both drivers, gesture against typed line', () => {
+    const { repl, gui } = bothDrivers();
+    inStep(repl, gui, 'use: entity.tutorial-island.smiths-chest.open');
+    // The one route onto the screen: a GUI inventory row dispatches the shared
+    // command with the item named, so what the row does is a line the REPL types.
+    inStep(repl, gui, '/inv tutorial-island.iron-sword', () => gui.open('tutorial-island.iron-sword'));
+    for (const [key, value] of CRAFTING_ROUTE) inStep(repl, gui, `submit-modal: ${key}=${value}`, () => gui.answer(key, value));
+
+    expect(gui.snapshot().view!.modals).toEqual([]);
+    const grown = JSON.parse(gui.serialized()!) as SerializedGrowth;
+    // A route every step of which was refused would leave both drivers standing
+    // in the same unmoved game, and every comparison above would pass over it.
+    expect(Object.keys(grown.instances.byId['1'].payload.plane)).toEqual(['0,0', '1,0', '2,-1']);
+    expect(grown.equipped).toEqual({ mainhand: '1' });
   });
 });

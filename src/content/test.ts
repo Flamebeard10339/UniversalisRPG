@@ -34,6 +34,10 @@ export type Directive =
   // their refusal is a value the one door returns, where every other verb
   // pushes a sentence into the log and leaves nothing to invert.
   | { kind: 'refuse'; inner: GrowthDirective }
+  // Raising a screen and answering one of its options, so a route through a
+  // modal is a recorded line rather than a driver's private gesture. The name
+  // is the engine's, not a section's, which is why nothing below resolves it.
+  | { kind: 'open-modal'; modal: string }
   | { kind: 'submit-modal'; key: string; value: string };
 
 export type GrowthDirective = Extract<Directive, { kind: 'feed' | 'slot' | 'allocate' | 'apply' }>;
@@ -130,6 +134,7 @@ function parseGrowth(verb: GrowthVerb, pattern: Map<GrowthVerb, RegExp>, payload
   if (!groups) throw new DslError(`malformed ${verb}: payload (expected ${GROWTH_FORM[verb]}): ${text}`);
   return growth(verb, text, groups);
 }
+const OPEN_MODAL = new RegExp(`^open-modal:[ \\t]*(?<name>${PATH})$`);
 const SUBMIT_MODAL_VERB = /^submit-modal:/;
 // One pair per line, the value running to the end of it, so an answer may hold
 // the spaces and punctuation a dialogue line is written with.
@@ -213,6 +218,9 @@ export function parseDirectiveLine(text: string): Directive | null {
     if (!refuse) throw new DslError(`unknown refuse: verb (expected one of ${GROWTH_VERBS.join(', ')}): ${text}`);
     return { kind: 'refuse', inner: parseGrowth(refuse.verb as GrowthVerb, GROWTH_INLINE, refuse.rest, text) };
   }
+
+  const opening = OPEN_MODAL.exec(text)?.groups;
+  if (opening) return { kind: 'open-modal', modal: opening.name };
 
   if (SUBMIT_MODAL_VERB.test(text)) {
     const submit = SUBMIT_MODAL.exec(text)?.groups;

@@ -1,13 +1,15 @@
-import { ClusterEffect } from '../content/item';
+import { ClusterEffect, Item } from '../content/item';
 import { Direction, DIRECTIONS, Hex, hexKey, NEIGHBOR_DELTA, opposite, PlaneNode } from '../content/hex';
 import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';
 import { BonusAmount } from '../grammar/tagClause';
+import { carriedName } from './carriedName';
 import { positionPayloads } from './clusterEffect';
-import { isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
-import { grownItems, itemInstance, itemLevel, pointsRemaining } from './itemInstance';
+import { basePlane, isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
+import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
+import { hasStackCopy, itemCopies, grownItems, isGrownCopy, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining, wornCopy } from './itemInstance';
 import { GameState } from './state';
-import { scaledAmount } from './stats';
+import { counterLevels } from './stats';
 
 // Where a point may go, said once for both things a point buys. `blocked` is a
 // slot alone: the hex beyond it already holds a cluster that entered another
@@ -56,16 +58,30 @@ export interface ClusterReport {
   readonly slots: SlotReport[];
 }
 
+// Which plane a screen has in hand and which hexagon of it, as the two ids the
+// growth verbs spell — never the plane itself, so a surface that draws one
+// draws the report the view already publishes rather than a second copy of it.
+export interface PlaneFocus {
+  readonly instance: string;
+  readonly hex: string;
+}
+
 export interface PlaneReport {
   // The id the four verbs address this plane by.
   readonly instance: string;
   readonly template: string;
   readonly title: string;
+  // What a screen holding this plane calls the copy it is growing (c16).
+  readonly name: string;
   readonly level: number;
   readonly maxLevel: number;
   readonly spent: number;
   readonly remaining: number;
   readonly clusters: ClusterReport[];
+  // What wearing this copy is worth, per stat, as the stat fold itself reads it
+  // — the item's own tags and its allocated payloads together, so a screen
+  // states this rather than adding the clusters up again (c8).
+  readonly contributions: StatContribution[];
 }
 
 function standingOf(registry: Registry, plane: Plane, node: PlaneNode): Standing {
@@ -134,29 +150,59 @@ function clusterReport(registry: Registry, plane: Plane, hex: Hex): ClusterRepor
   return { hex: hexKey(hex), jewel: jewel.id, title: jewel.title, shape: jewel.shape, entry, effects, modSlots: jewel.modSlots, positions, slots };
 }
 
-export function planeReport(registry: Registry, state: GameState, instanceId: string): PlaneReport | undefined {
-  const template: string | undefined = grownItems(state)[instanceId];
-  const payload = itemInstance(state, instanceId);
-  if (template === undefined || !payload) return undefined;
+// A growth verb spells its target either way an item is carried, and both have
+// a plane to report: a base still in its stack has the one growing it would
+// mint, which is what a screen opened on that stack is looking at. A base the
+// player is wearing is the same case — c21 took it out of the stack, and the
+// plane growing it would mint is the one its equipment row opens.
+function targeted(registry: Registry, state: GameState, target: string): { item: Item; template: string; grown: boolean; payload: ItemInstance } | undefined {
+  const template = itemTemplate(state, target);
   const item = registry.items.get(template);
   if (!item) return undefined;
+
+  const live = itemInstance(state, target);
+  if (live) return { item, template, grown: true, payload: live };
+  if (!hasStackCopy(state, target)) return undefined;
+
+  const plane = basePlane(item);
+  return plane === undefined ? undefined : { item, template, grown: false, payload: { experience: 0, plane } };
+}
+
+export function planeReport(registry: Registry, state: GameState, target: string): PlaneReport | undefined {
+  const targets = targeted(registry, state, target);
+  if (!targets) return undefined;
+  const { item, template, grown, payload } = targets;
 
   const clusters = planeClusters(payload.plane)
     .sort((a, b) => distance(a.hex) - distance(b.hex) || a.hex.q - b.hex.q || a.hex.r - b.hex.r)
     .flatMap(({ hex }) => clusterReport(registry, payload.plane, hex) ?? []);
 
   return {
-    instance: instanceId,
+    instance: target,
     template,
     title: item.title,
+    name: carriedName(item.title, grown),
     level: itemLevel(payload, item),
     maxLevel: item.maxLevel,
     spent: pointsSpent(payload.plane),
     remaining: pointsRemaining(payload, item),
     clusters,
+    contributions: itemContribution(registry, item, payload, counterLevels(state)),
   };
 }
 
+// Every plane the player has, whichever way they have it: a grown copy under its
+// own id and a base under the item's, whether that base is in a stack or in a
+// slot — `itemCopies` counts both sides of c21, so a worn base is among its keys
+// and needs no reading of `equipped` here. All are addressable by the growth
+// verbs and all are what a screen can be opened on, so publishing only the grown
+// ones would leave a focus pointing at a plane no driver could find.
 export function planeReports(registry: Registry, state: GameState): PlaneReport[] {
-  return Object.keys(grownItems(state)).flatMap((id) => planeReport(registry, state, id) ?? []);
+  const stacks = [...itemCopies(state).keys()];
+  // A worn stack copy answers to the slot wearing it rather than to its item, so
+  // its plane is published under that spelling too — it is the one an equipment
+  // row opens, and a focus on it would otherwise point at a plane no driver
+  // could find. A worn grown copy is already among the first list.
+  const slots = Object.entries(state.equipped).flatMap(([slot, id]) => (isGrownCopy(state, id) ? [] : [wornCopy(slot)]));
+  return [...Object.keys(grownItems(state)), ...stacks, ...slots].flatMap((id) => planeReport(registry, state, id) ?? []);
 }

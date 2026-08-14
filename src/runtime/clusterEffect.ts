@@ -7,8 +7,8 @@ import { GameState } from './state';
 
 // One allocated payload and what the cluster it sits in makes it worth. The
 // bonus is the declared one and `scale` is the factor it is folded with, so
-// nothing here multiplies a BonusAmount: `foldBonus` in stats.ts is the one
-// function that does, and this is the number it takes as its `times`.
+// nothing here multiplies a BonusAmount: a payload leaves this module carrying
+// its factor rather than having spent it.
 export interface ScaledPayload {
   readonly node: PlaneNode;
   readonly statId: string;

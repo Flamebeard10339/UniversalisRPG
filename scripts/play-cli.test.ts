@@ -10,6 +10,46 @@ import { driveRun, formatLive, formatOutput, formatResult, formatTick, loadModpo
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
+// Two bases the player carries and has grown neither of: the plane a screen
+// opened on one holds is a plane no copy exists for yet, and the other is there
+// so that drawing the focused one is not the same as drawing the first one.
+const PLANE_SOURCE = `
+# location camp
+x: 0, y: 0
+starting
+
+# cluster-jewel core
+shape: point
+open-connections: e
+
+# item blade
+title: Blade
+slot: mainhand
+max-level: 2
+origin-cluster: core
+
+# item shield
+title: Shield
+slot: offhand
+max-level: 2
+origin-cluster: core
+
+# save stocked
+{"version":${SAVE_VERSION},"inventory":{"blade":1,"shield":1}}
+
+# save worn
+{"version":${SAVE_VERSION},"inventory":{"blade":1,"shield":1},"equipped":{"offhand":"shield"}}
+`;
+
+// The screen a plane is in hand on: the inventory opened on one of the two
+// bases, and then its first verb, which is the one that opens a plane.
+function onPlaneScreen(save: string, item: string): string[] {
+  const ctx = driver(PLANE_SOURCE);
+  runLine(ctx, `/load ${save}`);
+  runLine(ctx, `/inv ${item}`);
+  return formatResult(runLine(ctx, '1'));
+}
+
 function driver(text: string, speed = 1, driving = false): CommandContext {
   const session = startSession(loadModule(text));
   const recorder: Recorder = { history: [], startSave: serializeSession(session) };
@@ -88,14 +128,57 @@ starting
   // would not see it at all, and the id printed here is what equips it.
   it('names grown copies on a line of their own, above the stack counts’ neighbours', () => {
     const ctx = driver(source);
-    const status = runLine(ctx, '/inventory').output.find((out) => out.kind === 'inventory')!.status;
+    const status = runLine(ctx, '/state').output.find((out) => out.kind === 'status')!.status;
 
-    expect(formatOutput({ kind: 'inventory', status })).toEqual(['Inventory: {}', 'XP: {}']);
-    expect(formatOutput({ kind: 'inventory', status: { ...status, grown: { '1': 'tutorial-island.iron-sword' } } })).toEqual([
-      'Inventory: {}',
+    expect(formatOutput({ kind: 'status', status })).not.toContain('Grown: {}');
+    expect(formatOutput({ kind: 'status', status: { ...status, grown: { '1': 'tutorial-island.iron-sword' } } })).toContain(
       'Grown: {"1":"tutorial-island.iron-sword"}',
-      'XP: {}',
-    ]);
+    );
+  });
+
+  // c1: the screen is the modal, and /state is where the same holdings are
+  // still read as text.
+  it('draws the inventory screen /inv opens and nothing beside it', () => {
+    const ctx = driver(source);
+    const lines = formatResult(runLine(ctx, '/inv'));
+
+    expect(lines).toContain('[carried-items] item');
+    expect(lines).toContain('Item:');
+    expect(lines).toContain('  1) Close');
+    expect(lines.some((line) => line.startsWith('Inventory:'))).toBe(false);
+  });
+
+  // c10: the plane is drawn because the view publishes a focus into the planes
+  // it publishes beside it, and this driver reads no modal name to decide it —
+  // the same route draws a screen it has never heard of.
+  it('draws the plane a screen has in hand above the question it is asking', () => {
+    const lines = onPlaneScreen('stocked', 'blade');
+
+    expect(lines).toContain('[item-plane] plane');
+    expect(lines).toContain('Blade — level 1/2, 0 spent, 1 point left');
+    // The hexagon in hand is marked, and the question it belongs to comes under it.
+    expect(lines.indexOf('> 0,0  core · point · origin · mods 0/2')).toBeGreaterThan(lines.indexOf('[item-plane] plane'));
+    expect(lines.indexOf('Blade at 0,0:')).toBeGreaterThan(lines.indexOf('> 0,0  core · point · origin · mods 0/2'));
+  });
+
+  // The focus says which of the published planes, so a driver that drew the
+  // first one it was handed would draw the wrong plane here.
+  it('draws the plane the focus names rather than the first one published', () => {
+    const lines = onPlaneScreen('stocked', 'shield');
+
+    expect(lines).toContain('Shield — level 1/2, 0 spent, 1 point left');
+    expect(lines.some((line) => line.startsWith('Blade —'))).toBe(false);
+  });
+
+  it('says the plane in hand is one the player is wearing', () => {
+    expect(onPlaneScreen('worn', 'shield')).toContain('Shield — worn — level 1/2, 0 spent, 1 point left');
+  });
+
+  it('draws no plane for a screen with none in hand', () => {
+    const ctx = driver(PLANE_SOURCE);
+    runLine(ctx, '/load stocked');
+
+    expect(formatResult(runLine(ctx, '/inv'))).not.toContain('Blade — level 1/2, 0 spent, 1 point left');
   });
 
   it('separates each authored block with a blank line, so the emission pastes into a module', () => {

@@ -261,10 +261,13 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'refuse':
       visitDirective(value.inner, `${where} refuse:`, visit);
       return;
-    // `unequip:` names a slot and `submit-modal:` an option key, neither of
-    // which is a section's id, so they resolve nothing here; a slot is checked
-    // against what items declare by validateTestReferences.
+    // `unequip:` names a slot, `open-modal:` a screen the engine defines and
+    // `submit-modal:` an option key, none of which is a section's id, so they
+    // resolve nothing here; a slot is checked against what items declare by
+    // validateTestReferences, and a screen only the layer above can name is
+    // refused where it is raised.
     case 'unequip':
+    case 'open-modal':
     case 'submit-modal':
   }
 }
