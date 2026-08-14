@@ -9,6 +9,15 @@ export interface Range {
 
 export const point = (value: number): Range => ({ min: value, max: value });
 
+// Whether an unchecked value is one. A `# save` body is hand-written JSON and
+// is the one source of a Range nothing parsed, so the question has to be asked
+// somewhere; here, because this is where what a Range is is decided.
+export const isRange = (value: unknown): value is Range => {
+  if (typeof value !== 'object' || value === null) return false;
+  const { min, max } = value as { min?: unknown; max?: unknown };
+  return typeof min === 'number' && Number.isFinite(min) && typeof max === 'number' && Number.isFinite(max) && min <= max;
+};
+
 export const isPoint = (range: Range): boolean => range.min === range.max;
 
 export const addRanges = (a: Range, b: Range): Range => ({ min: a.min + b.min, max: a.max + b.max });

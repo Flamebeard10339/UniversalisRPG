@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { armFightAction, createGameState, GameState, initResources, PLAYER, resolve } from './runtime';
+import { armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { startSession, view } from './session';
 import { attemptDuration } from './stats';
@@ -33,6 +33,9 @@ trigger: on empty
 
 # item rat-tail
 examine: Still twitching.
+
+# item sword-oil
+food, +25% attack-rate, 60s
 
 # stat max-carapace
 
@@ -155,7 +158,7 @@ describe('a rate raised mid-swing (absolute carry)', () => {
     const registry = loaded();
     const state = fighting(registry);
     resolve(state, registry, secondsToMs(at));
-    state.activeBuffs['sword:attack-rate'] = { statId: 'attack-rate', kind: 'increased', amount: 0.25, expiresAt: secondsToMs(10_000) };
+    grantBuff(state, PLAYER, registry.items.get('sword-oil')!, secondsToMs(10_000));
     return { registry, state };
   }
 
@@ -274,7 +277,7 @@ describe('rate: as the per-minute cadence, to the millisecond', () => {
     expect(attemptDuration(fight, state, registry)).toBe(secondsToMs(2.4));
     expect(attemptDuration(fight, state, registry, 'giant-rat')).toBe(secondsToMs(3.75));
 
-    state.activeBuffs['haste:attack-rate'] = { statId: 'attack-rate', amount: 0.25, kind: 'increased', expiresAt: secondsToMs(60) };
+    grantBuff(state, PLAYER, registry.items.get('sword-oil')!, secondsToMs(60));
     expect(attemptDuration(fight, state, registry)).toBe(secondsToMs(1.92));
   });
 

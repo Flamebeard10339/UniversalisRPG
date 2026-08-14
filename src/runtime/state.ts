@@ -1,10 +1,10 @@
-import type { Range } from '../grammar/range';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import type { ActiveAction } from './encounter';
 import { createInstanceTable, type InstanceTable } from './instances';
 import type { Populations } from './population';
 import type { Journey } from './journey';
 import type { ModalFrame } from './modals';
+import { type BuffTable, clearBuffs } from './buffs';
 
 export class RuntimeError extends Error {}
 
@@ -13,13 +13,17 @@ export type PoolLevels = { readonly [resourceId: string]: number };
 
 export const PLAYER = 'player';
 
-interface TimedModifier {
-  statId: string;
-  expiresAt: number;
-}
-export type ActiveBuff =
-  | (TimedModifier & { kind: 'added'; amount: Range })
-  | (TimedModifier & { kind: 'increased'; amount: number });
+// A fight-scoped copy's key is its type and which copy it is. No syntax anywhere
+// names one — an author writes counts — so this separator never reaches a page.
+// Here beside `PLAYER` because how an actor id is spelled is one question, and
+// everything that asks it sits above this file.
+export const FIGHT_SCOPED = '#';
+
+export const templateOf = (actorId: string): string => actorId.split(FIGHT_SCOPED)[0];
+
+// A copy minted for the fight stands in no location at all, so no question
+// about a place can be asked of it — it is present while the fight is.
+export const isFightScoped = (actorId: string): boolean => actorId !== templateOf(actorId);
 
 export interface GameState extends RngCursor {
   flags: Record<string, boolean | number>;
@@ -33,7 +37,8 @@ export interface GameState extends RngCursor {
   // The walk under way, and null when the player is not on one. journey.ts owns
   // the route; runtime.ts owns arming each leg off it.
   journey: Journey | null;
-  activeBuffs: Record<string, ActiveBuff>;
+  // Readonly because buffs.ts owns every write, and with it stacking and expiry.
+  readonly buffs: BuffTable;
   resources: PoolLevels;
   resourceRateRemainders: Record<string, number>;
   equipped: Record<string, string>;
@@ -48,7 +53,7 @@ export interface GameState extends RngCursor {
 }
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, journey: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
 }
 
 // The one seam through which simulated time advances; nothing reads a real clock.
@@ -59,6 +64,10 @@ export function advanceTime(state: GameState, milliseconds: number): void {
 }
 
 export function endAction(state: GameState): void {
+  // A copy minted for the fight vanishes with it, so what was buffing it has
+  // nobody left to buff. A standing entity that fought keeps what it holds,
+  // because the fight ending is not it leaving the world.
+  if (state.activeAction) clearBuffs(state, Object.keys(state.activeAction.actors ?? {}).filter(isFightScoped));
   state.activeAction = null;
 }
 
@@ -66,5 +75,5 @@ export function endAction(state: GameState): void {
 // nothing arms the next one.
 export function endJourney(state: GameState): void {
   state.journey = null;
-  state.activeAction = null;
+  endAction(state);
 }

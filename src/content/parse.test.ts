@@ -36,21 +36,28 @@ describe('items and tag clauses', () => {
     ]);
   });
 
-  // The counter is the resource's level here; a buff's stack count and a stat
-  // join the same shape rather than growing a second multiplier.
+  // The two counters a `per` can name, spelled apart on the clause so no reader
+  // has to guess which namespace an id came from.
   it('parses a counter-scaled stat bonus beside the flat and percent forms', () => {
-    const blade = parseOne('# item blade\n+4-7 attack, +2 attack per rage, +10% attack per rage', itemSchema);
+    const blade = parseOne('# item blade\n+4-7 attack, +2 attack per rage, +10% attack per rage, +1% attack per stack of vigor', itemSchema);
     expect(blade.tags).toEqual([
       { kind: 'stat-bonus', statId: 'attack', amount: { min: 4, max: 7 }, percent: false },
-      { kind: 'stat-bonus', statId: 'attack', amount: point(2), percent: false, per: 'rage' },
-      { kind: 'stat-bonus', statId: 'attack', amount: 10, percent: true, per: 'rage' },
+      { kind: 'stat-bonus', statId: 'attack', amount: point(2), percent: false, per: { kind: 'resource', id: 'rage' } },
+      { kind: 'stat-bonus', statId: 'attack', amount: 10, percent: true, per: { kind: 'resource', id: 'rage' } },
+      { kind: 'stat-bonus', statId: 'attack', amount: 1, percent: true, per: { kind: 'stack', id: 'vigor' } },
     ]);
   });
 
   it('resolves the counter as a resource, so a bonus scaled by nothing is a load error', () => {
     const source = (counter: string) => `# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# item blade\n+2 attack per ${counter}\n`;
-    expect(loadModule(source('rage')).items.get('blade')!.tags).toEqual([{ kind: 'stat-bonus', statId: 'attack', amount: point(2), percent: false, per: 'rage' }]);
+    expect(loadModule(source('rage')).items.get('blade')!.tags).toEqual([{ kind: 'stat-bonus', statId: 'attack', amount: point(2), percent: false, per: { kind: 'resource', id: 'rage' } }]);
     expect(() => loadModule(source('fury'))).toThrow(/resource/);
+  });
+
+  it('resolves a stack counter as the buff source it names, which is an item', () => {
+    const source = (counter: string) => `# stat attack\nbase: 5\n\n# item vigor\nfood, +1 attack, 60s\n\n# item blade\n+2 attack per stack of ${counter}\n`;
+    expect(loadModule(source('vigor')).items.get('blade')!.tags).toEqual([{ kind: 'stat-bonus', statId: 'attack', amount: point(2), percent: false, per: { kind: 'stack', id: 'vigor' } }]);
+    expect(() => loadModule(source('torpor'))).toThrow(/item/);
   });
 
   it('rejects a labelled tags: with a message naming it as a bare field, not a tag-clause parse error', () => {
