@@ -16,6 +16,7 @@
     {
       "name": "DSL load path",
       "paths": [
+        "content/engine-en.dsl",
         "content/tutorial-island.dsl",
         "src/content/action.ts",
         "src/content/clusterJewel.test.ts",
@@ -23,6 +24,7 @@
         "src/content/dialogue.ts",
         "src/content/dropTable.test.ts",
         "src/content/dropTable.ts",
+        "src/content/engineLocale.ts",
         "src/content/entity.ts",
         "src/content/event.ts",
         "src/content/faction.ts",
@@ -34,6 +36,8 @@
         "src/content/instanceId.ts",
         "src/content/item.test.ts",
         "src/content/item.ts",
+        "src/content/locale.test.ts",
+        "src/content/locale.ts",
         "src/content/location.ts",
         "src/content/merge.test.ts",
         "src/content/merge.ts",
@@ -188,6 +192,22 @@
             "src/content/item.ts"
           ],
           "note": "produced by items-mods-and-crafting-pass1-a-base-s-own-origin-cluster-an: isBase says an item is a base iff it declares slot:, and itemRoleProblem refuses at load an item claiming both roles. Registered over item.ts alone -- the runtime half lives in basePlane and belongs to Runtime's existing item cluster plane concept"
+        },
+        {
+          "name": "module language declaration",
+          "paths": [
+            "src/content/info.ts"
+          ],
+          "note": "produced by modules-declare-their-language-and-humanize-becomes-english-"
+        },
+        {
+          "name": "locale section",
+          "paths": [
+            "src/content/locale.ts",
+            "content/engine-en.dsl",
+            "src/content/engineLocale.ts"
+          ],
+          "note": "produced by the-locale-section-and-its-missing-key-report"
         }
       ]
     },
@@ -233,6 +253,9 @@
         "src/runtime/itemInstance.ts",
         "src/runtime/journey.test.ts",
         "src/runtime/journey.ts",
+        "src/runtime/localized.test.ts",
+        "src/runtime/localized.ts",
+        "src/runtime/localizedFixture.ts",
         "src/runtime/location.test.ts",
         "src/runtime/modals.test.ts",
         "src/runtime/modals.ts",
@@ -440,6 +463,13 @@
             "src/runtime/itemInstance.ts"
           ],
           "note": "produced by carried-and-worn-are-disjoint: equip() takes the copy off the carried side as it fills the slot and unequip() puts it back, and itemCopies is the one read that says where every copy of an item is - carriedCount for what an inventory row states, heldCount for what a gate asks"
+        },
+        {
+          "name": "localized text type",
+          "paths": [
+            "src/runtime/localized.ts"
+          ],
+          "note": "produced by reimplement-localization"
         }
       ]
     },

@@ -49,27 +49,16 @@ not Spanish either.
 | a travel edge, `es` lacks `engine.travel.to`               | es      | `engine.travel.to`                          |
 | a `# locale` key matching no base key                      | any     | reported as unmatched, not silently kept     |
 
-The fifteen engine keys this branch strips out of TypeScript and ships as a `# locale en` section.
-The list is closed in code by c2's literal union; it is written here so the diff that changes it is
-readable, and it includes but is not limited to:
-
-```
-engine.travel.to            Travel to {destination}
-engine.craft.label          Craft {recipe}
-engine.equip.label          Equip {item}
-engine.unequip.label        Unequip {item}
-engine.inputs.short         You don't have enough {item}.
-engine.combat.player.miss   You miss the {target}.
-engine.combat.player.hit    You hit the {target} for {damage}.
-engine.combat.foe.miss      The {attacker} misses you.
-engine.combat.foe.hit       The {attacker} hits you for {damage}.
-engine.item.examine         This is {article} {item}.
-engine.prune.record         Removed {path} {id} because its {kind} is not loaded.
-engine.prune.location       Moved from unavailable location {from} to {to}.
-engine.prune.buff           Removed active buff {buff} because its {missing} is not loaded.
-engine.prune.equipped       Unequipped {slot} because its {reason}.
-engine.prune.action         Stopped unavailable action {action}: {reason}.
-```
+The engine keys this branch strips out of TypeScript and ships as a `# locale en` module. The
+list is closed in code by c2's literal union and printed by `ENGINE_KEYS` in `src/content/locale.ts`;
+the shipped `content/engine-en.dsl` covers it exactly, and a test asserts the two agree. It began as
+the fifteen counted while surveying this task, and finished at thirty-two — the survey's own point,
+made a third time. What the survey missed: a `Talk to {entity}` label that is a choice like any
+other; the log line narrating an opened modal; a foe swinging at another foe, which the four combat
+patterns did not cover; and the prune and instance warnings, which reach the log through
+`PruneWarning.message` and were one composed sentence each until each reason became a pattern of its
+own — a fragment like `stat attack` substituted into `because its {missing} is not loaded` is a
+sentence no translator can reach.
 
 Proof:
 
@@ -192,6 +181,50 @@ Proof:
   dropdown warning all need a GUI that does not exist. c7 makes each of them a rendering of an answer
   this branch computes. The evidence's Spanish end-to-end plan belongs there too, since it exercises
   the authoring path rather than the loading one.
+
+### Decided while building it
+
+- **The patterns ship as `content/engine-en.dsl`, their own module, rather than as a section of
+  `content/tutorial-island.dsl`.** The shipped glob picks either up, so the app is unaffected; what
+  changes is that a universe without the tutorial island still has English, a mod can depend on the
+  module by name, and a unit test loads English without loading 880 lines of island. The spec's
+  requirement — engine English is content loaded through `# locale`, never a constant in TypeScript
+  — is what is being kept, and a test proves no pattern survives anywhere in `src`.
+- **A language tag is whatever `# info language:` says, unvalidated and lowercase.** The section
+  heading grammar already bounds it, so `pt-br` is writable and `pt-BR` is not; nothing but the
+  `humanizeEn` gate reads the tag, so an unknown one is a language with no locale rather than an
+  error.
+- **The localizer stringifies a number parameter and applies no locale-aware numeric formatting.**
+  Rounding stays where it was, in `spoken`. `Intl.NumberFormat` would change today's English for any
+  number past a thousand, which c9 forbids, and no language in play needs it yet.
+- **A pattern naming a parameter the call site did not supply throws; a parameter the pattern does
+  not name is allowed.** The second direction is deliberate: a Spanish `engine.item.examine`
+  legitimately drops `{article}`, and refusing the extra would make the English call site
+  untranslatable.
+- **The language is an input carried on `GameState`, beside `log`, and is not a save field.** Every
+  site that writes a player-visible line has the state in hand and nothing else does; `SaveDiff` and
+  the exhaustive `SAVE_FIELDS` table exclude it by name, so `SAVE_VERSION` does not move and adding
+  a field still fails to compile until somebody classifies it.
+- **A `# locale` section is attributed to the module that wrote it and printed back out under it, and
+  `registryDiff` compares the sections.** Without that, a serialize-and-reload — which is what the
+  contribution flow does to every edit — would drop every translation in silence.
+- **A base string is keyed to the module that owns the id, not to the module that last patched the
+  section.** A patch writes text into somebody else's object; the key names the object.
+- **Prose the DSL carries verbatim goes through one door and is not keyed by this branch.** A `say:`
+  result, a dialogue line and a plane's growth refusal all reach `state.log` with no key to address
+  them by. `Localizer.prose` is the one way they become `Localized`, and it shows the text only where
+  every loaded module is writing the language being played — so a player of another language sees
+  `(untranslated)` rather than the module's own language, which is c3's rule kept rather than
+  bypassed. Keying them is its own task: a dialogue line's value is not a flat pattern but a segment
+  list with `{path}` interpolation and `{cond: text}` conditionals, so a locale entry for one has to
+  be re-parsed by the dialogue grammar, and a `say:` nested inside a result list has no id at all.
+- **`Equip` and `Unequip` stay English.** They are the carried screen's answer *values* — the string
+  a `submit-modal:` directive replays — so localizing them would move an authored id, which c9
+  forbids. Splitting a modal option's display from its value is the GUI's task, and the two keys the
+  deliverable listed are left out of the union rather than added and left dead.
+- **`engine.item.examine` has one reader, `itemExamine`, and the schema default is gone.** Nothing
+  displayed an item's examine before this branch either; what mattered was that the English sentence
+  and its `article()` left the schema, which is what c2 and c5 ask for.
 
 ## Open questions
 
