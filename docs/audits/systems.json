@@ -688,6 +688,7 @@
         "src/ui/transcript.ts",
         "src/ui/transient.test.ts",
         "src/ui/transient.ts",
+        "src/ui/words.ts",
         "src/vite-env.d.ts",
         "tailwind.config.js"
       ],
@@ -811,6 +812,14 @@
             "src/ui/asking.ts"
           ],
           "note": "produced by a-row-acts-in-one-click-and-clicking-away-leaves-the-screen for crafting-modal c19: one decision taken off published fields alone - what a gesture away from the open screen answers, which is the leaving value the Modal itself publishes and nothing where it publishes none. Both gestures the GUI shell has, a click on the sheet's ground and a move to another page, go through it. The concept was registered with a second half, the row that owned its own question, and revert-the-inline-row-question-and-five-bugs-the-author-foun struck it with c20: src/ui/Question.tsx went back inside ModalSheet, which is the one thing drawing an option again"
+        },
+        {
+          "name": "the shell's keyed vocabulary",
+          "paths": [
+            "src/ui/labels.ts",
+            "src/ui/words.ts"
+          ],
+          "note": "produced by both-drivers-read-their-own-words-from-the-localizer: the table of engine keys the shell names its own words by, and the one door a component reads them through"
         }
       ]
     },
