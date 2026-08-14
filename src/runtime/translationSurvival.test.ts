@@ -62,6 +62,26 @@ describe('a universe with every word replaced', () => {
     for (const language of PLAYED) expect(worded.filter((key) => registry.locales.declared.get(language)?.get(key) === englishOf(shipped.locales, key))).toEqual([]);
   });
 
+  // c6 put spoken lines in the replaced set, and a line's `{player.name}` or
+  // `{quest-given: text}` is the segment grammar's machinery rather than words:
+  // shifting its letters leaves a path naming nothing, which renders as the
+  // empty string that no `# test` asserts against, and a condition the grammar
+  // cannot read at all. An engine pattern's `{item}` is the same fact one
+  // segment long.
+  const fragments = (text: string): string[] => [...text.matchAll(/\{[^{}]*\}/g)].map((match) => match[0]);
+
+  it('leaves every braced fragment standing, whatever it does to the words around it', () => {
+    const keys = everyKey(shipped.locales);
+    const moved = [];
+    for (const language of PLAYED) {
+      for (const key of keys) {
+        const replaced = registry.locales.declared.get(language)?.get(key) ?? '';
+        if (fragments(replaced).join() !== fragments(englishOf(shipped.locales, key)).join()) moved.push(`${language} ${key}`);
+      }
+    }
+    expect(moved).toEqual([]);
+  });
+
   it('gives the base language and the played one different words for one key', () => {
     const worded = everyKey(shipped.locales).filter((key) => hasWords(englishOf(shipped.locales, key)));
     expect(worded.filter((key) => registry.locales.declared.get(BASE_LANGUAGE)?.get(key) === registry.locales.declared.get(TRANSLATED_LANGUAGE)?.get(key))).toEqual([]);
