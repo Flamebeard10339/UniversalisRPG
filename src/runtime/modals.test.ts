@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverse, Registry } from '../content/registry';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
-import { answerModal, dialogueFrame, isModalFrame, Modal, ModalFrame, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { answerModal, dialogueFrame, isModalFrame, Modal, ModalChoice, ModalFrame, MODAL_NAMES, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
 import { SAVE_VERSION } from './save';
 import { choose, createGameState, DialogueCursor, GameState, RuntimeError, talk } from './runtime';
 import { applyResultsNow } from './effects';
@@ -829,7 +829,7 @@ describe('nothing a player answers with carries words', () => {
     '  -> Say nothing.',
     '',
     '# save stocked',
-    `{"version":${SAVE_VERSION},"inventory":{"forge.blade":1,"forge.whetstone":2,"forge.bough-jewel":1}}`,
+    `{"version":${SAVE_VERSION},"inventory":{"forge.blade":2,"forge.whetstone":2,"forge.bough-jewel":1}}`,
   ].join('\n');
 
   const SPANISH = [
@@ -866,12 +866,31 @@ describe('nothing a player answers with carries words', () => {
   // Every screen the engine declares, each carried far enough to publish: the
   // inventory with nothing chosen and with a grown copy chosen, the plane that
   // copy opens, the dialogue the sage raises, and character creation.
+  // The modals the walk actually published from, so the set it covers is read
+  // off what it did rather than off the list above it.
+  const walked = new Set<string>();
+
+  // What the carried screen is listing, as the answers it publishes for them.
+  const rows = (session: PlaySession): string[] => {
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    const open = view(session).modals;
+    const listed = (open[open.length - 1].options[0].values ?? []).map((choice: ModalChoice) => choice.value);
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'close' });
+    return listed.filter((value: string) => value !== 'close');
+  };
+
   const everyValue = (language: string): string[] => {
     const session = startSession(registry, language);
     applyDirective(session, { kind: 'load', save: 'forge.stocked' });
+    // Worn rows and their verbs are only published once something is worn, and
+    // a screen half-walked is a screen half-checked.
+    applyDirective(session, { kind: 'equip', item: 'forge.blade' });
     const values: string[] = [];
     const published = (): void => {
-      for (const modal of view(session).modals) for (const option of modal.options) for (const choice of option.values ?? []) values.push(choice.value);
+      for (const modal of view(session).modals) {
+        walked.add(modal.name);
+        for (const option of modal.options) for (const choice of option.values ?? []) values.push(choice.value);
+      }
     };
 
     applyDirective(session, { kind: 'open-modal', modal: 'character-creation' });
@@ -890,6 +909,16 @@ describe('nothing a player answers with carries words', () => {
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'plane', value: 'back' });
     applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'close' });
+
+    // Every row, not the one this walk happened to pick: the verbs a row
+    // offers are computed from what the row is, so a stack, a grown copy and a
+    // worn one publish three different lists and only one of them was checked.
+    for (const row of rows(session)) {
+      applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+      applyDirective(session, { kind: 'submit-modal', key: 'item', value: row });
+      published();
+      applyDirective(session, { kind: 'submit-modal', key: 'verb', value: 'close' });
+    }
 
     applyDirective(session, { kind: 'talk', entity: 'forge.sage' });
     published();
@@ -911,11 +940,26 @@ describe('nothing a player answers with carries words', () => {
       // walk that never publishes them leaves the check above watching
       // nothing.
       for (const verb of ['slot: ', 'feed: ']) expect(values.filter((value) => value.startsWith(verb)), `${language} published no ${verb.trim()} value`).not.toEqual([]);
+      // The verbs a row offers depend on what the row is, so a walk that wears
+      // nothing never publishes these two and never checks them.
+      // The verbs a row offers depend on what the row is, so a walk that
+      // wears nothing never publishes these and never checks them. The
+      // fixture stocks the blade twice so one is worn and one is not.
+      for (const verb of ['equip', 'unequip', 'destroy']) expect(values, language).toContain(verb);
       expect(values.flatMap((value) => wordsInside(value, words).map((word) => `${value} holds ${word}`)), language).toEqual([]);
     }
   });
 
   it('publishes the same values in every language, so a recording replays in each', () => {
     expect(everyValue('es')).toEqual(everyValue('en'));
+  });
+
+  // "every modal" is the clause's word. Held against the definitions rather
+  // than against the list of directives above, so declaring a fifth modal
+  // fails this test instead of quietly shrinking what the clause covers.
+  it('walks every modal the engine declares, so the enumeration is of all of them', () => {
+    everyValue('en');
+
+    expect([...walked].sort()).toEqual([...MODAL_NAMES].sort());
   });
 });

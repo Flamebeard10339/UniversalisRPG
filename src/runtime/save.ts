@@ -150,8 +150,6 @@ function activeActionProblem(localizer: Localizer, state: GameState, registry: R
 export function pruneStateForRegistry(state: GameState, registry: Registry): PruneWarning[] {
   const warnings: PruneWarning[] = [];
   const localizer = localizerOf(registry, state);
-  // An id survives translation; the reason a modal or an action was dropped is
-  // an English diagnostic and does not.
   const named = localizer.identifier;
 
   // First, so every rule under it asks a settled table rather than one still
