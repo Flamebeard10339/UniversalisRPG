@@ -31,7 +31,9 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
 
   const offsets = layerOffsets(bands);
   const heights = bodyHeights(bands);
-  const restingAt = (at: number): string => `translate3d(0, ${-offsets[at]}px, 0)`;
+  // 2D and unpromoted, for the reason the pager gives: a layer is rastered
+  // once and then moved as a picture, and the text on it goes soft.
+  const restingAt = (at: number): string => `translate(0, ${-offsets[at]}px)`;
 
   // The column is sized from what the banners actually measured, so a banner
   // that grows a line of entities moves the layers rather than being clipped.
@@ -68,7 +70,7 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
     dragging.dy = y - dragging.y;
     dragging.motion = sampleVelocity(dragging.motion, y, at);
     if (dragging.dy !== 0) dragged.current = dragged.current || wasDragged(dragging.dy);
-    if (column.current) column.current.style.transform = `translate3d(0, ${-offsets[layer] + pagerOffset(dragging.dy, layer, LAYERS.length)}px, 0)`;
+    if (column.current) column.current.style.transform = `translate(0, ${-offsets[layer] + pagerOffset(dragging.dy, layer, LAYERS.length)}px)`;
   };
 
   const end = (at: number, taken: boolean): void => {
@@ -86,7 +88,7 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
 
   return (
     <div ref={frame} className="relative min-h-0 flex-1 overflow-hidden">
-      <div ref={column} className="flex w-full flex-col will-change-transform">
+      <div ref={column} className="flex w-full flex-col">
         {bodies.flatMap((body, at) => [
           <div key={`body-${LAYERS[at].id}`} className="flex w-full shrink-0 flex-col overflow-hidden" style={bands.height > 0 ? { height: heights[at] } : undefined}>
             {body}

@@ -204,7 +204,11 @@ function formatInventory(status: PlayStatus, localizer: Localizer): ToolLine[] {
   // player equips it by.
   if (Object.keys(status.grown).length > 0) lines.push(dumped(localizer, 'engine.repl.state.grown', status.grown));
   lines.push(dumped(localizer, 'engine.repl.state.xp', Object.fromEntries(status.xp.map((row) => [row.id, row.value]))));
-  if (status.equipment.length > 0) lines.push(dumped(localizer, 'engine.repl.state.equipped', Object.fromEntries(status.equipment.map((row) => [row.slot, row.item]))));
+  // What is worn, and not which slots there are: the view publishes a row per
+  // declared slot so a page can draw an empty one, and a readout of what the
+  // state holds says nothing about a slot the state holds nothing in.
+  const filled = status.equipment.flatMap((row) => (row.item === null ? [] : [[row.slot, row.item] as const]));
+  if (filled.length > 0) lines.push(dumped(localizer, 'engine.repl.state.equipped', Object.fromEntries(filled)));
   return lines;
 }
 

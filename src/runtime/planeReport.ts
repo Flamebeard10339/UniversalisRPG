@@ -6,7 +6,7 @@ import { BonusAmount, Counter } from '../grammar/tagClause';
 import { carriedName } from './carriedName';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { positionPayloads } from './clusterEffect';
-import { basePlane, isAllocated, neighbours, placementAt, Plane, planeClusters, pointsSpent, slotDirections, slotState } from './clusterPlane';
+import { basePlane, isAllocated, neighbours, nodeKey, placementAt, Plane, planeClusters, pointsSpent, positionOnEdge, slotDirections, slotState } from './clusterPlane';
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
 import { hasStackCopy, itemCopies, grownItems, isGrownCopy, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining, wornCopy } from './itemInstance';
 import { GameState } from './state';
@@ -40,17 +40,29 @@ export interface ContributionReport extends StatContribution {
 
 export interface PositionReport {
   readonly position: number;
+  // What tells this node from every other on the plane, and the name the edges
+  // below join by.
+  readonly node: Answer;
   readonly passive: Answer | null;
   readonly title: Localized | null;
   readonly standing: Standing;
   // Allocated without a point having been spent: the origin cluster's root.
   readonly free: boolean;
+  // The neighbouring hexes whose shared edge lands on this position, named as
+  // hexes rather than as directions: a surface drawing the plane needs to know
+  // which way a position faces, and a direction is a word of the plane's own
+  // that such a surface would then have to learn the geometry of.
+  readonly faces: Answer[];
   readonly payloads: PayloadReport[];
 }
 
 export interface SlotReport {
   readonly direction: Direction;
+  readonly node: Answer;
   readonly standing: Standing;
+  // The hex on the other side of this edge, whether or not anything stands in
+  // it. A slot is drawn between two hexes, and this is the second one.
+  readonly toward: Answer;
   // The hex beyond this edge when a cluster stands in it, whether this slot let
   // it in or another one did — which is the whole difference between filled and
   // blocked, and the reason both name the same neighbour.
@@ -94,6 +106,11 @@ export interface PlaneReport {
   readonly spent: number;
   readonly remaining: number;
   readonly clusters: ClusterReport[];
+  // Every pair of nodes that touch, once each and in no direction: the plane is
+  // a graph and this is its edge list, read out of the one function that
+  // decides what touches what. A surface drawing the plane joins the nodes it
+  // is given rather than working the adjacency out again from the shapes.
+  readonly links: Array<{ readonly from: Answer; readonly to: Answer }>;
   // What wearing this copy is worth, per stat, as the stat fold itself reads it
   // — the item's own tags and its allocated payloads together, so a screen
   // states this rather than adding the clusters up again (c8).
@@ -143,10 +160,12 @@ function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, h
     const standing = standingOf(registry, plane, { hex, kind: 'position', position });
     positions.push({
       position,
+      node: nodeKey({ hex, kind: 'position', position }),
       passive: passive ?? null,
       title: passive === undefined ? null : localizer.title('passive', passive),
       standing,
       free: standing === 'allocated' && !cluster.allocatedPositions.includes(position),
+      faces: DIRECTIONS.filter((direction) => positionOnEdge(placement, direction) === position).map((direction) => step(hex, direction)),
       payloads: payloadsOf(registry, localizer, plane, hex, position),
     });
   }
@@ -158,7 +177,9 @@ function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, h
     const occupied = plane[step(hex, direction)] !== undefined;
     slots.push({
       direction,
+      node: nodeKey({ hex, kind: 'slot', direction }),
       standing: standingOf(registry, plane, { hex, kind: 'slot', direction }),
+      toward: step(hex, direction),
       beyond: occupied ? step(hex, direction) : null,
     });
   }
@@ -226,8 +247,36 @@ export function planeReport(registry: Registry, state: GameState, target: string
     spent: pointsSpent(payload.plane),
     remaining: pointsRemaining(payload, item),
     clusters,
+    links: linksAcross(registry, payload.plane, clusters),
     contributions: itemContribution(registry, item, payload, counterLevels(state)).map((each) => ({ ...each, statTitle: localizer.title('stat', each.statId) })),
   };
+}
+
+// The plane's edges, from the one function that says what touches what. Every
+// pair once and in no direction — a node names its neighbour and the neighbour
+// names it back — and only between nodes the report itself published, so a
+// reader joining them never holds an end that is not on the page.
+function linksAcross(registry: Registry, plane: Plane, clusters: readonly ClusterReport[]): PlaneReport['links'] {
+  const drawn = new Set(clusters.flatMap((cluster) => [...cluster.positions.map((each) => each.node), ...cluster.slots.map((each) => each.node)]));
+  const links = new Map<string, { from: Answer; to: Answer }>();
+  for (const { hex } of planeClusters(plane)) {
+    const placement = placementAt(registry, plane, hex);
+    if (!placement) continue;
+    const here: PlaneNode[] = [
+      ...Array.from({ length: getShape(placement.jewel.shape).positionCount }, (_, at): PlaneNode => ({ hex, kind: 'position', position: at + 1 })),
+      ...slotDirections(placement).map((direction): PlaneNode => ({ hex, kind: 'slot', direction })),
+    ];
+    for (const node of here) {
+      const from = nodeKey(node);
+      for (const other of neighbours(registry, plane, node)) {
+        const to = nodeKey(other);
+        if (!drawn.has(from) || !drawn.has(to)) continue;
+        const pair = from < to ? `${from}|${to}` : `${to}|${from}`;
+        if (!links.has(pair)) links.set(pair, from < to ? { from, to } : { from: to, to: from });
+      }
+    }
+  }
+  return [...links.values()];
 }
 
 // Every plane the player has, whichever way they have it: a grown copy under its

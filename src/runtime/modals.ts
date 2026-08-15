@@ -20,6 +20,14 @@ import type { Said } from './said';
 export interface ModalChoice {
   readonly value: Answer;
   readonly shown: Localized;
+  // What the choice acts on, where the screen has a subject it also publishes
+  // and a driver may be drawing that subject rather than this list. Absent on
+  // every screen whose choices are only ever pressed as a list.
+  readonly on?: Answer;
+  // What the choice brings to that node, named the one way every screen names a
+  // carried thing. `shown` is the whole sentence a list needs; this is the half
+  // of it a driver drawing the node itself has room for.
+  readonly subject?: Localized;
 }
 
 export interface ModalOption {

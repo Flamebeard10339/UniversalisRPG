@@ -14,7 +14,13 @@ interface Drag {
 
 // The strip is as wide as its panes and is moved by whole panes, so a percent
 // translate is one pane and the pane width never has to be measured.
-const restingAt = (index: number): string => `translate3d(${-index * 100}%, 0, 0)`;
+//
+// A 2D translate, not a translate3d, and no `will-change`: either of those puts
+// the strip on its own compositor layer, and a layer is rastered once and then
+// moved as a picture — so every line of narration and every label on a choice
+// was drawn at whatever the layer happened to be rastered at and went soft. The
+// map learned this first and says so in the same words.
+const restingAt = (index: number): string => `translate(${-index * 100}%, 0)`;
 
 // Panes side by side, moved under the finger and settled on release.
 //
@@ -57,7 +63,7 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
 
     dragging.dx = dx;
     dragging.motion = sampleVelocity(dragging.motion, x, at);
-    if (strip.current) strip.current.style.transform = `translate3d(calc(${-index * 100}% + ${pagerOffset(dx, index, panes.length)}px), 0, 0)`;
+    if (strip.current) strip.current.style.transform = `translate(calc(${-index * 100}% + ${pagerOffset(dx, index, panes.length)}px), 0)`;
     return true;
   };
 
@@ -119,7 +125,7 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
         event.stopPropagation();
       }}
     >
-      <div ref={strip} className="flex h-full w-full will-change-transform">
+      <div ref={strip} className="flex h-full w-full">
         {panes.map((pane, at) => (
           <div key={at} className="flex h-full min-h-0 w-full shrink-0 flex-col">
             {pane}

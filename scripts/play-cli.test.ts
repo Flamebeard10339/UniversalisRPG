@@ -145,7 +145,10 @@ starting
       // what discovery now means; the beach is behind the locked front door.
       'Flags: {"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true}',
       'Inventory: {}',
-      'XP: {}',
+      // Every skill the world declares, at the level everyone starts at: the
+      // view stopped publishing only the totals that had moved, because a page
+      // reading those was reading the save rather than the world.
+      'XP: {"tutorial-island.thieving":0,"tutorial-island.melee":0,"tutorial-island.cooking":0}',
       'Health: ██████████ 30/30',
     ]);
     expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: tutorial-island.guide-house');

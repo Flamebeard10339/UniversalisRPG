@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../../runtime/localizedFixture';
 import { layerNamed, mapState, mapSurface, pointFrom, shellState, shellSurface, subpageNamed, zoomFrom } from './surfaces';
-import { CLIMB_NUDGE, sheetAt, ZOOM_MAX, ZOOM_MIN, type Place, type Point } from '../discovery';
+import { CLIMB_NUDGE, sheetAt, type Place } from '../discovery';
+import { ZOOM_MAX, ZOOM_MIN, type Point } from '../viewport';
 import { HOME_LAYER, LAYERS, OPENING, toLayer } from '../nav';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
@@ -86,7 +87,7 @@ describe('the map as a driving agent reaches it', () => {
 
   it('pans and zooms through the same settling a finger goes through', () => {
     const rests: Array<{ pan: Point; zoom: number }> = [];
-    const surface = mapSurface(view, { settle: (pan, zoom) => void rests.push({ pan, zoom }), plane: () => undefined });
+    const surface = mapSurface(view, { settle: (pan, zoom) => void rests.push({ pan, zoom }), plane: () => undefined, recentre: () => undefined });
 
     surface.actions!.pan({ x: 20, y: -5 });
     surface.actions!.zoom(2);
@@ -113,7 +114,7 @@ describe('the map as a driving agent reaches it', () => {
 
   it('changes to a floor it is drawing, and refuses one it is not', () => {
     const floors: number[] = [];
-    const surface = mapSurface(view, { settle: () => undefined, plane: (at) => void floors.push(at) });
+    const surface = mapSurface(view, { settle: () => undefined, plane: (at) => void floors.push(at), recentre: () => undefined });
 
     surface.actions!.plane(-1);
 

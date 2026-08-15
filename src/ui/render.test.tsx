@@ -14,7 +14,7 @@ import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { LABELS, type LabelId } from './labels';
 import { wordsOf } from './words';
-import { LAYERS, OPENING, toLayer } from './nav';
+import { LAYERS, OPENING, toLayer, toSubpage } from './nav';
 
 // A run that is under way and going nowhere, which is what a test about what
 // is drawn wants: no timer, and the same frame however long the test takes.
@@ -84,7 +84,7 @@ function published(view: PlayView): string[] {
     ...view.carried.map((row) => row.name),
     ...view.stats.map((row) => row.title),
     ...view.xp.map((row) => row.title),
-    ...view.equipment.flatMap((row) => [row.title, row.name]),
+    ...view.equipment.flatMap((row) => (row.name === null ? [row.title] : [row.title, row.name])),
     ...view.said,
   ];
 }
@@ -105,7 +105,7 @@ function idsPublished(view: PlayView): string[] {
   return [
     ...view.stats.map((row) => row.id),
     ...view.xp.map((row) => row.id),
-    ...view.equipment.flatMap((row) => [row.slot, row.item]),
+    ...view.equipment.flatMap((row) => (row.item === null ? [row.slot] : [row.slot, row.item])),
     ...view.carried.map((row) => row.id),
     ...view.discovered.map((place) => place.id),
   ];
@@ -195,6 +195,22 @@ function places(html: string): Array<{ id: string; runs: string[]; disabled: boo
     flashing: /\barrived\b/.test(attributes),
     left: offset(attributes, 'left'),
     top: offset(attributes, 'top'),
+  }));
+}
+
+// The skills page's panels, each as the skill it stands for and the runs inside
+// it. data-skill is written by SkillsPane and nothing else, and the runs are
+// taken whole rather than through `readable`, because a level is digits and
+// `readable` keeps only what has a letter in it.
+function skillPanels(html: string): Array<{ id: string; runs: string[]; ring: boolean }> {
+  return [...html.matchAll(/<button([^>]*data-skill="([^"]*)"[^>]*)>([\s\S]*?)<\/button>/g)].map(([, , id, inner]) => ({
+    id,
+    runs: inner
+      .replace(/<[^>]*>/g, '\n')
+      .split('\n')
+      .map((run) => run.trim())
+      .filter((run) => run !== ''),
+    ring: inner.includes('stroke-dashoffset'),
   }));
 }
 
@@ -395,7 +411,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, LOOK_OUT));
     const view = driver.snapshot().view!;
 
-    const drawn = places(renderToStaticMarkup(<MapPane view={view} arrivals={['surveyed.overlook']} generation={1} onChoose={() => undefined} />));
+    const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={['surveyed.overlook']} generation={1} onChoose={() => undefined} />));
 
     expect(drawn.find((entry) => entry.id === 'surveyed.overlook')!.flashing).toBe(true);
     expect(drawn.find((entry) => entry.id === 'surveyed.workshop')!.flashing).toBe(false);
@@ -409,7 +425,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, 'travel:surveyed.cove'));
     const view = driver.snapshot().view!;
 
-    const html = renderToStaticMarkup(<MapPane view={view} arrivals={[]} generation={0} onChoose={() => undefined} />);
+    const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />);
 
     expect(view.journey).toEqual({ to: 'surveyed.cove', legs: ['surveyed.overlook', 'surveyed.cove'] });
     expect(places(html).map((node) => [node.id, node.walk])).toEqual([
@@ -427,7 +443,7 @@ describe('what the shell puts on the screen', () => {
     const driver = createDriver([SURVEYED]);
     driver.choose(position(driver, LOOK_OUT));
 
-    const html = renderToStaticMarkup(<MapPane view={driver.snapshot().view!} arrivals={[]} generation={0} onChoose={() => undefined} />);
+    const html = renderToStaticMarkup(<MapPane words={shellWord} view={driver.snapshot().view!} arrivals={[]} generation={0} onChoose={() => undefined} />);
 
     expect(driver.snapshot().view!.journey).toBeNull();
     expect(places(html).every((node) => node.walk === undefined)).toBe(true);
@@ -473,11 +489,12 @@ describe('what the shell puts on the screen', () => {
       expect(onScreen(runs, row.id), row.id).toBe(false);
     }
     // c10: a slot is a word with a key, so the equipment page draws its title
-    // and never the id `equipment-slots:` named it by.
+    // and never the id `equipment-slots:` named it by. Every slot the world
+    // declares is a row, whether or not anything is worn in it.
     expect(view.equipment.map((row) => [row.slot, row.title])).toEqual([['mainhand', 'Main Hand']]);
     for (const row of view.equipment) {
       expect(onScreen(runs, row.title), row.title).toBe(true);
-      expect(onScreen(runs, row.name), row.name).toBe(true);
+      if (row.name !== null) expect(onScreen(runs, row.name), row.name).toBe(true);
       expect(onScreen(runs, row.slot), row.slot).toBe(false);
     }
   });
@@ -575,7 +592,7 @@ describe('what the shell puts on the screen', () => {
       const driver = createDriver([STOREYS]);
       const view = driver.snapshot().view!;
 
-      const strip = floors(renderToStaticMarkup(<MapPane view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+      const strip = floors(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
 
       expect(view.discovered.map((place) => place.z).sort()).toEqual([0, 1]);
       expect(strip.offered.sort()).toEqual([0, 1]);
@@ -585,12 +602,22 @@ describe('what the shell puts on the screen', () => {
       expect(strip.drawn).toBe(1);
     });
 
+    it('offers a way back to the player, on the floor they are standing on', () => {
+      const driver = createDriver([STOREYS]);
+      const view = driver.snapshot().view!;
+
+      const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />);
+
+      expect(html).toContain('data-drive="map.recentre"');
+      expect(onScreen(readable(html), shellWord('recentre'))).toBe(true);
+    });
+
     it('draws the sheet under the pan and the zoom it reports', () => {
       const driver = createDriver([SURVEYED]);
       driver.choose(position(driver, LOOK_OUT));
       const view = driver.snapshot().view!;
 
-      const under = drawnAt(renderToStaticMarkup(<MapPane view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+      const under = drawnAt(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
 
       // Nothing has been dragged, so the sheet sits centred on what it is
       // showing at a zoom of 1. Worked out from the places the engine
@@ -601,6 +628,29 @@ describe('what the shell puts on the screen', () => {
       const centre = { x: ((Math.min(...xs) + Math.max(...xs)) / 2) * PER_UNIT, y: ((Math.min(...ys) + Math.max(...ys)) / 2) * PER_UNIT };
 
       expect(under).toEqual({ x: -centre.x, y: -centre.y, zoom: 1 });
+    });
+
+    it('draws one skill panel per row the view publishes, each with its own level in its own ring', () => {
+      const driver = createDriver([SURVEYED], { ticker: noTicks });
+      driver.choose(position(driver, LOOK_OUT));
+      const view = driver.snapshot().view!;
+      // Where the skills page is: the character layer, on the page the nav
+      // names, rather than an index this test would have to keep in step.
+      const skills = LAYERS[2].subpages.findIndex((subpage) => subpage.id === 'skills');
+      const where = toSubpage(toLayer(OPENING, 2), 2, skills);
+
+      const drawn = skillPanels(renderToStaticMarkup(<App driver={driver} opening={where} />));
+
+      expect(view.xp.length).toBeGreaterThan(0);
+      expect(drawn.map((panel) => panel.id).sort()).toEqual(view.xp.map((row) => row.id).sort());
+      for (const row of view.xp) {
+        const panel = drawn.find((each) => each.id === row.id)!;
+
+        expect(onScreen(panel.runs, row.title as unknown as string), `the panel does not name ${row.id}`).toBe(true);
+        // The level, inside the ring that fills toward the next one.
+        expect(onScreen(panel.runs, String(row.level)), `the panel does not draw the level of ${row.id}`).toBe(true);
+        expect(panel.ring, `the panel for ${row.id} draws no ring`).toBe(true);
+      }
     });
 
     it('draws the nav standing where it was opened, so a shell handing over a constant is markup that shows it', () => {
@@ -630,7 +680,7 @@ describe('what the shell puts on the screen', () => {
       driver.choose(position(driver, LOOK_OUT));
       const view = driver.snapshot().view!;
 
-      const drawn = places(renderToStaticMarkup(<MapPane view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+      const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
 
       expect(drawn.map((node) => node.id).sort()).toEqual(view.discovered.map((place) => place.id).sort());
       // Where the player is standing is the one with no travel out to it.

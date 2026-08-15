@@ -1,11 +1,7 @@
 import type { PlayView } from '../runtime/session';
+import { bounds, type Box, type Point } from './viewport';
 
 export type Place = PlayView['discovered'][number];
-
-export interface Point {
-  x: number;
-  y: number;
-}
 
 export interface Node {
   place: Place;
@@ -109,108 +105,16 @@ export function drawnFor(view: PlayView | null, asked: number | null): Drawn {
   return { plane, here, sheet: sheetAt(discovered, here, plane, travels), travels };
 }
 
-export interface Box {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-}
-
-// The room everything drawn takes up. Nothing drawn is a point rather than an
-// absence, so a caller always has a centre and never divides by a zero span.
-export function bounds(nodes: readonly Node[]): Box {
-  if (nodes.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  const xs = nodes.map((node) => node.at.x);
-  const ys = nodes.map((node) => node.at.y);
-  return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
-}
-
-// How far in and out the map can be taken. Far enough out that a walked-over
-// island fits, far enough in that a place is a comfortable target, and no
-// further either way: a map zoomed to nothing is a map the player has lost.
-export const ZOOM_MIN = 0.4;
-export const ZOOM_MAX = 3;
-
-export const clampZoom = (scale: number): number => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
-
-// The floor every control is held to, in CSS pixels. The stylesheet applies it
-// to controls that stand still; a place on the map does not, because the sheet
-// it is drawn on is scaled, and a target scaled to ZOOM_MIN is a target a thumb
-// misses. So the map asks how big to draw its tap area for the scale it is at,
-// and the answer grows as the sheet shrinks. Zoomed in, the bubble is already
-// past the floor and the area stays where the bubble is.
-export const TOUCH_FLOOR = 44;
-
-export const tapTarget = (scale: number): number => TOUCH_FLOOR / Math.min(1, scale);
-
-// A wheel notch is a fraction of the zoom rather than a fixed step, so zooming
-// out and back in again lands where it started.
-export const WHEEL_RATE = 0.0015;
-
-export const zoomByWheel = (scale: number, deltaY: number): number => clampZoom(scale * Math.exp(-deltaY * WHEEL_RATE));
-
-// Where the map has to sit for the point under the pointer -- or between the
-// fingers -- to still be under it once the zoom has changed. Everything is
-// measured from the middle of the window, which is what the pan is an offset
-// from.
-export function panAfterZoom(pan: number, focal: number, from: number, to: number): number {
-  if (from === 0) return pan;
-  return focal - (focal - pan) * (to / from);
-}
-
-export const spanBetween = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
-
-export const midpoint = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-
-// Panned until the furthest place reaches the middle of the window, and no
-// further. Half a screen of nothing is a map being read at its edge; a whole
-// one is a map the player has lost. Measured against the sheet alone and not
-// against the window, because a map that is mostly gap between places is
-// narrower than the window long after the player has zoomed all the way in, and
-// asking it to cover the window is what left it barely able to move.
-export function clampPan(offset: number, reach: number): number {
-  const slack = reach / 2;
-  return Math.min(slack, Math.max(-slack, offset));
-}
-
 // One authored unit of the world, in CSS pixels, before any zoom. The tutorial
 // island's places sit a unit apart, so this is what turns "east of the guide
-// house" into a gap a thumb can aim between.
+// house" into a gap a thumb can aim between. It is the whole of the conversion
+// between where the engine says a place is and where the sheet draws it.
 export const PER_UNIT = 104;
 
-export interface Size {
-  width: number;
-  height: number;
-}
+export const spotOf = (node: Node): Point => ({ x: node.at.x * PER_UNIT, y: node.at.y * PER_UNIT });
 
-export interface Frame {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
-
-// The room the sheet takes up, in unscaled pixels. A box spans the points
-// places stand on, and a place is drawn as a bubble around its point, so one
-// whole bubble is half a bubble at each end — which is the half that was still
-// on screen when a pan measured from the points alone stopped.
-export function drawnBox(box: Box, bubble: Size): Frame {
-  return {
-    left: box.minX * PER_UNIT - bubble.width / 2,
-    top: box.minY * PER_UNIT - bubble.height / 2,
-    width: (box.maxX - box.minX) * PER_UNIT + bubble.width,
-    height: (box.maxY - box.minY) * PER_UNIT + bubble.height,
-  };
-}
-
-// Where the map comes to rest after a gesture: the zoom it asked for, and the
-// pan held to the slack that zoom leaves. One zoom goes in and both come out,
-// because clamping a new pan against the room the old zoom took is how a
-// zoomed-in map ends up unable to reach its own edges.
-export function settled(pan: Point, zoom: number, box: Box, bubble: Size): { pan: Point; scale: number } {
-  const drawn = drawnBox(box, bubble);
-  return { scale: zoom, pan: { x: clampPan(pan.x, drawn.width * zoom), y: clampPan(pan.y, drawn.height * zoom) } };
-}
+// The room the map takes up, in the sheet pixels a viewport is held against.
+export const mapBox = (nodes: readonly Node[]): Box => bounds(nodes.map(spotOf));
 
 // The line a walk takes, from where the player is standing to where they are
 // going. The engine publishes the legs still to cross and not the place they

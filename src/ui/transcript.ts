@@ -12,6 +12,10 @@ export interface PlayerLine {
   readonly kind: LogKind;
   readonly tone: MessageTone;
   readonly text: Localized;
+  // How many times in a row the column has been told this. A skill worked at
+  // for a minute says the same sentence a hundred times, and a hundred copies
+  // of it is a column with nothing else left in it.
+  readonly repeats: number;
 }
 
 // What the authoring tool said to whoever is driving it: a parser diagnostic, a
@@ -24,6 +28,7 @@ export interface ToolLine {
   readonly kind: LogKind;
   readonly tone: MessageTone;
   readonly text: string;
+  readonly repeats: number;
 }
 
 // The discriminant `CommandOutput`'s message arm carries, kept to the screen
@@ -40,7 +45,7 @@ export interface Transcript {
   described: readonly string[];
 }
 
-type Written = Omit<PlayerLine, 'id'> | Omit<ToolLine, 'id'>;
+type Written = Omit<PlayerLine, 'id' | 'repeats'> | Omit<ToolLine, 'id' | 'repeats'>;
 
 interface Cursor {
   place: string | null;
@@ -96,12 +101,26 @@ function fromOutput(output: CommandOutput, cursor: Cursor): Written[] {
   }
 }
 
+// The same line again, by everything about it a reader could tell apart. Whose
+// words it is counts: a diagnostic that reads like something the world said is
+// still not the same line.
+const isRepeat = (held: LogEntry, line: Written): boolean =>
+  held.words === line.words && held.kind === line.kind && held.tone === line.tone && held.text === line.text;
+
 export function appendOutputs(transcript: Transcript, outputs: readonly CommandOutput[]): Transcript {
   const cursor: Cursor = { place: transcript.place, described: [...transcript.described] };
   const written = outputs.flatMap((output) => fromOutput(output, cursor));
   if (written.length === 0) return transcript;
 
+  // A line the column has just been told again is counted rather than written
+  // out: it keeps its place and its id, so nothing above it moves and the
+  // acknowledgement it played when it first arrived is not played again.
   let nextId = transcript.nextId;
-  const entries = [...transcript.entries, ...written.map((line): LogEntry => ({ ...line, id: nextId++ }))];
+  const entries: LogEntry[] = [...transcript.entries];
+  for (const line of written) {
+    const held = entries[entries.length - 1];
+    if (held !== undefined && isRepeat(held, line)) entries[entries.length - 1] = { ...held, repeats: held.repeats + 1 };
+    else entries.push({ ...line, id: nextId++, repeats: 1 } as LogEntry);
+  }
   return { entries, nextId, place: cursor.place, described: cursor.described };
 }

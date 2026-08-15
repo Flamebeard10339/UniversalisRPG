@@ -11,7 +11,7 @@ export const SETTLE_MS = 220;
 //
 // A note is the kind the channel draws itself; the rest are drawn by the node
 // they play over.
-export type MomentKind = 'note' | 'arrival' | 'rise' | 'darken' | 'settle';
+export type MomentKind = 'note' | 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'linger' | 'deny';
 
 // What the caller puts on its node for the moment to be drawn, which is the
 // only place any of these strings is written. A kind is a verb and a class is
@@ -26,6 +26,9 @@ const DRAWN_AS: Record<MomentKind, string> = {
   rise: 'risen',
   darken: 'darkened',
   settle: `transform ${SETTLE_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1)`,
+  sprout: 'sprouted',
+  linger: 'lingered',
+  deny: 'denied',
 };
 
 // Not a moment, and here for the same reason the moments are: this file is
@@ -38,6 +41,21 @@ const DRAWN_AS: Record<MomentKind, string> = {
 // view publishes as that value changes — there is no instant of it a driving
 // agent could miss.
 export const FILL_TRANSITION = { transitionProperty: 'width', transitionTimingFunction: 'linear', transitionDuration: `${LIVE_TICK_MS}ms` };
+
+// When a moment plays, for the one kind that plays over many things at once: a
+// cluster of a plane arrives as a dozen nodes and edges, and a dozen of them in
+// one frame reads as the screen having changed rather than as something being
+// built. `backwards` so a node waiting its turn is already in the state its
+// moment begins from, instead of standing fully drawn until its delay is up.
+// Here for the same reason FILL_TRANSITION is: this file is where the shell's
+// animation is written, and a rule can say nothing else writes one.
+export const playedAfter = (ms: number): { animationDelay: string; animationFillMode: 'backwards' } => ({ animationDelay: `${ms}ms`, animationFillMode: 'backwards' });
+
+// Not a moment: a level crossed and not yet looked at is a state the banner is
+// in, which lasts until the player goes and looks rather than beginning and
+// ending on its own. Here because this file is where the shell's animation is
+// named, which is the rule the moments are a case of.
+export const STIRRING = 'stirring';
 
 // A transient note carries text and nothing about where it came from, so the
 // overlay rendering it cannot know which moment produced it.

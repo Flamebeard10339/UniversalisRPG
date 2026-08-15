@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
-import { bounds, clampPan, CLIMB_NUDGE, clampZoom, drawnAt, drawnBox, midpoint, newlyFound, panAfterZoom, PER_UNIT, settled, sheetAt, onWalk, spanBetween, tapTarget, TOUCH_FLOOR, walkLine, waysOut, ZOOM_MAX, ZOOM_MIN, zoomByWheel, type Place } from './discovery';
+import { CLIMB_NUDGE, drawnAt, mapBox, newlyFound, PER_UNIT, sheetAt, onWalk, walkLine, waysOut, type Place } from './discovery';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -108,27 +108,14 @@ describe('one plane of the map', () => {
   });
 });
 
-describe('how far the map can be pushed around', () => {
-  it('gives back the room everything drawn takes up', () => {
-    expect(bounds(sheetAt(HOUSE, 'hall', 0).nodes)).toEqual({ minX: -CLIMB_NUDGE, minY: -CLIMB_NUDGE, maxX: 2, maxY: CLIMB_NUDGE });
-  });
-
-  it('is a point when there is nothing drawn, so a caller still has a centre', () => {
-    expect(bounds([])).toEqual({ minX: 0, minY: 0, maxX: 0, maxY: 0 });
-  });
-
-  it('lets the furthest place be dragged to the middle, and no further', () => {
-    expect(clampPan(900, 1000)).toBe(500);
-    expect(clampPan(-900, 1000)).toBe(-500);
-    expect(clampPan(100, 1000)).toBe(100);
-  });
-
-  it('still moves a map narrower than the window, which is most of them zoomed in', () => {
-    expect(clampPan(200, 300)).toBe(150);
-  });
-
-  it('holds still when there is one place and nowhere to pan to', () => {
-    expect(clampPan(50, 0)).toBe(0);
+describe('the room the map takes up', () => {
+  it('is the places it draws, turned into the pixels a viewport is held against', () => {
+    expect(mapBox(sheetAt(HOUSE, 'hall', 0).nodes)).toEqual({
+      minX: -CLIMB_NUDGE * PER_UNIT,
+      minY: -CLIMB_NUDGE * PER_UNIT,
+      maxX: 2 * PER_UNIT,
+      maxY: CLIMB_NUDGE * PER_UNIT,
+    });
   });
 });
 
@@ -197,106 +184,6 @@ describe('which offer is the way to a place', () => {
   });
 });
 
-describe('how far in and out the map goes', () => {
-  it('stops at each end rather than zooming to nothing or to one room', () => {
-    expect(clampZoom(99)).toBe(ZOOM_MAX);
-    expect(clampZoom(0)).toBe(ZOOM_MIN);
-    expect(clampZoom(1.5)).toBe(1.5);
-  });
-
-  it('reads a wheel as a fraction of where it is, so one notch means the same at every zoom', () => {
-    const out = zoomByWheel(1, 120);
-    const back = zoomByWheel(out, -120);
-
-    expect(out).toBeLessThan(1);
-    expect(back).toBeCloseTo(1, 10);
-    // The property a fixed step per notch would fail: the same notch moves a
-    // zoomed-in map by the same proportion, not by the same number of pixels.
-    expect(zoomByWheel(2, 120) / 2).toBeCloseTo(out, 10);
-  });
-
-  it('zooms in when the wheel goes the way a page scrolls up', () => {
-    expect(zoomByWheel(1, -120)).toBeGreaterThan(1);
-  });
-
-  it('will not be wheeled past either end', () => {
-    expect(zoomByWheel(ZOOM_MAX, -10_000)).toBe(ZOOM_MAX);
-    expect(zoomByWheel(ZOOM_MIN, 10_000)).toBe(ZOOM_MIN);
-  });
-});
-
-describe('what stays put while the map is zoomed', () => {
-  it('keeps the point under the pointer under the pointer', () => {
-    // A world point 200px right of the middle at rest is 400 away at 2x, so the
-    // map has to give back the 200 it gained for the pointer to still be on it.
-    expect(panAfterZoom(0, 200, 1, 2)).toBe(-200);
-  });
-
-  it('leaves the middle of the window alone, since it is the point zoom is about', () => {
-    expect(panAfterZoom(0, 0, 1, 3)).toBe(0);
-  });
-
-  it('undoes itself when the zoom is undone', () => {
-    const there = panAfterZoom(40, 130, 1, 2.5);
-
-    expect(panAfterZoom(there, 130, 2.5, 1)).toBeCloseTo(40, 10);
-  });
-
-  it('holds still rather than dividing by a zoom of nothing', () => {
-    expect(panAfterZoom(40, 130, 0, 2)).toBe(40);
-  });
-});
-
-describe('the two fingers', () => {
-  it('measures how far apart they are, whichever way round they are', () => {
-    expect(spanBetween({ x: 0, y: 0 }, { x: 3, y: 4 })).toBe(5);
-    expect(spanBetween({ x: 3, y: 4 }, { x: 0, y: 0 })).toBe(5);
-  });
-
-  it('takes the point between them as what the pinch is about', () => {
-    expect(midpoint({ x: -10, y: 4 }, { x: 30, y: 8 })).toEqual({ x: 10, y: 6 });
-  });
-});
-
-describe('where the map comes to rest', () => {
-  const BOX = { minX: 0, minY: 0, maxX: 4, maxY: 0 };
-  const BUBBLE = { width: 150, height: 34 };
-  const NO_BUBBLE = { width: 0, height: 0 };
-
-  it('grows the box a place stands in by the bubble drawn around it', () => {
-    expect(drawnBox(BOX, BUBBLE)).toEqual({ left: -75, top: -17, width: 4 * PER_UNIT + 150, height: 34 });
-  });
-
-  it('hands back the zoom it was asked for', () => {
-    expect(settled({ x: 0, y: 0 }, 1.75, BOX, BUBBLE).scale).toBe(1.75);
-  });
-
-  it('holds the pan to the slack the new zoom leaves, not the slack the old one did', () => {
-    // Zooming in makes the sheet wider, so there is further to pan, and a pan
-    // clamped against the smaller sheet could never reach the new edges.
-    const close = settled({ x: 9999, y: 0 }, 2, BOX, BUBBLE).pan.x;
-    const far = settled({ x: 9999, y: 0 }, 1, BOX, BUBBLE).pan.x;
-
-    expect(close).toBeGreaterThan(far);
-  });
-
-  it('stops with the outer edge of the last bubble under the middle of the window', () => {
-    expect(settled({ x: 9999, y: 0 }, 1, BOX, BUBBLE).pan.x).toBe((4 * PER_UNIT + 150) / 2);
-  });
-
-  it('still leaves a lone place room to be dragged off centre by its own width', () => {
-    const alone = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-
-    expect(settled({ x: 500, y: 500 }, 1, alone, BUBBLE).pan).toEqual({ x: 75, y: 17 });
-  });
-
-  it('refuses to move a sheet with nowhere to go, however far the gesture went', () => {
-    const alone = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-
-    expect(settled({ x: 500, y: 500 }, 1, alone, NO_BUBBLE).pan).toEqual({ x: 0, y: 0 });
-  });
-});
-
 describe('the walk under way', () => {
   const journey = { to: 'd', legs: ['b', 'c', 'd'] };
 
@@ -326,17 +213,3 @@ describe('the walk under way', () => {
   });
 });
 
-describe('how big a place is to tap', () => {
-  it('asks for the floor and no more while the sheet is at its own size or bigger', () => {
-    expect(tapTarget(1)).toBe(TOUCH_FLOOR);
-    expect(tapTarget(ZOOM_MAX)).toBe(TOUCH_FLOOR);
-  });
-
-  it('grows as the sheet shrinks, so what reaches the screen is the floor at every zoom', () => {
-    // Drawn inside the scale, so the figure a thumb meets is the product of
-    // the two — which is what fell to 13.6 px when the area was fixed.
-    for (const scale of [ZOOM_MIN, 0.5, 0.75, 1, 2, ZOOM_MAX]) {
-      expect(tapTarget(scale) * scale).toBeGreaterThanOrEqual(TOUCH_FLOOR);
-    }
-  });
-});
