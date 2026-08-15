@@ -703,13 +703,11 @@ export function useAction(obj: string, objId: string, actionId: string, registry
 // A journey from an unset origin is a plain placement, not a journey.
 export function travelFirstUnit(origin: string, dest: string, registry: Registry, state: GameState): number {
   if (!origin) return 0;
-  const { label } = travelAction(origin, dest, registry);
-  return actionFirstUnit('travel', travelPair(origin, dest), label, registry, state);
+  return actionFirstUnit('travel', travelPair(origin, dest), actionAddress(travelAction(origin, dest, registry)), registry, state);
 }
 
 export function armTravel(origin: string, dest: string, registry: Registry, state: GameState): ArmResult {
-  const { label } = travelAction(origin, dest, registry);
-  return armAction('travel', travelPair(origin, dest), label, registry, state);
+  return armAction('travel', travelPair(origin, dest), actionAddress(travelAction(origin, dest, registry)), registry, state);
 }
 
 // Sets off for anywhere the roads reach, which is one leg when the place is
@@ -780,8 +778,7 @@ export function useTravel(origin: string, dest: string, registry: Registry, stat
     spreadDiscovery(state, registry);
     return;
   }
-  const { label } = travelAction(origin, dest, registry);
-  useAction('travel', travelPair(origin, dest), label, registry, state);
+  useAction('travel', travelPair(origin, dest), actionAddress(travelAction(origin, dest, registry)), registry, state);
 }
 
 // The whole walk, resolved where it stands. The same route the armed walk
@@ -832,13 +829,13 @@ export function armCraft(recipeId: string, registry: Registry, state: GameState)
   if (!recipe) throw new RuntimeError(`unknown recipe: ${recipeId}`);
   if (!recipeCraftable(recipe, registry, state)) throw new RuntimeError(`recipe not craftable: ${recipeId}`);
   const action = registry.recipeActions.get(recipeId)!;
-  return armAction('recipe', recipeId, action.label, registry, state);
+  return armAction('recipe', recipeId, actionAddress(action), registry, state);
 }
 
 export function craftFirstUnit(recipeId: string, registry: Registry, state: GameState): number {
   const action = registry.recipeActions.get(recipeId);
   if (!action) return 0;
-  return actionFirstUnit('recipe', recipeId, action.label, registry, state);
+  return actionFirstUnit('recipe', recipeId, actionAddress(action), registry, state);
 }
 
 export function craft(recipeId: string, registry: Registry, state: GameState): void {

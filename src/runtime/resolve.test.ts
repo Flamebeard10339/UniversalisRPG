@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ActiveAction, armAction, buffsOf, craft, createGameState, GameState, grantBuff, initResources, PLAYER, resolve, RuntimeError, statValue, useAction } from './runtime';
+import { actionAddress } from '../content/action';
 import { Boundary, BoundarySource, boundarySourceName, requireBoundaryNotPast, requireForwardProgress, STALL_BOUND } from './forwardProgress';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { loadModule, Registry } from '../content/registry';
@@ -189,11 +190,12 @@ function loaded(): Registry {
   return loadModule(MODULE);
 }
 
-// Looked up from the registry rather than hardcoded, so these gates do not
-// depend on guessing the compiled action's label text.
+// Read through `actionAddress` rather than off the label, because what a save
+// holds is the address and the two are no longer the same string.
 function recipeActive(registry: Registry, recipeId: string): ActiveAction {
   const action = registry.recipeActions.get(recipeId)!;
-  return { ownerRef: `recipe.${recipeId}`, actionSlug: action.label, repeating: action.kind === 'continuous', implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: `recipe.${recipeId}`, actionSlug: action.label, target: recipeId } } };
+  const slug = actionAddress(action);
+  return { ownerRef: `recipe.${recipeId}`, actionSlug: slug, repeating: action.kind === 'continuous', implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: `recipe.${recipeId}`, actionSlug: slug, target: recipeId } } };
 }
 
 function withCampfireCooking(registry: Registry, buffed: boolean): GameState {

@@ -1,7 +1,8 @@
 import { ActionResult } from '../grammar/actionResult';
 import { evaluateCondition } from './conditions';
 import { Action } from '../content/entity';
-import { actionAddress } from '../content/action';
+import { actionAddress, ActionDeclaration } from '../content/action';
+import { humanizeEn } from '../grammar/values';
 import { Location } from '../content/location';
 import { Registry } from '../content/registry';
 import type { ActiveAction } from './encounter';
@@ -46,7 +47,12 @@ export const TRAVEL_PAIR = '>';
 
 export const travelPair = (origin: string, dest: string): string => `${origin}${TRAVEL_PAIR}${dest}`;
 
-export const TRAVEL_LABEL = 'travel';
+// What addresses a compiled travel, which is an id and not its label: the label
+// is display text that no surface draws — a walk under way is said by
+// `engine.travel.to` — and a save holds this. `humanizeEn` fills the label from
+// it exactly as a `# action` with no `title:` is filled, so the two are visibly
+// not the same string and a caller reaching for the wrong one does not arm.
+export const TRAVEL_ADDRESS = 'travel';
 
 // The two ends of a pair, and what is said about either of them being gone.
 // Asked rather than thrown wherever the answer reaches a player.
@@ -58,11 +64,13 @@ export function travelEndProblem(localizer: Localizer, originId: string, destId:
 
 // Shaped as a one-attempt fight so a journey spans like any other action. The
 // origin comes from the ownerRef: state.location holds it until relocate fires.
-export function travelAction(originId: string, destId: string, registry: Registry): Action {
+export function travelAction(originId: string, destId: string, registry: Registry): ActionDeclaration {
   const problem = travelEndProblem(localizerFor(registry, BASE_LANGUAGE), originId, destId, registry);
   if (problem) throw new RuntimeError(problem);
   return {
-    label: TRAVEL_LABEL,
+    id: TRAVEL_ADDRESS,
+    label: humanizeEn(TRAVEL_ADDRESS),
+    generatedLabel: true,
     results: [{ kind: 'relocate', location: destId }],
     time: locationDistance(registry.locations.get(originId)!, registry.locations.get(destId)!) * travelSecondsPerUnit(registry),
   };

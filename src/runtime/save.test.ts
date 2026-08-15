@@ -7,8 +7,9 @@ import { answerModal, ModalFrame, openModalNamed } from './modals';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
-import { TRAVEL_LABEL } from './actions';
-import { CRAFT_LABEL, loadUniverse, type Registry } from '../content/registry';
+import { travelAction, TRAVEL_ADDRESS } from './actions';
+import { actionAddress } from '../content/action';
+import { CRAFT_ADDRESS, loadUniverse, type Registry } from '../content/registry';
 import { GameState } from './state';
 import { toMilliUnits } from './units';
 
@@ -518,8 +519,19 @@ describe('a walk under way survives its destination being retitled', () => {
   };
 
   it('stores an id rather than the sentence a player reads', () => {
-    expect(walking().activeAction!.actionSlug).toBe(TRAVEL_LABEL);
-    expect(JSON.parse(serializeSave(walking(), loadInEnglish(ISLAND('Far Beach')))).activeAction.actionSlug).toBe(TRAVEL_LABEL);
+    expect(walking().activeAction!.actionSlug).toBe(TRAVEL_ADDRESS);
+    expect(JSON.parse(serializeSave(walking(), loadInEnglish(ISLAND('Far Beach')))).activeAction.actionSlug).toBe(TRAVEL_ADDRESS);
+  });
+
+  // The address and the label were one string, so this file could assert a save
+  // holds `TRAVEL_LABEL` and mean nothing by it. Held apart here, because the
+  // arming path reaching for the wrong one is only catchable while they differ.
+  it('holds a label that is not the address, so reaching for the wrong one does not arm', () => {
+    const registry = loadInEnglish(ISLAND('Far Beach'));
+    const action = travelAction('isla.shore', 'isla.far', registry);
+
+    expect(actionAddress(action)).toBe(TRAVEL_ADDRESS);
+    expect(action.label).not.toBe(TRAVEL_ADDRESS);
   });
 
   it('keeps the walk when the destination is retitled underneath it', () => {
@@ -570,8 +582,15 @@ describe('a craft under way stores an id, not the sentence it is offered as', ()
   };
 
   it('stores an id rather than the sentence a player reads', () => {
-    expect(cooking().activeAction!.actionSlug).toBe(CRAFT_LABEL);
-    expect(JSON.parse(serializeSave(cooking(), universe('pan'))).activeAction.actionSlug).toBe(CRAFT_LABEL);
+    expect(cooking().activeAction!.actionSlug).toBe(CRAFT_ADDRESS);
+    expect(JSON.parse(serializeSave(cooking(), universe('pan'))).activeAction.actionSlug).toBe(CRAFT_ADDRESS);
+  });
+
+  it('holds a label that is not the address, so reaching for the wrong one does not arm', () => {
+    const action = universe('pan').recipeActions.get('cocina.pan')!;
+
+    expect(actionAddress(action)).toBe(CRAFT_ADDRESS);
+    expect(action.label).not.toBe(CRAFT_ADDRESS);
   });
 
   it('keeps the craft when the recipe is retitled underneath it', () => {

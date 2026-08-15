@@ -146,11 +146,15 @@ export interface UniverseLoadResult {
   disabledModules: string[];
 }
 
-export const CRAFT_LABEL = 'craft';
+// What addresses a compiled craft, on the same terms a travel is addressed:
+// an id, because the label is display text no surface draws — a craft under way
+// is said by `engine.craft.label` over the recipe's own title — and a save holds
+// this.
+export const CRAFT_ADDRESS = 'craft';
 
 // Compiled to an Action so a craft runs through the same resolve() machinery
 // as any other single-attempt fight.
-function recipeAction(recipe: Recipe): Action {
+function recipeAction(recipe: Recipe): ActionDeclaration {
   const takes: ActionResult[] = recipe.in.map((q) => ({ kind: 'take', item: q.item, amount: q.amount }));
   const gives: ActionResult[] = recipe.out.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
   const results: ActionResult[] = [...takes, ...gives];
@@ -163,8 +167,10 @@ function recipeAction(recipe: Recipe): Action {
   // authored action judges this one rather than a recipe-shaped copy of it.
   const rate = typeof recipe.rate === 'string' ? { id: recipe.rate } : recipe.rate;
   const cadence: Pick<Action, 'rate' | 'time'> = rate !== undefined ? { rate } : recipe.time !== undefined ? { time: recipe.time } : {};
-  const action: Action = {
-    label: CRAFT_LABEL,
+  const action: ActionDeclaration = {
+    id: CRAFT_ADDRESS,
+    label: humanizeEn(CRAFT_ADDRESS),
+    generatedLabel: true,
     kind: 'rate' in cadence || 'time' in cadence ? 'continuous' : 'instant',
     results,
     ...cadence,

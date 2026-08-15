@@ -447,7 +447,7 @@ describe('action kinds and their cadence', () => {
   // The compiled craft is judged by the same table as an authored action, so a
   // recipe cannot express a cadence the grammar would have refused.
   it.each([['rate: 0'], ['rate: -30'], ['time: 0'], ['time: -3']])('refuses %s on a recipe, naming the recipe and its craft', (line) => {
-    expect(() => loadModule(`# item ore\nexamine: Rock.\n# recipe dig\n${line}\nout: 1 ore\n`)).toThrow(/# recipe dig action "craft": (time|rate): must be positive/);
+    expect(() => loadModule(`# item ore\nexamine: Rock.\n# recipe dig\n${line}\nout: 1 ore\n`)).toThrow(/# recipe dig action "Craft": (time|rate): must be positive/);
   });
 
   // A shared value parser says what it expected but not what it was reading;
