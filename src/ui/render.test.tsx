@@ -25,22 +25,48 @@ const TALK = 'talk:tutorial-island.miki';
 
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'", '&#39;': "'" };
 
-const JOINER = ' · ';
-
-// Every run of text the markup would put in front of a player, with the
-// separator this layer joins a list of titles with taken back apart. An
-// aria-label is one of those runs: a control named for a screen reader is
-// prose a player reads, and leaving it out would exempt from the clause the
-// one place a glyph control is allowed to say anything at all.
+// Every run of text the markup would put in front of a player. An aria-label is
+// one of those runs: a control named for a screen reader is prose a player
+// reads, and leaving it out would exempt from the clause the one place a glyph
+// control is allowed to say anything at all.
 function readable(html: string): string[] {
   return html
     .replace(/aria-label="([^"]*)"/g, '\n$1\n')
     .replace(/<[^>]*>/g, '\n')
     .split('\n')
-    .flatMap((run) => run.split(JOINER))
     .map((run) => run.replace(/&(?:amp|lt|gt|quot|#x27|#39);/g, (entity) => ENTITIES[entity]).trim())
     .filter((run) => /[A-Za-z]/.test(run));
 }
+
+// Whether a run of text is accounted for by the words a player may read,
+// however this layer chose to lay them out. Consumed from the front, longest
+// match first, and anything that is not a letter is layout — so a component
+// putting two engine values in one element, or joining a list with a glyph,
+// is a presentational change rather than a word nobody published. The
+// separator list this replaces was kept in step with the components by hand
+// and red'd three tests the first time `{entry.name} {entry.value}` went into
+// one `<dt>`, where both halves were engine values.
+function accountedFor(run: string, permitted: readonly string[]): boolean {
+  const longest = [...permitted].filter((word) => /[A-Za-z]/.test(word)).sort((left, right) => right.length - left.length);
+  let rest = run;
+  while (rest !== '') {
+    const word = longest.find((each) => rest.startsWith(each));
+    if (word !== undefined) {
+      rest = rest.slice(word.length);
+      continue;
+    }
+    if (/^[A-Za-z]/.test(rest)) return false;
+    rest = rest.slice(1);
+  }
+  return true;
+}
+
+// Whether the words are on the screen, wherever this layer chose to put the
+// element boundaries. The mirror of `accountedFor`: a clause about what must be
+// drawn is no more entitled to assume one value per element than a clause about
+// what must not be, and a run holding an id as well as its title is a failure
+// here rather than a pass on a boundary.
+const onScreen = (runs: readonly string[], text: string): boolean => runs.some((run) => run.includes(text));
 
 function published(view: PlayView): string[] {
   return [
@@ -279,7 +305,7 @@ describe('what the shell puts on the screen', () => {
       const runs = readable(html);
       seen += runs.length;
       for (const run of runs) {
-        expect([...engine, ...SHELL_WORDS], `"${run}" is on the screen and no engine value produced it`).toContain(run);
+        expect(accountedFor(run, [...engine, ...SHELL_WORDS]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
       }
     };
 
@@ -312,7 +338,7 @@ describe('what the shell puts on the screen', () => {
     const engine = new Set<string>(published(view));
     expect(idsPublished(view).filter((id) => engine.has(id))).toEqual([]);
     for (const run of readable(renderToStaticMarkup(<App driver={driver} />))) {
-      expect([...engine, ...SHELL_WORDS], `"${run}" is on the screen and no engine value produced it`).toContain(run);
+      expect(accountedFor(run, [...engine, ...SHELL_WORDS]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
     }
   });
 
@@ -323,7 +349,7 @@ describe('what the shell puts on the screen', () => {
 
     const runs = readable(renderToStaticMarkup(<App driver={driver} />));
 
-    for (const choice of driver.snapshot().view!.choices) expect(runs).toContain(choice.label);
+    for (const choice of driver.snapshot().view!.choices) expect(onScreen(runs, choice.label), choice.label).toBe(true);
   });
 
   it('draws the discovered places where they are, with the roads between them', () => {
@@ -341,7 +367,7 @@ describe('what the shell puts on the screen', () => {
     for (const place of found) {
       const node = drawn.find((entry) => entry.id === place.id);
       expect(node, `${place.title} has no node on the map`).toBeDefined();
-      expect(node!.runs).toContain(place.title);
+      expect(onScreen(node!.runs, place.title), place.title).toBe(true);
     }
     // One road per pair rather than one per end, and the fixture has three.
     expect(html.match(/<line/g) ?? []).toHaveLength(3);
@@ -436,23 +462,23 @@ describe('what the shell puts on the screen', () => {
     // travelled beside.
     expect(view.stats.find((row) => row.id === 'surveyed.might')?.title).toBe('Might');
     for (const row of [...view.stats, ...view.xp]) {
-      expect(runs).toContain(row.title);
-      expect(runs).not.toContain(row.id);
+      expect(onScreen(runs, row.title), row.title).toBe(true);
+      expect(onScreen(runs, row.id), row.id).toBe(false);
     }
 
     // c16 and c18: a carried thing reaches the page under the name the engine
     // published and beside its count, never under the id a verb addresses it by.
     for (const row of view.carried) {
-      expect(runs).toContain(row.name);
-      expect(runs).not.toContain(row.id);
+      expect(onScreen(runs, row.name), row.name).toBe(true);
+      expect(onScreen(runs, row.id), row.id).toBe(false);
     }
     // c10: a slot is a word with a key, so the equipment page draws its title
     // and never the id `equipment-slots:` named it by.
     expect(view.equipment.map((row) => [row.slot, row.title])).toEqual([['mainhand', 'Main Hand']]);
     for (const row of view.equipment) {
-      expect(runs).toContain(row.title);
-      expect(runs).toContain(row.name);
-      expect(runs).not.toContain(row.slot);
+      expect(onScreen(runs, row.title), row.title).toBe(true);
+      expect(onScreen(runs, row.name), row.name).toBe(true);
+      expect(onScreen(runs, row.slot), row.slot).toBe(false);
     }
   });
 
@@ -487,7 +513,7 @@ describe('what the shell puts on the screen', () => {
     const html = renderToStaticMarkup(<App driver={driver} />);
 
     expect(html).toContain(`aria-label="${shellWord('command')}"`);
-    expect(readable(html)).toContain(shellWord('run'));
+    expect(onScreen(readable(html), shellWord('run'))).toBe(true);
   });
 
   it('names its two glyph controls with the engine value each one acts on', () => {
@@ -515,7 +541,7 @@ describe('what the shell puts on the screen', () => {
 
     const asked = renderToStaticMarkup(<App driver={driver} />);
     expect(asking(asked)).toBe(true);
-    for (const choice of menu.values!) expect(readable(asked)).toContain(choice.shown);
+    for (const choice of menu.values!) expect(onScreen(readable(asked), choice.shown), choice.shown).toBe(true);
 
     driver.answer(menu.key, menu.values![0].value);
     const answered = renderToStaticMarkup(<App driver={driver} />);
