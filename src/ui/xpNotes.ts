@@ -64,8 +64,19 @@ export function risesOf(gains: readonly Gain[]): Rise[] {
 // Something the queue has been told about and has not said yet.
 export type Pending = { kind: 'xp'; gain: Gain } | { kind: 'item'; arrival: Arrival };
 
-// One line on the screen.
-export type Note = { id: number; began: number } & ({ kind: 'xp'; rises: Rise[] } | { kind: 'item'; name: Localized; count: number });
+// One line on the screen. `slot` is where it is drawn and is the line's for as
+// long as it lives: lines leave in the order they arrived and a stack that
+// closed the gap would jerk every line still on screen upward the moment the
+// oldest went.
+export type Note = { id: number; began: number; slot: number } & ({ kind: 'xp'; rises: Rise[] } | { kind: 'item'; name: Localized; count: number });
+
+// The lowest place nothing is standing in. A line leaving frees its place for
+// the next one rather than for the lines beside it, which is what keeps them
+// still.
+export function freeSlot(living: readonly Note[]): number {
+  const taken = new Set(living.map((note) => note.slot));
+  for (let at = 0; ; at += 1) if (!taken.has(at)) return at;
+}
 
 // How close together two lines may begin. Experience arrives a tick at a time
 // during a run, and a line per tick is a column of text nobody can read.
@@ -96,12 +107,12 @@ export function queued(queue: NoteQueue, gains: readonly Gain[], arrivals: reado
 // gain waiting, wherever in the queue it is, because a burst of them is one
 // event; a thing that arrived takes only itself, because two things arriving
 // are two events and the player is owed both names.
-function nextLine(waiting: readonly Pending[], id: number, now: number): { note: Note; rest: readonly Pending[] } | null {
+function nextLine(waiting: readonly Pending[], id: number, now: number, slot: number): { note: Note; rest: readonly Pending[] } | null {
   const head = waiting[0];
   if (head === undefined) return null;
-  if (head.kind === 'item') return { note: { id, began: now, kind: 'item', name: head.arrival.name, count: head.arrival.count }, rest: waiting.slice(1) };
+  if (head.kind === 'item') return { note: { id, began: now, slot, kind: 'item', name: head.arrival.name, count: head.arrival.count }, rest: waiting.slice(1) };
   const gains = waiting.flatMap((each) => (each.kind === 'xp' ? [each.gain] : []));
-  return { note: { id, began: now, kind: 'xp', rises: risesOf(gains) }, rest: waiting.filter((each) => each.kind !== 'xp') };
+  return { note: { id, began: now, slot, kind: 'xp', rises: risesOf(gains) }, rest: waiting.filter((each) => each.kind !== 'xp') };
 }
 
 // Everything the queue has been told, as far as the clock allows: one line
@@ -112,7 +123,7 @@ export function poured(queue: NoteQueue, now: number): NoteQueue {
   const living = queue.shown.filter((note) => now - note.began < NOTE_LIFETIME_MS);
   const held = living.length === queue.shown.length ? queue : { ...queue, shown: living };
   if (now - queue.began < NOTE_SPACING_MS) return held;
-  const next = nextLine(queue.waiting, queue.next, now);
+  const next = nextLine(queue.waiting, queue.next, now, freeSlot(living));
   if (next === null) return held;
   return { ...held, shown: [...living, next.note], waiting: next.rest, began: now, next: queue.next + 1 };
 }

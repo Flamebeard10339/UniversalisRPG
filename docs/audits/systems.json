@@ -690,6 +690,7 @@
         "src/ui/nav.test.ts",
         "src/ui/nav.ts",
         "src/ui/pageZoom.test.ts",
+        "src/ui/pages.test.ts",
         "src/ui/phone.test.tsx",
         "src/ui/planeGraph.test.ts",
         "src/ui/planeGraph.ts",

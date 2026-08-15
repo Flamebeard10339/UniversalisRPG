@@ -124,11 +124,11 @@ textarea {
   }
   70% {
     opacity: 1;
-    transform: translateY(0.75rem);
+    transform: translateY(0.5rem);
   }
   to {
     opacity: 0;
-    transform: translateY(1.25rem);
+    transform: translateY(0.75rem);
   }
 }
 

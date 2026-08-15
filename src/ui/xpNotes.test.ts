@@ -142,6 +142,43 @@ describe('what has just arrived', () => {
   });
 });
 
+describe('where a line stands', () => {
+  it('gives the first line the first place', () => {
+    expect(poured(queued(emptyQueue, [gain('attack', 1)]), 0).shown[0].slot).toBe(0);
+  });
+
+  it('gives a line beginning beside another a place of its own', () => {
+    const first = poured(queued(emptyQueue, [], [arrival('rope', 1), arrival('blade', 1)]), 0);
+    const second = poured(first, NOTE_SPACING_MS);
+
+    expect(second.shown.map((note) => note.slot)).toEqual([0, 1]);
+  });
+
+  it('leaves every line where it was when one of them goes', () => {
+    let queue = queued(emptyQueue, [], [arrival('a', 1), arrival('b', 1), arrival('c', 1)]);
+    for (const at of [0, NOTE_SPACING_MS, NOTE_SPACING_MS * 2]) queue = poured(queue, at);
+    const places = new Map(queue.shown.map((note) => [note.id, note.slot]));
+
+    // The first has been on screen a whole lifetime and has gone; the two under
+    // it are exactly where they were, which is what a stack closing its gap
+    // would not have done.
+    const after = poured(queue, NOTE_LIFETIME_MS);
+
+    expect(queue.shown).toHaveLength(3);
+    expect(after.shown.map((note) => note.id)).toEqual([2, 3]);
+    for (const note of after.shown) expect(note.slot, `line ${note.id} moved`).toBe(places.get(note.id));
+  });
+
+  it('gives the place a line has left to the next one that begins', () => {
+    let queue = poured(queued(emptyQueue, [], [arrival('a', 1)]), 0);
+    queue = queued(queue, [], [arrival('b', 1)]);
+    const after = poured(queue, NOTE_LIFETIME_MS);
+
+    expect(after.shown.map((note) => note.slot)).toEqual([0]);
+    expect(after.shown[0].id).toBe(2);
+  });
+});
+
 describe('how a line leaves', () => {
   it('has gone once its lifetime is up, without anything asking it to', () => {
     const shown = poured(queued(emptyQueue, [gain('attack', 100)]), 0);

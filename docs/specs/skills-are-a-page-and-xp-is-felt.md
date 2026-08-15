@@ -50,6 +50,17 @@ Proof:
   rather than the world.
   proof: vitest src/runtime/session.test.ts
 
+- [c10] A line holds its place until it has gone. Lines leave in the order they arrived, and a stack
+  that closed the gap would jerk every line still on screen upward the moment the oldest went — so a
+  line is placed rather than stacked, and the place a line leaves goes to the next line that begins
+  rather than to the ones beside it.
+  proof: vitest src/ui/xpNotes.test.ts
+- [c11] A page positions what it opens over itself against the page and never against the window. The
+  pages ride on a strip the shell moves with a transform, and a transform is the containing block for
+  everything `fixed` beneath it, so a page that reached for the window would draw its panel a page's
+  width off screen. The rule reads the pages off the shell's own `pane` rather than off a list.
+  proof: vitest src/ui/pages.test.ts
+
 ## Goal
 
 Progress the player can see arriving and go and read about, from the totals the engine already

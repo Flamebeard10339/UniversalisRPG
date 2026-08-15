@@ -52,21 +52,27 @@ export function SkillsPane({ view, first, crossed, words }: { view: PlayView | n
   useTestSurface('skills', { panels, opened, greeted: [...crossed.greeted], controls: { open: setOpened } });
 
   return (
-    <div className="unbarred min-h-0 flex-1 overflow-y-auto px-4 py-3">
-      <div className="mx-auto grid max-w-2xl grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-3">
-        {panels.map((panel) => (
-          <button
-            key={panel.id}
-            data-drive="skills.open"
-            data-skill={panel.id}
-            type="button"
-            onClick={() => setOpened(panel.id)}
-            className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface-raised px-3 py-3 transition-transform duration-75 active:scale-[0.98] active:border-accent"
-          >
-            <span className="w-full truncate text-center text-sm font-semibold">{panel.title}</span>
-            <Ring key={`${panel.id}-${crossed.greeted.has(panel.id) ? crossed.generation : 0}`} panel={panel} greeted={crossed.greeted.has(panel.id)} />
-          </button>
-        ))}
+    // The page and what it opens over it, in that order. `absolute` and not
+    // `fixed`: the pages ride on a strip this shell moves with a transform, and
+    // a fixed child of a transformed element is positioned against that element
+    // rather than against the window — which puts it a page's width off screen.
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="unbarred min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <div className="mx-auto grid max-w-2xl grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-3">
+          {panels.map((panel) => (
+            <button
+              key={panel.id}
+              data-drive="skills.open"
+              data-skill={panel.id}
+              type="button"
+              onClick={() => setOpened(panel.id)}
+              className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface-raised px-3 py-3 transition-transform duration-75 active:scale-[0.98] active:border-accent"
+            >
+              <span className="w-full truncate text-center text-sm font-semibold">{panel.title}</span>
+              <Ring key={`${panel.id}-${crossed.greeted.has(panel.id) ? crossed.generation : 0}`} panel={panel} greeted={crossed.greeted.has(panel.id)} />
+            </button>
+          ))}
+        </div>
       </div>
 
       {shown === null ? null : (
@@ -75,7 +81,7 @@ export function SkillsPane({ view, first, crossed, words }: { view: PlayView | n
           role="dialog"
           aria-modal
           onClick={(event) => void (event.target === event.currentTarget && setOpened(null))}
-          className="fixed inset-0 z-50 flex flex-col justify-end bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+          className="absolute inset-0 z-50 flex flex-col justify-end bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
         >
           <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
             <p className="text-base font-semibold">{shown.title}</p>
