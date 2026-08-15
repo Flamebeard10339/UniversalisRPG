@@ -73,6 +73,20 @@ function Fold({ contributions }: { contributions: readonly Contribution[] }): JS
   );
 }
 
+// What there is left to spend, and the one place this screen ever says no. A
+// growth is refused for want of a point, so the refusal is drawn on the count
+// that ran out rather than as a sentence beside it.
+function Points({ remaining, denied, words }: { remaining: number; denied: boolean; words: Words }): JSX.Element {
+  const refused = useMoment('deny', denied);
+
+  return (
+    <div className={`flex items-baseline gap-1 rounded px-1 ${refused}`}>
+      <dt className="text-xs uppercase tracking-wide text-text-subtle">{words('points')}</dt>
+      <dd className="text-sm tabular-nums">{tidy(remaining)}</dd>
+    </div>
+  );
+}
+
 function Node({
   node,
   scale,
@@ -140,7 +154,10 @@ function Line({ edge, arrived, delay }: { edge: GraphEdge; arrived: boolean; del
 // because a class that never changes plays no animation and a cluster that
 // arrives has to be seen arriving.
 function useSprouts(graph: PlaneGraph): { nodes: ReadonlySet<Answer>; edges: ReadonlySet<string>; generation: number } {
-  const seen = useRef<PlaneGraph | null>(null);
+  // Seeded with what the modal opened on, so the plane a player already has is
+  // there the moment they look at it. What sprouts is what a jewel brought,
+  // which is the one thing that arrives while they are watching.
+  const seen = useRef<PlaneGraph | null>(graph);
   const [sprouted, setSprouted] = useState({ nodes: new Set<Answer>(), edges: new Set<string>(), generation: 0 });
   const shape = `${graph.nodes.map((node) => node.key).join('|')}#${graph.edges.map((edge) => edge.key).join('|')}`;
 
@@ -168,6 +185,8 @@ export function PlaneModal({
   const buttons = useRef<Array<HTMLElement | null>>([]);
   const [chosen, setChosen] = useState<Answer | null>(null);
   const [picking, setPicking] = useState(false);
+  const [denied, setDenied] = useState(0);
+  const dispatched = useRef<number | null>(null);
   const graph = useMemo(() => planeGraph(plane), [plane]);
   const sprouted = useSprouts(graph);
   const hold = useSheetHold(graph.points, buttons, String(graph.nodes.length));
@@ -188,6 +207,11 @@ export function PlaneModal({
 
   // Opened on the copy's own cluster, which is where the plane starts and where
   // a player looking at one expects to be looking.
+  const grow = (value: Answer): void => {
+    dispatched.current = plane.spent;
+    onAnswer(option.key, value);
+  };
+
   const opened = useRef(false);
   useEffect(() => {
     const root = graph.nodes.find((each) => each.standing === 'allocated') ?? graph.nodes[0];
@@ -195,6 +219,17 @@ export function PlaneModal({
     opened.current = true;
     hold.settle(panOnto(root.at, hold.box, 1), 1);
   }, [graph]);
+
+  // A growth that did not take, as the engine's own answer rather than as a
+  // rule read twice: the points spent are noted when one is dispatched and
+  // compared when the next view arrives. Nothing else on this screen can spend
+  // one, so a dispatch that left the count where it was is a refusal, and the
+  // number that explains it is the one the head is already drawing.
+  useEffect(() => {
+    const was = dispatched.current;
+    dispatched.current = null;
+    if (was !== null && plane.spent === was) setDenied((held) => held + 1);
+  }, [plane]);
 
   useTestSurface('plane', { plane, graph, chosen, picking, controls: { press: (key) => press(graph.nodes.find((each) => each.key === key)!), pick: setPicking, settle: hold.settle } });
 
@@ -206,31 +241,34 @@ export function PlaneModal({
       aria-modal
       className={`${darkened} fixed inset-0 z-50 flex flex-col bg-scrim pt-[env(safe-area-inset-top)]`}
     >
-      <div className="unbarred flex min-h-0 basis-1/2 flex-col overflow-y-auto border-b border-border bg-surface-raised px-4 py-3">
+      <div className="unbarred flex min-h-0 basis-[30%] flex-col overflow-y-auto border-b border-border bg-surface-raised px-4 py-2">
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-          {leaving === null ? null : (
-            <button
-              data-drive="answer"
-              type="button"
-              onClick={() => onAnswer(option.key, leaving.value)}
-              className="mb-2 self-end rounded-xl border border-border bg-panel px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97] active:text-accent"
-            >
-              {leaving.shown}
-            </button>
-          )}
+          {/* The copy itself, which stands whatever is pressed: what is being
+              grown, how far it has got and what there is left to spend are the
+              three things a player reads every other line against. */}
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="min-w-0 truncate text-base font-semibold">{plane.name}</p>
+            {leaving === null ? null : (
+              <button
+                data-drive="answer"
+                type="button"
+                onClick={() => onAnswer(option.key, leaving.value)}
+                className="shrink-0 rounded-xl border border-border bg-panel px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97] active:text-accent"
+              >
+                {leaving.shown}
+              </button>
+            )}
+          </div>
+          <dl className="flex flex-wrap gap-x-4">
+            <div className="flex items-baseline gap-1">
+              <dt className="text-xs uppercase tracking-wide text-text-subtle">{words('level')}</dt>
+              <dd className="text-sm tabular-nums">{`${tidy(plane.level)}/${tidy(plane.maxLevel)}`}</dd>
+            </div>
+            <Points key={denied} remaining={plane.remaining} denied={denied > 0} words={words} />
+          </dl>
+          <hr className="my-2 border-border" />
           {node === null ? (
             <>
-              <p className="text-base font-semibold">{plane.name}</p>
-              <dl className="mt-1 flex flex-wrap gap-x-4">
-                <div className="flex items-baseline gap-1">
-                  <dt className="text-xs uppercase tracking-wide text-text-subtle">{words('level')}</dt>
-                  <dd className="text-sm tabular-nums">{`${tidy(plane.level)}/${tidy(plane.maxLevel)}`}</dd>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <dt className="text-xs uppercase tracking-wide text-text-subtle">{words('points')}</dt>
-                  <dd className="text-sm tabular-nums">{tidy(plane.remaining)}</dd>
-                </div>
-              </dl>
               <Fold contributions={plane.contributions} />
               {feeding.length === 0 ? null : (
                 <>
@@ -253,7 +291,7 @@ export function PlaneModal({
             </>
           ) : (
             <>
-              <p className="text-base font-semibold">{name}</p>
+              <p className="text-sm font-semibold">{name}</p>
               <p className="mt-0.5 text-xs uppercase tracking-wide text-text-subtle">{words(panel.standing!)}</p>
               <Paid payloads={node.payloads} />
               {node.holds === null ? null : <p className="mt-1 text-sm">{node.holds}</p>}
@@ -261,7 +299,7 @@ export function PlaneModal({
                 <button
                   data-drive="answer"
                   type="button"
-                  onClick={() => onAnswer(option.key, acting.value)}
+                  onClick={() => grow(acting.value)}
                   className="mt-3 self-start rounded-xl border border-accent bg-panel px-4 text-sm font-semibold text-accent transition-transform duration-75 active:scale-[0.98] active:bg-accent-strong active:text-accent-text"
                 >
                   {words('allocate')}
@@ -316,7 +354,7 @@ export function PlaneModal({
                   key={choice.value}
                   data-drive="answer"
                   type="button"
-                  onClick={() => void (setPicking(false), onAnswer(option.key, choice.value))}
+                  onClick={() => void (setPicking(false), grow(choice.value))}
                   className="w-full rounded-xl border border-border bg-panel px-4 py-2 text-left transition-transform duration-75 active:scale-[0.99] active:bg-accent-strong active:text-accent-text"
                 >
                   {choice.subject}

@@ -14,7 +14,7 @@ import { crossings, looked, nothingCrossed, noticed, stirring, type Crossings } 
 import { markOf, type XpMark } from './skillPanels';
 import { SkillsPane } from './SkillsPane';
 import { XpOverlay } from './XpOverlay';
-import { emptyQueue, gainsBetween, poured, queued, type XpNote } from './xpNotes';
+import { arrivalsBetween, emptyQueue, gainsBetween, poured, queued, type Note } from './xpNotes';
 import { ModalSheet } from './ModalSheet';
 import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
@@ -50,19 +50,22 @@ function useArrivals(discovered: readonly Place[]): { arrivals: readonly string[
 // enough that a screen with nothing to say costs no timer at all.
 const NOTE_TICK_MS = 100;
 
-// Experience arriving, as lines. The engine publishes what a skill has and
-// never what it just got, so the gain is the difference between two views —
-// which is also why this is held here, above every page, rather than on the one
-// page that happens to be about skills.
-function useXpNotes(rows: PlayView['xp'], clock: () => number): readonly XpNote[] {
-  const seen = useRef(rows);
+// What the world just gave, as lines. The engine publishes what a skill has and
+// what the player is carrying, never what either just got, so both are the
+// difference between two views — which is also why this is held here, above
+// every page, rather than on whichever page happens to be about one of them.
+function useXpNotes(view: PlayView | null, clock: () => number): readonly Note[] {
+  const rows = view?.xp ?? [];
+  const carried = view?.carried ?? [];
+  const seen = useRef({ rows, carried });
   const [queue, setQueue] = useState(emptyQueue);
 
   useEffect(() => {
-    const gains = gainsBetween(seen.current, rows);
-    seen.current = rows;
-    if (gains.length > 0) setQueue((held) => poured(queued(held, gains), clock()));
-  }, [rows]);
+    const gains = gainsBetween(seen.current.rows, rows);
+    const arrivals = arrivalsBetween(seen.current.carried, carried);
+    seen.current = { rows, carried };
+    if (gains.length + arrivals.length > 0) setQueue((held) => poured(queued(held, gains, arrivals), clock()));
+  }, [rows, carried]);
 
   // A line waiting on the spacing has to reach the screen without anything else
   // happening, and one already shown has to leave the same way.
@@ -112,7 +115,7 @@ export function App({ driver, opening = OPENING, clock = () => Date.now() }: { d
   const plane = view?.focus ? (view.planes.find((each) => each.instance === view.focus?.instance) ?? null) : null;
   const { arrivals, generation } = useArrivals(view?.discovered ?? []);
   const rows = view?.xp ?? [];
-  const notes = useXpNotes(rows, clock);
+  const notes = useXpNotes(view, clock);
   // Where the session's own reading of how fast experience arrives is measured
   // from. The engine keeps no such field: a rate is a fact about the play.
   const opened = useRef<XpMark | null>(null);

@@ -41,6 +41,15 @@ Proof:
   that crossed and settles everything back.
   proof: vitest src/ui/levelling.test.ts
 
+- [c8] A thing arriving is said the same way, and each on its own line: two things that arrive
+  together are two lines one after the other, never one line naming both, because two things
+  arriving are two events and the player is owed both names.
+  proof: vitest src/ui/xpNotes.test.ts
+- [c9] Every skill the world declares is on the page, at the level everyone starts at until it is
+  earned in. A page inferring a skill's existence from a total that has moved is reading the save
+  rather than the world.
+  proof: vitest src/runtime/session.test.ts
+
 ## Goal
 
 Progress the player can see arriving and go and read about, from the totals the engine already

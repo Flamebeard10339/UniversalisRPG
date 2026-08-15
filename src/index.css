@@ -100,6 +100,19 @@ textarea {
   }
 }
 
+@keyframes denied {
+  0%,
+  100% {
+    background-color: transparent;
+    color: inherit;
+  }
+  25%,
+  75% {
+    background-color: var(--color-danger-surface);
+    color: var(--color-danger);
+  }
+}
+
 @keyframes drifted {
   from {
     opacity: 0;
@@ -147,6 +160,12 @@ textarea {
   animation: darkened 180ms ease-out;
 }
 
+/* Twice over, so a second refusal on a count that has not moved still reads as
+   an answer rather than as nothing happening. */
+.denied {
+  animation: denied 420ms ease-in-out 2;
+}
+
 /* The whole life of one line, so it leaves without anything asking it to. Kept
    in step with NOTE_LIFETIME_MS by nothing but a reader: the queue drops the
    line at two seconds and the animation has to be over by then. */
@@ -171,6 +190,7 @@ textarea {
   .darkened,
   .sprouted,
   .drifted,
+  .denied,
   .stirring {
     animation: none;
   }

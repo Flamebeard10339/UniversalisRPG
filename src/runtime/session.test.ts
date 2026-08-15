@@ -791,12 +791,15 @@ describe('what the engine publishes', () => {
     ]);
   });
 
-  it('carries skill xp as it is earned', () => {
+  it('carries every skill the world declares, earned in or not', () => {
     const registry = loadInEnglish(PUBLISHED_MODULE);
     const session = startSession(registry);
     applyDirective(session, { kind: 'load', save: 'stocked' });
 
-    expect(view(session).xp).toEqual([]);
+    // A skill nobody has earned in is one the character has, at the level
+    // everyone starts at. A page reading only the totals that have moved would
+    // be reading the save rather than the world.
+    expect(view(session).xp).toEqual([{ id: 'smithing', title: 'Smithing', value: 0, level: 1, earned: 0, span: xpForLevel(2) }]);
 
     const forged = apply(session, 'craft:ingot');
     // The level and where inside it the total stands are published beside the

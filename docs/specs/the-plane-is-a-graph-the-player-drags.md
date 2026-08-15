@@ -44,8 +44,16 @@ Proof:
   proof: vitest src/ui/planeModal.test.tsx
 - [c9] A cluster that has just arrived is drawn arriving: the nodes and edges the last view did not
   carry are played through the one channel, one after another, and the class they are drawn with is
-  written in `transient.ts` like every other.
+  written in `transient.ts` like every other. The plane the modal opens on is not an arrival — it is
+  already there — so what a player watches sprout is what a jewel just brought.
   proof: vitest src/ui/planeGraph.test.ts
+- [c11] Nothing on the plane is drawn over anything else. What a node takes up and what the layout
+  leaves for it are one figure, so the two cannot drift, and every pair of every shape the catalogue
+  declares is checked rather than the ones someone measured.
+  proof: vitest src/ui/planeGraph.test.ts
+- [c12] The page itself does not zoom. The two surfaces that do hold their own pinch, and a browser
+  scale over one of them is a scale nothing in the app can read or undo.
+  proof: vitest src/ui/pageZoom.test.ts
 - [c10] The map offers a control that puts the player's own place back in the middle of the window,
   on the floor they are standing on, at rest.
   proof: vitest src/ui/render.test.tsx
