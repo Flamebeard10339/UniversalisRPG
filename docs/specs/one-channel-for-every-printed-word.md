@@ -91,7 +91,11 @@ Proof:
   are the whole list: the `say:` and dialogue keys of c6; a stat's spelling under c9, where
   `+3 attack` becomes `+3 Attack` on the character sheet and the plane pane; and under c10 every id
   a surface still draws as a word, which is a skill's on the character sheet and a declared slot's
-  on the equipment page. Nothing else player-visible moves.
+  on the equipment page. A fourth moves for a player of a language the line was not authored in,
+  and it belongs to c6 rather than being a separate change: `engine.text.untranslated` retires with
+  `Localizer.prose`, so where such a player read `(untranslated)` they now read the key — which is
+  the whole of what c6 buys, an address a translator can fill. English display is unaffected, which
+  is why no test moved. Nothing else player-visible moves.
   **Read over this spec's own work and not over the branch's diff.** The branch carries
   `action-labels-as-members` and `what-is-stored-or-replayed-is-an-id` as well, and between them
   `SAVE_VERSION` goes 9 to 11, `activeAction`'s action field is renamed, `PlaneFrame.said` changes
