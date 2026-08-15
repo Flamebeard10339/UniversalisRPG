@@ -84,7 +84,7 @@ function published(view: PlayView): string[] {
     ...view.carried.map((row) => row.name),
     ...view.stats.map((row) => row.title),
     ...view.xp.map((row) => row.title),
-    ...view.equipment.flatMap((row) => [row.title, row.name]),
+    ...view.equipment.flatMap((row) => (row.name === null ? [row.title] : [row.title, row.name])),
     ...view.said,
   ];
 }
@@ -105,7 +105,7 @@ function idsPublished(view: PlayView): string[] {
   return [
     ...view.stats.map((row) => row.id),
     ...view.xp.map((row) => row.id),
-    ...view.equipment.flatMap((row) => [row.slot, row.item]),
+    ...view.equipment.flatMap((row) => (row.item === null ? [row.slot] : [row.slot, row.item])),
     ...view.carried.map((row) => row.id),
     ...view.discovered.map((place) => place.id),
   ];
@@ -489,11 +489,12 @@ describe('what the shell puts on the screen', () => {
       expect(onScreen(runs, row.id), row.id).toBe(false);
     }
     // c10: a slot is a word with a key, so the equipment page draws its title
-    // and never the id `equipment-slots:` named it by.
+    // and never the id `equipment-slots:` named it by. Every slot the world
+    // declares is a row, whether or not anything is worn in it.
     expect(view.equipment.map((row) => [row.slot, row.title])).toEqual([['mainhand', 'Main Hand']]);
     for (const row of view.equipment) {
       expect(onScreen(runs, row.title), row.title).toBe(true);
-      expect(onScreen(runs, row.name), row.name).toBe(true);
+      if (row.name !== null) expect(onScreen(runs, row.name), row.name).toBe(true);
       expect(onScreen(runs, row.slot), row.slot).toBe(false);
     }
   });

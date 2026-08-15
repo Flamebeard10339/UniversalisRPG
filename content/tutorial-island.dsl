@@ -53,7 +53,7 @@ base: 25
 
 // Chestnuts per minute: 15/min is one every 4 seconds.
 # stat cooking-rate
-base: 15
+base: 55
 
 // The drop channel. Contested like any other roll, so a charm that reads
 // `+20 luck` moves a rare find without any table knowing the charm exists.
@@ -537,6 +537,7 @@ roast chestnuts:
   continuous
   rate: cooking-rate
   give: 1 roasted-chestnut
+  xp: cooking 40-80
   on success:
     say: Another chestnut pops from the embers, roasted through.
 

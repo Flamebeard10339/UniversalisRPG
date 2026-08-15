@@ -127,6 +127,7 @@ engine.shell.socket: Jewel socket
 engine.shell.allocate: Allocate
 engine.shell.insert: Socket a jewel
 engine.shell.feed: Feed
+engine.shell.empty: Empty
 engine.shell.experience: Experience
 engine.shell.to-next: To next level
 engine.shell.an-hour: Experience an hour

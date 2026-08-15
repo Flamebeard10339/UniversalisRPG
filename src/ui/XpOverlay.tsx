@@ -15,9 +15,13 @@ import { risesOf, type Note } from './xpNotes';
 // that channel is a line of text in the middle of the screen with a lifetime of
 // its own — this is a different place, a different wait, and a different shape.
 
-// How far apart two places stand, in CSS pixels. Wider than a line is tall, so
-// two lines standing side by side are read as two.
-const SLOT_PITCH = 42;
+// How tall a line is drawn and how far apart two places stand. The height is
+// set rather than left to the text, because the pitch is measured from it: two
+// figures that had to agree would be two figures that could drift, and the gap
+// between two lines is the whole of what separates them.
+const LINE_HEIGHT = 28;
+const LINE_GAP = 1;
+const SLOT_PITCH = LINE_HEIGHT + LINE_GAP;
 
 export function XpOverlay({ notes }: { notes: readonly Note[] }): JSX.Element {
   return (
@@ -39,8 +43,8 @@ function Line({ note }: { note: Note }): JSX.Element {
     <span
       data-note={note.kind}
       data-slot={note.slot}
-      style={{ top: note.slot * SLOT_PITCH }}
-      className={`${lingering} absolute right-0 whitespace-nowrap rounded-full bg-panel px-3 py-1 text-sm font-semibold text-accent-strong shadow`}
+      style={{ top: note.slot * SLOT_PITCH, height: LINE_HEIGHT }}
+      className={`${lingering} absolute right-0 flex items-center whitespace-nowrap rounded-full bg-panel px-3 text-sm font-semibold text-accent-strong shadow`}
     >
       {note.kind === 'item' ? (
         <>

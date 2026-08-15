@@ -57,6 +57,16 @@ Proof:
 - [c10] The map offers a control that puts the player's own place back in the middle of the window,
   on the floor they are standing on, at rest.
   proof: vitest src/ui/render.test.tsx
+- [c13] Every slot the world declares is a row on the equipment page, whether or not anything is worn
+  in it, and a row with nothing in it opens nothing. A slot standing empty is somewhere the player can
+  put something and is a fact about the character; a page inferring the slots from what is worn draws
+  a character with nothing on as having none.
+  proof: vitest src/ui/sheet.test.ts
+- [c14] Nothing the shell draws asks the browser for a compositor layer. A layer is rastered once and
+  then moved as a picture, so text on one is drawn at whatever scale it was rastered at; the shell
+  moves three surfaces and all three are text. The rule reads every module and the stylesheet, with
+  prose stripped first so the comment explaining it is not a breach of it.
+  proof: vitest src/ui/layers.test.ts
 
 ## Goal
 

@@ -684,6 +684,7 @@
         "src/ui/gesture.test.ts",
         "src/ui/gesture.ts",
         "src/ui/labels.ts",
+        "src/ui/layers.test.ts",
         "src/ui/levelling.test.ts",
         "src/ui/levelling.ts",
         "src/ui/moments.test.ts",

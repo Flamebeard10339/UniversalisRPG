@@ -136,6 +136,7 @@ export const ENGINE_KEYS = [
   'engine.shell.allocate',
   'engine.shell.insert',
   'engine.shell.feed',
+  'engine.shell.empty',
   'engine.shell.experience',
   'engine.shell.to-next',
   'engine.shell.an-hour',

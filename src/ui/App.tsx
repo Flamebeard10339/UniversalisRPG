@@ -155,7 +155,7 @@ export function App({ driver, opening = OPENING, clock = () => Date.now() }: { d
     // Both sides of what the player has are rows that act, because c21 puts a
     // worn copy on this page and nowhere else and the verbs it offers are
     // reachable from nowhere else either.
-    if (subpage.id === 'equipment') return <Ledger entries={worn(view?.carried ?? [], view?.planes ?? [], localizer)} onOpen={driver.open} />;
+    if (subpage.id === 'equipment') return <Ledger entries={worn(view?.equipment ?? [], view?.carried ?? [], view?.planes ?? [], localizer, words('empty'))} onOpen={driver.open} />;
     return <Ledger entries={carried(view?.carried ?? [], view?.planes ?? [], localizer)} onOpen={driver.open} />;
   };
 

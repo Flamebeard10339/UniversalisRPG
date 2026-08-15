@@ -65,6 +65,11 @@ Proof:
   number going up. It stays while the work feeding it lasts and starts again from nothing once that
   work has stopped for a lifetime, so a skill worked at for a minute is one line and not a column.
   proof: vitest src/ui/xpNotes.test.ts
+- [c13] A line the column is told again is counted rather than written out again. It keeps its id and
+  its place, so nothing above it moves and the acknowledgement it played when it first arrived is not
+  played again; whose words it is counts, so a diagnostic reading like something the world said is
+  still its own line.
+  proof: vitest src/ui/transcript.test.ts
 
 ## Goal
 

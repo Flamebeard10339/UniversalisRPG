@@ -19,6 +19,7 @@ export interface Entry {
 
 type CarriedRow = PlayStatus['carried'][number];
 type Plane = PlayStatus['planes'][number];
+type WornSlot = PlayStatus['equipment'][number];
 type Contribution = Plane['contributions'][number];
 
 // Sorted by name rather than left in the order the engine happened to build
@@ -67,12 +68,20 @@ export function carried(rows: readonly CarriedRow[], planes: readonly Plane[], l
 }
 
 // What is worn, slot by slot: the slot is the row and what fills it is the
-// value, named the one way every surface names a carried thing. This is the
-// other side of c21 rather than a second reading of the equipment dictionary,
-// so a row is of the copy the engine already named and opening it dispatches
-// the id that names that copy and not the item behind it.
-export function worn(rows: readonly CarriedRow[], planes: readonly Plane[], localizer: Localizer): Entry[] {
-  return rows
-    .flatMap((row) => (row.worn ? [{ id: row.id, name: row.worn.title, value: row.name, ...detailOf(row, planes, localizer) }] : []))
+// value, named the one way every surface names a carried thing.
+//
+// Which slots there are comes from the engine's own dictionary, because a slot
+// standing empty is a fact about the character that nothing the player is
+// carrying could say. What fills one is still the copy the engine already named
+// on the carried side of c21, so opening a row dispatches the id that names
+// that copy and not the item behind it — and a row with nothing in it opens
+// nothing, because there is no copy for it to open.
+export function worn(slots: readonly WornSlot[], rows: readonly CarriedRow[], planes: readonly Plane[], localizer: Localizer, empty: Localized): Entry[] {
+  return slots
+    .map((slot) => {
+      const filled = rows.find((row) => row.worn?.slot === slot.slot);
+      if (!filled) return { name: slot.title, value: empty };
+      return { id: filled.id, name: slot.title, value: filled.name, ...detailOf(filled, planes, localizer) };
+    })
     .sort(byName);
 }

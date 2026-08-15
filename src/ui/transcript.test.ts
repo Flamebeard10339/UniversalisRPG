@@ -70,9 +70,46 @@ describe('the narration column', () => {
     ]);
 
     expect(transcript.entries).toEqual([
-      { id: 1, words: 'player', kind: 'message', tone: 'error', text: 'no.' },
-      { id: 2, words: 'player', kind: 'detail', tone: 'error', text: 'because' },
-      { id: 3, words: 'player', kind: 'detail', tone: 'error', text: 'of this' },
+      { id: 1, words: 'player', kind: 'message', tone: 'error', text: 'no.', repeats: 1 },
+      { id: 2, words: 'player', kind: 'detail', tone: 'error', text: 'because', repeats: 1 },
+      { id: 3, words: 'player', kind: 'detail', tone: 'error', text: 'of this', repeats: 1 },
+    ]);
+  });
+
+  it('counts a line it is told again rather than writing it out again', () => {
+    const roasted = { kind: 'message', words: 'player', tone: 'plain', text: asLocalized('a chestnut pops') } as const;
+    const told = (held: Transcript, times: number): Transcript => Array.from({ length: times }).reduce<Transcript>((each) => appendOutputs(each, [roasted]), held);
+
+    const transcript = told(emptyTranscript(), 435);
+
+    // One line, keeping the id and the place it first took, so nothing above it
+    // moves and the acknowledgement it played is not played 434 times more.
+    expect(transcript.entries).toEqual([{ id: 1, words: 'player', kind: 'message', tone: 'plain', text: 'a chestnut pops', repeats: 435 }]);
+    expect(transcript.nextId).toBe(2);
+  });
+
+  it('counts only what it was just told, so a line coming back after another is its own', () => {
+    const pops = { kind: 'message', words: 'player', tone: 'plain', text: asLocalized('a chestnut pops') } as const;
+    const burns = { kind: 'message', words: 'player', tone: 'plain', text: asLocalized('one burns') } as const;
+
+    const transcript = appendOutputs(appendOutputs(appendOutputs(emptyTranscript(), [pops, pops]), [burns]), [pops]);
+
+    expect(transcript.entries.map((entry) => [entry.text, entry.repeats])).toEqual([
+      ['a chestnut pops', 2],
+      ['one burns', 1],
+      ['a chestnut pops', 1],
+    ]);
+  });
+
+  it('tells a diagnostic from something the world said, however alike they read', () => {
+    const spoken = { kind: 'message', words: 'player', tone: 'plain', text: asLocalized('the same words') } as const;
+    const noted = { kind: 'message', words: 'tool', tone: 'plain', text: 'the same words' } as const;
+
+    const transcript = appendOutputs(emptyTranscript(), [spoken, noted]);
+
+    expect(transcript.entries.map((entry) => [entry.words, entry.repeats])).toEqual([
+      ['player', 1],
+      ['tool', 1],
     ]);
   });
 

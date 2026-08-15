@@ -23,6 +23,7 @@ export const LABELS = {
   allocate: 'engine.shell.allocate',
   insert: 'engine.shell.insert',
   feed: 'engine.shell.feed',
+  empty: 'engine.shell.empty',
   experience: 'engine.shell.experience',
   'to-next': 'engine.shell.to-next',
   'an-hour': 'engine.shell.an-hour',

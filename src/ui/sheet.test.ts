@@ -10,6 +10,12 @@ import { carried, contributionText, counted, worn } from './sheet';
 const localizer = localizerFor(loadInEnglish(''), 'en');
 
 type CarriedRow = PlayStatus['carried'][number];
+type WornSlot = PlayStatus['equipment'][number];
+
+// A slot the world declares, and what the page calls one standing empty.
+const slot = (id: string, title: string): WornSlot => ({ slot: id, title: asLocalized(title), item: null, name: null });
+
+const EMPTY = asLocalized('Empty');
 type Plane = PlayStatus['planes'][number];
 
 const row = (over: Partial<CarriedRow> = {}): CarriedRow => ({ id: 'rope', name: asLocalized('Rope'), count: 1, shown: asLocalized('Rope x1'), grown: false, ...over });
@@ -65,7 +71,7 @@ describe('the counted rows the engine publishes, as a sheet draws them', () => {
   it('has nothing to draw for a player carrying nothing', () => {
     expect(counted([], localizer)).toEqual([]);
     expect(carried([], [], localizer)).toEqual([]);
-    expect(worn([], [], localizer)).toEqual([]);
+    expect(worn([], [], [], localizer, EMPTY)).toEqual([]);
   });
 });
 
@@ -125,7 +131,7 @@ describe('what the player is wearing, as rows', () => {
       row({ id: '1', name: asLocalized('Modified Blade'), grown: true, worn: { slot: 'mainhand', title: asLocalized('Main Hand') } }),
       row({ id: 'worn:back', name: asLocalized('Cloak'), worn: { slot: 'back', title: asLocalized('Back') } }),
     ];
-    expect(worn(rows, [], localizer)).toEqual([
+    expect(worn([slot('mainhand', 'Main Hand'), slot('back', 'Back')], rows, [], localizer, EMPTY)).toEqual([
       { id: 'worn:back', name: 'Back', value: 'Cloak' },
       { id: '1', name: 'Main Hand', value: 'Modified Blade' },
     ]);
@@ -138,14 +144,25 @@ describe('what the player is wearing, as rows', () => {
     const rows = [row({ id: '1', name: asLocalized('Modified Blade'), grown: true, worn: { slot: 'mainhand', title: asLocalized('Main Hand') } })];
     const published = plane({ instance: '1', contributions: [flat(15)] });
 
-    expect(worn(rows, [published], localizer)[0].detail).toBe('+15 Attack');
+    expect(worn([slot('mainhand', 'Main Hand')], rows, [published], localizer, EMPTY)[0].detail).toBe('+15 Attack');
   });
 
   it('leaves a worn stack copy without a summary, the way the carried page leaves its stack', () => {
     const rows = [row({ id: 'worn:mainhand', name: asLocalized('Blade'), worn: { slot: 'mainhand', title: asLocalized('Main Hand') } })];
     const published = plane({ instance: 'worn:mainhand', contributions: [flat(15)] });
 
-    expect(worn(rows, [published], localizer)[0].detail).toBeUndefined();
+    expect(worn([slot('mainhand', 'Main Hand')], rows, [published], localizer, EMPTY)[0].detail).toBeUndefined();
+  });
+
+  it('draws a slot with nothing in it as a slot, and gives it nothing to open', () => {
+    const rows = [row({ id: '1', name: asLocalized('Blade'), worn: { slot: 'mainhand', title: asLocalized('Main Hand') } })];
+
+    // A character wearing one thing has every other slot still, because a slot
+    // is somewhere to put something and not a thing the player happens to have.
+    expect(worn([slot('mainhand', 'Main Hand'), slot('back', 'Back')], rows, [], localizer, EMPTY)).toEqual([
+      { name: 'Back', value: 'Empty' },
+      { id: '1', name: 'Main Hand', value: 'Blade' },
+    ]);
   });
 
   // c21: one copy, one page. The engine says which side a row is on and this
@@ -159,6 +176,6 @@ describe('what the player is wearing, as rows', () => {
     ];
 
     expect(carried(rows, [], localizer).map((entry) => entry.id)).toEqual(['blade']);
-    expect(worn(rows, [], localizer)).toEqual([{ id: 'worn:mainhand', name: 'Main Hand', value: 'Blade' }]);
+    expect(worn([slot('mainhand', 'Main Hand')], rows, [], localizer, EMPTY)).toEqual([{ id: 'worn:mainhand', name: 'Main Hand', value: 'Blade' }]);
   });
 });
