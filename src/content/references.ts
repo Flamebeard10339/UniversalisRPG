@@ -4,7 +4,7 @@ import { Registry } from './registry';
 import { Dialogue } from './dialogue';
 import { Directive, Test } from './test';
 import { isActionOwnerKind, NAMESPACED_KINDS } from './namespace';
-import { APPLY_SITE, Visit, visitSection } from './referenceSites';
+import { INFLICT_SITE, Visit, visitSection } from './referenceSites';
 
 // Resolution qualifies a name; it cannot prove the name still points at
 // something. Both `# remove` and a `-field:` edit decide what survives at merge,
@@ -20,13 +20,13 @@ export function validateSectionReferences(kind: string, id: string, value: objec
     if (NAMESPACED_KINDS.includes(referenced) && !registry.namespace.has(referenced, target)) {
       throw new DslError(`${where} names an unknown ${referenced}: ${target}`);
     }
-    if (where.endsWith(APPLY_SITE)) refuseUntimedPayload(target, where, registry);
+    if (where.endsWith(INFLICT_SITE)) refuseUntimedPayload(target, where, registry);
     return target;
   };
   visitSection(kind, { ...value }, `# ${kind} ${id}`, visit);
 }
 
-// An `apply:` grants one instance of a declaration for as long as that
+// An `inflict:` grants one instance of a declaration for as long as that
 // declaration says it runs, and a declaration that says nothing runs for no time
 // at all — granted at an instant already past, gone at the next boundary, with
 // nothing said anywhere. Refused here because this is the one moment both halves

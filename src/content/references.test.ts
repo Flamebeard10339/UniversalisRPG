@@ -159,17 +159,17 @@ describe('load-time reference resolution', () => {
     expect(() => loadModule(`${VALID}\n# recipe weave\naccuracy: attack\nout: 1 straw\nburnt: 1 bogus\n`)).toThrow(/# recipe weave burnt: names an unknown item: bogus/);
   });
 
-  it('checks what a character carries a passive by, and what an applied payload names', () => {
+  it('checks what a character carries a passive by, and what an inflicted payload names', () => {
     expect(loading('passives: spined', 'passives: spinned')).toThrow(/# entity training-dummy passives: names an unknown passive: spinned/);
     expect(loading('when hit: drain: 5 health from them', 'when hit: drain: 5 helth from them')).toThrow(/# passive spined when hit: drain: names an unknown resource: helth/);
-    expect(loading('when hit: drain: 5 health from them', 'on hit: apply: bam to them')).toThrow(/# passive spined on hit: apply: names an unknown item: bam/);
+    expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: bam on them')).toThrow(/# passive spined on hit: inflict: names an unknown item: bam/);
   });
 
   // A payload with no duration is granted at an instant already past, so it is
   // over before anything can read it and nothing anywhere says so.
-  it('refuses an applied payload that declares no duration', () => {
-    expect(loading('when hit: drain: 5 health from them', 'on hit: apply: straw to them')).toThrow(/apply: names straw, which declares no duration/);
-    expect(loading('when hit: drain: 5 health from them', 'on hit: apply: balm to them')).not.toThrow();
+  it('refuses an inflicted payload that declares no duration', () => {
+    expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: straw on them')).toThrow(/inflict: names straw, which declares no duration/);
+    expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: balm on them')).not.toThrow();
   });
 
   it('checks a food item tag, the other way a stat id reaches statRange', () => {

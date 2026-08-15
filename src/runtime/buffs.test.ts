@@ -47,22 +47,22 @@ slot: mainhand
 
 # item envenomed-blade
 slot: mainhand
-on hit: apply: venom to them
+on hit: inflict: venom on them
 
 # item rousing-blade
 slot: mainhand
-on hit: apply: accelerated-vigor to me
+on hit: inflict: accelerated-vigor on me
 
 # item plain-blade
 slot: mainhand
-on hit: apply: accelerated-vigor
+on hit: inflict: accelerated-vigor
 
 # item flash-tonic
 +2 attack, 40s
 
 # item flashing-blade
 slot: mainhand
-on hit: apply: flash-tonic
+on hit: inflict: flash-tonic
 
 # item war-cry
 food, +3 attack per stack of accelerated-vigor, 60s
@@ -269,7 +269,7 @@ describe('durations tick on the existing cadence', () => {
   });
 });
 
-describe('an applied buff is granted by the declaration it names', () => {
+describe('an inflicted buff is granted by the declaration it names', () => {
   const swinging = (registry: Registry, blade: string): GameState => {
     const state = started(registry);
     state.inventory[blade] = 1;

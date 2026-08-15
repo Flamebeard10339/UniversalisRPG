@@ -6,6 +6,7 @@ import { restorePools } from './effects';
 import { Registry } from '../content/registry';
 import { engineLocale, withEngineLocale } from '../content/engineLocale';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
+import { NAMESPACED_KINDS } from '../content/namespace';
 import { loadUniverse } from '../content/registry';
 import { runTest } from './session';
 import { initialState } from './save';
@@ -196,8 +197,28 @@ describe('combat-expansion, read off the routes it ships', () => {
 // folds `(base + added) x (1 + increased)`, so the percent half is worth almost
 // nothing until the flat half is stacked. Derived over whatever the module
 // declares, so a seventh jewel is graded by the same rule that graded the first.
+// A tag that groups is one more than one jewel carries: `thorns` names an effect
+// and sits on one jewel, where an archetype sits on the pair. Derived, so a
+// fourth archetype is grouped — and forbidden below — by the rule that reached
+// the first three, and neither reader has a list to keep in step with the other.
+const jewelsOf = (registry: Registry, namespace: string) => [...registry.clusterJewels.values()].filter((jewel) => jewel.id.startsWith(`${namespace}.`));
+
+const unsharedTagsOn = (registry: Registry, namespace: string, jewel: { positions: Record<number, string> }): string[] => {
+  const shared = new Set(
+    [...registry.passives.values()].filter((passive) => !passive.id.startsWith(`${namespace}.`)).flatMap((passive) => passive.tags.filter((tag) => tag.kind === 'keyword').map((tag) => tag.value)),
+  );
+  const carried = Object.values(jewel.positions).flatMap((passiveId) => registry.passives.get(passiveId)?.tags ?? []);
+  return [...new Set(carried.filter((tag) => tag.kind === 'keyword' && !shared.has(tag.value)).map((tag) => (tag as { value: string }).value))];
+};
+
+function archetypeGrouping(registry: Registry, namespace: string): Map<string, string[]> {
+  const seen = new Map<string, string[]>();
+  for (const jewel of jewelsOf(registry, namespace)) for (const tag of unsharedTagsOn(registry, namespace, jewel)) seen.set(tag, [...(seen.get(tag) ?? []), jewel.id]);
+  return new Map([...seen.entries()].filter(([, carriers]) => carriers.length > 1));
+}
+
 describe('the archetype jewels are paired added-then-increased', () => {
-  const declared = (registry: Registry, namespace: string) => [...registry.clusterJewels.values()].filter((jewel) => jewel.id.startsWith(`${namespace}.`));
+  const declared = jewelsOf;
 
   // What a jewel's allocated positions pay, counted by channel: one entry per
   // payload, not per position, because a passive may carry several.
@@ -207,29 +228,9 @@ describe('the archetype jewels are paired added-then-increased', () => {
     return { flat: bonuses.filter((tag) => !tag.percent).length, percent: bonuses.filter((tag) => tag.percent).length };
   };
 
-  // The tags a jewel's own passives carry that the rest of the universe does
-  // not use. `physical` and `life` are tutorial-island's too and drop out here.
-  const ownTags = (registry: Registry, namespace: string, jewel: { positions: Record<number, string> }): string[] => {
-    const shared = new Set(
-      [...registry.passives.values()].filter((passive) => !passive.id.startsWith(`${namespace}.`)).flatMap((passive) => passive.tags.filter((tag) => tag.kind === 'keyword').map((tag) => tag.value)),
-    );
-    const carried = Object.values(jewel.positions).flatMap((passiveId) => registry.passives.get(passiveId)?.tags ?? []);
-    return [...new Set(carried.filter((tag) => tag.kind === 'keyword' && !shared.has(tag.value)).map((tag) => (tag as { value: string }).value))];
-  };
-
-  // A tag that groups is one more than one jewel carries: `thorns` names an
-  // effect and sits on one jewel, where an archetype sits on the pair. Derived,
-  // so a fourth archetype is grouped by the rule that grouped the first three.
-  const grouping = (registry: Registry, namespace: string): Map<string, string[]> => {
-    const jewels = declared(registry, namespace);
-    const seen = new Map<string, string[]>();
-    for (const jewel of jewels) for (const tag of ownTags(registry, namespace, jewel)) seen.set(tag, [...(seen.get(tag) ?? []), jewel.id]);
-    return new Map([...seen.entries()].filter(([, carriers]) => carriers.length > 1));
-  };
-
   it('gives every archetype one flat jewel and one percent jewel, and no archetype two of a kind', () => {
     const jewels = declared(shipped, 'combat-expansion');
-    const groups = grouping(shipped, 'combat-expansion');
+    const groups = archetypeGrouping(shipped, 'combat-expansion');
     expect(groups.size).toBeGreaterThan(0);
     // Every jewel is in exactly one group, so nothing is graded twice and
     // nothing escapes the rule by carrying no archetype at all.
@@ -246,51 +247,78 @@ describe('the archetype jewels are paired added-then-increased', () => {
   });
 });
 
-// c2: nothing in the shipped runtime is named after anything this content
-// composes. Derived from the module itself — every id it declares, less the ids
-// the rest of the universe already declares — so a fifth effect is covered by
-// authoring it and by nothing else. Ids only: a keyword tag is a free-form word
-// an author picks, and drawing the set from tags would let a passive tagged
-// `state` or `range` redden the sweep over an engine file that has never heard
-// of it.
+// c2 and c9: nothing in the shipped source is named after anything this content
+// composes, an archetype least of all. Both halves of the set are derived from
+// the module itself — every id it declares under every kind the language
+// namespaces, and every tag that groups its jewels — so a fifth effect and a
+// fourth archetype are both covered by authoring them and by nothing else. What
+// is deliberately NOT in the set is a free-form keyword tag that groups nothing:
+// a passive tagged `state` or `range` would otherwise redden the sweep over an
+// engine file that has never heard of it.
 describe('no shipped identifier is named after this content', () => {
-  const words = (registry: Registry, namespace: string): Set<string> => {
+  const declaredIds = (registry: Registry, namespace: string): Set<string> => {
     const own = new Set<string>();
-    for (const map of [registry.passives, registry.items, registry.resources, registry.entities, registry.clusterJewels, registry.stats]) {
-      for (const id of map.keys()) if (id.startsWith(`${namespace}.`)) own.add(id.slice(namespace.length + 1));
+    for (const kind of NAMESPACED_KINDS) {
+      for (const key of registry.namespace.declaredKeys(kind)) {
+        if (!key.startsWith(`${namespace}.`)) continue;
+        // A member hangs under its owner and a flag under its object, so what
+        // is left after the namespace still carries a dot. Only a section's own
+        // id is a word, and the owner it hangs under is already in the set.
+        const id = key.slice(namespace.length + 1);
+        if (!id.includes('.')) own.add(id);
+      }
     }
     return own;
   };
 
+  // Every source file the build carries, of either extension, less the tests —
+  // which is the one exclusion c2 makes, because a test may use one of these
+  // words as an arbitrary content id with no bearing on the runtime.
   const sourceFiles = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
       const full = `${dir}/${entry.name}`;
       if (entry.isDirectory()) return sourceFiles(full);
-      return entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts') ? [full] : [];
+      if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) return [];
+      return /\.test\.tsx?$/.test(entry.name) ? [] : [full];
     });
 
-  it('finds none of them in src, excluding tests', () => {
-    const mine = words(shipped, 'combat-expansion');
-    const shared = words(shipped, 'tutorial-island');
-    const named = [...mine].filter((word) => !shared.has(word));
-    expect(named.length).toBeGreaterThan(20);
-
+  const sweep = (words: readonly string[]): string[] => {
     const camel = (word: string): string => word.replace(/-(.)/g, (_, letter: string) => letter.toUpperCase());
-    const patterns = named.flatMap((word) => [word, camel(word)]).map((token) => new RegExp(`\\b${token}\\b`));
-
-    const found = sourceFiles('src').flatMap((file) => {
+    const patterns = words.flatMap((word) => [word, camel(word)]).map((token) => new RegExp(`\\b${token}\\b`, 'i'));
+    return sourceFiles('src').flatMap((file) => {
       const text = readFileSync(file, 'utf8');
       return patterns.filter((pattern) => pattern.test(text)).map((pattern) => `${file}: ${pattern.source}`);
     });
-    expect(found).toEqual([]);
+  };
+
+  it('sweeps every file the build carries, of either extension', () => {
+    const swept = sourceFiles('src');
+    expect(swept.filter((file) => file.endsWith('.tsx')).length).toBeGreaterThan(0);
+    expect(swept.some((file) => file.endsWith('.test.ts'))).toBe(false);
   });
 
-  // The clause's own command, which names the four effects rather than deriving
-  // them: two of them are mechanical tags rather than ids, and a tag is not in
-  // the derived set above for the reason stated there.
+  it('finds no id this module declares', () => {
+    const mine = declaredIds(shipped, 'combat-expansion');
+    const shared = declaredIds(shipped, 'tutorial-island');
+    const named = [...mine].filter((word) => !shared.has(word));
+    expect(named.length).toBeGreaterThan(20);
+    expect(sweep(named)).toEqual([]);
+  });
+
+  // c9's own honesty mechanism. An archetype is a tag, so it is not among the
+  // ids above; it is derived here by the same rule that pairs the jewels, which
+  // is what keeps "membership is a tag and nothing more" checkable rather than
+  // asserted.
+  it('finds no archetype, which is a tag and never an id', () => {
+    const archetypes = [...archetypeGrouping(shipped, 'combat-expansion').keys()];
+    expect(archetypes.length).toBeGreaterThan(1);
+    expect(sweep(archetypes)).toEqual([]);
+  });
+
+  // The four the clause names in its own command, two of which are mechanical
+  // tags that group nothing and so reach neither derivation above.
   it('finds none of the four effects the clause names either', () => {
-    const named = /\b(poison|rage|thorns|accelerated.?vigou?r)\b/i;
-    expect(sourceFiles('src').filter((file) => named.test(readFileSync(file, 'utf8')))).toEqual([]);
+    expect(sweep(['poison', 'rage', 'thorns', 'accelerated-vigor', 'accelerated vigour'])).toEqual([]);
   });
 });
 

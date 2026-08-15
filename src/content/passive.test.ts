@@ -56,7 +56,7 @@ max: max-health
 # passive envenom
 poison
 on hit:
-  1 in 4: apply: venom to them
+  1 in 4: inflict: venom on them
 
 # passive retribution
 when hit: drain: 3 health from them
@@ -65,7 +65,7 @@ when hit: drain: 3 health from them
   it('reads both blocks, and the party phrase inside them', () => {
     const registry = loadModule(SOURCE);
     expect(registry.passives.get('envenom')!.onHit).toEqual([
-      { kind: 'chance', numerator: 1, denominator: 4, results: [{ kind: 'apply', buff: 'venom', party: 'them' }] },
+      { kind: 'chance', numerator: 1, denominator: 4, results: [{ kind: 'inflict', buff: 'venom', party: 'them' }] },
     ]);
     expect(registry.passives.get('retribution')!.whenHit).toEqual([{ kind: 'pool', resource: 'health', delta: { min: -3, max: -3 }, party: 'them' }]);
   });

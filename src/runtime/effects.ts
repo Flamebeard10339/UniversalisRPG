@@ -6,7 +6,7 @@ import { isPoint, Range, sampleCount, sampleRange } from '../grammar/range';
 import { Registry } from '../content/registry';
 import { Resource } from '../content/resource';
 import { evaluateCondition } from './conditions';
-import { actorEntity } from './encounter';
+import { actorEntity, hasPool } from './encounter';
 import { stockItem } from './itemInstance';
 import { openModalNamed } from './modals';
 import { localizerOf } from './localized';
@@ -250,7 +250,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       addDelta(segment.deltas, subjectOf(segment, result.party, actor), result.resource, milliAmount);
       return milliAmount;
     }
-    case 'apply': {
+    case 'inflict': {
       const source = registry.items.get(result.buff);
       if (!source) throw new RuntimeError(`unknown buff source: ${result.buff}`);
       // Once per repetition rather than once scaled: whether a second
@@ -321,6 +321,11 @@ export function captureResourceRates(state: GameState, registry: Registry): Reso
   }
   for (const actorId of actors) {
     for (const resource of registry.resources.values()) {
+      // A pool this character has no ceiling for is not a pool: nothing accrues
+      // into it, so no rate is snapshotted and no remainder is carried for it.
+      // Without this a declared rate reaches every character in the universe and
+      // writes a remainder into every save, whether or not anything can hold it.
+      if (!hasPool(state, registry, actorId, resource.id)) continue;
       const ratePerMinute = resource.rate ? toMilliUnits(statValue(resource.rate, state, registry, actorId)) : 0;
       if (ratePerMinute === 0) continue;
       snapshots.push({ resource, actorId, ratePerMinute, max: toMilliUnits(statValue(resource.max, state, registry, actorId)) });

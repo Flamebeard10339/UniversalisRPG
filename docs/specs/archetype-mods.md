@@ -39,7 +39,7 @@ Proof:
   bearing on the runtime, which `src/content/references.test.ts:139` does today with `# stat rage`
   while resolving references. The command is clean on the tree as it stands, so it is a real
   regression check rather than one that starts red and gets weakened.
-  proof: command grep -rniE "\b(poison|rage|thorns|accelerated.?vigou?r)\b" src/ --include=*.ts --exclude=*.test.ts
+  proof: command grep -rniE "\b(poison|rage|thorns|accelerated.?vigou?r|berserker|juggernaut|assassin)\b" src/ --include=*.ts --include=*.tsx --exclude=*.test.ts --exclude=*.test.tsx
 - [c3] **Rage** is a resource with a constant drain, granted on a landed swing and read as a counter:
   `+N% attack per rage`. Its ceiling and its rate are what distinguish it from a stack count, and a
   `# test` shows attack rising as rage accumulates and falling as it drains, with no other stat
@@ -76,7 +76,7 @@ Proof:
   passives" would be a class system arriving through the back door. Mechanical tags — `poison`,
   `physical`, `life` — are the ones a future tag selector may read; archetype tags exist for authors
   and for grouping, and c2's command is what keeps that honest.
-  proof: vitest src/runtime/integration.test.ts
+  proof: vitest src/runtime/integration.test.ts src/runtime/session.test.ts
 - [c10] The three archetypes ship as six cluster jewels, paired added-then-increased, matching the
   trial in `docs/smithing/cluster-jewels-draft.dsl`. Each pair has one jewel whose passives are flat
   and one whose passives are mostly percent, because `statRange` folds
@@ -214,6 +214,37 @@ Every finding pass 1 filed was promoted and fixed on this branch. What each fix 
   above was worth doing at all: every player in the universe was shown a Rage meter at empty from
   the first turn of the tutorial. Nothing can be spent out of a pool with no capacity, so what gives
   it a ceiling is what makes it appear.
+
+## After pass 2
+
+Four changes the author directed, and what each decided.
+
+- **c9 has a check now, and it is derived.** Pass 1's triage narrowed the forbidden word set to
+  declared ids, which silently removed every archetype from it: an archetype is a tag, not an id, so
+  the fix was aimed at the finding's wording rather than at the property the clause promises. The
+  set is now both halves, each derived from the module — every id it declares under every kind the
+  language namespaces, and every tag that groups its jewels, which is the same rule c10's pairing
+  reads and is written once for both. A tag that groups nothing is deliberately still outside the
+  set: `thorns` and `poison` name effects and reach the sweep through c2's own command instead,
+  which is what stops a passive tagged `state` reddening an engine file that never heard of it.
+- **The sweep reads every file the build carries.** It read `*.ts` and c2's command said
+  `--include=*.ts`, so all nineteen `.tsx` files were outside both. Both now read either extension
+  and exclude tests by either. c2's command gained the three archetype words as well, because the
+  clause it keeps honest is c9 as much as c2.
+- **`apply:` is `inflict:`.** The DSL already spends `apply:` on growing a plane — `apply: 1 at
+  1,-1 with orb-of-the-edge` is in the tutorial's own recorded route — and two unrelated verbs of
+  one name is the collision that is cheap to rule out now and costs content later. The party
+  preposition follows the verb as it does for the other two: `inflict: venom on them`. Reads
+  strangely for a payload a character puts on itself, which `spurred` does; the sign of the payload
+  is what says whether it is a boon, and one verb for both is the rule `buffs-generalized` set.
+- **The drain belongs to the pool, not to the passive that fills it.** `# stat rage-drain` carries
+  `base: -30`, so a second copy of `rising-fury` allocated on a second jewel no longer bleeds the
+  pool twice as fast. The ceiling stays on the passive, because a global one is read as a full pool
+  by every actor a fight snapshots. What makes a declared rate safe to state globally is the rule
+  underneath it: `captureResourceRates` now asks `hasPool` before it snapshots anything, so a
+  character with no ceiling for a pool accrues nothing into it and carries no remainder for it —
+  the same question the screen asks before drawing a meter, and the same one a swing asks before
+  choosing a target.
 
 ## Out of scope
 

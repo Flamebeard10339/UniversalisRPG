@@ -12,9 +12,9 @@ import { mayBeInstanceId } from './instanceId';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
-// The tail every `apply:` site's `where` ends with, so the walk that writes it
+// The tail every `inflict:` site's `where` ends with, so the walk that writes it
 // and the check that reads it cannot disagree about how it is spelled.
-export const APPLY_SITE = 'apply:';
+export const INFLICT_SITE = 'inflict:';
 
 export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'action' | 'event' | 'faction' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node' | 'passive' | 'cluster-jewel' | typeof ACTION_MEMBER;
 
@@ -115,8 +115,8 @@ function results(list: ActionResult[] | undefined, where: string, visit: Visit):
       case 'roll':
         put(result, 'table', 'droptable', `${where} roll:`, visit);
         break;
-      case 'apply':
-        put(result, 'buff', 'item', `${where} ${APPLY_SITE}`, visit);
+      case 'inflict':
+        put(result, 'buff', 'item', `${where} ${INFLICT_SITE}`, visit);
         break;
       case 'contest':
         // A side written as a name is a stat; a literal is left alone, exactly

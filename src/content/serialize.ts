@@ -105,11 +105,11 @@ function result(value: ActionResult): string {
       const party = value.party === undefined ? '' : ` ${value.delta.max < 0 ? 'from' : 'to'} ${value.party}`;
       return `${value.delta.max < 0 ? 'drain' : 'restore'}: ${range(magnitude)} ${value.resource}${party}`;
     }
-    case 'apply': {
+    case 'inflict': {
       // The preposition is the one this verb takes rather than a stored field,
       // exactly as a pool's is re-derived from its sign.
-      const party = value.party === undefined ? '' : ` to ${value.party}`;
-      return `apply: ${value.buff}${party}`;
+      const party = value.party === undefined ? '' : ` on ${value.party}`;
+      return `inflict: ${value.buff}${party}`;
     }
     case 'roll':
       return `roll: ${value.table}`;

@@ -29,15 +29,18 @@ dependencies: tutorial-island
 // --- rage ---
 //
 // The ceiling and the rate are what make this a resource rather than a stack
-// count. Both stats sit at nothing by default and the passive that grants rage
-// carries both, so a character who never took the passive has no pool at all
-// rather than a full one nothing can spend and a rate nobody can see. A ceiling
-// left global would have been read as full by every actor a fight snapshots,
-// which is the inverse of what a resource granted on a landed swing is for.
+// count, and they are held apart on purpose. The rate is the pool's own and is
+// declared here, so a second copy of the passive that grants rage does not bleed
+// it twice as fast; the ceiling arrives with the passive, because a stat left
+// global is read as a full pool by every actor a fight snapshots and that is the
+// inverse of what a resource granted on a landed swing is for. Nobody without
+// the passive has a pool at all, so the rate below reaches nothing until one is
+// allocated.
 
 # stat max-rage
 
 # stat rage-drain
+base: -30
 
 # resource rage
 rate: rage-drain
@@ -65,14 +68,12 @@ poison, -30 regeneration, 20s
 // --- berserker passives ---
 
 # passive goring-edge
-examine: Wide, and not interested in closing.
 berserker, physical, +3 attack
 
 # passive bloodlust
 berserker, speed, +3 attack-rate
 
 # passive reckless
-examine: Guard is a thing other people keep.
 berserker, physical, +10% attack, -2 defense
 
 // Rage: gained on a landed swing, bled back at a constant rate, and read as a
@@ -80,19 +81,17 @@ berserker, physical, +10% attack, -2 defense
 // that taking the passive is what starts the pool moving.
 # passive rising-fury
 title: Rising Fury
-examine: Every blow lands harder than the one before it.
-berserker, physical, +20 max-rage, -30 rage-drain, +2% attack per rage
+berserker, physical, +20 max-rage, +2% attack per rage
 
 on hit: restore: 3 rage
 
 // The chance gate is a wrapper the drop tables already had; what is behind it
 // is one instance of a payload that stacks.
 # passive spurred
-examine: Sometimes the second swing arrives before you decided on it.
 berserker, speed
 
 on hit:
-  1 in 4: apply: accelerated-vigor to me
+  1 in 4: inflict: accelerated-vigor on me
 
 // The second half of the pair, and separable from it: this reads how many are
 // held without granting any, so stacking is worth more with it than without.
@@ -108,14 +107,12 @@ juggernaut, armour, +4 defense
 juggernaut, life, +25 max-health
 
 # passive slow-and-certain
-examine: It does not hurry. It does not need to.
 juggernaut, armour, +3 defense, -2 attack-rate
 
 // Thorns: read off whoever was struck, and its result names the other party in
 // that moment. Nothing here is declared on an action, which is what lets a
 // thing that never swings carry it.
 # passive retribution
-examine: Striking it is its own punishment.
 juggernaut, thorns
 
 when hit: drain: 5 health from them
@@ -129,17 +126,15 @@ assassin, precision, +6 accuracy, +2 attack-rate
 assassin, evasion, +12 evasion
 
 # passive exposed-throat
-examine: There is a right place, and there is everywhere else.
 assassin, precision, +10 accuracy, -1 attack
 
 // Poison: the same two-party requirement as thorns and in the opposite
 // direction. The payload's own duration is how long it runs; nothing here says
 // so a second time.
 # passive envenom
-examine: The cut is the smallest part of it.
 assassin, poison
 
-on hit: apply: venom to them
+on hit: inflict: venom on them
 
 // --- cluster jewels ---
 //
