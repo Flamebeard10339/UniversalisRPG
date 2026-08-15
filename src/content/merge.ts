@@ -1,5 +1,5 @@
 import { Dialogue, DialogueNode } from './dialogue';
-import { SCHEMAS } from './module';
+import { schemaFor } from './module';
 import { AnySchema, FieldEdits, isEntryRemoval, isFieldEdits, isListField } from '../grammar/section';
 
 type Fields = Record<string, unknown>;
@@ -82,7 +82,7 @@ function mergeDialogue(into: Dialogue, from: Dialogue): Dialogue {
 // Whether the section creates or edits is not declared — it follows from whether
 // the id was already there when this module loaded.
 export function mergeSection(kind: string, into: object | undefined, from: object): object {
-  const schema = SCHEMAS[kind];
+  const schema = schemaFor(kind);
   if (schema) return mergeAuthored((into as Fields) ?? { id: (from as { id: string }).id }, from as Fields, schema);
   if (into === undefined) return from;
   return kind === 'dialogue' ? mergeDialogue(into as Dialogue, from as Dialogue) : from;

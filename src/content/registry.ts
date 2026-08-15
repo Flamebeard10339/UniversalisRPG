@@ -27,7 +27,7 @@ import {
   LocaleSection,
   ProseShape,
   sayField,
-  TEXT_FIELDS,
+  textFieldsOf,
   unsuppliedParameters,
 } from './locale';
 import { Passive, passiveRangeProblem, passiveSchema } from './passive';
@@ -277,7 +277,7 @@ function recordBase(registry: Registry, key: string, entry: BaseEntry): void {
 // not for a global id: a `# slot` is keyed under nobody and written in whatever
 // its declarer speaks, so the caller says which is which.
 function recordBaseText(registry: Registry, kind: string, authored: Record<string, unknown>, namespace: string | null, language: string): void {
-  const fields = TEXT_FIELDS[kind];
+  const fields = textFieldsOf(kind);
   if (!fields) return;
   const id = authored.id as string;
   for (const field of fields) {

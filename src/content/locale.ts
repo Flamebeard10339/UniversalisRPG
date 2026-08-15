@@ -1,3 +1,4 @@
+import type { SchemaKind } from './module';
 import { DslError } from '../grammar/parser';
 import { RawSection } from '../grammar/structure';
 
@@ -190,8 +191,18 @@ const ENGINE_KEY_SET: ReadonlySet<string> = new Set(ENGINE_KEYS);
 export const isEngineKey = (key: string): key is EngineKey => ENGINE_KEY_SET.has(key);
 
 // The text fields each section kind authors, in the order a locale file lists
-// them. A kind absent here authors no player-visible text.
-export const TEXT_FIELDS: Readonly<Record<string, readonly string[]>> = {
+// them. Exhaustive over `SchemaKind` rather than keyed by `string`: a kind added
+// to `SCHEMAS` and forgotten here does not compile, where before it loaded with
+// its `title:` unkeyed in every language and nothing said so — measured
+// 2026-08-15 by deleting `event` and `faction`, which left tsc and all 3091
+// tests green. An empty list is a decision and is spelled as one.
+//
+// The other way to get this wrong is a text field added to a kind that IS here,
+// and that is caught in src/content/locale.test.ts, which walks the schemas: a
+// field a section parses with `text` is prose somebody wrote, so it is words
+// unless this file says otherwise. What is hand-kept is therefore the half that
+// is NOT words, which is what c1 asks of every rule on this branch.
+export const TEXT_FIELDS: Readonly<Record<SchemaKind, readonly string[]>> = {
   entity: ['title', 'examine'],
   location: ['title', 'examine'],
   item: ['title', 'examine'],
@@ -199,7 +210,9 @@ export const TEXT_FIELDS: Readonly<Record<string, readonly string[]>> = {
   'cluster-jewel': ['title', 'examine'],
   event: ['title'],
   // A recipe authors no title: `humanizeEn` of its id is the whole English
-  // name, so the key exists to be translated rather than to be authored.
+  // name, so the key exists to be translated rather than to be authored. Its
+  // `say:` is words too, and is keyed by its owner and its index with every
+  // other spoken line (c6) rather than as a field of the recipe.
   recipe: ['title'],
   faction: ['title'],
   resource: ['title'],
@@ -208,7 +221,19 @@ export const TEXT_FIELDS: Readonly<Record<string, readonly string[]>> = {
   // A slot's key is minted from the vocabulary `equipment-slots:` names rather
   // than from a section, so `# slot` is optional and supplies only the words.
   slot: ['title'],
+  // A module's `language:` is a code, not words: it is the one thing a locale
+  // must not be able to move, since it says which language the rest is in.
+  info: [],
+  // Neither declares anything a player reads. A flag is a name and a boolean; a
+  // variable is a name and a number.
+  flag: [],
+  variable: [],
 };
+
+// The one lookup, because a kind at load time is whatever a module wrote and the
+// bespoke ones — an action, a dialogue, a droptable, a test — have no schema and
+// key their words themselves.
+export const textFieldsOf = (kind: string): readonly string[] | undefined => (TEXT_FIELDS as Record<string, readonly string[] | undefined>)[kind];
 
 // The one field whose absence the engine fills in, and so the one whose entry a
 // module can own without having authored it — but only in English, because
@@ -278,7 +303,7 @@ export function actionSlug(label: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-const FIELD_NAMES: ReadonlySet<string> = new Set(Object.values(TEXT_FIELDS).flat());
+const FIELD_NAMES: ReadonlySet<string> = new Set(Object.values<readonly string[]>(TEXT_FIELDS).flat());
 
 // An address the path grammar cannot spell, or that collides with a field of
 // the object that owns it, is neither a key nor a member — and two actions
