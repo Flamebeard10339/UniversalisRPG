@@ -274,15 +274,25 @@ describe('loadUniverseWithDiagnostics', () => {
       'starting',
       'entities: dresser',
     );
-    const walker = module('walk', '# info walk', 'dependencies: base', '# test walk', 'use: item.base.dresser.search-drawer');
+    const walker = (use: string): ModuleSource => module('walk', '# info walk', 'dependencies: base', '# test walk', `use: ${use}`);
 
-    const { registry, loadedModules, diagnostics } = loadUniverseWithDiagnostics([base, ghost, walker]);
+    const survivor = loadUniverseWithDiagnostics([base, ghost, walker('item.base.dresser.search-drawer')]);
 
-    expect({ loadedModules, diagnostics }).toEqual({ loadedModules: ['base', 'walk'], diagnostics: [] });
-    expect(registry.entities.get('base.dresser')!.blocks).toEqual([]);
-    expect(registry.items.get('base.dresser')!.actions).toHaveLength(1);
-    expect(registry.namespace.declaredKeys('action-slug')).toEqual(['base.dresser.search-drawer']);
-    expect([...registry.tests.keys()]).toEqual(['walk.walk']);
+    expect({ loadedModules: survivor.loadedModules, diagnostics: survivor.diagnostics }).toEqual({ loadedModules: ['base', 'walk'], diagnostics: [] });
+    expect(survivor.registry.entities.get('base.dresser')!.blocks).toEqual([]);
+    expect(survivor.registry.items.get('base.dresser')!.actions).toHaveLength(1);
+    expect(survivor.registry.namespace.declaredKeys('action-slug')).toEqual(['item.base.dresser.search-drawer']);
+    expect([...survivor.registry.tests.keys()]).toEqual(['walk.walk']);
+
+    // And the other side of the same fixture, which is what the key carrying no
+    // owner kind hid: the entity lost its action, so a `use:` aimed at the
+    // entity names nothing — even though an item of that id still answers to
+    // that address. It used to load clean and throw `engine.action.stale.action`
+    // in front of a player.
+    const stranded = loadUniverseWithDiagnostics([base, ghost, walker('entity.base.dresser.search-drawer')]);
+
+    expect({ loadedModules: stranded.loadedModules, diagnostics: stranded.diagnostics }).toEqual({ loadedModules: ['base', 'walk'], diagnostics: [] });
+    expect([...stranded.registry.tests.keys()]).toEqual([]);
   });
 
   it('disables only the module whose source does not parse', () => {

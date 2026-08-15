@@ -195,21 +195,23 @@ describe("an action's address is a member of the namespace", () => {
   const namespace = () => loadUniverse([ISLA]).namespace;
 
   it('hangs an inline block under the object that heads it, on all three kinds that own one', () => {
-    expect(namespace().has(ACTION_MEMBER, 'isla.dresser.search-drawer')).toBe(true);
-    expect(namespace().has(ACTION_MEMBER, 'isla.shore.light-beacon')).toBe(true);
-    expect(namespace().has(ACTION_MEMBER, 'isla.lamp.polish')).toBe(true);
+    expect(namespace().has(ACTION_MEMBER, 'entity.isla.dresser.search-drawer')).toBe(true);
+    expect(namespace().has(ACTION_MEMBER, 'location.isla.shore.light-beacon')).toBe(true);
+    expect(namespace().has(ACTION_MEMBER, 'item.isla.lamp.polish')).toBe(true);
   });
 
   // Declared elsewhere and performed here, so the address is the id it was
   // written under rather than a slug of the title it is shown as.
   it('hangs an action a `uses:` brings under the entity that brings it', () => {
-    expect(namespace().has(ACTION_MEMBER, 'isla.dresser.pry')).toBe(true);
-    expect(namespace().has(ACTION_MEMBER, 'isla.pry')).toBe(false);
+    expect(namespace().has(ACTION_MEMBER, 'entity.isla.dresser.pry')).toBe(true);
+    expect(namespace().has(ACTION_MEMBER, 'entity.isla.pry')).toBe(false);
+    // One id, two kinds: only the kind that performs it answers to the address.
+    expect(namespace().has(ACTION_MEMBER, 'item.isla.dresser.pry')).toBe(false);
   });
 
   it('puts it beside the flags of the same owner, under the one path grammar', () => {
     expect(namespace().has('flag', 'isla.dresser.searched')).toBe(true);
-    expect(namespace().snapshot()).toContain(`${ACTION_MEMBER} isla.dresser.search-drawer isla`);
+    expect(namespace().snapshot()).toContain(`${ACTION_MEMBER} entity.isla.dresser.search-drawer isla`);
   });
 
   it('declares nothing for an action nobody performs, so a slug is not a name on its own', () => {

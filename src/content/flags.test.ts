@@ -204,7 +204,7 @@ describe('an action a field edit takes away', () => {
   const BASE = module('base', '# action pry', 'instant', 'say: creak', '# entity dresser', 'uses: pry');
   const cut = (id: string): ModuleSource => module(id, 'dependencies: base', '# entity base.dresser', '-uses: pry');
   const wants = (id: string): ModuleSource => module(id, 'dependencies: base', '# test walk', 'use: entity.base.dresser.pry');
-  const dangles = /names an unknown action-slug: base.dresser.pry/;
+  const dangles = /names an unknown action-slug: entity.base.dresser.pry/;
 
   it('goes away with the value, so a use: the edit stranded no longer resolves', () => {
     expect(() => loadUniverse([BASE, wants('watcher')])).not.toThrow();
@@ -233,7 +233,7 @@ describe('an action a field edit takes away', () => {
 
     expect(() => loadUniverse([shelf, dusts])).not.toThrow();
     expect(loadUniverse([shelf, cutBlock]).entities.get('base.shelf')!.actions).toEqual([]);
-    expect(() => loadUniverse([shelf, cutBlock, dusts])).toThrow(/names an unknown action-slug: base.shelf.dust-it/);
+    expect(() => loadUniverse([shelf, cutBlock, dusts])).toThrow(/names an unknown action-slug: entity.base.shelf.dust-it/);
   });
 
   it('takes it with the object too, when the whole object goes', () => {

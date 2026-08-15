@@ -37,7 +37,7 @@ import { mergeSection } from './merge';
 import { ModuleSection } from './module';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
-import { ACTION_MEMBER, isActionOwnerKind, Namespace, NAMESPACED_KINDS } from './namespace';
+import { ACTION_MEMBER, isActionOwnerKind, memberKey, Namespace, NAMESPACED_KINDS } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
 import { registryCapabilities, registrySlots, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
 import { ReferenceKind, Visit, visitAction, visitResults, visitSection, visitTags } from './referenceSites';
@@ -678,7 +678,7 @@ function pruneStrandedActionMembers(registry: Registry, pruned: Set<string>): bo
   const surviving = new Set<string>();
   for (const [kind, map] of ACTION_OWNER_MAPS) {
     for (const owner of (registry[map] as ReadonlyMap<string, MemberOwner>).values()) {
-      for (const address of actionAddresses(kind, owner)) surviving.add(`${owner.id}.${address}`);
+      for (const address of actionAddresses(kind, owner)) surviving.add(memberKey(ACTION_MEMBER, kind, owner.id, address));
     }
   }
   let dropped = false;
@@ -1102,19 +1102,19 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
 
 const wouldDeclare = (kind: string, value: MemberOwner): Member[] => declareMembers(new Namespace(), kind, value);
 
-const memberKey = (member: Member): string => `${member.kind}\0${member.key}`;
+const memberIdentity = (member: Member): string => `${member.kind}\0${member.key}`;
 
 function reconcileMembers(namespace: Namespace, merged: Map<string, Map<string, OwnedSection>>, declared: ReadonlyMap<string, Member[]>): void {
   const survivingAcrossEveryKind = new Set<string>();
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
-      for (const member of wouldDeclare(kind, section.value as MemberOwner)) survivingAcrossEveryKind.add(memberKey(member));
+      for (const member of wouldDeclare(kind, section.value as MemberOwner)) survivingAcrossEveryKind.add(memberIdentity(member));
     }
   }
   for (const [kind, byId] of merged) {
     for (const id of byId.keys()) {
       for (const member of declared.get(ownerKey(kind, id)) ?? []) {
-        if (!survivingAcrossEveryKind.has(memberKey(member))) namespace.undeclare(member.kind, member.key);
+        if (!survivingAcrossEveryKind.has(memberIdentity(member))) namespace.undeclare(member.kind, member.key);
       }
     }
   }

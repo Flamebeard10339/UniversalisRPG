@@ -6,7 +6,7 @@ import { Directive } from './test';
 import { Ally, EntityBlock, isHandlerBlock } from './entity';
 import { Edge, Population, Relative } from './location';
 import { isFieldEdits, listMembers } from '../grammar/section';
-import { ACTION_MEMBER, isActionOwnerKind } from './namespace';
+import { ACTION_MEMBER, isActionOwnerKind, memberKey } from './namespace';
 import { lastSegment } from '../grammar/values';
 import { mayBeInstanceId } from './instanceId';
 import { Quantified } from '../grammar/values';
@@ -239,7 +239,7 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       // because the key it hangs under is the one the object settled on.
       if (!isActionOwnerKind(value.obj)) return;
       put(value, 'objId', value.obj, `${where} use:`, visit);
-      value.actionId = lastSegment(visit(ACTION_MEMBER, `${value.objId}.${value.actionId}`, `${where} use:`));
+      value.actionId = lastSegment(visit(ACTION_MEMBER, memberKey(ACTION_MEMBER, value.obj, value.objId, value.actionId), `${where} use:`));
       return;
     }
     case 'use-on':
