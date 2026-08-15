@@ -53,7 +53,7 @@ export function stackCount(state: GameState, actorId: string, source: string): n
 
 // How long one instance of a declaration runs. Zero where it names no duration,
 // which `applyDeclared`'s callers may not reach: the load path refuses an
-// `apply:` naming a source with none, and a `# item` with no duration clause
+// `inflict:` naming a source with none, and a `# item` with no duration clause
 // grants a buff that is gone at the next boundary, which is the behaviour food
 // has always had.
 export function declaredSeconds(source: BuffSource): number {
@@ -61,8 +61,8 @@ export function declaredSeconds(source: BuffSource): number {
 }
 
 // The one place a declaration becomes an instance on a clock. Both authored
-// routes into a buff — eating one, and an `apply:` naming one — spend this, so
-// a later rule about what may be granted is written once.
+// routes into a buff — eating one, and an `inflict:` naming one — spend this,
+// so a later rule about what may be granted is written once.
 export function applyDeclared(state: GameState, actorId: string, source: BuffSource, now: number): void {
   grantBuff(state, actorId, source, now + secondsToMs(declaredSeconds(source)));
 }

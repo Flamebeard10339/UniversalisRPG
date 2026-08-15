@@ -50,7 +50,7 @@ display: minimal
 
 // --- payloads a swing can hand out ---
 //
-// A declaration carrying a payload and a duration, granted by `apply:` and
+// A declaration carrying a payload and a duration, granted by `inflict:` and
 // never given, dropped or carried. `stacks` on the first is what makes a
 // second application a second instance instead of a refreshed one, which is
 // the whole difference between the two counter sources below.
@@ -76,9 +76,10 @@ berserker, speed, +3 attack-rate
 # passive reckless
 berserker, physical, +10% attack, -2 defense
 
-// Rage: gained on a landed swing, bled back at a constant rate, and read as a
-// counter by the same clause an item's own tag uses. The drain rides here so
-// that taking the passive is what starts the pool moving.
+// Rage: gained on a landed swing, bled back at the rate the pool itself
+// declares, and read as a counter by the same clause an item's own tag uses.
+// The ceiling rides here, so nobody without this has a pool at all; the rate
+// does not, so a second copy of this does not bleed one twice as fast.
 # passive rising-fury
 title: Rising Fury
 berserker, physical, +20 max-rage, +2% attack per rage
