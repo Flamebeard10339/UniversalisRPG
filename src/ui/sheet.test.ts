@@ -23,6 +23,7 @@ const plane = (over: Partial<Plane> = {}): Plane => ({
   maxLevel: 20,
   spent: 1,
   remaining: 2,
+  links: [],
   clusters: [],
   contributions: [],
   ...over,

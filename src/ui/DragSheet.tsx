@@ -40,6 +40,10 @@ export interface SheetHold {
   // which is what a control on the sheet asks before it counts as a tap.
   dragged(): boolean;
   gesture: { current: Grab | Pinch | null };
+  // Whether the gesture that has just ended travelled. Held past the end of it
+  // because a click arrives after the release that clears the gesture, and a
+  // control asking mid-click whether it was dragged would always be told no.
+  travelled: { current: boolean };
 }
 
 const AT_REST: Point = { x: 0, y: 0 };
@@ -49,6 +53,7 @@ const DRAG_SLOP_PX = 6;
 
 export function useSheetHold(points: readonly Point[], measured: { current: Array<HTMLElement | null> }, keyed: string): SheetHold {
   const gesture = useRef<Grab | Pinch | null>(null);
+  const travelled = useRef(false);
   const [pan, setPan] = useState<Point>(AT_REST);
   const [zoom, setZoom] = useState(1);
   const [node, setNode] = useState<Size>({ width: 0, height: 0 });
@@ -87,8 +92,9 @@ export function useSheetHold(points: readonly Point[], measured: { current: Arra
       setZoom(scale);
       setPan(next);
     },
-    dragged: () => gesture.current?.kind === 'pan' && gesture.current.moved,
+    dragged: () => travelled.current,
     gesture,
+    travelled,
   };
 }
 
@@ -97,8 +103,13 @@ export function DragSheet({
   debug,
   children,
   overlay,
+  onGround,
 }: {
   hold: SheetHold;
+  // What pressing the sheet itself does, where the caller has something for it
+  // to do. Only the sheet's own ground: a press that landed on anything drawn
+  // on it is that thing's.
+  onGround?: () => void;
   // What the sheet draws over itself and does not move: a control fixed to a
   // corner of the window rather than to the sheet.
   overlay?: ReactNode;
@@ -143,6 +154,7 @@ export function DragSheet({
   };
 
   const beginPan = (point: Point): void => {
+    hold.travelled.current = false;
     gesture.current = { kind: 'pan', from: point, pan: hold.pan, moved: false };
   };
 
@@ -151,6 +163,7 @@ export function DragSheet({
     if (grabbed?.kind !== 'pan') return;
     const next = { x: grabbed.pan.x + (point.x - grabbed.from.x), y: grabbed.pan.y + (point.y - grabbed.from.y) };
     grabbed.moved = grabbed.moved || Math.abs(next.x - grabbed.pan.x) > DRAG_SLOP_PX || Math.abs(next.y - grabbed.pan.y) > DRAG_SLOP_PX;
+    hold.travelled.current = hold.travelled.current || grabbed.moved;
     hold.settle(next, hold.zoom);
   };
 
@@ -164,6 +177,7 @@ export function DragSheet({
     <div
       ref={frame}
       className="relative min-h-0 flex-1 touch-none overflow-hidden"
+      onClick={onGround ? (event) => void (event.target === event.currentTarget && !hold.dragged() && onGround()) : undefined}
       // Kept from whatever is either side: a gesture over the sheet is the
       // sheet being moved, not the page being turned or the layer changed.
       onWheel={(event) => {

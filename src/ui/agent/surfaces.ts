@@ -1,9 +1,10 @@
+import type { Answer } from '../../runtime/localized';
 import type { Sheet } from '../discovery';
 import { clampZoom, type Point } from '../viewport';
 import { clampIndex } from '../gesture';
 import type { LabelId } from '../labels';
 import { LAYERS, subpageOf, toLayer, toSubpage, type LayerId, type Where } from '../nav';
-import type { PlaneView } from '../plane';
+import type { PlaneGraph, Plane } from '../planeGraph';
 import type { TestSurface } from '../testSurface';
 
 // Everything here exists to be driven and nothing here is drawn, so the whole
@@ -140,13 +141,45 @@ export function mapSurface(map: MapView, controls: MapControls): TestSurface {
   };
 }
 
-// The rows the pane drew, which is the one thing about a focused plane the view
-// does not already carry: the view publishes the report, and which of it reached
-// the screen and under which words is the pane's reading of it. Nothing to
-// drive — every answer a plane screen takes is a value the option publishes, so
-// the sheet is where an agent presses.
-export function planeSurface(plane: PlaneView): TestSurface {
-  return { state: () => plane };
+// Where the plane put its nodes and which one is pressed, which is the whole of
+// what a focused plane holds that the view does not: the view publishes the
+// report and the edges, and turning those into points is the modal's. Pressing
+// a node is offered by name, because a point on a scaled sheet is not something
+// an agent should have to aim at.
+export function planeState(held: AgentSurfaces['plane']): PlaneState {
+  return {
+    instance: held.plane.instance,
+    chosen: held.chosen,
+    picking: held.picking,
+    nodes: held.graph.nodes.map((node) => ({ key: node.key, at: node.at, standing: node.standing, socket: node.socket, holds: node.holds !== null })),
+    edges: held.graph.edges.map((edge) => edge.key),
+  };
+}
+
+export interface PlaneState {
+  instance: Answer;
+  chosen: Answer | null;
+  // Whether the jewels a socket will take are the screen in front of the plane.
+  picking: boolean;
+  nodes: Array<{ key: Answer; at: Point; standing: string; socket: boolean; holds: boolean }>;
+  edges: string[];
+}
+
+export function nodeNamed(graph: PlaneGraph, value: unknown): Answer {
+  const node = graph.nodes.find((each) => each.key === value);
+  if (!node) throw new Error(`the plane draws no node called ${String(value)}`);
+  return node.key;
+}
+
+export function planeSurface(held: AgentSurfaces['plane']): TestSurface {
+  return {
+    state: () => planeState(held),
+    actions: {
+      press: (value) => held.controls.press(nodeNamed(held.graph, value)),
+      pick: (value) => held.controls.pick(value === true),
+      pan: (value) => held.controls.settle(pointFrom(value), 1),
+    },
+  };
 }
 
 // What each component hands over: the values it already holds and the callbacks
@@ -154,11 +187,11 @@ export function planeSurface(plane: PlaneView): TestSurface {
 export interface AgentSurfaces {
   shell: { where: Where; go: (where: Where) => void };
   map: { map: MapView; controls: MapControls };
-  plane: { plane: PlaneView };
+  plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
 }
 
 export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurfaces[K]) => TestSurface } = {
   shell: ({ where, go }) => shellSurface(where, go),
   map: ({ map, controls }) => mapSurface(map, controls),
-  plane: ({ plane }) => planeSurface(plane),
+  plane: (held) => planeSurface(held),
 };

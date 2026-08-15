@@ -122,6 +122,10 @@ engine.command.speed: Speed set to {speed}x.
 engine.command.stopped: Stopped.
 engine.shell.map: Map
 engine.shell.recentre: Recentre
+engine.shell.socket: Jewel socket
+engine.shell.allocate: Allocate
+engine.shell.insert: Socket a jewel
+engine.shell.feed: Feed
 engine.shell.edit: Edit
 engine.shell.home: Home
 engine.shell.settings: Settings

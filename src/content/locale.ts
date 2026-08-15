@@ -131,6 +131,10 @@ export const ENGINE_KEYS = [
   // a clock and a resource bar as shapes rather than as lines of text.
   'engine.shell.map',
   'engine.shell.recentre',
+  'engine.shell.socket',
+  'engine.shell.allocate',
+  'engine.shell.insert',
+  'engine.shell.feed',
   'engine.shell.edit',
   'engine.shell.home',
   'engine.shell.settings',

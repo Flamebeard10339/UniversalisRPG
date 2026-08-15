@@ -227,7 +227,11 @@ export function isPlane(value: unknown): value is Plane {
   return true;
 }
 
-const nodeKey = (node: PlaneNode): string => (node.kind === 'slot' ? `${hexKey(node.hex)}/${node.direction}` : `${hexKey(node.hex)}/${node.position}`);
+// What tells two nodes of one plane apart, and the same string wherever it is
+// asked for: the walk that checks reachability names a node by it, and so does
+// a report handing a surface the edges between them. A direction and a position
+// never collide, one being letters and the other digits.
+export const nodeKey = (node: PlaneNode): string => (node.kind === 'slot' ? `${hexKey(node.hex)}/${node.direction}` : `${hexKey(node.hex)}/${node.position}`);
 
 function allocatedNodes(plane: Plane): PlaneNode[] {
   const nodes: PlaneNode[] = [];

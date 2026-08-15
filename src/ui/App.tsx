@@ -12,8 +12,7 @@ import { newlyFound, type Place } from './discovery';
 import { ModalSheet } from './ModalSheet';
 import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
-import { focusedPlane } from './plane';
-import { PlanePane } from './PlanePane';
+import { PlaneModal } from './PlaneModal';
 import { carried, counted, worn } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
@@ -51,8 +50,10 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
   const asking = view ? askedOption(view.modals) : undefined;
   // Drawn because the engine says one is in hand, never because the shell
   // recognised the screen holding it: the focus is a published field and the
-  // screen's name is not a thing this layer can read.
-  const plane = focusedPlane(view, localizer);
+  // screen's name is not a thing this layer can read. A screen with a plane in
+  // hand is drawn as that plane rather than as a list of its values, so the
+  // option sheet is what every other screen gets.
+  const plane = view?.focus ? (view.planes.find((each) => each.instance === view.focus?.instance) ?? null) : null;
   const { arrivals, generation } = useArrivals(view?.discovered ?? []);
 
   // The one answer a gesture away from the open screen makes: the value that
@@ -120,11 +121,8 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
           <FloatingText channel={driver.transient} />
         </main>
         <TabBar words={words} tabs={LAYERS[shell.where.layer].subpages} active={subpageOf(shell.where)} onSelect={(index) => go((held) => toSubpage(held, held.layer, index))} />
-        {asking ? (
-          <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave}>
-            {plane ? <PlanePane plane={plane} /> : null}
-          </ModalSheet>
-        ) : null}
+        {asking && plane ? <PlaneModal plane={plane} option={asking} words={words} onAnswer={driver.answer} /> : null}
+        {asking && !plane ? <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave} /> : null}
       </div>
     </TransientProvider>
   );
