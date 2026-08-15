@@ -16,6 +16,7 @@
     {
       "name": "DSL load path",
       "paths": [
+        "content/combat-expansion.dsl",
         "content/engine-en.dsl",
         "content/tutorial-island.dsl",
         "src/content/action.ts",
@@ -242,6 +243,21 @@
             "src/content/slot.ts"
           ],
           "note": "produced by an-equipment-slot-is-a-word-with-no-key-so-no-locale-can-rea: # slot <id> with a title:, optional, and global rather than namespaced for capability's reason. The vocabulary stays equipment-slots: and the key is minted from it, so a slot nobody declared still has words. Registered over slot.ts alone because the pass that mints the key lives in registry.ts, already claimed by 'the registry'"
+        },
+        {
+          "name": "a passive carries the hook blocks",
+          "paths": [
+            "src/content/passive.ts",
+            "src/content/passive.test.ts"
+          ],
+          "note": "produced by archetype-mods"
+        },
+        {
+          "name": "three archetypes as cluster jewels",
+          "paths": [
+            "content/combat-expansion.dsl"
+          ],
+          "note": "produced by archetype-mods"
         }
       ]
     },
@@ -562,6 +578,21 @@
             "src/runtime/command.ts"
           ],
           "note": "produced by the-command-layer-and-the-plane-refuse-in-keys — CommandOutput's message arm is PlayerMessage (a Localized from a key, moving with the played language) or ToolMessage (the authoring tool's own English), discriminated at runtime by words: 'player' | 'tool'. PlayerMessage is a published.test.ts root, so the brand cannot be dropped silently."
+        },
+        {
+          "name": "a declared payload granted to a party",
+          "paths": [
+            "src/runtime/effects.ts",
+            "src/runtime/buffs.ts"
+          ],
+          "note": "produced by archetype-mods"
+        },
+        {
+          "name": "a passive on the modifier walk",
+          "paths": [
+            "src/runtime/stats.ts"
+          ],
+          "note": "produced by archetype-mods"
         }
       ]
     },
@@ -1169,7 +1200,7 @@
         "scripts/play-cli.test.ts",
         "scripts/play-cli.ts",
         "scripts/printedWords.test.ts",
-    "scripts/probe.test.ts",
+        "scripts/probe.test.ts",
         "scripts/probe.ts",
         "scripts/session-timing.test.ts",
         "scripts/session-timing.ts"

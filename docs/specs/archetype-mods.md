@@ -113,6 +113,52 @@ Proof:
   passive that wants a stat reading another stat belongs to `per-grammar-dependent-stats`, and the
   archetype content is authored to need none.
 
+## Decisions taken while building it
+
+The spec was silent on each of these; every one is a judgement the worker made and the reason it
+was made.
+
+- **The trial `docs/smithing/cluster-jewels-draft.dsl` that c10 names was deleted before this
+  branch started**, in b00c105, for drifting twice. Its jewel and passive names are carried forward
+  out of git history unchanged, because c10 asks the six jewels to match it and matching a retired
+  file is only possible by reading it. A passive and a cluster jewel share an id in two places
+  (`retribution`, `wracking-blades`), exactly as the trial had them: ids are per kind, and the jewel
+  is named after the passive that is the point of it.
+- **Rage's drain rides on the passive that grants rage, not on the stat's base.** A `# resource`
+  whose rate stat has a nonzero global base is snapshotted for every character in every segment, and
+  `settlePools` then writes a `resourceRateRemainders` entry for it — which lands in every save
+  written anywhere in the universe, including `tutorial-island`'s recorded `expect:` sheets. Keeping
+  the base at nothing means a character who never took the passive has a pool that cannot move, and
+  the tutorial's six shipped routes replay byte-identical beside this module.
+- **A buff's source is an `# item`.** `buffs-generalized` made `BuffSource = Item`, `pruneBuffs`
+  resolves a held buff's source in the item registry, and `+N stat per stack of <id>` resolves its
+  counter as an item. `# item accelerated-vigor` and `# item venom` are therefore declarations that
+  are never given, dropped or carried — the same standing a `# droptable` has. That a payload which
+  is not a thing has to be declared as one is filed as a finding rather than fixed here: changing it
+  means a reference kind that resolves against two registries, which is the buff engine's own branch.
+- **`# entity passives:` is new, and is why thorns is authored once.** c1 wants every effect authored
+  as a `# passive` in a jewel; c5 wants a `# test` in which an enemy carries thorns. An enemy has no
+  plane to allocate on, so without this field the effect would be written twice — once as the passive
+  and once as a `when hit:` block copied onto the entity — which is the failure mode CLAUDE.md names
+  first. The field is generic: any entity carries any passive, and nothing about it knows what an
+  archetype is.
+- **Poison is not chance-gated.** c6 says it is applied when a swing of the player's lands and names
+  no gate; c4 is where a wrapper is required, and accelerated vigor carries it. Leaving poison
+  certain also makes its fixture deterministic without leaning on the seed.
+- **The archetype content is reached by a `# save` and not by an edge from the island.** Where these
+  jewels appear in the world is out of scope by the spec's own last section. A two-way edge would
+  also have rewritten `tutorial-island`'s recorded routes, because `spreadDiscovery` marks every
+  neighbour of wherever the player stands. `proving-ground` has one edge out to the beach so nobody
+  put there is stranded.
+- **`integration.test.ts` reads `content/` rather than naming a file.** It named
+  `content/tutorial-island.dsl` literally, and a second content module would otherwise have shipped
+  with no `# test` of it ever replayed. `src/ui/shippedContent.test.ts` listed the same two module
+  names by hand and is derived the same way for the same reason.
+- **A plane payload reading its counter was a defect, not a feature this branch added.** c3 and c4
+  both need `+N% <stat> per <counter>` on a passive; `itemContribution` folded plane payloads by
+  their cluster scale alone, so such a payload was silently worth its declared magnitude once. The
+  fix is in the fold and the plane screen now prints the counter beside the number it states.
+
 ## Out of scope
 
 Any fifth effect, and any archetype beyond the three. Rolled variance on a jewel and jewels that
