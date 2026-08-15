@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DIRECTIONS, hexKey, NEIGHBOR_DELTA, opposite, parseHexKey, type Direction } from '../content/hex';
 import { SHAPES, type Shape } from '../content/shapes';
 import { asLocalized } from '../runtime/localizedFixture';
-import { arrivalDelay, HEX_SPAN, hexAt, newlyDrawn, planeGraph, type Plane } from './planeGraph';
+import { arrivalDelay, HEX_SPAN, hexAt, newlyDrawn, NODE_CLEARANCE, planeGraph, reachOf, type Plane } from './planeGraph';
 import { spanBetween } from './viewport';
 
 type Cluster = Plane['clusters'][number];
@@ -73,6 +73,25 @@ function planeOf(shape: Shape, hex = '0,0'): Plane {
   };
 }
 
+// How much room every pair of nodes leaves beyond what the two of them take up.
+// A node is drawn at the touch floor and a socket is that square on its point,
+// so what each reaches is its own and the pair is judged on the sum — which is
+// what keeps this a rule about the layout rather than about one shape someone
+// measured.
+function clearances(nodes: ReturnType<typeof planeGraph>['nodes']): { tightest: number; between: string } {
+  let tightest = Number.POSITIVE_INFINITY;
+  let between = '';
+  for (let one = 0; one < nodes.length; one += 1) {
+    for (let other = one + 1; other < nodes.length; other += 1) {
+      const room = spanBetween(nodes[one].at, nodes[other].at) - reachOf(nodes[one]) - reachOf(nodes[other]) - NODE_CLEARANCE;
+      if (room >= tightest) continue;
+      tightest = room;
+      between = `${nodes[one].key} and ${nodes[other].key}`;
+    }
+  }
+  return { tightest, between };
+}
+
 const shapeNamed = (name: string): Shape => SHAPES.find((shape) => shape.name === name)!;
 
 describe('where a hexagon of the plane stands', () => {
@@ -105,6 +124,10 @@ describe('laying out every shape the catalogue declares', () => {
       expect(graph.nodes.filter((node) => !node.socket)).toHaveLength(shape.positionCount);
       expect(graph.nodes.filter((node) => node.socket)).toHaveLength(DIRECTIONS.length);
       expect(new Set(spots).size).toBe(graph.nodes.length);
+    });
+
+    it(`leaves room between every pair of nodes a ${shape.name} draws`, () => {
+      expect(clearances(planeGraph(planeOf(shape)).nodes).tightest).toBeGreaterThanOrEqual(0);
     });
 
     it(`joins a ${shape.name} up with every pair the engine published, and invents none`, () => {
@@ -229,6 +252,12 @@ describe('two clusters either side of one edge', () => {
     const spots = planeGraph(joined()).nodes.map((node) => `${node.at.x.toFixed(3)},${node.at.y.toFixed(3)}`);
 
     expect(new Set(spots).size).toBe(spots.length);
+  });
+
+  it('leaves room between every pair across the two, not only within each', () => {
+    const room = clearances(planeGraph(joined()).nodes);
+
+    expect(room.tightest, `${room.between} are too close`).toBeGreaterThanOrEqual(0);
   });
 });
 

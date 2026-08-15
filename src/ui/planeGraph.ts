@@ -1,6 +1,6 @@
 import type { Answer } from '../runtime/localized';
 import type { PlayView } from '../runtime/session';
-import type { Point } from './viewport';
+import { TOUCH_FLOOR, type Point } from './viewport';
 
 // An item's plane, laid out. The engine publishes the plane as a graph — nodes
 // with keys and the pairs of them that touch — so nothing here decides what is
@@ -18,16 +18,39 @@ type Slot = Cluster['slots'][number];
 
 export type Standing = Position['standing'];
 
+// How much room one node takes, from its middle outward. A node is a control
+// and no control is drawn under the touch floor, so the floor is what a node is
+// as well as what it must be: a passive is a circle of it, and a socket is that
+// square turned on its point, which reaches half a diagonal along the line
+// between two hexagons rather than half a side.
+export const NODE_SIZE = TOUCH_FLOOR;
+export const NODE_REACH = NODE_SIZE / 2;
+export const SOCKET_REACH = (NODE_SIZE * Math.SQRT2) / 2;
+
+// The space left between two nodes drawn side by side. Small on purpose: it is
+// what stops them touching, not what sets how far apart they read.
+export const NODE_CLEARANCE = 4;
+
+export const reachOf = (node: { socket: boolean }): number => (node.socket ? SOCKET_REACH : NODE_REACH);
+
 // How far apart two neighbouring hexagons stand, in unscaled sheet pixels.
 // Everything else on the plane is a fraction of it, so the whole layout scales
-// by changing this one figure.
-export const HEX_SPAN = 210;
+// by changing this one figure — and what sets it is the tightest pair a shape
+// can draw: the inner ring of a double ring, six nodes on a circle of INNER,
+// where the gap between neighbours is the radius itself. That wants
+// `INNER × HEX_SPAN` to clear one whole node, which is what
+// planeGraph.test.ts checks over every shape the catalogue declares rather than
+// leaving it to this comment.
+export const HEX_SPAN = 360;
 
 // Where a node sits inside its own hexagon, as a fraction of the span: a
 // position that faces an edge, one that faces none but hangs off one that does,
 // and the socket that sits on the edge itself, halfway to the next hexagon.
+// INNER is half of OUTER, which is what makes the two gaps a double ring has to
+// leave — between its inner neighbours, and between its rings — the same, so
+// neither is the one that pinches first.
 const OUTER = 0.3;
-const INNER = 0.15;
+const INNER = OUTER / 2;
 
 export interface GraphNode {
   key: Answer;

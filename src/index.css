@@ -30,6 +30,15 @@
     sans-serif;
 }
 
+/* The page itself does not zoom. Two surfaces do -- the map and an item's plane
+   -- and each holds its own pinch, so a browser zoom on top of one is a second
+   scale nothing in the app knows about and cannot undo. `pan-x pan-y` leaves
+   every scroller working and takes away the pinch and the double-tap. */
+html,
+body {
+  touch-action: pan-x pan-y;
+}
+
 body {
   margin: 0;
   min-width: 320px;

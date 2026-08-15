@@ -3,7 +3,7 @@ import type { Answer } from '../runtime/localized';
 import type { PlayView } from '../runtime/session';
 import { DragSheet, useSheetHold } from './DragSheet';
 import { signed, tidy } from './format';
-import { arrivalDelay, newlyDrawn, planeGraph, type GraphEdge, type GraphNode, type Plane, type PlaneGraph, type Standing } from './planeGraph';
+import { arrivalDelay, newlyDrawn, NODE_SIZE, planeGraph, type GraphEdge, type GraphNode, type Plane, type PlaneGraph, type Standing } from './planeGraph';
 import { nameOf, panelFor } from './planePanel';
 import { useTestSurface } from './testSurface';
 import { playedAfter, useMoment } from './transient';
@@ -104,9 +104,11 @@ function Node({
       data-socket={node.socket ? 'yes' : undefined}
       data-chosen={chosen ? 'yes' : undefined}
       onClick={() => void (dragged() || onPress(node))}
-      style={{ left: node.at.x, top: node.at.y, ...(arrived ? playedAfter(delay) : {}) }}
+      // Sized off the same figure the layout leaves room for, so what is drawn
+      // and what the spacing was worked out from cannot be two answers.
+      style={{ left: node.at.x, top: node.at.y, width: NODE_SIZE, height: NODE_SIZE, ...(arrived ? playedAfter(delay) : {}) }}
       className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center border p-0 text-[10px] font-semibold ${sprout} ${RING[node.standing]} ${
-        node.socket ? 'h-11 w-11 rotate-45' : 'h-10 w-10 rounded-full'
+        node.socket ? 'rotate-45' : 'rounded-full'
       } ${chosen ? 'ring-2 ring-accent-strong' : ''}`}
     >
       {/* Inside the control, so what it covers is what the control answers, and
