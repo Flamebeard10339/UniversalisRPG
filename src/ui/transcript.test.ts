@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { asLocalized } from '../runtime/localizedFixture';
 import type { CommandOutput } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 
-function viewAt(id: string, said: string[] = [], description = ''): PlayView {
+function viewAt(id: string, plain: string[] = [], description = ''): PlayView {
+  const said = plain.map(asLocalized);
   return {
-    location: { id, title: `title of ${id}`, description },
+    location: { id, title: asLocalized(`title of ${id}`), description: asLocalized(description) },
     entities: [],
     choices: [],
     time: 0,
@@ -18,9 +20,9 @@ function viewAt(id: string, said: string[] = [], description = ''): PlayView {
     carried: [],
     planes: [],
     focus: null,
-    equipment: {},
-    xp: {},
-    stats: {},
+    equipment: [],
+    xp: [],
+    stats: [],
     flags: {},
     discovered: [],
     player: { name: '', race: '' },
@@ -63,12 +65,30 @@ describe('the narration column', () => {
   });
 
   it('keeps a message and its detail as the engine worded them', () => {
-    const transcript = appendOutputs(emptyTranscript(), [{ kind: 'message', tone: 'error', text: 'no.', detail: ['because', 'of this'] }]);
+    const transcript = appendOutputs(emptyTranscript(), [
+      { kind: 'message', words: 'player', tone: 'error', text: asLocalized('no.'), detail: [asLocalized('because'), asLocalized('of this')] },
+    ]);
 
     expect(transcript.entries).toEqual([
-      { id: 1, kind: 'message', tone: 'error', text: 'no.' },
-      { id: 2, kind: 'detail', tone: 'error', text: 'because' },
-      { id: 3, kind: 'detail', tone: 'error', text: 'of this' },
+      { id: 1, words: 'player', kind: 'message', tone: 'error', text: 'no.' },
+      { id: 2, words: 'player', kind: 'detail', tone: 'error', text: 'because' },
+      { id: 3, words: 'player', kind: 'detail', tone: 'error', text: 'of this' },
+    ]);
+  });
+
+  // The finding this branch closed: the discriminant existed on the arm and
+  // stopped one function short of the screen, so a shell had no way to tell an
+  // authoring diagnostic from something the world said.
+  it('says whose words each line is, so a shell can draw the tool apart from the player', () => {
+    const transcript = appendOutputs(emptyTranscript(), [
+      { kind: 'message', words: 'tool', tone: 'error', text: 'local changes did not load.', detail: ['first'] },
+      { kind: 'message', words: 'player', tone: 'plain', text: asLocalized('The door opens.') },
+    ]);
+
+    expect(transcript.entries.map((entry) => [entry.words, entry.text])).toEqual([
+      ['tool', 'local changes did not load.'],
+      ['tool', 'first'],
+      ['player', 'The door opens.'],
     ]);
   });
 

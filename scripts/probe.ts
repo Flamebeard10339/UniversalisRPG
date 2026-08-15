@@ -3,7 +3,7 @@ import path from 'node:path';
 import { formatVersion } from '../src/grammar/dependency';
 import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, loadUniverseWithDiagnostics, type Registry } from '../src/content/registry';
 import { REGISTRY_DIFF_MAPS } from '../src/content/registryDiff';
-import { canSerialize, declaredVariableIds, roundTripModule, roundTripUniverse } from '../src/content/roundTrip';
+import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from '../src/content/roundTrip';
 import { type ModuleSource, type ParsedModule } from '../src/content/universe';
 
 export type RoundTripMode = 'universe' | 'module';
@@ -129,7 +129,7 @@ function roundTripEachModule(sources: readonly ModuleSource[], parsed: readonly 
       continue;
     }
     const others = sources.filter((source) => source !== module.source);
-    const trip = roundTripModule(loaded, { info: module.info, globalVariables: declaredVariableIds(module) }, (printed) => loadUniverseWithDiagnostics([...others, { ...module.source, text: printed }]));
+    const trip = roundTripModule(loaded, { info: module.info, globals: declaredGlobalIds(module) }, (printed) => loadUniverseWithDiagnostics([...others, { ...module.source, text: printed }]));
     if (trip.diagnostics.length > 0) {
       lines.push(`${module.info.id}: its serialization does not load beside the others`, ...trip.diagnostics.map((each) => `  ${formatModuleDiagnostic(each)}`));
       ok = false;

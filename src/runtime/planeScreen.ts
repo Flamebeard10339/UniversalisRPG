@@ -2,11 +2,13 @@ import { hexKey } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
+import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { carriedEntries, carriedFrame } from './carriedScreen';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
+import { isSaid, say, type Said } from './said';
 import { itemCopies, wornCopySlot } from './itemInstance';
-import { type ModalFrame, type ModalOption } from './modals';
+import { type ModalChoice, type ModalFrame, type ModalOption } from './modals';
 import { ClusterReport, PlaneFocus, PlaneReport, planeReport } from './planeReport';
 import { GameState } from './state';
 
@@ -17,15 +19,15 @@ import { GameState } from './state';
 
 // The value that leaves (c15). It goes back to the screen this one replaced
 // rather than closing the world, which is the other half of c3.
-export const BACK = 'Back to inventory';
+export const BACK: Answer = 'back';
 
 // The one thing this screen asks. An answer to it is a value it published, so
 // neither driver needs a way to type into it.
-export const PLANE = 'plane';
+export const PLANE: Answer = 'plane';
 
 export type PlaneFrame = Extract<ModalFrame, { name: 'item-plane' }>;
 
-export function planeFrame(target: string, hex: string = hexKey(ORIGIN), said?: string): PlaneFrame {
+export function planeFrame(target: string, hex: string = hexKey(ORIGIN), said?: Said): PlaneFrame {
   const frame: PlaneFrame = { name: 'item-plane', answers: {}, target, hex };
   return said === undefined ? frame : { ...frame, said };
 }
@@ -34,7 +36,10 @@ export function planeFrame(target: string, hex: string = hexKey(ORIGIN), said?: 
 // value with the target and the focused hexagon the frame holds filled back in
 // — and is null for a value that only moves the focus (c5).
 interface PlaneMove {
-  readonly value: string;
+  readonly value: Answer;
+  // The words offered for it, which move with the played language while the
+  // value does not — the two halves of one `ModalChoice`.
+  readonly shown: Localized;
   readonly line: string | null;
   readonly focus: string;
 }
@@ -45,26 +50,16 @@ interface PlaneMove {
 // be, the other two grow a hexagon of one — so the fill is written per verb
 // rather than as one shared prefix, and a frame that one day holds more than
 // one hexagon fills more in rather than needing a grammar to say so.
-// The tail is said twice over: once in the words the screen offers and once in
-// the ids the directive takes, because a jewel is named to the player by the one
-// naming function (c16) and to the parser by its id.
-interface Tail {
-  readonly said: string;
-  readonly spelled: string;
+function onCopy(frame: PlaneFrame, verb: string, tail: string, shown: Localized): PlaneMove {
+  return { value: `${verb}: ${tail}`, shown, line: `${verb}: ${frame.target} ${tail}`, focus: frame.hex };
 }
 
-const same = (tail: string): Tail => ({ said: tail, spelled: tail });
-
-function onCopy(frame: PlaneFrame, verb: string, tail: Tail): PlaneMove {
-  return { value: `${verb}: ${tail.said}`, line: `${verb}: ${frame.target} ${tail.spelled}`, focus: frame.hex };
+function onHexagon(frame: PlaneFrame, verb: string, tail: string, shown: Localized): PlaneMove {
+  return { value: `${verb}: ${tail}`, shown, line: `${verb}: ${frame.target} at ${frame.hex} ${tail}`, focus: frame.hex };
 }
 
-function onHexagon(frame: PlaneFrame, verb: string, tail: Tail): PlaneMove {
-  return { value: `${verb}: ${tail.said}`, line: `${verb}: ${frame.target} at ${frame.hex} ${tail.spelled}`, focus: frame.hex };
-}
-
-function goes(hex: string): PlaneMove {
-  return { value: `Go to ${hex}`, line: null, focus: hex };
+function goes(hex: string, shown: Localized): PlaneMove {
+  return { value: `go: ${hex}`, shown, line: null, focus: hex };
 }
 
 // The hexagons a step away, whichever side of the slot joining them this one
@@ -79,10 +74,11 @@ function reachable(report: PlaneReport, here: ClusterReport): string[] {
 // What a stack the player can spend holds, by the field that says the item is
 // the kind a growth verb consumes. A grown copy is never taken, so a jewel that
 // has itself been grown is not one to slot.
-function stacked(state: GameState, registry: Registry, spent: (item: Item) => boolean): Array<{ id: string; name: string }> {
+function stacked(state: GameState, registry: Registry, spent: (item: Item) => boolean): Array<{ id: string; name: Localized }> {
+  const localizer = localizerOf(registry, state);
   return [...itemCopies(state)].flatMap(([id, { stack }]) => {
     const item = registry.items.get(id);
-    return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(item.title, false) }] : [];
+    return stack > 0 && item !== undefined && spent(item) ? [{ id, name: carriedName(localizer, 'item', id, null) }] : [];
   });
 }
 
@@ -90,46 +86,56 @@ function movesOn(frame: PlaneFrame, report: PlaneReport | undefined, state: Game
   const here = report?.clusters.find((cluster) => cluster.hex === frame.hex);
   if (!report || !here) return [];
 
-  const moves = reachable(report, here).map(goes);
+  const localizer = localizerOf(registry, state);
+  const moves = reachable(report, here).map((hex) => goes(hex, localizer.engine('engine.plane.go', { hex: localizer.identifier(hex) })));
   for (const slot of here.slots) {
     if (slot.standing !== 'allocated' || slot.beyond !== null) continue;
     for (const jewel of stacked(state, registry, (item) => item.clusterJewel !== undefined)) {
-      moves.push(onHexagon(frame, 'slot', { said: `${slot.direction} with ${jewel.name}`, spelled: `${slot.direction} with ${jewel.id}` }));
+      const shown = localizer.engine('engine.plane.slot', { direction: localizer.identifier(slot.direction), jewel: jewel.name });
+      moves.push(onHexagon(frame, 'slot', `${slot.direction} with ${jewel.id}`, shown));
     }
   }
   for (const slot of here.slots) {
-    if (slot.standing === 'available') moves.push(onHexagon(frame, 'allocate', same(`slot ${slot.direction}`)));
+    if (slot.standing !== 'available') continue;
+    moves.push(onHexagon(frame, 'allocate', `slot ${slot.direction}`, localizer.engine('engine.plane.allocate.slot', { direction: localizer.identifier(slot.direction) })));
   }
   for (const position of here.positions) {
-    if (position.standing === 'available') moves.push(onHexagon(frame, 'allocate', same(`position ${position.position}`)));
+    if (position.standing !== 'available') continue;
+    moves.push(onHexagon(frame, 'allocate', `position ${position.position}`, localizer.engine('engine.plane.allocate.position', { position: position.position })));
   }
   // Last, and on every hexagon, because what a copy is fed is the one growth
   // that is the copy's rather than one hexagon of it — and without it a base
   // still in its stack would publish only values it has no point to spend on.
   for (const food of stacked(state, registry, (item) => item.itemExperience !== undefined)) {
-    moves.push(onCopy(frame, 'feed', { said: `with ${food.name}`, spelled: `with ${food.id}` }));
+    moves.push(onCopy(frame, 'feed', `with ${food.id}`, localizer.engine('engine.plane.feed', { item: food.name })));
   }
   return moves;
 }
 
-// The label is the whole of what this screen says beside its values, so a
-// refusal the frame came back holding reaches the player here (c7).
-function heading(frame: PlaneFrame, report: PlaneReport | undefined): string {
-  const standing = `${report?.name ?? frame.target} at ${frame.hex}`;
-  return frame.said === undefined ? standing : `${standing} — ${frame.said}`;
+// What the screen is of, where on it, and what it last said — the label being
+// the whole of what this screen says beside its values, so a refusal the frame
+// came back holding reaches the player here (c7). A plane no report can be
+// built for is named by the id the verb addressed it with, which is an id and
+// not words.
+function heading(localizer: Localizer, frame: PlaneFrame, report: PlaneReport | undefined): Localized {
+  const plane = report?.name ?? localizer.identifier(frame.target);
+  const hex = localizer.identifier(frame.hex);
+  if (frame.said === undefined) return localizer.engine('engine.plane.heading', { plane, hex });
+  return localizer.engine('engine.plane.heading.said', { plane, hex, said: say(localizer, frame.said) });
 }
 
 export function planeOptions(frame: PlaneFrame, state: GameState, registry: Registry): ModalOption[] {
   const report = planeReport(registry, state, frame.target);
-  const values = movesOn(frame, report, state, registry).map((move) => move.value);
-  return [{ key: PLANE, label: heading(frame, report), values: [...values, BACK] }];
+  const localizer = localizerOf(registry, state);
+  const offered: ModalChoice[] = movesOn(frame, report, state, registry).map((move) => ({ value: move.value, shown: move.shown }));
+  return [{ key: PLANE, label: heading(localizer, frame, report), values: [...offered, { value: BACK, shown: localizer.engine('engine.plane.back') }] }];
 }
 
 // c3: leaving a plane is not closing a screen, it is going back to the one this
 // replaced with the copy it was opened from still chosen.
 function inventory(target: string, state: GameState, registry: Registry): ModalFrame {
   const entry = carriedEntries(state, registry).find((each) => each.id === target);
-  return carriedFrame(entry ? { item: entry.value } : {});
+  return carriedFrame(entry ? { item: entry.id } : {});
 }
 
 export function planeSubmit(frame: PlaneFrame, state: GameState, registry: Registry): ModalFrame | null {
@@ -154,20 +160,22 @@ export function planeFocus(frame: PlaneFrame): PlaneFocus {
 }
 
 // Beyond a name and answers, a saved frame is two ids and whatever the plane
-// last said. Shape only: whether either id still names anything is planeStale's.
+// last said, as the key it was said with. Shape only: whether either id still
+// names anything is planeStale's.
 export function isPlaneFrameBody(value: Record<string, unknown>): boolean {
   if (typeof value.target !== 'string' || typeof value.hex !== 'string') return false;
-  return value.said === undefined || typeof value.said === 'string';
+  return value.said === undefined || isSaid(value.said);
 }
 
-export function planeStale(frame: PlaneFrame, state: GameState, registry: Registry): string | null {
+export function planeStale(frame: PlaneFrame, state: GameState, registry: Registry): Localized | null {
+  const localizer = localizerOf(registry, state);
   const report = planeReport(registry, state, frame.target);
   // c16: a slot's spelling is the runtime's own word for whichever copy the slot
   // holds, so a sentence about one that has emptied names the slot rather than
   // printing a spelling the player has never seen.
   const slot = wornCopySlot(frame.target);
-  if (!report) return slot === undefined ? `it grows ${frame.target}, which the player no longer carries` : `it grows what was worn in ${slot}, and that slot is empty`;
-  if (!report.clusters.some((cluster) => cluster.hex === frame.hex)) return `it holds ${frame.hex}, where that plane has no cluster`;
+  if (!report) return slot === undefined ? localizer.engine('engine.plane.stale.uncarried', { item: localizer.identifier(frame.target) }) : localizer.engine('engine.plane.stale.slot', { slot: localizer.identifier(slot) });
+  if (!report.clusters.some((cluster) => cluster.hex === frame.hex)) return localizer.engine('engine.plane.stale.hex', { hex: localizer.identifier(frame.hex) });
   return null;
 }
 

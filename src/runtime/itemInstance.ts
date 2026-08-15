@@ -3,6 +3,7 @@ import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
 import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';
+import { anId, aCopy, aCount, says, type Said } from './said';
 import { skillLevel } from './skills';
 import { GameState } from './state';
 
@@ -16,11 +17,14 @@ export interface ItemInstance {
   plane: Plane;
 }
 
-export type Refusal = { ok: false; refused: string };
+// What a refused verb tells the player: the key and the parameters it takes,
+// unsaid, because a refusal outlives the screen it was taken on — a plane frame
+// carries one across a save, and which words it is depends on who loads it (c3).
+export type Refusal = { ok: false; refused: Said };
 export type Growth = { ok: true; instance: string } | Refusal;
 export type Destruction = { ok: true; item: string } | Refusal;
 
-const refused = (reason: string): Refusal => ({ ok: false, refused: reason });
+const refused = (reason: Said): Refusal => ({ ok: false, refused: reason });
 
 export function isItemInstance(payload: unknown): payload is ItemInstance {
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return false;
@@ -231,7 +235,7 @@ export function destroyItem(state: GameState, id: string): Destruction {
     return { ok: true, item: standing.template };
   }
   const source = stackCopy(state, id);
-  if (!source) return refused(`you carry no ${id}`);
+  if (!source) return refused(says('engine.growth.no-copy', { item: anId(id) }));
   const template = itemTemplate(state, id);
   if (source.from === 'slot') delete state.equipped[source.slot];
   else {
@@ -252,7 +256,7 @@ export function pointsRemaining(payload: ItemInstance, item: Item): number {
 interface Growing {
   target: string;
   consumes?: string;
-  change(payload: ItemInstance, item: Item): string | undefined;
+  change(payload: ItemInstance, item: Item): Said | undefined;
 }
 
 const held = (state: GameState, itemId: string): number => copiesOf(state, itemId).stack;
@@ -273,14 +277,14 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
   const standing = grown(state, copy);
   const template = itemTemplate(state, target);
   const item = registry.items.get(template);
-  if (!item) return refused(`there is no item or item instance called ${target}`);
+  if (!item) return refused(says('engine.growth.unknown-item', { item: anId(target) }));
 
   const plane = basePlane(item);
-  if (!plane) return refused(`${template} is not a base: only an item you can wear has a plane to grow`);
+  if (!plane) return refused(says('engine.growth.not-a-base', { item: anId(template) }));
 
   const source = standing ? undefined : stackCopy(state, target);
-  if (!standing && !source) return refused(`you carry no ${template}`);
-  if (consumes !== undefined && held(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(`you carry no ${consumes}`);
+  if (!standing && !source) return refused(says('engine.growth.no-copy', { item: anId(template) }));
+  if (consumes !== undefined && held(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(says('engine.growth.no-copy', { item: anId(consumes) }));
 
   const payload = standing?.payload ?? { experience: 0, plane };
   const problem = growing.change(payload, item);
@@ -297,12 +301,12 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
 // c12: the only event in the game that moves an item's experience.
 export function feedItem(state: GameState, registry: Registry, target: string, food: string): Growth {
   const experience = registry.items.get(food)?.itemExperience;
-  if (experience === undefined) return refused(`${food} grants no item experience`);
+  if (experience === undefined) return refused(says('engine.growth.no-experience', { item: anId(food) }));
   return growItem(state, registry, {
     target,
     consumes: food,
     change: (payload, item) => {
-      if (itemLevel(payload, item) >= item.maxLevel) return `${item.title} is already at level ${item.maxLevel}, which is its maximum`;
+      if (itemLevel(payload, item) >= item.maxLevel) return says('engine.growth.max-level', { item: aCopy('item', item.id), level: aCount(item.maxLevel) });
       payload.experience += experience;
       return undefined;
     },
@@ -311,7 +315,7 @@ export function feedItem(state: GameState, registry: Registry, target: string, f
 
 export function slotJewel(state: GameState, registry: Registry, target: string, jewelItem: string, hex: Hex, direction: Direction): Growth {
   const jewel = registry.items.get(jewelItem)?.clusterJewel;
-  if (jewel === undefined) return refused(`${jewelItem} is not a cluster jewel`);
+  if (jewel === undefined) return refused(says('engine.growth.not-a-jewel', { item: anId(jewelItem) }));
   return growItem(state, registry, {
     target,
     consumes: jewelItem,

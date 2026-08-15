@@ -10,7 +10,11 @@ import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantif
 export type Party = 'me' | 'them';
 
 export type ActionResult =
-  | { kind: 'say'; text: string }
+  // `key` is the address a `# locale` translates the line by. A `say:` has no
+  // id of its own, so it is addressed by the object that authored it and its
+  // place in that object, neither of which the grammar can know: a line is not
+  // under an owner until it is loaded, and the load path stamps it there.
+  | { kind: 'say'; text: string; key?: string }
   | { kind: 'set'; variable: string }
   | { kind: 'unset'; variable: string }
   | { kind: 'add'; variable: string; amount: number }

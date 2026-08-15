@@ -3,7 +3,8 @@ import { point } from '../grammar/range';
 import { applyResults, getDelta, newSegment, RESULT_OBSERVERS, ResultApplication, ResultObserver, settlePools } from './effects';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { createGameState, GameState, initResources, PLAYER } from './runtime';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { toMilliUnits } from './units';
 
 const MODULE = `
@@ -17,6 +18,9 @@ max: max-health
 
 # droptable spoils
 drain: 5 health
+
+# droptable bakery
+say: One loaf.
 
 // One of each wrapper kind, every one of them certain to fire, so what varies
 // between them is only which actor their body is applied to.
@@ -35,7 +39,7 @@ function watched(): { seen: ResultApplication[]; observer: ResultObserver } {
 }
 
 function fresh(): { registry: Registry; state: GameState } {
-  const registry = loadModule(MODULE);
+  const registry = loadInEnglish(MODULE);
   const state = createGameState();
   initResources(state, registry);
   return { registry, state };
@@ -56,7 +60,7 @@ describe('applyResults: the actor a result applies to', () => {
     const { registry, state } = fresh();
     state.activeAction = {
       ownerRef: 'entity.brute',
-      actionLabel: 'fight',
+      actionSlug: 'fight',
       repeating: false,
       implicitTarget: IMPLICIT_TARGET_FULL,
       cadences: { [PLAYER]: newCadence() },
@@ -122,8 +126,10 @@ describe('applyResults: watching what was applied', () => {
     const { seen, observer } = watched();
     const segment = newSegment(state, registry, [observer]);
 
+    // Read off the registry rather than written here, because a `say:` speaks
+    // through the address the load path stamped on it and code cannot mint one.
     applyResults(segment, [
-      { kind: 'say', text: 'One loaf.' },
+      registry.dropTables.get('bakery')!.results[0],
       { kind: 'give', item: 'coin', amount: { min: 1, max: 4 } },
     ], PLAYER, 5);
 

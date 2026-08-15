@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatModuleDiagnostic, loadModule, loadUniverse, loadUniverseWithDiagnostics } from './registry';
-import { declaredVariableIds, roundTripModule } from './roundTrip';
+import { declaredGlobalIds, roundTripModule } from './roundTrip';
 import { serializeRegistryModule } from './serialize';
 import { ModuleSource, parseModuleSource } from './universe';
 
@@ -149,7 +149,7 @@ expect: blank
 describe('serializeRegistryModule', () => {
   function expectSemanticRoundTrip(source: ModuleSource): void {
     const parsed = parseModuleSource(source);
-    const trip = roundTripModule(loadUniverse([source]), { info: parsed.info, globalVariables: declaredVariableIds(parsed) }, (printed) =>
+    const trip = roundTripModule(loadUniverse([source]), { info: parsed.info, globals: declaredGlobalIds(parsed) }, (printed) =>
       loadUniverseWithDiagnostics([{ ...source, text: printed }]),
     );
 
@@ -170,7 +170,7 @@ describe('serializeRegistryModule', () => {
     const registry = loadModule(FULL_MODULE);
     const printed = serializeRegistryModule(registry, {
       info: { id: 'base', version: [1, 2, 3], pack: 'core' },
-      globalVariables: ['travel-seconds-per-unit'],
+      globals: ['travel-seconds-per-unit'],
     });
     const roundTrip = loadModule(printed);
 
@@ -192,10 +192,10 @@ describe('serializeRegistryModule', () => {
     expect(roundTrip.entities.get('base.npc')?.whenHit).toEqual([{ kind: 'pool', resource: 'base.stamina', delta: { min: 1, max: 1 } }]);
     const npcAction = (label: string) => roundTrip.entities.get('base.npc')?.actions.find((each) => each.label === label);
     expect(npcAction('haul')).toMatchObject({ kind: 'continuous', rate: 12 });
-    expect(npcAction('cheer')?.onSuccess).toEqual([{ kind: 'say', text: 'Hello.' }]);
+    expect(npcAction('cheer')?.onSuccess).toEqual([{ kind: 'say', text: 'Hello.', key: 'base.entity.npc.say.0' }]);
     expect(npcAction('sequence')?.results).toEqual([
       { kind: 'set', variable: 'base.levered' },
-      { kind: 'say', text: 'Middle.' },
+      { kind: 'say', text: 'Middle.', key: 'base.entity.npc.say.1' },
       { kind: 'unset', variable: 'base.levered' },
     ]);
     expect(roundTrip.locations.get('base.grove')?.x).toBe(1);

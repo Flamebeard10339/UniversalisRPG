@@ -130,11 +130,14 @@ export function moduleOrderProblems(modules: readonly ParsedModule[]): ModuleOrd
       .map((module) => ({ module, error: new DslError(`two modules declare the id ${module.info.id}`) }));
   }
 
-  const unnamed = modules.filter((module) => module.namespace === null);
-  if (modules.length > 1 && unnamed.length > 0) {
+  // A module that is nothing but translations declares no id, so it is not one
+  // of the modules an unnamespaced module has to be kept apart from.
+  const declaring = modules.filter((module) => module.sections.some((section) => section.kind !== 'locale'));
+  const unnamed = declaring.filter((module) => module.namespace === null);
+  if (declaring.length > 1 && unnamed.length > 0) {
     return unnamed.map((module) => ({
       module,
-      error: new DslError(`${module.info.id} declares no # info, so its ids have no namespace to keep them apart from the other ${modules.length - 1} module(s) loaded`),
+      error: new DslError(`${module.info.id} declares no # info, so its ids have no namespace to keep them apart from the other ${declaring.length - 1} module(s) loaded`),
     }));
   }
 

@@ -1,11 +1,12 @@
 import { Action, isTwoSided, Sided } from '../grammar/action';
 import { attemptDuration, statValue } from './stats';
 import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
+import { actionAddress } from '../content/action';
 import { declaredId, Entity } from '../content/entity';
 import { hostile, Registry } from '../content/registry';
 import { actionVisible, findActiveAction, findActionOwner, requiresMet } from './actions';
 import { GameState, PLAYER, RuntimeError, templateOf } from './state';
-import { humanize } from '../grammar/values';
+import { Answer, Localized, localizerOf, Params } from './localized';
 import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
 
 // Where one participant's swing comes from and who it lands on. Every
@@ -13,13 +14,14 @@ import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
 // identity.
 export interface Seat {
   ownerRef: string;
-  actionLabel: string;
+  actionSlug: string;
   target: string;
 }
 
 export interface ActiveAction {
   ownerRef: string; // "<obj>.<objId>", e.g. "entity.oven" or "action.melee-combat"
-  actionLabel: string;
+  // What addresses the action under that owner, never the label it is shown as.
+  actionSlug: string;
   repeating: boolean;
   implicitTarget: number;
   // Insertion order breaks ties between clocks due at the same instant.
@@ -89,7 +91,7 @@ export function retaliation(state: GameState, registry: Registry, actorId: strin
 // player is offered a choice.
 export const performable = (action: Action, state: GameState): boolean => requiresMet(action, state) && actionVisible(action, state);
 
-export const seatOf = (id: string, action: Action, target: string): Seat => ({ ownerRef: `action.${id}`, actionLabel: action.label, target });
+export const seatOf = (id: string, action: Action, target: string): Seat => ({ ownerRef: `action.${id}`, actionSlug: actionAddress(action), target });
 
 // The actor's own max, not initResources' `start`, a player-lifecycle concept.
 export function enterEncounter(active: ActiveAction, actorId: string, state: GameState, registry: Registry, attackerId: string): void {
@@ -141,7 +143,7 @@ function seatedAction(seat: Seat, registry: Registry, actorId: string): Action |
     if (own) return own;
   }
   const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-  return owner?.actions?.find((each) => each.label === seat.actionLabel);
+  return owner?.actions?.find((each) => actionAddress(each) === seat.actionSlug);
 }
 
 // What the performer of the armed action actually brings: its own copy, with
@@ -165,8 +167,11 @@ export function participants(state: GameState, registry: Registry): Participant[
   return list;
 }
 
-export function actorTitle(actorId: string, registry: Registry): string {
-  return actorEntity(registry, actorId)?.title ?? humanize(actorId);
+// The name a swing says. An actor whose entity is no longer loaded has no
+// title in any language, so its key stands in — which is what c3 asks for and
+// what a humanized id was pretending not to be.
+export function actorTitle(actorId: string, registry: Registry, state: GameState): Localized {
+  return localizerOf(registry, state).title('entity', actorEntity(registry, actorId)?.id ?? actorId);
 }
 
 // Everyone in the fight who is hostile to this actor, which is what a fight's
@@ -176,9 +181,9 @@ export function opposes(registry: Registry, a: string, b: string): boolean {
 }
 
 export interface EncounterFoe {
-  id: string;
-  title: string;
-  resource: string;
+  id: Answer;
+  title: Localized;
+  resource: Answer;
   current: number;
   max: number;
   cadence: number | null;
@@ -207,7 +212,7 @@ export function encounterView(state: GameState, registry: Registry): EncounterVi
     const swing = swinging.get(actorId);
     foes.push({
       id: actorId,
-      title: actorTitle(actorId, registry),
+      title: actorTitle(actorId, registry, state),
       resource: resource.id,
       current: fromMilliUnits(actor.resources[resource.id] ?? 0),
       max: statValue(resource.max, state, registry, actorId),
@@ -232,16 +237,27 @@ export function damageTarget(state: GameState, registry: Registry, action: Actio
 }
 
 // Rounded, because the log is prose: sub-unit precision belongs in the pool,
-// not in a sentence reporting a hit for 4.873.
-function spoken(milliAmount: number): string {
-  return String(Math.round(fromMilliUnits(milliAmount) * 10) / 10);
+// not in a sentence reporting a hit for 4.873. Handed to the pattern as a
+// number, so how a language spells one stays the pattern's business.
+function spoken(milliAmount: number): number {
+  return Math.round(fromMilliUnits(milliAmount) * 10) / 10;
 }
 
+// Four patterns rather than one assembled sentence: who swings decides which
+// two of them there are, and a language is free to put the actor, the verb and
+// the amount wherever it puts them.
 export function logSwing(state: GameState, registry: Registry, self: string, other: string, damage: number | null): void {
-  const swinger = self === PLAYER ? 'You' : `The ${actorTitle(self, registry)}`;
-  const struck = other === PLAYER ? 'you' : `the ${actorTitle(other, registry)}`;
-  const verb = self === PLAYER ? { hit: 'hit', miss: 'miss' } : { hit: 'hits', miss: 'misses' };
-  state.log.push(damage === null ? `${swinger} ${verb.miss} ${struck}.` : `${swinger} ${verb.hit} ${struck} for ${spoken(damage)}.`);
+  const localizer = localizerOf(registry, state);
+  // A swing the player lands on themselves is neither of the two sides the
+  // patterns name, so it is said the way one between two others is: whoever
+  // swings is named, and so is whoever it lands on.
+  const attacker = self === PLAYER && other !== PLAYER ? undefined : actorTitle(self, registry, state);
+  const target = other === PLAYER && self !== PLAYER ? undefined : actorTitle(other, registry, state);
+  const side = attacker === undefined ? 'player' : target === undefined ? 'foe' : 'other';
+  const params: Params = { ...(attacker === undefined ? {} : { attacker }), ...(target === undefined ? {} : { target }) };
+  const hit = `engine.combat.${side}.hit` as const;
+  const miss = `engine.combat.${side}.miss` as const;
+  state.log.push(damage === null ? localizer.engine(miss, params) : localizer.engine(hit, { ...params, damage: spoken(damage) }));
 }
 
 export function poolLevel(state: GameState, registry: Registry, actorId: string, resourceId: string): number {

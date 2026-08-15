@@ -9,15 +9,22 @@ export type TextSegment =
   | { kind: 'interpolate'; reference: Reference }
   | { kind: 'conditional'; condition: Condition; text: string };
 
-export interface Choice {
+// A line a dialogue speaks, and the address a `# locale` reaches its words by.
+// The key is stamped by the load path, which is the first place that knows both
+// the node the line sits in and how many lines of its kind came before it.
+export interface Spoken {
   segments: TextSegment[];
+  key?: string;
+}
+
+export interface Choice extends Spoken {
   when?: Condition;
   effects: ActionResult[];
   goto?: string;
 }
 
 export type NodeStep =
-  | { kind: 'say'; segments: TextSegment[] }
+  | ({ kind: 'say' } & Spoken)
   | { kind: 'effect'; result: ActionResult }
   | { kind: 'goto'; target: string }
   | { kind: 'menu'; choices: Choice[] };
@@ -27,7 +34,7 @@ export interface DialogueNode {
   when?: Condition;
   once?: boolean;
   sticky?: boolean;
-  again?: TextSegment[];
+  again?: Spoken;
   steps: NodeStep[];
 }
 
@@ -56,7 +63,10 @@ function parseFragment(raw: string, base: number): TextSegment {
   return { kind: 'conditional', condition: parsedCondition, text: raw.slice(colon + 1).replace(/^[ \t]/, '') };
 }
 
-function parseSegments(text: string, base: number): TextSegment[] {
+// Exported because a `# locale` translates a spoken line into the same grammar
+// it was authored in, so the words a translator wrote are read back by the
+// reader that read the author's.
+export function parseSegments(text: string, base: number): TextSegment[] {
   const segments: TextSegment[] = [];
   let literalStart = 0;
   let i = 0;
@@ -108,7 +118,7 @@ function parseNode(name: string, source: RawLine): DialogueNode {
     const again = AGAIN.exec(line.text)?.groups;
     const goto = GOTO.exec(line.text)?.groups;
     if (when) node.when = parseWhole(condition, when.cond, line.span.start, 'a node when');
-    else if (again) node.again = parseSegments(again.text, line.span.start);
+    else if (again) node.again = { segments: parseSegments(again.text, line.span.start) };
     else if (line.text === 'once') node.once = true;
     else if (line.text === 'sticky') node.sticky = true;
     else if (goto) node.steps.push({ kind: 'goto', target: goto.target });

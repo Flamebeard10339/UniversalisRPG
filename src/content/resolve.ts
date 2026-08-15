@@ -1,8 +1,12 @@
+import { Action } from '../grammar/action';
+import { actionSlug } from './locale';
 import { DISCOVERED } from './location';
 import { DslError } from '../grammar/parser';
+import { EntityBlock, isHandlerBlock } from './entity';
+import { lastSegment } from '../grammar/values';
 import { VISITS } from '../grammar/condition';
 import { isFieldEdits, listMembers } from '../grammar/section';
-import { NAMESPACED_KINDS, Namespace, qualify } from './namespace';
+import { ACTION_MEMBER, isActionOwnerKind, NAMESPACED_KINDS, Namespace, qualify } from './namespace';
 import { ParsedModule } from './universe';
 import { ReferenceKind, visitSection } from './referenceSites';
 import { Removal } from './removal';
@@ -60,12 +64,15 @@ function declareFlag(namespace: Namespace, kind: string, id: string, name: strin
   return namespace.declareMember('flag', kind, id, name);
 }
 
-const addedMembers = (value: unknown): string[] => (isFieldEdits(value) ? value.ops.filter((op) => op.op === '+').flatMap((op) => op.values as string[]) : listMembers<string>(value));
+const addedMembers = <T>(value: unknown): T[] => (isFieldEdits(value) ? value.ops.filter((op) => op.op === '+').flatMap((op) => op.values as T[]) : listMembers<T>(value));
 
 export interface MemberOwner {
   id: string;
   flags?: unknown;
   nodes?: { name: string }[];
+  actions?: unknown;
+  blocks?: unknown;
+  uses?: unknown;
 }
 
 export interface Member {
@@ -73,12 +80,27 @@ export interface Member {
   key: string;
 }
 
-// What hangs under an object rather than beside it: the flags it owns, and the
-// nodes of a dialogue, whose visits the engine counts against the node's path.
+// Read off what was authored rather than off the built table, because a member
+// is declared before `uses:` is resolved and reconciled against the merged
+// section long before either is linked. A shortened id names the same action as
+// the whole path, so the last segment is what survives resolution either way,
+// and a block whose label names a used action is that entity's overload of it
+// rather than an action of its own.
+export function actionAddresses(kind: string, value: MemberOwner): string[] {
+  if (!isActionOwnerKind(kind)) return [];
+  const used = addedMembers<string>(value.uses).map(lastSegment);
+  const inline = [...addedMembers<Action>(value.actions), ...addedMembers<EntityBlock>(value.blocks).filter((block) => !isHandlerBlock(block))] as Action[];
+  return [...used, ...inline.filter((block) => !used.includes(lastSegment(block.label))).map((block) => actionSlug(block.label))];
+}
+
+// What hangs under an object rather than beside it: the flags it owns, the
+// actions it performs, and the nodes of a dialogue, whose visits the engine
+// counts against the node's path.
 export function declareMembers(namespace: Namespace, kind: string, value: MemberOwner): Member[] {
   const declared: Member[] = [];
   if (kind === 'location') declared.push({ kind: 'flag', key: namespace.declareMember('flag', kind, value.id, DISCOVERED) });
-  for (const flag of addedMembers(value.flags)) declared.push({ kind: 'flag', key: declareFlag(namespace, kind, value.id, flag, `# ${kind} ${value.id}`) });
+  for (const flag of addedMembers<string>(value.flags)) declared.push({ kind: 'flag', key: declareFlag(namespace, kind, value.id, flag, `# ${kind} ${value.id}`) });
+  for (const address of actionAddresses(kind, value)) declared.push({ kind: ACTION_MEMBER, key: namespace.declareMember(ACTION_MEMBER, kind, value.id, address) });
   if (kind === 'dialogue') for (const node of value.nodes ?? []) declared.push({ kind: 'node', key: namespace.declareMember('node', kind, value.id, node.name) });
   return declared;
 }

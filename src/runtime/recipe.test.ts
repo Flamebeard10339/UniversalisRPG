@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { craft, createGameState, RuntimeError, recipeCraftable, resolve } from './runtime';
-import { loadModule, Registry } from '../content/registry';
+import { CRAFT_ADDRESS, loadModule, Registry } from '../content/registry';
 import { applyDirective, startSession, view } from './session';
 import { SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';
@@ -228,7 +228,7 @@ describe('spannable repeating craft', () => {
     expect(state.inventory['clay-brick']).toBe(1);
     expect(state.inventory['raw-clay']).toBe(2);
     expect(state.time).toBe(secondsToMs(2));
-    expect(state.activeAction).toEqual({ ownerRef: 'recipe.brick', actionLabel: 'Craft Brick', repeating: true, implicitTarget: toMilliUnits(1), cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'recipe.brick', actionLabel: 'Craft Brick', target: 'brick' } } });
+    expect(state.activeAction).toEqual({ ownerRef: 'recipe.brick', actionSlug: CRAFT_ADDRESS, repeating: true, implicitTarget: toMilliUnits(1), cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'recipe.brick', actionSlug: CRAFT_ADDRESS, target: 'brick' } } });
 
     resolve(state, registry, secondsToMs(6)); // two more completions' worth of time
     expect(state.inventory['clay-brick']).toBe(3);

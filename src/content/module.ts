@@ -8,6 +8,7 @@ import { factionSchema } from './faction';
 import { flagSchema } from './flag';
 import { infoSchema } from './info';
 import { itemSchema } from './item';
+import { parseLocaleSection } from './locale';
 import { locationSchema } from './location';
 import { passiveSchema } from './passive';
 import { DslError } from '../grammar/parser';
@@ -17,16 +18,23 @@ import { resourceSchema } from './resource';
 import { parseSaveSection } from './saveSection';
 import { AnySchema, parseAnySection } from '../grammar/section';
 import { skillSchema } from './skill';
+import { slotSchema } from './slot';
 import { statSchema } from './stat';
 import { RawSection, splitSections } from '../grammar/structure';
 import { parseTest } from './test';
 import { variableSchema } from './variable';
 
-export const SCHEMAS: Record<string, AnySchema> = {
+// Every kind whose grammar is key/value, beside the schema that reads it. The
+// literal keys are kept rather than widened to `string`, because `TEXT_FIELDS`
+// is exhaustive over them: a kind added here and nowhere else is a kind whose
+// words nobody decided about, and that is a compile error rather than a title
+// that quietly has no key.
+export const SCHEMAS = {
   info: infoSchema,
   item: itemSchema,
   stat: statSchema,
   skill: skillSchema,
+  slot: slotSchema,
   location: locationSchema,
   entity: entitySchema,
   event: eventSchema,
@@ -37,7 +45,14 @@ export const SCHEMAS: Record<string, AnySchema> = {
   variable: variableSchema,
   passive: passiveSchema,
   'cluster-jewel': clusterJewelSchema,
-};
+} satisfies Record<string, AnySchema>;
+
+export type SchemaKind = keyof typeof SCHEMAS;
+
+// The runtime lookup, where a kind is whatever a module wrote and may be
+// bespoke or nothing at all. The union above is for the exhaustiveness checks
+// that read it; this is for asking.
+export const schemaFor = (kind: string): AnySchema | undefined => (SCHEMAS as Record<string, AnySchema | undefined>)[kind];
 
 // A few kinds have a grammar too far from key/value to fit the generic engine
 // and bring their own parser. They merge on their own terms too — see mergeSection.
@@ -48,6 +63,7 @@ const BESPOKE: Record<string, (section: RawSection) => object> = {
   test: parseTest,
   save: parseSaveSection,
   remove: parseRemoval,
+  locale: parseLocaleSection,
 };
 
 const PARSERS: Record<string, (section: RawSection) => object> = {

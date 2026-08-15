@@ -1,6 +1,7 @@
 import { evaluateCondition, renderSegments } from './conditions';
-import { Choice, Dialogue, DialogueNode } from '../content/dialogue';
+import { Choice, Dialogue, DialogueNode, Spoken } from '../content/dialogue';
 import { applyResultsNow } from './effects';
+import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';
 import { GameState, RuntimeError } from './state';
 
@@ -16,23 +17,34 @@ export interface DialogueCursor {
   replay: boolean;
 }
 
+// A line the dialogue speaks, at the address the load path stamped on it. A
+// line without one was built in code rather than loaded, and there is no
+// language it could be shown in.
+function spokenLine(registry: Registry, state: GameState, line: Spoken): Localized {
+  if (line.key === undefined) throw new RuntimeError(`a dialogue line reached the log with no address: ${JSON.stringify(renderSegments(line.segments, state))}`);
+  return localizerOf(registry, state).line(line.key, (segments) => renderSegments(segments, state));
+}
+
 function findNode(dialogue: Dialogue, name: string): DialogueNode {
   const node = dialogue.nodes.find((n) => n.name === name);
   if (!node) throw new RuntimeError(`goto target not found: ${name} in dialogue ${dialogue.id}`);
   return node;
 }
 
-export function cursorProblem(cursor: DialogueCursor, registry: Registry): string | null {
+export function cursorProblem(localizer: Localizer, cursor: DialogueCursor, registry: Registry): Localized | null {
+  const named = { dialogue: localizer.identifier(cursor.dialogue), node: localizer.identifier(cursor.node) };
   const dialogue = registry.dialogues.get(cursor.dialogue);
-  if (!dialogue) return `dialogue ${cursor.dialogue} is not loaded`;
+  if (!dialogue) return localizer.engine('engine.dialogue.stale.unloaded', named);
   const node = dialogue.nodes.find((n) => n.name === cursor.node);
-  if (!node) return `dialogue ${cursor.dialogue} has no node ${cursor.node}`;
-  if (node.steps[cursor.resumeIndex - 1]?.kind !== 'menu') return `dialogue ${cursor.dialogue} node ${cursor.node} no longer offers a menu there`;
+  if (!node) return localizer.engine('engine.dialogue.stale.no-node', named);
+  if (node.steps[cursor.resumeIndex - 1]?.kind !== 'menu') return localizer.engine('engine.dialogue.stale.no-menu', named);
   return null;
 }
 
+// A cursor this stale is a fault rather than a screen, so it is stated in the
+// language the engine is written in and never reaches a player.
 function resolveMenu(cursor: DialogueCursor, registry: Registry): { dialogue: Dialogue; node: DialogueNode; choices: Choice[] } {
-  const problem = cursorProblem(cursor, registry);
+  const problem = cursorProblem(localizerFor(registry, BASE_LANGUAGE), cursor, registry);
   if (problem) throw new RuntimeError(`stale dialogue cursor: ${problem}`);
   const dialogue = registry.dialogues.get(cursor.dialogue)!;
   const node = findNode(dialogue, cursor.node);
@@ -46,7 +58,7 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, st
     const step = node.steps[i];
     switch (step.kind) {
       case 'say':
-        if (replay) state.log.push(renderSegments(step.segments, state));
+        if (replay) state.log.push(spokenLine(registry, state, step));
         break;
       case 'effect':
         if (replay) applyResultsNow(state, registry, [step.result]);
@@ -66,7 +78,7 @@ function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, s
   const counter = `${dialogue.id}.${node.name}`;
   const visit = (state.visits[counter] = (state.visits[counter] ?? 0) + 1);
   const replay = visit === 1 || node.sticky === true;
-  if (!replay && node.again) state.log.push(renderSegments(node.again, state));
+  if (!replay && node.again) state.log.push(spokenLine(registry, state, node.again));
   return runSteps(dialogue, node, registry, state, 0, replay);
 }
 
@@ -84,20 +96,26 @@ export function talk(entityId: string, registry: Registry, state: GameState): Di
 
 // One gate, one rendering: the offer and the answer are read off the same list,
 // so a choice withheld by its `when:` cannot be reachable by typing its text.
-function offered(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ choice: Choice; text: string }> {
+// c2: the index is the option's place among the choices its node declares, not
+// among the ones offered here, so a choice a `when:` withholds does not shift
+// the answer to every choice after it.
+function offered(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ choice: Choice; index: number }> {
   return resolveMenu(cursor, registry)
-    .choices.filter((choice) => !choice.when || evaluateCondition(choice.when, state))
-    .map((choice) => ({ choice, text: renderSegments(choice.segments, state) }));
+    .choices.map((choice, index) => ({ choice, index }))
+    .filter((entry) => !entry.choice.when || evaluateCondition(entry.choice.when, state));
 }
 
-export function menuTexts(cursor: DialogueCursor, registry: Registry, state: GameState): string[] {
-  return offered(cursor, registry, state).map((entry) => entry.text);
+// The index is what a driver answers with and the display is what it draws:
+// the two halves of a choice, and the reason a menu option is as translatable
+// as the lines around it (c6).
+export function menuChoices(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ index: number; display: Localized }> {
+  return offered(cursor, registry, state).map((entry) => ({ index: entry.index, display: spokenLine(registry, state, entry.choice) }));
 }
 
-export function choose(text: string, cursor: DialogueCursor, registry: Registry, state: GameState): DialogueCursor | null {
+export function choose(answer: string, cursor: DialogueCursor, registry: Registry, state: GameState): DialogueCursor | null {
   const { dialogue, node } = resolveMenu(cursor, registry);
-  const match = offered(cursor, registry, state).find((entry) => entry.text === text)?.choice;
-  if (!match) throw new RuntimeError(`no choice matches: ${JSON.stringify(text)}`);
+  const match = offered(cursor, registry, state).find((entry) => String(entry.index) === answer)?.choice;
+  if (!match) throw new RuntimeError(`no choice matches: ${JSON.stringify(answer)}`);
 
   applyResultsNow(state, registry, match.effects);
   if (match.goto) return enterNode(dialogue, findNode(dialogue, match.goto), registry, state);

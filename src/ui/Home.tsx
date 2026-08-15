@@ -24,11 +24,19 @@ const KIND_CLASS: Record<LogKind, string> = {
   detail: 'pl-3 text-sm text-text-subtle',
 };
 
+// Whose words a line is, as the shell draws it: the tool's are set in the
+// monospace the DSL is written in and dimmed, so a parser diagnostic does not
+// read as something the world said. The distinction is the entry's own, carried
+// from the arm the command layer split it on.
+const WORDS_CLASS: Record<LogEntry['words'], string> = { player: '', tool: 'font-mono text-text-muted' };
+
 // A line mounts once, so the flash marks exactly the text that just arrived.
 function Line({ entry }: { entry: LogEntry }): JSX.Element {
   const tone = entry.kind === 'message' ? TONE_CLASS[entry.tone] : '';
   const arrived = useMoment('arrival', true, String(entry.id));
-  return <p className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 leading-relaxed ${KIND_CLASS[entry.kind]} ${tone}`}>{entry.text}</p>;
+  return (
+    <p className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 leading-relaxed ${WORDS_CLASS[entry.words]} ${KIND_CLASS[entry.kind]} ${tone}`}>{entry.text}</p>
+  );
 }
 
 // Grouped under whatever offers them, so an offer with an owner and one without

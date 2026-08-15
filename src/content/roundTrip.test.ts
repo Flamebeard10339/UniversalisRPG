@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadModule, loadUniverseWithDiagnostics, type ModuleDiagnostic, type UniverseLoadResult } from './registry';
-import { canSerialize, declaredVariableIds, roundTripModule, roundTripUniverse } from './roundTrip';
+import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from './roundTrip';
 import { parseUniverse, type ModuleSource } from './universe';
 
 const BASE = ['# info base', 'version: 1.0.0', '', '# item bread', 'title: Bread', '', '# location camp', 'x: 0, y: 0', 'starting'].join('\n');
@@ -83,8 +83,8 @@ describe('roundTripModule', () => {
   });
 
   it('reports a value the reload changed, not only one it dropped', () => {
-    const result = roundTripModule(loadModule(BASE), { info }, (printed) => reloadAlone(printed.replace('title: Bread', 'title: Toast')));
-    expect(result.differences).toEqual(['  items: changed base.bread']);
+    const result = roundTripModule(loadModule(BASE), { info }, (printed) => reloadAlone(printed.replace('x: 0, y: 0', 'x: 1, y: 0')));
+    expect(result.differences).toEqual(['  locations: changed base.camp']);
   });
 
   it('stops at diagnostics and does not diff a registry that never loaded', () => {
@@ -109,23 +109,23 @@ describe('roundTripModule', () => {
     expect(undeclared.printed).not.toContain('# variable');
     expect(undeclared.differences).toEqual(['  variables: missing travel-seconds-per-unit']);
 
-    const declared = roundTripModule(withVariable, { info, globalVariables: ['travel-seconds-per-unit'] }, reloadAlone);
+    const declared = roundTripModule(withVariable, { info, globals: ['travel-seconds-per-unit'] }, reloadAlone);
     expect(declared.printed).toContain('# variable travel-seconds-per-unit');
     expect(declared.differences).toEqual([]);
   });
 });
 
-describe('declaredVariableIds', () => {
+describe('declaredGlobalIds', () => {
   it('answers in a stable order, so the serializer prints the same bytes whatever order they were authored in', () => {
     const one = parseUniverse([{ name: 'm', text: '# info m\nversion: 1.0.0\n\n# variable zebra\nvalue: 1\n\n# variable alpha\nvalue: 2\n' }])[0];
     const other = parseUniverse([{ name: 'm', text: '# info m\nversion: 1.0.0\n\n# variable alpha\nvalue: 2\n\n# variable zebra\nvalue: 1\n' }])[0];
-    expect(declaredVariableIds(one)).toEqual(['alpha', 'zebra']);
-    expect(declaredVariableIds(one)).toEqual(declaredVariableIds(other));
+    expect(declaredGlobalIds(one)).toEqual(['alpha', 'zebra']);
+    expect(declaredGlobalIds(one)).toEqual(declaredGlobalIds(other));
   });
 
   it('names only variables, not every section that has an id', () => {
     const module = parseUniverse([{ name: 'm', text: '# info m\nversion: 1.0.0\n\n# item rock\n\n# variable pace\nvalue: 3\n' }])[0];
-    expect(declaredVariableIds(module)).toEqual(['pace']);
+    expect(declaredGlobalIds(module)).toEqual(['pace']);
   });
 });
 
@@ -161,7 +161,7 @@ describe('roundTripUniverse', () => {
   };
 
   it('hands the reload the serializations, never the sources it was given', () => {
-    const source: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\ntitle: Rope\n' };
+    const source: ModuleSource = { name: 'base', text: '// a rope\n# info base\nversion: 1.0.0\n\n# item rope\n' };
     const result = trip([source]);
     expect(handed).toHaveLength(1);
     expect(handed[0]).toEqual(result.sources);
@@ -170,14 +170,14 @@ describe('roundTripUniverse', () => {
 
   it('hands over one serialization per module, and no original among them', () => {
     const other: ModuleSource = { name: 'more', text: '# info more\nversion: 1.0.0\ndependencies:\n  base\n\n# item ribbon\ntitle: Ribbon\n' };
-    const base: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\ntitle: Rope\n' };
+    const base: ModuleSource = { name: 'base', text: '// a rope\n# info base\nversion: 1.0.0\n\n# item rope\n' };
     const result = trip([base, other]);
     expect(handed[0]).toHaveLength(2);
     expect(handed[0]).toEqual(result.sources);
     expect(handed[0].map((each) => each.text)).not.toContain(base.text);
   });
 
-  const BASE_TWO: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\ntitle: Rope\n\n# item bread\ntitle: Bread\n' };
+  const BASE_TWO: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\n\n# item bread\ntitle: Bread\n' };
 
   it('round-trips a single module clean', () => {
     expect(trip([BASE_TWO]).differences).toEqual([]);

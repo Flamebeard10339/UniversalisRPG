@@ -5,8 +5,17 @@ Kept current: when the tool and this document disagree, that is a defect in one 
 promise lives at `docs/specs/<slug>.md` and becomes a historical record the moment it merges — this
 file never does.
 
-Two roles. A **planner** decomposes and never implements, so its context never fills with low-level
-detail. A **worker** implements and never plans, so its context is spent on one piece.
+Two roles. A **planner** decides what a spec promises and never implements, so its context never
+fills with low-level detail. A **worker** implements one spec and never plans, so its context is
+spent on one piece.
+
+A spec is that piece. It is not cut into sub-tasks, and the step that used to cut it has been
+removed rather than improved: a planner cutting one rule into slices has only where the code lives
+to cut by, never where the rule applies, so it cuts by surface — and each slice then applies the
+rule to its own surface and truthfully reports success while the rule remains unenforced everywhere
+else. That failure is recorded as `a-clause-that-enumerates-instances-is-graded-on-the-enumerat`.
+If a spec looks like it needs cutting, it is too big: write two, each with its own clauses and its
+own audit.
 
 ## The session, in order
 
@@ -28,32 +37,54 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    — and record that in the spec's `## Decisions`, because it is the reasoning a later planner
    would otherwise re-litigate. A survey that finds an owner is a success: reuse it, or write down
    why a second one is right. Naming no paths still prints the clause format and the
-   decompose/`plan`/dispatch sequence below, so the brief is worth running even at the first guess.
-2. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — one spec per branch, numbered
-   proof clauses under `## Deliverable`, in the literal `- [cN] text` form `plan-prompt` prints,
-   because that number is what `--discharges` in step 3 references. The spec is the contract,
-   never the test plan. Run `spec new` after the survey above, not before — it writes only the
-   scaffold, never a planner's capability decisions.
-3. **Decompose** into tasks whose `--writes` regions are disjoint:
-   `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids>`.
-   A `--produces` here is a **forecast** of a capability, answerable to the survey in step 1; the
-   registration that makes it durable happens later, once someone has read the region. `--discharges
-   c3,c6` records which proof clauses a slice would settle, so `tasks spec show` can name the owner
-   of every clause standing and say which clause has none. The grant
-   is a forecast too, and is recorded as one — declare the region you honestly mean, a directory
-   included, rather than inventing file paths to make step 4 quiet. Setting `--writes` prints
-   everything that has ever claimed those paths, so step 1's survey happens again whether or not
-   anyone asked for it. `tasks system` / `tasks system "<name>"` / `tasks where <path>` answer
-   the architecture.
-4. **`tasks plan`** — grades the set for overlap, unstated dependencies and duplicated
-   interfaces before anyone works it. It reports and refuses nothing.
+   `plan`/dispatch sequence below, so the brief is worth running even at the first guess.
+2. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — numbered proof clauses under
+   `## Deliverable`, in the literal `- [cN] text` form `plan-prompt` prints. The spec is the
+   contract, never the test plan. Run `spec new` after the survey above, not before — it writes
+   only the scaffold, never a planner's capability decisions.
+   **Every clause carries a `proof:` target on the line below it**, a `vitest <path>` or a
+   `proof: command`. This is not decoration: `audit-prompt` builds the mutation manifest from those
+   targets, and a spec of pure prose hands an auditor nothing, which is the single largest measured
+   cost in this repository — 37 recorded occurrences, 25 to 45 minutes of hand-aiming per pass, on
+   at least eight specs.
+   **If a clause says *every*, its proof derives its own subjects.** A test that enumerates cannot
+   grow when the code does, so an enumerated proof under a universal clause guarantees the audit
+   grades the list rather than the sentence. Sixteen hand-written `@ts-expect-error` lines had gone
+   stale by seven fields; the walk over the published types that replaced them costs 54ms and covers
+   the field written next month.
+   A branch may declare more than one spec, and each is graded and audited on its own. `audit-prompt`
+   infers the spec from the branch name and withholds the pass file and the manifest when that
+   inference disagrees with the slug asked for — so a branch working several specs audits each from
+   a worktree whose branch is named after it, per step 7.
+3. **Register the spec as its own single member.**
+   `tasks add "<title>" --spec <slug> --writes <paths> --produces "<capability>" --discharges c1,c2,…`
+   — **naming every clause the spec has.** A spec is the unit of work, so there is one member and it
+   owes all of it; this step exists because the store's unit is a record and the spec's is a
+   document, and it stays a hand step until the tool mints it. Discharge every number: the clauses
+   leg of `merge-ready` reads `discharges`, and a member discharging none passes that leg on
+   nothing, so a missing number is a gate going green over a clause nobody answered. A `--produces`
+   here is a **forecast** of a capability, answerable to the survey in step 1; the registration that
+   makes it durable happens in step 5, once someone has read the region. The grant is a forecast
+   too — declare the region you honestly mean, a directory included, rather than inventing file
+   paths to make step 4 quiet. Setting `--writes` prints everything that has ever claimed those
+   paths, so step 1's survey happens again whether or not anyone asked for it.
+4. **`tasks plan`** — grades the open specs against each other for overlap, unstated dependencies
+   and duplicated interfaces before anyone is dispatched. It reports and refuses nothing. Two specs
+   writing one region is the collision that costs, and it is the one this check exists for now that
+   a spec is never cut into members. Then run `tasks work-prompt <slug>` and read what comes back,
+   because it is the brief a dispatcher will hand a worker and a plan that grades clean can still
+   put the wrong thing in front of one. `tasks system` / `tasks system "<name>"` / `tasks where
+   <path>` answer the architecture.
 5. **Dispatch a worker with one instruction**: "run `npm run tasks -- work-prompt <id>` and do what
    it says" — symmetric with the auditor's in step 7, and for the same reason: a hand-written brief
    is a copy of the record that drifts from it, and composing one is where a planner smuggles in
    detail nobody asked it to hold. The brief invites refusal, and a planner must believe it. The
-   argument may also be a **spec slug**, which briefs that spec's next open, unblocked member — a
-   dispatcher knows the name of the work, not which member is unblocked right now. An exact task id
-   wins over a spec of the same name.
+   argument is normally the **spec slug**, since the spec is the work. An exact task id wins over a
+   spec of the same name.
+   **One worker per worktree at a time, and it stages explicit paths** — `git add <paths>`, never
+   `git add -A`. Two workers sharing a tree stage each other's half-written files and run the suite
+   against each other's edits; measured here as 206 lines of a live worker's uncommitted test file
+   swallowed by another actor's commit, and a second worker's commit lost to the race.
    **The worker proposes before it implements**: `tasks start <id> --actor <name>`, then
    `tasks edit <id> --writes <what it will actually touch> --grant commitment` — the worker has
    just read the region and the planner has not, and `--grant commitment` is the word that turns
@@ -73,6 +104,17 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    line. `tasks import <doc>` reads findings out of a written report and belongs to the
    whole-system sweeps under `docs/audits/`, which are a different thing from one branch's audit.
    Filing findings without `--proof` flags appends no pass, so late findings never reset verdicts.
+   **N specs need N auditors, and they are the one thing here that genuinely parallelises** — on one
+   condition: each gets its own `git worktree`, because `npm run mutate` rewrites source in place
+   and an auditor sharing a tree reads another's mutant as its own baseline. Name each worktree's
+   branch after its spec so `audit-prompt`'s strict route resolves it with no `--branch` override
+   and prints nothing false. The gate is in the brief alone; `tasks audit` files whatever it is handed.
+   **Filing is the one step that cannot be concurrent, and serialising it costs nothing.**
+   `docs/tasks.jsonl` is read-modify-write under no lock, so two `tasks audit` or `tasks add` calls
+   in flight lose records with no error raised. The pass file is already the hand-back artifact:
+   auditors fill theirs, one actor runs `--args-from` over each in turn. That is seconds against a
+   parallel run, and it is the only place cross-auditor duplicates are caught — parallel auditors
+   cannot read each other's filings the way a serial third one can.
 8. **Triage.** A separate step with a separate actor: the auditor files findings and never promotes
    one, and `audit-prompt` tells it so. Findings from the branch's **own first pass** skip the walk:
    promote HIGHs and anything judged fix-now with `tasks promote <id>... ` — they are always
@@ -118,58 +160,29 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
     decision the next planner will re-litigate — which is why `done`, `decline` and `triage`
     each print the command rather than leaving you to remember it.
 
-## Advice that is known good
-
-- **Cut by write grants, not by layers.** The most expensive recurring mistake is slicing work so
-  every slice touches the same file. Chunks touching one file are one task.
-- **Do not add workers to buy speed.** Agent count is the one lever measured to correlate with
-  nothing. Fewer workers over disjoint regions is not a compromise.
-- **A finding cannot create work; an unmet clause creates work directly.** The first rule stops a
-  spec growing without a human; the second stops it closing falsely. Both have happened here.
-- **`met` carries evidence, `unmet` means checked-and-fails, `unknown` means nobody looked.** The
-  three never collapse.
-- **Red-green proves a test can fail; only mutation proves it fails for the right reason.**
-  `npm run mutate -- <manifest.json>` is the tool; keep manifests in scratch, they rot.
-- **Commission one auditor whose only question is "is anything worse than before".**
-  Clause-by-clause verification cannot see a regression.
-- **Read a finding list's shape before promoting it.** Density in one file is a structural
-  diagnosis; ask what single change retires the most of the list, and build that seam first.
-- **Independent audits parallelise; one task's workers still do not.** The ruling above is about
-  splitting one piece of work, and it stands. N audits over N specs are N pieces, and they run
-  concurrently on one condition: each auditor gets its own `git worktree`, because `npm run mutate`
-  rewrites source in place and a second auditor sharing that tree reads a mutant as its own
-  baseline. `audit-prompt` assumes one spec per branch and withholds the pass file and the manifest
-  when the spec it infers for the branch is not the slug asked for — so name each worktree's branch
-  after its spec and the strict route resolves it, needing no `--branch` override and printing
-  nothing false. The gate is in the brief alone; `tasks audit` files whatever it is handed.
-- **Filing is the one step that cannot be concurrent, and serialising it costs nothing.**
-  `docs/tasks.jsonl` is read-modify-write under no lock, so two `tasks audit` or `tasks add` calls
-  in flight lose records with no error raised. The pass file is already the hand-back artifact:
-  auditors fill theirs, one actor runs `--args-from` over each in turn. That is seconds against a
-  parallel run, and it is the only place cross-auditor duplicates are caught — parallel auditors
-  cannot read each other's filings the way a serial third one can.
-- **Persisting evidence is planner work.** Archive audit reports into `docs/audits/` before the
-  session ends; the store is the record of note.
-- **A commit body scales with what the commit touches.** The contract asks for one line past the
-  subject, and a diff that changes code earns much more than that — it is the only place the shape
-  of *that* diff is explained, and it is where `git blame` lands. A commit that changes only the
-  store or a spec has already been recorded: `events.jsonl` holds who, when, branch and head for
-  every store write, and the spec's `## Decisions` holds the reasoning. There, say what changed and
-  point at where the reasoning lives rather than restating it — a judgement written in three places
-  is three places to drift.
-
 ## Why it is shaped this way
 
-**Write grants.** `writes` is what a task may change (files or directories; a directory covers
-everything beneath it) — not `files`, which is evidence about where a finding was observed.
-`produces` names an interface nothing owns until the task lands, so "who owns batching?" is a
-query instead of a guess. `requires` orders tasks; a forward reference to a record that does not
-exist yet holds the task until it does. `tasks plan` reports eight shapes of defect and note —
-two unordered tasks writing one region, a write into a region another task is producing an
+**Write grants.** `writes` is what a spec's work may change (files or directories; a directory
+covers everything beneath it) — not `files`, which is evidence about where a finding was observed.
+`produces` names an interface nothing owns until the work lands, so "who owns batching?" is a
+query instead of a guess. `requires` orders work; a forward reference to a record that does not
+exist yet holds it until it does. `tasks plan` reports eight shapes of defect and note —
+two unordered records writing one region, a write into a region another is producing an
 interface for, two claims on one interface, a claim the repository already answers, a plan
-concentrated in one path, a grant it cannot read, a wildcard it cannot resolve, and a task that
-starts blocked. Dispatching against a reported defect is a call a planner may make; making it
+concentrated in one path, a grant it cannot read, a wildcard it cannot resolve, and one that
+starts blocked. Those now grade **specs against each other** rather than members within one, since
+a spec is never cut. Dispatching against a reported defect is a call a planner may make; making it
 unknowingly is not.
+
+**Why the cut was removed rather than improved.** The rule it replaced — cut by write grants, so no
+two slices touch one file — is sound for work that is genuinely several pieces, and it is exactly
+wrong for one rule that reaches many files. A planner has only the file tree to cut by, so it cuts
+by surface; each worker then enforces the rule where it can see it, reports honestly, and the rule
+is left unenforced everywhere it could not. `reimplement-localization` paid seven audit passes to
+that, its c3 unmet at six of them on a new surface each time, and the successor spec began
+reproducing it — a stat, then a slot, then a skill — until the author stopped it. What closed it was
+one sweep applying one rule everywhere at once. Chunks touching one file are one task; one rule
+across forty files is also one task.
 
 **Forecast and commitment.** A grant also records which side of step 5 it is on, and `plan`
 grades an overlap as a **defect** only between two commitments. Anything else is a note naming

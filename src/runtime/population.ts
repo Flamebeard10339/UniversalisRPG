@@ -2,6 +2,7 @@ import { Location, populationCount } from '../content/location';
 import { Registry } from '../content/registry';
 import { templateOf } from './state';
 import { evaluateCondition } from './conditions';
+import { Localized, localizerOf } from './localized';
 import { GameState } from './state';
 import { secondsToMs } from './units';
 
@@ -96,14 +97,21 @@ export function applyRespawns(state: GameState): boolean {
 
 // Pruned when the entity or the location leaves the registry, which is what
 // keeps a deficit from outliving the place it is a fact about.
-export function prunePopulations(state: GameState, registry: Registry): { path: string; id: string; message: string }[] {
-  const warnings: { path: string; id: string; message: string }[] = [];
+export function prunePopulations(state: GameState, registry: Registry): { path: string; id: string; message: Localized }[] {
+  const warnings: { path: string; id: string; message: Localized }[] = [];
+  const localizer = localizerOf(registry, state);
+  const named = localizer.identifier;
   for (const [locationId, byEntity] of Object.entries(state.populations)) {
     for (const entityId of Object.keys(byEntity)) {
-      const missing = !registry.locations.has(locationId) ? `location ${locationId}` : !registry.entities.has(entityId) ? `entity ${entityId}` : undefined;
-      if (!missing) continue;
+      const params = { entity: named(entityId), location: named(locationId) };
+      const message = !registry.locations.has(locationId)
+        ? localizer.engine('engine.prune.population.location', params)
+        : !registry.entities.has(entityId)
+          ? localizer.engine('engine.prune.population.entity', params)
+          : undefined;
+      if (!message) continue;
       delete byEntity[entityId];
-      warnings.push({ path: `populations.${locationId}.${entityId}`, id: entityId, message: `Removed the population record for ${entityId} at ${locationId} because its ${missing} is not loaded.` });
+      warnings.push({ path: `populations.${locationId}.${entityId}`, id: entityId, message });
     }
     if (Object.keys(byEntity).length === 0) delete state.populations[locationId];
   }

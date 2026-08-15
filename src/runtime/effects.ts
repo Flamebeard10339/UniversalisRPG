@@ -9,6 +9,7 @@ import { evaluateCondition } from './conditions';
 import { actorEntity } from './encounter';
 import { stockItem } from './itemInstance';
 import { openModalNamed } from './modals';
+import { localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
 import { hitChance, statValue } from './stats';
@@ -49,8 +50,10 @@ export type ResultObserver = (segment: Segment, application: ResultApplication) 
 
 // Narration only — opening the modal happens in the switch below. Reaching the
 // log from an observer is what keeps the narration out of that switch.
-const narrateModal: ResultObserver = ({ state }, { result, lead }) => {
-  if (result.kind === 'open-modal' && lead) state.log.push(`modal:${result.modal}`);
+const narrateModal: ResultObserver = ({ state, registry }, { result, lead }) => {
+  if (result.kind !== 'open-modal' || !lead) return;
+  const localizer = localizerOf(registry, state);
+  state.log.push(localizer.engine('engine.modal.opened', { modal: localizer.identifier(result.modal) }));
 };
 
 // Every result a segment applies is offered to each of these, in application
@@ -197,7 +200,11 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
   switch (result.kind) {
     case 'say':
       if (!lead) return undefined;
-      state.log.push(result.text);
+      // The address the load path stamped on this line. A result that reached
+      // here without one was built in code rather than loaded, and there is no
+      // language it could be shown in.
+      if (result.key === undefined) throw new RuntimeError(`a say: reached the log with no address: ${JSON.stringify(result.text)}`);
+      state.log.push(localizerOf(registry, state).spoken(result.key));
       return 0;
     case 'set':
       state.flags[result.variable] = true;

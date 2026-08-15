@@ -28,6 +28,10 @@ export interface Contest {
 
 export interface Action {
   label: string;
+  // The label was made from the id rather than authored, so it is English by
+  // construction. Set where the label is generated, read where a label becomes
+  // a locale entry, and never printed back out.
+  generatedLabel?: true;
   // Absent is `duration`, and absent is what an untagged action records — so a
   // block overriding an inherited action keeps the kind it did not restate.
   kind?: ActionKind;

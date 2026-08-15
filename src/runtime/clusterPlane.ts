@@ -3,6 +3,7 @@ import { Direction, DIRECTIONS, Hex, hexKey, NEIGHBOR_DELTA, opposite, parseHexK
 import { isBase, Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';
+import { aCount, anId, says, type Said } from './said';
 
 export const ORIGIN: Hex = { q: 0, r: 0 };
 
@@ -31,10 +32,12 @@ export type SlotState = 'none' | 'open' | 'filled' | 'blocked';
 
 // The cluster an item base carries when it declares no `origin-cluster:` of its
 // own (c9). It is not a declaration and is never registered, so no content can
-// shadow it and `jewel: null` is what a save records for it.
+// shadow it, `jewel: null` is what a save records for it, and the words a
+// report draws it under are `engine.plane.base` rather than this field, which
+// addresses nothing.
 const BASE_CLUSTER: ClusterJewel = {
   id: 'base',
-  title: 'Base',
+  title: 'base',
   shape: 'point',
   openConnections: ['e'],
   positions: {},
@@ -84,8 +87,11 @@ export function positionOnEdge(placement: Placement, direction: Direction): numb
   return getShape(placement.jewel.shape).edges[rotate(direction, -placement.rotation)];
 }
 
-function describeNode(node: PlaneNode): string {
-  return node.kind === 'slot' ? `the ${node.direction} slot of ${hexKey(node.hex)}` : `position ${node.position} of ${hexKey(node.hex)}`;
+// A node inside a sentence about it, which is a pattern the played language
+// supplies like any other rather than a phrase assembled before one.
+function describeNode(node: PlaneNode): Said {
+  const hex = anId(hexKey(node.hex));
+  return node.kind === 'slot' ? says('engine.plane.node.slot', { direction: anId(node.direction), hex }) : says('engine.plane.node.position', { position: aCount(node.position), hex });
 }
 
 export function slotState(registry: Registry, plane: Plane, hex: Hex, direction: Direction): SlotState {
@@ -98,9 +104,10 @@ export function slotState(registry: Registry, plane: Plane, hex: Hex, direction:
 
 // The two refusals filling a slot and allocating one share, so c8's blocked
 // slot is one sentence refused in one place rather than two that can drift.
-function slotProblem(state: SlotState, hex: Hex, direction: Direction): string | undefined {
-  if (state === 'none') return `there is no jewel slot on the ${direction} edge of ${hexKey(hex)}`;
-  if (state === 'blocked') return `the ${direction} slot of ${hexKey(hex)} is blocked: a cluster already stands in ${hexKey(step(hex, direction))}`;
+function slotProblem(state: SlotState, hex: Hex, direction: Direction): Said | undefined {
+  const at = { direction: anId(direction), hex: anId(hexKey(hex)) };
+  if (state === 'none') return says('engine.plane.no-slot', at);
+  if (state === 'blocked') return says('engine.plane.slot-blocked', { ...at, beyond: anId(hexKey(step(hex, direction))) });
   return undefined;
 }
 
@@ -163,32 +170,34 @@ export function basePlane(item: Item): Plane | undefined {
 // Checks and then places, so no caller holds a way to put a cluster down
 // without them. The rotation is not stored: `entry` is, and it is what c7's
 // rule is read back out of.
-export function fillSlot(registry: Registry, plane: Plane, hex: Hex, direction: Direction, jewel: string): string | undefined {
+export function fillSlot(registry: Registry, plane: Plane, hex: Hex, direction: Direction, jewel: string): Said | undefined {
   const state = slotState(registry, plane, hex, direction);
   const problem = slotProblem(state, hex, direction);
   if (problem) return problem;
-  if (state === 'filled') return `the ${direction} slot of ${hexKey(hex)} already holds a jewel`;
-  if (!isAllocated(registry, plane, { hex, kind: 'slot', direction })) return `the ${direction} slot of ${hexKey(hex)} has not been allocated`;
+  const at = { direction: anId(direction), hex: anId(hexKey(hex)) };
+  if (state === 'filled') return says('engine.plane.slot-filled', at);
+  if (!isAllocated(registry, plane, { hex, kind: 'slot', direction })) return says('engine.plane.slot-unallocated', at);
 
   plane[hexKey(step(hex, direction))] = { jewel, entry: direction, allocatedPositions: [], allocatedSlots: [], effects: [] };
   return undefined;
 }
 
-export function allocateNode(registry: Registry, plane: Plane, node: PlaneNode, points: number): string | undefined {
+export function allocateNode(registry: Registry, plane: Plane, node: PlaneNode, points: number): Said | undefined {
   const cluster = clusterAt(plane, node.hex);
   const placement = cluster === undefined ? undefined : placementOf(registry, cluster);
-  if (!cluster || !placement) return `no cluster stands in ${hexKey(node.hex)}`;
+  if (!cluster || !placement) return says('engine.plane.no-cluster', { hex: anId(hexKey(node.hex)) });
 
   if (node.kind === 'position') {
     const count = getShape(placement.jewel.shape).positionCount;
-    if (!Number.isInteger(node.position) || node.position < 1 || node.position > count) return `${placement.jewel.shape} has no position ${node.position} (1-${count})`;
+    if (!Number.isInteger(node.position) || node.position < 1 || node.position > count) return says('engine.plane.no-position', { shape: anId(placement.jewel.shape), position: aCount(node.position), count: aCount(count) });
   } else {
     const problem = slotProblem(slotState(registry, plane, node.hex, node.direction), node.hex, node.direction);
     if (problem) return problem;
   }
-  if (isAllocated(registry, plane, node)) return `${describeNode(node)} is already allocated`;
-  if (points < 1) return `${describeNode(node)} costs a point and none remain`;
-  if (!neighbours(registry, plane, node).some((each) => isAllocated(registry, plane, each))) return `${describeNode(node)} touches nothing allocated`;
+  const at = describeNode(node);
+  if (isAllocated(registry, plane, node)) return says('engine.plane.already-allocated', { node: at });
+  if (points < 1) return says('engine.plane.no-points', { node: at });
+  if (!neighbours(registry, plane, node).some((each) => isAllocated(registry, plane, each))) return says('engine.plane.unreachable', { node: at });
 
   if (node.kind === 'slot') cluster.allocatedSlots.push(node.direction);
   else cluster.allocatedPositions.push(node.position);
@@ -236,36 +245,36 @@ function drop(plane: Plane, node: PlaneNode): void {
   else cluster.allocatedPositions = cluster.allocatedPositions.filter((each) => each !== node.position);
 }
 
-function dropUnplaceable(registry: Registry, plane: Plane, repairs: string[]): boolean {
+function dropUnplaceable(registry: Registry, plane: Plane, repairs: Said[]): boolean {
   let changed = false;
   for (const [key, cluster] of Object.entries(plane)) {
     if (placementOf(registry, cluster)) continue;
     changed = true;
     if (key === hexKey(ORIGIN)) {
-      repairs.push(`the origin cluster ${cluster.jewel} is not loaded, so the base's own cluster stands in its place`);
+      repairs.push(says('engine.plane.repair.origin', { jewel: anId(String(cluster.jewel)) }));
       plane[key] = originPlane(null)[key]!;
     } else {
-      repairs.push(`dropped the ${cluster.jewel} cluster at ${key}, whose declaration is gone, and everything allocated in it`);
+      repairs.push(says('engine.plane.repair.cluster', { jewel: anId(String(cluster.jewel)), hex: anId(key) }));
       delete plane[key];
     }
   }
   return changed;
 }
 
-function dropStranded(registry: Registry, plane: Plane, repairs: string[]): boolean {
+function dropStranded(registry: Registry, plane: Plane, repairs: Said[]): boolean {
   let changed = false;
   for (const { hex, cluster } of planeClusters(plane)) {
     if (cluster.entry === null) continue;
     const parent = step(hex, opposite(cluster.entry));
     if (slotState(registry, plane, parent, cluster.entry) === 'filled') continue;
-    repairs.push(`dropped the ${cluster.jewel} cluster at ${hexKey(hex)}, which entered through a ${cluster.entry} slot of ${hexKey(parent)} that is gone`);
+    repairs.push(says('engine.plane.repair.stranded', { jewel: anId(String(cluster.jewel)), hex: anId(hexKey(hex)), direction: anId(cluster.entry), parent: anId(hexKey(parent)) }));
     delete plane[hexKey(hex)];
     changed = true;
   }
   return changed;
 }
 
-function dropVanishedAllocations(registry: Registry, plane: Plane, repairs: string[]): void {
+function dropVanishedAllocations(registry: Registry, plane: Plane, repairs: Said[]): void {
   for (const node of allocatedNodes(plane)) {
     const placement = placementAt(registry, plane, node.hex);
     if (!placement) continue;
@@ -273,16 +282,16 @@ function dropVanishedAllocations(registry: Registry, plane: Plane, repairs: stri
       ? !slotDirections(placement).includes(node.direction)
       : node.position > getShape(placement.jewel.shape).positionCount;
     if (!gone) continue;
-    repairs.push(`dropped ${describeNode(node)}, which ${placement.jewel.id} no longer has, returning its point`);
+    repairs.push(says('engine.plane.repair.dropped', { node: describeNode(node), jewel: anId(placement.jewel.id) }));
     drop(plane, node);
   }
 }
 
-function dropVanishedEffects(registry: Registry, plane: Plane, repairs: string[]): void {
+function dropVanishedEffects(registry: Registry, plane: Plane, repairs: Said[]): void {
   for (const [key, cluster] of Object.entries(plane)) {
     for (const effect of [...cluster.effects]) {
       if (registry.items.get(effect)?.clusterEffect) continue;
-      repairs.push(`dropped the ${effect} effect on the cluster at ${key}, whose declaration is gone`);
+      repairs.push(says('engine.plane.repair.effect', { effect: anId(effect), hex: anId(key) }));
       cluster.effects = cluster.effects.filter((each) => each !== effect);
     }
   }
@@ -292,7 +301,7 @@ function dropVanishedEffects(registry: Registry, plane: Plane, repairs: string[]
 // nodes, and a repair that drops one may cut the path to another; walking the
 // survivors is how that stays true rather than being asserted of a plane
 // nothing checks.
-function dropUnreachableAllocations(registry: Registry, plane: Plane, repairs: string[]): void {
+function dropUnreachableAllocations(registry: Registry, plane: Plane, repairs: Said[]): void {
   const placement = placementAt(registry, plane, ORIGIN);
   if (!placement) return;
   const frontier: PlaneNode[] = [{ hex: ORIGIN, kind: 'position', position: rootPosition(placement.jewel) }];
@@ -307,7 +316,7 @@ function dropUnreachableAllocations(registry: Registry, plane: Plane, repairs: s
   }
   for (const node of allocatedNodes(plane)) {
     if (reached.has(nodeKey(node))) continue;
-    repairs.push(`dropped ${describeNode(node)}, which nothing allocated reaches any more, returning its point`);
+    repairs.push(says('engine.plane.repair.unreachable', { node: describeNode(node) }));
     drop(plane, node);
   }
 }
@@ -316,8 +325,8 @@ function dropUnreachableAllocations(registry: Registry, plane: Plane, repairs: s
 // left has to be a plane the same rules would have built. Complete in one
 // call — a drop that strands a cluster beyond it is followed here rather than
 // left for a second pass the substrate only makes when an instance empties.
-export function repairPlane(registry: Registry, plane: Plane): string[] {
-  const repairs: string[] = [];
+export function repairPlane(registry: Registry, plane: Plane): Said[] {
+  const repairs: Said[] = [];
   for (let settled = false; !settled; ) {
     settled = !dropUnplaceable(registry, plane, repairs);
     settled = !dropStranded(registry, plane, repairs) && settled;

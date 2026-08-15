@@ -196,3 +196,47 @@ describe('a member key is owned by every kind that declares it', () => {
     expect(loadUniverse([door, adds]).namespace.has('flag', 'base.door.sealed')).toBe(true);
   });
 });
+
+// c3. An action's address goes away with the action for the same reason a flag
+// goes away with the field that listed it, through the same reconciliation
+// against the merged section — no removal logic of its own.
+describe('an action a field edit takes away', () => {
+  const BASE = module('base', '# action pry', 'instant', 'say: creak', '# entity dresser', 'uses: pry');
+  const cut = (id: string): ModuleSource => module(id, 'dependencies: base', '# entity base.dresser', '-uses: pry');
+  const wants = (id: string): ModuleSource => module(id, 'dependencies: base', '# test walk', 'use: entity.base.dresser.pry');
+  const dangles = /names an unknown action-slug: entity.base.dresser.pry/;
+
+  it('goes away with the value, so a use: the edit stranded no longer resolves', () => {
+    expect(() => loadUniverse([BASE, wants('watcher')])).not.toThrow();
+    expect(() => loadUniverse([BASE, cut('mod'), wants('watcher')])).toThrow(dangles);
+  });
+
+  it('fails whichever module names it first, because what survives is decided at merge', () => {
+    expect(() => loadUniverse([BASE, cut('aaa-cut'), wants('zzz-wants')])).toThrow(dangles);
+    expect(() => loadUniverse([BASE, wants('aaa-wants'), cut('zzz-cut')])).toThrow(dangles);
+  });
+
+  it('stays when a + in the same section puts it back, because the merged section is what is asked', () => {
+    const readd = module('mod', 'dependencies: base', '# entity base.dresser', '-uses: pry', '+uses: pry');
+    expect(loadUniverse([BASE, readd, wants('watcher')]).entities.get('base.dresser')!.actions.map((action) => action.label)).toEqual(['Pry']);
+  });
+
+  // An entity's own block is a member the same way. Cutting the block alone is
+  // what asks about the member: the entity is still there, so nothing but the
+  // action's own reconciliation can refuse the `use:` — where dropping the whole
+  // entity would have been refused for the entity and told us nothing.
+  const shelf = module('base', '# entity shelf', 'dust it:', '  instant', '  say: puff');
+  const dusts = module('watcher', 'dependencies: base', '# test walk', 'use: entity.base.shelf.dust-it');
+
+  it('takes an inline block away with the block, not only with the object that headed it', () => {
+    const cutBlock = module('mod', 'dependencies: base', '# entity base.shelf', '-dust it:');
+
+    expect(() => loadUniverse([shelf, dusts])).not.toThrow();
+    expect(loadUniverse([shelf, cutBlock]).entities.get('base.shelf')!.actions).toEqual([]);
+    expect(() => loadUniverse([shelf, cutBlock, dusts])).toThrow(/names an unknown action-slug: entity.base.shelf.dust-it/);
+  });
+
+  it('takes it with the object too, when the whole object goes', () => {
+    expect(() => loadUniverse([shelf, module('mod', 'dependencies: base', '# remove entity.base.shelf'), dusts])).toThrow(/names an unknown entity: base.shelf/);
+  });
+});

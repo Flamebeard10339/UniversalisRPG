@@ -75,6 +75,15 @@ export function sweptFiles(tracked: readonly string[], exists: (file: string) =>
   return tracked.map(posix).filter((file) => SOURCE_TREES.some((tree) => covers(tree, file)) && MODULE_EXTENSIONS.some((extension) => file.endsWith(extension)) && exists(file));
 }
 
+// The same enumeration with the tests taken out: what a rule about the code
+// this repository ships is owed an answer over. A rule that walks one tree of
+// its own reaches whichever driver that tree happens to hold and no other —
+// which is how three mutations to `scripts/` survived a brand rule that walked
+// `src`.
+export function shippedModules(tracked: readonly string[] = trackedFiles(), exists: (file: string) => boolean = existsSync): string[] {
+  return sweptFiles(tracked, exists).filter((file) => !/\.test\.[cm]?[jt]sx?$/.test(file));
+}
+
 export function unlayeredFiles(files: readonly string[], outside: Readonly<Record<string, string>> = OUTSIDE_STACK): string[] {
   return files.map(posix).filter((file) => layerOf(file) === null && outside[file] === undefined);
 }

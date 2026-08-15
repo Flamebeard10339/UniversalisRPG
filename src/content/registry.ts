@@ -4,14 +4,32 @@ import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields 
 import { Condition } from '../grammar/condition';
 import { HOOK_LABELS } from '../grammar/hook';
 import { ClusterJewel, clusterJewelProblem, clusterJewelSchema } from './clusterJewel';
-import { Dialogue } from './dialogue';
+import { Dialogue, parseSegments, Spoken } from './dialogue';
 import { DropTable } from './dropTable';
-import { ActionDeclaration } from './action';
+import { actionAddress, ActionDeclaration, actionTextKey, actionTextOwner } from './action';
 import { AuthoredEntity, Entity, EntityBlock, entitySchema, Handler, isHandlerBlock } from './entity';
 import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
 import { GameEvent, eventSchema } from './event';
 import { Item, itemRoleProblem, itemSchema } from './item';
+import {
+  actionSlugProblem,
+  addLocaleSection,
+  BaseEntry,
+  dialogueAgainField,
+  dialogueChoiceField,
+  dialogueLineField,
+  dialogueSayField,
+  emptyLocales,
+  GENERATED_FIELD,
+  localeKey,
+  Locales,
+  LocaleSection,
+  ProseShape,
+  sayField,
+  textFieldsOf,
+  unsuppliedParameters,
+} from './locale';
 import { Passive, passiveRangeProblem, passiveSchema } from './passive';
 import { getShape } from './shapes';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
@@ -19,20 +37,22 @@ import { mergeSection } from './merge';
 import { ModuleSection } from './module';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
-import { Namespace } from './namespace';
+import { ACTION_MEMBER, isActionOwnerKind, memberKey, Namespace, NAMESPACED_KINDS } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
-import { registryCapabilities, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
+import { registryCapabilities, registrySlots, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
 import { ReferenceKind, Visit, visitAction, visitResults, visitSection, visitTags } from './referenceSites';
 import { Removal } from './removal';
-import { declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
+import { printSegments } from './serialize';
+import { actionAddresses, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
-import { Authored, hydrateSection } from '../grammar/section';
+import { Authored, DEFAULT_LANGUAGE, hydrateSection, HydrateContext } from '../grammar/section';
 import { Skill, skillSchema } from './skill';
+import { Slot, slotSchema } from './slot';
 import { Stat, statSchema } from './stat';
 import { Test } from './test';
 import { validateTuningVariable } from './tuningVariables';
-import { humanize } from '../grammar/values';
+import { humanizeEn } from '../grammar/values';
 import { Variable, variableSchema } from './variable';
 
 export interface Registry {
@@ -52,6 +72,9 @@ export interface Registry {
   clusterJewels: Map<string, ClusterJewel>;
   stats: Map<string, Stat>;
   skills: Map<string, Skill>;
+  // Only the slots somebody declared words for. The vocabulary itself is the
+  // union of every `equipment-slots:`, which `registrySlots` answers.
+  slots: Map<string, Slot>;
   recipes: Map<string, Recipe>;
   recipeActions: Map<string, Action>;
   resources: Map<string, Resource>;
@@ -63,6 +86,10 @@ export interface Registry {
   variables: Map<string, Variable>;
   saves: Map<string, ParsedSave>;
   namespace: Namespace;
+  // The text side of the load: what content authored, under the language its
+  // module declared, and what `# locale` sections supplied. Kept apart from
+  // every content map above so that loading a locale cannot reach one (c6).
+  locales: Locales;
 }
 
 // Each DSL section kind beside the registry map that holds it. `recipeActions`
@@ -119,9 +146,15 @@ export interface UniverseLoadResult {
   disabledModules: string[];
 }
 
+// What addresses a compiled craft, on the same terms a travel is addressed:
+// an id, because the label is display text no surface draws — a craft under way
+// is said by `engine.craft.label` over the recipe's own title — and a save holds
+// this.
+export const CRAFT_ADDRESS = 'craft';
+
 // Compiled to an Action so a craft runs through the same resolve() machinery
 // as any other single-attempt fight.
-function recipeAction(recipe: Recipe): Action {
+function recipeAction(recipe: Recipe): ActionDeclaration {
   const takes: ActionResult[] = recipe.in.map((q) => ({ kind: 'take', item: q.item, amount: q.amount }));
   const gives: ActionResult[] = recipe.out.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
   const results: ActionResult[] = [...takes, ...gives];
@@ -134,8 +167,10 @@ function recipeAction(recipe: Recipe): Action {
   // authored action judges this one rather than a recipe-shaped copy of it.
   const rate = typeof recipe.rate === 'string' ? { id: recipe.rate } : recipe.rate;
   const cadence: Pick<Action, 'rate' | 'time'> = rate !== undefined ? { rate } : recipe.time !== undefined ? { time: recipe.time } : {};
-  const action: Action = {
-    label: `Craft ${humanize(recipe.id)}`,
+  const action: ActionDeclaration = {
+    id: CRAFT_ADDRESS,
+    label: humanizeEn(CRAFT_ADDRESS),
+    generatedLabel: true,
     kind: 'rate' in cadence || 'time' in cadence ? 'continuous' : 'instant',
     results,
     ...cadence,
@@ -175,9 +210,11 @@ function emptyRegistry(): Registry {
     dialoguesByOwner: new Map(),
     tests: new Map(),
     flags: new Map(),
+    slots: new Map(),
     variables: new Map(),
     saves: new Map(),
     namespace: new Namespace(),
+    locales: emptyLocales(),
   };
 }
 
@@ -221,10 +258,189 @@ export function formatModuleDiagnostic(value: ModuleDiagnostic): string {
   return `${at} [${value.moduleId}] ${value.stage}: ${value.message}`;
 }
 
-function applySection(registry: Registry, section: ModuleSection): void {
+// The base entries one section contributes: what it authored, plus the title
+// `humanizeEn` fills in — which is an English entry, so it is one only where the
+// module says it is writing English. A field left unauthored anywhere else has
+// no entry in any language, which is what puts its key on screen (c3, c5).
+// The one place a base entry is written, so a value naming a parameter nothing
+// supplies is refused the same whether it was authored as content or written as
+// a `# locale` line. No caller passes a parameter to a title or an examine, so
+// for a content key every parameter it names is one nothing supplies.
+function recordBase(registry: Registry, key: string, entry: BaseEntry): void {
+  const unsupplied = unsuppliedParameters(registry.locales, key, entry.text);
+  if (unsupplied.length > 0) throw new DslError(`${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
+  registry.locales.base.set(key, entry);
+}
+
+// `namespace` is the one the key is written under and `language` the one the
+// words are in. They are the same module for anything a module owns, and are
+// not for a global id: a `# slot` is keyed under nobody and written in whatever
+// its declarer speaks, so the caller says which is which.
+function recordBaseText(registry: Registry, kind: string, authored: Record<string, unknown>, namespace: string | null, language: string): void {
+  const fields = textFieldsOf(kind);
+  if (!fields) return;
+  const id = authored.id as string;
+  for (const field of fields) {
+    const key = localeKey(namespace, kind, id, field);
+    const authoredValue = authored[field];
+    // A title is asked for whatever anybody authored, so its key is addressable
+    // even where no module has text for it; an unauthored `examine:` is nothing
+    // the engine ever renders and so is not a gap in any language.
+    if (field === GENERATED_FIELD || typeof authoredValue === 'string') registry.locales.addressable.add(key);
+    if (typeof authoredValue === 'string') recordBase(registry, key, { text: authoredValue, language });
+    else if (field === GENERATED_FIELD && language === DEFAULT_LANGUAGE) recordBase(registry, key, { text: humanizeEn(id), language, generated: true });
+  }
+}
+
+// An action is keyed on what addresses it under whoever wrote its label, which
+// `actionTextOwner` decides: an address is unique per performer and the words
+// are not, so a declaration a dozen entities `use:` is one key and not a dozen
+// copies of one English string. Run over the built registry because an entity's
+// actions are assembled after its section is, so a used declaration is reached
+// once here and again from its own row — writing one key twice from one label
+// rather than needing an order between the two.
+function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly Action[]): void {
+  const taken = new Set<string>();
+  for (const action of actions) {
+    const slug = actionAddress(action);
+    const problem = actionSlugProblem(slug, action.label, taken);
+    if (problem) throw new DslError(`# ${kind} ${id}: ${problem}`);
+    taken.add(slug);
+    const owner = actionTextOwner(registry.namespace, kind, id, action);
+    const language = languages.get(owner.namespace) ?? DEFAULT_LANGUAGE;
+    const key = actionTextKey(owner);
+    registry.locales.addressable.add(key);
+    // A generated label is `humanizeEn` of an id, so it is an entry for English
+    // and for nothing else — the same gate `defaultTitle` applies, applied
+    // where the other generator runs (c5).
+    if (action.generatedLabel && language !== DEFAULT_LANGUAGE) continue;
+    recordBase(registry, key, { text: action.label, ...(action.generatedLabel ? { generated: true as const } : {}), language });
+  }
+}
+
+// Where a piece of authored prose hangs and what language it was written in,
+// asked once per owner because every line under one shares both.
+interface ProseOwner {
+  namespace: string | null;
+  kind: string;
+  id: string;
+  language: string;
+}
+
+function proseOwner(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string): ProseOwner {
+  const namespace = registry.namespace.ownerOf(kind, id) ?? null;
+  return { namespace, kind, id, language: languages.get(namespace) ?? DEFAULT_LANGUAGE };
+}
+
+function recordProse(registry: Registry, owner: ProseOwner, field: string, text: string, shape: ProseShape): string {
+  const key = localeKey(owner.namespace, owner.kind, owner.id, field);
+  registry.locales.addressable.add(key);
+  registry.locales.prose.set(key, shape);
+  recordBase(registry, key, { text, language: owner.language });
+  return key;
+}
+
+const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onFailure, action.onUnfinished].filter((list): list is ActionResult[] => list !== undefined);
+
+// Every result list a section AUTHORED, which is not every list a player can be
+// offered one from: an action an entity `uses:` was written once, under its own
+// declaration, and is keyed there however many entities perform it. An entity's
+// overload of one is written in that entity's block and is keyed under the
+// entity, which is where a translator will look for the words it changed.
+function authoredResults(registry: Registry): Array<[string, string, ActionResult[][]]> {
+  const owners: Array<[string, string, ActionResult[][]]> = [];
+  for (const [id, action] of registry.actions) owners.push(['action', id, actionResultLists(action)]);
+  for (const entity of registry.entities.values()) {
+    const blocks = entity.blocks.flatMap((block) => (isHandlerBlock(block) ? [block.results] : actionResultLists(block)));
+    owners.push(['entity', entity.id, [...blocks, entity.onHit, entity.whenHit]]);
+  }
+  for (const location of registry.locations.values()) owners.push(['location', location.id, location.actions.flatMap(actionResultLists)]);
+  for (const item of registry.items.values()) owners.push(['item', item.id, [...item.actions.flatMap(actionResultLists), item.onHit, item.whenHit]]);
+  for (const [id, table] of registry.dropTables) owners.push(['droptable', id, [table.results]]);
+  // Under the recipe rather than the compiled action, because the recipe's
+  // `say:` is what an author wrote and the action is what the loader made of it.
+  for (const [id, action] of registry.recipeActions) owners.push(['recipe', id, actionResultLists(action)]);
+  return owners;
+}
+
+// One counter over one owner's lists, in the order they were authored: a
+// wrapper is the last thing on its line, so the lines inside its body come
+// after every leaf the same list already spoke.
+function stampSays(registry: Registry, owner: ProseOwner, lists: readonly (readonly ActionResult[])[], field: (index: number) => string): void {
+  let index = 0;
+  const walk = (list: readonly ActionResult[]): void => {
+    for (const result of list) {
+      if (result.kind === 'say') result.key = recordProse(registry, owner, field(index++), result.text, 'verbatim');
+      for (const nested of nestedResults(result)) walk(nested);
+    }
+  };
+  for (const list of lists) walk(list);
+}
+
+// A node is the owner of every line spoken under it, and its `say:` results are
+// keyed beside them under the same node rather than under the dialogue: a
+// reader looking for the words of one node reads one prefix.
+function stampDialogue(registry: Registry, languages: ReadonlyMap<string | null, string>, dialogue: Dialogue): void {
+  const owner = proseOwner(registry, languages, 'dialogue', dialogue.id);
+  for (const node of dialogue.nodes) {
+    const spoken = (line: Spoken, field: string): void => {
+      line.key = recordProse(registry, owner, field, printSegments(line.segments), 'segments');
+    };
+    if (node.again) spoken(node.again, dialogueAgainField(node.name));
+    const results: ActionResult[][] = [];
+    let lines = 0;
+    let choices = 0;
+    for (const step of node.steps) {
+      if (step.kind === 'say') spoken(step, dialogueLineField(node.name, lines++));
+      else if (step.kind === 'effect') results.push([step.result]);
+      else if (step.kind === 'menu') {
+        for (const choice of step.choices) {
+          spoken(choice, dialogueChoiceField(node.name, choices++));
+          results.push(choice.effects);
+        }
+      }
+    }
+    stampSays(registry, owner, results, (index) => dialogueSayField(node.name, index));
+  }
+}
+
+function localeValueProblem(locales: Locales, language: string, key: string, value: string): DslError | undefined {
+  if (locales.prose.get(key) === 'segments') {
+    try {
+      parseSegments(value, 0);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return new DslError(`# locale ${language}: ${key} is a spoken line, and ${error.message}`);
+    }
+    return undefined;
+  }
+  const unsupplied = unsuppliedParameters(locales, key, value);
+  if (unsupplied.length === 0) return undefined;
+  return new DslError(`# locale ${language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
+}
+
+// A recipe is absent: its craft is shown through `engine.craft.label` over the
+// recipe's own title key, so keying the compiled label as well would be one
+// visible string with two keys that a translator has to fill in twice.
+// Every table of actions a player can be offered one from, each beside the id
+// that owns it — which is what lets a refusal name the module to blame.
+export function everyActionTable(registry: Registry): Array<[string, string, readonly Action[]]> {
+  return [
+    ...[...registry.entities.values()].map((entity) => ['entity', entity.id, entity.actions] as [string, string, readonly Action[]]),
+    ...[...registry.locations.values()].map((location) => ['location', location.id, location.actions] as [string, string, readonly Action[]]),
+    ...[...registry.items.values()].map((item) => ['item', item.id, item.actions] as [string, string, readonly Action[]]),
+    ...[...registry.actions].map(([id, action]) => ['action', id, [action]] as [string, string, readonly Action[]]),
+  ];
+}
+
+function applySection(registry: Registry, section: ModuleSection, context: HydrateContext): void {
   switch (section.kind) {
+    // Not skipped where it would be harmless: a locale reaching the content
+    // build is the failure c6 forbids, so the one route to it says so.
+    case 'locale':
+      throw new DslError('a # locale is not content and cannot be built into the registry');
     case 'entity': {
-      const entity = hydrateSection(section.value as Authored<AuthoredEntity>, entitySchema);
+      const entity = hydrateSection(section.value as Authored<AuthoredEntity>, entitySchema, context);
       // `actions` and `handlers` are what `blocks` becomes once `uses:` can be
       // read against the actions it names, which is after every section is in.
       registry.entities.set(entity.id, { ...entity, actions: [], handlers: [] });
@@ -236,7 +452,7 @@ function applySection(registry: Registry, section: ModuleSection): void {
       break;
     }
     case 'event': {
-      const event = hydrateSection(section.value as Authored<GameEvent>, eventSchema);
+      const event = hydrateSection(section.value as Authored<GameEvent>, eventSchema, context);
       if (!event.resource) throw new DslError(`# event ${event.id} requires a resource: to watch`);
       if (!event.trigger) throw new DslError(`# event ${event.id} requires a trigger:`);
       // An entity answers an event by writing `on <its name>:`, and a hook has
@@ -249,17 +465,17 @@ function applySection(registry: Registry, section: ModuleSection): void {
       break;
     }
     case 'faction': {
-      const faction = hydrateSection(section.value as Authored<Faction>, factionSchema);
+      const faction = hydrateSection(section.value as Authored<Faction>, factionSchema, context);
       registry.factions.set(faction.id, faction);
       break;
     }
     case 'location': {
-      const location = hydrateSection(section.value as Authored<Location>, locationSchema);
+      const location = hydrateSection(section.value as Authored<Location>, locationSchema, context);
       registry.locations.set(location.id, location);
       break;
     }
     case 'item': {
-      const item = hydrateSection(section.value as Authored<Item>, itemSchema);
+      const item = hydrateSection(section.value as Authored<Item>, itemSchema, context);
       const problem = itemRoleProblem(item);
       if (problem) throw new DslError(`# item ${item.id}: ${problem}`);
       registry.items.set(item.id, item);
@@ -267,7 +483,7 @@ function applySection(registry: Registry, section: ModuleSection): void {
     }
     case 'passive': {
       const authored = section.value as Authored<Passive>;
-      const passive = hydrateSection(authored, passiveSchema);
+      const passive = hydrateSection(authored, passiveSchema, context);
       const problem = passiveRangeProblem(passive);
       if (problem) throw new DslError(`# passive ${authored.id}: ${problem}`);
       registry.passives.set(passive.id, passive);
@@ -276,7 +492,7 @@ function applySection(registry: Registry, section: ModuleSection): void {
     case 'cluster-jewel': {
       const authored = section.value as Authored<ClusterJewel>;
       try {
-        const clusterJewel = hydrateSection(authored, clusterJewelSchema);
+        const clusterJewel = hydrateSection(authored, clusterJewelSchema, context);
         const shape = getShape(clusterJewel.shape);
         const problem = clusterJewelProblem(clusterJewel, shape);
         if (problem) throw new DslError(problem);
@@ -288,18 +504,18 @@ function applySection(registry: Registry, section: ModuleSection): void {
       break;
     }
     case 'stat': {
-      const stat = hydrateSection(section.value as Authored<Stat>, statSchema);
+      const stat = hydrateSection(section.value as Authored<Stat>, statSchema, context);
       registry.stats.set(stat.id, stat);
       break;
     }
     case 'skill': {
-      const skill = hydrateSection(section.value as Authored<Skill>, skillSchema);
+      const skill = hydrateSection(section.value as Authored<Skill>, skillSchema, context);
       if (skill['per-level'] && !skill['stat-id']) throw new DslError(`# skill ${skill.id}: per-level: needs a stat-id: to raise`);
       registry.skills.set(skill.id, skill);
       break;
     }
     case 'recipe': {
-      const recipe = hydrateSection(section.value as Authored<Recipe>, recipeSchema);
+      const recipe = hydrateSection(section.value as Authored<Recipe>, recipeSchema, context);
       // `burnt:` is what a failed attempt yields, and only `accuracy:` gives an
       // attempt a way to fail; without it the outputs are silently unreachable.
       if (recipe.burnt.length > 0 && !recipe.accuracy) {
@@ -310,7 +526,7 @@ function applySection(registry: Registry, section: ModuleSection): void {
       break;
     }
     case 'resource': {
-      const resource = hydrateSection(section.value as Authored<Resource>, resourceSchema);
+      const resource = hydrateSection(section.value as Authored<Resource>, resourceSchema, context);
       if (!resource.max) throw new DslError(`# resource ${resource.id} requires a max: stat`);
       registry.resources.set(resource.id, resource);
       break;
@@ -332,12 +548,17 @@ function applySection(registry: Registry, section: ModuleSection): void {
       break;
     }
     case 'flag': {
-      const flag = hydrateSection(section.value as Authored<Flag>, flagSchema);
+      const flag = hydrateSection(section.value as Authored<Flag>, flagSchema, context);
       registry.flags.set(flag.id, flag);
       break;
     }
+    case 'slot': {
+      const slot = hydrateSection(section.value as Authored<Slot>, slotSchema, context);
+      registry.slots.set(slot.id, slot);
+      break;
+    }
     case 'variable': {
-      const variable = hydrateSection(section.value as Authored<Variable>, variableSchema);
+      const variable = hydrateSection(section.value as Authored<Variable>, variableSchema, context);
       registry.variables.set(variable.id, variable);
       break;
     }
@@ -445,6 +666,30 @@ function dropContent(registry: Registry, kind: string, id: string, pruned: Set<s
   pruned.add(ownerKey(kind, id));
 }
 
+const ACTION_OWNER_MAPS = CONTENT_SECTION_MAPS.filter(([kind]) => isActionOwnerKind(kind));
+
+// Pruning an object's actions is done by rebuilding the object, so no site that
+// drops one is in a position to take its member with it — and a member left
+// behind is a `use:` that resolves at load and finds nothing at runtime. Asked
+// of the whole universe rather than of the object being rebuilt, because a
+// member key carries no owner kind: an entity and an item sharing an id share
+// their members' keys, and one's loss is not the other's.
+function pruneStrandedActionMembers(registry: Registry, pruned: Set<string>): boolean {
+  const surviving = new Set<string>();
+  for (const [kind, map] of ACTION_OWNER_MAPS) {
+    for (const owner of (registry[map] as ReadonlyMap<string, MemberOwner>).values()) {
+      for (const address of actionAddresses(kind, owner)) surviving.add(memberKey(ACTION_MEMBER, kind, owner.id, address));
+    }
+  }
+  let dropped = false;
+  for (const key of registry.namespace.declaredKeys(ACTION_MEMBER)) {
+    if (surviving.has(key)) continue;
+    dropContent(registry, ACTION_MEMBER, key, pruned, []);
+    dropped = true;
+  }
+  return dropped;
+}
+
 function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: ReadonlySet<string>): void {
   const pruned = new Set<string>();
   for (;;) {
@@ -546,6 +791,8 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
       dropContent(registry, 'test', id, pruned, [registry.tests]);
       changed = true;
     }
+
+    if (pruneStrandedActionMembers(registry, pruned)) changed = true;
 
     if (!changed) {
       registry.dialoguesByOwner.clear();
@@ -855,19 +1102,19 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
 
 const wouldDeclare = (kind: string, value: MemberOwner): Member[] => declareMembers(new Namespace(), kind, value);
 
-const memberKey = (member: Member): string => `${member.kind}\0${member.key}`;
+const memberIdentity = (member: Member): string => `${member.kind}\0${member.key}`;
 
 function reconcileMembers(namespace: Namespace, merged: Map<string, Map<string, OwnedSection>>, declared: ReadonlyMap<string, Member[]>): void {
   const survivingAcrossEveryKind = new Set<string>();
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
-      for (const member of wouldDeclare(kind, section.value as MemberOwner)) survivingAcrossEveryKind.add(memberKey(member));
+      for (const member of wouldDeclare(kind, section.value as MemberOwner)) survivingAcrossEveryKind.add(memberIdentity(member));
     }
   }
   for (const [kind, byId] of merged) {
     for (const id of byId.keys()) {
       for (const member of declared.get(ownerKey(kind, id)) ?? []) {
-        if (!survivingAcrossEveryKind.has(memberKey(member))) namespace.undeclare(member.kind, member.key);
+        if (!survivingAcrossEveryKind.has(memberIdentity(member))) namespace.undeclare(member.kind, member.key);
       }
     }
   }
@@ -922,6 +1169,9 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
             namespace.undeclare(kind, target);
             continue;
           }
+          // A locale is not content: it never enters the merge, so no id it
+          // names can be added, patched or removed by it (c6).
+          if (section.kind === 'locale') continue;
           if (!owns(section.kind)) continue;
           const byId = merged.get(section.kind) ?? new Map<string, OwnedSection>();
           const id = (section.value as { id: string }).id;
@@ -943,10 +1193,20 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   const mergeFailure = mergePass(() => true);
   if (mergeFailure) return { failure: mergeFailure };
   reconcileMembers(namespace, merged, declaredMembers);
+  const languages = new Map<string | null, string>(modules.map((module) => [module.namespace, module.info.language]));
+  // Only the modules that declare content: a locale-only module writing English
+  // beside a Spanish island says nothing about what language its prose is in,
+  // and counting it would shut the prose door for every player of every
+  // language, since the shipped engine locale declares `en`.
+  for (const module of modules) {
+    for (const section of module.sections) {
+      if (section.kind === 'locale') addLocaleSection(registry.locales, module.namespace, section.value as LocaleSection);
+    }
+  }
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
       try {
-        applySection(registry, { kind, value: section.value });
+        applySection(registry, { kind, value: section.value }, { language: languages.get(registry.namespace.ownerOf(kind, (section.value as { id: string }).id) ?? null) ?? DEFAULT_LANGUAGE });
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
         return { failure: { module: section.module, stage: 'build', error } };
@@ -955,6 +1215,55 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   }
   const validationFailure = validateBuiltRegistry(registry, owners, danglingRoots);
   if (validationFailure) return { failure: validationFailure };
+  // Both passes run after validation, so that content dropped for a dangling
+  // reference leaves no key behind for a translator to answer — and so that the
+  // labels keyed below are the assembled ones a player will be offered, since
+  // validation is where an entity's `uses:` becomes an action of its own.
+  for (const [kind, byId] of merged) {
+    for (const [id, section] of byId) {
+      // A global id is in no namespace to have been dropped from one: the guard
+      // is about content that went with a dangling reference, and the key such
+      // an id is written under is nobody's.
+      const owned = NAMESPACED_KINDS.includes(kind);
+      if (owned && !registry.namespace.has(kind, id)) continue;
+      const namespace = owned ? registry.namespace.ownerOf(kind, id) ?? null : null;
+      try {
+        recordBaseText(registry, kind, section.value as Record<string, unknown>, namespace, languages.get(owned ? namespace : section.module.namespace) ?? DEFAULT_LANGUAGE);
+      } catch (error) {
+        if (!(error instanceof DslError)) throw error;
+        return { failure: { module: section.module, stage: 'build', error } };
+      }
+    }
+  }
+  // Every slot the vocabulary holds that no `# slot` declared. `equipment-slots:`
+  // names the ids and the declaration is optional, so the key is minted from the
+  // vocabulary and `humanizeEn` fills it — `defaultTitle`'s rule, applied where
+  // there is no section to hang a default on.
+  for (const id of registrySlots(registry)) {
+    if (!registry.slots.has(id)) recordBaseText(registry, 'slot', { id }, null, DEFAULT_LANGUAGE);
+  }
+  for (const [kind, id, actions] of everyActionTable(registry)) {
+    try {
+      recordActionText(registry, languages, kind, id, actions);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return { failure: { module: sectionOwner(owners, kind, id) ?? modules[0], stage: 'build', error } };
+    }
+  }
+  for (const [kind, id, lists] of authoredResults(registry)) stampSays(registry, proseOwner(registry, languages, kind, id), lists, sayField);
+  for (const dialogue of registry.dialogues.values()) stampDialogue(registry, languages, dialogue);
+  // Last, because it reads both halves: what a locale said and what the English
+  // it is translating names. A parameter nothing supplies throws at the moment
+  // the screen is drawn, so it is refused where the value is assembled instead,
+  // and a translated line the segment grammar cannot read is refused beside it
+  // for the same reason: it would otherwise throw out of the dialogue.
+  const byNamespace = new Map(modules.map((module) => [module.namespace, module]));
+  for (const declared of registry.locales.sections) {
+    for (const { key, value } of declared.entries) {
+      const error = localeValueProblem(registry.locales, declared.language, key, value);
+      if (error) return { failure: { module: byNamespace.get(declared.module) ?? modules[0], stage: 'build', error } };
+    }
+  }
   return { registry };
 }
 

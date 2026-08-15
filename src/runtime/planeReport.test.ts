@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from '../content/registry';
+import { } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { Direction } from '../content/hex';
 import { applyClusterEffect } from './clusterEffect';
 import { ORIGIN } from './clusterPlane';
@@ -8,6 +9,7 @@ import { allocate, feedItem, Growth, slotJewel } from './itemInstance';
 import { ClusterReport, PlaneReport, planeReport, planeReports, PositionReport, SlotReport } from './planeReport';
 import { initialState } from './save';
 import { GameState } from './state';
+import { inEnglish } from './sayFixture';
 
 const MODULE = `
 # location camp
@@ -67,10 +69,10 @@ cluster-effect: +50% attack
 item-experience: 1000
 `;
 
-const registry = loadModule(MODULE);
+const registry = loadInEnglish(MODULE);
 
 function ok(outcome: Growth): string {
-  if (!outcome.ok) throw new Error(outcome.refused);
+  if (!outcome.ok) throw new Error(inEnglish(registry, outcome.refused));
   return outcome.instance;
 }
 
@@ -169,10 +171,10 @@ describe('planeReport', () => {
     ok(applyClusterEffect(state, registry, '1', 'goad', ORIGIN));
 
     const plane = report(state);
-    expect(clusterAt(plane, '0,0').effects).toEqual([{ id: 'goad', title: 'Goad', effect: { statId: 'attack', percent: 50 } }]);
+    expect(clusterAt(plane, '0,0').effects).toEqual([{ id: 'goad', title: 'Goad', statTitle: 'Attack', effect: { statId: 'attack', percent: 50 } }]);
     expect(positionAt(plane, '0,0', 3)).toMatchObject({
       standing: 'unreached',
-      payloads: [{ statId: 'attack', effective: { percent: false, amount: { min: 6, max: 6 } }, scale: 1.5 }],
+      payloads: [{ statId: 'attack', statTitle: 'Attack', effective: { percent: false, amount: { min: 6, max: 6 } }, scale: 1.5 }],
     });
   });
 
@@ -183,7 +185,7 @@ describe('planeReport', () => {
     ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position: 3 }));
     expect(positionAt(report(state), '0,0', 3)).toMatchObject({
       standing: 'allocated',
-      payloads: [{ statId: 'attack', effective: { percent: false, amount: { min: 6, max: 6 } }, scale: 1.5 }],
+      payloads: [{ statId: 'attack', statTitle: 'Attack', effective: { percent: false, amount: { min: 6, max: 6 } }, scale: 1.5 }],
     });
   });
 
@@ -287,8 +289,8 @@ describe('planeReport', () => {
     for (const position of [2, 3]) ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position }));
 
     expect(report(state).contributions).toEqual([
-      { statId: 'attack', added: { min: 4, max: 4 }, increased: 0 },
-      { statId: 'max-health', added: { min: 10, max: 10 }, increased: 0 },
+      { statId: 'attack', statTitle: 'Attack', added: { min: 4, max: 4 }, increased: 0 },
+      { statId: 'max-health', statTitle: 'Max Health', added: { min: 10, max: 10 }, increased: 0 },
     ]);
   });
 
@@ -297,6 +299,6 @@ describe('planeReport', () => {
     for (const position of [2, 3]) ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position }));
     ok(applyClusterEffect(state, registry, '1', 'goad', ORIGIN));
 
-    expect(report(state).contributions).toContainEqual({ statId: 'attack', added: { min: 6, max: 6 }, increased: 0 });
+    expect(report(state).contributions).toContainEqual({ statId: 'attack', statTitle: 'Attack', added: { min: 6, max: 6 }, increased: 0 });
   });
 });

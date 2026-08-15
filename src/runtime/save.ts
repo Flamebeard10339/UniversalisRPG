@@ -1,23 +1,29 @@
+import { Action } from '../content/entity';
+import { actionAddress } from '../content/action';
+import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { createGameState, endAction, GameState, initResources, RuntimeError } from './runtime';
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
-import { findActionOwner, parseOwnerRef } from './actions';
+import { findActionOwner, parseOwnerRef, travelEndProblem, TRAVEL_PAIR } from './actions';
 import { isBuffList, pruneBuffs } from './buffs';
 import { isInstanceTable, pruneInstances } from './instances';
 import { itemTemplate } from './itemInstance';
 import { isPopulations, prunePopulations } from './population';
 import { isModalFrame, pruneModals } from './modals';
+import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { PLAYER, templateOf } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 11;
 
-// A sparse diff against initialState: a new game saves as `{}`, and `log` is not state.
-export type SaveDiff = Partial<Omit<GameState, 'log'>>;
+// A sparse diff against initialState: a new game saves as `{}`, and neither
+// `log` nor `language` is state — one is drained by reading it, the other is
+// the player's setting for the session rather than the world's.
+export type SaveDiff = Partial<Omit<GameState, 'log' | 'language'>>;
 
 // A Record over the exhaustive key type, so adding a GameState field is a type
 // error here until it is classified as diffed key-by-key or carried whole.
-type SaveField = Exclude<keyof GameState, 'log'>;
+type SaveField = Exclude<keyof GameState, 'log' | 'language'>;
 
 interface RecordPrune {
   of: string;
@@ -86,8 +92,8 @@ export function startingLocationId(registry: Registry): string | undefined {
   return [...registry.locations.values()].find((location) => location.starting)?.id;
 }
 
-export function initialState(registry: Registry): GameState {
-  const state = createGameState();
+export function initialState(registry: Registry, language: string = DEFAULT_LANGUAGE): GameState {
+  const state = createGameState('', language);
   const starting = startingLocationId(registry);
   if (starting) state.location = starting;
   initResources(state, registry);
@@ -95,12 +101,12 @@ export function initialState(registry: Registry): GameState {
 }
 
 export interface PruneWarning {
-  path: string;
-  id: string;
-  message: string;
+  path: Answer;
+  id: Answer;
+  message: Localized;
 }
 
-function addWarning(warnings: PruneWarning[], path: string, id: string, message: string): void {
+function addWarning(warnings: PruneWarning[], path: string, id: string, message: Localized): void {
   warnings.push({ path, id, message });
 }
 
@@ -110,38 +116,43 @@ function pruneRecord<T>(
   has: (id: string) => boolean,
   kind: string,
   warnings: PruneWarning[],
+  localizer: Localizer,
 ): void {
   for (const id of Object.keys(record)) {
     if (has(id)) continue;
     delete record[id];
-    addWarning(warnings, `${path}.${id}`, id, `Removed ${path} ${id} because its ${kind} is not loaded.`);
+    addWarning(warnings, `${path}.${id}`, id, localizer.engine('engine.prune.record', { path: localizer.identifier(path), id: localizer.identifier(id), kind: localizer.identifier(kind) }));
   }
 }
 
-function activeActionProblem(state: GameState, registry: Registry): string | null {
+// A travel pair is the one owner ref naming two things, and the only one whose
+// lookup throws, so it is asked about before the lookup rather than caught out
+// of it: what a player reads here comes from a key like everything else.
+function activeActionProblem(localizer: Localizer, state: GameState, registry: Registry): Localized | null {
   const active = state.activeAction;
   if (!active) return null;
   const { obj, objId } = parseOwnerRef(active.ownerRef);
-  let owner: { actions?: { label: string }[] } | undefined;
-  try {
-    owner = findActionOwner(obj, objId, registry) as { actions?: { label: string }[] } | undefined;
-  } catch (error) {
-    if (error instanceof RuntimeError) return error.message;
-    throw error;
+  if (obj === 'travel') {
+    const [origin, dest] = objId.split(TRAVEL_PAIR);
+    const stale = travelEndProblem(localizer, origin ?? '', dest ?? '', registry);
+    if (stale) return stale;
   }
-  if (!owner) return `unknown ${obj}: ${objId}`;
-  if (!owner.actions?.some((action) => action.label === active.actionLabel)) return `unknown action ${JSON.stringify(active.actionLabel)} on ${active.ownerRef}`;
+  const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
+  if (!owner) return localizer.engine('engine.action.stale.owner', { kind: localizer.identifier(obj), id: localizer.identifier(objId) });
+  if (!owner.actions?.some((action) => actionAddress(action) === active.actionSlug)) return localizer.engine('engine.action.stale.action', { action: localizer.identifier(active.actionSlug), owner: localizer.identifier(active.ownerRef) });
 
-  for (const actorId of Object.keys(active.actors ?? {})) if (!registry.entities.has(templateOf(actorId))) return `unknown encounter actor: ${actorId}`;
-  for (const actorId of Object.keys(active.cadences)) if (actorId !== PLAYER && !registry.entities.has(templateOf(actorId))) return `unknown encounter cadence actor: ${actorId}`;
+  for (const actorId of Object.keys(active.actors ?? {})) if (!registry.entities.has(templateOf(actorId))) return localizer.engine('engine.action.stale.actor', { actor: localizer.identifier(actorId) });
+  for (const actorId of Object.keys(active.cadences)) if (actorId !== PLAYER && !registry.entities.has(templateOf(actorId))) return localizer.engine('engine.action.stale.cadence', { actor: localizer.identifier(actorId) });
   for (const actor of Object.values(active.actors ?? {})) {
-    for (const resourceId of Object.keys(actor.resources)) if (!registry.resources.has(resourceId)) return `unknown encounter resource: ${resourceId}`;
+    for (const resourceId of Object.keys(actor.resources)) if (!registry.resources.has(resourceId)) return localizer.engine('engine.action.stale.resource', { resource: localizer.identifier(resourceId) });
   }
   return null;
 }
 
 export function pruneStateForRegistry(state: GameState, registry: Registry): PruneWarning[] {
   const warnings: PruneWarning[] = [];
+  const localizer = localizerOf(registry, state);
+  const named = localizer.identifier;
 
   // First, so every rule under it asks a settled table rather than one still
   // being pruned beneath it: a field holding an instance id gets one answer.
@@ -152,11 +163,12 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     const old = state.location;
     const replacement = startingLocationId(registry) ?? '';
     state.location = replacement;
-    addWarning(warnings, 'location', old, `Moved from unavailable location ${old} to ${replacement || '(nowhere)'}.`);
+    const to = replacement ? named(replacement) : localizer.engine('engine.prune.nowhere');
+    addWarning(warnings, 'location', old, localizer.engine('engine.prune.location', { from: named(old), to }));
   }
 
   for (const [field, rule] of RECORD_PRUNES) {
-    pruneRecord(state[field] as unknown as Record<string, unknown>, field, (id) => rule.loaded(registry, id), rule.of, warnings);
+    pruneRecord(state[field] as unknown as Record<string, unknown>, field, (id) => rule.loaded(registry, id), rule.of, warnings, localizer);
   }
 
   // Who counts as a character is this module's answer everywhere else in it, so
@@ -169,14 +181,15 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   for (const [slot, wornId] of Object.entries(state.equipped)) {
     const itemId = itemTemplate(state, wornId);
     const item = registry.items.get(itemId);
-    const missing = !item ? `item ${itemId} is not loaded` : item.slot !== slot ? `item ${itemId} no longer declares that slot` : undefined;
-    if (!missing) continue;
+    const params = { slot: named(slot), item: named(itemId) };
+    const message = !item ? localizer.engine('engine.prune.equipped.missing', params) : item.slot !== slot ? localizer.engine('engine.prune.equipped.slot', params) : undefined;
+    if (!message) continue;
     delete state.equipped[slot];
-    addWarning(warnings, `equipped.${slot}`, wornId, `Unequipped ${slot} because its ${missing}.`);
+    addWarning(warnings, `equipped.${slot}`, wornId, message);
   }
 
   for (const { name, reason } of pruneModals(state, registry)) {
-    addWarning(warnings, `modals.${name}`, name, `Closed modal ${name} because ${reason}.`);
+    addWarning(warnings, `modals.${name}`, name, localizer.engine('engine.prune.modal', { modal: named(name), reason }));
   }
 
   // A walk whose destination or any of whose legs has gone is a walk to
@@ -186,16 +199,16 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     const lost = [journey.to, ...journey.legs].find((place) => !registry.locations.has(place));
     if (lost !== undefined) {
       state.journey = null;
-      addWarning(warnings, 'journey', journey.to, `Stopped the journey to ${journey.to} because location ${lost} is not loaded.`);
+      addWarning(warnings, 'journey', journey.to, localizer.engine('engine.prune.journey', { to: named(journey.to), lost: named(lost) }));
     }
   }
 
-  const activeProblem = activeActionProblem(state, registry);
+  const activeProblem = activeActionProblem(localizer, state, registry);
   if (activeProblem) {
     const active = state.activeAction!;
-    const id = `${active.ownerRef}.${active.actionLabel}`;
+    const id = `${active.ownerRef}.${active.actionSlug}`;
     endAction(state);
-    addWarning(warnings, 'activeAction', id, `Stopped unavailable action ${id}: ${activeProblem}.`);
+    addWarning(warnings, 'activeAction', id, localizer.engine('engine.prune.action', { action: named(id), reason: activeProblem }));
   }
 
   return warnings;

@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
+import { armAction, armCraft, armFightAction, armTravel, buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
-import { loadModule } from '../content/registry';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, ModalFrame, openModalNamed } from './modals';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
+import { travelAction, TRAVEL_ADDRESS } from './actions';
+import { actionAddress } from '../content/action';
+import { CRAFT_ADDRESS, loadUniverse, type Registry } from '../content/registry';
+import { GameState } from './state';
 import { toMilliUnits } from './units';
 
 const MODULE = `
@@ -39,21 +43,21 @@ open:
 
 describe('initialState', () => {
   it('places a fresh game at the registry starting location, like startSession', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     expect(initialState(registry).location).toBe('camp');
   });
 });
 
 describe('diffState', () => {
   it('is empty for a fresh state against the baseline', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const baseline = initialState(registry);
     const state = initialState(registry);
     expect(diffState(state, baseline)).toEqual({});
   });
 
   it('captures only the inventory entry that changed', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const baseline = initialState(registry);
     const state = initialState(registry);
     state.inventory.bread = 1;
@@ -61,7 +65,7 @@ describe('diffState', () => {
   });
 
   it('captures only location on a relocation', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const baseline = initialState(registry);
     const state = initialState(registry);
     state.location = 'elsewhere';
@@ -71,7 +75,7 @@ describe('diffState', () => {
 
 describe('serializeSave', () => {
   it('is single-line JSON carrying the version and only the changed fields', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     state.inventory.bread = 2;
     const serialized = serializeSave(state, registry);
@@ -80,7 +84,7 @@ describe('serializeSave', () => {
   });
 
   it('serializes a fresh game as just the version', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     expect(JSON.parse(serializeSave(state, registry))).toEqual({ version: SAVE_VERSION });
   });
@@ -88,7 +92,7 @@ describe('serializeSave', () => {
 
 describe('loadSave', () => {
   it('round-trips through serialize -> parseSaveSection -> loadSave', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     state.inventory.gold = 3;
     state.flags.done = true;
@@ -112,7 +116,7 @@ describe('loadSave', () => {
   });
 
   it('clears stale fields not present in the loaded save', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     state.location = 'camp';
     state.inventory.bread = 99;
@@ -126,13 +130,13 @@ describe('loadSave', () => {
   });
 
   it('throws a clear error on a version mismatch', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     expect(() => loadSave(state, { version: SAVE_VERSION + 1, diff: {} }, registry)).toThrow(/version/);
   });
 
   it('carries an open modal stack across a round trip, and refuses a body that is not one', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     openModalNamed(state, 'character-creation');
     answerModal(state, registry, { name: 'Rowan' });
@@ -163,7 +167,7 @@ describe('loadSave', () => {
   // A frame carrying two ids of its own is a frame a `# save` can hold, so what
   // it points at is checked on the way in rather than trusted.
   it('carries a plane screen across a round trip while the copy it grows is still carried', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = createGameState();
     state.inventory.charm = 1;
     (state.modals as ModalFrame[]).push({ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' });
@@ -175,11 +179,11 @@ describe('loadSave', () => {
   });
 
   it('closes a modal frame the loaded registry cannot answer, and says so, instead of restoring it', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     for (const [frame, message] of [
       [{ name: 'quest-journal', answers: {} }, 'Closed modal quest-journal because it is not a modal this engine knows.'],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'gone', node: 'greeting', resumeIndex: 1, replay: true } }, 'Closed modal dialogue because dialogue gone is not loaded.'],
-      [{ name: 'character-creation', answers: { name: 'Rowan', race: 'Elf' } }, 'Closed modal character-creation because it was saved with every option already answered.'],
+      [{ name: 'character-creation', answers: { name: 'Rowan', race: 'elf' } }, 'Closed modal character-creation because it was saved with every option already answered.'],
       [{ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' }, 'Closed modal item-plane because it grows charm, which the player no longer carries.'],
       [{ name: 'item-plane', answers: {}, target: '4', hex: '0,0' }, 'Closed modal item-plane because it grows 4, which the player no longer carries.'],
     ] as const) {
@@ -239,7 +243,7 @@ food, +1 strength, 60s
 
 describe('pruneStateForRegistry', () => {
   it('removes state entries whose content ids are not loaded', () => {
-    const registry = loadModule(PRUNE_MODULE);
+    const registry = loadInEnglish(PRUNE_MODULE);
     const state = initialState(registry);
     state.location = 'missing-camp';
     state.inventory.bread = 1;
@@ -253,14 +257,14 @@ describe('pruneStateForRegistry', () => {
     state.xp.cooking = 4;
     state.xp.mining = 5;
     restorePools(state, { health: toMilliUnits(6), mana: toMilliUnits(7) });
-    const wider = loadModule(WIDER_MODULE);
+    const wider = loadInEnglish(WIDER_MODULE);
     grantBuff(state, PLAYER, wider.items.get('bread')!, 10);
     grantBuff(state, PLAYER, wider.items.get('lost-meal')!, 10);
     grantBuff(state, PLAYER, wider.items.get('helm')!, 10);
     grantBuff(state, 'ghost', wider.items.get('bread')!, 10);
     state.activeAction = {
       ownerRef: 'item.mod.gem',
-      actionLabel: 'eat',
+      actionSlug: 'eat',
       repeating: false,
       implicitTarget: IMPLICIT_TARGET_FULL,
       cadences: { [PLAYER]: { progress: 0, attemptsMade: 0 } },
@@ -294,7 +298,7 @@ describe('pruneStateForRegistry', () => {
   });
 
   it('keeps object-owned flags and map discovery, which live only in the namespace', () => {
-    const registry = loadModule(PRUNE_MODULE);
+    const registry = loadInEnglish(PRUNE_MODULE);
     const state = initialState(registry);
     state.flags['camp.lit'] = true;
     state.flags['cave.discovered'] = true;
@@ -308,7 +312,7 @@ describe('pruneStateForRegistry', () => {
   });
 
   it('loadSave prunes restored stale ids and records quiet warnings in the transient log', () => {
-    const registry = loadModule(PRUNE_MODULE);
+    const registry = loadInEnglish(PRUNE_MODULE);
     const state = createGameState();
     const warnings = loadSave(state, { version: SAVE_VERSION, diff: { inventory: { 'mod.gem': 2 }, flags: { 'mod.flag': true } } }, registry);
 
@@ -321,7 +325,7 @@ describe('pruneStateForRegistry', () => {
 
 describe('compareSave', () => {
   it('returns no differences for a matching state', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     state.inventory.bread = 1;
     const saved = { version: SAVE_VERSION, diff: diffState(state, initialState(registry)) };
@@ -329,7 +333,7 @@ describe('compareSave', () => {
   });
 
   it('reports a human-readable mismatch', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     state.inventory.bread = 2;
     const saved = { version: SAVE_VERSION, diff: { inventory: { bread: 1 } } };
@@ -337,14 +341,14 @@ describe('compareSave', () => {
   });
 
   it('reports a flag present in the save but absent from the state', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     const saved = { version: SAVE_VERSION, diff: { flags: { 'tutorial.quest-given': true } } };
     expect(compareSave(state, saved, registry)).toEqual(['flags.tutorial.quest-given: (absent) vs true']);
   });
 
   it('throws a clear error on a version mismatch', () => {
-    const registry = loadModule(MODULE);
+    const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     expect(() => compareSave(state, { version: SAVE_VERSION + 1, diff: {} }, registry)).toThrow(/version/);
   });
@@ -396,7 +400,7 @@ assert: has charm
 // that claim means.
 describe('a # test section records an equip', () => {
   function replaying(testId: string): ReturnType<typeof createGameState> {
-    const registry = loadModule(SAVE_TEST_MODULE);
+    const registry = loadInEnglish(SAVE_TEST_MODULE);
     const state = createGameState('camp');
     state.inventory['charm'] = 1;
     expect(runTest(testId, registry, state)).toEqual({ passed: true });
@@ -406,7 +410,7 @@ describe('a # test section records an equip', () => {
   it('equips by authored id, fills the slot, and moves the stat', () => {
     const state = replaying('equips-a-charm');
     expect(state.equipped).toEqual({ neck: 'charm' });
-    expect(statValue('might', state, loadModule(SAVE_TEST_MODULE))).toBe(5);
+    expect(statValue('might', state, loadInEnglish(SAVE_TEST_MODULE))).toBe(5);
     // c21: equipping moves the copy. The stack it came out of is empty, and the
     // `assert: has charm` the section replays still holds, because having a
     // thing and carrying it are two questions and only one of them is the stack.
@@ -420,13 +424,13 @@ describe('a # test section records an equip', () => {
 
 describe('# save section wired through load: / expect: test directives', () => {
   it('passes when the loaded state still matches the save', () => {
-    const registry = loadModule(SAVE_TEST_MODULE);
+    const registry = loadInEnglish(SAVE_TEST_MODULE);
     const state = createGameState();
     expect(runTest('load-and-match', registry, state)).toEqual({ passed: true });
   });
 
   it('fails with a save-mismatch failure once state diverges after loading', () => {
-    const registry = loadModule(SAVE_TEST_MODULE);
+    const registry = loadInEnglish(SAVE_TEST_MODULE);
     const state = createGameState();
     const result = runTest('load-then-diverge', registry, state);
     expect(result.passed).toBe(false);
@@ -436,7 +440,7 @@ describe('# save section wired through load: / expect: test directives', () => {
 });
 
 describe('a # save body is checked past its version', () => {
-  const registry = loadModule(PRUNE_MODULE);
+  const registry = loadInEnglish(PRUNE_MODULE);
   const load = (diff: Record<string, unknown>) => () => loadSave(createGameState(), { version: SAVE_VERSION, diff }, registry);
 
   it('refuses a scalar of the wrong type', () => {
@@ -472,7 +476,7 @@ describe('a # save body is checked past its version', () => {
 });
 
 describe('equipped survives a registry that no longer matches it', () => {
-  const registry = loadModule(PRUNE_MODULE);
+  const registry = loadInEnglish(PRUNE_MODULE);
 
   function pruned(equipped: Record<string, string>): { state: ReturnType<typeof createGameState>; warnings: ReturnType<typeof pruneStateForRegistry> } {
     const state = createGameState('camp');
@@ -497,5 +501,216 @@ describe('equipped survives a registry that no longer matches it', () => {
     const { state, warnings } = pruned({ tail: 'helm' });
     expect(state.equipped).toEqual({});
     expect(warnings.map((w) => w.message)).toEqual(['Unequipped tail because its item helm no longer declares that slot.']);
+  });
+});
+
+// The Deliverable's headline sentence on the one save field that was still a
+// sentence: `activeAction.actionSlug` held `Travel to <title>`, and a rename
+// of that title alone stopped the walk it was under.
+describe('a walk under way survives its destination being retitled', () => {
+  const ISLAND = (far: string): string => ['# info isla', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'adjacent:', '  far', '', '# location far', `title: ${far}`, 'x: 30, y: 0', 'adjacent:', '  shore'].join('\n');
+
+  const walking = (): GameState => {
+    const registry = loadInEnglish(ISLAND('Far Beach'));
+    const state = initialState(registry);
+    armTravel('isla.shore', 'isla.far', registry, state);
+    expect(state.activeAction, 'the walk did not arm').not.toBeNull();
+    return state;
+  };
+
+  it('stores an id rather than the sentence a player reads', () => {
+    expect(walking().activeAction!.actionSlug).toBe(TRAVEL_ADDRESS);
+    expect(JSON.parse(serializeSave(walking(), loadInEnglish(ISLAND('Far Beach')))).activeAction.actionSlug).toBe(TRAVEL_ADDRESS);
+  });
+
+  // The address and the label were one string, so this file could assert a save
+  // holds `TRAVEL_LABEL` and mean nothing by it. Held apart here, because the
+  // arming path reaching for the wrong one is only catchable while they differ.
+  it('holds a label that is not the address, so reaching for the wrong one does not arm', () => {
+    const registry = loadInEnglish(ISLAND('Far Beach'));
+    const action = travelAction('isla.shore', 'isla.far', registry);
+
+    expect(actionAddress(action)).toBe(TRAVEL_ADDRESS);
+    expect(action.label).not.toBe(TRAVEL_ADDRESS);
+  });
+
+  it('keeps the walk when the destination is retitled underneath it', () => {
+    const state = walking();
+
+    expect(pruneStateForRegistry(state, loadInEnglish(ISLAND('Distant Beach')))).toEqual([]);
+    expect(state.activeAction).not.toBeNull();
+  });
+
+  // The other half: a destination that is gone still stops the walk, and says
+  // so through a key rather than by relaying what the lookup threw.
+  it('stops the walk when the destination is gone, and says so from a key', () => {
+    const state = walking();
+    const registry = loadInEnglish(['# info isla', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting'].join('\n'));
+
+    const warnings = pruneStateForRegistry(state, registry);
+    expect(warnings.map((warning) => warning.message)).toEqual(['Stopped unavailable action travel.isla.shore>isla.far.travel: unknown travel destination: isla.far.']);
+    expect(state.activeAction).toBeNull();
+  });
+});
+
+// The same field on the other owner of an action, the one the loader compiles
+// rather than an author writing it.
+describe('a craft under way stores an id, not the sentence it is offered as', () => {
+  const KITCHEN = (recipe: string): string =>
+    ['# info cocina', 'version: 1.0.0', 'language: es', '', '# location horno', 'x: 0, y: 0', 'starting', '', '# item harina', 'title: Harina', '', '# item pan', 'title: Pan', '', `# recipe ${recipe}`, 'time: 60', 'in: 1 harina', 'out: 1 pan'].join('\n');
+
+  const SPANISH = [
+    '# info cocina-es',
+    'version: 1.0.0',
+    'dependencies:',
+    '  cocina',
+    '',
+    '# locale es',
+    'engine.prune.action: Detenida la accion {action}: {reason}.',
+    'engine.action.stale.owner: no hay ningun {kind} {id}.',
+  ].join('\n');
+
+  const universe = (recipe: string): Registry => loadUniverse([engineLocale(), { name: 'cocina', text: KITCHEN(recipe) }, { name: 'cocina-es', text: SPANISH }]);
+
+  const cooking = (): GameState => {
+    const registry = universe('pan');
+    const state = initialState(registry, 'es');
+    state.inventory['cocina.harina'] = 5;
+    armCraft('cocina.pan', registry, state);
+    expect(state.activeAction, 'the craft did not arm').not.toBeNull();
+    return state;
+  };
+
+  it('stores an id rather than the sentence a player reads', () => {
+    expect(cooking().activeAction!.actionSlug).toBe(CRAFT_ADDRESS);
+    expect(JSON.parse(serializeSave(cooking(), universe('pan'))).activeAction.actionSlug).toBe(CRAFT_ADDRESS);
+  });
+
+  it('holds a label that is not the address, so reaching for the wrong one does not arm', () => {
+    const action = universe('pan').recipeActions.get('cocina.pan')!;
+
+    expect(actionAddress(action)).toBe(CRAFT_ADDRESS);
+    expect(action.label).not.toBe(CRAFT_ADDRESS);
+  });
+
+  it('keeps the craft when the recipe is retitled underneath it', () => {
+    const state = cooking();
+    const renamed = loadUniverse([engineLocale(), { name: 'cocina', text: KITCHEN('pan') }, { name: 'cocina-es', text: [SPANISH, 'cocina.recipe.pan.title: Barra'].join('\n') }]);
+
+    expect(pruneStateForRegistry(state, renamed)).toEqual([]);
+    expect(state.activeAction).not.toBeNull();
+  });
+
+  it('says the craft is gone with no word the played language did not supply', () => {
+    const state = cooking();
+
+    const warnings = pruneStateForRegistry(state, universe('barra'));
+    expect(warnings.map((warning) => warning.message)).toEqual(['Detenida la accion recipe.cocina.pan.craft: no hay ningun recipe cocina.pan..']);
+    expect(state.activeAction).toBeNull();
+  });
+});
+
+// The third and last owner of an action label: the one an author writes. Its
+// `title:` line WAS the identifier, so `# action melee-combat` titled "Fight"
+// stored "Fight" and a rename to "Combat" dropped the fight and put an English
+// word into a Spanish player's log. Reproduced by pass 3 of
+// `what-is-stored-or-replayed-is-an-id` against the shipped content's own shape.
+describe('a fight under way survives its action being retitled', () => {
+  const ARENA = (title: string): string =>
+    [
+      '# info isla',
+      'version: 1.0.0',
+      'language: es',
+      '',
+      '# location arena',
+      'x: 0, y: 0',
+      'starting',
+      'entities:',
+      '  rata',
+      '',
+      '# stat attack',
+      'base: 4',
+      '',
+      '# stat dr',
+      '',
+      '# stat attack-rate',
+      'base: 60',
+      '',
+      '# stat max-health',
+      '',
+      '# resource health',
+      'max: max-health',
+      '',
+      '# action melee-combat',
+      `title: ${title}`,
+      'rate: my attack-rate',
+      'damage: my attack vs their dr',
+      'depletes: their health',
+      '',
+      '# entity player',
+      'stats: max-health 1000, attack 4, attack-rate 60',
+      'uses: melee-combat',
+      '',
+      '# entity rata',
+      'stats: max-health 1000',
+      '',
+      '# entity comoda',
+      `${title.toLowerCase()} drawer:`,
+      '  instant',
+      '  say: polvo',
+    ].join('\n');
+
+  const SPANISH = [
+    '# info isla-es',
+    'version: 1.0.0',
+    'dependencies:',
+    '  isla',
+    '',
+    '# locale es',
+    'engine.prune.action: Detenida la accion {action}: {reason}.',
+    'engine.action.stale.action: no existe la accion {action} en {owner}',
+  ].join('\n');
+
+  const universe = (title: string): Registry => loadUniverse([engineLocale(), { name: 'isla', text: ARENA(title) }, { name: 'isla-es', text: SPANISH }]);
+
+  const fighting = (): GameState => {
+    const registry = universe('Fight');
+    const state = initialState(registry, 'es');
+    armFightAction('isla.melee-combat', 'isla.rata', registry, state);
+    expect(state.activeAction, 'the fight did not arm').not.toBeNull();
+    return state;
+  };
+
+  it('stores an id rather than the title a player reads, on the roster as well', () => {
+    expect(fighting().activeAction!.actionSlug).toBe('melee-combat');
+    expect(fighting().activeAction!.roster![PLAYER].actionSlug).toBe('melee-combat');
+    expect(JSON.parse(serializeSave(fighting(), universe('Fight'))).activeAction.actionSlug).toBe('melee-combat');
+  });
+
+  it('keeps the fight when the action is retitled underneath it', () => {
+    const state = fighting();
+
+    expect(pruneStateForRegistry(state, universe('Combat'))).toEqual([]);
+    expect(state.activeAction).not.toBeNull();
+  });
+
+  // The other half, on the owner that can actually lose one: an inline block
+  // renamed out from under a save stops the action and says so from a key, with
+  // no word the played language did not supply. `Fight drawer` slugs as
+  // `fight-drawer`, so retitling the fixture retitles this block with it.
+  const searching = (): GameState => {
+    const registry = universe('Fight');
+    const state = initialState(registry, 'es');
+    armAction('entity', 'isla.comoda', 'fight-drawer', registry, state);
+    expect(state.activeAction, 'the search did not arm').not.toBeNull();
+    return state;
+  };
+
+  it('says a block that is gone is gone, with no English in the log', () => {
+    const state = searching();
+
+    const warnings = pruneStateForRegistry(state, universe('Combat'));
+    expect(warnings.map((warning) => warning.message)).toEqual(['Detenida la accion entity.isla.comoda.fight-drawer: no existe la accion fight-drawer en entity.isla.comoda.']);
+    expect(state.activeAction).toBeNull();
   });
 });

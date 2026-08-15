@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { armFightAction, createGameState, equip, GameState, initResources, resolve, statValue, unequip } from './runtime';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { parseSaveSection } from '../content/saveSection';
 import { carriedCount, carriesItem, feedItem } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { secondsToMs, toMilliUnits } from './units';
+import { inEnglish } from './sayFixture';
 
 const MODULE = `
 # stat attack
@@ -60,7 +62,7 @@ item-experience: 1000
 `;
 
 function loaded(source = MODULE): Registry {
-  return loadModule(source);
+  return loadInEnglish(source);
 }
 
 function fighting(registry: Registry, entityId: string): GameState {
@@ -135,7 +137,7 @@ describe('equipment', () => {
   // Against content/tutorial-island.dsl itself, not a copy of it: a copy would
   // stay green after the shipped `slot:` or `+2 attack` changed underneath it.
   it('equipment-slots: the SHIPPED tutorial sword and shield move real stats once equipped', () => {
-    const tutorial = loadModule(readFileSync('content/tutorial-island.dsl', 'utf8'));
+    const tutorial = loadInEnglish(readFileSync('content/tutorial-island.dsl', 'utf8'));
     const sword = 'tutorial-island.iron-sword';
     const shield = 'tutorial-island.wooden-shield';
 
@@ -263,7 +265,7 @@ function carrying(registry: Registry, stacks: Record<string, number>): GameState
 
 function fed(state: GameState, registry: Registry, target: string): string {
   const outcome = feedItem(state, registry, target, 'whetstone');
-  if (!outcome.ok) throw new Error(outcome.refused);
+  if (!outcome.ok) throw new Error(inEnglish(registry, outcome.refused));
   return outcome.instance;
 }
 

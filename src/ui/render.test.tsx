@@ -1,5 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { localizerFor } from '../runtime/localized';
+import { asLocalized } from '../runtime/localizedFixture';
 import { loadUniverseWithDiagnostics } from '../content/registry';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
@@ -9,61 +12,119 @@ import { createDriver, type Driver } from './driver';
 import { MapPane } from './MapPane';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
-import { LABELS } from './labels';
+import { LABELS, type LabelId } from './labels';
+import { wordsOf } from './words';
 import { LAYERS, OPENING, toLayer } from './nav';
 
 // A run that is under way and going nowhere, which is what a test about what
 // is drawn wants: no timer, and the same frame however long the test takes.
 const noTicks: Ticker = () => () => undefined;
 
-const ROAST = 'use:entity.tutorial-island.oven.roast chestnuts';
+const ROAST = 'use:entity.tutorial-island.oven.roast-chestnuts';
 const TALK = 'talk:tutorial-island.miki';
 
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'", '&#39;': "'" };
 
-const JOINER = ' · ';
-
-// Every run of text the markup would put in front of a player, with the
-// separator this layer joins a list of titles with taken back apart. An
-// aria-label is one of those runs: a control named for a screen reader is
-// prose a player reads, and leaving it out would exempt from the clause the
-// one place a glyph control is allowed to say anything at all.
+// Every run of text the markup would put in front of a player. An aria-label is
+// one of those runs: a control named for a screen reader is prose a player
+// reads, and leaving it out would exempt from the clause the one place a glyph
+// control is allowed to say anything at all.
 function readable(html: string): string[] {
   return html
     .replace(/aria-label="([^"]*)"/g, '\n$1\n')
     .replace(/<[^>]*>/g, '\n')
     .split('\n')
-    .flatMap((run) => run.split(JOINER))
     .map((run) => run.replace(/&(?:amp|lt|gt|quot|#x27|#39);/g, (entity) => ENTITIES[entity]).trim())
     .filter((run) => /[A-Za-z]/.test(run));
 }
 
+// Whether a run of text is accounted for by the words a player may read,
+// however this layer chose to lay them out. Consumed from the front, longest
+// match first, and anything that is not a letter is layout — so a component
+// putting two engine values in one element, or joining a list with a glyph,
+// is a presentational change rather than a word nobody published. The
+// separator list this replaces was kept in step with the components by hand
+// and red'd three tests the first time `{entry.name} {entry.value}` went into
+// one `<dt>`, where both halves were engine values.
+function accountedFor(run: string, permitted: readonly string[]): boolean {
+  const longest = [...permitted].filter((word) => /[A-Za-z]/.test(word)).sort((left, right) => right.length - left.length);
+  let rest = run;
+  while (rest !== '') {
+    const word = longest.find((each) => rest.startsWith(each));
+    if (word !== undefined) {
+      rest = rest.slice(word.length);
+      continue;
+    }
+    if (/^[A-Za-z]/.test(rest)) return false;
+    rest = rest.slice(1);
+  }
+  return true;
+}
+
+// Whether the words are on the screen, wherever this layer chose to put the
+// element boundaries. The mirror of `accountedFor`: a clause about what must be
+// drawn is no more entitled to assume one value per element than a clause about
+// what must not be, and a run holding an id as well as its title is a failure
+// here rather than a pass on a boundary.
+const onScreen = (runs: readonly string[], text: string): boolean => runs.some((run) => run.includes(text));
+
 function published(view: PlayView): string[] {
   return [
     view.location.title,
-    view.location.description,
+    view.location.description ?? '',
     ...view.entities.flatMap((entity) => [entity.title, entity.examine ?? '']),
     ...view.choices.flatMap((choice) => [choice.label, choice.detail ?? '']),
     ...view.resources.map((resource) => resource.title),
-    ...view.modals.flatMap((modal) => modal.options.flatMap((option) => [option.label, ...(option.values ?? [])])),
-    // The map and the character sheet. Stats and skills publish keys and not
-    // titles, so a key is what the engine gave and a key is what the sheet may
-    // draw; what the player carries publishes a name, and that is what its rows
-    // and the equipment rows beside them read (c16).
-    ...view.discovered.flatMap((place) => [place.id, place.title]),
+    ...view.modals.flatMap((modal) => modal.options.flatMap((option) => [option.label as string, ...(option.values ?? []).map((choice) => choice.shown as string)])),
+    // The map and the character sheet. Every one of these is words the engine
+    // produced, and there is no id among them: under c10 a stat, a skill and a
+    // slot each arrive with their own title beside their own id, so c16's "a key
+    // is what the sheet may draw" has nothing left to cover and is retired.
+    ...view.discovered.map((place) => place.title),
     ...view.carried.map((row) => row.name),
-    ...Object.keys(view.xp),
-    ...Object.keys(view.stats),
-    ...Object.keys(view.equipment),
+    ...view.stats.map((row) => row.title),
+    ...view.xp.map((row) => row.title),
+    ...view.equipment.flatMap((row) => [row.title, row.name]),
     ...view.said,
   ];
 }
 
-// The driver's own vocabulary, taken whole rather than by where it is drawn.
-// Excising the <nav> region derived the expectation from the structure under
-// test, so no wording could fail it; a table read as a set makes a word the
-// shell puts on the screen either an engine value or one of these.
-const SHELL_WORDS: readonly string[] = Object.values(LABELS);
+// What a walk had on its screens, so a permission above is only ever granted to
+// a page the walk opened. Three of them were dead for seven passes because
+// nothing that ran ever reached Skills, Equipment or the Map, and no assertion
+// about what is on the screen can tell an empty page from a clean one.
+function pagesDrawn(view: PlayView): Record<string, number> {
+  return { stats: view.stats.length, skills: view.xp.length, equipment: view.equipment.length, carried: view.carried.length, map: view.discovered.length };
+}
+
+// Every id the view hands a driver beside the words for it. Nothing on a screen
+// fails because the permitted set is longer than it needs to be, so the set is
+// held against these as well: an id may never be a permitted screen word, and
+// putting one back is a failure here rather than an entry nobody notices.
+function idsPublished(view: PlayView): string[] {
+  return [
+    ...view.stats.map((row) => row.id),
+    ...view.xp.map((row) => row.id),
+    ...view.equipment.flatMap((row) => [row.slot, row.item]),
+    ...view.carried.map((row) => row.id),
+    ...view.discovered.map((place) => place.id),
+  ];
+}
+
+// The driver's own vocabulary, taken whole rather than by where it is drawn,
+// and read out of the localizer the way a component reads it: after c3 the
+// table names keys, and what lands on the screen is the English the shipped
+// engine locale gives them. Excising the <nav> region derived the expectation
+// from the structure under test, so no wording could fail it; a table read as a
+// set makes a word the shell puts on the screen either an engine value or one
+// of these.
+const shellWord = wordsOf(localizerFor(loadInEnglish(''), 'en'));
+
+// What the two nodes take, supplied at every call so the table can be read as a
+// set. A pattern that names neither is unaffected by being handed both.
+const NODE = { position: 1, direction: asLocalized('ne') };
+
+const SHELL_WORDS: readonly string[] = (Object.keys(LABELS) as LabelId[]).map((id) => shellWord(id, NODE));
 
 // The engine's half of what is drawn, with the shell's own words taken out by
 // what they are rather than by where they sit: excising a region left every
@@ -193,6 +254,13 @@ const SURVEYED = {
     '# item ore',
     'examine: Streaked with red.',
     '',
+    '# slot mainhand',
+    'title: Main Hand',
+    '',
+    '# item awl',
+    'title: Awl',
+    'slot: mainhand',
+    '',
     '# entity window',
     'title: Window',
     'look out:',
@@ -201,12 +269,24 @@ const SURVEYED = {
     '  discover: cove',
     '  discover: shed',
     '  give: 1 ore',
+    '  give: 1 awl',
     '  xp: surveying 3',
     '',
   ].join('\n'),
 };
 
-const LOOK_OUT = 'use:entity.surveyed.window.look out';
+const LOOK_OUT = 'use:entity.surveyed.window.look-out';
+
+// A session with a row on every page, reached the way a player reaches one: the
+// window fills the map, the sheet and the inventory, and the carried screen's
+// own verb fills the equipment page.
+function everyPageFilled(): Driver {
+  const driver = createDriver([engineLocale(), SURVEYED]);
+  driver.choose(position(driver, LOOK_OUT));
+  driver.open('surveyed.awl');
+  driver.answer('verb', 'equip');
+  return driver;
+}
 
 describe('what the shell puts on the screen', () => {
   // The engine's own words are gathered as it publishes them, so this is a
@@ -217,13 +297,15 @@ describe('what the shell puts on the screen', () => {
     let seen = 0;
 
     const step = (): void => {
-      for (const line of published(driver.snapshot().view!)) engine.add(line);
+      const at = driver.snapshot().view!;
+      for (const line of published(at)) engine.add(line);
+      expect(idsPublished(at).filter((id) => engine.has(id))).toEqual([]);
       const html = renderToStaticMarkup(<App driver={driver} />);
 
       const runs = readable(html);
       seen += runs.length;
       for (const run of runs) {
-        expect([...engine, ...SHELL_WORDS], `"${run}" is on the screen and no engine value produced it`).toContain(run);
+        expect(accountedFor(run, [...engine, ...SHELL_WORDS]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
       }
     };
 
@@ -231,16 +313,33 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, TALK));
     step();
     const menu = driver.snapshot().view!.modals[0].options[0];
-    driver.answer(menu.key, menu.values![1]);
+    driver.answer(menu.key, menu.values![1].value);
     step();
     driver.choose(position(driver, ROAST));
     step();
     driver.cancel();
-    driver.choose(position(driver, 'use:entity.tutorial-island.mirror.look in'));
+    driver.choose(position(driver, 'use:entity.tutorial-island.mirror.look-in'));
     step();
 
     // A shell that rendered nothing would satisfy every line above.
     expect(seen).toBeGreaterThan(20);
+  });
+
+  // The same rule over a session with something on every page. The walk above
+  // runs the shipped island, where the player has learned nothing and is wearing
+  // nothing, so Skills and Equipment are blank for the whole of it and a
+  // permission granted to either was answering no question (c10).
+  it('renders nothing a player can read that the engine did not publish, with a row on every page', () => {
+    const driver = everyPageFilled();
+    const view = driver.snapshot().view!;
+
+    expect(Object.entries(pagesDrawn(view)).filter(([, rows]) => rows === 0)).toEqual([]);
+
+    const engine = new Set<string>(published(view));
+    expect(idsPublished(view).filter((id) => engine.has(id))).toEqual([]);
+    for (const run of readable(renderToStaticMarkup(<App driver={driver} />))) {
+      expect(accountedFor(run, [...engine, ...SHELL_WORDS]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
+    }
   });
 
   // The clause above only refuses what should not be there, so a shell that
@@ -250,7 +349,7 @@ describe('what the shell puts on the screen', () => {
 
     const runs = readable(renderToStaticMarkup(<App driver={driver} />));
 
-    for (const choice of driver.snapshot().view!.choices) expect(runs).toContain(choice.label);
+    for (const choice of driver.snapshot().view!.choices) expect(onScreen(runs, choice.label), choice.label).toBe(true);
   });
 
   it('draws the discovered places where they are, with the roads between them', () => {
@@ -268,7 +367,7 @@ describe('what the shell puts on the screen', () => {
     for (const place of found) {
       const node = drawn.find((entry) => entry.id === place.id);
       expect(node, `${place.title} has no node on the map`).toBeDefined();
-      expect(node!.runs).toContain(place.title);
+      expect(onScreen(node!.runs, place.title), place.title).toBe(true);
     }
     // One road per pair rather than one per end, and the fixture has three.
     expect(html.match(/<line/g) ?? []).toHaveLength(3);
@@ -351,27 +450,35 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('draws what the player is carrying, and what they are made of, on the sheet', () => {
-    const driver = createDriver([SURVEYED]);
-    driver.choose(position(driver, LOOK_OUT));
+    const driver = everyPageFilled();
     const view = driver.snapshot().view!;
 
     const runs = engineRuns(renderToStaticMarkup(<App driver={driver} />));
 
-    expect(Object.keys(view.stats)).toContain('surveyed.might');
+    expect(view.stats.map((row) => row.id)).toContain('surveyed.might');
     expect(view.carried.map((row) => row.id)).toContain('surveyed.ore');
-    for (const stat of Object.keys(view.stats)) expect(runs).toContain(stat);
-    for (const skill of Object.keys(view.xp)) expect(runs).toContain(skill);
+    // c9, c10: every stat and every skill reaches the page under the title the
+    // engine published on its row, and none of them under the id that title
+    // travelled beside.
+    expect(view.stats.find((row) => row.id === 'surveyed.might')?.title).toBe('Might');
+    for (const row of [...view.stats, ...view.xp]) {
+      expect(onScreen(runs, row.title), row.title).toBe(true);
+      expect(onScreen(runs, row.id), row.id).toBe(false);
+    }
 
     // c16 and c18: a carried thing reaches the page under the name the engine
     // published and beside its count, never under the id a verb addresses it by.
-    const named = new Map(view.carried.map((row) => [row.id, row.name]));
     for (const row of view.carried) {
-      expect(runs).toContain(row.name);
-      expect(runs).not.toContain(row.id);
+      expect(onScreen(runs, row.name), row.name).toBe(true);
+      expect(onScreen(runs, row.id), row.id).toBe(false);
     }
-    for (const [slot, item] of Object.entries(view.equipment)) {
-      expect(runs).toContain(slot);
-      expect(runs).toContain(named.get(item));
+    // c10: a slot is a word with a key, so the equipment page draws its title
+    // and never the id `equipment-slots:` named it by.
+    expect(view.equipment.map((row) => [row.slot, row.title])).toEqual([['mainhand', 'Main Hand']]);
+    for (const row of view.equipment) {
+      expect(onScreen(runs, row.title), row.title).toBe(true);
+      expect(onScreen(runs, row.name), row.name).toBe(true);
+      expect(onScreen(runs, row.slot), row.slot).toBe(false);
     }
   });
 
@@ -405,8 +512,8 @@ describe('what the shell puts on the screen', () => {
 
     const html = renderToStaticMarkup(<App driver={driver} />);
 
-    expect(html).toContain(`aria-label="${LABELS.command}"`);
-    expect(readable(html)).toContain(LABELS.run);
+    expect(html).toContain(`aria-label="${shellWord('command')}"`);
+    expect(onScreen(readable(html), shellWord('run'))).toBe(true);
   });
 
   it('names its two glyph controls with the engine value each one acts on', () => {
@@ -416,7 +523,7 @@ describe('what the shell puts on the screen', () => {
 
     expect(renderToStaticMarkup(<App driver={driver} />)).toContain(`aria-label="${running}"`);
 
-    const field = { key: 'name', label: 'Name', values: null };
+    const field = { key: 'name', label: asLocalized('Name'), values: null };
     expect(renderToStaticMarkup(<ModalSheet option={field} onAnswer={() => undefined} />)).toContain(`aria-label="${field.label}"`);
   });
 
@@ -434,9 +541,9 @@ describe('what the shell puts on the screen', () => {
 
     const asked = renderToStaticMarkup(<App driver={driver} />);
     expect(asking(asked)).toBe(true);
-    for (const value of menu.values!) expect(readable(asked)).toContain(value);
+    for (const choice of menu.values!) expect(onScreen(readable(asked), choice.shown), choice.shown).toBe(true);
 
-    driver.answer(menu.key, menu.values![0]);
+    driver.answer(menu.key, menu.values![0].value);
     const answered = renderToStaticMarkup(<App driver={driver} />);
 
     // The sheet itself, not merely the words that were on it: a shell holding
@@ -445,15 +552,15 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('renders a modal it has never heard of from the option alone', () => {
-    const unheard = { key: 'heading', label: 'Which way from here', values: ['widdershins', 'deosil'] };
+    const unheard = { key: 'heading', label: asLocalized('Which way from here'), values: [{ value: 'widdershins', shown: asLocalized('widdershins') }, { value: 'deosil', shown: asLocalized('deosil') }] };
 
     const html = renderToStaticMarkup(<ModalSheet option={unheard} onAnswer={() => undefined} />);
 
-    expect(readable(html)).toEqual([unheard.label, ...unheard.values]);
+    expect(readable(html)).toEqual([unheard.label, ...unheard.values.map((choice) => choice.shown)]);
   });
 
   it('renders a free-text option as a field with no listed answer', () => {
-    const html = renderToStaticMarkup(<ModalSheet option={{ key: 'name', label: 'Name', values: null }} onAnswer={() => undefined} />);
+    const html = renderToStaticMarkup(<ModalSheet option={{ key: 'name', label: asLocalized('Name'), values: null }} onAnswer={() => undefined} />);
 
     expect(readable(html)).toEqual(['Name']);
     expect(html).toContain('<input');
@@ -504,12 +611,16 @@ describe('what the shell puts on the screen', () => {
       // where it is standing would draw the opening layer's tabs.
       const html = renderToStaticMarkup(<App driver={driver} opening={toLayer(OPENING, 2)} />);
 
-      const tabs = LAYERS[2].subpages.map((subpage) => LABELS[subpage.id]);
+      // Read out of this shell's own localizer rather than the shipped one:
+      // SURVEYED carries no engine locale, so its tabs are the keys themselves,
+      // and what is under test here is which four the bar offers.
+      const named = wordsOf(driver.localizer());
+      const tabs = LAYERS[2].subpages.map((subpage) => named(subpage.id));
       const bar = html.slice(html.lastIndexOf('<nav'));
 
       expect(tabs).toHaveLength(4);
       for (const tab of tabs) expect(bar, `the tab bar does not offer ${tab}`).toContain(tab);
-      for (const tab of LAYERS[OPENING.layer].subpages.map((subpage) => LABELS[subpage.id])) {
+      for (const tab of LAYERS[OPENING.layer].subpages.map((subpage) => named(subpage.id))) {
         if (!tabs.includes(tab)) expect(bar, `the tab bar still offers ${tab}`).not.toContain(tab);
       }
     });

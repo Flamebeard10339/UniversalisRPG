@@ -1,13 +1,17 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState, grantBuff, PLAYER, resolve, useAction, useFight } from './runtime';
-import { loadModule } from '../content/registry';
+import { engineLocale } from '../content/engineLocale';
+import { loadUniverse } from '../content/registry';
 import { runTest } from './session';
 import { initialState } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
-const registry = loadModule(source);
+// Beside the engine's own English, which is what the app ships and so what an
+// end-to-end read of the island has to be played in.
+const island = (text: string) => loadUniverse([engineLocale(), { name: 'tutorial-island', text }]);
+const registry = island(source);
 
 describe('tutorial-island content', () => {
   // A CRLF checkout is a real configuration — .gitattributes pins LF in the
@@ -15,7 +19,7 @@ describe('tutorial-island content', () => {
   it('loads identically from a CRLF checkout, with or without a BOM', () => {
     const crlf = source.replace(/\n/g, '\r\n');
     for (const text of [crlf, `\uFEFF${crlf}`]) {
-      const loaded = loadModule(text);
+      const loaded = island(text);
       expect([...loaded.locations.keys()]).toEqual([...registry.locations.keys()]);
       expect([...loaded.tests.keys()]).toEqual([...registry.tests.keys()]);
     }
@@ -41,14 +45,14 @@ describe('tutorial-island content', () => {
     const state = createGameState('tutorial-island.guide-house');
     state.inventory['tutorial-island.lockpick'] = 1;
 
-    useAction('entity', 'tutorial-island.front-door', 'pick lock', registry, state);
+    useAction('entity', 'tutorial-island.front-door', 'pick-lock', registry, state);
     expect(state.time).toBe(secondsToMs(4));
     expect(state.flags['tutorial-island.front-door.unlocked']).toBe(true);
   });
 
   it('hands out one lockpick from the dresser, not one per search', () => {
     const state = createGameState();
-    const search = () => useAction('entity', 'tutorial-island.dresser', 'search drawer', registry, state);
+    const search = () => useAction('entity', 'tutorial-island.dresser', 'search-drawer', registry, state);
 
     search();
     expect(state.inventory['tutorial-island.lockpick']).toBe(1);

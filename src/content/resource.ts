@@ -1,6 +1,7 @@
+import { defaultTitle } from './info';
 import { DslError, Parser } from '../grammar/parser';
 import { SectionSchema } from '../grammar/section';
-import { humanize, id, decimal, text } from '../grammar/values';
+import { id, decimal, text } from '../grammar/values';
 
 export type ResourceDisplay = 'full' | 'minimal';
 
@@ -30,7 +31,7 @@ const displayValue: Parser<ResourceDisplay> = {
 export const resourceSchema: SectionSchema<Resource> = {
   kind: 'resource',
   fields: {
-    title: { parser: text, default: (self) => humanize(self.id) },
+    title: { parser: text, default: defaultTitle },
     rate: { parser: id },
     max: { parser: id },
     start: { parser: decimal },

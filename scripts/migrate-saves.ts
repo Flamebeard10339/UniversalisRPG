@@ -7,7 +7,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { splitSections } from '../src/grammar/structure';
 import type { Span } from '../src/grammar/parser';
 import { createGameState } from '../src/runtime/runtime';
-import { SAVE_VERSION, loadSave } from '../src/runtime/save';
+import { SAVE_VERSION, loadSave, type PruneWarning } from '../src/runtime/save';
 
 export interface ContentFile {
   path: string;
@@ -38,7 +38,10 @@ export const noFieldMoved = (writtenFor: number): ShapeChange => ({ writtenFor, 
 // it; `git log -p` on this file is the history of every bump's shape change.
 // null is "nobody said", not "nothing moved" — migrate refuses it, and a bump
 // that moved no field says so with noFieldMoved.
-export const SHAPE_CHANGE: ShapeChange | null = noFieldMoved(9);
+// c5: activeAction.actionLabel became actionSlug, holding what addresses an
+// action under its owner rather than the title it is shown under. No shipped
+// fixture carries an action under way, so no body moves.
+export const SHAPE_CHANGE: ShapeChange | null = noFieldMoved(11);
 
 export function isStaleDeclaration(change: ShapeChange | null): boolean {
   return change !== null && change.writtenFor !== SAVE_VERSION;
@@ -99,7 +102,7 @@ const declareIt = `Set SHAPE_CHANGE in scripts/migrate-saves.ts, stamped written
 function validationProblems(rewrites: readonly Rewrite[], registry: Registry): string[] {
   const problems: string[] = [];
   for (const rewrite of rewrites) {
-    let warnings;
+    let warnings: PruneWarning[];
     try {
       const { version, ...diff } = JSON.parse(rewrite.text) as { version: number } & SaveBody;
       warnings = loadSave(createGameState(), { version, diff }, registry);
@@ -107,7 +110,10 @@ function validationProblems(rewrites: readonly Rewrite[], registry: Registry): s
       problems.push(`${rewrite.fixture.id}: ${(error as Error).message}`);
       continue;
     }
-    for (const warning of warnings) problems.push(`${rewrite.fixture.id}: ${warning.message}`);
+    // The path, not the sentence: a report is read by a developer against a
+    // universe that may ship no locale, and a key says nothing about which
+    // record moved. `message` is what a player reads; `path` is the fact.
+    for (const warning of warnings) problems.push(`${rewrite.fixture.id}: ${warning.path} — ${warning.message}`);
   }
   return problems;
 }

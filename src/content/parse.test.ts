@@ -447,7 +447,7 @@ describe('action kinds and their cadence', () => {
   // The compiled craft is judged by the same table as an authored action, so a
   // recipe cannot express a cadence the grammar would have refused.
   it.each([['rate: 0'], ['rate: -30'], ['time: 0'], ['time: -3']])('refuses %s on a recipe, naming the recipe and its craft', (line) => {
-    expect(() => loadModule(`# item ore\nexamine: Rock.\n# recipe dig\n${line}\nout: 1 ore\n`)).toThrow(/# recipe dig action "Craft Dig": (time|rate): must be positive/);
+    expect(() => loadModule(`# item ore\nexamine: Rock.\n# recipe dig\n${line}\nout: 1 ore\n`)).toThrow(/# recipe dig action "Craft": (time|rate): must be positive/);
   });
 
   // A shared value parser says what it expected but not what it was reading;
@@ -525,7 +525,7 @@ describe('dialogue', () => {
           name: 'remind-mirror',
           when: ref('tutorial', 'quest-given'),
           sticky: true,
-          again: [literal('The mirror is still waiting.')],
+          again: { segments: [literal('The mirror is still waiting.')] },
           steps: [{ kind: 'say', segments: [literal('The mirror awaits you.')] }],
         },
         { name: 'snub', steps: [{ kind: 'say', segments: [literal('Hmph. Suit yourself.')] }] },
@@ -591,14 +591,28 @@ describe('the authored / derived boundary', () => {
     expect(hydrateSection(gold(), itemSchema).title).toBe('Gold');
   });
 
+  // Over a schema of its own, because no shipped kind reads one default from
+  // another any more: the item sentence that did was English grammar and is a
+  // `# locale` entry now.
   it('resolves a default that reads another default, with nothing ordering them', () => {
-    const mystery = parseOne('# item mystery-box', itemSchema);
-    expect(mystery.title).toBeUndefined();
-    expect(mystery.examine).toBeUndefined();
-    const hydrated = hydrateSection(mystery, itemSchema);
-    expect(hydrated.title).toBe('Mystery Box');
-    expect(hydrated.examine).toBe('This is a Mystery Box.');
-    expect(hydrateSection(parseOne('# item apple', itemSchema), itemSchema).examine).toBe('This is an Apple.');
+    const chained: SectionSchema<{ id: string; a: string; b: string }> = {
+      kind: 'chained',
+      fields: {
+        a: { parser: text, default: (self) => `${self.b}!` },
+        b: { parser: text, default: (self) => self.id.toUpperCase() },
+      },
+    };
+    expect(hydrateSection({ id: 'x' }, chained).a).toBe('X!');
+    expect(hydrateSection({ id: 'x', a: 'authored' }, chained).a).toBe('authored');
+  });
+
+  it('leaves an unauthored examine absent rather than inventing an English sentence for it', () => {
+    expect(hydrateSection(parseOne('# item mystery-box', itemSchema), itemSchema).examine).toBeUndefined();
+  });
+
+  it('reads a default against the language its module declared', () => {
+    expect(hydrateSection(parseOne('# item mystery-box', itemSchema), itemSchema, { language: 'es' }).title).toBe('mystery-box');
+    expect(hydrateSection(parseOne('# item mystery-box', itemSchema), itemSchema, { language: 'en' }).title).toBe('Mystery Box');
   });
 
   it('lets an authored field win over its default', () => {

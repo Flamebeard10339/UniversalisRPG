@@ -95,18 +95,18 @@ describe('a location’s own actions', () => {
 
     const session = startSession(registry);
     const ids = view(session).choices.map((c) => c.id);
-    expect(ids).toContain('use:location.shore.search tideline');
+    expect(ids).toContain('use:location.shore.search-tideline');
     // Its bare reference is scoped to the location, as an entity action's is.
-    expect(ids).not.toContain('use:location.shore.light beacon');
+    expect(ids).not.toContain('use:location.shore.light-beacon');
   });
 
   it('runs one, scoping its bare references to the location that owns it', () => {
     const session = startSession(loadModule(WITH_ACTIONS));
 
-    const v = apply(session, 'use:location.shore.search tideline');
+    const v = apply(session, 'use:location.shore.search-tideline');
     expect(v.inventory['driftwood']).toBe(1);
     expect(v.flags['shore.searched']).toBe(true);
     expect(v.time).toBe(2);
-    expect(v.choices.map((c) => c.id)).toContain('use:location.shore.light beacon');
+    expect(v.choices.map((c) => c.id)).toContain('use:location.shore.light-beacon');
   });
 });

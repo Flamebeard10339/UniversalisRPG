@@ -37,15 +37,15 @@ export function ModalSheet({ option, onAnswer, onDismiss, children }: { option: 
         <p className="mb-3 text-xs uppercase tracking-wide text-text-subtle">{option.label}</p>
         {option.values ? (
           <div className="unbarred flex max-h-[60vh] flex-col gap-2 overflow-y-auto">
-            {option.values.map((value) => (
+            {option.values.map((choice) => (
               <button
-                key={value}
+                key={choice.value}
                 data-drive="answer"
                 type="button"
-                onClick={() => onAnswer(option.key, value)}
+                onClick={() => onAnswer(option.key, choice.value)}
                 className="min-h-[48px] w-full rounded-xl border border-border bg-panel px-4 py-2 text-left transition-transform duration-75 active:scale-[0.99] active:bg-accent-strong active:text-accent-text"
               >
-                {value}
+                {choice.shown}
               </button>
             ))}
           </div>

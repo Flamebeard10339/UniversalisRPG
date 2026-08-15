@@ -112,6 +112,16 @@ stat-id: attack
 
 # skill cooking
 
+// --- equipment slots ---
+
+// The vocabulary is still `equipment-slots:` on # entity player; these are the
+// words the equipment page draws, and the keys a translation answers.
+# slot mainhand
+title: Main Hand
+
+# slot offhand
+title: Off Hand
+
 // --- actions ---
 
 // The shape every combattable thing in the game shares, written once and
@@ -686,16 +696,16 @@ node snub:
 
 # test tutorial-quest-given
 talk: miki
-choose: Sounds good. Teach me.
+choose: 0
 assert: quest-given
 
 // Opens on a save so the route is walked with the pools a played game has.
 # test miki-route-full
 load: miki-route-start
 run: tutorial-quest-given
-use: entity.mirror.look in
+use: entity.mirror.look-in
 submit-modal: name=Rowan
-submit-modal: race=Elf
+submit-modal: race=elf
 assert: mirror-done
 talk: miki
 assert: has jug-of-water
@@ -730,16 +740,16 @@ expect: miki-route-end
 // --- saves ---
 
 # save miki-route-start
-{"version":9}
+{"version":11}
 
 # save miki-route-end
-{"version":9,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.beach.discovered":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"Elf"}}
+{"version":11,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.beach.discovered":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"elf"}}
 
 # save dresser-trinket-end
-{"version":9,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}
+{"version":11,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}
 
 # save explored-and-unlocked
-{"version":9,"flags":{"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true}}
+{"version":11,"flags":{"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true}}
 
 // The drawer's contested roll over shipped content. On the default seed this
 // search comes up empty behind the lockpick, so an assertion over inventory
@@ -750,7 +760,7 @@ expect: miki-route-end
 // Regenerate with /create-valid-test when the drawer's odds change on purpose.
 # test dresser-trinket
 travel: guide-house-upstairs
-use: entity.dresser.search drawer
+use: entity.dresser.search-drawer
 assert: has lockpick
 assert: searched
 expect: dresser-trinket-end
@@ -834,10 +844,10 @@ slot: 2 at 0,0 e with causeway-jewel
 expect: growing-a-heartwood-blade-end
 
 # save growing-a-heartwood-blade-start
-{"version":9,"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true}}
+{"version":11,"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true}}
 
 # save growing-a-heartwood-blade-end
-{"version":9,"inventory":{"tutorial-island.heartwood-blade":0,"tutorial-island.iron-sword":0,"tutorial-island.whetstone":2,"tutorial-island.masters-whetstone":1,"tutorial-island.keen-edge-jewel":0,"tutorial-island.stout-heart-jewel":1,"tutorial-island.tempered-will-jewel":1,"tutorial-island.great-work-jewel":1,"tutorial-island.causeway-jewel":0,"tutorial-island.crossroads-jewel":0,"tutorial-island.orb-of-vitality":0,"tutorial-island.orb-of-the-edge":1,"tutorial-island.lesser-orb-of-the-edge":0,"tutorial-island.orb-of-the-bulwark":1,"tutorial-island.orb-of-renewal":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"tutorial-island.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"tutorial-island.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["tutorial-island.orb-of-vitality"]},"1,-1":{"jewel":"tutorial-island.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["tutorial-island.orb-of-the-edge","tutorial-island.lesser-orb-of-the-edge"]},"1,0":{"jewel":"tutorial-island.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"tutorial-island.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"tutorial-island.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":11,"inventory":{"tutorial-island.heartwood-blade":0,"tutorial-island.iron-sword":0,"tutorial-island.whetstone":2,"tutorial-island.masters-whetstone":1,"tutorial-island.keen-edge-jewel":0,"tutorial-island.stout-heart-jewel":1,"tutorial-island.tempered-will-jewel":1,"tutorial-island.great-work-jewel":1,"tutorial-island.causeway-jewel":0,"tutorial-island.crossroads-jewel":0,"tutorial-island.orb-of-vitality":0,"tutorial-island.orb-of-the-edge":1,"tutorial-island.lesser-orb-of-the-edge":0,"tutorial-island.orb-of-the-bulwark":1,"tutorial-island.orb-of-renewal":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"tutorial-island.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"tutorial-island.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["tutorial-island.orb-of-vitality"]},"1,-1":{"jewel":"tutorial-island.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["tutorial-island.orb-of-the-edge","tutorial-island.lesser-orb-of-the-edge"]},"1,0":{"jewel":"tutorial-island.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"tutorial-island.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"tutorial-island.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // --- growing an item through the inventory screen ---
 //
@@ -857,24 +867,24 @@ expect: growing-a-heartwood-blade-end
 load: growing-a-heartwood-blade-start
 use: entity.smiths-chest.open
 open-modal: carried-items
-submit-modal: item=Iron Sword x1
-submit-modal: verb=Grow
+submit-modal: item=tutorial-island.iron-sword
+submit-modal: verb=grow
 submit-modal: plane=allocate: slot e
-submit-modal: plane=slot: e with Crossroads Jewel
+submit-modal: plane=slot: e with tutorial-island.crossroads-jewel
 // A base still in its stack is minted by the first growth, so the level the
 // next allocation spends is bought after the copy exists rather than before.
-submit-modal: plane=feed: with Master's Whetstone
-submit-modal: plane=Go to 1,0
+submit-modal: plane=feed: with tutorial-island.masters-whetstone
+submit-modal: plane=go: 1,0
 submit-modal: plane=allocate: position 1
 submit-modal: plane=allocate: slot ne
-submit-modal: plane=slot: ne with Keen Edge Jewel
-submit-modal: plane=Go to 2,-1
+submit-modal: plane=slot: ne with tutorial-island.keen-edge-jewel
+submit-modal: plane=go: 2,-1
 submit-modal: plane=allocate: position 1
-submit-modal: plane=Back to inventory
-submit-modal: verb=Equip
+submit-modal: plane=back
+submit-modal: verb=equip
 open-modal: carried-items
-submit-modal: item=Close
+submit-modal: item=close
 expect: growing-through-the-inventory-screen-end
 
 # save growing-through-the-inventory-screen-end
-{"version":9,"inventory":{"tutorial-island.heartwood-blade":1,"tutorial-island.iron-sword":0,"tutorial-island.whetstone":6,"tutorial-island.masters-whetstone":3,"tutorial-island.keen-edge-jewel":0,"tutorial-island.stout-heart-jewel":1,"tutorial-island.tempered-will-jewel":1,"tutorial-island.great-work-jewel":1,"tutorial-island.causeway-jewel":1,"tutorial-island.crossroads-jewel":0,"tutorial-island.orb-of-vitality":1,"tutorial-island.orb-of-the-edge":2,"tutorial-island.lesser-orb-of-the-edge":1,"tutorial-island.orb-of-the-bulwark":1,"tutorial-island.orb-of-renewal":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"tutorial-island.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"tutorial-island.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"tutorial-island.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":11,"inventory":{"tutorial-island.heartwood-blade":1,"tutorial-island.iron-sword":0,"tutorial-island.whetstone":6,"tutorial-island.masters-whetstone":3,"tutorial-island.keen-edge-jewel":0,"tutorial-island.stout-heart-jewel":1,"tutorial-island.tempered-will-jewel":1,"tutorial-island.great-work-jewel":1,"tutorial-island.causeway-jewel":1,"tutorial-island.crossroads-jewel":0,"tutorial-island.orb-of-vitality":1,"tutorial-island.orb-of-the-edge":2,"tutorial-island.lesser-orb-of-the-edge":1,"tutorial-island.orb-of-the-bulwark":1,"tutorial-island.orb-of-renewal":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"tutorial-island.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"tutorial-island.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"tutorial-island.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}

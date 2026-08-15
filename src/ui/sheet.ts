@@ -1,15 +1,20 @@
-import type { PlayStatus } from '../runtime/session';
-import { bare, signed, tidy } from './format';
+import type { Answer, Localized, Localizer } from '../runtime/localized';
+import type { CountedRow, PlayStatus } from '../runtime/session';
+import { signed, tidy } from './format';
 
 export interface Entry {
-  name: string;
-  value: string;
+  // What the row is of. Words where the engine published words, and the id or
+  // the count it published where it published one of those: a slot is a slot,
+  // and it goes through `identifier()` because a thing with no language is
+  // spelled the same in every one of them (c1's ruling on that door).
+  name: Localized;
+  value: Localized;
   // The engine id this row is of, where the page has one: what the row is kept
   // apart by and what opening it dispatches. Two rows may share a name — two
   // grown copies of one base do — and never an id.
-  id?: string;
+  id?: Answer;
   // Stated beneath the row, for what a name and a count do not say.
-  detail?: string;
+  detail?: Localized;
 }
 
 type CarriedRow = PlayStatus['carried'][number];
@@ -22,22 +27,22 @@ type Contribution = Plane['contributions'][number];
 const byName = (left: Entry, right: Entry): number =>
   left.name < right.name ? -1 : left.name > right.name ? 1 : (left.id ?? '') < (right.id ?? '') ? -1 : (left.id ?? '') > (right.id ?? '') ? 1 : 0;
 
-export function counted(held: Record<string, number>): Entry[] {
-  return Object.entries(held)
-    .map(([name, value]) => ({ name, value: tidy(value) }))
-    .sort(byName);
+// Rows the engine already named, drawn under those names. Stats and skills are
+// two readings of one shape, and neither reaches this page as an id (c9, c10).
+export function counted(rows: readonly CountedRow[], localizer: Localizer): Entry[] {
+  return rows.map((row) => ({ id: row.id, name: row.title, value: localizer.identifier(tidy(row.value)) })).sort(byName);
 }
 
 // What one item is worth, per stat, from the fold the engine already published:
 // the two channels are stated apart because they land on a stat differently and
 // adding them would be this layer inventing arithmetic.
-export function contributionText(contributions: readonly Contribution[]): string {
+export function contributionText(contributions: readonly Contribution[], localizer: Localizer): Localized {
   const parts: string[] = [];
-  for (const { statId, added, increased } of contributions) {
-    if (added.min !== 0 || added.max !== 0) parts.push(`${added.min === added.max ? signed(added.min) : `${signed(added.min)}-${tidy(added.max)}`} ${bare(statId)}`);
-    if (increased !== 0) parts.push(`${signed(increased)}% ${bare(statId)}`);
+  for (const { statTitle, added, increased } of contributions) {
+    if (added.min !== 0 || added.max !== 0) parts.push(`${added.min === added.max ? signed(added.min) : `${signed(added.min)}-${tidy(added.max)}`} ${statTitle}`);
+    if (increased !== 0) parts.push(`${signed(increased)}% ${statTitle}`);
   }
-  return parts.join(', ');
+  return localizer.identifier(parts.join(', '));
 }
 
 // A grown copy carries no id in its name, so what tells two of them apart is the
@@ -45,19 +50,19 @@ export function contributionText(contributions: readonly Contribution[]): string
 // row is of and never folded here (c8, c18). A stack has no such summary: what
 // is worth stating about one copy of it is worth stating on the page the copy
 // that left is listed on.
-function detailOf(row: CarriedRow, planes: readonly Plane[]): Partial<Entry> {
+function detailOf(row: CarriedRow, planes: readonly Plane[], localizer: Localizer): Partial<Entry> {
   const contributions = row.grown ? (planes.find((plane) => plane.instance === row.id)?.contributions ?? []) : [];
-  const detail = contributionText(contributions);
+  const detail = contributionText(contributions, localizer);
   return detail === '' ? {} : { detail };
 }
 
 // Everything the player is carrying, as the engine names and counts it — which
 // is the rows on the carried side of c21, the worn ones being the equipment
 // page's.
-export function carried(rows: readonly CarriedRow[], planes: readonly Plane[]): Entry[] {
+export function carried(rows: readonly CarriedRow[], planes: readonly Plane[], localizer: Localizer): Entry[] {
   return rows
-    .filter((row) => row.slot === undefined)
-    .map((row) => ({ id: row.id, name: row.name, value: tidy(row.count), ...detailOf(row, planes) }))
+    .filter((row) => row.worn === undefined)
+    .map((row) => ({ id: row.id, name: row.name, value: localizer.identifier(tidy(row.count)), ...detailOf(row, planes, localizer) }))
     .sort(byName);
 }
 
@@ -66,9 +71,8 @@ export function carried(rows: readonly CarriedRow[], planes: readonly Plane[]): 
 // other side of c21 rather than a second reading of the equipment dictionary,
 // so a row is of the copy the engine already named and opening it dispatches
 // the id that names that copy and not the item behind it.
-export function worn(rows: readonly CarriedRow[], planes: readonly Plane[]): Entry[] {
+export function worn(rows: readonly CarriedRow[], planes: readonly Plane[], localizer: Localizer): Entry[] {
   return rows
-    .filter((row) => row.slot !== undefined)
-    .map((row) => ({ id: row.id, name: row.slot as string, value: row.name, ...detailOf(row, planes) }))
+    .flatMap((row) => (row.worn ? [{ id: row.id, name: row.worn.title, value: row.name, ...detailOf(row, planes, localizer) }] : []))
     .sort(byName);
 }

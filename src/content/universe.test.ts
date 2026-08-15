@@ -216,6 +216,85 @@ describe('loadUniverseWithDiagnostics', () => {
     expect(registry.namespace.has('flag', 'base.camp.discovered')).toBe(false);
   });
 
+  it('takes an action-slug member with the action, at every site that prunes one, so a use: naming it cannot load clean', () => {
+    const ghost: ModuleSource = { ...module('ghost', '# info ghost', '# item gem'), enabled: false };
+    const base = module(
+      'base',
+      '# info base',
+      'dependencies: ? ghost',
+      '# action swing',
+      'give: ghost.gem',
+      '# entity brute',
+      'uses: swing',
+      '# entity dresser',
+      'search drawer:',
+      '  give: ghost.gem',
+      '# item lamp',
+      'polish:',
+      '  give: ghost.gem',
+      '# location shore',
+      'x: 0, y: 0',
+      'starting',
+      'entities: brute, dresser',
+      'light beacon:',
+      '  give: ghost.gem',
+    );
+    const walker = (name: string, use: string): ModuleSource => module(name, `# info ${name}`, 'dependencies: base', `# test ${name}`, `use: ${use}`);
+
+    for (const [name, address] of [
+      ['t1', 'entity.base.brute.swing'],
+      ['t2', 'entity.base.dresser.search-drawer'],
+      ['t3', 'item.base.lamp.polish'],
+      ['t4', 'location.base.shore.light-beacon'],
+    ]) {
+      const { registry, loadedModules, diagnostics } = loadUniverseWithDiagnostics([base, ghost, walker(name, address)]);
+
+      // A section naming what was pruned is dropped, never fatal: undeclaring
+      // the member without pruning it disabled the walker instead.
+      expect({ address, loadedModules, diagnostics }).toEqual({ address, loadedModules: ['base', name], diagnostics: [] });
+      expect({ address, tests: [...registry.tests.keys()] }).toEqual({ address, tests: [] });
+      expect(registry.namespace.declaredKeys('action-slug')).toEqual([]);
+    }
+  });
+
+  it('reads the survivors off the whole universe, so pruning one object does not take an identically named object of another kind with it', () => {
+    const ghost: ModuleSource = { ...module('ghost', '# info ghost', '# item gem'), enabled: false };
+    const base = module(
+      'base',
+      '# info base',
+      'dependencies: ? ghost',
+      '# entity dresser',
+      'search drawer:',
+      '  give: ghost.gem',
+      '# item dresser',
+      'search drawer:',
+      '  say: rattle',
+      '# location shore',
+      'x: 0, y: 0',
+      'starting',
+      'entities: dresser',
+    );
+    const walker = (use: string): ModuleSource => module('walk', '# info walk', 'dependencies: base', '# test walk', `use: ${use}`);
+
+    const survivor = loadUniverseWithDiagnostics([base, ghost, walker('item.base.dresser.search-drawer')]);
+
+    expect({ loadedModules: survivor.loadedModules, diagnostics: survivor.diagnostics }).toEqual({ loadedModules: ['base', 'walk'], diagnostics: [] });
+    expect(survivor.registry.entities.get('base.dresser')!.blocks).toEqual([]);
+    expect(survivor.registry.items.get('base.dresser')!.actions).toHaveLength(1);
+    expect(survivor.registry.namespace.declaredKeys('action-slug')).toEqual(['item.base.dresser.search-drawer']);
+    expect([...survivor.registry.tests.keys()]).toEqual(['walk.walk']);
+
+    // And the other side of the same fixture, which is what the key carrying no
+    // owner kind hid: the entity lost its action, so a `use:` aimed at the
+    // entity names nothing — even though an item of that id still answers to
+    // that address. It used to load clean and throw `engine.action.stale.action`
+    // in front of a player.
+    const stranded = loadUniverseWithDiagnostics([base, ghost, walker('entity.base.dresser.search-drawer')]);
+
+    expect({ loadedModules: stranded.loadedModules, diagnostics: stranded.diagnostics }).toEqual({ loadedModules: ['base', 'walk'], diagnostics: [] });
+    expect([...stranded.registry.tests.keys()]).toEqual([]);
+  });
+
   it('disables only the module whose source does not parse', () => {
     const result = loadUniverseWithDiagnostics([module('base', '# info base', '# item rope'), { name: 'broken', text: '# item' }]);
 
@@ -301,5 +380,65 @@ describe('the parsed modules a load hands back', () => {
 
   it('are empty when nothing loaded at all', () => {
     expect(loadUniverseWithDiagnostics([]).parsed).toEqual([]);
+  });
+});
+
+describe('a module declares the language it is written in (c5)', () => {
+  const titled = (language: string): string => {
+    const sources = [module('island', '# info island', 'version: 1.0.0', `language: ${language}`, '# entity giant-rat', '# location shore', 'x: 0, y: 0', 'starting')];
+    return loadUniverse(sources).entities.get('island.giant-rat')!.title;
+  };
+
+  it('defaults to en, which is where humanizeEn supplies an unauthored title', () => {
+    expect(parseModuleSource(module('island', '# info island')).info.language).toBe('en');
+    expect(titled('en')).toBe('Giant Rat');
+  });
+
+  it('leaves the raw id standing in another language, rather than an English phrase dressed as content', () => {
+    expect(titled('es')).toBe('giant-rat');
+  });
+
+  it('records a generated title as an entry only for a module writing English', () => {
+    const en = loadUniverse([module('island', '# info island', 'version: 1.0.0', '# entity giant-rat', '# location shore', 'x: 0, y: 0', 'starting')]);
+    const es = loadUniverse([module('island', '# info island', 'version: 1.0.0', 'language: es', '# entity giant-rat', '# location shore', 'x: 0, y: 0', 'starting')]);
+
+    expect(en.locales.base.get('island.entity.giant-rat.title')).toEqual({ text: 'Giant Rat', language: 'en', generated: true });
+    expect(es.locales.base.has('island.entity.giant-rat.title')).toBe(false);
+    // Addressable either way: the Spanish player is shown the key, which is
+    // exactly the gap a translator has to be told about (pass 2, c7).
+    expect(es.locales.addressable.has('island.entity.giant-rat.title')).toBe(true);
+  });
+
+  it('records an authored title under whatever language its module declared', () => {
+    const es = loadUniverse([module('island', '# info island', 'version: 1.0.0', 'language: es', '# entity rata-gigante', 'title: Rata Gigante', '# location shore', 'x: 0, y: 0', 'starting')]);
+
+    expect(es.locales.base.get('island.entity.rata-gigante.title')).toEqual({ text: 'Rata Gigante', language: 'es' });
+  });
+
+  it('takes a tag it has never heard of, because nothing but the humanizeEn gate reads one', () => {
+    expect(parseModuleSource(module('island', '# info island', 'language: pt-br')).info.language).toBe('pt-br');
+  });
+});
+
+// pass 1: `humanizeEn` also generates an action's label, and that half had no
+// gate — a Spanish module offered `Abrir Puerta` and reported nothing missing.
+describe('a generated action label is an English entry too (c5)', () => {
+  const isla = (language: string) =>
+    loadUniverse([module('isla', '# info isla', 'version: 1.0.0', `language: ${language}`, '# location orilla', 'x: 0, y: 0', 'starting', 'entities:', '  puerta', '# entity puerta', 'uses: abrir-puerta', '# action abrir-puerta', 'instant', 'say: se abre')]);
+
+  it('records the generated label only for a module writing English', () => {
+    expect(isla('en').locales.base.get('isla.action.abrir-puerta.abrir-puerta')).toEqual({ text: 'Abrir Puerta', language: 'en', generated: true });
+    expect(isla('es').locales.base.has('isla.action.abrir-puerta.abrir-puerta')).toBe(false);
+    expect(isla('es').locales.base.has('isla.entity.puerta.abrir-puerta')).toBe(false);
+  });
+
+  it('leaves the label itself alone, because it is what a player is shown', () => {
+    expect(isla('es').actions.get('isla.abrir-puerta')?.label).toBe('Abrir Puerta');
+  });
+
+  it('records an authored label whatever language it is in', () => {
+    const titled = loadUniverse([module('isla', '# info isla', 'version: 1.0.0', 'language: es', '# location orilla', 'x: 0, y: 0', 'starting', '# action abrir', 'title: Abrir la puerta', 'instant', 'say: se abre')]);
+
+    expect(titled.locales.base.get('isla.action.abrir.abrir')).toEqual({ text: 'Abrir la puerta', language: 'es' });
   });
 });

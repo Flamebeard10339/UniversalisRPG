@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { armFightAction, createGameState, GameState, initResources, PLAYER, resolve } from './runtime';
-import { hostile, loadModule, Registry } from '../content/registry';
+import { hostile, Registry } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
+import { logSwing } from './encounter';
 import { isPopulations } from './population';
 import { secondsToMs, toMilliUnits } from './units';
 
@@ -142,7 +144,7 @@ entities: urchin
 `;
 
 function loaded(): Registry {
-  return loadModule(MODULE);
+  return loadInEnglish(MODULE);
 }
 
 function standing(registry: Registry, where: string): GameState {
@@ -387,7 +389,7 @@ describe('an overload bounds and ends the action it overlays', () => {
     // The ogre carries 1000 health against 4 a hit and opens nothing itself, so
     // nothing here completes and nothing re-arms: what ends it is the
     // overload's own bound.
-    const registry = loadModule(patient);
+    const registry = loadInEnglish(patient);
     const overloaded = standing(registry, 'camp');
     armFightAction('swing', 'ogre', registry, overloaded);
     resolve(overloaded, registry, secondsToMs(10));
@@ -410,7 +412,7 @@ describe('a fight nobody can swing in is no fight', () => {
   it('ends rather than stalling when every seat gate has closed', () => {
     // No ally, so the boulder's gated seat and the player's are the whole
     // roster; taking the player's clock away leaves nobody at all.
-    const registry = loadModule(MODULE.replace(`uses: swing${String.fromCharCode(10)}allies: miki`, 'uses: swing'));
+    const registry = loadInEnglish(MODULE.replace(`uses: swing${String.fromCharCode(10)}allies: miki`, 'uses: swing'));
     const state = standing(registry, 'camp');
     state.flags['truce'] = true;
     armFightAction('swing', 'boulder', registry, state);
@@ -427,9 +429,9 @@ describe('allies: names somebody else', () => {
   const withAlly = (line: string): string => MODULE.replace('# entity bandit\nfaction: bandits', `# entity bandit\nfaction: bandits\n${line}`);
 
   it('refuses an entity that names itself, or the player, as its own ally', () => {
-    expect(() => loadModule(withAlly('allies: bandit'))).toThrow(/allies: names this entity itself/);
-    expect(() => loadModule(withAlly('allies: player'))).toThrow(/allies: names the player/);
-    expect(() => loadModule(withAlly('allies: miki'))).not.toThrow();
+    expect(() => loadInEnglish(withAlly('allies: bandit'))).toThrow(/allies: names this entity itself/);
+    expect(() => loadInEnglish(withAlly('allies: player'))).toThrow(/allies: names the player/);
+    expect(() => loadInEnglish(withAlly('allies: miki'))).not.toThrow();
   });
 });
 
@@ -445,7 +447,7 @@ describe('the populations save field', () => {
     loadSave(restored, { version: SAVE_VERSION, diff }, registry);
     expect(restored.populations).toEqual(state.populations);
 
-    const withoutShore = loadModule(MODULE.split('\n# location shore')[0]);
+    const withoutShore = loadInEnglish(MODULE.split('\n# location shore')[0]);
     const pruned = createGameState();
     const warnings = loadSave(pruned, { version: SAVE_VERSION, diff: { populations: { shore: { crab: { down: 1, due: [] } } } } }, withoutShore);
     expect(pruned.populations).toEqual({});
@@ -461,5 +463,20 @@ describe('the populations save field', () => {
     const registry = loaded();
     const state = createGameState();
     expect(() => loadSave(state, { version: SAVE_VERSION, diff: { populations: { shore: { crab: { down: 'lots' } } } } as never }, registry)).toThrow(/save field populations/);
+  });
+});
+
+// Four patterns cover three cases; a swing whose swinger and target are the
+// same player is the fourth, and before pass 2 the localizer threw for want of
+// a {target} rather than saying anything at all.
+describe('a swing the player lands on themselves', () => {
+  it('is said the way one between two others is, rather than refused', () => {
+    const registry = loadInEnglish(MODULE);
+    const state = initialState(registry);
+
+    logSwing(state, registry, PLAYER, PLAYER, toMilliUnits(3));
+    logSwing(state, registry, PLAYER, PLAYER, null);
+
+    expect(state.log).toEqual(['The Player hits the Player for 3.', 'The Player misses the Player.']);
   });
 });

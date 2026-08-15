@@ -76,17 +76,21 @@ export const id: Parser<string> = {
   },
 };
 
-// Reads the name off the end of the path: a title says "Miki", never the
-// namespace that keeps two Mikis apart.
-export const humanize = (id: string): string =>
-  (id.split('.').pop() ?? id)
+// The name off the end of the path: a title says "Miki", never the namespace
+// that keeps two Mikis apart.
+export const lastSegment = (id: string): string => id.split('.').pop() ?? id;
+
+// English in the name because it is English in the rule: every-word title case,
+// and a capitalisation that owes Turkish its dotted I.
+export const humanizeEn = (id: string): string =>
+  lastSegment(id)
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 
 // Approximate: the written vowel, not the spoken one, so "a unicorn" comes out
 // wrong and "an Hay" — which is what a blanket "an" produced — does not.
-export const article = (word: string): string => (/^[aeiou]/i.test(word) ? 'an' : 'a');
+export const articleEn = (word: string): string => (/^[aeiou]/i.test(word) ? 'an' : 'a');
 
 // A quantity that is CONSUMED. One number, because `inputLimit` has to answer
 // how many completions an inventory affords, and a range has no answer.

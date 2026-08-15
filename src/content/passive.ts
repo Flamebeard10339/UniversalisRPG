@@ -1,8 +1,9 @@
+import { defaultTitle } from './info';
 import { list } from '../grammar/list';
 import { SectionSchema } from '../grammar/section';
 import { Range } from '../grammar/range';
 import { TagClause, tagClause } from '../grammar/tagClause';
-import { humanize, text } from '../grammar/values';
+import { text } from '../grammar/values';
 
 // A passive shares the tag-clause body `# item` already uses: bare words are
 // tags, `+N stat` and `+N% stat` are payloads. Its id sits in the same global
@@ -18,7 +19,7 @@ export interface Passive {
 export const passiveSchema: SectionSchema<Passive> = {
   kind: 'passive',
   fields: {
-    title: { parser: text, default: (self) => humanize(self.id) },
+    title: { parser: text, default: defaultTitle },
     examine: { parser: text },
     tags: { parser: list(tagClause), default: () => [] },
   },

@@ -4,7 +4,8 @@ import { list } from '../grammar/list';
 import { Cursor, DslError, Parser } from '../grammar/parser';
 import { Authored, SectionSchema } from '../grammar/section';
 import { TagClause, tagClause } from '../grammar/tagClause';
-import { article, humanize, id, number, text } from '../grammar/values';
+import { id, number, text } from '../grammar/values';
+import { defaultTitle } from './info';
 
 // The value `cluster-effect:` takes: a percentage and a stat, per the spec's
 // c15 ("names a percentage and a stat") — a narrower grammar than
@@ -18,7 +19,10 @@ export interface ClusterEffect {
 export interface Item extends HookCarrier {
   id: string;
   title: string;
-  examine: string;
+  // Optional because the sentence that used to fill it in was English grammar
+  // built by `article()`; it is `engine.item.examine` now and belongs to the
+  // language being played, not to the item.
+  examine?: string;
   slot?: string;
   tags: TagClause[];
   actions: Action[];
@@ -77,8 +81,8 @@ export function itemRoleProblem(item: Item): string | undefined {
 export const itemSchema: SectionSchema<Item, never, 'actions'> = {
   kind: 'item',
   fields: {
-    title: { parser: text, default: (self) => humanize(self.id) },
-    examine: { parser: text, default: (self) => `This is ${article(self.title)} ${self.title}.` },
+    title: { parser: text, default: defaultTitle },
+    examine: { parser: text },
     slot: { parser: id },
     tags: { parser: list(tagClause), default: () => [] },
     clusterJewel: { parser: id, keyword: 'cluster-jewel' },

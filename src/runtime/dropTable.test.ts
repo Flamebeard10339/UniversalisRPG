@@ -1,14 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule, Registry } from '../content/registry';
+import type { ActionResult } from '../grammar/actionResult';
+import { loadInEnglish } from '../content/engineLocale';
+import { Registry } from '../content/registry';
 import { applyResultsNow, createGameState, grantBuff, PLAYER } from './runtime';
 import { GameState } from './state';
 
 const ITEMS = ['# item bones', '# item coins', '# item gem', '# item tail'];
 
+// Loaded once per body: a rate is measured over four thousand seeds and the
+// content is the same for every one of them, so reloading it per seed is four
+// thousand universe builds for one answer. Only the state a run is given
+// differs, and `run` builds that fresh.
+const loaded = new Map<string, { registry: Registry; results: ActionResult[] }>();
+
 function fight(...body: string[]) {
-  const registry = loadModule([...ITEMS, '# stat luck', 'base: 60', '# stat ward', 'base: 60', '# item charm', 'food, +400 luck, 60s', '# flag lit', '# entity giant-rat', 'fight:', ...body.map((line) => `  ${line}`)].join('\n'));
-  const results = registry.entities.get('giant-rat')!.actions[0].results;
-  return { registry, results };
+  const source = [...ITEMS, '# stat luck', 'base: 60', '# stat ward', 'base: 60', '# item charm', 'food, +400 luck, 60s', '# flag lit', '# entity giant-rat', 'fight:', ...body.map((line) => `  ${line}`)].join('\n');
+  const held = loaded.get(source);
+  if (held) return held;
+  const registry = loadInEnglish(source);
+  const built = { registry, results: registry.entities.get('giant-rat')!.actions[0].results };
+  loaded.set(source, built);
+  return built;
 }
 
 // One state per run, so what a run produces depends on the seed alone.
@@ -200,7 +212,7 @@ describe('roll: applies a named table', () => {
   const TABLES = ['# droptable rare', 'one of:', '  1x: give: 1 gem', '# droptable common', 'give: 1 bones', '1 in 2:', '  roll: rare'];
 
   it('reaches the table s results, and the table s own wrappers roll', () => {
-    const registry = loadModule([...ITEMS, ...TABLES, '# entity giant-rat', 'fight:', '  roll: common'].join('\n'));
+    const registry = loadInEnglish([...ITEMS, ...TABLES, '# entity giant-rat', 'fight:', '  roll: common'].join('\n'));
     const results = registry.entities.get('giant-rat')!.actions[0].results;
     let gems = 0;
     for (let seed = 1; seed <= 400; seed++) {

@@ -14,7 +14,9 @@ import { resolveCarried, resolveDirective } from '../content/typed';
 import { type ParsedSave } from '../content/saveSection';
 import { describeCondition, RuntimeError } from './runtime';
 import { wornCopySlot } from './itemInstance';
+import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal, type ModalOption } from './modals';
+import { anId, say, says, type Said } from './said';
 import {
   adoptRegistry,
   apply,
@@ -24,6 +26,7 @@ import {
   choiceToDirective,
   runSessionTest,
   serializeSession,
+  sessionLocalizer,
   sessionStatus,
   view,
   wait,
@@ -35,24 +38,57 @@ import {
 
 export type MessageTone = 'plain' | 'ok' | 'warn' | 'error';
 
+// c4: whose words a message is. A driver renders both, so it has to be able to
+// tell them apart at the moment it draws one, which a brand alone cannot do —
+// `Localized` is erased and nothing survives to be asked.
+export type MessageWords = 'player' | 'tool';
+
+// What the engine says to the player. Every one comes from a key, so every one
+// arrives in the language being played.
+export interface PlayerMessage {
+  readonly kind: 'message';
+  readonly words: 'player';
+  readonly tone: MessageTone;
+  readonly text: Localized;
+  readonly detail?: readonly Localized[];
+}
+
+// What the authoring tool says to whoever is driving it: a parser diagnostic, a
+// staging report, a test verdict. These are the tool's own words, in the
+// language the tool is written in, and they are not keyed because the engine
+// does not own them — a `DslError` is `src/grammar`'s and a load diagnostic is
+// `src/content`'s, both below the layer that declares the brand.
+export interface ToolMessage {
+  readonly kind: 'message';
+  readonly words: 'tool';
+  readonly tone: MessageTone;
+  readonly text: string;
+  readonly detail?: readonly string[];
+}
+
 // What a command did, in the engine's own words. A driver decides how each of
 // these looks; nothing here carries a glyph, a bar, a number list or a clock
 // suffix, because the same result is rendered by a terminal and by a screen.
 export type CommandOutput =
-  | { kind: 'message'; tone: MessageTone; text: string; detail?: string[] }
+  | PlayerMessage
+  | ToolMessage
   | { kind: 'view'; view: PlayView; reread: boolean }
   | { kind: 'status'; status: PlayStatus }
   | { kind: 'choices'; choices: PlayChoice[] }
-  | { kind: 'help'; entries: CommandHelp[] }
-  | { kind: 'source'; lines: string[] }
-  | { kind: 'authored'; blocks: string[][] };
+  // The tool's own words too, and they say so the way `ToolMessage` does: the
+  // command table's English, the DSL a module is written in, and the DSL a
+  // recorder just wrote. Without the discriminant these three were the arms
+  // that carried raw text and nothing said whose it was.
+  | { kind: 'help'; words: 'tool'; entries: CommandHelp[] }
+  | { kind: 'source'; words: 'tool'; lines: string[] }
+  | { kind: 'authored'; words: 'tool'; blocks: string[][] };
 
 export interface CommandResult {
   view?: PlayView;
   output: CommandOutput[];
   quit: boolean;
   // The colon-form directives just performed, in order; empty for read-only commands.
-  recorded: string[];
+  recorded: Answer[];
   // Set when the command armed something for a driver to advance in real time.
   live?: LiveRun;
 }
@@ -140,8 +176,11 @@ export interface CommandHelp {
   summary: string;
 }
 
+// Why a line names no command, and whose words say so. A `Said` where the
+// refusal is the player's — a number that indexes no choice the view published
+// — and the tool's own English where it names a command only the tool has.
 export interface CommandProblem {
-  problem: string;
+  problem: string | Said;
 }
 
 export interface CommandSpec<K extends ArgKind = ArgKind> {
@@ -172,22 +211,46 @@ function isProblem(value: unknown): value is CommandProblem {
   return typeof value === 'object' && value !== null && 'problem' in value;
 }
 
-function message(tone: MessageTone, text: string, detail?: string[]): CommandOutput {
-  return detail ? { kind: 'message', tone, text, detail } : { kind: 'message', tone, text };
+function message(tone: MessageTone, text: Localized): PlayerMessage {
+  return { kind: 'message', words: 'player', tone, text };
 }
 
-function said(tone: MessageTone, text: string): CommandResult {
+function note(tone: MessageTone, text: string, detail?: string[]): ToolMessage {
+  return detail ? { kind: 'message', words: 'tool', tone, text, detail } : { kind: 'message', words: 'tool', tone, text };
+}
+
+function said(tone: MessageTone, text: Localized): CommandResult {
   return { output: [message(tone, text)], quit: false, recorded: [] };
+}
+
+function noted(tone: MessageTone, text: string, detail?: string[]): CommandResult {
+  return { output: [note(tone, text, detail)], quit: false, recorded: [] };
+}
+
+// A number that indexes no choice the view published, whether it was typed or
+// dispatched. One sentence in one place, because a driver reaching this by a
+// keystroke and a driver reaching it by a line are refusing the same thing.
+function invalidChoice(answer: string): Said {
+  return says('engine.command.invalid-choice', { choice: anId(JSON.stringify(answer)) });
+}
+
+// A line that named no command, in whichever words said why.
+function refusedLine(ctx: CommandContext, problem: string | Said): CommandResult {
+  return typeof problem === 'string' ? noted('error', problem) : said('error', say(sessionLocalizer(ctx.session), problem));
 }
 
 function shown(next: PlayView, before: CommandOutput[] = []): CommandResult {
   return { view: next, output: [...before, { kind: 'view', view: next, reread: false }], quit: false, recorded: [] };
 }
 
-// Every route out of the engine that a player can provoke rather than a bug:
-// one message, and the session left where it was.
+// Every route out of the engine that stops a command rather than the process:
+// one message, and the session left where it was. It lands in the tool's arm
+// because a `RuntimeError` is raised where the engine has been handed something
+// it cannot mean — an id nothing declares, a line that does not parse, a save
+// whose shape is wrong — and a bug has no translation. What a player is owed
+// instead of a crash is a `Said`, and that takes the other arm.
 function refused(error: unknown): CommandResult {
-  if (error instanceof RuntimeError) return said('error', error.message);
+  if (error instanceof RuntimeError) return noted('error', error.message);
   throw error;
 }
 
@@ -234,7 +297,7 @@ function runNamedTest(ctx: CommandContext, testId: string): CommandResult {
     const result = runSessionTest(ctx.session, testId);
     const next = view(ctx.session);
     const verdict = result.passed ? `Test '${testId}' PASSED` : `Test '${testId}' FAILED: ${result.failure}`;
-    return shown(next, [message('plain', verdict)]);
+    return shown(next, [note('plain', verdict)]);
   } catch (error) {
     return refused(error);
   }
@@ -249,11 +312,11 @@ function openInventory(ctx: CommandContext, id: string): CommandResult {
   if (id === '') return runDirective(ctx, opening);
 
   const entry = carriedListing(ctx.session).find((each) => each.id === id);
-  if (!entry) return said('error', nothingIsNamed(id));
+  if (!entry) return said('error', nothingIsNamed(sessionLocalizer(ctx.session), id));
 
   const opened = runDirective(ctx, opening);
   if (opened.recorded.length === 0) return opened;
-  const selected = runDirective(ctx, { kind: 'submit-modal', key: 'item', value: entry.value });
+  const selected = runDirective(ctx, { kind: 'submit-modal', key: 'item', value: entry.id });
   return { ...selected, recorded: [...opened.recorded, ...selected.recorded] };
 }
 
@@ -261,9 +324,11 @@ function openInventory(ctx: CommandContext, id: string): CommandResult {
 // slot's spelling is the runtime's own — it names whichever copy the slot holds
 // and nothing else spells one that way — so an empty slot is reported as an
 // empty slot rather than printed back at whoever typed it.
-function nothingIsNamed(id: string): string {
+function nothingIsNamed(localizer: Localizer, id: string): Localized {
   const slot = wornCopySlot(id);
-  return slot === undefined ? `you carry no ${id}` : `you wear nothing in ${slot}`;
+  return slot === undefined
+    ? localizer.engine('engine.growth.no-copy', { item: localizer.identifier(id) })
+    : localizer.engine('engine.growth.no-worn', { slot: localizer.identifier(slot) });
 }
 
 function runDirective(ctx: CommandContext, directive: Directive): CommandResult {
@@ -273,7 +338,7 @@ function runDirective(ctx: CommandContext, directive: Directive): CommandResult 
     const label = directive.kind === 'expect' ? directive.save : describeCondition(directive.condition);
     try {
       const result = applyDirective(ctx.session, directive);
-      return result.failure ? said('warn', result.failure) : said('ok', `${label} matches`);
+      return result.failure ? noted('warn', result.failure) : noted('ok', `${label} matches`);
     } catch (error) {
       return refused(error);
     }
@@ -308,29 +373,29 @@ function localDiagnosticsFor(authoring: AuthoringContext, diagnostics: ReturnTyp
     .map((diagnostic) => formatModuleDiagnostic(diagnostic));
 }
 
-function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, text: string, note: string): CommandResult {
+function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, text: string, staged: string): CommandResult {
   const loaded = loadUniverseWithDiagnostics([...authoring.baseSources, { ...authoring.localSource, text }]);
   const localStatus = loaded.modules.find((module) => module.sourceName === authoring.localSource.name || module.moduleId === LOCAL_CHANGES_MODULE_ID);
   const diagnostics = localDiagnosticsFor(authoring, loaded.diagnostics);
   if (diagnostics.length > 0 || localStatus?.loaded !== true) {
-    return { output: [message('error', 'local changes did not load.', diagnostics)], quit: false, recorded: [] };
+    return noted('error', 'local changes did not load.', diagnostics);
   }
 
   try {
     authoring.writeLocalChanges?.(text);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    return said('error', `could not write local changes: ${detail}`);
+    return noted('error', `could not write local changes: ${detail}`);
   }
 
   authoring.localSource.text = text;
   adoptRegistry(ctx.session, loaded.registry);
 
   try {
-    return shown(view(ctx.session), [message('plain', note)]);
+    return shown(view(ctx.session), [note('plain', staged)]);
   } catch (error) {
     if (error instanceof RuntimeError) {
-      return { output: [message('plain', note), message('error', error.message)], quit: false, recorded: [] };
+      return { output: [note('plain', staged), note('error', error.message)], quit: false, recorded: [] };
     }
     throw error;
   }
@@ -340,43 +405,43 @@ export const UNAVAILABLE = 'local authoring is unavailable.';
 
 function runSectionEdit(ctx: CommandContext, section: SectionArg): CommandResult {
   const authoring = ctx.authoring;
-  if (!authoring) return said('error', UNAVAILABLE);
+  if (!authoring) return noted('error', UNAVAILABLE);
   try {
     const edit = upsertLocalSection(authoring.localSource.text, authoring.dependencies, localSectionSource(section));
     const verb = edit.replaced ? 'Replaced' : 'Staged';
     return commitLocalChanges(ctx, authoring, edit.text, `${verb} # ${edit.section.kind} ${edit.section.id} in ${LOCAL_CHANGES_MODULE_ID}.`);
   } catch (error) {
-    if (error instanceof DslError) return said('error', error.message);
+    if (error instanceof DslError) return noted('error', error.message);
     throw error;
   }
 }
 
 function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
   const authoring = ctx.authoring;
-  if (!authoring) return said('error', UNAVAILABLE);
+  if (!authoring) return noted('error', UNAVAILABLE);
 
   switch (op.op) {
     case 'list':
       try {
         const headings = localSectionHeadings(authoring.localSource.text);
         return headings.length > 0
-          ? { output: [{ kind: 'source', lines: headings }], quit: false, recorded: [] }
-          : said('plain', 'No local changes staged.');
+          ? { output: [{ kind: 'source', words: 'tool', lines: headings }], quit: false, recorded: [] }
+          : noted('plain', 'No local changes staged.');
       } catch (error) {
-        if (error instanceof DslError) return said('error', error.message);
+        if (error instanceof DslError) return noted('error', error.message);
         throw error;
       }
     case 'show':
-      return { output: [{ kind: 'source', lines: authoring.localSource.text.trimEnd().split('\n') }], quit: false, recorded: [] };
+      return { output: [{ kind: 'source', words: 'tool', lines: authoring.localSource.text.trimEnd().split('\n') }], quit: false, recorded: [] };
     case 'clear':
       return commitLocalChanges(ctx, authoring, clearLocalSections(authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
     case 'delete':
       try {
         const next = deleteLocalSection(authoring.localSource.text, authoring.dependencies, op.kind, op.id);
-        if (!next.deleted) return said('error', `no local # ${op.kind} ${op.id} is staged.`);
+        if (!next.deleted) return noted('error', `no local # ${op.kind} ${op.id} is staged.`);
         return commitLocalChanges(ctx, authoring, next.text, `Deleted local # ${op.kind} ${op.id}.`);
       } catch (error) {
-        if (error instanceof DslError) return said('error', error.message);
+        if (error instanceof DslError) return noted('error', error.message);
         throw error;
       }
   }
@@ -396,7 +461,7 @@ function savedGameFromSerialized(serialized: string): ParsedSave | null {
 // Never throws: a failure comes back as an error message.
 function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean }): CommandResult {
   const { recorder, session } = ctx;
-  if (recorder.history.length === 0) return said('error', 'nothing recorded yet');
+  if (recorder.history.length === 0) return noted('error', 'nothing recorded yet');
 
   const startSaveId = `${id}-start`;
   const endSaveId = `${id}-end`;
@@ -406,13 +471,13 @@ function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean
   // Taken before anything is written, because a recorder given no start save is
   // a driver that never took one, and half an emission is worse than none.
   const startSave = usesStartSave ? savedGameFromSerialized(recorder.startSave) : null;
-  if (usesStartSave && !startSave) return said('error', 'no start save was taken when this session began');
+  if (usesStartSave && !startSave) return noted('error', 'no start save was taken when this session began');
 
   const idTaken =
     session.registry.tests.has(id) ||
     (usesStartSave && session.registry.saves.has(startSaveId)) ||
     (opts.valid && session.registry.saves.has(endSaveId));
-  if (idTaken) return said('error', `test '${id}' already exists`);
+  if (idTaken) return noted('error', `test '${id}' already exists`);
 
   const lines = [...recorder.history];
   if (usesStartSave) lines.unshift(`load: ${startSaveId}`);
@@ -421,7 +486,7 @@ function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean
   const directives: Directive[] = [];
   for (const directiveLine of lines) {
     const directive = parseDirectiveLine(directiveLine);
-    if (!directive) return said('error', `internal: recorded line does not parse: ${directiveLine}`);
+    if (!directive) return noted('error', `internal: recorded line does not parse: ${directiveLine}`);
     directives.push(directive);
   }
 
@@ -438,7 +503,7 @@ function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean
   blocks.push([`# test ${id}`, ...lines]);
 
   return {
-    output: [message('plain', `Created test '${id}' (${recorder.history.length} steps).`), { kind: 'authored', blocks }],
+    output: [note('plain', `Created test '${id}' (${recorder.history.length} steps).`), { kind: 'authored', words: 'tool', blocks }],
     quit: false,
     recorded: [],
   };
@@ -485,7 +550,7 @@ function numberedModalAnswer(current: PlayView, trimmed: string): string | null 
   if (!asking?.values) return null;
   const index = Number(trimmed);
   if (!Number.isInteger(index) || index < 1 || index > asking.values.length) return null;
-  return `submit-modal: ${asking.key}=${asking.values[index - 1]}`;
+  return `submit-modal: ${asking.key}=${asking.values[index - 1].value}`;
 }
 
 // --- the table ------------------------------------------------------------
@@ -498,7 +563,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: 'choose option N',
     parse: (rest, ctx) => {
       const index = isChoiceLine(ctx.view, rest);
-      return index ?? { problem: `invalid choice: ${JSON.stringify(rest)}` };
+      return index ?? { problem: invalidChoice(rest) };
     },
     run: (ctx, index) => (ctx.live.driving ? driveChoice(ctx, index) : applyChoice(ctx, index)),
   }),
@@ -572,7 +637,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     },
     run: (ctx, multiplier) => {
       ctx.live.speed = multiplier;
-      return said('plain', `Speed set to ${multiplier}x.`);
+      return said('plain', sessionLocalizer(ctx.session).engine('engine.command.speed', { speed: multiplier }));
     },
   }),
   define({
@@ -669,7 +734,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'none',
     summary: 'show this help',
     parse: nothing,
-    run: () => ({ output: [{ kind: 'help', entries: helpEntries() }], quit: false, recorded: [] }),
+    run: () => ({ output: [{ kind: 'help', words: 'tool', entries: helpEntries() }], quit: false, recorded: [] }),
   }),
   define({
     name: '/quit',
@@ -766,7 +831,7 @@ export function runCommand(ctx: CommandContext, spec: CommandSpec, arg: ArgTypes
 // What a driver with a typed line calls: parse it, then dispatch what came out.
 export function runLine(ctx: CommandContext, line: string): CommandResult {
   const parsed = parseLine(ctx, line);
-  if (isProblem(parsed)) return said('error', parsed.problem);
+  if (isProblem(parsed)) return refusedLine(ctx, parsed.problem);
   return runCommand(ctx, parsed.spec, parsed.arg);
 }
 
@@ -814,7 +879,7 @@ export function createTicker(clock: Clock = wallClock, everyMs: number = LIVE_TI
 }
 
 export interface LivePool {
-  title: string;
+  title: Localized;
   current: number;
   max: number;
 }
@@ -822,7 +887,7 @@ export interface LivePool {
 // One tick's answer: how far the action got, what it is whittling down, and
 // whether it is still going. Every number, no rendering.
 export interface LiveProgress {
-  label: string;
+  label: Localized;
   active: boolean;
   time: number;
   progress: number;
@@ -839,7 +904,7 @@ export interface LiveRun {
 
 // What a finished run reports, however it finished: no progress to make, no
 // target to narrate, and the world as the last tick left it.
-function finished(label: string, current: PlayView): LiveProgress {
+function finished(label: Localized, current: PlayView): LiveProgress {
   return { label, active: false, time: current.time, progress: 1, pools: [], implicit: null, view: current };
 }
 
@@ -852,9 +917,10 @@ function livePools(status: PlayStatus): LivePool[] {
 }
 
 // `previous` names the action being driven, which is gone from the view the
-// tick that finishes it hands back.
-function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number): LiveProgress {
-  const label = previous.action?.label ?? 'action';
+// tick that finishes it hands back; `armed` is the label it was begun under,
+// for the tick that finds it gone from both.
+function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number, armed: Localized): LiveProgress {
+  const label = previous.action?.label ?? armed;
   const next = wait(ctx.session, (elapsedMs / 1000) * ctx.live.speed);
   ctx.view = next;
 
@@ -876,7 +942,7 @@ function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number): L
 
 function applyChoice(ctx: CommandContext, index: number): CommandResult {
   const choice = ctx.view.choices[index - 1];
-  if (!choice) return said('error', `invalid choice: ${JSON.stringify(String(index))}`);
+  if (!choice) return refusedLine(ctx, invalidChoice(String(index)));
   try {
     return { ...shown(apply(ctx.session, choice.id)), recorded: [recordedForChoice(choice)] };
   } catch (error) {
@@ -889,7 +955,7 @@ function applyChoice(ctx: CommandContext, index: number): CommandResult {
 // not a failure: beginning it is doing it, and it records as itself.
 function driveChoice(ctx: CommandContext, index: number): CommandResult {
   const choice = ctx.view.choices[index - 1];
-  if (!choice) return said('error', `invalid choice: ${JSON.stringify(String(index))}`);
+  if (!choice) return refusedLine(ctx, invalidChoice(String(index)));
 
   let opening: PlayView;
   try {
@@ -900,6 +966,7 @@ function driveChoice(ctx: CommandContext, index: number): CommandResult {
   if (!opening.action) return { ...shown(opening), recorded: [recordedForChoice(choice)] };
 
   const started = opening.time;
+  const armed = opening.action.label;
   let latest = opening;
   // A run ends once, whichever way it ends. The driver that owns the timer and
   // the keypress cannot make both arrive first, so the run refuses the second
@@ -911,18 +978,18 @@ function driveChoice(ctx: CommandContext, index: number): CommandResult {
   const live: LiveRun = {
     tick(elapsedMs) {
       if (over) return over;
-      const progress = tickOnce(ctx, latest, elapsedMs);
+      const progress = tickOnce(ctx, latest, elapsedMs, armed);
       latest = progress.view;
       if (!progress.active) over = progress;
       return progress;
     },
     end(cancelled) {
       if (closed) return closed;
-      const label = latest.action?.label ?? 'action';
+      const label = latest.action?.label ?? armed;
       const output: CommandOutput[] = [];
       if (cancelled) {
         applyDirective(ctx.session, { kind: 'cancel' });
-        output.push(message('plain', 'Stopped.'));
+        output.push(message('plain', sessionLocalizer(ctx.session).engine('engine.command.stopped')));
       }
       const final = view(ctx.session);
       latest = final;

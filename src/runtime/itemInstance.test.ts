@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { parseSaveSection } from '../content/saveSection';
 import { Hex, PlaneNode } from '../content/hex';
 import { clusterAt, ORIGIN, pointsSpent } from './clusterPlane';
 import { equip } from './equipment';
 import { instance, instanceIsLive } from './instances';
-import { allocate, carriedCount, carriesItem, destroyItem, feedItem, Growth, itemInstance, itemLevel, pointsRemaining, slotJewel } from './itemInstance';
+import { allocate, carriedCount, carriesItem, destroyItem, feedItem, Growth, Destruction, itemInstance, itemLevel, pointsRemaining, slotJewel } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { skillLevel } from './skills';
 import { GameState } from './state';
+import { inEnglish } from './sayFixture';
 
 const RINGLET = `
 # cluster-jewel ringlet
@@ -61,9 +62,9 @@ cluster-jewel: crossroads
 `;
 
 const MODULE = COMMON + RINGLET + CROSSROADS;
-const registry = loadModule(MODULE);
-const withoutCrossroads = loadModule(COMMON + RINGLET);
-const narrowed = loadModule(COMMON + RINGLET.replace('shape: ring\nopen-connections: e, ne\npassives: 1 hale, 4 stout', 'shape: point\nopen-connections: e\npassives: 1 hale') + CROSSROADS);
+const registry = loadInEnglish(MODULE);
+const withoutCrossroads = loadInEnglish(COMMON + RINGLET);
+const narrowed = loadInEnglish(COMMON + RINGLET.replace('shape: ring\nopen-connections: e, ne\npassives: 1 hale, 4 stout', 'shape: point\nopen-connections: e\npassives: 1 hale') + CROSSROADS);
 
 const position = (hex: Hex, index: number): PlaneNode => ({ hex, kind: 'position', position: index });
 const slot = (hex: Hex): PlaneNode => ({ hex, kind: 'slot', direction: 'e' });
@@ -76,13 +77,15 @@ function carrying(inventory: Record<string, number>): GameState {
 
 function grow(state: GameState, target: string, node: PlaneNode): string {
   const outcome = allocate(state, registry, target, node);
-  if (!outcome.ok) throw new Error(outcome.refused);
+  if (!outcome.ok) throw new Error(inEnglish(registry, outcome.refused));
   return outcome.instance;
 }
 
 function parse(serialized: string): { version: number; diff: Record<string, unknown> } {
   return parseSaveSection({ kind: 'save', id: 'x', body: [{ text: serialized, span: { start: 0, end: 0 }, children: [] }], span: { start: 0, end: 0 } }).saved;
 }
+
+const refusalOf = (outcome: Growth | Destruction): string => (outcome.ok ? 'not refused' : inEnglish(registry, outcome.refused));
 
 describe('an item is a stack until something is recorded about one of them', () => {
   it('counts stacks while nothing has happened to any of them', () => {
@@ -102,8 +105,8 @@ describe('an item is a stack until something is recorded about one of them', () 
 
   it('mints nothing and consumes nothing when the verb is refused', () => {
     const state = carrying({ 'iron-sword': 3, whetstone: 4 });
-    expect(allocate(state, registry, 'iron-sword', position(ORIGIN, 4))).toEqual({ ok: false, refused: 'point has no position 4 (1-1)' });
-    expect(feedItem(state, registry, 'iron-sword', 'iron-sword')).toEqual({ ok: false, refused: 'iron-sword grants no item experience' });
+    expect(refusalOf(allocate(state, registry, 'iron-sword', position(ORIGIN, 4)))).toBe('point has no position 4 (1-1)');
+    expect(refusalOf(feedItem(state, registry, 'iron-sword', 'iron-sword'))).toBe('iron-sword grants no item experience');
 
     expect(state.instances.byId).toEqual({});
     expect(state.inventory).toEqual({ 'iron-sword': 3, whetstone: 4 });
@@ -122,14 +125,14 @@ describe('an item is a stack until something is recorded about one of them', () 
 
   it('refuses a target that is neither a carried item nor a live instance', () => {
     const state = carrying({ whetstone: 4 });
-    expect(feedItem(state, registry, 'no-such-thing', 'whetstone')).toEqual({ ok: false, refused: 'there is no item or item instance called no-such-thing' });
-    expect(feedItem(state, registry, 'iron-sword', 'whetstone')).toEqual({ ok: false, refused: 'you carry no iron-sword' });
-    expect(feedItem(state, registry, '7', 'whetstone')).toEqual({ ok: false, refused: 'there is no item or item instance called 7' });
+    expect(refusalOf(feedItem(state, registry, 'no-such-thing', 'whetstone'))).toBe('there is no item or item instance called no-such-thing');
+    expect(refusalOf(feedItem(state, registry, 'iron-sword', 'whetstone'))).toBe('you carry no iron-sword');
+    expect(refusalOf(feedItem(state, registry, '7', 'whetstone'))).toBe('there is no item or item instance called 7');
   });
 
   it('will not feed a stack of one to itself, because the copy that leaves it is not there to be eaten', () => {
     const state = carrying({ 'sacrificial-blade': 1 });
-    expect(feedItem(state, registry, 'sacrificial-blade', 'sacrificial-blade')).toEqual({ ok: false, refused: 'you carry no sacrificial-blade' });
+    expect(refusalOf(feedItem(state, registry, 'sacrificial-blade', 'sacrificial-blade'))).toBe('you carry no sacrificial-blade');
 
     state.inventory['sacrificial-blade'] = 2;
     expect(feedItem(state, registry, 'sacrificial-blade', 'sacrificial-blade')).toEqual({ ok: true, instance: '1' });
@@ -143,11 +146,11 @@ describe('an item is a stack until something is recorded about one of them', () 
 describe('an item with no slot has no plane', () => {
   it('refuses every growth verb, leaving the stack and what it would have consumed whole', () => {
     const state = carrying({ whetstone: 4, 'crossroads-jewel': 2 });
-    const noPlane = (id: string): Growth => ({ ok: false, refused: `${id} is not a base: only an item you can wear has a plane to grow` });
+    const notABase = (id: string): string => `${id} is not a base: only an item you can wear has a plane to grow`;
 
-    expect(feedItem(state, registry, 'whetstone', 'whetstone')).toEqual(noPlane('whetstone'));
-    expect(allocate(state, registry, 'crossroads-jewel', position(ORIGIN, 1))).toEqual(noPlane('crossroads-jewel'));
-    expect(slotJewel(state, registry, 'crossroads-jewel', 'crossroads-jewel', ORIGIN, 'e')).toEqual(noPlane('crossroads-jewel'));
+    expect(refusalOf(feedItem(state, registry, 'whetstone', 'whetstone'))).toBe(notABase('whetstone'));
+    expect(refusalOf(allocate(state, registry, 'crossroads-jewel', position(ORIGIN, 1)))).toBe(notABase('crossroads-jewel'));
+    expect(refusalOf(slotJewel(state, registry, 'crossroads-jewel', 'crossroads-jewel', ORIGIN, 'e'))).toBe(notABase('crossroads-jewel'));
 
     expect(state.instances.byId).toEqual({});
     expect(state.inventory).toEqual({ whetstone: 4, 'crossroads-jewel': 2 });
@@ -155,7 +158,7 @@ describe('an item with no slot has no plane', () => {
 
   it('is refused before the stack is counted, so a jewel nobody carries reports the same reason', () => {
     const state = carrying({});
-    expect(feedItem(state, registry, 'crossroads-jewel', 'whetstone')).toEqual({ ok: false, refused: 'crossroads-jewel is not a base: only an item you can wear has a plane to grow' });
+    expect(refusalOf(feedItem(state, registry, 'crossroads-jewel', 'whetstone'))).toBe('crossroads-jewel is not a base: only an item you can wear has a plane to grow');
   });
 });
 
@@ -171,7 +174,7 @@ describe('a base is not a jewel', () => {
     grow(state, '1', position(ORIGIN, 4));
     grow(state, '1', slot(ORIGIN));
 
-    expect(slotJewel(state, registry, '1', 'heartwood-blade', ORIGIN, 'e')).toEqual({ ok: false, refused: 'heartwood-blade is not a cluster jewel' });
+    expect(refusalOf(slotJewel(state, registry, '1', 'heartwood-blade', ORIGIN, 'e'))).toBe('heartwood-blade is not a cluster jewel');
     expect(state.inventory['heartwood-blade']).toBe(1);
     expect(clusterAt(itemInstance(state, '1')!.plane, { q: 1, r: 0 })).toBeUndefined();
   });
@@ -180,7 +183,7 @@ describe('a base is not a jewel', () => {
 describe('an item experience', () => {
   it('has one source, so an item that grants none is refused as food', () => {
     const state = carrying({ 'iron-sword': 1, 'crossroads-jewel': 1 });
-    expect(feedItem(state, registry, 'iron-sword', 'crossroads-jewel')).toEqual({ ok: false, refused: 'crossroads-jewel grants no item experience' });
+    expect(refusalOf(feedItem(state, registry, 'iron-sword', 'crossroads-jewel'))).toBe('crossroads-jewel grants no item experience');
     expect(state.inventory).toEqual({ 'iron-sword': 1, 'crossroads-jewel': 1 });
   });
 
@@ -201,7 +204,7 @@ describe('an item experience', () => {
     expect(feedItem(state, registry, 'iron-sword', 'master-whetstone')).toEqual({ ok: true, instance: '1' });
     expect(itemLevel(itemInstance(state, '1')!, registry.items.get('iron-sword')!)).toBe(10);
 
-    expect(feedItem(state, registry, '1', 'whetstone')).toEqual({ ok: false, refused: 'Iron Sword is already at level 10, which is its maximum' });
+    expect(refusalOf(feedItem(state, registry, '1', 'whetstone'))).toBe('Iron Sword is already at level 10, which is its maximum');
     expect(state.inventory.whetstone).toBe(1);
     expect(itemInstance(state, '1')!.experience).toBe(20000);
   });
@@ -228,7 +231,7 @@ describe('growing an item', () => {
     grow(state, '1', slot(ORIGIN));
 
     expect(pointsSpent(itemInstance(state, '1')!.plane)).toBe(4);
-    expect(allocate(state, registry, '1', position(ORIGIN, 5))).toEqual({ ok: false, refused: 'position 5 of 0,0 costs a point and none remain' });
+    expect(refusalOf(allocate(state, registry, '1', position(ORIGIN, 5)))).toBe('position 5 of 0,0 costs a point and none remain');
   });
 
   it('consumes the jewel it slots, and charges no point for it', () => {
@@ -248,15 +251,15 @@ describe('growing an item', () => {
     grow(state, '1', slot(ORIGIN));
     slotJewel(state, registry, '1', 'crossroads-jewel', ORIGIN, 'e');
 
-    expect(slotJewel(state, registry, '1', 'crossroads-jewel', ORIGIN, 'e')).toEqual({ ok: false, refused: 'the e slot of 0,0 already holds a jewel' });
+    expect(refusalOf(slotJewel(state, registry, '1', 'crossroads-jewel', ORIGIN, 'e'))).toBe('the e slot of 0,0 already holds a jewel');
     expect(state.inventory['crossroads-jewel']).toBe(1);
   });
 
   it('refuses an item that is no cluster jewel, and one the player does not carry', () => {
     const state = fourPoints();
-    expect(slotJewel(state, registry, '1', 'whetstone', ORIGIN, 'e')).toEqual({ ok: false, refused: 'whetstone is not a cluster jewel' });
+    expect(refusalOf(slotJewel(state, registry, '1', 'whetstone', ORIGIN, 'e'))).toBe('whetstone is not a cluster jewel');
     state.inventory['crossroads-jewel'] = 0;
-    expect(slotJewel(state, registry, '1', 'crossroads-jewel', ORIGIN, 'e')).toEqual({ ok: false, refused: 'you carry no crossroads-jewel' });
+    expect(refusalOf(slotJewel(state, registry, '1', 'crossroads-jewel', ORIGIN, 'e'))).toBe('you carry no crossroads-jewel');
   });
 });
 
@@ -280,7 +283,7 @@ describe('an instance across a reload', () => {
 
   it('is pruned when its own template goes', () => {
     const state = grownBlade();
-    const warnings = pruneStateForRegistry(state, loadModule(MODULE.replace('# item heartwood-blade\nslot: mainhand\norigin-cluster: ringlet\n', '')));
+    const warnings = pruneStateForRegistry(state, loadInEnglish(MODULE.replace('# item heartwood-blade\nslot: mainhand\norigin-cluster: ringlet\n', '')));
 
     expect(warnings.map((warning) => warning.message)).toContain('Removed instance 1 because its template heartwood-blade is not loaded.');
     expect(instanceIsLive(state, '1')).toBe(false);
@@ -331,7 +334,7 @@ describe('destroying a carried item', () => {
     expect(destroyItem(state, 'iron-sword')).toEqual({ ok: true, item: 'iron-sword' });
     expect(state.inventory).toEqual({});
     expect(carriesItem(state, 'iron-sword')).toBe(false);
-    expect(destroyItem(state, 'iron-sword')).toEqual({ ok: false, refused: 'you carry no iron-sword' });
+    expect(refusalOf(destroyItem(state, 'iron-sword'))).toBe('you carry no iron-sword');
   });
 
   it('destroys a grown copy with the plane it holds, and gives nothing back to the stack', () => {
@@ -365,8 +368,8 @@ describe('destroying a carried item', () => {
     grow(state, 'heartwood-blade', position(ORIGIN, 2));
     const before = JSON.stringify(state);
 
-    expect(destroyItem(state, 'no-such-thing')).toEqual({ ok: false, refused: 'you carry no no-such-thing' });
-    expect(destroyItem(state, '7')).toEqual({ ok: false, refused: 'you carry no 7' });
+    expect(refusalOf(destroyItem(state, 'no-such-thing'))).toBe('you carry no no-such-thing');
+    expect(refusalOf(destroyItem(state, '7'))).toBe('you carry no 7');
     expect(JSON.stringify(state)).toBe(before);
   });
 
@@ -442,7 +445,7 @@ describe('growing a copy the player is wearing', () => {
   it('refuses an item the player neither carries nor wears', () => {
     const state = carrying({ whetstone: 1 });
 
-    expect(feedItem(state, registry, 'iron-sword', 'whetstone')).toEqual({ ok: false, refused: 'you carry no iron-sword' });
+    expect(refusalOf(feedItem(state, registry, 'iron-sword', 'whetstone'))).toBe('you carry no iron-sword');
     expect(state.instances.byId).toEqual({});
   });
 });

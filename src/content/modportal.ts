@@ -1,3 +1,4 @@
+import { GLOBAL_SECTION_KINDS } from './namespace';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import { contributionBase, extractContributionDsl } from './contribution';
 import type { ContributionBase } from './contribution';
@@ -110,9 +111,9 @@ function rewriteHydratedSection(kind: string, value: { id: string }, from: strin
   return next;
 }
 
-function localVariableIds(parsed: ReturnType<typeof parseModuleSource>, moduleId: string): string[] {
+function localGlobalIds(parsed: ReturnType<typeof parseModuleSource>, moduleId: string): string[] {
   return parsed.sections
-    .filter((section) => section.kind === 'variable')
+    .filter((section) => GLOBAL_SECTION_KINDS.includes(section.kind))
     .map((section) => renamedId((section.value as { id: string }).id, LOCAL_CHANGES_MODULE_ID, moduleId));
 }
 
@@ -120,12 +121,15 @@ function localVariableIds(parsed: ReturnType<typeof parseModuleSource>, moduleId
 // listed for the loader and forgotten here would keep its `local-changes.` id,
 // be dropped by serialize's own-module filter, and leave every reference that
 // WAS renamed pointing at a section the published mod no longer contains.
-// `flag` and `variable` are the two the loader's partition leaves out because
-// they hold no references of their own; `save` is renamed separately below.
+// `flag`, `variable` and `slot` are the three the loader's partition leaves out
+// because they hold no references of their own; `save` is renamed separately
+// below. A global id carries no module prefix, so renaming a variable or a slot
+// finds nothing to rename and is listed for the day one of them does.
 const RENAMED_SECTION_MAPS: readonly (readonly [string, keyof Registry])[] = [
   ...CONTENT_SECTION_MAPS,
   ['flag', 'flags'],
   ['variable', 'variables'],
+  ['slot', 'slots'],
 ];
 
 function canonicalLocalChangesModule(source: string, moduleId: string, base: readonly ModuleSource[]): string {
@@ -151,7 +155,7 @@ function canonicalLocalChangesModule(source: string, moduleId: string, base: rea
     saves.set(renamedId(id, LOCAL_CHANGES_MODULE_ID, moduleId), cloned(save));
   }
   registry.saves = saves;
-  return serializeRegistryModule(registry, { info: { ...parsed.info, id: moduleId }, globalVariables: localVariableIds(parsed, moduleId) });
+  return serializeRegistryModule(registry, { info: { ...parsed.info, id: moduleId }, globals: localGlobalIds(parsed, moduleId) });
 }
 
 export function materializeApprovedModIssue(issue: ApprovedModIssue, baseSources: readonly ModuleSource[] = []): MaterializedMod {

@@ -1,10 +1,13 @@
 import { ActionResult } from '../grammar/actionResult';
 import { evaluateCondition } from './conditions';
 import { Action } from '../content/entity';
+import { actionAddress, ActionDeclaration } from '../content/action';
+import { humanizeEn } from '../grammar/values';
 import { Location } from '../content/location';
 import { Registry } from '../content/registry';
 import type { ActiveAction } from './encounter';
 import { copiesOf } from './itemInstance';
+import { BASE_LANGUAGE, localizerFor, type Localized, type Localizer } from './localized';
 import { GameState, RuntimeError } from './state';
 import { travelSecondsPerUnit } from './tuning';
 
@@ -40,21 +43,36 @@ function locationDistance(a: Location, b: Location): number {
 // A travel ownerRef packs both ends of the journey into one objId, and a module
 // namespaces its ids with dots, so the pair is joined by a character an id
 // cannot contain.
-const TRAVEL_PAIR = '>';
+export const TRAVEL_PAIR = '>';
 
 export const travelPair = (origin: string, dest: string): string => `${origin}${TRAVEL_PAIR}${dest}`;
 
+// What addresses a compiled travel, which is an id and not its label: the label
+// is display text that no surface draws — a walk under way is said by
+// `engine.travel.to` — and a save holds this. `humanizeEn` fills the label from
+// it exactly as a `# action` with no `title:` is filled, so the two are visibly
+// not the same string and a caller reaching for the wrong one does not arm.
+export const TRAVEL_ADDRESS = 'travel';
+
+// The two ends of a pair, and what is said about either of them being gone.
+// Asked rather than thrown wherever the answer reaches a player.
+export function travelEndProblem(localizer: Localizer, originId: string, destId: string, registry: Registry): Localized | null {
+  if (!registry.locations.has(originId)) return localizer.engine('engine.travel.unknown-origin', { location: localizer.identifier(originId) });
+  if (!registry.locations.has(destId)) return localizer.engine('engine.travel.unknown-destination', { location: localizer.identifier(destId) });
+  return null;
+}
+
 // Shaped as a one-attempt fight so a journey spans like any other action. The
 // origin comes from the ownerRef: state.location holds it until relocate fires.
-export function travelAction(originId: string, destId: string, registry: Registry): Action {
-  const origin = registry.locations.get(originId);
-  const dest = registry.locations.get(destId);
-  if (!origin) throw new RuntimeError(`unknown travel origin: ${originId}`);
-  if (!dest) throw new RuntimeError(`unknown travel destination: ${destId}`);
+export function travelAction(originId: string, destId: string, registry: Registry): ActionDeclaration {
+  const problem = travelEndProblem(localizerFor(registry, BASE_LANGUAGE), originId, destId, registry);
+  if (problem) throw new RuntimeError(problem);
   return {
-    label: `Travel to ${dest.title}`,
+    id: TRAVEL_ADDRESS,
+    label: humanizeEn(TRAVEL_ADDRESS),
+    generatedLabel: true,
     results: [{ kind: 'relocate', location: destId }],
-    time: locationDistance(origin, dest) * travelSecondsPerUnit(registry),
+    time: locationDistance(registry.locations.get(originId)!, registry.locations.get(destId)!) * travelSecondsPerUnit(registry),
   };
 }
 
@@ -64,11 +82,12 @@ export function parseOwnerRef(ownerRef: string): { obj: string; objId: string } 
 }
 
 export function findActiveAction(active: ActiveAction, registry: Registry): Action {
+  const say = localizerFor(registry, BASE_LANGUAGE);
   const { obj, objId } = parseOwnerRef(active.ownerRef);
   const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-  if (!owner) throw new RuntimeError(`unknown ${obj}: ${objId}`);
-  const action = owner.actions?.find((a) => a.label === active.actionLabel);
-  if (!action) throw new RuntimeError(`unknown action ${JSON.stringify(active.actionLabel)} on ${active.ownerRef}`);
+  if (!owner) throw new RuntimeError(say.engine('engine.action.stale.owner', { kind: say.identifier(obj), id: say.identifier(objId) }));
+  const action = owner.actions?.find((each) => actionAddress(each) === active.actionSlug);
+  if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(active.actionSlug), owner: say.identifier(active.ownerRef) }));
   return action;
 }
 

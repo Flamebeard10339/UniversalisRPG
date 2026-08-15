@@ -3,9 +3,19 @@ import { Cursor, DslError, Parser, Span } from './parser';
 import { ListParser } from './list';
 import { RawLine, RawSection } from './structure';
 
+// What a default may know beyond the section it is filling in. A field-level
+// default cannot see the module its section came from, and c5 turns on that
+// question, so the module's answer is handed down to it.
+export interface HydrateContext {
+  language: string;
+}
+
+export const DEFAULT_LANGUAGE = 'en';
+export const DEFAULT_CONTEXT: HydrateContext = { language: DEFAULT_LANGUAGE };
+
 export interface Field<T, Self> {
   parser: Parser<NonNullable<T>>;
-  default?: (self: Self) => T;
+  default?: (self: Self, context: HydrateContext) => T;
   keyword?: string; // DSL surface keyword, when it differs from the field name
 }
 
@@ -16,7 +26,7 @@ export interface Field<T, Self> {
 export interface MappedField<T, Self> {
   parser: Parser<unknown>;
   hydrate(parsed: unknown): NonNullable<T>;
-  default?: (self: Self) => T;
+  default?: (self: Self, context: HydrateContext) => T;
   keyword?: string;
 }
 
@@ -80,7 +90,7 @@ export const isEntryRemoval = (entry: { label: string }): entry is EntryRemoval 
 
 export const parseAnySection = (section: RawSection, schema: AnySchema): { id: string } => parseSection(section, schema as unknown as SectionSchema<{ id: string }>);
 
-type AnyFields = Record<string, { parser: Parser<unknown>; hydrate?: (parsed: unknown) => unknown; default?: (self: unknown) => unknown; keyword?: string }>;
+type AnyFields = Record<string, { parser: Parser<unknown>; hydrate?: (parsed: unknown) => unknown; default?: (self: unknown, context: HydrateContext) => unknown; keyword?: string }>;
 type EntryConfig = { into: string; body: EntryBody };
 
 const KEY = /(?<op>[+-][ \t]*)?(?<key>[a-z][a-z0-9 -]*?):/;
@@ -211,7 +221,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
   }
 }
 
-export function hydrateSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(authored: Authored<H>, schema: SectionSchema<H, F, E>): H {
+export function hydrateSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(authored: Authored<H>, schema: SectionSchema<H, F, E>, context: HydrateContext = DEFAULT_CONTEXT): H {
   const fields = schema.fields as unknown as AnyFields;
   const read = authored as Record<string, unknown>;
   const view = { id: authored.id } as H;
@@ -227,7 +237,7 @@ export function hydrateSection<H extends { id: string }, F extends keyof H = nev
           state = 'resolving';
           const authoredValue = read[key];
           const hydrate = fields[key].hydrate;
-          cached = authoredValue === undefined ? fields[key].default?.(view) : hydrate ? hydrate(authoredValue) : authoredValue;
+          cached = authoredValue === undefined ? fields[key].default?.(view, context) : hydrate ? hydrate(authoredValue) : authoredValue;
           state = 'resolved';
         }
         return cached;

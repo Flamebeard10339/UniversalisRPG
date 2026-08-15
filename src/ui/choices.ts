@@ -1,17 +1,18 @@
+import type { Answer, Localized } from '../runtime/localized';
 import type { PlayView } from '../runtime/session';
 
 // The position the engine listed this choice at, kept because grouping moves
 // the buttons and the shared table answers to the number, not to the button.
 export interface Offer {
-  id: string;
-  label: string;
+  id: Answer;
+  label: Localized;
   position: number;
 }
 
 // What offers this, or nothing where the engine named no owner. The engine's
 // own field, not a title this layer composed.
 export interface OfferGroup {
-  source: string | null;
+  source: Localized | null;
   offers: Offer[];
 }
 

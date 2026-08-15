@@ -3,7 +3,8 @@ import { armAction, armFightAction, createGameState, GameState, initResources, P
 import { characterHooks } from './hooks';
 import { equip, unequip } from './equipment';
 import { IMPLICIT_TARGET_FULL } from './encounter';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { fromMilliUnits, secondsToMs, toMilliUnits } from './units';
 
 // Three carriers on the player — its own sheet and two slots — and three
@@ -156,7 +157,7 @@ starting
 entities: dummy, biter, boss, minion, wisp, anvil
 `;
 
-const loaded = (): Registry => loadModule(MODULE);
+const loaded = (): Registry => loadInEnglish(MODULE);
 
 function arena(registry: Registry): GameState {
   const state = createGameState('arena');
@@ -201,13 +202,13 @@ describe('a hook is gathered the way a stat bonus is (c2)', () => {
     expect(characterHooks(state, registry, PLAYER, 'onHit')).toEqual([
       [{ kind: 'pool', resource: 'fury', delta: { min: 2, max: 2 } }],
       [
-        { kind: 'say', text: 'charm' },
+        { kind: 'say', text: 'charm', key: 'item.bell-charm.say.0' },
         { kind: 'pool', resource: 'fury', delta: { min: -1, max: -1 } },
       ],
-      [{ kind: 'say', text: 'ring' }],
+      [{ kind: 'say', text: 'ring', key: 'item.ring-of-echoes.say.0' }],
     ]);
     expect(characterHooks(state, registry, PLAYER, 'whenHit')).toEqual([]);
-    expect(characterHooks(state, registry, 'dummy', 'whenHit')).toEqual([[{ kind: 'say', text: 'dummy' }]]);
+    expect(characterHooks(state, registry, 'dummy', 'whenHit')).toEqual([[{ kind: 'say', text: 'dummy', key: 'entity.dummy.say.0' }]]);
   });
 
   it('reads the entity block off whoever is being evaluated, whatever the player wears', () => {

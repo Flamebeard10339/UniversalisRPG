@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadInEnglish } from '../content/engineLocale';
 import { buffsOf, clearBuffs, expireBuffs, grantBuff, nextBuffExpiry, pruneBuffs, stackCount } from './buffs';
 import { Item } from '../content/item';
 import { createGameState, endAction, endJourney, GameState, initResources, PLAYER, resolve, statRange, statValue, useFight } from './runtime';
@@ -66,7 +67,7 @@ stats: max-health 4, attack 1
 `;
 
 function loaded(): Registry {
-  return loadModule(MODULE);
+  return loadInEnglish(MODULE);
 }
 
 // One more stat and one more item than `loaded()`, which is the shape of a mod
@@ -74,7 +75,7 @@ function loaded(): Registry {
 function wider(): Registry {
   // mint-tonic keeps its id and swaps its payload, so it is a source the
   // narrower registry still holds while the stat it names has gone with the mod.
-  return loadModule(
+  return loadInEnglish(
     `${MODULE}
 # stat panache
 
@@ -296,7 +297,7 @@ describe('a buff on a fight-scoped copy dies with the copy', () => {
     grantBuff(state, COPY, itemOf(registry, 'accelerated-vigor'), secondsToMs(1e9));
 
     const saved = { version: SAVE_VERSION, diff: diffState(state, initialState(registry)) };
-    const renamed = loadModule(MODULE.replace('# action strike', '# action swing').replace('uses: strike', 'uses: swing'));
+    const renamed = loadInEnglish(MODULE.replace('# action strike', '# action swing').replace('uses: strike', 'uses: swing'));
     const reloaded = initialState(renamed);
     const warnings = loadSave(reloaded, saved, renamed);
 

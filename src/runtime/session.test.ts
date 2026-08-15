@@ -2,10 +2,17 @@ import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
 import { feedItem, itemInstance } from './itemInstance';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { loadUniverse } from '../content/registry';
+import type { ModuleSource } from '../content/universe';
+import type { ModalChoice } from './modals';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
-import { apply, applyDirective, beginAction, cancelAction, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
+import { apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
+import { inEnglish } from './sayFixture';
+import { parseDirectiveLine, useChoiceId, type UseDirective } from '../content/test';
+import { printDirective } from '../content/serialize';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -22,6 +29,8 @@ function ids(v: PlayView): string[] {
   return v.choices.map((c) => c.id);
 }
 
+const statValueOf = (v: PlayView, id: string): number | undefined => v.stats.find((row) => row.id === id)?.value;
+
 function modalNames(v: PlayView): string[] {
   return v.modals.map((modal) => modal.name);
 }
@@ -32,14 +41,14 @@ describe('session', () => {
   // around them — which ids are offered and withdrawn, `inDialogue`, the
   // encounter readout, `said` — none of which a `# test` directive can reach.
   it('drives the tutorial-island miki route through the choice-list API', () => {
-    const registry = loadModule(source);
+    const registry = loadInEnglish(source);
     const session = startSession(registry);
 
     let v = view(session);
     expect(v.location.id).toBe('tutorial-island.guide-house');
     expect(v.said).toEqual([]);
     expect(ids(v)).toContain('talk:tutorial-island.miki');
-    expect(ids(v)).not.toContain('use:entity.tutorial-island.front-door.pick lock');
+    expect(ids(v)).not.toContain('use:entity.tutorial-island.front-door.pick-lock');
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual(['dialogue']);
@@ -50,11 +59,11 @@ describe('session', () => {
     expect(menu.key).toBe('choice');
     expect(menu.values).toHaveLength(2);
 
-    v = submitModal(session, { choice: menu.values![0] });
+    v = submitModal(session, { choice: menu.values![0].value });
     expect(modalNames(v)).toEqual([]);
     expect(v.flags['tutorial-island.quest-given']).toBe(true);
 
-    v = apply(session, 'use:entity.tutorial-island.mirror.look in');
+    v = apply(session, 'use:entity.tutorial-island.mirror.look-in');
     expect(v.said).toContain('modal:character-creation');
     expect(v.flags['tutorial-island.mirror-done']).toBe(true);
     // A modal sits atop the world, so nothing in the room is offered until it
@@ -62,9 +71,9 @@ describe('session', () => {
     expect(v.choices).toEqual([]);
     v = submitModal(session, { name: 'Rowan' });
     expect(modalNames(v)).toEqual(['character-creation']);
-    v = submitModal(session, { race: 'Elf' });
+    v = submitModal(session, { race: 'elf' });
     expect(modalNames(v)).toEqual([]);
-    expect(ids(v)).not.toContain('use:entity.tutorial-island.mirror.look in');
+    expect(ids(v)).not.toContain('use:entity.tutorial-island.mirror.look-in');
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual([]);
@@ -81,14 +90,14 @@ describe('session', () => {
 
     v = apply(session, 'use:entity.tutorial-island.stairs.ascend');
     expect(v.location.id).toBe('tutorial-island.guide-house-upstairs');
-    expect(ids(v)).toContain('use:entity.tutorial-island.dresser.search drawer');
+    expect(ids(v)).toContain('use:entity.tutorial-island.dresser.search-drawer');
 
-    v = apply(session, 'use:entity.tutorial-island.dresser.search drawer');
+    v = apply(session, 'use:entity.tutorial-island.dresser.search-drawer');
     expect(v.inventory['tutorial-island.lockpick']).toBe(1);
 
     v = apply(session, 'use:entity.tutorial-island.stairs-down.descend');
     expect(v.location.id).toBe('tutorial-island.guide-house');
-    expect(ids(v)).toContain('use:entity.tutorial-island.front-door.pick lock');
+    expect(ids(v)).toContain('use:entity.tutorial-island.front-door.pick-lock');
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual([]);
@@ -151,9 +160,9 @@ describe('session', () => {
   });
 
   it('throws a clear error on an unavailable or unknown choice id', () => {
-    const registry = loadModule(source);
+    const registry = loadInEnglish(source);
     const session = startSession(registry);
-    expect(() => apply(session, 'use:entity.tutorial-island.front-door.pick lock')).toThrow();
+    expect(() => apply(session, 'use:entity.tutorial-island.front-door.pick-lock')).toThrow();
     expect(() => apply(session, 'travel:tutorial-island.beach')).toThrow();
     expect(() => apply(session, 'nonsense')).toThrow();
   });
@@ -167,7 +176,7 @@ starting
 # item bread
 eat: take: 1 bread, say: You eat the bread.
 `;
-    const session = primed(loadModule(module), { inventory: { bread: 1 } });
+    const session = primed(loadInEnglish(module), { inventory: { bread: 1 } });
 
     let v = view(session);
     expect(ids(v)).toContain('use:item.bread.eat');
@@ -200,13 +209,13 @@ node greeting:
   set: greeted
   There you are, {player.name}, {player.race}.
 `;
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
 
-    let v = apply(session, 'use:entity.mirror.look in');
+    let v = apply(session, 'use:entity.mirror.look-in');
     expect(v.modals).toEqual([{ name: 'character-creation', leaving: null, options: [
       { key: 'name', label: 'Name', values: null },
-      { key: 'race', label: 'Race', values: ['Human', 'Elf', 'Dwarf', 'Orc'] },
+      { key: 'race', label: 'Race', values: [['human', 'Human'], ['elf', 'Elf'], ['dwarf', 'Dwarf'], ['orc', 'Orc']].map(([value, shown]) => ({ value, shown })) },
     ] }]);
     expect(v.player).toEqual({ name: '', race: '' });
 
@@ -216,16 +225,16 @@ node greeting:
     expect(v.modals[0].options.map((option) => option.key)).toEqual(['race']);
     expect(v.player).toEqual({ name: '', race: '' });
 
-    v = submitModal(session, { race: 'Elf' });
+    v = submitModal(session, { race: 'elf' });
     expect(v.modals).toEqual([]);
-    expect(v.player).toEqual({ name: 'Rowan', race: 'Elf' });
+    expect(v.player).toEqual({ name: 'Rowan', race: 'elf' });
 
     v = apply(session, 'talk:mirror');
-    expect(v.said).toContain('There you are, Rowan, Elf.');
+    expect(v.said).toContain('There you are, Rowan, elf.');
   });
 
   it('shows content-pruning warnings after loading a save with stale ids', () => {
-    const registry = loadModule(`
+    const registry = loadInEnglish(`
 # location camp
 x: 0, y: 0
 starting
@@ -278,7 +287,7 @@ out: 1 mix
 `;
 
   it('leaves a spannable entity action armed — activeAction set, progress 0, time and inventory unchanged', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
 
     const v = beginAction(session, 'use:entity.oven.roast');
@@ -289,7 +298,7 @@ out: 1 mix
   });
 
   it('completes an instant item action (no time:) immediately, same as apply', () => {
-    const session = primed(loadModule(module), { inventory: { bread: 1 } });
+    const session = primed(loadInEnglish(module), { inventory: { bread: 1 } });
 
     const v = beginAction(session, 'use:item.bread.eat');
     expect(v.action).toBeNull();
@@ -298,7 +307,7 @@ out: 1 mix
   });
 
   it('leaves a spannable craft (time: 2) armed without resolving it', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
 
     const v = beginAction(session, 'craft:dough');
@@ -308,7 +317,7 @@ out: 1 mix
   });
 
   it('completes an instant craft (no time:) immediately, same as apply', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
 
     const v = beginAction(session, 'craft:mix');
@@ -317,7 +326,7 @@ out: 1 mix
   });
 
   it('throws on an unavailable or unknown choice id, same as apply', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
     expect(() => beginAction(session, 'nonsense')).toThrow();
   });
@@ -344,7 +353,7 @@ adjacent:
 `;
 
   it('apply relocates instantly in real time while accruing the journey sim-time', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
     const journey = 1 * travelSecondsPerUnit(registry);
 
@@ -355,7 +364,7 @@ adjacent:
   });
 
   it('beginAction arms the journey spannably — location and time unchanged until driven', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
     const journey = 1 * travelSecondsPerUnit(registry);
 
@@ -373,7 +382,7 @@ adjacent:
 
 describe('travel edges aliased by a free entity relocate are hidden', () => {
   it('hides a travel edge that a stairs-like entity already offers as a free relocate', () => {
-    const registry = loadModule(source);
+    const registry = loadInEnglish(source);
     const session = startSession(registry);
 
     const choiceIds = ids(view(session));
@@ -410,7 +419,7 @@ enter:
   take: 1 coin
   relocate: cave
 `;
-    const session = primed(loadModule(module), { inventory: { coin: 1 } });
+    const session = primed(loadInEnglish(module), { inventory: { coin: 1 } });
 
     const choiceIds = ids(view(session));
     // gate.enter relocates to cave but costs a coin, so it is not a free alias —
@@ -422,7 +431,7 @@ enter:
 
 describe('cancelAction', () => {
   it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
-    const session = primed(loadModule(source), { inventory: { 'tutorial-island.dough': 2 } }); // two loaves' worth
+    const session = primed(loadInEnglish(source), { inventory: { 'tutorial-island.dough': 2 } }); // two loaves' worth
 
     beginAction(session, 'craft:tutorial-island.bread');
     const baked = wait(session, 4); // one full 3s bake done, a second one 1s in
@@ -437,7 +446,7 @@ describe('cancelAction', () => {
   });
 
   it('is a no-op when nothing is active', () => {
-    const registry = loadModule(source);
+    const registry = loadInEnglish(source);
     const session = startSession(registry);
     expect(() => cancelAction(session)).not.toThrow();
     expect(sessionStatus(session).action).toBeNull();
@@ -478,7 +487,7 @@ cancel
 `;
 
   it('begin: a repeating action then wait: to completion reproduces the same end state as an instant use:', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
 
     const instantState = createGameState();
     expect(runTest('roast-instant', registry, instantState)).toEqual({ passed: true });
@@ -492,7 +501,7 @@ cancel
   });
 
   it('begin: + a partial wait: + cancel leaves the action stopped mid-flight', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const state = createGameState();
 
     expect(runTest('roast-begin-partial-cancel', registry, state)).toEqual({ passed: true });
@@ -530,18 +539,18 @@ node greeting:
 
 # test leaves-the-modal-open
 travel: camp
-use: entity.mirror.look in
+use: entity.mirror.look-in
 
 # test half-answers-the-modal
 travel: camp
-use: entity.mirror.look in
+use: entity.mirror.look-in
 submit-modal: name=Rowan
 
 # test answers-the-modal
 travel: camp
-use: entity.mirror.look in
+use: entity.mirror.look-in
 submit-modal: name=Rowan
-submit-modal: race=Elf
+submit-modal: race=elf
 
 # test leaves-a-dialogue-open
 travel: camp
@@ -550,22 +559,22 @@ talk: sage
 # test answers-the-dialogue-as-a-modal
 travel: camp
 talk: sage
-submit-modal: choice=Nod.
+submit-modal: choice=0
 `;
 
   it('fails, naming the modal, and passes once every option of it is answered', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
 
     expect(runTest('leaves-the-modal-open', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: character-creation' });
     expect(runTest('half-answers-the-modal', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: character-creation' });
 
     const answered = createGameState();
     expect(runTest('answers-the-modal', registry, answered)).toEqual({ passed: true });
-    expect(answered.player).toEqual({ name: 'Rowan', race: 'Elf' });
+    expect(answered.player).toEqual({ name: 'Rowan', race: 'elf' });
   });
 
   it('holds a dialogue to the same standard, since a menu left hanging is the same unfinished route', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
 
     expect(runTest('leaves-a-dialogue-open', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: dialogue' });
     expect(runTest('answers-the-dialogue-as-a-modal', registry, createGameState())).toEqual({ passed: true });
@@ -578,6 +587,10 @@ submit-modal: choice=Nod.
 const PUBLISHED_MODULE = `
 # stat might
 base: 4
+
+# stat grit
+title: Fortitude
+base: 2
 
 # skill smithing
 
@@ -691,20 +704,33 @@ item-experience: 1000
 `;
 
 describe('what the engine publishes', () => {
-  it('carries stat values, and recomputes them when equipment changes them', () => {
-    const session = primed(loadModule(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
+  // c9: a stat reaches a page under a title rather than under the id the number
+  // is keyed by, and the title is the localizer's — an authored one where the
+  // content wrote one, and English's own reading of the id where it did not.
+  it('names every stat it counts, on the row it counted it on', () => {
+    const v = view(startSession(loadInEnglish(PUBLISHED_MODULE)));
 
-    expect(view(session).stats.might).toBe(4);
+    expect(v.stats.map((row) => [row.id, row.title])).toEqual([
+      ['might', 'Might'],
+      ['grit', 'Fortitude'],
+    ]);
+  });
+
+  it('carries stat values, and recomputes them when equipment changes them', () => {
+    const session = primed(loadInEnglish(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
+
+    expect(statValueOf(view(session), 'might')).toBe(4);
 
     applyDirective(session, { kind: 'equip', item: 'gauntlet' });
     const armed = view(session);
-    expect(armed.equipment).toEqual({ hand: 'gauntlet' });
-    expect(armed.stats.might).toBe(7);
+    // c10: the slot arrives with the words for it, and so does what fills it.
+    expect(armed.equipment).toEqual([{ slot: 'hand', title: 'Hand', item: 'gauntlet', name: 'Gauntlet' }]);
+    expect(statValueOf(armed, 'might')).toBe(7);
 
     applyDirective(session, { kind: 'unequip', slot: 'hand' });
     const bare = view(session);
-    expect(bare.equipment).toEqual({});
-    expect(bare.stats.might).toBe(4);
+    expect(bare.equipment).toEqual([]);
+    expect(statValueOf(bare, 'might')).toBe(4);
   });
 
   // Wearing a thing and taking it off are what a copy takes rather than what it
@@ -712,7 +738,7 @@ describe('what the engine publishes', () => {
   // offering them as well put the same act in two places and scoped an item to a
   // location, which nothing about an item is.
   it('offers no room-level way to wear a carried thing or take a worn one off', () => {
-    const session = primed(loadModule(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
+    const session = primed(loadInEnglish(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
 
     expect(ids(view(session)).filter((id) => id.startsWith('equip:'))).toEqual([]);
 
@@ -722,20 +748,20 @@ describe('what the engine publishes', () => {
     // The screen that does own them still does, under the one name every
     // surface spells a carried thing by.
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-    submitModal(session, { item: 'Gauntlet (hand)' });
+    submitModal(session, { item: 'worn:hand' });
     const asked = view(session).modals[0].options;
-    expect(asked[asked.length - 1].values).toContain('Unequip');
+    expect(asked[asked.length - 1].values?.map((choice) => choice.value)).toContain('unequip');
   });
 
   // Grown against a state and handed to the session as a save, so what is
   // under test is the published view of a copy rather than the verb that made
   // one; the verbs have their own describe below.
   it('names a grown copy beside the stacks, and offers it as its own row to wear', () => {
-    const registry = loadModule(GROWN_MODULE);
+    const registry = loadInEnglish(GROWN_MODULE);
     const grownState = createGameState('camp');
     Object.assign(grownState.inventory, { gauntlet: 2, oil: 1 });
     const grown = feedItem(grownState, registry, 'gauntlet', 'oil');
-    if (!grown.ok) throw new Error(grown.refused);
+    if (!grown.ok) throw new Error(inEnglish(registry, grown.refused));
 
     const { version: _version, ...diff } = JSON.parse(serializeSave(grownState, registry)) as SaveDiff & { version: number };
     const session = primed(registry, diff);
@@ -743,41 +769,41 @@ describe('what the engine publishes', () => {
     const carried = view(session);
     expect(carried.inventory).toEqual({ gauntlet: 1 });
     expect(carried.grown).toEqual({ [grown.instance]: 'gauntlet' });
-    expect(carried.stats.might).toBe(4);
+    expect(statValueOf(carried, 'might')).toBe(4);
 
     // c16: the world names a copy the one way every screen does — under a
     // descriptor, and never under the id the row itself carries.
     expect(carried.carried).toEqual([
-      { id: 'gauntlet', name: 'Gauntlet', count: 1, value: 'Gauntlet x1', grown: false },
-      { id: grown.instance, name: 'Modified Gauntlet', count: 1, value: 'Modified Gauntlet', grown: true },
+      { id: 'gauntlet', name: 'Gauntlet', count: 1, shown: 'Gauntlet x1', grown: false },
+      { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet', grown: true },
     ]);
 
     applyDirective(session, { kind: 'equip', item: grown.instance });
     const armed = view(session);
-    expect(armed.equipment).toEqual({ hand: grown.instance });
-    expect(armed.stats.might).toBe(7);
+    expect(armed.equipment).toEqual([{ slot: 'hand', title: 'Hand', item: grown.instance, name: 'Modified Gauntlet' }]);
+    expect(statValueOf(armed, 'might')).toBe(7);
     // The worn copy leaves the carried side and is named there instead (c21),
     // still under the id that says which of the two the player meant.
     expect(armed.carried).toEqual([
-      { id: 'gauntlet', name: 'Gauntlet', count: 1, value: 'Gauntlet x1', grown: false },
-      { id: grown.instance, name: 'Modified Gauntlet', count: 1, value: 'Modified Gauntlet (hand)', grown: true, slot: 'hand' },
+      { id: 'gauntlet', name: 'Gauntlet', count: 1, shown: 'Gauntlet x1', grown: false },
+      { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet (Hand)', grown: true, worn: { slot: 'hand', title: 'Hand' } },
     ]);
   });
 
   it('carries skill xp as it is earned', () => {
-    const registry = loadModule(PUBLISHED_MODULE);
+    const registry = loadInEnglish(PUBLISHED_MODULE);
     const session = startSession(registry);
     applyDirective(session, { kind: 'load', save: 'stocked' });
 
-    expect(view(session).xp).toEqual({});
+    expect(view(session).xp).toEqual([]);
 
     const forged = apply(session, 'craft:ingot');
-    expect(forged.xp).toEqual({ smithing: 5 });
+    expect(forged.xp).toEqual([{ id: 'smithing', title: 'Smithing', value: 5 }]);
     expect(forged.inventory).toEqual({ ingot: 1, gauntlet: 1 });
   });
 
   it('carries where the player is standing and everywhere they could walk to', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     const opening = view(session);
 
@@ -788,7 +814,7 @@ describe('what the engine publishes', () => {
   });
 
   it('fills the map in as the player walks, from wherever they are standing now', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     // The ridge is two roads out, so nothing about it is knowable from the
     // forge; arriving at the overlook is what puts it on the map.
@@ -803,7 +829,7 @@ describe('what the engine publishes', () => {
   // A `# test` opens with no location, which makes its first travel: the one
   // arrival in the engine that reaches no relocate: to spread from.
   it('discovers where a player was put down, and not only where they walked to', () => {
-    const registry = loadModule(PUBLISHED_MODULE);
+    const registry = loadInEnglish(PUBLISHED_MODULE);
     const state = createGameState();
 
     expect(runTest('placed-at-the-forge', registry, state)).toEqual({ passed: true });
@@ -821,7 +847,7 @@ describe('what the engine publishes', () => {
   // recomputed within the same application, which is the rule holding rather
   // than the result failing.
   it('cannot be hidden from a player who can reach it, whatever a result asks', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'ledger', actionId: 'forget' });
 
@@ -829,7 +855,7 @@ describe('what the engine publishes', () => {
   });
 
   it('works out what a save should have known, since a save carries both its inputs at once', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     // Written before any of this existed: it names a location and no discovery
     // at all, and loading it must not leave the player somewhere with a blank
@@ -840,7 +866,7 @@ describe('what the engine publishes', () => {
   });
 
   it('reveals what a way was shutting the moment it opens, without leaving the room', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     const opened = apply(session, 'use:entity.hatch.unlock');
 
@@ -849,9 +875,9 @@ describe('what the engine publishes', () => {
   });
 
   it('still takes a place it was told about from somewhere else', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
-    const told = apply(session, 'use:entity.window.look through');
+    const told = apply(session, 'use:entity.window.look-through');
 
     // No road runs to it from anywhere the player has stood, so this one can
     // only have arrived by being scouted.
@@ -860,12 +886,12 @@ describe('what the engine publishes', () => {
   });
 
   it('says a road is shut rather than hiding it, once both of its ends are known', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     // Scouted through the window, so the vault is known before the hatch that
     // leads to it is: knowing a road is there and being able to walk it are two
     // different facts and the map draws both.
-    const scouted = apply(session, 'use:entity.window.look through');
+    const scouted = apply(session, 'use:entity.window.look-through');
     const opened = apply(session, 'use:entity.hatch.unlock');
 
     expect(scouted.discovered.find((place) => place.id === 'forge')?.adjacent).toEqual([
@@ -879,7 +905,7 @@ describe('what the engine publishes', () => {
   });
 
   it('carries where each place is, since a map is drawn and not listed', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     const found = view(session).discovered;
 
@@ -888,13 +914,13 @@ describe('what the engine publishes', () => {
   });
 
   it('says where a choice leads, so a map can tell which offer is the way to a place', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
     const leads = (id: string): string | undefined => view(session).choices.find((choice) => choice.id === id)?.leadsTo;
 
     // The road itself, and the ladder that is only a way down: a staircase
     // publishes an action, so a map reading the choice's kind would miss it.
     expect(leads('travel:overlook')).toBe('overlook');
-    expect(leads('use:entity.ladder.climb down')).toBe('vault');
+    expect(leads('use:entity.ladder.climb-down')).toBe('vault');
     // The same move with a flag hung on it is not only a move, so it leads
     // nowhere as far as a map is concerned.
     expect(leads('use:entity.ladder.kick')).toBeUndefined();
@@ -902,7 +928,7 @@ describe('what the engine publishes', () => {
   });
 
   it('names each discovered place with the word its author wrote', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
     const found = view(session).discovered.find((place) => place.id === 'forge');
 
@@ -910,7 +936,7 @@ describe('what the engine publishes', () => {
   });
 
   it('carries how the discovered places connect, which is the other half of a map', () => {
-    const session = startSession(loadModule(PUBLISHED_MODULE));
+    const session = startSession(loadInEnglish(PUBLISHED_MODULE));
     const before = view(session).discovered;
 
     const opened = apply(session, 'use:entity.hatch.unlock');
@@ -933,6 +959,8 @@ describe('what the engine withholds', () => {
     // `instances` reached this repo unpublished with nothing noticing, which is
     // what this exists to stop happening twice.
     const classified: Record<keyof GameState, 'published' | 'withheld'> = {
+      // The player chose it, so the engine does not tell them what it is.
+      language: 'withheld',
       location: 'published',
       time: 'published',
       flags: 'published',
@@ -967,7 +995,7 @@ describe('what the engine withholds', () => {
     expect(Object.keys(createGameState()).sort()).toEqual(Object.keys(classified).sort());
 
     const published = Object.keys(classified).filter((field) => classified[field as keyof GameState] === 'published');
-    const carried = new Set(Object.keys(view(startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n')))));
+    const carried = new Set(Object.keys(view(startSession(loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n')))));
     // Two of them are renamed on the way out and one is drained into `said`.
     const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action', instances: 'grown' };
     for (const field of published) expect(carried.has(renamed[field] ?? field), field).toBe(true);
@@ -1035,9 +1063,9 @@ roast:
   // `registry.saves` is writable and is the only route a driver has to load
   // one, so what a save carries has to stop being the state once it lands.
   it('does not leave the author of a save holding the state it loaded', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
-    const mine = { name: 'Rowan', race: 'Elf' };
+    const mine = { name: 'Rowan', race: 'elf' };
     registry.saves.set('forged', { version: SAVE_VERSION, diff: { player: mine } });
 
     applyDirective(session, { kind: 'load', save: 'forged' });
@@ -1048,12 +1076,12 @@ roast:
   });
 
   it('does not let play rewrite the save it was loaded from', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
     // The clock, not the player: modals.ts answers by replacing `state.player`
     // wholesale, so an alias could never show through it. The engine writes
     // progress into the cadence in place, which is what an alias would move.
-    const fixture = { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'entity.oven', actionLabel: 'roast', target: '' } } };
+    const fixture = { ownerRef: 'entity.oven', actionSlug: 'roast', repeating: true, implicitTarget: 1000, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'entity.oven', actionSlug: 'roast', target: '' } } };
     registry.saves.set('midbake', { version: SAVE_VERSION, diff: { activeAction: fixture } });
 
     applyDirective(session, { kind: 'load', save: 'midbake' });
@@ -1066,11 +1094,11 @@ roast:
   // One missing clock, every path that reads one. publishAction was guarded on
   // its own first and the other two still died on the same input.
   it('plays on through every path when a save left an action with no player clock', () => {
-    const registry = loadModule(FIGHT_MODULE);
+    const registry = loadInEnglish(FIGHT_MODULE);
     const session = startSession(registry);
     registry.saves.set('midfight', {
       version: SAVE_VERSION,
-      diff: { activeAction: { ownerRef: 'action.hit', actionLabel: 'hit', repeating: true, implicitTarget: 1000, cadences: {}, roster: { player: { ownerRef: 'action.hit', actionLabel: 'hit', target: 'dummy' } }, actors: { dummy: { resources: { health: 12000 }, rateRemainders: {} } } } },
+      diff: { activeAction: { ownerRef: 'action.hit', actionSlug: 'hit', repeating: true, implicitTarget: 1000, cadences: {}, roster: { player: { ownerRef: 'action.hit', actionSlug: 'hit', target: 'dummy' } }, actors: { dummy: { resources: { health: 12000 }, rateRemainders: {} } } } },
     });
 
     applyDirective(session, { kind: 'load', save: 'midfight' });
@@ -1085,13 +1113,13 @@ roast:
   });
 
   it('publishes an action a save left without a player clock instead of dying on the next look', () => {
-    const registry = loadModule(module);
+    const registry = loadInEnglish(module);
     const session = startSession(registry);
     // checkSave takes any object here, and pruneStateForRegistry keeps it: the
     // owner and the label both resolve. Only the clock is missing.
     registry.saves.set('midbake', {
       version: SAVE_VERSION,
-      diff: { activeAction: { ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: 1000, cadences: {}, roster: { player: { ownerRef: 'entity.oven', actionLabel: 'roast', target: '' } } } },
+      diff: { activeAction: { ownerRef: 'entity.oven', actionSlug: 'roast', repeating: true, implicitTarget: 1000, cadences: {}, roster: { player: { ownerRef: 'entity.oven', actionSlug: 'roast', target: '' } } } },
     });
 
     applyDirective(session, { kind: 'load', save: 'midbake' });
@@ -1103,7 +1131,7 @@ roast:
 
 describe('the handle a driver obtains', () => {
   it('carries no route to the state it plays, by enumeration or by key', () => {
-    const session = startSession(loadModule('# location camp\nx: 0, y: 0\nstarting\n'));
+    const session = startSession(loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n'));
 
     // `session.state` is the compile-time half and tsc owns it. This is the
     // runtime half: a symbol member satisfied the type and handed the live
@@ -1114,7 +1142,7 @@ describe('the handle a driver obtains', () => {
   });
 
   it('refuses to play a handle it did not hand out, rather than reading undefined', () => {
-    const registry = loadModule('# location camp\nx: 0, y: 0\nstarting\n');
+    const registry = loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n');
     const forged = { registry };
 
     expect(() => view(forged)).toThrow(/not a session startSession handed out/);
@@ -1123,7 +1151,7 @@ describe('the handle a driver obtains', () => {
 
 describe('starting a session with nowhere to begin', () => {
   it('says so instead of failing later with an empty location id', () => {
-    expect(() => startSession(loadModule('# location camp\nx: 0, y: 0'))).toThrow(/no # location is marked starting/);
+    expect(() => startSession(loadInEnglish('# location camp\nx: 0, y: 0'))).toThrow(/no # location is marked starting/);
   });
 });
 
@@ -1172,7 +1200,7 @@ stats: attack 0, max-health 1000000, accuracy 100, evasion 0, swings-per-minute 
 `;
 
   function swinging(): ReturnType<typeof startSession> {
-    const session = startSession(loadModule(arena));
+    const session = startSession(loadInEnglish(arena));
     view(session);
     apply(session, 'fight:hit:dummy');
     return session;
@@ -1257,7 +1285,7 @@ refuse: apply 1 at 0,0 with lesser-orb
 `;
 
 describe('the four growth verbs through the directive surface', () => {
-  const registry = loadModule(GROWTH_MODULE);
+  const registry = loadInEnglish(GROWTH_MODULE);
 
   function stocked(): GameState {
     const state = createGameState('camp');
@@ -1303,5 +1331,358 @@ describe('the four growth verbs through the directive surface', () => {
     expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
     expect(Object.keys(state.instances.byId)).toEqual(['1']);
     expect(state.instances.next).toBe(2);
+  });
+});
+
+// c3. Playing a language a module was not authored in, with no entry for a
+// key, puts the key on screen — never the module's own language, never a
+// humanized id — and it does so for content keys and engine keys alike.
+describe('a missing translation shows its key, in every direction', () => {
+  const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'examine: Shingle and a drawn-up boat.', 'entities:', '  crab', 'adjacent:', '  cove', '', '# entity crab', 'title: Giant Crab', '', '# location cove', 'x: 1, y: 0'].join('\n');
+  const SPANISH = ['# info island-es', 'version: 1.0.0', 'dependencies:', '  island', '', '# locale es', 'island.location.shore.title: Orilla', 'engine.travel.to: Viaja a {destination}'].join('\n');
+
+  const played = (language: string, ...extra: ModuleSource[]): PlayView =>
+    view(startSession(loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, ...extra]), language));
+
+  it('plays the language the module declared with the text the module authored', () => {
+    const v = played('en');
+
+    expect(v.location.title).toBe('Shore');
+    expect(v.location.description).toBe('Shingle and a drawn-up boat.');
+    expect(v.entities[0].title).toBe('Giant Crab');
+    expect(v.choices.map((choice) => choice.label)).toContain('Travel to Cove');
+  });
+
+  it('shows the key for every string the played language has no entry for', () => {
+    const v = played('es');
+
+    expect(v.location.title).toBe('island.location.shore.title');
+    expect(v.location.description).toBe('island.location.shore.examine');
+    expect(v.entities[0].title).toBe('island.entity.crab.title');
+    expect(v.choices.map((choice) => choice.label)).toContain('engine.travel.to');
+  });
+
+  it('shows what the locale does translate, and the key for what it does not', () => {
+    const v = played('es', { name: 'island-es', text: SPANISH });
+
+    expect(v.location.title).toBe('Orilla');
+    expect(v.location.description).toBe('island.location.shore.examine');
+    // The destination is looked up in the played language before it is put into
+    // the pattern, so an untranslated place shows its key inside a translated
+    // sentence rather than dragging English in with it.
+    expect(v.choices.map((choice) => choice.label)).toContain('Viaja a island.location.cove.title');
+  });
+
+  it('never renders the module’s own language to a player of another one', () => {
+    const spanishModule = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# entity rata-gigante', 'title: Rata Gigante'].join('\n');
+    const v = view(startSession(loadUniverse([engineLocale(), { name: 'isla', text: spanishModule }]), 'en'));
+
+    // Neither direction: the English player gets the key rather than Spanish,
+    // and the Spanish player gets it too, because `humanizeEn` never ran to
+    // make an entry out of an id that is not English.
+    expect(v.location.title).toBe('isla.location.orilla.title');
+    expect(view(startSession(loadUniverse([engineLocale(), { name: 'isla', text: spanishModule }]), 'es')).location.title).toBe('isla.location.orilla.title');
+  });
+
+  it('leaves a readable screen when no locale file loaded at all', () => {
+    const v = view(startSession(loadUniverse([{ name: 'island', text: ISLAND }]), 'en'));
+
+    expect(v.location.title).toBe('Shore');
+    expect(v.choices.map((choice) => choice.label)).toEqual(['engine.travel.to']);
+  });
+
+  // The refusal a growth verb says is on the one line of that screen carrying
+  // words, and it was built in TypeScript around the registry's own `.title` —
+  // so a module writing a language with no title for an item put its raw id
+  // there while every other surface on the same screen showed the key (pass 5).
+  it('shows the key on what a refused growth says, and the translation where a locale supplies one', () => {
+    const ISLA = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location playa', 'x: 0, y: 0', 'starting', '', '# item cuerda-larga', 'slot: hand', 'max-level: 1', '', '# item miga', 'item-experience: 5'].join('\n');
+    const saidOnRefusal = (...extra: ModuleSource[]): string[] => {
+      const registry = loadUniverse([engineLocale(), { name: 'isla', text: ISLA }, ...extra]);
+      registry.saves.set('carried', { version: SAVE_VERSION, diff: { inventory: { 'isla.cuerda-larga': 1, 'isla.miga': 2 } } });
+      const session = startSession(registry, 'es');
+      applyDirective(session, { kind: 'load', save: 'carried' });
+      applyDirective(session, { kind: 'feed', target: 'isla.cuerda-larga', food: 'isla.miga' });
+      return view(session).said;
+    };
+
+    expect(saidOnRefusal()).toEqual(['engine.growth.max-level']);
+    expect(saidOnRefusal({ name: 'isla-es', text: ['# info isla-es', 'version: 1.0.0', 'dependencies:', '  isla', '', '# locale es', 'isla.item.cuerda-larga.title: Cuerda Larga', 'engine.growth.max-level: {item} ya alcanzo su nivel {level}, que es el maximo'].join('\n') })).toEqual(['Cuerda Larga ya alcanzo su nivel 1, que es el maximo']);
+  });
+});
+
+// pass 1: the choice that starts a craft and the bar that reports it were keyed
+// separately, so translating one left the other in English.
+describe('a craft is one string with one key', () => {
+  const KITCHEN = ['# info kitchen', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# item flour', '', '# item bread', '', '# recipe bread', 'in: flour', 'out: bread', 'time: 4'].join('\n');
+  const SPANISH = ['# info kitchen-es', 'version: 1.0.0', 'dependencies:', '  kitchen', '', '# locale es', 'engine.craft.label: Prepara {recipe}', 'kitchen.recipe.bread.title: Pan'].join('\n');
+
+  const cooking = (language: string): PlayView => {
+    const registry = loadUniverse([engineLocale(), { name: 'kitchen', text: KITCHEN }, { name: 'kitchen-es', text: SPANISH }]);
+    registry.saves.set('stocked', { version: SAVE_VERSION, diff: { inventory: { 'kitchen.flour': 2 } } });
+    const session = startSession(registry, language);
+    applyDirective(session, { kind: 'load', save: 'stocked' });
+    return beginAction(session, 'craft:kitchen.bread');
+  };
+
+  it('labels the offer and the action under way with the same words', () => {
+    expect(cooking('en').action?.label).toBe('Craft Bread');
+    expect(cooking('es').action?.label).toBe('Prepara Pan');
+  });
+
+  it('offers it under those words too, so one translation moves both', () => {
+    const registry = loadUniverse([engineLocale(), { name: 'kitchen', text: KITCHEN }, { name: 'kitchen-es', text: SPANISH }]);
+    registry.saves.set('stocked', { version: SAVE_VERSION, diff: { inventory: { 'kitchen.flour': 2 } } });
+    const session = startSession(registry, 'es');
+    applyDirective(session, { kind: 'load', save: 'stocked' });
+
+    expect(view(session).choices.map((choice) => choice.label)).toContain('Prepara Pan');
+  });
+});
+
+// pass 2: three surfaces read `.title` off the registry instead of asking the
+// localizer, so a Spanish player was shown the base language on the carried
+// screen, the plane screen and the modal built from them.
+describe('every screen a title reaches is played in one language', () => {
+  const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# cluster-jewel core', 'shape: point', 'open-connections: e', '', '# item blade', 'title: Blade', 'slot: mainhand', 'origin-cluster: core'].join('\n');
+  const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada'].join('\n');
+
+  const carrying = (language: string): PlayView => {
+    const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
+    registry.saves.set('armed', { version: SAVE_VERSION, diff: { inventory: { 'forge.blade': 1 } } });
+    const session = startSession(registry, language);
+    applyDirective(session, { kind: 'load', save: 'armed' });
+    return view(session);
+  };
+
+  it('names what the player carries in the language being played', () => {
+    expect(carrying('en').carried.map((entry) => entry.name)).toEqual(['Blade']);
+    expect(carrying('es').carried.map((entry) => entry.name)).toEqual(['Espada']);
+  });
+
+  it('names the plane that copy carries the same way, and every title it reports', () => {
+    expect(carrying('en').planes.map((plane) => [plane.name, plane.title, plane.clusters[0].title])).toEqual([['Blade', 'Blade', 'Core']]);
+    expect(carrying('es').planes.map((plane) => [plane.name, plane.title, plane.clusters[0].title])).toEqual([['Espada', 'Espada', 'forge.cluster-jewel.core.title']]);
+  });
+
+  it('shows the key on those screens too where the played language has none', () => {
+    expect(carrying('fr').carried.map((entry) => entry.name)).toEqual(['forge.item.blade.title']);
+    expect(carrying('fr').planes.map((plane) => plane.name)).toEqual(['forge.item.blade.title']);
+    expect(carrying('fr').planes.map((plane) => plane.title)).toEqual(['forge.item.blade.title']);
+  });
+});
+
+// pass 3: the plane screen composed its heading out of the registry's title and
+// an English refusal, and `ModalOption.label` was a plain string, so nothing
+// stopped it. c3 held on every other screen and failed on this one.
+describe('a modal names what it is about in the language being played', () => {
+  const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# cluster-jewel core', 'shape: point', 'open-connections: e', '', '# item blade', 'title: Blade', 'slot: mainhand', 'max-level: 1', 'origin-cluster: core'].join('\n');
+  const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada', 'engine.plane.heading: {plane} en {hex}', 'engine.modal.item: Objeto'].join('\n');
+
+  const carrying = (language: string): PlaySession => {
+    const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
+    registry.saves.set('armed', { version: SAVE_VERSION, diff: { inventory: { 'forge.blade': 1 } } });
+    const session = startSession(registry, language);
+    applyDirective(session, { kind: 'load', save: 'armed' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    return session;
+  };
+
+  const grown = (language: string): PlayView => {
+    const session = carrying(language);
+    submitModal(session, { item: view(session).modals[0].options[0].values![0].value });
+    return submitModal(session, { verb: 'grow' });
+  };
+
+  it('labels the carried screen in it', () => {
+    expect(view(carrying('en')).modals[0].options[0].label).toBe('Item');
+    expect(view(carrying('es')).modals[0].options[0].label).toBe('Objeto');
+  });
+
+  it('heads the plane screen with the copy it is of, named in it', () => {
+    expect(grown('en').modals[0].options[0].label).toBe('Blade at 0,0');
+    expect(grown('es').modals[0].options[0].label).toBe('Espada en 0,0');
+  });
+});
+
+// pass 4: an answer is read as well as replayed. Branding the label alone left
+// `values` carrying the base language on the very screens the label fixed, and
+// pass 2's carried-name fix had made the answer itself move with the player.
+describe('an answer is spelled once and read in the language being played', () => {
+  const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', 'entities:', '  smith', '', '# item blade', 'title: Blade', 'slot: mainhand', '', '# flag greeted', '', '# entity smith', 'title: Smith', '', '# dialogue smith', 'owner = smith', 'node greeting:', '  when: not greeted', '  say: Well met.', '  -> Ask the way.', '  -> Say nothing.'].join('\n');
+  const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada', 'engine.carried.stack: {item} x{count}', 'forge.dialogue.smith.greeting.choice.0: Pregunta el camino.'].join('\n');
+
+  const carried = (language: string): PlaySession => {
+    const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
+    registry.saves.set('armed', { version: SAVE_VERSION, diff: { inventory: { 'forge.blade': 1 } } });
+    const session = startSession(registry, language);
+    applyDirective(session, { kind: 'load', save: 'armed' });
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    return session;
+  };
+
+  const offered = (session: PlaySession) => view(session).modals[0].options[0].values!;
+
+  it('reads a carried row in the played language and answers it in the base one', () => {
+    // The way out is the engine's own word, so a player of a language nobody
+    // translated it into is shown its key while the answer stays `Close`.
+    expect(offered(carried('es')).map((choice) => choice.shown)).toEqual(['Espada x1', 'engine.carried.close']);
+    expect(offered(carried('en')).map((choice) => choice.shown)).toEqual(['Blade x1', 'Close']);
+    expect(offered(carried('es')).map((choice) => choice.value)).toEqual(offered(carried('en')).map((choice) => choice.value));
+  });
+
+  it('takes the answer a session in another language recorded, because the answer did not move', () => {
+    const spanish = carried('es');
+
+    expect(() => submitModal(spanish, { item: 'forge.blade' })).not.toThrow();
+    expect(view(spanish).modals[0].options.map((option) => option.key)).toEqual(['verb']);
+  });
+
+  it('reads a dialogue menu in the played language, and shows the key for the choice nobody translated (c6)', () => {
+    const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
+    const spanish = startSession(registry, 'es');
+    applyDirective(spanish, { kind: 'talk', entity: 'forge.smith' });
+    const menu = view(spanish).modals[0].options[0].values!;
+
+    expect(menu.map((choice) => choice.shown)).toEqual(['Pregunta el camino.', 'forge.dialogue.smith.greeting.choice.1']);
+    expect(menu.map((choice) => choice.value)).toEqual(['0', '1']);
+  });
+});
+
+// pass 5: `spelled()` set the words to the answer on three of the four modals,
+// so every word the engine offers was read verbatim in every language; and the
+// plane screen spelled its answers through the played localizer, so an answer
+// recorded in one language named nothing in another.
+describe('a modal answer is spelled in the base language on every screen, and only the words move', () => {
+  const FORGE = [
+    '# info forge',
+    'version: 1.0.0',
+    '',
+    '# location camp',
+    'x: 0, y: 0',
+    'starting',
+    '',
+    '# stat attack',
+    'base: 4',
+    '',
+    '# passive keen',
+    '+4 attack',
+    '',
+    '# cluster-jewel core',
+    'shape: point',
+    'open-connections: e, ne',
+    'passives: 1 keen',
+    '',
+    '# item blade',
+    'title: Blade',
+    'slot: mainhand',
+    'max-level: 20',
+    'origin-cluster: core',
+    '',
+    '# item whetstone',
+    'title: Whetstone',
+    'item-experience: 1000',
+  ].join('\n');
+  // Some of the engine's words translated and some left alone, because what an
+  // untranslated one shows is the half of c3 a screen full of translations hides.
+  const FORGE_ES = [
+    '# info forge-es',
+    'version: 1.0.0',
+    'dependencies:',
+    '  forge',
+    '',
+    '# locale es',
+    'forge.item.whetstone.title: Piedra',
+    'engine.carried.verb.grow: Cultiva',
+    'engine.race.elf: Elfo',
+    'engine.plane.feed: alimenta: con {item}',
+  ].join('\n');
+
+  const opened = (language: string): PlaySession => {
+    const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
+    registry.saves.set('armed', { version: SAVE_VERSION, diff: { inventory: { 'forge.blade': 1, 'forge.whetstone': 2 } } });
+    const session = startSession(registry, language);
+    applyDirective(session, { kind: 'load', save: 'armed' });
+    return session;
+  };
+
+  const choices = (session: PlaySession): readonly ModalChoice[] => {
+    const options = view(session).modals[0].options;
+    return options[options.length - 1].values!;
+  };
+
+  const races = (language: string): readonly ModalChoice[] => {
+    const session = opened(language);
+    applyDirective(session, { kind: 'open-modal', modal: 'character-creation' });
+    return choices(session);
+  };
+
+  const verbs = (language: string): readonly ModalChoice[] => {
+    const session = opened(language);
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    submitModal(session, { item: choices(session).find((choice) => choice.value.endsWith('blade'))!.value });
+    return choices(session);
+  };
+
+  const moves = (language: string): readonly ModalChoice[] => {
+    const session = opened(language);
+    applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
+    submitModal(session, { item: choices(session).find((choice) => choice.value.endsWith('blade'))!.value });
+    submitModal(session, { verb: 'grow' });
+    return choices(session);
+  };
+
+  const answers = (offered: readonly ModalChoice[]): string[] => offered.map((choice) => choice.value);
+  const words = (offered: readonly ModalChoice[]): string[] => offered.map((choice) => choice.shown);
+
+  it('offers the same answers in every language, on every screen', () => {
+    expect(answers(races('es'))).toEqual(answers(races('en')));
+    expect(answers(verbs('es'))).toEqual(answers(verbs('en')));
+    // The one the plane screen spelled through the played localizer: a jewel or
+    // a food in the value put the player's language into what a `# test` replays.
+    expect(answers(moves('es'))).toEqual(answers(moves('en')));
+    expect(answers(moves('en'))).toContain('feed: with forge.whetstone');
+  });
+
+  it('reads them as the words the engine says in the played language', () => {
+    expect(words(races('en'))).toEqual(['Human', 'Elf', 'Dwarf', 'Orc']);
+    expect(words(verbs('en'))).toEqual(['Grow', 'Equip', 'Destroy', 'Close']);
+    expect(words(moves('en'))).toContain('feed: with Whetstone');
+  });
+
+  it('shows the key for every engine word the played language has no entry for', () => {
+    expect(words(races('es'))).toEqual(['engine.race.human', 'Elfo', 'engine.race.dwarf', 'engine.race.orc']);
+    expect(words(verbs('es'))).toEqual(['Cultiva', 'engine.carried.verb.equip', 'engine.carried.verb.destroy', 'engine.carried.close']);
+    expect(words(moves('es'))).toContain('alimenta: con Piedra');
+    expect(words(moves('es'))).toContain('engine.plane.back');
+  });
+});
+
+// c6. The choice id the runtime offers and the `use:` an author writes are one
+// string in two places, and each used to carry its own template and its own
+// regex. Walked over the shipped content rather than a fixture, because what
+// the two have to agree on is every id a real session hands out.
+describe('a use: choice id and a use: directive are one shape', () => {
+  const useChoices = (v: PlayView) => v.choices.filter((choice) => choice.kind === 'action' && choice.id.startsWith('use:'));
+
+  it('offers no action choice the directive parser cannot read back', () => {
+    const session = startSession(loadInEnglish(source));
+    const offered = useChoices(view(session));
+
+    expect(offered.length).toBeGreaterThan(0);
+    for (const choice of offered) {
+      const directive = choiceToDirective(choice) as UseDirective;
+      expect(directive.kind).toBe('use');
+      expect(useChoiceId(directive)).toBe(choice.id);
+    }
+  });
+
+  it('prints a line the parser reads back as the directive the choice was', () => {
+    const session = startSession(loadInEnglish(source));
+
+    for (const choice of useChoices(view(session))) {
+      const directive = choiceToDirective(choice);
+      expect(parseDirectiveLine(printDirective(directive))).toEqual(directive);
+    }
   });
 });

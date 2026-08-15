@@ -1,6 +1,7 @@
 import type { Registry } from '../content/registry';
 import type { Item } from '../content/item';
 import { isTagClause, TagClause } from '../grammar/tagClause';
+import { localizerOf } from './localized';
 import type { PruneWarning } from './save';
 import type { GameState } from './state';
 
@@ -98,13 +99,21 @@ export function isBuffList(value: unknown): boolean {
 // the bonus to nothing rather than failing, so an unresolvable one has to be
 // found here — the load path refuses it, and a `# save` body is the one reader
 // the load path never sees.
-function missingReference(tag: TagClause, registry: Registry): string | undefined {
+//
+// The kind of thing that is missing and its id, kept apart rather than composed
+// into a phrase: a fragment like `stat attack` substituted into a sentence is a
+// sentence no translator can reach.
+type Missing = { kind: 'stat' | 'item' | 'resource'; id: string };
+
+function missingReference(tag: TagClause, registry: Registry): Missing | undefined {
   if (tag.kind !== 'stat-bonus') return undefined;
-  if (!registry.stats.has(tag.statId)) return `stat ${tag.statId}`;
+  if (!registry.stats.has(tag.statId)) return { kind: 'stat', id: tag.statId };
   if (tag.per === undefined) return undefined;
-  if (tag.per.kind === 'stack') return registry.items.has(tag.per.id) ? undefined : `item ${tag.per.id}`;
-  return registry.resources.has(tag.per.id) ? undefined : `resource ${tag.per.id}`;
+  if (tag.per.kind === 'stack') return registry.items.has(tag.per.id) ? undefined : { kind: 'item', id: tag.per.id };
+  return registry.resources.has(tag.per.id) ? undefined : { kind: 'resource', id: tag.per.id };
 }
+
+const MISSING_KEY = { stat: 'engine.prune.buff.stat', item: 'engine.prune.buff.item', resource: 'engine.prune.buff.resource' } as const;
 
 // `actorLoaded` because who counts as a character is the encounter's to say and
 // not this module's; what a buff is made of is this module's, and is the rest.
@@ -112,22 +121,25 @@ function missingReference(tag: TagClause, registry: Registry): string | undefine
 // because a hand-written `# save` is the one table nothing else here assembled.
 export function pruneBuffs(state: GameState, registry: Registry, actorLoaded: (actorId: string) => boolean): PruneWarning[] {
   const warnings: PruneWarning[] = [];
+  const localizer = localizerOf(registry, state);
+  const named = localizer.identifier;
   for (const [actorId, held] of Object.entries(state.buffs)) {
     if (!actorLoaded(actorId)) {
       set(state, actorId, []);
-      warnings.push({ path: `buffs.${actorId}`, id: actorId, message: `Removed every buff on ${actorId} because it is not a character this world has.` });
+      warnings.push({ path: `buffs.${actorId}`, id: actorId, message: localizer.engine('engine.prune.buff.actor', { actor: named(actorId) }) });
       continue;
     }
     const kept: BuffInstance[] = [];
     for (const buff of held) {
-      const missing = registry.items.has(buff.source)
+      const missing: Missing | undefined = registry.items.has(buff.source)
         ? buff.tags.map((tag) => missingReference(tag, registry)).find((problem) => problem !== undefined)
-        : `item ${buff.source}`;
+        : { kind: 'item', id: buff.source };
       if (!missing) {
         kept.push(buff);
         continue;
       }
-      warnings.push({ path: `buffs.${actorId}.${buff.source}`, id: buff.source, message: `Removed buff ${buff.source} on ${actorId} because its ${missing} is not loaded.` });
+      const message = localizer.engine(MISSING_KEY[missing.kind], { buff: named(buff.source), actor: named(actorId), [missing.kind]: named(missing.id) });
+      warnings.push({ path: `buffs.${actorId}.${buff.source}`, id: buff.source, message });
     }
     set(state, actorId, kept);
   }

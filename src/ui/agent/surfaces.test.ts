@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { asLocalized } from '../../runtime/localizedFixture';
 import { layerNamed, mapState, mapSurface, pointFrom, shellState, shellSurface, subpageNamed, zoomFrom } from './surfaces';
 import { CLIMB_NUDGE, sheetAt, ZOOM_MAX, ZOOM_MIN, type Place, type Point } from '../discovery';
 import { HOME_LAYER, LAYERS, OPENING, toLayer } from '../nav';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
-  title: id.toUpperCase(),
+  title: asLocalized(id.toUpperCase()),
   x,
   y,
   z,

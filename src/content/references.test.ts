@@ -261,7 +261,7 @@ ${line}
     const test = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
     expect(test('use: creature.training-dummy.eat')).toThrow(/# test walk use: names an unknown kind: creature/);
     expect(test('use: entity.training-dumy.eat')).toThrow(/# test walk use: names an unknown entity: training-dumy/);
-    expect(test('use: entity.training-dummy.eat')).toThrow(/# test walk use: names an unknown entity action: eat/);
+    expect(test('use: entity.training-dummy.eat')).toThrow(/# test walk use: names an unknown action-slug: entity.training-dummy.eat/);
   });
 
   // The two-sided spelling, checked on both halves: the action by id and the
@@ -343,5 +343,33 @@ describe('the slot vocabulary is what entities declare', () => {
 describe('a skill names the stat it raises', () => {
   it('checks stat-id like any other reference', () => {
     expect(loading('stat-id: attack', 'stat-id: attak')).toThrow(/# skill brawling stat-id: names an unknown stat: attak/);
+  });
+});
+
+// c2. `use:` used to be checked by a rule of its own, which read the built
+// action table and compared labels. Both halves after the verb are namespaced
+// now, so the walk that already knows a member goes away with its owner is what
+// answers, and an unknown action reads like an unknown flag.
+describe('a use: names an object and a member of it', () => {
+  const walking = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
+
+  it('spells the address, not the title the action is shown under', () => {
+    expect(walking('use: entity.player.strike')).not.toThrow();
+    expect(walking('use: entity.player.Strike')).toThrow(/unexpected line in # test/);
+  });
+
+  it('resolves a shortened owner the way every other reference is resolved', () => {
+    expect(walking('use: entity.player.strike')).not.toThrow();
+    expect(walking('use: entity.dummy.strike')).toThrow(/names an unknown entity: dummy/);
+  });
+
+  // The whole point of the member: an entity that does not bring the action
+  // cannot be told to perform it, and nothing had to read its table to say so.
+  it('refuses an action of another object, however real that action is elsewhere', () => {
+    expect(walking('use: entity.training-dummy.strike')).toThrow(/names an unknown action-slug: entity.training-dummy.strike/);
+  });
+
+  it('leaves the kind it leads with the one thing still checked here', () => {
+    expect(walking('use: creature.player.strike')).toThrow(/names an unknown kind: creature/);
   });
 });

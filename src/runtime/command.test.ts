@@ -1,10 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState } from './runtime';
-import { loadModule } from '../content/registry';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { loadUniverse, type Registry } from '../content/registry';
+import { hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/translation';
+import { BASE_LANGUAGE, localizerFor } from './localized';
 import { initialLocalChangesModule } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 import { SAVE_VERSION } from './save';
+import type { ModalOption } from './modals';
 import { runTest, serializeSession, sessionStatus, startSession, view, type PlaySession } from './session';
 import {
   COMMANDS,
@@ -92,7 +96,7 @@ interface Fixture {
 }
 
 function fixture(text: string, authoring?: AuthoringContext): Fixture {
-  const session = startSession(loadModule(text));
+  const session = startSession(loadInEnglish(text));
   const recorder: Recorder = { history: [], startSave: serializeSession(session) };
   return { session, recorder, ctx: newContext(session, view(session), { recorder, authoring }) };
 }
@@ -124,6 +128,14 @@ function choiceIndex(ctx: CommandContext, id: string): string {
   expect(index, id).toBeGreaterThanOrEqual(0);
   return String(index + 1);
 }
+
+
+// What a screen offers, as the answers alone: the words beside each are asserted
+// where the language they are in is the point, and everywhere else they are
+// noise between an option and the answers it takes.
+const answered = (options: readonly ModalOption[] | undefined) => (options ?? []).map((option) => ({ ...option, values: option.values?.map((choice) => choice.value) ?? null }));
+const takes = (option: { values?: readonly { value: string }[] | null } | undefined) => option?.values?.map((choice) => choice.value);
+
 
 describe('the command table is the one definition of the command set', () => {
   it('names every command once, and every spelling reaches its own entry', () => {
@@ -335,7 +347,7 @@ describe('the commands a player plays with', () => {
     const opened = runLine(ctx, '/inv');
     expect(kinds(opened)).toEqual(['view']);
     expect(opened.recorded).toEqual(['open-modal: carried-items']);
-    expect(opened.view?.modals).toEqual([{ name: 'carried-items', leaving: 'Close', options: [{ key: 'item', label: 'Item', values: ['Gauntlet x1', 'Close'] }] }]);
+    expect(opened.view?.modals.map((modal) => ({ ...modal, options: answered(modal.options) }))).toEqual([{ name: 'carried-items', leaving: 'close', options: [{ key: 'item', label: 'Item', values: ['gauntlet', 'close'] }] }]);
   });
 
   // c1: the argument a GUI row hands over is the same dispatch a player types,
@@ -346,8 +358,8 @@ describe('the commands a player plays with', () => {
 
     const opened = runLine(ctx, '/inv gauntlet');
     expect(kinds(opened)).toEqual(['view']);
-    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet x1']);
-    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
+    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=gauntlet']);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['grow', 'equip', 'destroy', 'close'] }]);
   });
 
   // c1 and c18: the equipment row dispatches the same command, and the id it
@@ -358,8 +370,8 @@ describe('the commands a player plays with', () => {
     runLine(ctx, '/load armed');
 
     const opened = runLine(ctx, '/inv worn:hand');
-    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet (hand)']);
-    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Unequip', 'Destroy', 'Close'] }]);
+    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=worn:hand']);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['grow', 'unequip', 'destroy', 'close'] }]);
   });
 
   it('/inventory <item> still opens the stack the worn copy left, and offers it Equip', () => {
@@ -367,8 +379,8 @@ describe('the commands a player plays with', () => {
     runLine(ctx, '/load armed');
 
     const opened = runLine(ctx, '/inv gauntlet');
-    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=Gauntlet x1']);
-    expect(opened.view?.modals[0].options).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['Grow', 'Equip', 'Destroy', 'Close'] }]);
+    expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=gauntlet']);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['grow', 'equip', 'destroy', 'close'] }]);
   });
 
   it('refuses an item the player is not carrying, and opens no screen to say so', () => {
@@ -395,8 +407,8 @@ describe('the commands a player plays with', () => {
     runLine(ctx, '/inv gauntlet');
 
     const equipped = runLine(ctx, '2');
-    expect(equipped.recorded).toEqual(['submit-modal: verb=Equip']);
-    expect(sessionStatus(session).equipment).toEqual({ hand: 'gauntlet' });
+    expect(equipped.recorded).toEqual(['submit-modal: verb=equip']);
+    expect(sessionStatus(session).equipment).toEqual([{ slot: 'hand', title: 'Hand', item: 'gauntlet', name: 'Gauntlet' }]);
     expect(equipped.view?.modals).toEqual([]);
   });
 
@@ -407,12 +419,12 @@ describe('the commands a player plays with', () => {
     runLine(ctx, '/load stocked');
 
     runLine(ctx, '/inv');
-    expect(runLine(ctx, 'submit-modal: item=Close').view?.modals).toEqual([]);
+    expect(runLine(ctx, 'submit-modal: item=close').view?.modals).toEqual([]);
 
     runLine(ctx, '/inv gauntlet');
-    const left = runLine(ctx, 'submit-modal: verb=Close');
+    const left = runLine(ctx, 'submit-modal: verb=close');
     expect(left.view?.modals).toEqual([]);
-    expect(sessionStatus(session).equipment).toEqual({});
+    expect(sessionStatus(session).equipment).toEqual([]);
     expect(sessionStatus(session).inventory).toEqual({ gauntlet: 1 });
     expect(sessionStatus(session).time).toBe(0);
   });
@@ -571,9 +583,9 @@ node greeting:
 
 # test crosses-a-modal
 load: fresh
-use: entity.mirror.look in
+use: entity.mirror.look-in
 submit-modal: name=Rowan
-submit-modal: race=Elf
+submit-modal: race=elf
 `;
 
 // A dialogue whose own effect raises a second modal underneath it, so the
@@ -604,28 +616,28 @@ describe('a modal is driven by its published name and options', () => {
   it('publishes the open modal and the option it is waiting on', () => {
     const { ctx } = fixture(MODAL_MODULE);
 
-    const opened = runLine(ctx, 'use: entity.mirror.look in');
+    const opened = runLine(ctx, 'use: entity.mirror.look-in');
     expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation']);
     expect(opened.view?.modals[0].options.map((option) => option.key)).toEqual(['name', 'race']);
     expect(opened.view?.modals[0].options[0].values).toBeNull();
 
     const named = runLine(ctx, 'submit-modal: name=Rowan');
     expect(named.view?.modals[0].options.map((option) => option.key)).toEqual(['race']);
-    expect(named.view?.modals[0].options[0].values).toEqual(['Human', 'Elf', 'Dwarf', 'Orc']);
+    expect(takes(named.view?.modals[0].options[0])).toEqual(['human', 'elf', 'dwarf', 'orc']);
   });
 
   it('answers a listed value by number and records the canonical submit-modal: line either way', () => {
     const { ctx, recorder } = fixture(MODAL_MODULE);
 
     const opened = runLine(ctx, 'talk: sage');
-    expect(opened.view?.modals[0].options[0].values).toEqual(['Ask the way.', 'Say nothing.']);
+    expect(takes(opened.view?.modals[0].options[0])).toEqual(['0', '1']);
 
     // The second value, not the first: a driver that answered by position but
     // always handed back the head of the list would pass on `1` alone.
     const answered = runLine(ctx, '2');
-    expect(answered.recorded).toEqual(['submit-modal: choice=Say nothing.']);
+    expect(answered.recorded).toEqual(['submit-modal: choice=1']);
     expect(answered.view?.modals).toEqual([]);
-    expect(recorder.history).toEqual(['talk: sage', 'submit-modal: choice=Say nothing.']);
+    expect(recorder.history).toEqual(['talk: sage', 'submit-modal: choice=1']);
   });
 
   it('asks for the top of the stack, not the bottom, when one modal sits over another', () => {
@@ -637,14 +649,14 @@ describe('a modal is driven by its published name and options', () => {
     // The dialogue is on top, so its menu is what a number answers — the bottom
     // modal's first option is free text and takes no number at all.
     const answered = runLine(ctx, '1');
-    expect(answered.recorded).toEqual(['submit-modal: choice=Ask about the mirror.']);
+    expect(answered.recorded).toEqual(['submit-modal: choice=0']);
     expect(answered.view?.modals.map((modal) => modal.name)).toEqual(['character-creation']);
   });
 
   it('refuses a bare line while a modal is open instead of taking it as the field being asked for', () => {
     const { ctx, session, recorder } = fixture(MODAL_MODULE);
 
-    runLine(ctx, 'use: entity.mirror.look in');
+    runLine(ctx, 'use: entity.mirror.look-in');
     // The line the old prompt would have swallowed as the name.
     expect(errors(runLine(ctx, 'Rowan'))).toEqual(['invalid choice: "Rowan"']);
     expect(statusOf(runLine(ctx, '/state')).status.location.id).toBe('camp');
@@ -652,7 +664,7 @@ describe('a modal is driven by its published name and options', () => {
     const still = sessionStatus(session);
     expect(still.player).toEqual({ name: '', race: '' });
     expect(still.modals.map((modal) => modal.name)).toEqual(['character-creation']);
-    expect(recorder.history).toEqual(['use: entity.mirror.look in']);
+    expect(recorder.history).toEqual(['use: entity.mirror.look-in']);
   });
 
   it('never takes a line as a modal field: a command after a /test that crossed a modal is still a command', () => {
@@ -670,20 +682,20 @@ describe('a modal is driven by its published name and options', () => {
   it('emits a replayable # test from a session that crossed a modal, with no hand-editing', () => {
     const { ctx } = fixture(MODAL_MODULE);
 
-    runLine(ctx, 'use: entity.mirror.look in');
+    runLine(ctx, 'use: entity.mirror.look-in');
     runLine(ctx, 'submit-modal: name=Rowan');
-    const done = runLine(ctx, 'submit-modal: race=Elf');
-    expect(done.view?.player).toEqual({ name: 'Rowan', race: 'Elf' });
+    const done = runLine(ctx, 'submit-modal: race=elf');
+    expect(done.view?.player).toEqual({ name: 'Rowan', race: 'elf' });
 
     const created = runLine(ctx, '/create-valid-test crossed');
     const blocks = created.output.find((out) => out.kind === 'authored');
     expect(blocks?.kind).toBe('authored');
     if (blocks?.kind !== 'authored') return;
     expect(blocks.blocks[blocks.blocks.length - 1]).toContain('submit-modal: name=Rowan');
-    expect(blocks.blocks[blocks.blocks.length - 1]).toContain('submit-modal: race=Elf');
+    expect(blocks.blocks[blocks.blocks.length - 1]).toContain('submit-modal: race=elf');
 
     const pasted = `${MODAL_MODULE}\n${blocks.blocks.map((block) => block.join('\n')).join('\n\n')}\n`;
-    expect(runTest('crossed', loadModule(pasted), createGameState())).toEqual({ passed: true });
+    expect(runTest('crossed', loadInEnglish(pasted), createGameState())).toEqual({ passed: true });
   });
 });
 
@@ -787,7 +799,7 @@ describe('the live clock', () => {
   // Driven through the table, not around it: a live run is what the `<N>` entry
   // does when the driver says it can advance one.
   function liveFixture(text: string, choiceId: string, speed = 1) {
-    const session = startSession(loadModule(text));
+    const session = startSession(loadInEnglish(text));
     const recorder: Recorder = { history: [], startSave: serializeSession(session) };
     const ctx = newContext(session, view(session), { recorder, speed, driving: true });
     const index = ctx.view.choices.findIndex((choice) => choice.id === choiceId) + 1;
@@ -897,7 +909,7 @@ ring:
   });
 
   it('refuses a choice number no view offers, whether it arrives as a line or as an argument', () => {
-    const session = startSession(loadModule(LIVE_MODULE));
+    const session = startSession(loadInEnglish(LIVE_MODULE));
     const ctx = newContext(session, view(session), { driving: true });
     const typed = runLine(ctx, '99');
     expect(typed.live).toBeUndefined();
@@ -910,7 +922,7 @@ ring:
   });
 
   it('the same entry resolves the choice instantly when the driver cannot advance a run', () => {
-    const session = startSession(loadModule(LIVE_MODULE));
+    const session = startSession(loadInEnglish(LIVE_MODULE));
     const recorder: Recorder = { history: [], startSave: serializeSession(session) };
     const ctx = newContext(session, view(session), { recorder });
     const index = ctx.view.choices.findIndex((choice) => choice.id === 'use:entity.anvil.strike') + 1;
@@ -1056,7 +1068,7 @@ describe('the recorder: /create-test and /create-valid-test', () => {
     // The correctness gate: paste the emitted blocks into a brand-new module,
     // sharing no state with the recording session, and replay them.
     const pasted = `${TRAVEL_MODULE}\n${blocks.map((block) => block.join('\n')).join('\n\n')}\n`;
-    expect(runTest('bar', loadModule(pasted), createGameState()).passed).toBe(true);
+    expect(runTest('bar', loadInEnglish(pasted), createGameState()).passed).toBe(true);
   });
 
   it('does not prepend a second load:/-start save when the history already begins with load:', () => {
@@ -1072,7 +1084,7 @@ describe('the recorder: /create-test and /create-valid-test', () => {
   it('says so rather than throwing when the session began without a start save', () => {
     // What newContext hands a driver that keeps no recorder of its own: an
     // empty start save, which is not a save and is not JSON either.
-    const session = startSession(loadModule(TRAVEL_MODULE));
+    const session = startSession(loadInEnglish(TRAVEL_MODULE));
     const ctx = newContext(session, view(session));
     runLine(ctx, choiceIndex(ctx, 'travel:ruins'));
 
@@ -1115,7 +1127,7 @@ title: Coin
 
 describe('local DSL authoring takes its file as an argument, never reaching for one', () => {
   function authoringFixture() {
-    const baseSources: ModuleSource[] = [{ name: 'base', text: AUTHORING_MODULE }];
+    const baseSources: ModuleSource[] = [engineLocale(), { name: 'base', text: AUTHORING_MODULE }];
     const writes: string[] = [];
     const authoring: AuthoringContext = {
       baseSources,
@@ -1181,7 +1193,7 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     expect(failure.detail?.some((line) => line.includes('missing-item'))).toBe(true);
     expect(writes).toEqual([]);
     expect(authoring.localSource.text).toBe(before);
-    expect(session.registry.entities.get('base.chest')?.actions[0].results).toEqual([{ kind: 'say', text: 'Empty.' }]);
+    expect(session.registry.entities.get('base.chest')?.actions[0].results).toEqual([{ kind: 'say', text: 'Empty.', key: 'base.entity.chest.say.0' }]);
   });
 
   it('/local clear reloads and prunes stale state from removed local content', () => {
@@ -1225,7 +1237,7 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     expect(registry.stats.get('local-changes.vigor')?.base).toEqual({ min: 10, max: 10 });
     expect(registry.skills.get('local-changes.focus')?.['stat-id']).toBe('local-changes.vigor');
     expect(registry.items.get('local-changes.token')?.title).toBe('Token');
-    expect(registry.entities.get('local-changes.npc')?.actions).toEqual([{ label: 'cheer', results: [{ kind: 'say', text: 'Hello.' }] }]);
+    expect(registry.entities.get('local-changes.npc')?.actions).toEqual([{ label: 'cheer', results: [{ kind: 'say', text: 'Hello.', key: 'local-changes.entity.npc.say.0' }] }]);
     expect(registry.locations.get('local-changes.grove')).toMatchObject({ x: 1, y: 0, entities: [{ entity: 'local-changes.npc' }] });
     expect(registry.flags.has('local-changes.levered')).toBe(true);
     expect(registry.variables.get('local-knob')?.value).toBe(2);
@@ -1350,5 +1362,87 @@ item-experience: 1000
 
     expect(recorder.history).toEqual(['load: stocked', 'feed: blade with whetstone', 'refuse: feed 1 with whetstone']);
     expect(said.view?.said).toContain('Blade is already at level 2, which is its maximum');
+  });
+});
+
+// c4: whose words a message is. The universe is loaded twice — once as
+// authored and once with every word it can address replaced, engine patterns
+// included — and the same script is driven through both. A message that moved
+// went through the localizer; a message that did not is the tool speaking its
+// own language, which is the whole of what the type now says.
+describe('a command says whose words it answered in (c4)', () => {
+  const CAMP = ['# info camp', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', 'entities:', '  chest', '', '# entity chest', 'title: Chest', 'open:', '  time: 40'].join('\n');
+
+  const sources = [engineLocale(), { name: 'camp', text: CAMP }];
+  const english = loadUniverse(sources);
+  const translated = loadUniverse([...sources, translationOf(english)]);
+  const zz = localizerFor(translated, TRANSLATED_LANGUAGE);
+
+  const playing = (registry: Registry, language: string): CommandContext => {
+    const session = startSession(registry, language);
+    return newContext(session, view(session), { recorder: { history: [], startSave: serializeSession(session) }, driving: true });
+  };
+
+  const played = () => playing(translated, TRANSLATED_LANGUAGE);
+
+  const spoken = (result: CommandResult, words: 'player' | 'tool'): string[] => messages(result).filter((out) => out.words === words).map((out) => out.text);
+
+  it('answers the player from a key, in the language being played', () => {
+    const ctx = played();
+
+    expect(spoken(runLine(ctx, '/speed 3'), 'player')).toEqual([zz.engine('engine.command.speed', { speed: 3 })]);
+    expect(spoken(runLine(ctx, '99'), 'player')).toEqual([zz.engine('engine.command.invalid-choice', { choice: zz.identifier('"99"') })]);
+    expect(spoken(runLine(ctx, 'not a line at all'), 'player')).toEqual([zz.engine('engine.command.invalid-choice', { choice: zz.identifier('"not a line at all"') })]);
+  });
+
+  it('refuses a keystroke and a typed line in the one sentence, so neither driver has words the other lacks', () => {
+    const ctx = played();
+    const beyond = ctx.view.choices.length + 1;
+    const numbered = COMMANDS.find((spec) => spec.match === 'choice')!;
+
+    expect(spoken(runCommand(ctx, numbered, beyond), 'player')).toEqual(spoken(runLine(ctx, String(beyond)), 'player'));
+  });
+
+  it('stops a live run in the player language, which is the one message that route writes', () => {
+    const ctx = played();
+    const armed = runLine(ctx, choiceIndex(ctx, 'use:entity.camp.chest.open'));
+
+    expect(spoken(armed.live!.end(true), 'player')).toEqual([zz.engine('engine.command.stopped')]);
+  });
+
+  it('relays a fault out of the engine as the tool speaking, never as the player being refused', () => {
+    const ctx = played();
+    // Raised inside the run rather than by the parser, which is the route
+    // `refused()` owns.
+    const answered = runLine(ctx, 'submit-modal: verb=grow');
+
+    expect(spoken(answered, 'player')).toEqual([]);
+    expect(spoken(answered, 'tool')).toEqual(['no modal is open to answer: verb']);
+  });
+
+  // The rule the four above are examples of, read off the table rather than
+  // listed: every entry twice, bare and with an argument, through both
+  // universes at once. Nobody edits this when a command is added.
+  it('moves every player message with the language and no authoring message, over the whole table', () => {
+    const shaped: Record<string, string> = { '<N>': '1', '<enter>': '', '<directive>': 'use: entity.camp.chest.open' };
+    const script = COMMANDS.flatMap((spec) => [shaped[spec.name] ?? spec.name, `${shaped[spec.name] ?? spec.name} 1`]);
+    const sweep = (registry: Registry, language: string) => {
+      const ctx = playing(registry, language);
+      return script.flatMap((line) => messages(runLine(ctx, line)).map((out) => ({ line, words: out.words, text: out.text })));
+    };
+
+    const asAuthored = sweep(english, BASE_LANGUAGE);
+    const asPlayed = sweep(translated, TRANSLATED_LANGUAGE);
+
+    expect(asPlayed.map(({ line, words }) => `${line}: ${words}`)).toEqual(asAuthored.map(({ line, words }) => `${line}: ${words}`));
+    expect(new Set(asPlayed.map((each) => each.words))).toEqual(new Set(['player', 'tool']));
+
+    // A message with no word of its own has nothing a translation could move,
+    // and none of these has one; the filter is what keeps that honest.
+    const moved = asPlayed.filter((each, at) => each.text !== asAuthored[at].text);
+    expect(asPlayed.filter((each) => each.words === 'player' && hasWords(each.text) && !moved.includes(each))).toEqual([]);
+    expect(asPlayed.filter((each) => each.words === 'tool' && moved.includes(each))).toEqual([]);
+    // And a run in which nothing moved would pass both lines above.
+    expect(moved.length).toBeGreaterThan(0);
   });
 });

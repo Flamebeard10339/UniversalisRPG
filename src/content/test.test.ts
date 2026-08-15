@@ -5,12 +5,16 @@ import { parseDirectiveLine } from './test';
 
 const ref = (...path: string[]) => ({ kind: 'reference' as const, reference: { path } });
 
-// Both readings can match one line, and which it is has to be decided rather
-// than fall out of the order the two regexes are tried in.
-describe('use: has two payloads and one rule for telling them apart', () => {
-  it('reads a leading object kind as the dotted form, however the label ends', () => {
-    expect(parseDirectiveLine('use: entity.mirror.look on shelf')).toEqual({ kind: 'use', obj: 'entity', objId: 'mirror', actionId: 'look on shelf' });
+// One verb, two payloads, and no ranking between them: an action is addressed
+// by a slug, which holds no space, and the two-sided form is spelled with one.
+describe('use: has two payloads and no line that is both', () => {
+  it('reads a dotted address ending in a slug as the one-sided form', () => {
+    expect(parseDirectiveLine('use: entity.mirror.look-in')).toEqual({ kind: 'use', obj: 'entity', objId: 'mirror', actionId: 'look-in' });
     expect(parseDirectiveLine('use: entity.giant-rat.fight')).toEqual({ kind: 'use', obj: 'entity', objId: 'giant-rat', actionId: 'fight' });
+  });
+
+  it('reads a spaced payload as the two-sided form, whatever leads it', () => {
+    expect(parseDirectiveLine('use: entity.mirror.look-in on shelf')).toEqual({ kind: 'use-on', action: 'entity.mirror.look-in', target: 'shelf' });
   });
 
   it('reads anything else before the first dot as the two-sided form', () => {
@@ -22,8 +26,8 @@ describe('use: has two payloads and one rule for telling them apart', () => {
     expect(parseDirectiveLine('use: creature.dummy.strike')).toEqual({ kind: 'use', obj: 'creature', objId: 'dummy', actionId: 'strike' });
   });
 
-  it('decides a begin: payload by the same rule', () => {
-    expect(parseDirectiveLine('begin: use entity.mirror.look on shelf')).toEqual({ kind: 'begin', inner: { kind: 'use', obj: 'entity', objId: 'mirror', actionId: 'look on shelf' } });
+  it('reads a begin: payload by the same two shapes', () => {
+    expect(parseDirectiveLine('begin: use entity.mirror.look-in')).toEqual({ kind: 'begin', inner: { kind: 'use', obj: 'entity', objId: 'mirror', actionId: 'look-in' } });
     expect(parseDirectiveLine('begin: use melee-combat on giant-rat')).toEqual({ kind: 'begin', inner: { kind: 'use-on', action: 'melee-combat', target: 'giant-rat' } });
   });
 });
@@ -35,7 +39,7 @@ describe('test: composable in-game scripts', () => {
       'run: enter-guide-house',
       'talk: miki',
       'choose: Sounds good.',
-      'use: entity.front-door.pick lock',
+      'use: entity.front-door.pick-lock',
       'travel: beach',
       'assert: tutorial.quest-given',
     ].join('\n');
@@ -47,7 +51,7 @@ describe('test: composable in-game scripts', () => {
         { kind: 'run', test: 'enter-guide-house' },
         { kind: 'talk', entity: 'miki' },
         { kind: 'choose', text: 'Sounds good.' },
-        { kind: 'use', obj: 'entity', objId: 'front-door', actionId: 'pick lock' },
+        { kind: 'use', obj: 'entity', objId: 'front-door', actionId: 'pick-lock' },
         { kind: 'travel', location: 'beach' },
         { kind: 'assert', condition: ref('tutorial', 'quest-given') },
       ],
@@ -68,12 +72,12 @@ describe('test: composable in-game scripts', () => {
       '# test replay',
       'run: tutorial-island.intro',
       'talk: tutorial-island.miki',
-      'use: entity.tutorial-island.front-door.pick lock',
+      'use: entity.tutorial-island.front-door.pick-lock',
       'travel: tutorial-island.beach',
       'craft: tutorial-island.bread',
       'load: tutorial-island.start',
       'expect: tutorial-island.end',
-      'begin: use entity.tutorial-island.oven.roast chestnuts',
+      'begin: use entity.tutorial-island.oven.roast-chestnuts',
       'begin: travel tutorial-island.basement',
       'begin: craft tutorial-island.dough',
     ].join('\n');
@@ -82,12 +86,12 @@ describe('test: composable in-game scripts', () => {
     expect(section.value.directives).toEqual([
       { kind: 'run', test: 'tutorial-island.intro' },
       { kind: 'talk', entity: 'tutorial-island.miki' },
-      { kind: 'use', obj: 'entity', objId: 'tutorial-island.front-door', actionId: 'pick lock' },
+      { kind: 'use', obj: 'entity', objId: 'tutorial-island.front-door', actionId: 'pick-lock' },
       { kind: 'travel', location: 'tutorial-island.beach' },
       { kind: 'craft', recipe: 'tutorial-island.bread' },
       { kind: 'load', save: 'tutorial-island.start' },
       { kind: 'expect', save: 'tutorial-island.end' },
-      { kind: 'begin', inner: { kind: 'use', obj: 'entity', objId: 'tutorial-island.oven', actionId: 'roast chestnuts' } },
+      { kind: 'begin', inner: { kind: 'use', obj: 'entity', objId: 'tutorial-island.oven', actionId: 'roast-chestnuts' } },
       { kind: 'begin', inner: { kind: 'travel', location: 'tutorial-island.basement' } },
       { kind: 'begin', inner: { kind: 'craft', recipe: 'tutorial-island.dough' } },
     ]);

@@ -1,5 +1,7 @@
 import { mayBeInstanceId } from '../content/instanceId';
 import type { Registry } from '../content/registry';
+import { Localized, localizerOf } from './localized';
+import { say, type Said } from './said';
 import type { PruneWarning } from './save';
 import { GameState, RuntimeError } from './state';
 
@@ -51,7 +53,7 @@ export interface InstanceKind<P = unknown> {
   // repair. `live` is the substrate's answer, so a kind never asks the table.
   // Called until the table settles, so a payload with nothing left to repair
   // must return nothing rather than repeat what it already reported.
-  repair(payload: P, registry: Registry, live: (id: string) => boolean): string[];
+  repair(payload: P, registry: Registry, live: (id: string) => boolean): Said[];
 }
 
 const KINDS = new Map<string, InstanceKind<never>>();
@@ -120,18 +122,20 @@ export function collapseInstance(state: GameState, id: string): boolean {
 export function pruneInstances(state: GameState, registry: Registry): PruneWarning[] {
   const table = writable(state.instances);
   const warnings: PruneWarning[] = [];
-  const warn = (id: string, message: string): void => {
+  const localizer = localizerOf(registry, state);
+  const named = localizer.identifier;
+  const warn = (id: string, message: Localized): void => {
     warnings.push({ path: `instances.${id}`, id, message });
   };
-  const drop = (id: string, because: string): void => {
+  const drop = (id: string, message: Localized): void => {
     delete table.byId[id];
-    warn(id, `Removed instance ${id} because ${because}.`);
+    warn(id, message);
   };
 
   for (const [id, held] of Object.entries(table.byId)) {
     const definition = kindOf(held.kind);
-    if (!definition) drop(id, `${held.kind} is not an instance kind this engine knows`);
-    else if (!definition.templateLoaded(registry, held.template)) drop(id, `its template ${held.template} is not loaded`);
+    if (!definition) drop(id, localizer.engine('engine.prune.instance.kind', { instance: named(id), kind: named(held.kind) }));
+    else if (!definition.templateLoaded(registry, held.template)) drop(id, localizer.engine('engine.prune.instance.template', { instance: named(id), template: named(held.template) }));
   }
 
   // A repair can drop the reference that another drop in this same pass made
@@ -142,10 +146,10 @@ export function pruneInstances(state: GameState, registry: Registry): PruneWarni
     for (const [id, held] of Object.entries(table.byId)) {
       const definition = kindOf(held.kind)!;
       for (const repaired of definition.repair(held.payload as never, registry, (ref) => instanceIsLive(state, ref))) {
-        warn(id, `Repaired instance ${id}: ${repaired}.`);
+        warn(id, localizer.engine('engine.prune.instance.repaired', { instance: named(id), repair: say(localizer, repaired) }));
       }
       if (definition.empty(held.payload as never)) {
-        drop(id, 'nothing is left recorded about it');
+        drop(id, localizer.engine('engine.prune.instance.empty', { instance: named(id) }));
         settled = false;
       }
     }

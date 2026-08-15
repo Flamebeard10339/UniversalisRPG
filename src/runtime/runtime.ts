@@ -49,6 +49,7 @@ import {
   targetLevel,
 } from './encounter';
 import { applyRespawns, downOne, isStanding, nextRespawn, standing } from './population';
+import { actionAddress } from '../content/action';
 import { Action, declaredId } from '../content/entity';
 import { actionKind, isTwoSided } from '../grammar/action';
 import { fireHooks } from './hooks';
@@ -58,6 +59,7 @@ import { Boundary, BoundarySource, requireBoundaryNotPast, requireForwardProgres
 import { Item } from '../content/item';
 import { Recipe } from '../content/recipe';
 import { Registry } from '../content/registry';
+import { BASE_LANGUAGE, Localized, localizerFor, localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { roadsFrom, routeTo } from './journey';
 import { clearBuffs, expireBuffs, grantBuff, nextBuffExpiry } from './buffs';
@@ -185,7 +187,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): Bou
   if (expiry && expiry.at < boundary.at) boundary = { at: expiry.at, source: { kind: 'buff', actorId: expiry.actorId, source: expiry.source } };
   if (state.activeAction) {
     const active = state.activeAction;
-    const source: BoundarySource = { kind: 'action', ownerRef: active.ownerRef, actionLabel: active.actionLabel };
+    const source: BoundarySource = { kind: 'action', ownerRef: active.ownerRef, actionSlug: active.actionSlug };
     const action = armedAction(state, registry);
     if (!resolvesPerAttempt(action)) {
       const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
@@ -230,7 +232,7 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
   const { duration, abilityAmount, attemptsToResolve, outcome } = fightPlan(action, state, registry);
 
   if (active.repeating && duration <= 0) {
-    throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a rate: that reads positive`);
+    throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionSlug} resolved a non-positive duration (${duration}) — give it a positive time: or a rate: that reads positive`);
   }
 
   const player = playerCadence(active);
@@ -540,7 +542,7 @@ function joinAllies(active: ActiveAction, state: GameState, registry: Registry, 
 export function armFight(state: GameState, registry: Registry, actionId: string, action: Action, targetId: string): ActiveAction {
   const active: ActiveAction = {
     ownerRef: `action.${actionId}`,
-    actionLabel: action.label,
+    actionSlug: actionAddress(action),
     repeating: actionKind(action) === 'continuous',
     implicitTarget: IMPLICIT_TARGET_FULL,
     // First in, so the player wins a tie between cadences due at the same instant.
@@ -615,20 +617,21 @@ function firstUnitSpan(action: Action, state: GameState, registry: Registry): nu
 function refuseUnpayableInputs(action: Action, registry: Registry, state: GameState): ArmResult | undefined {
   const { short, unspendable } = inputLimit(action, state);
   if (short === undefined && unspendable === undefined) return undefined;
-  const title = (id: string): string => registry.items.get(id)?.title ?? id;
+  const localizer = localizerOf(registry, state);
+  const item = (id: string): Localized => localizer.title('item', id);
   if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
-  else if (short !== undefined) state.log.push(`You don't have enough ${title(short)}.`);
-  else if (unspendable!.kind === 'grown') state.log.push(`Your ${title(unspendable!.item)} has grown a plane of its own, and a grown item is never spent.`);
-  else state.log.push(`Your ${title(unspendable!.item)} is the one you are wearing, and what you wear is never spent.`);
+  else if (short !== undefined) state.log.push(localizer.engine('engine.inputs.short', { item: item(short) }));
+  else state.log.push(localizer.engine(unspendable!.kind === 'grown' ? 'engine.inputs.grown' : 'engine.inputs.worn', { item: item(unspendable!.item) }));
   return { armed: false };
 }
 
 export function armAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): ArmResult {
+  const say = localizerFor(registry, BASE_LANGUAGE);
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-  if (!target) throw new RuntimeError(`unknown ${obj}: ${objId}`);
+  if (!target) throw new RuntimeError(say.engine('engine.action.stale.owner', { kind: say.identifier(obj), id: say.identifier(objId) }));
 
-  const action = target.actions?.find((a) => a.label === actionId);
-  if (!action) throw new RuntimeError(`unknown action ${JSON.stringify(actionId)} on ${obj}.${objId}`);
+  const action = target.actions?.find((each) => actionAddress(each) === actionId);
+  if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(actionId), owner: say.identifier(`${obj}.${objId}`) }));
   if (!requiresMet(action, state)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
   if (!actionVisible(action, state)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
@@ -645,11 +648,11 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   // First in, so the player wins a tie between cadences due at the same instant.
   const active: ActiveAction = {
     ownerRef: `${obj}.${objId}`,
-    actionLabel: actionId,
+    actionSlug: actionId,
     repeating,
     implicitTarget: IMPLICIT_TARGET_FULL,
     cadences: { [PLAYER]: newCadence() },
-    roster: { [PLAYER]: { ownerRef: `${obj}.${objId}`, actionLabel: actionId, target: objId } },
+    roster: { [PLAYER]: { ownerRef: `${obj}.${objId}`, actionSlug: actionId, target: objId } },
   };
   state.activeAction = active;
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
@@ -661,7 +664,7 @@ export function armAction(obj: string, objId: string, actionId: string, registry
 // an action already in flight.
 export function actionFirstUnit(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): number {
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-  const action = target?.actions?.find((a) => a.label === actionId);
+  const action = target?.actions?.find((each) => actionAddress(each) === actionId);
   if (!action) return 0;
   return firstUnitSpan(action, state, registry);
 }
@@ -697,16 +700,8 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   resolve(state, registry, state.time + armed.firstUnit);
 }
 
-// A journey from an unset origin is a plain placement, not a journey.
-export function travelFirstUnit(origin: string, dest: string, registry: Registry, state: GameState): number {
-  if (!origin) return 0;
-  const { label } = travelAction(origin, dest, registry);
-  return actionFirstUnit('travel', travelPair(origin, dest), label, registry, state);
-}
-
 export function armTravel(origin: string, dest: string, registry: Registry, state: GameState): ArmResult {
-  const { label } = travelAction(origin, dest, registry);
-  return armAction('travel', travelPair(origin, dest), label, registry, state);
+  return armAction('travel', travelPair(origin, dest), actionAddress(travelAction(origin, dest, registry)), registry, state);
 }
 
 // Sets off for anywhere the roads reach, which is one leg when the place is
@@ -715,15 +710,16 @@ export function armTravel(origin: string, dest: string, registry: Registry, stat
 // The one sentence a walk with no route says, so the arming path and the
 // resolving path say the same thing and a caller reading it back reads the
 // sentence the player was shown.
-function noWayTo(dest: string, registry: Registry): string {
-  return `There is no way from here to ${registry.locations.get(dest)?.title ?? dest}.`;
+function noWayTo(dest: string, registry: Registry, state: GameState): Localized {
+  const localizer = localizerOf(registry, state);
+  return localizer.engine('engine.travel.no-way', { destination: localizer.title('location', dest) });
 }
 
 export function armJourney(dest: string, registry: Registry, state: GameState): ArmResult {
   if (!registry.locations.has(dest)) throw new RuntimeError(`unknown location: ${dest}`);
   const route = routeTo(state.location, dest, registry, state);
   if (!route) {
-    state.log.push(noWayTo(dest, registry));
+    state.log.push(noWayTo(dest, registry, state));
     return { armed: false };
   }
   state.journey = { to: dest, legs: route };
@@ -776,8 +772,7 @@ export function useTravel(origin: string, dest: string, registry: Registry, stat
     spreadDiscovery(state, registry);
     return;
   }
-  const { label } = travelAction(origin, dest, registry);
-  useAction('travel', travelPair(origin, dest), label, registry, state);
+  useAction('travel', travelPair(origin, dest), actionAddress(travelAction(origin, dest, registry)), registry, state);
 }
 
 // The whole walk, resolved where it stands. The same route the armed walk
@@ -787,7 +782,7 @@ export function useTravel(origin: string, dest: string, registry: Registry, stat
 // Returns the sentence refusing the walk, and nothing when one was made: no
 // route is the one way this leaves the world exactly as it found it, and a
 // caller that can only report what it is told needs telling.
-export function walkTo(dest: string, registry: Registry, state: GameState): string | undefined {
+export function walkTo(dest: string, registry: Registry, state: GameState): Localized | undefined {
   if (!registry.locations.has(dest)) throw new RuntimeError(`unknown location: ${dest}`);
   if (!state.location) {
     useTravel('', dest, registry, state);
@@ -795,7 +790,7 @@ export function walkTo(dest: string, registry: Registry, state: GameState): stri
   }
   const route = routeTo(state.location, dest, registry, state);
   if (!route) {
-    const refused = noWayTo(dest, registry);
+    const refused = noWayTo(dest, registry, state);
     state.log.push(refused);
     return refused;
   }
@@ -828,13 +823,13 @@ export function armCraft(recipeId: string, registry: Registry, state: GameState)
   if (!recipe) throw new RuntimeError(`unknown recipe: ${recipeId}`);
   if (!recipeCraftable(recipe, registry, state)) throw new RuntimeError(`recipe not craftable: ${recipeId}`);
   const action = registry.recipeActions.get(recipeId)!;
-  return armAction('recipe', recipeId, action.label, registry, state);
+  return armAction('recipe', recipeId, actionAddress(action), registry, state);
 }
 
 export function craftFirstUnit(recipeId: string, registry: Registry, state: GameState): number {
   const action = registry.recipeActions.get(recipeId);
   if (!action) return 0;
-  return actionFirstUnit('recipe', recipeId, action.label, registry, state);
+  return actionFirstUnit('recipe', recipeId, actionAddress(action), registry, state);
 }
 
 export function craft(recipeId: string, registry: Registry, state: GameState): void {

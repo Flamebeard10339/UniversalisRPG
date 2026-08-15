@@ -247,13 +247,13 @@ describe('the rat sheet', () => {
   it('answers with the first action in uses: whose depletes: names a pool the attacker has', () => {
     const registry = loaded();
     const state = fighting(registry);
-    expect(state.activeAction!.roster!['giant-rat']).toEqual({ ownerRef: 'action.fight', actionLabel: 'fight', target: PLAYER });
+    expect(state.activeAction!.roster!['giant-rat']).toEqual({ ownerRef: 'action.fight', actionSlug: 'fight', target: PLAYER });
 
     // The same rat against a target that DOES carry a carapace answers with the
     // earlier one, so the order is doing work rather than the filter alone.
     const shelled = loadModule(MODULE.replace('stats: attack 10, dr 0, max-health 100, attack-rate 25', 'stats: attack 10, dr 0, max-health 100, max-carapace 20, attack-rate 25'));
     const against = fighting(shelled);
-    expect(against.activeAction!.roster!['giant-rat'].actionLabel).toBe('shell-crack');
+    expect(against.activeAction!.roster!['giant-rat'].actionSlug).toBe('shell-crack');
   });
 
   it('gives an entity that uses nothing no answer at all, and no attack-rate of 0 to write', () => {

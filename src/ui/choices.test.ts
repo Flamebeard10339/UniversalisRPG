@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
 import { groupOffers } from './choices';
 import { drawnFor, type Place } from './discovery';
 
-const choice = (id: string, label: string, detail?: string): PlayView['choices'][number] => ({ id, kind: 'action', label, ...(detail ? { detail } : {}) });
+const choice = (id: string, label: string, detail?: string): PlayView['choices'][number] => ({ id, kind: 'action', label: asLocalized(label), ...(detail ? { detail: asLocalized(detail) } : {}) });
 
 describe('the offers on the sheet', () => {
   it('gathers what one object offers, in the order the engine listed it', () => {
@@ -30,8 +31,8 @@ describe('the offers on the sheet', () => {
   });
 
   it('leaves out the places that are a walk away, and keeps the one next door', () => {
-    const near: PlayView['choices'][number] = { id: 'travel:yard', kind: 'travel', label: 'Travel to Yard', leadsTo: 'yard', legs: 1 };
-    const far: PlayView['choices'][number] = { id: 'travel:ford', kind: 'travel', label: 'Travel to Ford', leadsTo: 'ford', legs: 3 };
+    const near: PlayView['choices'][number] = { id: 'travel:yard', kind: 'travel', label: asLocalized('Travel to Yard'), leadsTo: 'yard', legs: 1 };
+    const far: PlayView['choices'][number] = { id: 'travel:ford', kind: 'travel', label: asLocalized('Travel to Ford'), leadsTo: 'ford', legs: 3 };
 
     const groups = groupOffers([choice('a', 'Talk to Miki'), near, far]);
 
@@ -45,10 +46,10 @@ describe('the offers on the sheet', () => {
   // carries it whatever plane is being looked at. Held here rather than left to
   // either file's comment, because it is the one claim neither owns alone.
   it('withdraws a walk-away offer only where the map is drawing the place it leads to', () => {
-    const at = (id: string, z: number, ...adjacent: string[]): Place => ({ id, title: id.toUpperCase(), x: 0, y: 0, z, adjacent: adjacent.map((to) => ({ to, open: true })) });
+    const at = (id: string, z: number, ...adjacent: string[]): Place => ({ id, title: asLocalized(id.toUpperCase()), x: 0, y: 0, z, adjacent: adjacent.map((to) => ({ to, open: true })) });
     // Two roads out and two floors down from where the player is standing.
     const discovered = [at('landing', 1, 'hall'), at('hall', 0, 'landing', 'cellar'), at('cellar', -1, 'hall')];
-    const walk: PlayView['choices'][number] = { id: 'travel:cellar', kind: 'travel', label: 'Travel to Cellar', leadsTo: 'cellar', legs: 2 };
+    const walk: PlayView['choices'][number] = { id: 'travel:cellar', kind: 'travel', label: asLocalized('Travel to Cellar'), leadsTo: 'cellar', legs: 2 };
     const offers = [choice('a', 'Talk to Miki'), walk];
     const view = { discovered, location: { id: 'landing' }, choices: offers } as unknown as PlayView;
 

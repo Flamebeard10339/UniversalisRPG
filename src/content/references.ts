@@ -3,7 +3,7 @@ import { Recipe } from './recipe';
 import { Registry } from './registry';
 import { Dialogue } from './dialogue';
 import { Directive, Test } from './test';
-import { NAMESPACED_KINDS } from './namespace';
+import { isActionOwnerKind, NAMESPACED_KINDS } from './namespace';
 import { Visit, visitSection } from './referenceSites';
 
 // Resolution qualifies a name; it cannot prove the name still points at
@@ -86,11 +86,6 @@ export function validateDialogueReferences(dialogue: Dialogue): void {
 }
 
 export function validateTestReferences(test: Test, registry: Registry): void {
-  const owners: Record<string, ReadonlyMap<string, { actions: { label: string }[] }>> = {
-    entity: registry.entities,
-    location: registry.locations,
-    item: registry.items,
-  };
   const slots = registrySlots(registry);
   const directive = (value: Directive, where: string): void => {
     if (value.kind === 'begin') return directive(value.inner, `${where} begin:`);
@@ -105,11 +100,11 @@ export function validateTestReferences(test: Test, registry: Registry): void {
       if (!registry.player?.uses.some((used) => used === value.action)) throw new DslError(`${where} use: names an action the player does not use:: ${value.action}`);
       return;
     }
-    if (value.kind !== 'use') return;
-    const owner = owners[value.obj];
-    if (!owner) throw new DslError(`${where} use: names an unknown kind: ${value.obj}`);
-    const labels = owner.get(value.objId)?.actions.map((action) => action.label) ?? [];
-    if (!labels.includes(value.actionId)) throw new DslError(`${where} use: names an unknown ${value.obj} action: ${value.actionId}`);
+    // What is left of `use:` here is the kind it leads with. Both halves after
+    // it are namespaced — the object, and the action hanging under it — so an
+    // action nothing declares is an unknown member, caught by the walk above
+    // rather than by a second comparison against the built table.
+    if (value.kind === 'use' && !isActionOwnerKind(value.obj)) throw new DslError(`${where} use: names an unknown kind: ${value.obj}`);
   };
   for (const each of test.directives) directive(each, `# test ${test.id}`);
 }

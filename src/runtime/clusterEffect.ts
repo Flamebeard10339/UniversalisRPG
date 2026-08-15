@@ -3,6 +3,7 @@ import { BonusAmount } from '../grammar/tagClause';
 import { Hex, hexKey, PlaneNode } from '../content/hex';
 import { clusterAt, isAllocated, placementAt, Plane, planeClusters } from './clusterPlane';
 import { Growth, growItem, ItemInstance } from './itemInstance';
+import { aCount, anId, says, type Said } from './said';
 import { GameState } from './state';
 
 // One allocated payload and what the cluster it sits in makes it worth. The
@@ -70,12 +71,13 @@ export function instancePayloads(registry: Registry, instance: ItemInstance): Sc
 // share them. The duplicate is refused because a cluster's `effects` is a set
 // in the shape a save round-trips: `isPlane` rejects a repeat, so recording
 // one would mint a plane the player could not reload.
-function recordEffect(registry: Registry, plane: Plane, hex: Hex, effectItem: string): string | undefined {
+function recordEffect(registry: Registry, plane: Plane, hex: Hex, effectItem: string): Said | undefined {
   const cluster = clusterAt(plane, hex);
   const placement = placementAt(registry, plane, hex);
-  if (!cluster || !placement) return `no cluster stands in ${hexKey(hex)}`;
-  if (cluster.effects.includes(effectItem)) return `the cluster at ${hexKey(hex)} already carries ${effectItem}`;
-  if (cluster.effects.length >= placement.jewel.modSlots) return `the cluster at ${hexKey(hex)} fills all ${placement.jewel.modSlots} of its mod slots`;
+  const at = anId(hexKey(hex));
+  if (!cluster || !placement) return says('engine.plane.no-cluster', { hex: at });
+  if (cluster.effects.includes(effectItem)) return says('engine.cluster.effect-repeated', { hex: at, effect: anId(effectItem) });
+  if (cluster.effects.length >= placement.jewel.modSlots) return says('engine.cluster.slots-full', { hex: at, count: aCount(placement.jewel.modSlots) });
   cluster.effects.push(effectItem);
   return undefined;
 }
@@ -84,7 +86,7 @@ function recordEffect(registry: Registry, plane: Plane, hex: Hex, effectItem: st
 // jewel in inventory, so it goes through the one door every other verb takes
 // and the item is consumed only once the plane has taken it.
 export function applyClusterEffect(state: GameState, registry: Registry, target: string, effectItem: string, hex: Hex): Growth {
-  if (registry.items.get(effectItem)?.clusterEffect === undefined) return { ok: false, refused: `${effectItem} carries no cluster effect` };
+  if (registry.items.get(effectItem)?.clusterEffect === undefined) return { ok: false, refused: says('engine.cluster.not-an-effect', { item: anId(effectItem) }) };
   return growItem(state, registry, {
     target,
     consumes: effectItem,

@@ -16,6 +16,7 @@
     {
       "name": "DSL load path",
       "paths": [
+        "content/engine-en.dsl",
         "content/tutorial-island.dsl",
         "src/content/action.ts",
         "src/content/clusterJewel.test.ts",
@@ -23,6 +24,7 @@
         "src/content/dialogue.ts",
         "src/content/dropTable.test.ts",
         "src/content/dropTable.ts",
+        "src/content/engineLocale.ts",
         "src/content/entity.ts",
         "src/content/event.ts",
         "src/content/faction.ts",
@@ -34,6 +36,8 @@
         "src/content/instanceId.ts",
         "src/content/item.test.ts",
         "src/content/item.ts",
+        "src/content/locale.test.ts",
+        "src/content/locale.ts",
         "src/content/location.ts",
         "src/content/merge.test.ts",
         "src/content/merge.ts",
@@ -55,9 +59,12 @@
         "src/content/shapes.test.ts",
         "src/content/shapes.ts",
         "src/content/skill.ts",
+        "src/content/slot.test.ts",
+        "src/content/slot.ts",
         "src/content/stat.ts",
         "src/content/test.test.ts",
         "src/content/test.ts",
+        "src/content/translation.ts",
         "src/content/tuningVariables.ts",
         "src/content/typed.ts",
         "src/content/universe.test.ts",
@@ -188,6 +195,53 @@
             "src/content/item.ts"
           ],
           "note": "produced by items-mods-and-crafting-pass1-a-base-s-own-origin-cluster-an: isBase says an item is a base iff it declares slot:, and itemRoleProblem refuses at load an item claiming both roles. Registered over item.ts alone -- the runtime half lives in basePlane and belongs to Runtime's existing item cluster plane concept"
+        },
+        {
+          "name": "module language declaration",
+          "paths": [
+            "src/content/info.ts"
+          ],
+          "note": "produced by modules-declare-their-language-and-humanize-becomes-english-"
+        },
+        {
+          "name": "locale section",
+          "paths": [
+            "src/content/locale.ts",
+            "content/engine-en.dsl",
+            "src/content/engineLocale.ts"
+          ],
+          "note": "produced by the-locale-section-and-its-missing-key-report"
+        },
+        {
+          "name": "a universe with every word replaced",
+          "paths": [
+            "src/content/translation.ts"
+          ],
+          "note": "produced by a-recording-survives-translation; a # locale module built from a loaded registry that gives every engine pattern and every content title different words, in the base language and in one nothing ships"
+        },
+        {
+          "name": "the engine's refusal vocabulary",
+          "paths": [
+            "content/engine-en.dsl",
+            "src/content/locale.ts"
+          ],
+          "note": "produced by every-engine-sentence-is-keyed; every refusal, stale reason and plane repair the engine says on its own behalf, as keys in the closed union with an English pattern beside each"
+        },
+        {
+          "name": "action slug members",
+          "paths": [
+            "src/content/resolve.ts",
+            "src/content/namespace.ts",
+            "src/content/action.ts"
+          ],
+          "note": "produced by action-labels-as-members"
+        },
+        {
+          "name": "a slot's words",
+          "paths": [
+            "src/content/slot.ts"
+          ],
+          "note": "produced by an-equipment-slot-is-a-word-with-no-key-so-no-locale-can-rea: # slot <id> with a title:, optional, and global rather than namespaced for capability's reason. The vocabulary stays equipment-slots: and the key is minted from it, so a slot nobody declared still has words. Registered over slot.ts alone because the pass that mints the key lives in registry.ts, already claimed by 'the registry'"
         }
       ]
     },
@@ -235,6 +289,9 @@
         "src/runtime/itemInstance.ts",
         "src/runtime/journey.test.ts",
         "src/runtime/journey.ts",
+        "src/runtime/localized.test.ts",
+        "src/runtime/localized.ts",
+        "src/runtime/localizedFixture.ts",
         "src/runtime/location.test.ts",
         "src/runtime/modals.test.ts",
         "src/runtime/modals.ts",
@@ -243,6 +300,7 @@
         "src/runtime/planeScreen.test.ts",
         "src/runtime/planeScreen.ts",
         "src/runtime/population.ts",
+        "src/runtime/published.test.ts",
         "src/runtime/recipe.test.ts",
         "src/runtime/resolve.test.ts",
         "src/runtime/resource.test.ts",
@@ -250,8 +308,10 @@
         "src/runtime/rng.ts",
         "src/runtime/runtime.test.ts",
         "src/runtime/runtime.ts",
+        "src/runtime/said.ts",
         "src/runtime/save.test.ts",
         "src/runtime/save.ts",
+        "src/runtime/sayFixture.ts",
         "src/runtime/session.test.ts",
         "src/runtime/session.ts",
         "src/runtime/skills.test.ts",
@@ -261,6 +321,7 @@
         "src/runtime/stats.ts",
         "src/runtime/stopping.test.ts",
         "src/runtime/time.test.ts",
+        "src/runtime/translationSurvival.test.ts",
         "src/runtime/tuning.ts",
         "src/runtime/units.ts"
       ],
@@ -449,6 +510,58 @@
             "src/runtime/buffs.ts"
           ],
           "note": "produced by buffs-generalized"
+        },
+        {
+          "name": "localized text type",
+          "paths": [
+            "src/runtime/localized.ts"
+          ],
+          "note": "produced by reimplement-localization"
+        },
+        {
+          "name": "the translation-survival gate",
+          "paths": [
+            "src/runtime/translationSurvival.test.ts"
+          ],
+          "note": "produced by a-recording-survives-translation; c5's gate, replaying every shipped # test over that universe in both languages and naming the ones that do not survive yet"
+        },
+        {
+          "name": "the name of an instance with no key",
+          "paths": [
+            "src/runtime/carriedName.ts"
+          ],
+          "note": "produced by an-instance-is-named-from-its-template; where the played language has no title for the template, a grown copy is named <template>#<ordinal> rather than the template's key, because a locale addresses only a template"
+        },
+        {
+          "name": "a sentence the engine has not said yet",
+          "paths": [
+            "src/runtime/said.ts",
+            "src/runtime/sayFixture.ts"
+          ],
+          "note": "produced by a-plane-frame-carries-a-key-not-a-sentence; a Said is an engine key and the parameters it takes, unrendered, so a growth refusal can be stored, replayed and read in whichever language loads it"
+        },
+        {
+          "name": "the modal answer wire",
+          "paths": [
+            "src/runtime/modals.ts",
+            "src/runtime/carriedScreen.ts"
+          ],
+          "note": "produced by every-modal-answer-is-an-id; every ModalChoice.value is an id — a content id, an instance ordinal, a slot, a hexagon, a dialogue option's index within its node, or one the engine owns spelled as an id — and the words beside it are the pair's other half"
+        },
+        {
+          "name": "the derived brand rule",
+          "paths": [
+            "src/runtime/published.test.ts",
+            "src/runtime/localized.ts"
+          ],
+          "note": "produced by the-published-surface-declares-what-is-words-and-what-is-an-"
+        },
+        {
+          "name": "a command message says whose words it is",
+          "paths": [
+            "src/runtime/command.ts"
+          ],
+          "note": "produced by the-command-layer-and-the-plane-refuse-in-keys — CommandOutput's message arm is PlayerMessage (a Localized from a key, moving with the played language) or ToolMessage (the authoring tool's own English), discriminated at runtime by words: 'player' | 'tool'. PlayerMessage is a published.test.ts root, so the brand cannot be dropped silently."
         }
       ]
     },
@@ -584,6 +697,7 @@
         "src/ui/transcript.ts",
         "src/ui/transient.test.ts",
         "src/ui/transient.ts",
+        "src/ui/words.ts",
         "src/vite-env.d.ts",
         "tailwind.config.js"
       ],
@@ -707,6 +821,14 @@
             "src/ui/asking.ts"
           ],
           "note": "produced by a-row-acts-in-one-click-and-clicking-away-leaves-the-screen for crafting-modal c19: one decision taken off published fields alone - what a gesture away from the open screen answers, which is the leaving value the Modal itself publishes and nothing where it publishes none. Both gestures the GUI shell has, a click on the sheet's ground and a move to another page, go through it. The concept was registered with a second half, the row that owned its own question, and revert-the-inline-row-question-and-five-bugs-the-author-foun struck it with c20: src/ui/Question.tsx went back inside ModalSheet, which is the one thing drawing an option again"
+        },
+        {
+          "name": "the shell's keyed vocabulary",
+          "paths": [
+            "src/ui/labels.ts",
+            "src/ui/words.ts"
+          ],
+          "note": "produced by both-drivers-read-their-own-words-from-the-localizer: the table of engine keys the shell names its own words by, and the one door a component reads them through"
         }
       ]
     },
@@ -1046,7 +1168,8 @@
         "scripts/planeView.ts",
         "scripts/play-cli.test.ts",
         "scripts/play-cli.ts",
-        "scripts/probe.test.ts",
+        "scripts/printedWords.test.ts",
+    "scripts/probe.test.ts",
         "scripts/probe.ts",
         "scripts/session-timing.test.ts",
         "scripts/session-timing.ts"

@@ -9,6 +9,7 @@ import { itemContribution, StatContribution } from './itemContribution';
 import { initialState } from './save';
 import { statValue } from './stats';
 import { GameState } from './state';
+import { inEnglish } from './sayFixture';
 
 const MODULE = `
 # location camp
@@ -63,7 +64,7 @@ item-experience: 1000
 const registry = loadModule(MODULE);
 
 function ok(outcome: Growth): string {
-  if (!outcome.ok) throw new Error(outcome.refused);
+  if (!outcome.ok) throw new Error(inEnglish(registry, outcome.refused));
   return outcome.instance;
 }
 
