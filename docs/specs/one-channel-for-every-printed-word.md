@@ -92,6 +92,12 @@ Proof:
   `+3 attack` becomes `+3 Attack` on the character sheet and the plane pane; and under c10 every id
   a surface still draws as a word, which is a skill's on the character sheet and a declared slot's
   on the equipment page. Nothing else player-visible moves.
+  **Read over this spec's own work and not over the branch's diff.** The branch carries
+  `action-labels-as-members` and `what-is-stored-or-replayed-is-an-id` as well, and between them
+  `SAVE_VERSION` goes 9 to 11, `activeAction`'s action field is renamed, `PlaneFrame.said` changes
+  shape and four authored lines are respelled. Each is named in that spec's own closing clause and
+  none is this one's to answer for: what this clause covers is the channel, which stores nothing
+  and respells nothing.
   proof: npm test
 - [c10] **An id never reaches a driver alone.** Every published value a driver draws carries its own
   words beside its own id, in one row, so a driver never holds an identifier it has no words for and
