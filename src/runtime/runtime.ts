@@ -700,12 +700,6 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   resolve(state, registry, state.time + armed.firstUnit);
 }
 
-// A journey from an unset origin is a plain placement, not a journey.
-export function travelFirstUnit(origin: string, dest: string, registry: Registry, state: GameState): number {
-  if (!origin) return 0;
-  return actionFirstUnit('travel', travelPair(origin, dest), actionAddress(travelAction(origin, dest, registry)), registry, state);
-}
-
 export function armTravel(origin: string, dest: string, registry: Registry, state: GameState): ArmResult {
   return armAction('travel', travelPair(origin, dest), actionAddress(travelAction(origin, dest, registry)), registry, state);
 }
