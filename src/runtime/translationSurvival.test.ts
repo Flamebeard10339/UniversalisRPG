@@ -36,29 +36,21 @@ describe('a universe with every word replaced', () => {
     for (const language of PLAYED) expect(keys.filter((key) => registry.locales.declared.get(language)?.has(key) !== true)).toEqual([]);
   });
 
-  // Every key whose English is nothing but parameters and punctuation, which is
-  // the one thing no replacement can make different. Each is a line a driver
-  // lays out from values it was handed — a numbered choice, a resource beside
-  // its meter, a bar beside its clock — and each is a key rather than a
-  // template so that a language may reorder it, which is the only thing there
-  // is to translate about one.
-  const SHAPES = [
-    'engine.carried.worn',
-    'engine.repl.place',
-    'engine.repl.pool',
-    'engine.repl.choice',
-    'engine.repl.choice.owned',
-    'engine.repl.modal',
-    'engine.repl.modal.asking',
-    'engine.repl.live.running',
-    'engine.repl.live.pool',
-    'engine.repl.plane.effect',
-  ];
-
+  // A key whose English is nothing but parameters and punctuation has no word
+  // for a replacement to reach, and is the one thing no translation can make
+  // different: each is a line a driver lays out from values it was handed — a
+  // numbered choice, a resource beside its meter, a bar beside its clock — and
+  // each is a key rather than a template so that a language may reorder it,
+  // which is the only thing there is to translate about one. Which keys those
+  // are is read off the patterns, so a layout-only key added tomorrow needs no
+  // edit here; what is asserted is that they are the minority, because a
+  // partition that swallowed everything would leave the line below green over
+  // nothing.
   it('leaves no key reading the English it was authored in', () => {
     const keys = everyKey(shipped.locales);
-    expect(keys.filter((key) => !hasWords(englishOf(shipped.locales, key)))).toEqual(SHAPES);
     const worded = keys.filter((key) => hasWords(englishOf(shipped.locales, key)));
+
+    expect(worded.length).toBeGreaterThan(keys.length - worded.length);
     for (const language of PLAYED) expect(worded.filter((key) => registry.locales.declared.get(language)?.get(key) === englishOf(shipped.locales, key))).toEqual([]);
   });
 
@@ -87,9 +79,18 @@ describe('a universe with every word replaced', () => {
     expect(worded.filter((key) => registry.locales.declared.get(BASE_LANGUAGE)?.get(key) === registry.locales.declared.get(TRANSLATED_LANGUAGE)?.get(key))).toEqual([]);
   });
 
+  // Over every item the island ships rather than over one named here: naming a
+  // title makes renaming that item a test edit, and the property is about the
+  // whole shipped vocabulary anyway.
   it('says nothing a shipped title says', () => {
-    expect(localizerFor(shipped, BASE_LANGUAGE).title('item', 'tutorial-island.iron-sword')).toBe('Iron Sword');
-    for (const language of PLAYED) expect(localizerFor(registry, language).title('item', 'tutorial-island.iron-sword')).not.toBe('Iron Sword');
+    const asShipped = localizerFor(shipped, BASE_LANGUAGE);
+    const ids = [...shipped.items.keys()];
+
+    expect(ids.length).toBeGreaterThan(5);
+    for (const language of PLAYED) {
+      const said = localizerFor(registry, language);
+      expect(ids.filter((id) => said.title('item', id) === asShipped.title('item', id))).toEqual([]);
+    }
   });
 });
 
