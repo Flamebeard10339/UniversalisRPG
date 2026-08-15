@@ -3,12 +3,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../src/content/engineLocale';
+import { ENGINE_KEYS } from '../src/content/locale';
 import { localizerFor } from '../src/runtime/localized';
 import { asLocalized } from '../src/runtime/localizedFixture';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { serializeSession, startSession, view } from '../src/runtime/session';
 import { COMMANDS, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
-import { driveRun, formatLive, formatOutput, formatResult, formatTick, loadModportalSources, printed, type ReplLine } from './play-cli';
+import { driveRun, formatLive, formatOutput, formatResult, formatTick, loadModportalSources, openRepl, printed, type ReplLine } from './play-cli';
 
 // Every word this driver prints comes from an engine key, and the content text
 // it puts into one arrives localized on the view, so one English localizer
@@ -89,6 +90,18 @@ describe('play-cli renders what a command result says happened', () => {
     expect(lines[3]).toBe('Health: ██████████ 30/30');
     expect(lines).toContain('  1) Talk to Miki');
     expect(lines[lines.length - 1]).toBe('[time: 0s]');
+  });
+
+  // The documented usage — `npx tsx scripts/play-cli.ts content/tutorial-island.dsl`
+  // — named one file and got a game that spoke in keys, because the engine's
+  // own English was remembered in a default argument rather than assembled with
+  // the sources. Derived over the whole key union, so a key minted tomorrow is
+  // covered here unedited.
+  it('speaks the engine’s own words over a universe nobody named the locale to', () => {
+    const opening = openRepl([{ name: 'tutorial-island', text: source }]).opening.map(printed);
+
+    expect(ENGINE_KEYS.filter((key) => opening.some((line) => line.includes(key)))).toEqual([]);
+    expect(opening.length).toBeGreaterThan(5);
   });
 
   it('prints a location description on first arrival and again only when /look asks', () => {

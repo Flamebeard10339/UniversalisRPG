@@ -4,6 +4,7 @@ import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { RuntimeError } from '../src/runtime/runtime';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
+import { withEngineLocale } from '../src/content/engineLocale';
 import { type ModuleSource } from '../src/content/universe';
 import { initialLocalChangesModule } from '../src/content/localChanges';
 import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './lib/modportalCache';
@@ -28,9 +29,7 @@ import {
 import { formatPlane } from './planeView';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-// The engine's own English is a locale module like any other, so a session
-// started without it plays the island with keys where the engine speaks.
-const defaultContent = 'content/engine-en.dsl,content/tutorial-island.dsl';
+const defaultContent = 'content/tutorial-island.dsl';
 const defaultLocalChanges = 'content/local-changes.dsl';
 
 // TODO(quest-journal): quests are emergent from flags, not a DSL kind. See backlog.
@@ -469,12 +468,16 @@ function sourceName(file: string): string {
 }
 
 // One file is one module: its `# info` names it, and its filename is the
-// fallback id for a file that declares none.
+// fallback id for a file that declares none. The engine's own English joins
+// them here rather than in the default argument, so a session named on the
+// command line is as playable as the one nobody named.
 function loadContent(files: string[]): ModuleSource[] {
-  return files.map((file) => ({
-    name: sourceName(file),
-    text: readFileSync(repoPath(file), 'utf8'),
-  }));
+  return withEngineLocale(
+    files.map((file) => ({
+      name: sourceName(file),
+      text: readFileSync(repoPath(file), 'utf8'),
+    })),
+  );
 }
 
 function writeLocalChanges(file: string, text: string): void {
@@ -514,7 +517,7 @@ export interface Repl {
 // proof drives the REPL rather than a second copy of it — a copy is what made
 // the previous cross-driver comparison measure only one of the two drivers.
 export function openRepl(sources: readonly ModuleSource[], options: { authoring?: AuthoringContext; driving?: boolean } = {}): Repl {
-  const loaded = loadUniverseWithDiagnostics(sources);
+  const loaded = loadUniverseWithDiagnostics(withEngineLocale(sources));
   const session = startSession(loaded.registry);
   const recorder: Recorder = { history: [], startSave: serializeSession(session) };
   const opening = view(session);
