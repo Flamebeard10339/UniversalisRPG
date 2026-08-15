@@ -118,14 +118,24 @@ Proof:
   c7 removes for actions. A skill needs no declaration: `skill: ['title']` is already in
   `TEXT_FIELDS` and only the publishing and the reading are missing.
 
-  Two enforcements, because the rule above is only worth what notices it: c1's walk refuses a
-  published map keyed by an `Answer`, so the next dictionary is caught at the type rather than at an
-  audit; and `published()` in `src/ui/render.test.tsx` stops offering raw ids as permissible screen
-  text while its walk visits the pages that draw them. Measured 2026-08-14: deleting the three id
-  entries from `published()` leaves every test in that file passing, because the walk never opens
-  the Skills, Equipment or Map pages — so the one rule in this repository saying a driver may invent
-  no word has never looked at three of its screens.
+  Three enforcements, one per driver and one at the type, because the rule above is only worth what
+  notices it. c1's walk refuses a published map keyed by an `Answer`, so the next dictionary is
+  caught at the type rather than at an audit. `published()` in `src/ui/render.test.tsx` stops
+  offering raw ids as permissible screen text while its walk visits the pages that draw them —
+  measured 2026-08-14: deleting the three id entries from it leaves every test in that file passing,
+  because the walk never opens the Skills, Equipment or Map pages. And the REPL's own lines are
+  walked the way the shell's markup is, by playing one script twice over one universe — the base
+  language and `translationOf()` of it — so that every run of letters surviving the change of
+  language is a word no locale produced. Four things may leave one standing and every one of them
+  derives its own subjects: a bearing out of `DIRECTIONS`, a token the engine itself spelled into
+  words it published, the player's own line quoted back, and this clause's own sentence — an id
+  drawn where the words published on its row are drawn too. Which of a published field's values are
+  ids and which are words is read off the two renderings rather than named, so a field added
+  tomorrow is covered unedited. `/state` and the modal banner are exempt by being `ToolLine`s, which
+  is c4's `words: 'tool'` discriminant and not a list of strings: they address records and screens
+  by the ids the engine stores under, and answer to whoever is driving rather than to a player.
   proof: vitest src/runtime/published.test.ts
+  proof: vitest scripts/printedWords.test.ts
 - [c9] **A stat is read by its title, not by its id.** The character sheet, the plane pane and the
   REPL read a stat's localized title, so `bare(statId)` stops putting an identifier in front of a
   player. Delivered first as a `statTitles` map published beside `stats`; c10 retires that map and
