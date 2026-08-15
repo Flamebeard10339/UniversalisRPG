@@ -211,3 +211,112 @@ sentence as the surface written today, with nobody having to remember it.
 - Whether an entity that overloads a `use:`d action gets its own display key under c7. The grammar
   rejects a `title:` in an overload block today, so there is no authored English for a second key to
   carry; if that ever changes, the rule needs its named companion.
+
+## Audit passes
+
+### Pass 1 — 2026-08-15
+
+- base: `cfa1eb692c996ed4414390fa5cb492741856a0f2`
+- head: `e9ae6d48a7956d91b46bf4abe598a4eda582fd57`
+- proof 1: met — npx vitest run src/runtime/published.test.ts — 7 tests green over a parse-only walk whose
+roots are derived from the import graph (every type src/ui or scripts imports from src/runtime, plus
+every type either declares that spells Localized); the sixteen @ts-expect-error lines are gone.
+Mutation KILLED: src/runtime/session.ts entities: Array<{ id: Answer; title: Localized; ... }> with
+title reverted to string fails "leaves no field on the published surface a bare string" with nobody
+editing the test. Mutation KILLED: narrowing derivedRoots' brought.file.startsWith(RUNTIME) to a path
+nothing matches fails "derives a root set that reaches the surface both drivers draw", so the
+derivation is load-bearing and not decorative. The second half of c1 — which fields are words — is
+derived too as of 79016e2: TEXT_FIELDS is Record<SchemaKind, ...> so a kind added to SCHEMAS does not
+compile, and locale.test.ts walks SCHEMAS for every field whose parser is text. Mutation KILLED:
+event: ['title'] changed to event: [] fails "leaves none unaccounted for", so the empty-list escape
+the brief asked about is closed for any kind whose title is { parser: text, default: defaultTitle },
+which is all eleven of them. The residual — a words-bearing field parsed by something other than the
+text reference — is filed as a low finding; no such field exists today.
+- proof 2: met — npx vitest run src/runtime/modals.test.ts. Mutation KILLED: src/runtime/carriedScreen.ts's
+carried list built with value: String(at) instead of value: entry.id fails "reaches the same object
+from either order, because the value is what was recorded". ModalOption.values is null for free text
+(modals.ts:97) so there is no list to index there, and Answer is applied at RACES, LEAVE, CONFIRMED,
+PLANE, BACK, CarriedVerb.value and PlaneMove.value — where each is built, which is what c1's walk reads.
+- proof 3: met — src/ui/labels.ts holds twenty EngineKeys and no words; wordsOf() is the only door and takes
+no text. A scan of every non-test file under src/ui for multi-word English string literals, JSX text
+runs and placeholder/aria/title/alt attributes returns nothing. Mutation KILLED: TabBar's
+{words(tab.id)} changed to {'Journal'} fails both walk tests in src/ui/render.test.tsx with
+"Journal" is on the screen and no engine value produced it. The walk is genuine: Pager and VStack
+render every subpage of every layer into one strip, so renderToStaticMarkup(<App/>) really does contain
+the Skills, Equipment and Map markup. Filed as a medium finding: the walk runs in one language and
+SHELL_WORDS is derived from wordsOf() itself, so a component spelling one of the twenty English labels
+literally would pass.
+- proof 4: met — npx vitest run src/runtime/command.test.ts. PlayerMessage carries text: Localized and
+ToolMessage text: string, discriminated by words, and the three raw-DSL arms (help, source, authored)
+declare words: 'tool' — which src/runtime/published.test.ts reads rather than restates.
+Mutation KILLED: said() publishing { words: 'tool', text: text as string } fails "moves every player
+message with the language and no authoring message, over the whole table", a sweep of every COMMANDS
+entry twice through two universes that derives its own subjects. Filed as a low finding: the clause
+says every RuntimeError message refused() relays comes from a key, and what was built relays all of
+them as the tool speaking — including engine.action.stale.owner/action, which are keyed and localized
+and then published as words: 'tool'.
+- proof 5: met — A literal scan of scripts/play-cli.ts and scripts/planeView.ts finds no player-facing
+English of their own: what English is left is argv usage (console.error), the "Disabled module:"
+load-diagnostic prefix and formatHelp's command table, all ToolLine, which is the split recorded in
+60a847b. planeView.ts declares PlaneLines = readonly Localized[] so a string[] return would be red.
+Mutation KILLED: replacing formatView's engine.repl.clock line with an invented English sentence
+fails scripts/play-cli.test.ts. But that kill is an enumeration, and the state is all that holds:
+three mutations SURVIVED the whole 3094-test suite — (a) ADDING a new English line to formatView that
+no assertion pins, (b) an "as Localized" cast in scripts/planeView.ts, (c) an engine pattern's English
+("Back to inventory") spelled out verbatim in scripts/planeView.ts. Each is caught for src/ and for
+nothing else, because localized.test.ts's "the brand is closed (c1)" and "leaves no engine sentence
+behind in TypeScript" both walk sourceFiles('src'). Filed high.
+- proof 6: met — npx vitest run src/content/locale.test.ts — "every line the DSL speaks carries an address
+(c6)" walks the built registry for say: results and dialogue lines and asserts each carries a key, that
+the addressable set is exactly the keys the lines carry, and that reordering under one owner moves them.
+Mutation KILLED: dropping the assignment in stampSays (result.key = recordProse(...) becomes a bare
+recordProse(...) call) fails "leaves no spoken line in the registry without one". A recipe's say: is the
+one text field exempted from TEXT_FIELDS, and it is genuinely keyed — registry.ts:362 registers
+recipeActions under recipe for stampSays, so the exemption is not cover.
+- proof 7: met — npx vitest run src/content/locale.test.ts src/runtime/localized.test.ts. actionTextOwner
+(src/content/action.ts:39) is the one place the question is answered and both the loader and
+Localizer.actionLabel read it. Two mutations, both KILLED: replacing the owner choice with
+{ kind, id: ownerId } fails "writes none under the performer, so no translator fills one word once
+per performer" in the content table, and "shows every performer the translated words, and never the
+untranslated label" in the runtime lookup, the latter over a # locale es minted from the shipped
+declarations themselves. The three questions the brief raised, checked by reading:
+(a) overloads — overlayAction (registry.ts:886) skips label, and an entity's overload block carries
+no id field (ACTION_FIELDS declares none), so the assembled action keeps the declaration's id and the
+key does not move;
+(b) a namespace boundary — the hall/casa fixture at locale.test.ts:250 has a Spanish module use: an
+English declaration, and the entry lands at hall.action.pick-lock.pick-lock with language en, with no
+key under casa.entity.puerta for either side to disagree at;
+(c) the double write — recordActionText reaches a used declaration once from the performer's row and
+once from registry.actions, and both writes pass the same action.label, the same generatedLabel (an
+overload cannot set it) and the same language, since language is now looked up on owner.namespace and
+not on the performer. locales.base.set is therefore idempotent here and needs no order.
+- proof 8: met — npm test green (3094), scripts/drift.test.ts green, npm run tasks -- merge-ready green on
+tsc, tests, layer-check, audit-status, doctor and the byte check. Read over this spec's own work as the
+clause directs: SAVE_VERSION moves twice in the range and neither move is this spec's — b510099
+(what-is-stored-or-replayed-is-an-id) takes 9 to 10 and 6f6f838 (action-labels-as-members) takes 10 to
+11, confirmed by git show <sha> -- src/runtime/save.ts. No commit belonging to this spec touches
+SAVE_VERSION. The three moves the clause names are all present in the diff: c6's say:/dialogue keys,
+c9's "+3 attack" becoming "+3 Attack", and the skill and slot ids that became titles. One item not in
+the clause's whole list: 1425ff5 retires engine.text.untranslated, so a player of an untranslated
+language now reads a key where they read (untranslated). English display is unaffected. Filed low.
+- proof 10: unmet — Both enforcements the clause names landed, and both are load-bearing. Mutation KILLED:
+stats: CountedRow[] reverted to Record<Answer, number> fails "publishes no map keyed by an id that has
+not said nothing in it is words". Mutation KILLED: sheet.ts's counted() drawing localizer.identifier(row.id)
+instead of row.title fails "renders nothing a player can read that the engine did not publish, with a
+row on every page" — and that page is genuinely opened now, because everyPageFilled() equips something
+and Pager/VStack render every subpage into the markup. The clause's leading sentence is still false, one
+driver over. The REPL draws ids for which the branch has just published words: scripts/planeView.ts:98
+draws bare(cluster.jewel) where ClusterReport.title sits on the same row and src/ui/plane.ts:107 draws
+that title; scripts/play-cli.ts:202 dumps status.xp by row.id and :203 dumps status.equipment by
+row.slot/row.item — the exact three fields c10 reshaped. It also draws ids for which no words exist at
+all: status.flags, status.inventory and status.grown keys and Modal.name, all through say() and so all
+PlayerLines. scripts/play-cli.test.ts:125 pins them (Flags: {"tutorial-island.guide-house.discovered":true},
+Inventory: {}, XP: {}). What is missing is not another instance but the derivation: the enforcement
+the clause built reads the GUI's rendered markup and nothing reads the REPL's, so the rule that says a
+driver may draw no id has never looked at the second driver.
+- proof 9: met — npx vitest run src/ui/sheet.test.ts. Mutation KILLED: counted() naming a row
+localizer.identifier(row.id) instead of row.title fails "names a row by the title the engine published
+on it". The plane pane and the REPL's plane both read statTitle rather than bare(statId) —
+src/ui/plane.ts and scripts/planeView.ts payload() and clusterHeading(), diffed at 9805250 — and the
+statTitles map c9 first shipped is retired in favour of CountedRow carrying its own title, which is what
+c10 asks for and what leaves no second dictionary to keep in step by hand.

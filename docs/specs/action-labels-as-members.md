@@ -116,3 +116,92 @@ Proof:
 - `gui-rebuild` will still redefine the choice-id contract when it lands. c5 asks only that the shape
   be agreed in one place now, so that redefinition changes one thing rather than two regexes that
   drifted apart in the meantime.
+
+## Audit passes
+
+### Pass 1 — 2026-08-15
+
+- base: `cfa1eb692c996ed4414390fa5cb492741856a0f2`
+- head: `e9ae6d48a7956d91b46bf4abe598a4eda582fd57`
+- proof 1: met — declareMembers (src/content/resolve.ts:103) declares one ACTION_MEMBER key per
+address returned by actionAddresses, for entity, location and item alike; NAMESPACED_KINDS
+carries 'action-slug' (src/content/namespace.ts:11,26).
+src/content/resolve.test.ts "an action's address is a member of the namespace" walks all three
+owner kinds, the uses: form, the negative (no member for an action nobody performs) and the
+snapshot line that puts it beside the owner's flag.
+Mutation: deleting the declare line at resolve.ts:103 is KILLED by resolve.test.ts "hangs an
+inline block under the object that heads it, on all three kinds that own one"; emptying `used`
+in actionAddresses is KILLED by "hangs an action a `uses:` brings under the entity that brings
+it". Manifest:
+C:\Users\yonat\AppData\Local\Temp\audit-action-labels-as-members-pass1-mutations.json
+- proof 2: met — validateTestReferences (src/content/references.ts:88-108) no longer builds the
+entity/location/item owners map and no longer compares action.label; all that is left of use:
+there is the leading kind. Both halves after the verb are resolved in
+referenceSites.ts:236-243, the action half through visit(ACTION_MEMBER, ...).
+src/content/references.test.ts "a use: names an object and a member of it" covers the address
+spelling, a shortened owner, an action of another object, and the kind check; the pre-existing
+case now reports "names an unknown action-slug: training-dummy.eat", i.e. the flag wording.
+Mutation: deleting referenceSites.ts:242 is KILLED by references.test.ts "refuses an action of
+another object, however real that action is elsewhere".
+Boundary found and filed below: the member key carries no owner kind, so an object that loses
+its action while a same-id object of another kind keeps that address still resolves the use: at
+load and dies at runtime. That is the key shape flags already use and a recorded ruling, so it
+is filed rather than graded against this clause.
+- proof 3: met — No removal logic is written for the member: reconcileMembers
+(src/content/registry.ts:1107-1121) recomputes wouldDeclare over the merged sections and
+undeclares what no longer survives — the machinery dangling-reference-on-field-edit already
+built — and actionAddresses reads the merged authored section, so -uses:, +uses: and a removed
+inline block all reconcile there.
+src/content/flags.test.ts "an action a field edit takes away" covers the field edit, order
+independence, a + putting it back, an inline block cut on its own, and the whole object going.
+The prune-time half (an action dropped for a dangling reference) is covered by
+src/content/universe.test.ts over all four sites that strand one.
+Mutation: deleting the undeclare line in reconcileMembers is KILLED twice — by flags.test.ts
+"goes away with the value, so a use: the edit stranded no longer resolves" and by "takes an
+inline block away with the block, not only with the object that headed it".
+- proof 4: met — ActiveAction.actionSlug and Seat.actionSlug (src/runtime/encounter.ts:17,24) carry
+the address; findActiveAction (actions.ts:89), activeActionProblem (save.ts:142) and
+seatOf/seatAction (encounter.ts:94,146) all compare actionAddress(each); a choice id is built by
+useChoiceId from actionAddress (session.ts:245,253,268) and a recorded line by
+canonicalDirective(choiceToDirective(...)), so nothing persisted holds a label.
+src/runtime/save.test.ts "a fight under way survives its action being retitled" is the proof the
+clause asks for: a save armed against `title: Fight` in an es universe is replayed against the
+same action retitled Combat, stays under way, and the inline-block half stops with a message
+carrying no English.
+Mutations, seven aimed at the arming call sites and the two comparison sites: all KILLED —
+actions.ts and save.ts label comparisons, runtime.ts:545 actionSlug: actionAddress(action),
+armCraft, craftFirstUnit, armTravel, useTravel, encounter.ts seatOf. Manifests
+...-pass1-mutations.json and ...-pass1-mutations-travel.json.
+One exception, filed below: reverting travelFirstUnit (runtime.ts:704) to .label SURVIVED at
+whole-suite scope, 0 failed of 3094 — the function has no callers anywhere in the repository.
+It writes no field, so the clause holds; the commit's "five call sites ... fails 43 tests" is an
+aggregate one of the five contributes nothing to.
+- proof 5: met — Read over this spec's own commits (6f6f838, f51b3ff, e0b7483, 827b4f3, 82cf320,
+d201b75, 852173f) and not over the branch range, as the clause directs.
+SAVE_VERSION 9->10 belongs to what-is-stored-or-replayed-is-an-id; 6f6f838 moves it 10->11
+exactly as named (git show 6f6f838:src/runtime/save.ts | grep SAVE_VERSION).
+Seven # save fixtures in content/tutorial-island.dsl change the version stamp and no other byte
+(miki-route-start, miki-route-end, dresser-trinket-end, explored-and-unlocked,
+growing-a-heartwood-blade-start, growing-a-heartwood-blade-end,
+growing-through-the-inventory-screen-end).
+Exactly two authored lines move: use: entity.mirror.look in -> look-in and
+use: entity.dresser.search drawer -> search-drawer. The other seven shipped use: lines were
+already slugs or are the two-sided form. The block labels are untouched — look in: at :527 and
+search drawer: at :582 still read as English. No title: and no content id moves anywhere in
+this spec's diff.
+The one named author-facing move checks out: parse.test.ts now expects
+way (travel -> Travel) and is not named, but reaches no diagnostic — travel is not stochastic so
+runtime.ts:357 cannot quote it, it carries no rate: so stats.ts:164 cannot, and everyActionTable
+excludes recipeActions and travel, so neither compiled label becomes a locale entry. The use:
+load diagnostic also moved wording; that is c2's own deliverable rather than an unnamed change,
+and is filed low so the next pass has it in writing.
+- proof 6: met — usePayload, parseUsePayload, useChoiceId and parseUseChoiceId are the one pair, all
+in src/content/test.ts:117-131, built on the same USE_PAYLOAD the directive grammar parses.
+session.ts reaches for them at :245, :253, :268, :338 and :581; serialize.ts at :287. No second
+template or regex over use: survives outside test.ts (grep -rn "'use:'" src scripts). The
+OBJECT_KINDS tie-break is gone because the two payload shapes are now disjoint: an address holds
+no space and the two-sided form is spelled with one.
+src/runtime/session.test.ts "a use: choice id and a use: directive are one shape" walks every
+use: choice a real session over the shipped content offers, in both directions.
+Mutation: changing usePayload's separator from . to : is KILLED by "offers no action choice the
+directive parser cannot read back".
