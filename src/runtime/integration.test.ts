@@ -188,6 +188,35 @@ describe('combat-expansion, read off the routes it ships', () => {
   });
 });
 
+// The jewels split into a flat half and a percent half because `statRange`
+// folds `(base + added) x (1 + increased)`, so the percent half is worth almost
+// nothing until the flat half is stacked. Derived over whatever the module
+// declares, so a seventh jewel is graded by the same rule that graded the first.
+describe('the archetype jewels are paired added-then-increased', () => {
+  const declared = (registry: Registry, namespace: string) => [...registry.clusterJewels.values()].filter((jewel) => jewel.id.startsWith(`${namespace}.`));
+
+  // What a jewel's allocated positions pay, counted by channel: one entry per
+  // payload, not per position, because a passive may carry several.
+  const channels = (registry: Registry, jewel: { positions: Record<number, string> }): { flat: number; percent: number } => {
+    const payloads = Object.values(jewel.positions).flatMap((passiveId) => registry.passives.get(passiveId)?.tags ?? []);
+    const bonuses = payloads.filter((tag) => tag.kind === 'stat-bonus');
+    return { flat: bonuses.filter((tag) => !tag.percent).length, percent: bonuses.filter((tag) => tag.percent).length };
+  };
+
+  it('ships them in even numbers, half of each kind', () => {
+    const jewels = declared(shipped, 'combat-expansion');
+    expect(jewels.length).toBe(6);
+
+    const led = jewels.map((jewel) => {
+      const worth = channels(shipped, jewel);
+      expect(worth.flat + worth.percent).toBeGreaterThan(0);
+      return worth.percent > worth.flat ? 'increased' : 'added';
+    });
+    expect(led.filter((kind) => kind === 'added').length).toBe(jewels.length / 2);
+    expect(led.filter((kind) => kind === 'increased').length).toBe(jewels.length / 2);
+  });
+});
+
 // c2: nothing in the shipped runtime is named after anything this content
 // composes. Derived from the module itself — every id it declares and every tag
 // its passives carry, less the words the rest of the universe already uses — so

@@ -26,6 +26,7 @@ Proof:
   `combat-events` and `buffs-generalized` ship. No archetype is a runtime concept, no archetype has
   a code path, and none is innate: an effect reaches the player by being allocated on a plane and
   by nothing else.
+  proof: vitest src/content/passive.test.ts src/runtime/itemContribution.test.ts src/runtime/integration.test.ts
 - [c2] The constraint is checkable rather than asserted. No identifier in the shipped source is named
   for any fixture this branch composes, and the command that shows it is the clause's proof. It
   excludes tests deliberately: a test may use one of these words as an arbitrary content id with no
@@ -37,40 +38,50 @@ Proof:
   `+N% attack per rage`. Its ceiling and its rate are what distinguish it from a stack count, and a
   `# test` shows attack rising as rage accumulates and falling as it drains, with no other stat
   moving.
+  proof: vitest src/runtime/integration.test.ts src/runtime/itemContribution.test.ts
 - [c4] **Accelerated vigor** is a chance-gated stacking buff. A wrapper from `droptables` gates the
   grant, each stack pays its own payload through the existing fold, and `+N% <stat> per stack` reads
   the stack count so that stacking improves what a stack is worth. A `# test` shows the two
   contributions are separable: stacks alone, and stacks under the per-counter bonus.
+  proof: vitest src/runtime/integration.test.ts src/runtime/buffs.test.ts
 - [c5] **Thorns** is a persistent effect on `damage-taken` that damages the attacker. It is carried
   by an actor rather than declared on an action, which is what lets a passive enemy have one, and a
   `# test` proves an enemy carrying it damages a player who strikes it.
+  proof: vitest src/runtime/integration.test.ts src/runtime/hooks.test.ts
 - [c6] **Poison** is a timed debuff held by the struck actor, applied when a swing of the player's
   lands. It is `buffs-generalized`'s mechanism with a sign and a duration, not a second one, and a
   `# test` shows a struck enemy losing health after the swing that applied it and stopping when it
   expires.
+  proof: vitest src/runtime/integration.test.ts src/runtime/buffs.test.ts
 - [c7] All four are authored as **actor-carried persistent effects**, because a passive is carried by
   whoever allocated it rather than written onto a swing. `on hit:` and `on hit self:` are the second
   authoring route for the same moment, correct for a weapon or an entity that declares a swinging
   action of its own; `combat-events`' fixture table describes that route, and this branch takes the
   other one because the content it owes is passives. Neither is a lesser form of the other, and no
   fixture needs both.
+  proof: vitest src/content/passive.test.ts src/runtime/itemContribution.test.ts
 - [c8] A persistent effect's results can name **the other party in the moment**. Thorns fires on
   `damage-taken`, whose moment identifies the actor struck, and must damage the one who struck them;
   poison fires when the player deals damage and must land on the target. Both are the same
   requirement, and a fixture proves each direction rather than assuming one implies the other.
+  proof: vitest src/runtime/hooks.test.ts src/runtime/buffs.test.ts src/runtime/integration.test.ts
 - [c9] Archetype membership is a **tag on a passive and nothing more**. No `cluster-effect:`, no
   selector, and no runtime lookup may name an archetype, because a modifier that scaled "berserker
   passives" would be a class system arriving through the back door. Mechanical tags — `poison`,
   `physical`, `life` — are the ones a future tag selector may read; archetype tags exist for authors
   and for grouping, and c2's command is what keeps that honest.
+  proof: vitest src/runtime/integration.test.ts
 - [c10] The three archetypes ship as six cluster jewels, paired added-then-increased, matching the
   trial in `docs/smithing/cluster-jewels-draft.dsl`. Each pair has one jewel whose passives are flat
   and one whose passives are mostly percent, because `statRange` folds
   `(base + added) x (1 + increased)` and the pairing is what makes flat-first a visible build order
   rather than a thing a player has to be told.
+  proof: vitest src/runtime/integration.test.ts
 - [c11] All of it is one content module, `combat-expansion`, loaded through the machinery that
   already exists. Nothing here proves the module store; that belongs to the store's own branch.
+  proof: vitest src/ui/shippedContent.test.ts src/runtime/integration.test.ts
 - [c12] `npm run tasks -- merge-ready` passes before the spec is marked done.
+  proof: command npm run tasks -- merge-ready
 
 ## Decisions
 
