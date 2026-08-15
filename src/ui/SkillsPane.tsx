@@ -58,7 +58,7 @@ export function SkillsPane({ view, first, crossed, words }: { view: PlayView | n
     // rather than against the window — which puts it a page's width off screen.
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="unbarred min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <div className="mx-auto grid max-w-2xl grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-3">
+        <div className="mx-auto grid max-w-2xl grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-3">
           {panels.map((panel) => (
             <button
               key={panel.id}

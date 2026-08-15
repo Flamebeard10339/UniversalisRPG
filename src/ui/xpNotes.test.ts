@@ -2,36 +2,49 @@ import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
 import { skillLevel, xpForLevel } from '../runtime/skills';
-import { arrivalsBetween, emptyQueue, gainsBetween, NOTE_LIFETIME_MS, NOTE_SPACING_MS, poured, queued, risesOf, type Arrival, type Gain, type Note } from './xpNotes';
+import { arrivalsBetween, emptyQueue, foldGains, gainsBetween, heard, NOTE_LIFETIME_MS, NOTE_SPACING_MS, poured, risesOf, type Arrival, type Gain, type NoteQueue } from './xpNotes';
 
 type Row = PlayView['xp'][number];
+type Carried = PlayView['carried'][number];
 
-// A published skill row. What the notes read is the total alone, so the level
+const named = (id: string): string => id[0].toUpperCase() + id.slice(1);
+
+// A published skill row. What the lines read is the total alone, so the level
 // beside it is whatever the curve says and is never looked at here.
 const row = (id: string, value: number): Row => {
   const level = skillLevel(value);
   const foot = xpForLevel(level);
-  return { id, title: asLocalized(id[0].toUpperCase() + id.slice(1)), value, level, earned: value - foot, span: xpForLevel(level + 1) - foot };
+  return { id, title: asLocalized(named(id)), value, level, earned: value - foot, span: xpForLevel(level + 1) - foot };
 };
 
-const gain = (id: string, amount: number): Gain => ({ id, title: asLocalized(id[0].toUpperCase() + id.slice(1)), amount });
+const carried = (id: string, count: number): Carried => ({ id, name: asLocalized(named(id)), count, shown: asLocalized(`${id} x${count}`), grown: false });
 
-const titles = (rises: ReturnType<typeof risesOf>): Array<[number, string[]]> => rises.map((rise) => [rise.amount, rise.titles.map((title) => title as unknown as string)]);
+const gain = (id: string, amount: number): Gain => ({ id, title: asLocalized(named(id)), amount });
 
-const risesIn = (note: Note): ReturnType<typeof risesOf> => (note.kind === 'xp' ? note.rises : []);
+const arrival = (id: string, count: number): Arrival => ({ id, name: asLocalized(named(id)), count });
 
-type Carried = PlayView['carried'][number];
+// One turn of the shell's clock: what happened, taken in and then said.
+const told = (queue: NoteQueue, gains: readonly Gain[], arrivals: readonly Arrival[], now: number): NoteQueue => poured(heard(queue, gains, arrivals, now), now);
 
-const carried = (id: string, count: number): Carried => ({ id, name: asLocalized(id[0].toUpperCase() + id.slice(1)), count, shown: asLocalized(`${id} x${count}`), grown: false });
+const tick = (queue: NoteQueue, now: number): NoteQueue => poured(queue, now);
 
-const arrival = (id: string, count: number): Arrival => ({ id, name: asLocalized(id[0].toUpperCase() + id.slice(1)), count });
+const spell = (title: unknown): string => title as string;
+
+// Every line on the screen, as a player reads it.
+const said = (queue: NoteQueue): string[] =>
+  queue.shown.map((note) =>
+    note.kind === 'item'
+      ? `+${note.count} ${spell(note.name)}`
+      : risesOf(note.gains)
+          .map((rise) => `+${rise.amount} ${rise.titles.map(spell).join(', ')}`)
+          .join(', '),
+  );
+
+const titles = (rises: ReturnType<typeof risesOf>): Array<[number, string[]]> => rises.map((rise) => [rise.amount, rise.titles.map(spell)]);
 
 describe('what was just earned', () => {
   it('is the difference between two readings of the same published totals', () => {
-    const before = [row('attack', 100), row('defence', 40)];
-    const after = [row('attack', 200), row('defence', 40)];
-
-    expect(gainsBetween(before, after)).toEqual([{ id: 'attack', title: asLocalized('Attack'), amount: 100 }]);
+    expect(gainsBetween([row('attack', 100), row('defence', 40)], [row('attack', 200), row('defence', 40)])).toMatchObject([{ id: 'attack', amount: 100 }]);
   });
 
   it('counts a skill the player had never earned in as having come from nothing', () => {
@@ -41,62 +54,6 @@ describe('what was just earned', () => {
   it('is nothing when nothing moved, and nothing for a total that went backwards', () => {
     expect(gainsBetween([row('attack', 100)], [row('attack', 100)])).toEqual([]);
     expect(gainsBetween([row('attack', 100)], [row('attack', 60)])).toEqual([]);
-  });
-});
-
-describe('the line it makes', () => {
-  it('names the skills together when one thing happened to all of them', () => {
-    expect(titles(risesOf([gain('attack', 737), gain('defence', 737), gain('health', 737)]))).toEqual([[737, ['Attack', 'Defence', 'Health']]]);
-  });
-
-  it('keeps two different amounts apart, largest first, and drops neither', () => {
-    expect(titles(risesOf([gain('attack', 50), gain('thieving', 400)]))).toEqual([
-      [400, ['Thieving']],
-      [50, ['Attack']],
-    ]);
-  });
-
-  it('is one skill on its own when only one gained', () => {
-    expect(titles(risesOf([gain('attack', 100)]))).toEqual([[100, ['Attack']]]);
-  });
-});
-
-describe('how often a line may begin', () => {
-  it('begins one the moment there is something to say', () => {
-    const queue = poured(queued(emptyQueue, [gain('attack', 100)]), 0);
-
-    expect(queue.shown).toHaveLength(1);
-    expect(queue.waiting).toHaveLength(0);
-  });
-
-  it('begins no second line inside the spacing', () => {
-    const first = poured(queued(emptyQueue, [gain('attack', 100)]), 0);
-    const held = poured(queued(first, [gain('defence', 5)]), NOTE_SPACING_MS - 1);
-
-    expect(held.shown).toHaveLength(1);
-    expect(held.waiting).toHaveLength(1);
-  });
-
-  it('does not drop what landed inside it: the wait joins the next line', () => {
-    const first = poured(queued(emptyQueue, [gain('attack', 100)]), 0);
-    const waited = poured(queued(first, [gain('defence', 5)]), NOTE_SPACING_MS - 1);
-    const next = poured(queued(waited, [gain('health', 5)]), NOTE_SPACING_MS);
-
-    expect(next.shown).toHaveLength(2);
-    expect(next.waiting).toHaveLength(0);
-    expect(titles(risesIn(next.shown[1]))).toEqual([[5, ['Defence', 'Health']]]);
-  });
-
-  it('begins a second line once the spacing has passed', () => {
-    const first = poured(queued(emptyQueue, [gain('attack', 100)]), 0);
-    const second = poured(queued(first, [gain('defence', 5)]), NOTE_SPACING_MS);
-
-    expect(second.shown).toHaveLength(2);
-    expect(second.shown.map((note) => note.id)).toEqual([1, 2]);
-  });
-
-  it('begins nothing at all while there is nothing to say', () => {
-    expect(poured(emptyQueue, 10_000)).toBe(emptyQueue);
   });
 });
 
@@ -113,56 +70,116 @@ describe('what has just arrived', () => {
     expect(arrivalsBetween([carried('rope', 3)], [carried('rope', 3)])).toEqual([]);
     expect(arrivalsBetween([carried('rope', 3)], [carried('rope', 1)])).toEqual([]);
   });
+});
 
-  it('says each thing on its own line, one after the other, rather than in one breath', () => {
-    const told = queued(emptyQueue, [], [arrival('rope', 1), arrival('blade', 1)]);
-    const first = poured(told, 0);
-    const second = poured(first, NOTE_SPACING_MS);
-
-    expect(first.shown).toHaveLength(1);
-    expect(first.waiting).toHaveLength(1);
-    expect(second.shown.map((note) => (note.kind === 'item' ? (note.name as unknown as string) : 'xp'))).toEqual(['Rope', 'Blade']);
+describe('one number per skill', () => {
+  it('adds two grants to one skill together, whatever the world did to reach them', () => {
+    expect(foldGains([gain('cooking', 7), gain('cooking', 4), gain('cooking', 6)])).toEqual([gain('cooking', 17)]);
   });
 
-  it('says what was earned in one line and still owes a line for each thing', () => {
-    const told = queued(emptyQueue, [gain('attack', 10), gain('defence', 10)], [arrival('rope', 2)]);
-    const first = poured(told, 0);
-
-    expect(first.shown).toHaveLength(1);
-    expect(titles(risesIn(first.shown[0]))).toEqual([[10, ['Attack', 'Defence']]]);
-    expect(first.waiting).toHaveLength(1);
-    expect(poured(first, NOTE_SPACING_MS).shown[1]).toMatchObject({ kind: 'item', count: 2 });
+  it('leaves two skills apart', () => {
+    expect(foldGains([gain('attack', 3), gain('defence', 5)])).toHaveLength(2);
   });
 
-  it('carries how many arrived, so two of a thing is not two lines', () => {
-    const shown = poured(queued(emptyQueue, [], [arrival('rope', 5)]), 0);
+  it('names the skills together when one number is what they are all standing at', () => {
+    expect(titles(risesOf([gain('attack', 737), gain('defence', 737), gain('health', 737)]))).toEqual([[737, ['Attack', 'Defence', 'Health']]]);
+  });
 
-    expect(shown.shown[0]).toMatchObject({ kind: 'item', count: 5 });
-    expect(shown.waiting).toHaveLength(0);
+  it('keeps two different numbers apart, largest first, and drops neither', () => {
+    expect(titles(risesOf([gain('attack', 50), gain('thieving', 400)]))).toEqual([
+      [400, ['Thieving']],
+      [50, ['Attack']],
+    ]);
+  });
+});
+
+describe('a line already saying it', () => {
+  it('counts up rather than being followed by a second line saying the same', () => {
+    let queue = told(emptyQueue, [gain('cooking', 7)], [], 0);
+    queue = told(queue, [gain('cooking', 4)], [], 900);
+    queue = told(queue, [gain('cooking', 6)], [], 1800);
+
+    expect(said(queue)).toEqual(['+17 Cooking']);
+  });
+
+  it('takes what it is told straight away, without waiting on the spacing', () => {
+    const queue = told(told(emptyQueue, [gain('cooking', 7)], [], 0), [gain('cooking', 4)], [], 1);
+
+    expect(said(queue)).toEqual(['+11 Cooking']);
+  });
+
+  it('counts the same thing arriving up too, so a run of them is one line', () => {
+    let queue = told(emptyQueue, [], [arrival('chestnut', 1)], 0);
+    for (const at of [700, 1400, 2100]) queue = told(queue, [], [arrival('chestnut', 1)], at);
+
+    expect(said(queue)).toEqual(['+4 Chestnut']);
+  });
+
+  it('starts again from nothing once the work has stopped for a while', () => {
+    const gone = tick(told(emptyQueue, [], [arrival('chestnut', 1)], 0), NOTE_LIFETIME_MS);
+    const again = told(gone, [], [arrival('chestnut', 1)], NOTE_LIFETIME_MS + 1);
+
+    expect(said(gone)).toEqual([]);
+    expect(said(again)).toEqual(['+1 Chestnut']);
+  });
+
+  it('stays while it is being fed, however long the work lasts', () => {
+    let queue = told(emptyQueue, [], [arrival('chestnut', 1)], 0);
+    for (let at = 1500; at <= 12_000; at += 1500) queue = told(queue, [], [arrival('chestnut', 1)], at);
+
+    expect(said(queue)).toEqual(['+9 Chestnut']);
+  });
+
+  it('is the line about the same skills, so a different set of them is a line of its own', () => {
+    const queue = told(told(emptyQueue, [gain('attack', 5), gain('defence', 5)], [], 0), [gain('cooking', 3)], [], NOTE_SPACING_MS);
+
+    expect(said(queue)).toEqual(['+5 Attack, Defence', '+3 Cooking']);
+  });
+});
+
+describe('how often a line may begin', () => {
+  it('begins one the moment there is something to say', () => {
+    expect(told(emptyQueue, [gain('attack', 100)], [], 0).shown).toHaveLength(1);
+  });
+
+  it('begins no second line inside the spacing, and drops nothing that landed there', () => {
+    const held = told(told(emptyQueue, [], [arrival('rope', 1)], 0), [], [arrival('blade', 1)], NOTE_SPACING_MS - 1);
+
+    expect(held.shown).toHaveLength(1);
+    expect(held.waiting).toHaveLength(1);
+    expect(said(tick(held, NOTE_SPACING_MS))).toEqual(['+1 Rope', '+1 Blade']);
+  });
+
+  it('is a fifth of a second, which is the pace the page was designed around', () => {
+    expect(NOTE_SPACING_MS).toBe(200);
+    expect(NOTE_LIFETIME_MS).toBe(2000);
+  });
+
+  it('begins nothing at all while there is nothing to say', () => {
+    expect(tick(emptyQueue, 10_000)).toBe(emptyQueue);
   });
 });
 
 describe('where a line stands', () => {
   it('gives the first line the first place', () => {
-    expect(poured(queued(emptyQueue, [gain('attack', 1)]), 0).shown[0].slot).toBe(0);
+    expect(told(emptyQueue, [gain('attack', 1)], [], 0).shown[0].slot).toBe(0);
   });
 
   it('gives a line beginning beside another a place of its own', () => {
-    const first = poured(queued(emptyQueue, [], [arrival('rope', 1), arrival('blade', 1)]), 0);
-    const second = poured(first, NOTE_SPACING_MS);
+    const first = told(emptyQueue, [], [arrival('rope', 1), arrival('blade', 1)], 0);
 
-    expect(second.shown.map((note) => note.slot)).toEqual([0, 1]);
+    expect(tick(first, NOTE_SPACING_MS).shown.map((note) => note.slot)).toEqual([0, 1]);
   });
 
   it('leaves every line where it was when one of them goes', () => {
-    let queue = queued(emptyQueue, [], [arrival('a', 1), arrival('b', 1), arrival('c', 1)]);
-    for (const at of [0, NOTE_SPACING_MS, NOTE_SPACING_MS * 2]) queue = poured(queue, at);
+    let queue = heard(emptyQueue, [], [arrival('a', 1), arrival('b', 1), arrival('c', 1)], 0);
+    for (const at of [0, NOTE_SPACING_MS, NOTE_SPACING_MS * 2]) queue = tick(queue, at);
     const places = new Map(queue.shown.map((note) => [note.id, note.slot]));
 
     // The first has been on screen a whole lifetime and has gone; the two under
     // it are exactly where they were, which is what a stack closing its gap
     // would not have done.
-    const after = poured(queue, NOTE_LIFETIME_MS);
+    const after = tick(queue, NOTE_LIFETIME_MS);
 
     expect(queue.shown).toHaveLength(3);
     expect(after.shown.map((note) => note.id)).toEqual([2, 3]);
@@ -170,9 +187,8 @@ describe('where a line stands', () => {
   });
 
   it('gives the place a line has left to the next one that begins', () => {
-    let queue = poured(queued(emptyQueue, [], [arrival('a', 1)]), 0);
-    queue = queued(queue, [], [arrival('b', 1)]);
-    const after = poured(queue, NOTE_LIFETIME_MS);
+    const waiting = heard(told(emptyQueue, [], [arrival('a', 1)], 0), [], [arrival('b', 1)], 1);
+    const after = tick(waiting, NOTE_LIFETIME_MS);
 
     expect(after.shown.map((note) => note.slot)).toEqual([0]);
     expect(after.shown[0].id).toBe(2);
@@ -180,23 +196,16 @@ describe('where a line stands', () => {
 });
 
 describe('how a line leaves', () => {
-  it('has gone once its lifetime is up, without anything asking it to', () => {
-    const shown = poured(queued(emptyQueue, [gain('attack', 100)]), 0);
+  it('has gone once nothing has added to it for a lifetime', () => {
+    const shown = told(emptyQueue, [gain('attack', 100)], [], 0);
 
-    expect(poured(shown, NOTE_LIFETIME_MS - 1).shown).toHaveLength(1);
-    expect(poured(shown, NOTE_LIFETIME_MS).shown).toHaveLength(0);
+    expect(tick(shown, NOTE_LIFETIME_MS - 1).shown).toHaveLength(1);
+    expect(tick(shown, NOTE_LIFETIME_MS).shown).toHaveLength(0);
   });
 
   it('takes the older of two with it and leaves the younger, each on its own clock', () => {
-    const first = poured(queued(emptyQueue, [gain('attack', 100)]), 0);
-    const second = poured(queued(first, [gain('defence', 5)]), NOTE_SPACING_MS);
-    const later = poured(second, NOTE_LIFETIME_MS + 1);
+    const second = told(told(emptyQueue, [], [arrival('rope', 1)], 0), [], [arrival('blade', 1)], NOTE_SPACING_MS);
 
-    expect(later.shown.map((note) => note.id)).toEqual([2]);
-  });
-
-  it('is two seconds, which is the wait the page was designed around', () => {
-    expect(NOTE_LIFETIME_MS).toBe(2000);
-    expect(NOTE_SPACING_MS).toBe(500);
+    expect(tick(second, NOTE_LIFETIME_MS + 1).shown.map((note) => note.id)).toEqual([2]);
   });
 });

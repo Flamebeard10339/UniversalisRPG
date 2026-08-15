@@ -25,10 +25,10 @@ Proof:
   and the time that leaves. The rate is measured against the world's own clock, from what the session
   has watched rather than from a field the engine would have to keep.
   proof: vitest src/ui/skillPanels.test.ts
-- [c4] Every xp gain the view carries produces one line, and the line names the skills rather than
-  restating a total per skill: skills that gained the same amount are named together. No more than
-  one line begins in any 500ms, and a gain arriving inside that window is not dropped but joins the
-  next line.
+- [c4] Every xp gain the view carries reaches a line, and the line names the skills rather than
+  restating a total per skill: one number per skill however many grants reached it, and skills
+  standing at the same number named together. No more than one line *begins* in any 200ms, and
+  anything arriving inside that window is not dropped but joins the next line.
   proof: vitest src/ui/xpNotes.test.ts
 - [c5] A line leaves on its own after two seconds without anything asking it to, and the class it
   travels and fades with is written in `transient.ts` like every other.
@@ -60,6 +60,11 @@ Proof:
   everything `fixed` beneath it, so a page that reached for the window would draw its panel a page's
   width off screen. The rule reads the pages off the shell's own `pane` rather than off a list.
   proof: vitest src/ui/pages.test.ts
+- [c12] A line already saying a thing counts up rather than being followed by a second line saying
+  it again, and takes what it is told the moment it is told — there is nothing to space out about a
+  number going up. It stays while the work feeding it lasts and starts again from nothing once that
+  work has stopped for a lifetime, so a skill worked at for a minute is one line and not a column.
+  proof: vitest src/ui/xpNotes.test.ts
 
 ## Goal
 
@@ -77,7 +82,8 @@ publishes and a curve that is already shipped.
   publishes.
 - **Extends** the one channel every played moment is begun on rather than opening a second: the xp
   line and the banner's mark are classes written in `transient.ts`, which is where the rule says an
-  animation is named.
+  animation is named. The banner's mark moves a window over a gradient that stands still rather than
+  turning one on and off, because a wave that blinks reads as a fault rather than as progress.
 - **Extends** what the view publishes for a skill rather than letting the shell read the curve.
   `src/ui` may not reach into the runtime except through the play surface — the rule
   `surface.test.ts` holds every module under it to — so a page deriving a level would either have

@@ -113,32 +113,22 @@ textarea {
   }
 }
 
-@keyframes drifted {
-  from {
-    opacity: 0;
-    transform: translateY(-0.5rem);
-  }
-  15% {
-    opacity: 1;
-    transform: none;
-  }
+@keyframes lingered {
+  0%,
   70% {
     opacity: 1;
-    transform: translateY(0.5rem);
   }
   to {
     opacity: 0;
-    transform: translateY(0.75rem);
   }
 }
 
 @keyframes stirring {
-  0%,
-  100% {
-    background-image: none;
+  from {
+    background-position: 100% 0;
   }
-  50% {
-    background-image: linear-gradient(100deg, transparent 20%, var(--color-gilt) 50%, transparent 80%);
+  to {
+    background-position: -100% 0;
   }
 }
 
@@ -166,16 +156,24 @@ textarea {
   animation: denied 420ms ease-in-out 2;
 }
 
-/* The whole life of one line, so it leaves without anything asking it to. Kept
-   in step with NOTE_LIFETIME_MS by nothing but a reader: the queue drops the
-   line at two seconds and the animation has to be over by then. */
-.drifted {
-  animation: drifted 2000ms linear;
+/* The whole life of one line, so it leaves without anything asking it to. It
+   holds its last frame: the queue reads the clock on a tick and takes the line
+   away a moment after the fade ends, and a line that snapped back to full
+   before being removed was the flash that read as a glitch. There is no fade
+   in, because a line is re-keyed every time it is told something more and a
+   fade in would flicker on every one. */
+.lingered {
+  animation: lingered 2000ms linear forwards;
 }
 
-/* A slow gold wave over the banner, running until the player goes and looks. */
+/* A gold wave travelling across the banner, running until the player goes and
+   looks. The gradient stands still and the window on to it moves, so the light
+   flows rather than switching on and off. */
 .stirring {
-  animation: stirring 2400ms ease-in-out infinite;
+  background-image: linear-gradient(100deg, transparent 35%, var(--color-gilt) 50%, transparent 65%);
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  animation: stirring 2400ms linear infinite;
 }
 
 /* Long enough to be seen landing and short enough that a cluster of a dozen is
@@ -189,7 +187,7 @@ textarea {
   .risen,
   .darkened,
   .sprouted,
-  .drifted,
+  .lingered,
   .denied,
   .stirring {
     animation: none;

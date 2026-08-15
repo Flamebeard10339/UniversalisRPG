@@ -14,7 +14,7 @@ import { crossings, looked, nothingCrossed, noticed, stirring, type Crossings } 
 import { markOf, type XpMark } from './skillPanels';
 import { SkillsPane } from './SkillsPane';
 import { XpOverlay } from './XpOverlay';
-import { arrivalsBetween, emptyQueue, gainsBetween, poured, queued, type Note } from './xpNotes';
+import { arrivalsBetween, emptyQueue, gainsBetween, heard, poured, type Note } from './xpNotes';
 import { ModalSheet } from './ModalSheet';
 import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
@@ -64,7 +64,7 @@ function useXpNotes(view: PlayView | null, clock: () => number): readonly Note[]
     const gains = gainsBetween(seen.current.rows, rows);
     const arrivals = arrivalsBetween(seen.current.carried, carried);
     seen.current = { rows, carried };
-    if (gains.length + arrivals.length > 0) setQueue((held) => poured(queued(held, gains, arrivals), clock()));
+    if (gains.length + arrivals.length > 0) setQueue((held) => poured(heard(held, gains, arrivals, clock()), clock()));
   }, [rows, carried]);
 
   // A line waiting on the spacing has to reach the screen without anything else

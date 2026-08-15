@@ -11,7 +11,7 @@ export const SETTLE_MS = 220;
 //
 // A note is the kind the channel draws itself; the rest are drawn by the node
 // they play over.
-export type MomentKind = 'note' | 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'drift' | 'deny';
+export type MomentKind = 'note' | 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'linger' | 'deny';
 
 // What the caller puts on its node for the moment to be drawn, which is the
 // only place any of these strings is written. A kind is a verb and a class is
@@ -27,7 +27,7 @@ const DRAWN_AS: Record<MomentKind, string> = {
   darken: 'darkened',
   settle: `transform ${SETTLE_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1)`,
   sprout: 'sprouted',
-  drift: 'drifted',
+  linger: 'lingered',
   deny: 'denied',
 };
 
