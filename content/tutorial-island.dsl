@@ -210,11 +210,9 @@ life, +15 max-health
 life, +20 max-health
 
 # passive tempered-frame
-examine: Not more armour. Better armour.
 life, +12% max-health
 
 # passive mending
-examine: The wound closes while you are still deciding whether it hurt.
 life, recovery, +2 regeneration
 
 # passive warded

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import { formatModuleDiagnostic, loadModule, loadUniverse, loadUniverseWithDiagnostics } from './registry';
-import { declaredGlobalIds, roundTripModule } from './roundTrip';
+import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from './roundTrip';
 import { serializeRegistryModule } from './serialize';
-import { ModuleSource, parseModuleSource } from './universe';
+import { ModuleSource, parseModuleSource, parseUniverse } from './universe';
 
 const FULL_MODULE = `
 # info base
@@ -161,9 +162,23 @@ describe('serializeRegistryModule', () => {
     expectSemanticRoundTrip({ name: 'base', text: FULL_MODULE });
   });
 
-  it('preserves the loaded semantics of shipped content', () => {
-    const file = path.join(import.meta.dirname, '../../content/tutorial-island.dsl');
-    expectSemanticRoundTrip({ name: 'tutorial-island', text: readFileSync(file, 'utf8') });
+  // The directory is the manifest, the way the browser's glob and the shipped
+  // replay both read it: a module added to content/ is round-tripped on the
+  // commit that authors it. Reloaded as one universe rather than one at a time,
+  // because a module naming another's ids does not load alone.
+  it('preserves the loaded semantics of every shipped module, as one universe', () => {
+    const dir = path.join(import.meta.dirname, '../../content');
+    const sources = readdirSync(dir)
+      .filter((name) => name.endsWith('.dsl'))
+      .map((name) => ({ name: name.replace(/\.dsl$/, ''), text: readFileSync(path.join(dir, name), 'utf8') }))
+      .filter((source) => source.name !== LOCAL_CHANGES_MODULE_ID);
+    expect(sources.length).toBeGreaterThan(1);
+
+    const modules = parseUniverse(sources);
+    const trip = roundTripUniverse(loadUniverse(sources), modules.filter(canSerialize), (printed) => loadUniverseWithDiagnostics(printed));
+
+    expect(trip.diagnostics.map(formatModuleDiagnostic)).toEqual([]);
+    expect(trip.differences).toEqual([]);
   });
 
   it('prints readable canonical sections for the broad fixture', () => {

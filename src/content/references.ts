@@ -4,7 +4,7 @@ import { Registry } from './registry';
 import { Dialogue } from './dialogue';
 import { Directive, Test } from './test';
 import { isActionOwnerKind, NAMESPACED_KINDS } from './namespace';
-import { Visit, visitSection } from './referenceSites';
+import { INFLICT_SITE, Visit, visitSection } from './referenceSites';
 
 // Resolution qualifies a name; it cannot prove the name still points at
 // something. Both `# remove` and a `-field:` edit decide what survives at merge,
@@ -20,9 +20,22 @@ export function validateSectionReferences(kind: string, id: string, value: objec
     if (NAMESPACED_KINDS.includes(referenced) && !registry.namespace.has(referenced, target)) {
       throw new DslError(`${where} names an unknown ${referenced}: ${target}`);
     }
+    if (where.endsWith(INFLICT_SITE)) refuseUntimedPayload(target, where, registry);
     return target;
   };
   visitSection(kind, { ...value }, `# ${kind} ${id}`, visit);
+}
+
+// An `inflict:` grants one instance of a declaration for as long as that
+// declaration says it runs, and a declaration that says nothing runs for no time
+// at all — granted at an instant already past, gone at the next boundary, with
+// nothing said anywhere. Refused here because this is the one moment both halves
+// are loaded: the result naming the source, and the source's own clauses.
+function refuseUntimedPayload(itemId: string, where: string, registry: Registry): void {
+  const source = registry.items.get(itemId);
+  if (source && !source.tags.some((tag) => tag.kind === 'duration')) {
+    throw new DslError(`${where} names ${itemId}, which declares no duration, so an instance of it would be over before anything could read it`);
+  }
 }
 
 // What is left for the per-section checks below are the references that point at

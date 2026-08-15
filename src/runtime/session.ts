@@ -11,6 +11,7 @@ import { parseOwnerRef, TRAVEL_PAIR } from './actions';
 import { spreadDiscovery } from './effects';
 import { reachable, type Journey } from './journey';
 import { armedAction, hasPool, playerCadence } from './encounter';
+import { PLAYER } from './state';
 import { declaredId } from '../content/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
@@ -491,15 +492,22 @@ function publishDiscovered(state: GameState, registry: Registry): PlayStatus['di
   }));
 }
 
+// A pool with no capacity for this character is not a pool: nothing can be
+// spent out of it and nothing put into it, so it is withheld rather than drawn
+// at an empty it can never leave. What gives it a ceiling — a passive, a worn
+// item — is what makes it appear, and `hasPool` is the same question the rate
+// snapshot and a swing's target both ask.
 function publishResources(state: GameState, registry: Registry): PlayStatus['resources'] {
   const localizer = localizerOf(registry, state);
-  return [...registry.resources.values()].map((resource) => ({
-    id: resource.id,
-    title: localizer.title('resource', resource.id),
-    current: fromMilliUnits(state.resources[resource.id] ?? 0),
-    max: statValue(resource.max, state, registry),
-    display: resource.display,
-  }));
+  return [...registry.resources.values()]
+    .filter((resource) => hasPool(state, registry, PLAYER, resource.id))
+    .map((resource) => ({
+      id: resource.id,
+      title: localizer.title('resource', resource.id),
+      current: fromMilliUnits(state.resources[resource.id] ?? 0),
+      max: statValue(resource.max, state, registry),
+      display: resource.display,
+    }));
 }
 
 // A travel action is compiled per pair of places rather than declared under

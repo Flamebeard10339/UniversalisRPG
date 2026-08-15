@@ -3,7 +3,7 @@ import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
 import { actorEntity, participants, sideOf } from './encounter';
 import { Registry } from '../content/registry';
-import { CounterLevel, itemContribution, scaledAmount, StatContribution } from './itemContribution';
+import { carriedPassives, CounterLevel, itemContribution, scaledAmount, StatContribution } from './itemContribution';
 import { Item } from '../content/item';
 import { itemInstance, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
@@ -70,32 +70,53 @@ function ownStores(state: GameState, actorId: string): { buffs: readonly BuffIns
 }
 
 // What a character carries a modifier on, and the order a fold reads them in:
-// its own sheet, then what is buffing it, then each equipped item it still
-// carries. A stat bonus and a hook are read off this one walk, so a source
-// appears on it once and joins as a carrier of both at once. A skill's
+// its own sheet and the passives it was authored with, then what is buffing it,
+// then each equipped item it still carries and the passives that item's spent
+// points stand on. A stat bonus and a hook are read off this one walk, so a
+// source appears on it once and joins as a carrier of both at once. A skill's
 // `per-level:` is not here because it is a declaration on `# skill` rather
 // than a thing carried, and the performing action is not here because an
 // action is a verb and no character carries it.
 export interface ModifierCarrier {
-  // Absent where the source holds no hook block, which today is a buff: what it
-  // grants is an amount the engine wrote and not an authored section.
+  // Absent where the source declares no hook block, which a buff never does:
+  // what it grants is an amount the engine wrote and not an authored section.
   hooks?: HookCarrier;
-  buff?: BuffInstance;
+  // What this source pays out by itself. Absent on a worn item and on the
+  // passives its plane holds, because `itemContribution` assembles both into
+  // one worth and folding them here as well would pay them twice.
+  tags?: readonly TagClause[];
   // The worn item and the id its slot holds, which is what `itemContribution`
   // assembles a worth off — the copy, never the template.
   item?: Item;
   wornId?: string;
 }
 
+// A declaration this character carries, whether it pays out here or has already
+// been counted into an item's worth.
+function passiveCarrier(registry: Registry, passiveId: string, paysOut: boolean): ModifierCarrier | undefined {
+  const passive = registry.passives.get(passiveId);
+  if (!passive) return undefined;
+  return paysOut ? { hooks: passive, tags: passive.tags } : { hooks: passive };
+}
+
 export function modifierCarriers(state: GameState, registry: Registry, actorId: string): ModifierCarrier[] {
   const carriers: ModifierCarrier[] = [];
   const entity = actorEntity(registry, actorId);
   if (entity) carriers.push({ hooks: entity });
+  for (const passiveId of entity?.passives ?? []) {
+    const carrier = passiveCarrier(registry, passiveId, true);
+    if (carrier) carriers.push(carrier);
+  }
   const own = ownStores(state, actorId);
-  for (const buff of own.buffs) carriers.push({ buff });
+  for (const buff of own.buffs) carriers.push({ tags: buff.tags });
   for (const wornId of own.equipped) {
     const item = registry.items.get(itemTemplate(state, wornId));
-    if (item) carriers.push({ hooks: item, item, wornId });
+    if (!item) continue;
+    carriers.push({ hooks: item, item, wornId });
+    for (const passiveId of carriedPassives(registry, item, itemInstance(state, wornId))) {
+      const carrier = passiveCarrier(registry, passiveId, false);
+      if (carrier) carriers.push(carrier);
+    }
   }
   return carriers;
 }
@@ -130,7 +151,7 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
   // the strength of being worn. Asking whether it is also carried would fold
   // nothing at all, because being worn is exactly what says it is not.
   for (const carrier of modifierCarriers(state, registry, actorId)) {
-    if (carrier.buff) foldStatBonuses(carrier.buff.tags, statId, fold, counter);
+    if (carrier.tags) foldStatBonuses(carrier.tags, statId, fold, counter);
     if (carrier.item) foldContribution(itemContribution(registry, carrier.item, itemInstance(state, carrier.wornId!), counter), statId, fold);
   }
   return scaleRange(fold.added, 1 + fold.increased);

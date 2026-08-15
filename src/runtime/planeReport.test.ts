@@ -28,6 +28,25 @@ base: 4
 # passive keen
 +4 attack
 
+// The two counter sources, so what the report says about each is read off a
+// real declaration rather than a hand-built one.
+# passive raging
++5% attack per fury
+
+# passive quickening
++3% attack per stack of tonic
+
+# stat max-fury
+base: 10
+
+# resource fury
+max: max-fury
+start: 0
+
+# item tonic
+title: Tonic
++1 attack, 30s
+
 # cluster-jewel core
 shape: spindle
 open-connections: e, ne
@@ -42,10 +61,20 @@ shape: ring
 open-connections: e
 passives: 1 hale, 2 keen
 
+# cluster-jewel counters
+shape: spindle
+open-connections: e
+passives: 1 raging, 2 quickening
+
 # item blade
 slot: mainhand
 max-level: 20
 origin-cluster: core
+
+# item counting-blade
+slot: mainhand
+max-level: 20
+origin-cluster: counters
 
 # item hub-blade
 slot: mainhand
@@ -187,6 +216,24 @@ describe('planeReport', () => {
       standing: 'allocated',
       payloads: [{ statId: 'attack', statTitle: 'Attack', effective: { percent: false, amount: { min: 6, max: 6 } }, scale: 1.5 }],
     });
+  });
+
+  // A plane belongs to an item and a counter is a fact about whoever carries it,
+  // so what is stated is what one point of the counter pays — and it says which
+  // counter, in the words that name it, rather than printing a bare magnitude
+  // that is only true at zero.
+  it('names the counter a payload is paid per, whichever of the two sources it is', () => {
+    const plane = report(fed('counting-blade', 3));
+    expect(positionAt(plane, '0,0', 1)).toMatchObject({
+      payloads: [{ statId: 'attack', statTitle: 'Attack', effective: { percent: true, amount: 5 }, scale: 1, perTitle: 'Fury' }],
+    });
+    expect(positionAt(plane, '0,0', 2)).toMatchObject({
+      payloads: [{ statId: 'attack', statTitle: 'Attack', effective: { percent: true, amount: 3 }, scale: 1, perTitle: 'Tonic' }],
+    });
+  });
+
+  it('says nothing of a counter where the payload named none', () => {
+    expect(positionAt(report(fed('blade', 3)), '0,0', 1).payloads[0]).not.toHaveProperty('perTitle');
   });
 
   it('orders clusters outward from the origin rather than by when they were slotted', () => {

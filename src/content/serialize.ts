@@ -105,6 +105,12 @@ function result(value: ActionResult): string {
       const party = value.party === undefined ? '' : ` ${value.delta.max < 0 ? 'from' : 'to'} ${value.party}`;
       return `${value.delta.max < 0 ? 'drain' : 'restore'}: ${range(magnitude)} ${value.resource}${party}`;
     }
+    case 'inflict': {
+      // The preposition is the one this verb takes rather than a stored field,
+      // exactly as a pool's is re-derived from its sign.
+      const party = value.party === undefined ? '' : ` on ${value.party}`;
+      return `inflict: ${value.buff}${party}`;
+    }
     case 'roll':
       return `roll: ${value.table}`;
     case 'stop':
@@ -369,6 +375,7 @@ function passiveSection(registry: Registry, moduleId: string, passive: Passive):
   const lines = [`# passive ${moduleLocalId(moduleId, passive.id)}`];
   titled(lines, registry, moduleId, 'passive', passive);
   if (passive.tags.length > 0) lines.push(passive.tags.map(tag).join(', '));
+  hookLines(lines, passive);
   return lines.join('\n');
 }
 
@@ -413,6 +420,7 @@ function entitySection(registry: Registry, moduleId: string, entity: Entity): st
   const stats = Object.entries(entity.stats).map(([statId, value]) => `${statId} ${range(value)}`);
   if (stats.length > 0) lines.push(`stats: ${stats.join(', ')}`);
   if (entity.skills.length > 0) lines.push(`skills: ${entity.skills.join(', ')}`);
+  if (entity.passives.length > 0) lines.push(`passives: ${entity.passives.join(', ')}`);
   if (entity.equipmentSlots.length > 0) lines.push(`equipment-slots: ${entity.equipmentSlots.join(', ')}`);
   if (entity.uses.length > 0) lines.push(`uses: ${entity.uses.join(', ')}`);
   if (entity.faction.length > 0) lines.push(`faction: ${entity.faction.join(', ')}`);

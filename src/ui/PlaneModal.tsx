@@ -37,8 +37,10 @@ function magnitude(bonus: Payload['effective']): string {
 }
 
 // What one line of the panel says a node pays: the effective number, the stat
-// it is of, and the factor that made it where there was one, so a player never
-// multiplies to know what a position is worth.
+// it is of, the factor that made it where there was one, and the counter it is
+// paid per where the payload named one — so a player never multiplies to know
+// what a position is worth, and a number that is only true at zero never stands
+// on its own.
 function Paid({ payloads }: { payloads: readonly Payload[] }): JSX.Element | null {
   if (payloads.length === 0) return null;
   return (
@@ -48,6 +50,7 @@ function Paid({ payloads }: { payloads: readonly Payload[] }): JSX.Element | nul
           <span className="tabular-nums text-accent">{magnitude(payload.effective)}</span>
           <span>{payload.statTitle}</span>
           {payload.scale === 1 ? null : <span className="tabular-nums text-text-subtle">×{tidy(payload.scale)}</span>}
+          {payload.perTitle == null ? null : <span className="text-text-subtle">per {payload.perTitle}</span>}
         </li>
       ))}
     </ul>

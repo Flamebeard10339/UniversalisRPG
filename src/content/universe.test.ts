@@ -188,6 +188,43 @@ describe('loadUniverseWithDiagnostics', () => {
     expect(result.registry.locations.get('base.camp')!.adjacent).toEqual([]);
   });
 
+  // A passive is carried rather than performed, so it is rebuilt the way an item
+  // is: what a jewel placed it for outlives a payload whose stat went with the
+  // module that declared it.
+  it('prunes what a passive carries, who carries it, and the position that placed it', () => {
+    const addon: ModuleSource = { ...module('addon', '# info addon', '# stat might', '# item gem', '# passive gilded'), enabled: false };
+    const base = module(
+      'base',
+      '# info base',
+      'dependencies: ? addon',
+      '# stat guile',
+      '# passive spined',
+      '+2 addon.might, +1 guile',
+      'on hit: give: addon.gem',
+      'when hit: give: 1 charm',
+      '# item charm',
+      '# cluster-jewel band',
+      'shape: spindle',
+      'open-connections: e',
+      'passives: 1 spined, 2 addon.gilded',
+      '# entity urchin',
+      'passives: spined, addon.gilded',
+    );
+
+    const { registry, loadedModules, diagnostics } = loadUniverseWithDiagnostics([base, addon]);
+
+    expect({ loadedModules, diagnostics }).toEqual({ loadedModules: ['base'], diagnostics: [] });
+    expect(registry.entities.get('base.urchin')!.passives).toEqual(['base.spined']);
+    expect(registry.clusterJewels.get('base.band')!.positions).toEqual({ 1: 'base.spined' });
+
+    const spined = registry.passives.get('base.spined')!;
+    expect(spined.tags.map((tag) => (tag.kind === 'stat-bonus' ? tag.statId : tag.kind))).toEqual(['base.guile']);
+    expect(spined.onHit).toEqual([]);
+    // The block that named nothing absent is untouched: a hook is pruned whole
+    // and its neighbour is a different hook.
+    expect(spined.whenHit).toEqual([{ kind: 'give', item: 'base.charm', amount: { min: 1, max: 1 } }]);
+  });
+
   it('undeclares what it prunes, so the namespace and the registry survive as one universe', () => {
     const addon: ModuleSource = { ...module('addon', '# info addon', '# item gem'), enabled: false };
     const base = module(

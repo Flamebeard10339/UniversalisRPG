@@ -6,7 +6,7 @@ import { isPoint, Range, sampleCount, sampleRange } from '../grammar/range';
 import { Registry } from '../content/registry';
 import { Resource } from '../content/resource';
 import { evaluateCondition } from './conditions';
-import { actorEntity } from './encounter';
+import { actorEntity, hasPool } from './encounter';
 import { stockItem } from './itemInstance';
 import { openModalNamed } from './modals';
 import { localizerOf } from './localized';
@@ -15,6 +15,7 @@ import { skillLevel } from './skills';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
 import { hitChance, statValue } from './stats';
 import { divideRateRemainder, toMilliUnits } from './units';
+import { applyDeclared } from './buffs';
 
 export interface Segment {
   state: GameState;
@@ -260,6 +261,15 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       addDelta(segment.deltas, subjectOf(segment, result.party, actor), result.resource, milliAmount);
       return milliAmount;
     }
+    case 'inflict': {
+      const source = registry.items.get(result.buff);
+      if (!source) throw new RuntimeError(`unknown buff source: ${result.buff}`);
+      // Once per repetition rather than once scaled: whether a second
+      // application stacks or replaces is the source's rule, and granting it
+      // `count` times is what asks that rule `count` times.
+      for (let i = 0; i < count; i++) applyDeclared(state, subjectOf(segment, result.party, actor), source, state.time);
+      return count;
+    }
     case 'stop':
       segment.stopped = true;
       return 0;
@@ -322,6 +332,11 @@ export function captureResourceRates(state: GameState, registry: Registry): Reso
   }
   for (const actorId of actors) {
     for (const resource of registry.resources.values()) {
+      // A pool this character has no ceiling for is not a pool: nothing accrues
+      // into it, so no rate is snapshotted and no remainder is carried for it.
+      // Without this a declared rate reaches every character in the universe and
+      // writes a remainder into every save, whether or not anything can hold it.
+      if (!hasPool(state, registry, actorId, resource.id)) continue;
       const ratePerMinute = resource.rate ? toMilliUnits(statValue(resource.rate, state, registry, actorId)) : 0;
       if (ratePerMinute === 0) continue;
       snapshots.push({ resource, actorId, ratePerMinute, max: toMilliUnits(statValue(resource.max, state, registry, actorId)) });

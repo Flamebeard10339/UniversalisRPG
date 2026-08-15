@@ -12,6 +12,10 @@ import { mayBeInstanceId } from './instanceId';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
+// The tail every `inflict:` site's `where` ends with, so the walk that writes it
+// and the check that reads it cannot disagree about how it is spelled.
+export const INFLICT_SITE = 'inflict:';
+
 export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'action' | 'event' | 'faction' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node' | 'passive' | 'cluster-jewel' | typeof ACTION_MEMBER;
 
 // Returns what the id should become. Resolution rewrites it into a namespaced
@@ -110,6 +114,9 @@ function results(list: ActionResult[] | undefined, where: string, visit: Visit):
         break;
       case 'roll':
         put(result, 'table', 'droptable', `${where} roll:`, visit);
+        break;
+      case 'inflict':
+        put(result, 'buff', 'item', `${where} ${INFLICT_SITE}`, visit);
         break;
       case 'contest':
         // A side written as a name is a stat; a literal is left alone, exactly
@@ -312,6 +319,7 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       strings(section, 'uses', 'action', `${where} uses:`, visit);
       strings(section, 'faction', 'faction', `${where} faction:`, visit);
       strings(section, 'skills', 'skill', `${where} skills:`, visit);
+      strings(section, 'passives', 'passive', `${where} passives:`, visit);
       for (const entry of listMembers<Ally>(section.allies)) put(entry, 'entity', 'entity', `${where} allies:`, visit);
       condition(section.hiddenIf as Condition | undefined, `${where} hidden if:`, visit);
       // A block is an action unless its label names an event, which is the one
@@ -338,6 +346,7 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       return;
     case 'passive':
       visitTags(section.tags, where, visit);
+      hooks(section, where, visit);
       return;
     case 'cluster-jewel':
       // Positions are authored as `<position> <passive>` pairs, the same

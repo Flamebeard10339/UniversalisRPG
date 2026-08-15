@@ -2,7 +2,7 @@ import { ClusterEffect, Item } from '../content/item';
 import { Direction, DIRECTIONS, Hex, hexKey, NEIGHBOR_DELTA, opposite, PlaneNode } from '../content/hex';
 import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';
-import { BonusAmount } from '../grammar/tagClause';
+import { BonusAmount, Counter } from '../grammar/tagClause';
 import { carriedName } from './carriedName';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { positionPayloads } from './clusterEffect';
@@ -26,6 +26,10 @@ export interface PayloadReport {
   readonly statTitle: Localized;
   readonly effective: BonusAmount;
   readonly scale: number;
+  // What the magnitude is paid per, where the payload named a counter. A plane
+  // belongs to an item and a counter is a fact about whoever carries it, so the
+  // number here is what one point of it is worth and this is what says so.
+  readonly perTitle?: Localized;
 }
 
 // A stat fold as a screen draws it: the fold itself, named the same way a
@@ -121,12 +125,19 @@ function standingOf(registry: Registry, plane: Plane, node: PlaneNode): Standing
 
 const step = (hex: Hex, direction: Direction): string => hexKey({ q: hex.q + NEIGHBOR_DELTA[direction].q, r: hex.r + NEIGHBOR_DELTA[direction].r });
 
+// A counter is one of two live stores, and which of them decides the kind whose
+// title names it — a resource's own, or the source of the buff being stacked.
+function counterTitle(localizer: Localizer, per: Counter): Localized {
+  return localizer.title(per.kind === 'stack' ? 'item' : 'resource', per.id);
+}
+
 function payloadsOf(registry: Registry, localizer: Localizer, plane: Plane, hex: Hex, position: number): PayloadReport[] {
   return positionPayloads(registry, plane, hex, position).map((payload) => ({
     statId: payload.statId,
     statTitle: localizer.title('stat', payload.statId),
     effective: scaledAmount(payload.bonus, payload.scale),
     scale: payload.scale,
+    ...(payload.per === undefined ? {} : { perTitle: counterTitle(localizer, payload.per) }),
   }));
 }
 
