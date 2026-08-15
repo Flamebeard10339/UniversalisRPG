@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { characterHooks } from './hooks';
 import { loadModule } from '../content/registry';
 import { midpoint } from '../grammar/range';
 import { applyClusterEffect } from './clusterEffect';
@@ -6,8 +7,9 @@ import { ORIGIN } from './clusterPlane';
 import { equip } from './equipment';
 import { allocate, feedItem, Growth, itemInstance, itemTemplate } from './itemInstance';
 import { itemContribution, StatContribution } from './itemContribution';
+import { restorePools } from './effects';
 import { initialState } from './save';
-import { statValue } from './stats';
+import { counterLevels, statValue } from './stats';
 import { GameState } from './state';
 import { inEnglish } from './sayFixture';
 
@@ -31,10 +33,28 @@ base: 4
 # passive keen
 +4 attack
 
+// The two shapes a payload takes that a flat one does not: a magnitude paid per
+// point of a live counter, and a block answering a moment.
+# passive raging
++5% attack per fury
+on hit: restore: 1 fury
+
+# stat max-fury
+base: 10
+
+# resource fury
+max: max-fury
+start: 0
+
 # cluster-jewel twin
 shape: spindle
 open-connections: e
 passives: 1 hale, 2 vigorous, 3 keen
+
+# cluster-jewel goad
+shape: spindle
+open-connections: e
+passives: 1 hale, 2 raging
 
 # item blade
 slot: mainhand
@@ -46,6 +66,10 @@ origin-cluster: twin
 +10 max-health
 +2 attack
 
+# item goading-blade
+slot: mainhand
+origin-cluster: goad
+
 # item broad-blade
 slot: mainhand
 +5-9 max-health
@@ -56,6 +80,9 @@ slot: mainhand
 
 # item lesser-orb
 cluster-effect: +25% max-health
+
+# item edge-orb
+cluster-effect: +25% attack
 
 # item whetstone
 item-experience: 1000
@@ -87,7 +114,9 @@ function grown(itemId: string, positions: number[], extra: Record<string, number
 function contribution(state: GameState, id: string): StatContribution[] {
   const item = registry.items.get(itemTemplate(state, id));
   if (!item) throw new Error(`no item behind ${id}`);
-  return itemContribution(registry, item, itemInstance(state, id));
+  // The counter comes off the state, exactly as `statRange` supplies it: a
+  // fold asked without one reads every `per` payload as nothing at all.
+  return itemContribution(registry, item, itemInstance(state, id), counterLevels(state));
 }
 
 const on = (contributions: StatContribution[], statId: string): StatContribution =>
@@ -130,6 +159,49 @@ describe('itemContribution', () => {
 
   it('answers with an item that has no plane at all, from its tags alone', () => {
     expect(itemContribution(registry, registry.items.get('charm')!, undefined)).toEqual([{ statId: 'attack', added: { min: 2, max: 2 }, increased: 0 }]);
+  });
+});
+
+describe('a plane payload paid per counter', () => {
+  const raging = (fury: number): GameState => {
+    const state = grown('goading-blade', [2]);
+    equip(state, registry, '1');
+    restorePools(state, { fury: fury * 1000 });
+    return state;
+  };
+
+  it('is worth nothing while the counter is empty', () => {
+    expect(on(contribution(raging(0), '1'), 'attack')).toEqual({ statId: 'attack', added: { min: 0, max: 0 }, increased: 0 });
+  });
+
+  it('is worth its declared magnitude once per point held', () => {
+    expect(on(contribution(raging(3), '1'), 'attack').increased).toBe(15);
+    expect(statValue('attack', raging(3), registry)).toBeCloseTo(4 * 1.15, 10);
+  });
+
+  it('multiplies the counter by what its cluster made it worth, not instead of it', () => {
+    const state = raging(3);
+    state.inventory['edge-orb'] = 1;
+    ok(applyClusterEffect(state, registry, '1', 'edge-orb', ORIGIN));
+    // Both factors, and neither instead of the other: 5% per point, three
+    // points held, and a quarter again from the orb.
+    expect(on(contribution(state, '1'), 'attack').increased).toBeCloseTo(5 * 3 * 1.25, 10);
+  });
+});
+
+describe('a passive standing on a spent point', () => {
+  it("answers a moment for whoever wears the copy, and does not once the copy comes off", () => {
+    const state = grown('goading-blade', [2]);
+    expect(characterHooks(state, registry, 'player', 'onHit')).toEqual([]);
+
+    equip(state, registry, '1');
+    expect(characterHooks(state, registry, 'player', 'onHit')).toEqual([[{ kind: 'pool', resource: 'fury', delta: { min: 1, max: 1 } }]]);
+  });
+
+  it('is silent while its point is unspent, though the position stands in the plane', () => {
+    const state = grown('goading-blade', []);
+    equip(state, registry, '1');
+    expect(characterHooks(state, registry, 'player', 'onHit')).toEqual([]);
   });
 });
 

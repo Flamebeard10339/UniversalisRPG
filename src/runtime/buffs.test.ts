@@ -4,7 +4,7 @@ import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { buffsOf, clearBuffs, expireBuffs, grantBuff, nextBuffExpiry, pruneBuffs, stackCount } from './buffs';
 import { Item } from '../content/item';
-import { createGameState, endAction, endJourney, GameState, initResources, PLAYER, resolve, statRange, statValue, useFight } from './runtime';
+import { createGameState, endAction, endJourney, equip, GameState, initResources, PLAYER, resolve, statRange, statValue, useFight } from './runtime';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
@@ -41,6 +41,28 @@ food, +7 attack, 60s
 # item keen-blade
 slot: mainhand
 +10% attack per stack of accelerated-vigor
+
+# item venom
+-4 attack, 20s
+
+# item envenomed-blade
+slot: mainhand
+on hit: apply: venom to them
+
+# item rousing-blade
+slot: mainhand
+on hit: apply: accelerated-vigor to me
+
+# item plain-blade
+slot: mainhand
+on hit: apply: accelerated-vigor
+
+# item flash-tonic
++2 attack, 40s
+
+# item flashing-blade
+slot: mainhand
+on hit: apply: flash-tonic
 
 # item war-cry
 food, +3 attack per stack of accelerated-vigor, 60s
@@ -244,6 +266,61 @@ describe('durations tick on the existing cadence', () => {
     expect(expireBuffs(state, secondsToMs(10) - 1)).toBe(false);
     expect(expireBuffs(state, secondsToMs(10))).toBe(true);
     expect(expireBuffs(state, secondsToMs(10))).toBe(false);
+  });
+});
+
+describe('an applied buff is granted by the declaration it names', () => {
+  const swinging = (registry: Registry, blade: string): GameState => {
+    const state = started(registry);
+    state.inventory[blade] = 1;
+    equip(state, registry, blade);
+    useFight('strike', 'giant-rat', registry, state);
+    resolve(state, registry, secondsToMs(1));
+    return state;
+  };
+
+  it('lands on the other party when the phrase names one', () => {
+    const registry = loaded();
+    const state = swinging(registry, 'envenomed-blade');
+
+    expect(buffsOf(state, 'giant-rat')).toEqual([{ source: 'venom', tags: itemOf(registry, 'venom').tags, expiresAt: secondsToMs(21) }]);
+    expect(buffsOf(state, PLAYER)).toEqual([]);
+    expect(statValue('attack', state, registry, 'giant-rat')).toBe(1);
+  });
+
+  it('lands on the carrier when the phrase names it, and when there is no phrase at all', () => {
+    for (const blade of ['rousing-blade', 'plain-blade']) {
+      const registry = loaded();
+      const state = swinging(registry, blade);
+      expect(stackCount(state, PLAYER, 'accelerated-vigor')).toBe(1);
+      expect(buffsOf(state, 'giant-rat')).toEqual([]);
+    }
+  });
+
+  // The duration is read off the declaration and nowhere else, which is what
+  // stops one payload having two answers about how long it runs. The fight is
+  // put down after the swing that granted it so nothing refreshes the clock.
+  it('expires on the clock its own declaration set, without a second one being named', () => {
+    const registry = loaded();
+    const state = swinging(registry, 'flashing-blade');
+    endAction(state);
+
+    resolve(state, registry, secondsToMs(40));
+    expect(buffsOf(state, PLAYER).length).toBe(1);
+    resolve(state, registry, secondsToMs(42));
+    expect(buffsOf(state, PLAYER)).toEqual([]);
+  });
+
+  it('asks the source whether a second application stacks, rather than deciding for it', () => {
+    const stacking = loaded();
+    const stacked = swinging(stacking, 'rousing-blade');
+    resolve(stacked, stacking, secondsToMs(3));
+    expect(stackCount(stacked, PLAYER, 'accelerated-vigor')).toBe(3);
+
+    const single = loaded();
+    const refreshed = swinging(single, 'flashing-blade');
+    resolve(refreshed, single, secondsToMs(3));
+    expect(stackCount(refreshed, PLAYER, 'flash-tonic')).toBe(1);
   });
 });
 

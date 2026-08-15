@@ -1,5 +1,5 @@
 import { Registry } from '../content/registry';
-import { BonusAmount } from '../grammar/tagClause';
+import { BonusAmount, Counter } from '../grammar/tagClause';
 import { Hex, hexKey, PlaneNode } from '../content/hex';
 import { clusterAt, isAllocated, placementAt, Plane, planeClusters } from './clusterPlane';
 import { Growth, growItem, ItemInstance } from './itemInstance';
@@ -15,6 +15,10 @@ export interface ScaledPayload {
   readonly statId: string;
   readonly bonus: BonusAmount;
   readonly scale: number;
+  // What the declared magnitude is multiplied by per point held, when the
+  // payload named one. It is a live fact about a character and a plane belongs
+  // to an item, so it is carried out rather than spent here.
+  readonly per?: Counter;
 }
 
 // Every effect on one cluster naming one stat joins one pool, so two 25%
@@ -44,9 +48,28 @@ export function positionPayloads(registry: Registry, plane: Plane, hex: Hex, pos
   const payloads: ScaledPayload[] = [];
   for (const tag of registry.passives.get(passiveId)?.tags ?? []) {
     if (tag.kind !== 'stat-bonus') continue;
-    payloads.push({ node, statId: tag.statId, bonus: tag, scale: clusterScale(registry, cluster.effects, tag.statId) });
+    const scale = clusterScale(registry, cluster.effects, tag.statId);
+    payloads.push(tag.per === undefined ? { node, statId: tag.statId, bonus: tag, scale } : { node, statId: tag.statId, bonus: tag, scale, per: tag.per });
   }
   return payloads;
+}
+
+// Every position of a plane whose point has been spent, and the passive
+// standing in it. The one walk over what a plane amounts to, so what its
+// payloads are worth and what its passives answer cannot disagree about which
+// positions are live.
+export function allocatedPositions(registry: Registry, plane: Plane): { hex: Hex; position: number; passiveId: string }[] {
+  const allocated: { hex: Hex; position: number; passiveId: string }[] = [];
+  for (const { hex } of planeClusters(plane)) {
+    const placement = placementAt(registry, plane, hex);
+    if (!placement) continue;
+    for (const key of Object.keys(placement.jewel.positions)) {
+      const position = Number(key);
+      if (!isAllocated(registry, plane, { hex, kind: 'position', position })) continue;
+      allocated.push({ hex, position, passiveId: placement.jewel.positions[position] });
+    }
+  }
+  return allocated;
 }
 
 // The whole of what a grown item's plane contributes, as one pure function of
@@ -54,17 +77,7 @@ export function positionPayloads(registry: Registry, plane: Plane, hex: Hex, pos
 // (c19): a surface reads a position's effective number off the same entries
 // the fold does.
 export function instancePayloads(registry: Registry, instance: ItemInstance): ScaledPayload[] {
-  const payloads: ScaledPayload[] = [];
-  for (const { hex } of planeClusters(instance.plane)) {
-    const placement = placementAt(registry, instance.plane, hex);
-    if (!placement) continue;
-    for (const key of Object.keys(placement.jewel.positions)) {
-      const position = Number(key);
-      if (!isAllocated(registry, instance.plane, { hex, kind: 'position', position })) continue;
-      payloads.push(...positionPayloads(registry, instance.plane, hex, position));
-    }
-  }
-  return payloads;
+  return allocatedPositions(registry, instance.plane).flatMap(({ hex, position }) => positionPayloads(registry, instance.plane, hex, position));
 }
 
 // c15's two refusals, both of them here so the verb below and any later one

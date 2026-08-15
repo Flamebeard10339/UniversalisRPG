@@ -2,8 +2,8 @@ import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { addRanges, point, Range, scaleRange } from '../grammar/range';
 import { BonusAmount, Counter } from '../grammar/tagClause';
-import { instancePayloads } from './clusterEffect';
-import { basePlane } from './clusterPlane';
+import { allocatedPositions, instancePayloads } from './clusterEffect';
+import { basePlane, Plane } from './clusterPlane';
 import { ItemInstance } from './itemInstance';
 import type { Answer } from './localized';
 
@@ -12,6 +12,20 @@ import type { Answer } from './localized';
 // screen and the number a fold takes cannot be two different answers.
 export function scaledAmount(bonus: BonusAmount, times: number): BonusAmount {
   return bonus.percent ? { percent: true, amount: bonus.amount * times } : { percent: false, amount: scaleRange(bonus.amount, times) };
+}
+
+// Which plane a carried copy stands on: the one it grew, or the default its
+// base declares for a copy still in its stack. One answer, so a reader of what
+// a copy carries never has to know which of the two it was handed.
+export function carriedPlane(item: Item, instance?: ItemInstance): Plane | undefined {
+  return instance?.plane ?? basePlane(item);
+}
+
+// The passives a carried copy's spent points stand on, which is what makes an
+// allocated one answer a moment for whoever wears the copy.
+export function carriedPassives(registry: Registry, item: Item, instance?: ItemInstance): string[] {
+  const plane = carriedPlane(item, instance);
+  return plane === undefined ? [] : allocatedPositions(registry, plane).map((each) => each.passiveId);
 }
 
 // How many of a counter a `per` bonus reads. It is a live fact about a
@@ -53,8 +67,15 @@ export function itemContribution(registry: Registry, item: Item, instance?: Item
 
   for (const tag of item.tags) if (tag.kind === 'stat-bonus') fold(tag.statId, tag, tag.per === undefined ? 1 : counter(tag.per));
 
-  const plane = instance?.plane ?? basePlane(item);
-  if (plane) for (const payload of instancePayloads(registry, { experience: instance?.experience ?? 0, plane })) fold(payload.statId, payload.bonus, payload.scale);
+  // A plane payload reads its counter exactly as the item's own tags do, and
+  // multiplies what its cluster made it worth: the two factors are independent,
+  // because one is a fact about the item and the other about the character.
+  const plane = carriedPlane(item, instance);
+  if (plane) {
+    for (const payload of instancePayloads(registry, { experience: instance?.experience ?? 0, plane })) {
+      fold(payload.statId, payload.bonus, payload.scale * (payload.per === undefined ? 1 : counter(payload.per)));
+    }
+  }
 
   return [...byStat.entries()].sort(([a], [b]) => byName(a, b)).map(([statId, channels]) => ({ statId, ...channels }));
 }

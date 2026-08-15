@@ -28,6 +28,10 @@ export type ActionResult =
   // absent party is the character the result is read off, which is what lets one
   // rule serve a hook whichever end of the swing carried it.
   | { kind: 'pool'; resource: string; delta: Range; party?: Party }
+  // Puts one instance of a declared payload on a character for as long as that
+  // declaration says it lasts. One result whichever sign the payload carries: a
+  // debuff is a buff with a minus, and asking which would be a second path.
+  | { kind: 'apply'; buff: string; party?: Party }
   // Abandons the action in flight, exactly as a player-initiated cancel does.
   | { kind: 'stop' }
   // The five wrappers. Each holds an ordinary result list, so layering a drop is
@@ -79,10 +83,10 @@ function parseAdd(cursor: Cursor): ActionResult {
 // English puts the party after the thing moved, and the preposition follows the
 // verb rather than the author: an amount taken moves away *from* a party and an
 // amount given moves *to* one, so the wrong one is a mistake and not a dialect.
-const PREPOSITION = { drain: 'from', restore: 'to' } as const;
+const PREPOSITION = { drain: 'from', restore: 'to', apply: 'to' } as const;
 const MOVES = { from: 'takes its amount away from a party', to: 'gives its amount to a party' } as const;
 
-function parseParty(verb: 'drain' | 'restore', cursor: Cursor): Party | undefined {
+function parseParty(verb: keyof typeof PREPOSITION, cursor: Cursor): Party | undefined {
   const start = cursor.pos;
   // Peeked whole, so nothing is consumed unless a phrase opens: what follows may
   // be nothing, or a typo the caller's end-of-line demand describes better than
@@ -107,6 +111,15 @@ function parsePool(sign: 1 | -1, cursor: Cursor): ActionResult {
   const party = parseParty(sign < 0 ? 'drain' : 'restore', cursor);
   const pool = { kind: 'pool' as const, resource, delta: scaleRange(delta, sign) };
   return party === undefined ? pool : { ...pool, party };
+}
+
+// The declaration names what is applied and how long it lasts, so nothing here
+// takes a duration: two sites saying how long one payload runs is one of them
+// wrong, and the payload is what a reload reads back.
+function parseApply(cursor: Cursor): ActionResult {
+  const buff = id.parse(cursor);
+  const party = parseParty('apply', cursor);
+  return party === undefined ? { kind: 'apply', buff } : { kind: 'apply', buff, party };
 }
 
 function parseGive(value: Produced): ActionResult {
@@ -251,6 +264,7 @@ function parseResult(cursor: Cursor): ActionResult {
   if (cursor.take(/give:[ \t]*/) !== null) return parseGive(produced.parse(cursor));
   if (cursor.take(/take:[ \t]*/) !== null) return { kind: 'take', ...quantified.parse(cursor) };
   if (cursor.take(/roll:[ \t]*/) !== null) return { kind: 'roll', table: id.parse(cursor) };
+  if (cursor.take(/apply:[ \t]*/) !== null) return parseApply(cursor);
   if (cursor.take(/xp:[ \t]*/) !== null) {
     const skill = id.parse(cursor);
     cursor.take(/[ \t]+/);
@@ -284,7 +298,7 @@ function parseResults(cursor: Cursor, line: RawLine | null): ActionResult[] {
   return results;
 }
 
-const LEAF_RESULT = /(?:say|add|give|take|xp|roll|drain|restore|relocate|discover|open modal):|(?:set|unset)[: \t]|stop(?![\w-])/;
+const LEAF_RESULT = /(?:say|add|give|take|xp|roll|apply|drain|restore|relocate|discover|open modal):|(?:set|unset)[: \t]|stop(?![\w-])/;
 
 export function startsResult(cursor: Cursor): boolean {
   // A ranged selector is claimed here so the result reader is what explains it.
@@ -305,12 +319,22 @@ function readResultLine(line: RawLine): ActionResult[] {
   return results;
 }
 
+// The phrase a result names a party in, or undefined where it names none. Read
+// off the result rather than off the verb that parsed it, because both readers
+// below walk a list of results and neither of them ever sees a verb.
+export function partyPhrase(result: ActionResult): string | undefined {
+  if (result.kind === 'pool' && result.party !== undefined) return `${PREPOSITION[result.delta.max < 0 ? 'drain' : 'restore']} ${result.party}`;
+  if (result.kind === 'apply' && result.party !== undefined) return `${PREPOSITION.apply} ${result.party}`;
+  return undefined;
+}
+
 // A party names one of two, so it reads only where the moment identifies the
 // other. Every other result list in the language has a single actor, and a
 // phrase there would be applied to that actor — the opposite of what it says.
-function firstParty(results: readonly ActionResult[]): Extract<ActionResult, { kind: 'pool' }> | undefined {
+function firstParty(results: readonly ActionResult[]): string | undefined {
   for (const result of results) {
-    if (result.kind === 'pool' && result.party !== undefined) return result;
+    const phrase = partyPhrase(result);
+    if (phrase !== undefined) return phrase;
     for (const nested of nestedResults(result)) {
       const found = firstParty(nested);
       if (found) return found;
@@ -323,7 +347,7 @@ function refuseParty(results: ActionResult[], span: Span): ActionResult[] {
   const found = firstParty(results);
   if (found === undefined) return results;
   throw new DslError(
-    `\`${found.delta.max < 0 ? 'from' : 'to'} ${found.party}\` names one of two parties, so it reads only inside \`on hit:\` or \`when hit:\` — a list reached from anywhere else, a \`# droptable\` a hook rolls among them, has one actor and no other to name`,
+    `\`${found}\` names one of two parties, so it reads only inside \`on hit:\` or \`when hit:\` — a list reached from anywhere else, a \`# droptable\` a hook rolls among them, has one actor and no other to name`,
     span,
   );
 }

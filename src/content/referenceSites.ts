@@ -111,6 +111,9 @@ function results(list: ActionResult[] | undefined, where: string, visit: Visit):
       case 'roll':
         put(result, 'table', 'droptable', `${where} roll:`, visit);
         break;
+      case 'apply':
+        put(result, 'buff', 'item', `${where} apply:`, visit);
+        break;
       case 'contest':
         // A side written as a name is a stat; a literal is left alone, exactly
         // as an action's `rate:` is.
@@ -312,6 +315,7 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       strings(section, 'uses', 'action', `${where} uses:`, visit);
       strings(section, 'faction', 'faction', `${where} faction:`, visit);
       strings(section, 'skills', 'skill', `${where} skills:`, visit);
+      strings(section, 'passives', 'passive', `${where} passives:`, visit);
       for (const entry of listMembers<Ally>(section.allies)) put(entry, 'entity', 'entity', `${where} allies:`, visit);
       condition(section.hiddenIf as Condition | undefined, `${where} hidden if:`, visit);
       // A block is an action unless its label names an event, which is the one
@@ -338,6 +342,7 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       return;
     case 'passive':
       visitTags(section.tags, where, visit);
+      hooks(section, where, visit);
       return;
     case 'cluster-jewel':
       // Positions are authored as `<position> <passive>` pairs, the same

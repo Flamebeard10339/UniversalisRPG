@@ -49,6 +49,10 @@ export interface AuthoredEntity extends HookCarrier {
   // Replaces the global `# stat` default per name, for this entity alone.
   stats: Record<string, Range>;
   skills: string[];
+  // The passives this entity carries innately, declared once and referenced,
+  // so an enemy authored with one and a plane position holding it are the same
+  // declaration rather than two copies of a body.
+  passives: string[];
   equipmentSlots: string[];
   flags: string[];
   uses: string[];
@@ -121,6 +125,7 @@ export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'>
       default: () => ({}),
     },
     skills: { parser: list(id), hydrate: (parsed) => [...new Set(parsed as string[])], default: () => [] },
+    passives: { parser: list(id), default: () => [] },
     equipmentSlots: { parser: list(id), keyword: 'equipment-slots', default: () => [] },
     flags: { parser: list(id), default: () => [] },
     uses: { parser: list(id), default: () => [] },

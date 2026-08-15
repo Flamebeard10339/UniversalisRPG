@@ -13,7 +13,8 @@ import { localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
 import { hitChance, statValue } from './stats';
-import { divideRateRemainder, toMilliUnits } from './units';
+import { divideRateRemainder, secondsToMs, toMilliUnits } from './units';
+import { grantBuff } from './buffs';
 
 export interface Segment {
   state: GameState;
@@ -248,6 +249,16 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       const milliAmount = toMilliUnits(drawAmount(state, result.delta)) * count;
       addDelta(segment.deltas, subjectOf(segment, result.party, actor), result.resource, milliAmount);
       return milliAmount;
+    }
+    case 'apply': {
+      const source = registry.items.get(result.buff);
+      if (!source) throw new RuntimeError(`unknown buff source: ${result.buff}`);
+      const seconds = source.tags.find((tag) => tag.kind === 'duration')?.seconds ?? 0;
+      // Once per repetition rather than once scaled: whether a second
+      // application stacks or replaces is the source's rule, and granting it
+      // `count` times is what asks that rule `count` times.
+      for (let i = 0; i < count; i++) grantBuff(state, subjectOf(segment, result.party, actor), source, state.time + secondsToMs(seconds));
+      return count;
     }
     case 'stop':
       segment.stopped = true;

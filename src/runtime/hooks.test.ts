@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armAction, armFightAction, createGameState, GameState, initResources, PLAYER, resolve } from './runtime';
+import { armAction, armFightAction, createGameState, GameState, initResources, PLAYER, resolve, statValue } from './runtime';
 import { characterHooks } from './hooks';
 import { equip, unequip } from './equipment';
 import { IMPLICIT_TARGET_FULL } from './encounter';
@@ -85,6 +85,11 @@ on hit:
 slot: body
 when hit: drain: 5 health from them
 
+// One declaration, carried rather than written into whoever carries it.
+# passive spined
++1 dr
+when hit: drain: 5 health from them
+
 # action swing
 title: swing
 rate: my attack-rate
@@ -114,6 +119,14 @@ on hit: restore: 2 fury
 title: Dummy
 stats: max-health 20, max-fury 0, dodge 1000
 when hit: say: dummy
+
+// Swings nothing and declares no action at all: what it answers with is the
+// passive it carries, which is the whole point of reading a moment off the
+// character rather than off a verb.
+# entity urchin
+title: Urchin
+stats: max-health 20, max-fury 0, dodge 0
+passives: spined
 
 # entity biter
 title: Biter
@@ -154,7 +167,7 @@ pry:
 # location arena
 x: 0, y: 0
 starting
-entities: dummy, biter, boss, minion, wisp, anvil
+entities: dummy, biter, boss, minion, wisp, anvil, urchin
 `;
 
 const loaded = (): Registry => loadInEnglish(MODULE);
@@ -177,6 +190,27 @@ const own = (state: GameState, resourceId: string): number => fromMilliUnits(sta
 const setFoeHealth = (state: GameState, actorId: string, health: number): void => {
   state.activeAction!.actors![actorId].resources['health'] = toMilliUnits(health);
 };
+
+describe('a passive an entity declares is carried by it', () => {
+  it('answers the moment for a character that swings nothing and declares no action', () => {
+    const registry = loaded();
+    const state = arena(registry);
+    expect(characterHooks(state, registry, 'urchin', 'whenHit')).toEqual([[{ kind: 'pool', resource: 'health', delta: { min: -5, max: -5 }, party: 'them' }]]);
+
+    armFightAction('swing', 'urchin', registry, state);
+    resolve(state, registry, secondsToMs(1));
+    expect(own(state, 'health')).toBe(95);
+  });
+
+  it('pays its stat bonus onto the character carrying it, out of the one walk that gathered the hook', () => {
+    const registry = loaded();
+    const state = arena(registry);
+    // Neither sheet declares `dr` at all, so the whole of the difference
+    // between them is the passive one of the two carries.
+    expect(statValue('dr', state, registry, 'urchin')).toBe(1);
+    expect(statValue('dr', state, registry, 'dummy')).toBe(0);
+  });
+});
 
 describe('a hook is gathered the way a stat bonus is (c2)', () => {
   it('reaches its wearer while the item is equipped and stops when it comes off', () => {

@@ -39,6 +39,57 @@ describe('# passive', () => {
   });
 });
 
+// c1: a passive is held by whoever allocated it, so it answers the two moments
+// a character answers, out of the same field pair every other carrier spreads.
+describe('# passive carries the hook blocks a character modifier carries', () => {
+  const SOURCE = `
+# stat attack
+
+# stat max-health
+
+# resource health
+max: max-health
+
+# item venom
+-2 attack, 8s
+
+# passive envenom
+poison
+on hit:
+  1 in 4: apply: venom to them
+
+# passive retribution
+when hit: drain: 3 health from them
+`;
+
+  it('reads both blocks, and the party phrase inside them', () => {
+    const registry = loadModule(SOURCE);
+    expect(registry.passives.get('envenom')!.onHit).toEqual([
+      { kind: 'chance', numerator: 1, denominator: 4, results: [{ kind: 'apply', buff: 'venom', party: 'them' }] },
+    ]);
+    expect(registry.passives.get('retribution')!.whenHit).toEqual([{ kind: 'pool', resource: 'health', delta: { min: -3, max: -3 }, party: 'them' }]);
+  });
+
+  it('is empty rather than absent where a passive writes neither, so a reload returns what an edit emptied', () => {
+    const passive = loadModule('# passive plain').passives.get('plain')!;
+    expect(passive.onHit).toEqual([]);
+    expect(passive.whenHit).toEqual([]);
+  });
+
+  it('refuses a party phrase in a list no moment identifies a second party for', () => {
+    const table = `
+# stat max-health
+
+# resource health
+max: max-health
+
+# droptable spite
+drain: 3 health from them
+`;
+    expect(() => loadModule(table)).toThrow(/names one of two parties/);
+  });
+});
+
 // c2: a passive's payload may not be a range. tagClause produces a Range for
 // every +N stat, and it is the # passive schema's job to refuse it.
 describe('# passive refuses a range payload', () => {
@@ -57,12 +108,12 @@ describe('# passive refuses a range payload', () => {
 
 describe('passiveRangeProblem', () => {
   it('finds nothing wrong with a passive whose payloads are all fixed', () => {
-    const problem = passiveRangeProblem({ id: 'hale', title: 'Hale', tags: [{ kind: 'stat-bonus', statId: 'max-health', percent: false, amount: { min: 15, max: 15 } }] });
+    const problem = passiveRangeProblem({ id: 'hale', title: 'Hale', onHit: [], whenHit: [], tags: [{ kind: 'stat-bonus', statId: 'max-health', percent: false, amount: { min: 15, max: 15 } }] });
     expect(problem).toBeUndefined();
   });
 
   it('names the statId and the range when a payload is not fixed', () => {
-    const problem = passiveRangeProblem({ id: 'risky', title: 'Risky', tags: [{ kind: 'stat-bonus', statId: 'accuracy', percent: false, amount: { min: 5, max: 8 } }] });
+    const problem = passiveRangeProblem({ id: 'risky', title: 'Risky', onHit: [], whenHit: [], tags: [{ kind: 'stat-bonus', statId: 'accuracy', percent: false, amount: { min: 5, max: 8 } }] });
     expect(problem).toMatch(/\+5-8 accuracy is a range/);
   });
 });

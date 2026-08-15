@@ -62,10 +62,13 @@ function magnitude(bonus: Payload['effective']): string {
 }
 
 // The effective number leads and the factor that made it trails, so a player
-// never multiplies to know what a position pays.
+// never multiplies to know what a position pays. A counter trails both: what is
+// printed is then what one point of it pays, which is the only number a plane
+// can state without knowing who is carrying it.
 function payload(report: Payload): string {
   const scale = report.scale === 1 ? '' : ` ×${tidy(report.scale)}`;
-  return `${magnitude(report.effective)} ${report.statTitle}${scale}`;
+  const per = report.perTitle == null ? '' : ` per ${report.perTitle}`;
+  return `${magnitude(report.effective)} ${report.statTitle}${scale}${per}`;
 }
 
 function positionRow(position: Position, words: Words, localizer: Localizer): PlaneRow {

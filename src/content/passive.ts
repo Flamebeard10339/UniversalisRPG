@@ -1,4 +1,5 @@
 import { defaultTitle } from './info';
+import { HOOK_FIELDS, HookCarrier } from '../grammar/hook';
 import { list } from '../grammar/list';
 import { SectionSchema } from '../grammar/section';
 import { Range } from '../grammar/range';
@@ -8,8 +9,9 @@ import { text } from '../grammar/values';
 // A passive shares the tag-clause body `# item` already uses: bare words are
 // tags, `+N stat` and `+N% stat` are payloads. Its id sits in the same global
 // space as every other section, so one declaration is named by any number of
-// cluster jewels (c1).
-export interface Passive {
+// cluster jewels (c1). It carries the two hook blocks for the same reason an
+// item does: whoever holds it answers the moment, and a passive is held.
+export interface Passive extends HookCarrier {
   id: string;
   title: string;
   examine?: string;
@@ -22,6 +24,7 @@ export const passiveSchema: SectionSchema<Passive> = {
     title: { parser: text, default: defaultTitle },
     examine: { parser: text },
     tags: { parser: list(tagClause), default: () => [] },
+    ...HOOK_FIELDS,
   },
   clauses: 'tags',
 };
