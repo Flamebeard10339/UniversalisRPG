@@ -52,6 +52,7 @@ engine.growth.unknown-item: there is no item or item instance called {item}
 engine.growth.not-a-base: {item} is not a base: only an item you can wear has a plane to grow
 engine.growth.no-experience: {item} grants no item experience
 engine.growth.not-a-jewel: {item} is not a cluster jewel
+engine.plane.base: Base
 engine.plane.go: Go to {hex}
 engine.plane.slot: slot: {direction} with {jewel}
 engine.plane.allocate.slot: allocate: slot {direction}

@@ -171,8 +171,8 @@ starting
     expect(lines).toContain('[item-plane] plane');
     expect(lines).toContain('Blade — level 1/2, 0 spent, 1 point left');
     // The hexagon in hand is marked, and the question it belongs to comes under it.
-    expect(lines.indexOf('> 0,0  core · point · origin · mods 0/2')).toBeGreaterThan(lines.indexOf('[item-plane] plane'));
-    expect(lines.indexOf('Blade at 0,0:')).toBeGreaterThan(lines.indexOf('> 0,0  core · point · origin · mods 0/2'));
+    expect(lines.indexOf('> 0,0  Core · point · origin · mods 0/2')).toBeGreaterThan(lines.indexOf('[item-plane] plane'));
+    expect(lines.indexOf('Blade at 0,0:')).toBeGreaterThan(lines.indexOf('> 0,0  Core · point · origin · mods 0/2'));
   });
 
   // The focus says which of the published planes, so a driver that drew the

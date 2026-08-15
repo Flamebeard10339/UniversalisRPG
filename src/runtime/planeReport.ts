@@ -159,7 +159,22 @@ function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, h
   }
 
   const entry = cluster.entry === null ? null : { hex: step(hex, opposite(cluster.entry)), direction: cluster.entry };
-  return { hex: hexKey(hex), jewel: jewel.id, title: localizer.title('cluster-jewel', jewel.id), shape: jewel.shape, entry, effects, modSlots: jewel.modSlots, positions, slots };
+  // A jewel no module declared is the one the engine mints for a base that
+  // named no `origin-cluster:`. It is registered nowhere, so it addresses no
+  // locale key and `title` would publish the key itself as this row's words —
+  // which is the engine speaking, and the engine speaks in keys of its own (c2).
+  const declared = registry.clusterJewels.has(jewel.id);
+  return {
+    hex: hexKey(hex),
+    jewel: jewel.id,
+    title: declared ? localizer.title('cluster-jewel', jewel.id) : localizer.engine('engine.plane.base'),
+    shape: jewel.shape,
+    entry,
+    effects,
+    modSlots: jewel.modSlots,
+    positions,
+    slots,
+  };
 }
 
 // A growth verb spells its target either way an item is carried, and both have

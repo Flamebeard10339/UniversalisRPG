@@ -66,9 +66,9 @@ describe('formatPlane', () => {
   });
 
   it('addresses the origin as an origin and a slotted cluster by the slot it came through', () => {
-    const entered = cluster({ hex: '1,-1', jewel: 'mod.junction', shape: 'point', entry: { hex: '0,0', direction: 'ne' } });
-    expect(shown(plane({ clusters: [cluster(), entered] }))).toContain('  0,0  core · spindle · origin · mods 0/2');
-    expect(shown(plane({ clusters: [entered] }))).toContain('  1,-1  junction · point · via 0,0 ne · mods 0/2');
+    const entered = cluster({ hex: '1,-1', jewel: 'mod.junction', title: asLocalized('Junction'), shape: 'point', entry: { hex: '0,0', direction: 'ne' } });
+    expect(shown(plane({ clusters: [cluster(), entered] }))).toContain('  0,0  Core · spindle · origin · mods 0/2');
+    expect(shown(plane({ clusters: [entered] }))).toContain('  1,-1  Junction · point · via 0,0 ne · mods 0/2');
   });
 
   it('names every effect a cluster carries against its mod-slot count', () => {
@@ -168,10 +168,10 @@ describe('formatPlane', () => {
   });
 
   it('marks the hexagon in hand in the margin, and only that one', () => {
-    const entered = cluster({ hex: '1,-1', jewel: 'mod.junction', shape: 'point', entry: { hex: '0,0', direction: 'ne' } });
+    const entered = cluster({ hex: '1,-1', jewel: 'mod.junction', title: asLocalized('Junction'), shape: 'point', entry: { hex: '0,0', direction: 'ne' } });
     const lines = formatPlane(plane({ clusters: [cluster(), entered] }), false, '1,-1', localizer);
-    expect(lines).toContain('> 1,-1  junction · point · via 0,0 ne · mods 0/2');
-    expect(lines).toContain('  0,0  core · spindle · origin · mods 0/2');
+    expect(lines).toContain('> 1,-1  Junction · point · via 0,0 ne · mods 0/2');
+    expect(lines).toContain('  0,0  Core · spindle · origin · mods 0/2');
   });
 
   it('marks nothing when the hexagon in hand is not one this plane has', () => {

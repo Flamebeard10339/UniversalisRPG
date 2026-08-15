@@ -57,6 +57,7 @@ export const ENGINE_KEYS = [
   'engine.growth.not-a-base',
   'engine.growth.no-experience',
   'engine.growth.not-a-jewel',
+  'engine.plane.base',
   'engine.plane.go',
   'engine.plane.slot',
   'engine.plane.allocate.slot',

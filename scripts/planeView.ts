@@ -19,11 +19,6 @@ const STANDING: Record<Standing, EngineKey> = { allocated: 'engine.shell.spent',
 // language.
 const COLUMNS = [7, 12] as const;
 
-// Ids arrive namespaced and a player types the short name, so the view spells
-// them the way the verbs and the DSL do rather than the way the registry keys
-// them.
-const bare = (id: string): string => id.split('.').pop() ?? id;
-
 interface Row {
   standing: Localized;
   node: Localized;
@@ -95,7 +90,7 @@ function clusterHeading(cluster: ClusterReport, focused: boolean, localizer: Loc
       : localizer.engine('engine.repl.plane.via', { hex: localizer.identifier(cluster.entry.hex), direction: localizer.identifier(cluster.entry.direction) });
   const heading = localizer.engine('engine.repl.plane.cluster', {
     hex: localizer.identifier(cluster.hex),
-    jewel: localizer.identifier(bare(cluster.jewel)),
+    jewel: cluster.title,
     shape: localizer.identifier(cluster.shape),
     from,
     mods: cluster.effects.length,

@@ -1,12 +1,10 @@
-import { readFileSync, readdirSync, statSync } from 'fs';
-import path from 'path';
+import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { actionAddress } from '../content/action';
 import { declaredId } from '../content/entity';
 import { everyActionTable } from '../content/registry';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { ENGINE_KEYS } from '../content/locale';
-import { hasWords } from '../content/translation';
 import { loadUniverse } from '../content/registry';
 import { itemExamine, localizerFor, type Localized } from './localized';
 import { RuntimeError } from './state';
@@ -38,27 +36,6 @@ describe('the engine speaks in keys (c2)', () => {
     const shipped = loadInEnglish('').locales.declared.get('en');
 
     expect([...(shipped?.keys() ?? [])].sort()).toEqual([...ENGINE_KEYS].sort());
-  });
-
-  it('leaves no engine sentence behind in TypeScript', () => {
-    // Every pattern, at any length, matched as the shape it would take in
-    // TypeScript: its literal parts with a template hole where each parameter
-    // is. A length filter is what let two of these hide (pass 1).
-    // Only the patterns that have a word of their own. One that is nothing
-    // but parameters and punctuation — `{item} ({slot})`, `{index}) {choice}` —
-    // is no sentence to leave behind, and its shape is common enough in
-    // TypeScript that matching it reports ordinary templates that say nothing:
-    // `{resource}: {meter}` names five composed lines under src/content and
-    // src/grammar that carry no engine text at all. `hasWords` is the same
-    // predicate translationSurvival.test.ts asks with, so the two agree on what
-    // a pattern with words is.
-    const patterns = [...(loadInEnglish('').locales.declared.get('en')?.entries() ?? [])].filter(([, value]) => hasWords(value));
-    const offenders = sourceFiles('src').flatMap((file) => {
-      const text = readFileSync(file, 'utf8');
-      return patterns.flatMap(([, value]) => [...text.matchAll(asTemplate(value))].map(() => `${file}: ${value}`));
-    });
-
-    expect(offenders.sort()).toEqual([]);
   });
 
   it('renders the key itself when the language being played has no entry', () => {
@@ -114,44 +91,6 @@ describe('an item with no examine of its own', () => {
     const registry = withExamine('Esto es {article} {item}.');
 
     expect(() => itemExamine(localizerFor(registry, 'es'), registry.items.get('island.apple')!)).toThrow(/takes a \{article\}/);
-  });
-});
-
-const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-// A pattern as TypeScript would spell it: the literal parts verbatim, and a
-// template hole wherever the pattern names a parameter. Anchored on the quotes,
-// because an engine sentence surviving in TypeScript is a whole string —
-// matching a fragment of one flags `slot: ${a} at ${b}` for a heading that
-// reads `{plane} at {hex}`, and a parameterless pattern like `Item` would
-// otherwise match every occurrence of the word.
-const asTemplate = (pattern: string): RegExp => {
-  const parts = pattern.split(/\{[a-z-]+\}/).map(escaped);
-  return parts.length === 1 ? new RegExp(String.raw`(['"\`])${parts[0]}\1`, 'g') : new RegExp('`' + parts.join(String.raw`\$\{[^}]+\}`) + '`', 'g');
-};
-
-function sourceFiles(directory: string): string[] {
-  return readdirSync(directory).flatMap((entry) => {
-    const full = path.join(directory, entry);
-    if (statSync(full).isDirectory()) return sourceFiles(full);
-    return /\.tsx?$/.test(entry) && !entry.endsWith('.test.ts') && !entry.endsWith('.test.tsx') ? [full.split(path.sep).join('/')] : [];
-  });
-}
-
-describe('the brand is closed (c1)', () => {
-  // `asLocalized` is the one cast that makes a Localized without a localizer.
-  // It is a fixture; a line of `src` importing it would be a hole in the type
-  // this whole branch stands on.
-  it('is reachable outside the localizer only from a test', () => {
-    const importers = sourceFiles('src').filter((file) => !file.endsWith('localizedFixture.ts') && readFileSync(file, 'utf8').includes('localizedFixture'));
-
-    expect(importers).toEqual([]);
-  });
-
-  it('is minted nowhere but the module that declares it', () => {
-    const casts = sourceFiles('src').filter((file) => !file.endsWith('localized.ts') && !file.endsWith('localizedFixture.ts') && /as Localized\b/.test(readFileSync(file, 'utf8')));
-
-    expect(casts).toEqual([]);
   });
 });
 

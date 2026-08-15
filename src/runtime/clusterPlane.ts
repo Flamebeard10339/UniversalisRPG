@@ -32,10 +32,12 @@ export type SlotState = 'none' | 'open' | 'filled' | 'blocked';
 
 // The cluster an item base carries when it declares no `origin-cluster:` of its
 // own (c9). It is not a declaration and is never registered, so no content can
-// shadow it and `jewel: null` is what a save records for it.
+// shadow it, `jewel: null` is what a save records for it, and the words a
+// report draws it under are `engine.plane.base` rather than this field, which
+// addresses nothing.
 const BASE_CLUSTER: ClusterJewel = {
   id: 'base',
-  title: 'Base',
+  title: 'base',
   shape: 'point',
   openConnections: ['e'],
   positions: {},

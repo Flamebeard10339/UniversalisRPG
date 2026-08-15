@@ -144,13 +144,18 @@ function formatFocus(v: PlayView, localizer: Localizer): PlayerLine[] {
 // Rendered from the published name and options alone, so a modal this driver
 // has never heard of prints the same way the ones it has do. The option being
 // asked for is the top modal's first; a listed value is answerable by number.
-function formatModals(v: PlayView, localizer: Localizer): PlayerLine[] {
-  const lines: PlayerLine[] = [];
+//
+// The banner and the free-text prompt spell the screen's own id and the keys a
+// `submit-modal:` answers it by, which the engine publishes no words for and
+// no language moves: they address the screen rather than describe it, and are
+// this driver's own vocabulary the way `formatHelp`'s table is (c10).
+function formatModals(v: PlayView, localizer: Localizer): ReplLine[] {
+  const lines: ReplLine[] = [];
   for (const modal of v.modals) {
     const options = modal.options.map((option) => option.key).join(', ');
     const modalId = localizer.identifier(modal.name);
     lines.push(
-      say(
+      note(
         options === ''
           ? localizer.engine('engine.repl.modal.answered', { modal: modalId })
           : localizer.engine('engine.repl.modal', { modal: modalId, options: localizer.identifier(options) }),
@@ -163,13 +168,13 @@ function formatModals(v: PlayView, localizer: Localizer): PlayerLine[] {
   if (!asking) return lines;
   lines.push(say(localizer.engine('engine.repl.modal.asking', { option: asking.label })));
   if (asking.values) asking.values.forEach((choice, index) => lines.push(say(localizer.engine('engine.repl.choice', { index: index + 1, choice: choice.shown }), 2)));
-  else lines.push(say(localizer.engine('engine.repl.modal.free', { option: localizer.identifier(asking.key) }), 2));
+  else lines.push(note(localizer.engine('engine.repl.modal.free', { option: localizer.identifier(asking.key) }), 2));
   return lines;
 }
 
-function formatView(v: PlayView, localizer: Localizer, reread = false): PlayerLine[] {
+function formatView(v: PlayView, localizer: Localizer, reread = false): ReplLine[] {
   if (reread) shownLocations.delete(v.location.id);
-  const lines: PlayerLine[] = [];
+  const lines: ReplLine[] = [];
   for (const said of v.said) lines.push(say(said));
   lines.push(say(localizer.engine('engine.repl.place', { location: v.location.title, id: localizer.identifier(v.location.id) })));
   if (!shownLocations.has(v.location.id)) {
@@ -185,15 +190,15 @@ function formatView(v: PlayView, localizer: Localizer, reread = false): PlayerLi
   return lines;
 }
 
-// A dictionary the player is shown whole, under the key that names it. The
+// A dictionary the record is shown whole, under the key that names it. The
 // parameter is the last segment of that key, so the pattern and the value it
 // takes cannot drift apart in a translation.
 type DumpKey = 'engine.repl.state.flags' | 'engine.repl.state.inventory' | 'engine.repl.state.grown' | 'engine.repl.state.xp' | 'engine.repl.state.equipped';
 
-const dumped = (localizer: Localizer, key: DumpKey, held: unknown): PlayerLine =>
-  say(localizer.engine(key, { [key.split('.').pop()!]: localizer.identifier(JSON.stringify(held)) }));
+const dumped = (localizer: Localizer, key: DumpKey, held: unknown): ToolLine =>
+  note(localizer.engine(key, { [key.split('.').pop()!]: localizer.identifier(JSON.stringify(held)) }));
 
-function formatInventory(status: PlayStatus, localizer: Localizer): PlayerLine[] {
+function formatInventory(status: PlayStatus, localizer: Localizer): ToolLine[] {
   const lines = [dumped(localizer, 'engine.repl.state.inventory', status.inventory)];
   // Named on their own line rather than folded into the stack counts: a grown
   // copy is not interchangeable with its stack, and the id here is the handle a
@@ -204,10 +209,16 @@ function formatInventory(status: PlayStatus, localizer: Localizer): PlayerLine[]
   return lines;
 }
 
-function formatState(status: PlayStatus, localizer: Localizer): PlayerLine[] {
+// The record behind the game rather than the game: every line but the pools is
+// a dictionary keyed by the ids the engine stores under, printed for whoever is
+// driving this session and answering to no screen (c10). They are tool lines,
+// and that is the whole of their exemption from the rule that a driver draws no
+// id it has no words for — the pools below them are the same words a player
+// reads anywhere else and stay on the player's channel.
+function formatState(status: PlayStatus, localizer: Localizer): ReplLine[] {
   return [
-    say(localizer.engine('engine.repl.state.location', { location: localizer.identifier(status.location.id) })),
-    say(localizer.engine('engine.repl.state.time', { time: status.time })),
+    note(localizer.engine('engine.repl.state.location', { location: localizer.identifier(status.location.id) })),
+    note(localizer.engine('engine.repl.state.time', { time: status.time })),
     dumped(localizer, 'engine.repl.state.flags', status.flags),
     ...formatInventory(status, localizer),
     ...formatResources(status.resources, localizer),
@@ -494,7 +505,7 @@ export interface Repl {
   // Written to stderr by main, because a disabled module is not part of the
   // game being played.
   diagnostics: string[];
-  opening: readonly PlayerLine[];
+  opening: readonly ReplLine[];
 }
 
 // Everything between having the sources and taking the first line: load the
