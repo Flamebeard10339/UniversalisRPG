@@ -19,12 +19,12 @@ export function Ledger({ entries, onOpen }: { entries: readonly Entry[]; onOpen?
       <dl className="mx-auto flex max-w-2xl flex-col">
         {entries.map((entry) => (
           <div key={entry.id ?? entry.name} className="relative border-b border-border py-2 last:border-b-0 active:scale-[0.99] active:text-accent">
-            {onOpen ? (
+            {onOpen && entry.id !== undefined ? (
               <button
                 data-drive="send"
                 type="button"
                 aria-label={entry.name}
-                onClick={() => onOpen(entry.id ?? entry.name)}
+                onClick={() => onOpen(entry.id!)}
                 className="absolute inset-0 z-10 w-full"
               />
             ) : null}

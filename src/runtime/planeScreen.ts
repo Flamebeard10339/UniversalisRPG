@@ -42,6 +42,13 @@ interface PlaneMove {
   readonly shown: Localized;
   readonly line: string | null;
   readonly focus: string;
+  // The node of the plane this move acts on, where it acts on one. A surface
+  // drawing the plane as a graph joins a tap on a node to the value that moves
+  // it by this, rather than spelling the value's own grammar a second time.
+  readonly on?: Answer;
+  // The copy the move brings, where it brings one: the jewel a slot takes or
+  // the food a copy is fed.
+  readonly subject?: Localized;
 }
 
 // c4: a value and the line it becomes are one directive, and the only
@@ -50,25 +57,24 @@ interface PlaneMove {
 // be, the other two grow a hexagon of one — so the fill is written per verb
 // rather than as one shared prefix, and a frame that one day holds more than
 // one hexagon fills more in rather than needing a grammar to say so.
-function onCopy(frame: PlaneFrame, verb: string, tail: string, shown: Localized): PlaneMove {
-  return { value: `${verb}: ${tail}`, shown, line: `${verb}: ${frame.target} ${tail}`, focus: frame.hex };
+function onCopy(frame: PlaneFrame, verb: string, tail: string, shown: Localized, subject?: Localized): PlaneMove {
+  return { value: `${verb}: ${tail}`, shown, line: `${verb}: ${frame.target} ${tail}`, focus: frame.hex, subject };
 }
 
-function onHexagon(frame: PlaneFrame, verb: string, tail: string, shown: Localized): PlaneMove {
-  return { value: `${verb}: ${tail}`, shown, line: `${verb}: ${frame.target} at ${frame.hex} ${tail}`, focus: frame.hex };
+function onHexagon(frame: PlaneFrame, verb: string, tail: string, shown: Localized, on?: Answer, subject?: Localized): PlaneMove {
+  return { value: `${verb}: ${tail}`, shown, line: `${verb}: ${frame.target} at ${frame.hex} ${tail}`, focus: frame.hex, on, subject };
 }
 
 function goes(hex: string, shown: Localized): PlaneMove {
-  return { value: `go: ${hex}`, shown, line: null, focus: hex };
+  return { value: `go: ${hex}`, shown, line: null, focus: hex, on: hex };
 }
 
-// The hexagons a step away, whichever side of the slot joining them this one
-// is. A cluster that entered another way is still somewhere to walk to.
+// Every hexagon standing on the plane but this one. It was the ones a step away
+// while the plane was read as a list and walked a cluster at a time; a surface
+// that draws the whole plane at once shows the player nodes they would then
+// have had no single move to reach.
 function reachable(report: PlaneReport, here: ClusterReport): string[] {
-  const standing = new Set(report.clusters.map((cluster) => cluster.hex));
-  const beyond = here.slots.flatMap((slot) => slot.beyond ?? []);
-  if (here.entry) beyond.push(here.entry.hex);
-  return [...new Set(beyond)].filter((hex) => standing.has(hex));
+  return report.clusters.map((cluster) => cluster.hex).filter((hex) => hex !== here.hex);
 }
 
 // What a stack the player can spend holds, by the field that says the item is
@@ -92,22 +98,22 @@ function movesOn(frame: PlaneFrame, report: PlaneReport | undefined, state: Game
     if (slot.standing !== 'allocated' || slot.beyond !== null) continue;
     for (const jewel of stacked(state, registry, (item) => item.clusterJewel !== undefined)) {
       const shown = localizer.engine('engine.plane.slot', { direction: localizer.identifier(slot.direction), jewel: jewel.name });
-      moves.push(onHexagon(frame, 'slot', `${slot.direction} with ${jewel.id}`, shown));
+      moves.push(onHexagon(frame, 'slot', `${slot.direction} with ${jewel.id}`, shown, slot.node, jewel.name));
     }
   }
   for (const slot of here.slots) {
     if (slot.standing !== 'available') continue;
-    moves.push(onHexagon(frame, 'allocate', `slot ${slot.direction}`, localizer.engine('engine.plane.allocate.slot', { direction: localizer.identifier(slot.direction) })));
+    moves.push(onHexagon(frame, 'allocate', `slot ${slot.direction}`, localizer.engine('engine.plane.allocate.slot', { direction: localizer.identifier(slot.direction) }), slot.node));
   }
   for (const position of here.positions) {
     if (position.standing !== 'available') continue;
-    moves.push(onHexagon(frame, 'allocate', `position ${position.position}`, localizer.engine('engine.plane.allocate.position', { position: position.position })));
+    moves.push(onHexagon(frame, 'allocate', `position ${position.position}`, localizer.engine('engine.plane.allocate.position', { position: position.position }), position.node));
   }
   // Last, and on every hexagon, because what a copy is fed is the one growth
   // that is the copy's rather than one hexagon of it — and without it a base
   // still in its stack would publish only values it has no point to spend on.
   for (const food of stacked(state, registry, (item) => item.itemExperience !== undefined)) {
-    moves.push(onCopy(frame, 'feed', `with ${food.id}`, localizer.engine('engine.plane.feed', { item: food.name })));
+    moves.push(onCopy(frame, 'feed', `with ${food.id}`, localizer.engine('engine.plane.feed', { item: food.name }), food.name));
   }
   return moves;
 }
@@ -127,7 +133,7 @@ function heading(localizer: Localizer, frame: PlaneFrame, report: PlaneReport | 
 export function planeOptions(frame: PlaneFrame, state: GameState, registry: Registry): ModalOption[] {
   const report = planeReport(registry, state, frame.target);
   const localizer = localizerOf(registry, state);
-  const offered: ModalChoice[] = movesOn(frame, report, state, registry).map((move) => ({ value: move.value, shown: move.shown }));
+  const offered: ModalChoice[] = movesOn(frame, report, state, registry).map((move) => ({ value: move.value, shown: move.shown, on: move.on, subject: move.subject }));
   return [{ key: PLANE, label: heading(localizer, frame, report), values: [...offered, { value: BACK, shown: localizer.engine('engine.plane.back') }] }];
 }
 

@@ -49,14 +49,19 @@ export interface CarriedEntry {
   readonly worn?: { readonly slot: Answer; readonly title: Localized };
 }
 
-// What is worn, slot by slot. `item` is the spelling the state holds — what a
-// plane report and a save name the copy by — which is not the row `carried`
-// lists it as, because c21 mints that one from the slot.
+// One row per slot the world declares, whether or not anything is in it: a slot
+// standing empty is somewhere the player can put something and is a fact about
+// the character, and a page inferring it from what happens to be worn would
+// show a character with nothing on as having no slots.
+//
+// `item` is the spelling the state holds — what a plane report and a save name
+// the copy by — which is not the row `carried` lists it as, because c21 mints
+// that one from the slot. Both it and the name are null for an empty slot.
 export interface WornRow {
   readonly slot: Answer;
   readonly title: Localized;
-  readonly item: Answer;
-  readonly name: Localized;
+  readonly item: Answer | null;
+  readonly name: Localized | null;
 }
 
 interface CarriedVerb {
@@ -139,6 +144,7 @@ export function carriedEntries(state: GameState, registry: Registry): CarriedEnt
     entries.push({ id, name: nameOf(template, localizer, id), count: 1, shown: nameOf(template, localizer, id), grown: true });
   }
   for (const row of wornRows(state, registry)) {
+    if (row.item === null || row.name === null) continue;
     const grown = isGrownCopy(state, row.item);
     entries.push({
       id: grown ? row.item : wornCopy(row.slot),
@@ -154,12 +160,21 @@ export function carriedEntries(state: GameState, registry: Registry): CarriedEnt
 
 export function wornRows(state: GameState, registry: Registry): WornRow[] {
   const localizer = localizerOf(registry, state);
-  return Object.entries(state.equipped).map(([slot, id]) => ({
-    slot,
-    title: localizer.title('slot', slot),
-    item: id,
-    name: nameOf(itemTemplate(state, id), localizer, isGrownCopy(state, id) ? id : null),
-  }));
+  // Every declared slot, and then anything the state is wearing in a slot the
+  // registry no longer declares — a save older than the module that dropped it
+  // still has the copy, and a row nobody drew would be a copy the player could
+  // not reach.
+  const declared = [...registry.slots.keys()];
+  const slots = [...declared, ...Object.keys(state.equipped).filter((slot) => !declared.includes(slot))];
+  return slots.map((slot) => {
+    const id: string | undefined = state.equipped[slot];
+    return {
+      slot,
+      title: localizer.title('slot', slot),
+      item: id ?? null,
+      name: id === undefined ? null : nameOf(itemTemplate(state, id), localizer, isGrownCopy(state, id) ? id : null),
+    };
+  });
 }
 
 function verbsFor(entry: CarriedEntry, state: GameState, registry: Registry): readonly CarriedVerb[] {

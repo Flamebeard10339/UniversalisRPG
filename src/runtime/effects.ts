@@ -11,6 +11,7 @@ import { stockItem } from './itemInstance';
 import { openModalNamed } from './modals';
 import { localizerOf } from './localized';
 import { nextRandom } from './rng';
+import { skillLevel } from './skills';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
 import { hitChance, statValue } from './stats';
 import { divideRateRemainder, toMilliUnits } from './units';
@@ -230,7 +231,17 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       return stockItem(state, result.item, -(result.amount ?? 1) * count);
     case 'xp': {
       const amount = drawCount(state, result.amount) * count;
-      state.xp[result.skill] = (state.xp[result.skill] ?? 0) + amount;
+      const before = state.xp[result.skill] ?? 0;
+      state.xp[result.skill] = before + amount;
+      // Said where the total moves, so every route that grants experience says
+      // it and none of them has to remember to. The level is derived from the
+      // total and stored nowhere, which is why the crossing is only visible
+      // here, between the two totals.
+      const reached = skillLevel(state.xp[result.skill]);
+      if (reached > skillLevel(before)) {
+        const localizer = localizerOf(registry, state);
+        state.log.push(localizer.engine('engine.skill.levelled', { skill: localizer.title('skill', result.skill), level: reached }));
+      }
       return amount;
     }
     case 'relocate':

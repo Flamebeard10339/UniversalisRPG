@@ -17,6 +17,8 @@ const flat = (amount: number, scale = 1, statTitle = STAT.statTitle): PayloadRep
 
 const position = (over: Partial<PositionReport> = {}): PositionReport => ({
   position: 1,
+  node: '0,0/1',
+  faces: [],
   passive: 'hale',
   title: asLocalized('Hale'),
   standing: 'unreached',
@@ -25,7 +27,7 @@ const position = (over: Partial<PositionReport> = {}): PositionReport => ({
   ...over,
 });
 
-const slot = (over: Partial<SlotReport> = {}): SlotReport => ({ direction: 'e', standing: 'unreached', beyond: null, ...over });
+const slot = (over: Partial<SlotReport> = {}): SlotReport => ({ direction: 'e', node: '0,0/e', standing: 'unreached', toward: '1,0', beyond: null, ...over });
 
 const cluster = (over: Partial<ClusterReport> = {}): ClusterReport => ({
   hex: '0,0',
@@ -48,6 +50,7 @@ const plane = (over: Partial<PlaneReport> = {}): PlaneReport => ({
   level: 3,
   maxLevel: 20,
   spent: 1,
+  links: [],
   remaining: 2,
   clusters: [],
   contributions: [],

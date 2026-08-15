@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { MODAL_NAMES } from '../runtime/modals';
 import { SURFACE_BUILDERS } from './agent/surfaces';
 import { createSurfaceRegistry, installTestHarness } from './agent/testHarness';
-import { TOUCH_FLOOR } from './discovery';
+import { TOUCH_FLOOR } from './viewport';
 import { LABELS } from './labels';
 import { createTransientChannel } from './transient';
 

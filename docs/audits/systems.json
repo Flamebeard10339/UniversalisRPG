@@ -646,6 +646,7 @@
         "src/main.tsx",
         "src/ui/App.tsx",
         "src/ui/Console.tsx",
+        "src/ui/DragSheet.tsx",
         "src/ui/FloatingText.tsx",
         "src/ui/Home.tsx",
         "src/ui/Ledger.tsx",
@@ -655,11 +656,13 @@
         "src/ui/Meter.tsx",
         "src/ui/ModalSheet.tsx",
         "src/ui/Pager.tsx",
-        "src/ui/PlanePane.tsx",
+        "src/ui/PlaneModal.tsx",
+        "src/ui/SkillsPane.tsx",
         "src/ui/Splitter.tsx",
         "src/ui/StatusBanner.tsx",
         "src/ui/TabBar.tsx",
         "src/ui/VStack.tsx",
+        "src/ui/XpOverlay.tsx",
         "src/ui/agent/surfaces.test.ts",
         "src/ui/agent/surfaces.ts",
         "src/ui/agent/testHarness.test.ts",
@@ -673,6 +676,7 @@
         "src/ui/consoleLine.ts",
         "src/ui/discovery.test.ts",
         "src/ui/discovery.ts",
+        "src/ui/dragSheet.test.ts",
         "src/ui/driver.test.ts",
         "src/ui/driver.ts",
         "src/ui/format.test.ts",
@@ -680,24 +684,37 @@
         "src/ui/gesture.test.ts",
         "src/ui/gesture.ts",
         "src/ui/labels.ts",
+        "src/ui/layers.test.ts",
+        "src/ui/levelling.test.ts",
+        "src/ui/levelling.ts",
         "src/ui/moments.test.ts",
         "src/ui/nav.test.ts",
         "src/ui/nav.ts",
+        "src/ui/pageZoom.test.ts",
+        "src/ui/pages.test.ts",
         "src/ui/phone.test.tsx",
-        "src/ui/plane.test.ts",
-        "src/ui/plane.ts",
+        "src/ui/planeGraph.test.ts",
+        "src/ui/planeGraph.ts",
+        "src/ui/planeModal.test.tsx",
+        "src/ui/planePanel.ts",
         "src/ui/render.test.tsx",
         "src/ui/sheet.test.ts",
         "src/ui/sheet.ts",
         "src/ui/shippedContent.test.ts",
         "src/ui/shippedContent.ts",
+        "src/ui/skillPanels.test.ts",
+        "src/ui/skillPanels.ts",
         "src/ui/surface.test.ts",
         "src/ui/testSurface.ts",
         "src/ui/transcript.test.ts",
         "src/ui/transcript.ts",
         "src/ui/transient.test.ts",
         "src/ui/transient.ts",
+        "src/ui/viewport.test.ts",
+        "src/ui/viewport.ts",
         "src/ui/words.ts",
+        "src/ui/xpNotes.test.ts",
+        "src/ui/xpNotes.ts",
         "src/vite-env.d.ts",
         "tailwind.config.js"
       ],
@@ -810,10 +827,11 @@
         {
           "name": "the plane pane",
           "paths": [
-            "src/ui/plane.ts",
-            "src/ui/PlanePane.tsx"
+            "src/ui/PlaneModal.tsx",
+            "src/ui/planeGraph.ts",
+            "src/ui/planePanel.ts"
           ],
-          "note": "produced by gui-draws-the-focused-plane: the focused plane read into rows and drawn above the option sheet, off PlayStatus.focus and never off a screen's name (c9/c10)"
+          "note": "produced by gui-draws-the-focused-plane and taken over by the-plane-is-a-graph-the-player-drags: the focused plane, off PlayStatus.focus and never off a screen's name (c9/c10). It was rows under hexagon headings in src/ui/plane.ts and src/ui/PlanePane.tsx and is now the graph the report already publishes, drawn on the map's own sheet. Repointed rather than left beside a second concept: two surfaces drawing one report is two places to change when the report changes"
         },
         {
           "name": "what leaving a screen answers",
@@ -829,6 +847,25 @@
             "src/ui/words.ts"
           ],
           "note": "produced by both-drivers-read-their-own-words-from-the-localizer: the table of engine keys the shell names its own words by, and the one door a component reads them through"
+        },
+        {
+          "name": "a pannable sheet both the map and the plane are drawn on",
+          "paths": [
+            "src/ui/viewport.ts",
+            "src/ui/DragSheet.tsx"
+          ],
+          "note": "produced by the-plane-is-a-graph-the-player-drags: the pan, zoom and clamp arithmetic and the one component holding the gesture, moved out from under the map so the plane rides the same sheet"
+        },
+        {
+          "name": "the skills page and the experience a player sees arrive",
+          "paths": [
+            "src/ui/SkillsPane.tsx",
+            "src/ui/skillPanels.ts",
+            "src/ui/XpOverlay.tsx",
+            "src/ui/xpNotes.ts",
+            "src/ui/levelling.ts"
+          ],
+          "note": "produced by skills-are-a-page-and-xp-is-felt: the level inside its ring, and the lines that count up as experience and things arrive"
         }
       ]
     },
@@ -1169,7 +1206,7 @@
         "scripts/play-cli.test.ts",
         "scripts/play-cli.ts",
         "scripts/printedWords.test.ts",
-    "scripts/probe.test.ts",
+        "scripts/probe.test.ts",
         "scripts/probe.ts",
         "scripts/session-timing.test.ts",
         "scripts/session-timing.ts"
