@@ -827,10 +827,11 @@
         {
           "name": "the plane pane",
           "paths": [
-            "src/ui/plane.ts",
-            "src/ui/PlanePane.tsx"
+            "src/ui/PlaneModal.tsx",
+            "src/ui/planeGraph.ts",
+            "src/ui/planePanel.ts"
           ],
-          "note": "produced by gui-draws-the-focused-plane: the focused plane read into rows and drawn above the option sheet, off PlayStatus.focus and never off a screen's name (c9/c10)"
+          "note": "produced by gui-draws-the-focused-plane and taken over by the-plane-is-a-graph-the-player-drags: the focused plane, off PlayStatus.focus and never off a screen's name (c9/c10). It was rows under hexagon headings in src/ui/plane.ts and src/ui/PlanePane.tsx and is now the graph the report already publishes, drawn on the map's own sheet. Repointed rather than left beside a second concept: two surfaces drawing one report is two places to change when the report changes"
         },
         {
           "name": "what leaving a screen answers",
@@ -846,6 +847,25 @@
             "src/ui/words.ts"
           ],
           "note": "produced by both-drivers-read-their-own-words-from-the-localizer: the table of engine keys the shell names its own words by, and the one door a component reads them through"
+        },
+        {
+          "name": "a pannable sheet both the map and the plane are drawn on",
+          "paths": [
+            "src/ui/viewport.ts",
+            "src/ui/DragSheet.tsx"
+          ],
+          "note": "produced by the-plane-is-a-graph-the-player-drags: the pan, zoom and clamp arithmetic and the one component holding the gesture, moved out from under the map so the plane rides the same sheet"
+        },
+        {
+          "name": "the skills page and the experience a player sees arrive",
+          "paths": [
+            "src/ui/SkillsPane.tsx",
+            "src/ui/skillPanels.ts",
+            "src/ui/XpOverlay.tsx",
+            "src/ui/xpNotes.ts",
+            "src/ui/levelling.ts"
+          ],
+          "note": "produced by skills-are-a-page-and-xp-is-felt: the level inside its ring, and the lines that count up as experience and things arrive"
         }
       ]
     },
@@ -1186,7 +1206,7 @@
         "scripts/play-cli.test.ts",
         "scripts/play-cli.ts",
         "scripts/printedWords.test.ts",
-    "scripts/probe.test.ts",
+        "scripts/probe.test.ts",
         "scripts/probe.ts",
         "scripts/session-timing.test.ts",
         "scripts/session-timing.ts"
