@@ -29,9 +29,9 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    would otherwise re-litigate. A survey that finds an owner is a success: reuse it, or write down
    why a second one is right. Naming no paths still prints the clause format and the
    decompose/`plan`/dispatch sequence below, so the brief is worth running even at the first guess.
-2. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — one spec per branch, numbered
-   proof clauses under `## Deliverable`, in the literal `- [cN] text` form `plan-prompt` prints,
-   because that number is what `--discharges` in step 3 references. The spec is the contract,
+2. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — any number of specs per branch, 
+   numbered proof clauses under `## Deliverable`, in the literal `- [cN] text` form `plan-prompt` 
+   prints, because that number is what `--discharges` in step 3 references. The spec is the contract,
    never the test plan. Run `spec new` after the survey above, not before — it writes only the
    scaffold, never a planner's capability decisions.
 3. **Decompose** into tasks whose `--writes` regions are disjoint:
@@ -120,46 +120,6 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
     against the record they name. A decision made in a session and not recorded here is a
     decision the next planner will re-litigate — which is why `done`, `decline` and `triage`
     each print the command rather than leaving you to remember it.
-
-## Advice that is known good
-
-- **Cut by write grants, not by layers.** The most expensive recurring mistake is slicing work so
-  every slice touches the same file. Chunks touching one file are one task.
-- **Do not add workers to buy speed.** Agent count is the one lever measured to correlate with
-  nothing. Fewer workers over disjoint regions is not a compromise.
-- **A finding cannot create work; an unmet clause creates work directly.** The first rule stops a
-  spec growing without a human; the second stops it closing falsely. Both have happened here.
-- **`met` carries evidence, `unmet` means checked-and-fails, `unknown` means nobody looked.** The
-  three never collapse.
-- **Red-green proves a test can fail; only mutation proves it fails for the right reason.**
-  `npm run mutate -- <manifest.json>` is the tool; keep manifests in scratch, they rot.
-- **Commission one auditor whose only question is "is anything worse than before".**
-  Clause-by-clause verification cannot see a regression.
-- **Read a finding list's shape before promoting it.** Density in one file is a structural
-  diagnosis; ask what single change retires the most of the list, and build that seam first.
-- **Independent audits parallelise; one task's workers still do not.** The ruling above is about
-  splitting one piece of work, and it stands. N audits over N specs are N pieces, and they run
-  concurrently on one condition: each auditor gets its own `git worktree`, because `npm run mutate`
-  rewrites source in place and a second auditor sharing that tree reads a mutant as its own
-  baseline. `audit-prompt` assumes one spec per branch and withholds the pass file and the manifest
-  when the spec it infers for the branch is not the slug asked for — so name each worktree's branch
-  after its spec and the strict route resolves it, needing no `--branch` override and printing
-  nothing false. The gate is in the brief alone; `tasks audit` files whatever it is handed.
-- **Filing is the one step that cannot be concurrent, and serialising it costs nothing.**
-  `docs/tasks.jsonl` is read-modify-write under no lock, so two `tasks audit` or `tasks add` calls
-  in flight lose records with no error raised. The pass file is already the hand-back artifact:
-  auditors fill theirs, one actor runs `--args-from` over each in turn. That is seconds against a
-  parallel run, and it is the only place cross-auditor duplicates are caught — parallel auditors
-  cannot read each other's filings the way a serial third one can.
-- **Persisting evidence is planner work.** Archive audit reports into `docs/audits/` before the
-  session ends; the store is the record of note.
-- **A commit body scales with what the commit touches.** The contract asks for one line past the
-  subject, and a diff that changes code earns much more than that — it is the only place the shape
-  of *that* diff is explained, and it is where `git blame` lands. A commit that changes only the
-  store or a spec has already been recorded: `events.jsonl` holds who, when, branch and head for
-  every store write, and the spec's `## Decisions` holds the reasoning. There, say what changed and
-  point at where the reasoning lives rather than restating it — a judgement written in three places
-  is three places to drift.
 
 ## Why it is shaped this way
 

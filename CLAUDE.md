@@ -2,28 +2,60 @@
 
 Optimize for correctness, bounded scope, reuse, architectural coherence, strong evidence, and clean review—not patch volume. Passing tests is necessary. Avoid patches that accrue technical debt. Prefer self documenting code over comments or updating repository context. 
 
-An audit reviews the diff a branch proposes to merge, not a running commit count. The workflow and the tool that carries it are specified in `docs/workflow.md`, which is kept current; a `docs/specs/<slug>.md` is one branch's promise and is history once merged. `npm run tasks` and `docs/tasks.jsonl` are the store. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
+An audit reviews the diff a branch proposes to merge, not a running commit count. The workflow and the tool that carries it are specified in `docs/workflow.md`, which is kept current; a `docs/specs/<slug>.md` is one branch's promise and is history once merged. `npm run tasks` and `docs/tasks.jsonl` are the store. Keep independent systems independent. 
+
+Do not create systems that are required to be manually kept in sync. This bears repeating because it is the single largest and most frequent failure mode in the entire repository. Do not, under any circumstances, create systems that are required to be manually kept in sync. A second audit turning up a HIGH is a signal that this failure mode occured. Pause immediately and define the invariant shape that satisfies the requirements instead of chasing surfaces endlessly. 
 
 Make commits after each logical chunk.
 
-# Comments
-
-Comments are scarce by principle, not by quota. The 5% budget and its `comment-only` companion were retired 2026-07-28: the lesson had been extracted (they are what exposed `runtime.ts` hiding structure behind 521 comments), and the audit then showed `comment-only` certifying commits that deleted CI steps. A gate that generates strip commits and cannot prove what it claims costs more than it prevents.
-
-Keep a comment only if the fact is **owned by this file**, **not derivable from reading it**, and expressible as neither a name, a type, nor a test. Otherwise it has a destination — rename it, type it, test it, or leave it in the commit message and the audit log. Deleting it loses nothing; git holds every word.
-
-Never describe another module's contract. That comment drifts the moment its owner changes, and the owner is the ground truth a reader should go to instead.
-
-Never close an audit finding by writing its rationale into the source. The finding lives in `docs/audits/`, its fix lives in the code, and every behavioural claim it makes lives in a test. A comment restating a finding is a third copy that cannot be executed and will rot.
-
-A file drifting toward heavy commenting is a design signal — read it as "this needs a seam", not "this needs a strip pass". Audits are where that gets caught now.
-
 Do not bloat CLAUDE.md with over 200 lines of instructions. 
+
+# Context and task list
 
 `.planning/.scratch.md` contains open thoughts — gitignored, so it exists only in the main checkout and an agent in a worktree cannot read it. Vetted work, its state, and its archive all live in `docs/tasks.jsonl`, reached through `npm run tasks` — `tasks next` for what to work on, `tasks show <id>` for a task's full record. A branch's own spec lives at `docs/specs/<slug>.md`. `docs/workflow.md` is the end-to-end protocol every agent follows — decompose against disjoint `writes` grants, grade the set with `tasks plan` before dispatching it, and let a worker correct its own grant, and register what it produces, before it writes code. `.planning/agent-swarm-theory.md` holds what a planner owes the tree — read it before decomposing a finding list into worker chunks.
 
-# Wisdom that reduces audit issues
+## Advice that is known good
+
 - Enforce where a value is assembled, not where it is written
+- Do not create systems that are required to be manually kept in sync
+- A gate earns its place by preventing something that actually happened.
+- **Cut by write grants, not by layers.** The most expensive recurring mistake is slicing work so
+  every slice touches the same file. Chunks touching one file are one task.
+- **Do not add workers to buy speed.** Agent count is the one lever measured to correlate with
+  nothing. Fewer workers over disjoint regions is not a compromise.
+- **A finding cannot create work; an unmet clause creates work directly.** The first rule stops a
+  spec growing without a human; the second stops it closing falsely. Both have happened here.
+- **`met` carries evidence, `unmet` means checked-and-fails, `unknown` means nobody looked.** The
+  three never collapse.
+- **Red-green proves a test can fail; only mutation proves it fails for the right reason.**
+  `npm run mutate -- <manifest.json>` is the tool; keep manifests in scratch, they rot.
+- **Commission one auditor whose only question is "is anything worse than before".**
+  Clause-by-clause verification cannot see a regression.
+- **Read a finding list's shape before promoting it.** Density in one file is a structural
+  diagnosis; ask what single change retires the most of the list, and build that seam first.
+- **Independent audits parallelise; one task's workers still do not.** The ruling above is about
+  splitting one piece of work, and it stands. N audits over N specs are N pieces, and they run
+  concurrently on one condition: each auditor gets its own `git worktree`, because `npm run mutate`
+  rewrites source in place and a second auditor sharing that tree reads a mutant as its own
+  baseline. `audit-prompt` assumes one spec per branch and withholds the pass file and the manifest
+  when the spec it infers for the branch is not the slug asked for — so name each worktree's branch
+  after its spec and the strict route resolves it, needing no `--branch` override and printing
+  nothing false. The gate is in the brief alone; `tasks audit` files whatever it is handed.
+- **Filing is the one step that cannot be concurrent, and serialising it costs nothing.**
+  `docs/tasks.jsonl` is read-modify-write under no lock, so two `tasks audit` or `tasks add` calls
+  in flight lose records with no error raised. The pass file is already the hand-back artifact:
+  auditors fill theirs, one actor runs `--args-from` over each in turn. That is seconds against a
+  parallel run, and it is the only place cross-auditor duplicates are caught — parallel auditors
+  cannot read each other's filings the way a serial third one can.
+- **Persisting evidence is planner work.** Archive audit reports into `docs/audits/` before the
+  session ends; the store is the record of note.
+- **A commit body scales with what the commit touches.** The contract asks for one line past the
+  subject, and a diff that changes code earns much more than that — it is the only place the shape
+  of *that* diff is explained, and it is where `git blame` lands. A commit that changes only the
+  store or a spec has already been recorded: `events.jsonl` holds who, when, branch and head for
+  every store write, and the spec's `## Decisions` holds the reasoning. There, say what changed and
+  point at where the reasoning lives rather than restating it — a judgement written in three places
+  is three places to drift.
 
 # Repository systems
 
@@ -37,11 +69,17 @@ Audits are the one gate that has repeatedly caught real defects, so they stay. R
 
 `git worktree remove` deletes through a worktree's `node_modules` junction and empties the shared target every other worktree points at. `rmdir` the junction first, which unlinks it without touching what it points at, and remove the worktree after.
 
-1. **DSL load path** — `src/grammar` (text to syntax) and `src/content` (syntax to registry, incl. load-time reference resolution)
-2. **Runtime** — `src/runtime`: state, travel, actions, encounters, resources, stats, skills, flags, dialogue, saves; `session.ts` is the entry point everything above plays through
-3. **Contribution system** — unbuilt: editor, validation/merge engine
-4. **User interface** — `src/ui`, the shell `gui-rebuild` delivered. Main tabs: Map, Home, Character, Settings, Edit. Modals: dialogue, skills, stats. Experience: floating text
-5. **Task system** — `scripts/tasks.ts` (entry) over `scripts/tasks/` (command families) and the task-workflow libs in `scripts/lib` (`taskStore`, `eventLog`, `specDoc`, `planCheck`, `producers`, `auditImport`, `commitContract`, `architecture`). The store, the spec machinery, the event log, the architecture queries, and the audit/triage workflow
+`npm run tasks -- merge-ready` runs the merge gate (tsc, tests, layer-check, audit-status, doctor, byte check) in one invocation.
+
+## Individual Systems (Needs to be relocated into the task system - This is literally `Concepts`)
+
+See `docs\audits\systems.json` for a system's concepts. 
+
+1. **DSL load path**
+2. **Runtime**
+3. **Contribution system**
+4. **User interface**
+5. **Task system**
 6. **Testing procedure**
   1. `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
   2. `npm run probe -- <source>... [--show <kind>.<id>] [--round-trip] [--each]` asks the load path a question without building a runner for it — sources are files or stdin, `--each` surveys a table of variants split on `---`. `npm run mutate -- <manifest.json>` breaks a named line, runs the tests it names, restores from bytes it captured (never from git), and reports what the suite failed to notice. `npm run inspect -- "<expression>"` (or `-` for a body on stdin) evaluates against the repo's own module resolution and leaves no file behind, which is what a scratch `.ts` inside the worktree was for. None of the three is a gate; reach for them instead of a scratch `*.test.ts`
@@ -57,11 +95,17 @@ Audits are the one gate that has repeatedly caught real defects, so they stay. R
 
 `grammar < content < runtime < ui < scripts`. Imports point downward only, gated by `npm run layer-check`. Cycles within a layer are allowed; reaching up is not. A file that needs something from the layer above is usually two files — that is how `tuning.ts` and `save.ts` split. Tests live in the folder of the layer they drive, not the one their name suggests.
 
-# Audits
+# Comments
 
-The auditor's brief is generated, never hand-written: `npm run tasks -- audit-prompt <spec>` prints the whole thing — the eight steps an auditor takes, in order, over the diff range, clause standings, checklist and regression question they act on. It writes the mutation manifest and the pass file; the auditor fills the pass file in and hands it back with `tasks audit <slug> --args-from <it>`, which is the one filing route for a branch audit. Commission an auditor by telling it to run that command and do what it says. A worker is dispatched the same way: `npm run tasks -- work-prompt <id-or-spec>` prints its whole brief, and the one instruction is to run it and do what it says. `npm run tasks -- merge-ready` runs the merge gate (tsc, tests, layer-check, audit-status, doctor, byte check) in one invocation.
+Comments are scarce by principle, not by quota. A gate that generates strip commits and cannot prove what it claims costs more than it prevents. Keep a comment only if the fact is **owned by this file**, **not derivable from reading it**, and expressible as neither a name, a type, nor a test. Otherwise it has a destination — rename it, type it, test it, or leave it in the commit message and the audit log. Deleting it loses nothing; git holds every word.
 
-# Additional repository context (maximum 300 tokens)
+Never describe another module's contract. That comment drifts the moment its owner changes, and the owner is the ground truth a reader should go to instead.
+
+Never close an audit finding by writing its rationale into the source. The finding lives in `docs/audits/`, its fix lives in the code, and every behavioural claim it makes lives in a test. A comment restating a finding is a third copy that cannot be executed and will rot.
+
+A file drifting toward heavy commenting is a design signal — read it as "this needs a seam", not "this needs a strip pass". Audits are where that gets caught now.
+
+# Additional repository context
 - "descriptive flavor text for an object" is **one** mechanism
 - modals are rendered unconditionally with guaranteed closing behavior
 - quest/stage conditions are runtime flag checks evaluated against live state
