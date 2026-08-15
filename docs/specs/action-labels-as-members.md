@@ -46,6 +46,17 @@ Proof:
   in shipped `# test` sections become their slugs, which is this spec's original promise that no
   directive is respelled being withdrawn rather than quietly broken. No `title:` moves, no
   content id moves, and no player-visible English moves.
+  **Read over this spec's own work and not over the branch's diff.** The branch carries
+  `one-channel-for-every-printed-word` as well, whose c8 names three player-visible things that
+  do move — the `say:` and dialogue keys, a stat's spelling, and the ids a surface used to draw
+  as words. Those are that spec's to account for and are not counterexamples here. What this
+  clause covers is the addressing change: `activeAction`, the choice-id shape, the namespace
+  member, and the two respelled `use:` lines. One author-facing string moves and is named
+  rather than left to be found: a compiled craft's label is `Craft` where it was `craft`, so a
+  load error about a recipe's cadence quotes it capitalised. It is a diagnostic and not a
+  screen — no surface draws either compiled label, since a craft under way is said by
+  `engine.craft.label` and a walk by `engine.travel.to`.
+  proof: npm test
 - [c6] The choice-id contract is stated once, where it is built. `use:<kind>.<objId>.<slug>` is
   produced and parsed in one agreed shape across `session.ts` and `test.ts`, rather than a regex in
   each that happens to match the other.

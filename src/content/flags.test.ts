@@ -221,12 +221,22 @@ describe('an action a field edit takes away', () => {
     expect(loadUniverse([BASE, readd, wants('watcher')]).entities.get('base.dresser')!.actions.map((action) => action.label)).toEqual(['Pry']);
   });
 
-  // An entity's own block is a member the same way, and a patch that drops the
-  // whole entity takes both with it rather than either one alone.
-  it('takes an inline block with the object that headed it', () => {
-    const shelf = module('base', '# entity shelf', 'dust it:', '  instant', '  say: puff');
-    const uses = module('watcher', 'dependencies: base', '# test walk', 'use: entity.base.shelf.dust-it');
-    expect(() => loadUniverse([shelf, uses])).not.toThrow();
-    expect(() => loadUniverse([shelf, module('mod', 'dependencies: base', '# remove entity.base.shelf'), uses])).toThrow(/names an unknown entity: base.shelf/);
+  // An entity's own block is a member the same way. Cutting the block alone is
+  // what asks about the member: the entity is still there, so nothing but the
+  // action's own reconciliation can refuse the `use:` — where dropping the whole
+  // entity would have been refused for the entity and told us nothing.
+  const shelf = module('base', '# entity shelf', 'dust it:', '  instant', '  say: puff');
+  const dusts = module('watcher', 'dependencies: base', '# test walk', 'use: entity.base.shelf.dust-it');
+
+  it('takes an inline block away with the block, not only with the object that headed it', () => {
+    const cutBlock = module('mod', 'dependencies: base', '# entity base.shelf', '-dust it:');
+
+    expect(() => loadUniverse([shelf, dusts])).not.toThrow();
+    expect(loadUniverse([shelf, cutBlock]).entities.get('base.shelf')!.actions).toEqual([]);
+    expect(() => loadUniverse([shelf, cutBlock, dusts])).toThrow(/names an unknown action-slug: base.shelf.dust-it/);
+  });
+
+  it('takes it with the object too, when the whole object goes', () => {
+    expect(() => loadUniverse([shelf, module('mod', 'dependencies: base', '# remove entity.base.shelf'), dusts])).toThrow(/names an unknown entity: base.shelf/);
   });
 });

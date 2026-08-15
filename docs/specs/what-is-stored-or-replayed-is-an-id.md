@@ -20,6 +20,7 @@ Proof:
   `iron-sword#18273` — because an instance has no key of its own: there are unboundedly many
   of them and a locale can address only a template. Two copies of one template are named alike
   on screen, which is correct and is nothing any surface has to repair.
+  proof: vitest src/runtime/carriedName.test.ts src/runtime/instances.test.ts
 - [c2] Nothing a player answers with carries words. Every `ModalChoice.value` every modal
   publishes is an id — a content id, an instance ordinal, a slot, a hexagon, or one the engine
   itself owns — and none is drawn from a `title:`, an authored line or a locale entry. The
@@ -27,19 +28,23 @@ Proof:
   `Grow`. Proven by enumerating what every modal publishes against the loaded locale rather
   than by reading the source. `distinct()` goes with it: ids do not collide, so nothing has to
   be made answerable after the fact.
+  proof: vitest src/runtime/modals.test.ts src/runtime/planeScreen.test.ts
 - [c3] What is stored is a key and its parameters, never a rendered sentence. No save field
   holds text the engine composed: `PlaneFrame.said` carries an engine key and the parameters
   it takes, so one save read by a player of one language and a player of another reads in
   each. Proven by writing a frame in one language and rendering it in the other, both
   directions.
+  proof: vitest src/runtime/planeScreen.test.ts src/runtime/save.test.ts
 - [c4] No engine sentence is built in TypeScript. Every string the engine puts on a screen or
   into the log comes from a key in the union — the twenty growth, plane and cluster refusals
   included. `Localizer.prose` is left with one job, text the DSL authored that carries no key,
   and the sentence-scan allowlist holds nothing but action labels.
+  proof: vitest src/runtime/localized.test.ts src/runtime/growth.test.ts src/runtime/clusterPlane.test.ts
 - [c5] A recording survives translation. Every shipped `# test` passes against a universe
   whose every engine pattern and every content title has been replaced with different text.
   This is the property the whole branch exists to buy: after it, a `# test` that breaks is a
   `# test` about behaviour, and nothing a translator or an editor does can break one.
+  proof: vitest src/runtime/translationSurvival.test.ts
 - [c6] What changes is only what had to, and it is named here in full. `SAVE_VERSION` moves 9
   to 10 for `PlaneFrame.said`'s new shape. Three authored things move with it and nothing else
   does: the `submit-modal:` values in shipped `# test` sections, the one `choose:` line in
@@ -48,6 +53,7 @@ Proof:
   an id with the rest. No fixture's instances or equipment moves, since an ordinal is what they
   already hold. No content id, no field name and no player-visible English string moves, every
   `# test` passes, and `npm run tasks -- merge-ready` is green on every behavioural leg.
+  proof: npm test
 
 ## Goal
 
