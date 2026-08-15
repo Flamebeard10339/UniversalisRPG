@@ -533,3 +533,144 @@ pass 1 predicted it would. The command still exits NOT merge-ready on one leg, `
 archetype-mods`, which reports "1 open member(s): archetype-mods" — the branch's own in-progress
 task record, which is what "before the spec is marked done" describes. Same standing pass 1 graded
 met, re-measured on this head.
+
+### Pass 3 — 2026-08-15
+
+- base: `a00808630c5fbdac69d3ea4ebac0b5586cb80bbd`
+- head: `9cb75d8743d94b2e40ff3cc154c2ba2c7634dee9`
+- proof 1: met — Every effect still reaches the player only through an allocated position on a
+carried copy, and the mutated line is the one neither earlier pass took: the answer to "which
+plane is a carried copy standing on". src/runtime/itemContribution.ts `  return instance?.plane ??
+basePlane(item);` rewritten to `  return basePlane(item);` — so a grown copy's own allocations are
+replaced by its base's — was KILLED by src/runtime/itemContribution.test.ts > a passive standing on
+a spent point > "answers a moment for whoever wears the copy, and does not once the copy comes off",
+re-run at its own file with the mutant still applied. All four hook blocks in the module sit under a
+`# passive`: `grep -n "on hit:\|when hit:\|cluster-effect:" content/combat-expansion.dsl` returns 86,
+93, 118, 137 and no `cluster-effect:` at all. The player has no `# entity`, so
+`modifierCarriers` (src/runtime/stats.ts) reaches a passive only from `entity.passives` or from
+`carriedPassives`, which is `allocatedPositions` filtered on `isAllocated`.
+- proof 2: met — The clause's own command is clean on 9cb75d8, in its widened form —
+`grep -rniE "\b(poison|rage|thorns|accelerated.?vigou?r|berserker|juggernaut|assassin)\b" src/
+over --include=*.ts --include=*.tsx --exclude=*.test.ts --exclude=*.test.tsx` exits 1 with no output. The
+derived sweep now reads the .tsx half of the tree, which is what pass 2 filed as its first blind
+spot: mutation planting a declared id in a .tsx — src/ui/PlanePane.tsx `import type { PlaneView }
+from './plane';` given a trailing `// proving-post` — was KILLED by src/runtime/integration.test.ts >
+no shipped identifier is named after this content > "finds no id this module declares", re-run at its
+own file with the mutant still applied. Pass 2's second blind spot is closed too: the word set is now
+built from `NAMESPACED_KINDS` and `registry.namespace.declaredKeys`, so `# location`, `# droptable`,
+`# save` and `# test` ids are in it, where the six hand-listed maps had left them out. A third blind
+spot this pass found is filed as a finding rather than held against the clause: the sweep enumerates
+two spellings per word where the clause's own command derives them, and three plants survived the
+whole suite because of it.
+- proof 3: met — Rage still has both a ceiling and a rate, and the rate moved onto the pool this
+commit — `# stat rage-drain` carries `base: -30` and `# resource rage` names it as `rate:`, while
+`# passive rising-fury` carries `+20 max-rage` and `+2% attack per rage` beside `on hit: restore: 3
+rage`. Mutation aimed at the drain where it now lives rather than at the fold that reads the counter:
+content/combat-expansion.dsl `base: -30` rewritten to `base: 0` was KILLED by
+src/runtime/integration.test.ts > shipped content > `test "combat-expansion.rage-drains-when-the-
+swinging-stops" passes`, re-run at its own file with the mutant still applied. The move is safe for
+every other character because `captureResourceRates` asks `hasPool` first; measured directly with
+`npm run inspect`, after `rage-rises-as-swings-land` the pool stands at 20000 and
+`captureResourceRates` returns `combat-expansion.rage@player rate -30000`, and with the blade off it
+returns nothing at all. It does not become an exploit: `clampResources` (src/runtime/effects.ts:461,
+called from src/runtime/runtime.ts:487) still takes the orphaned pool to 0, measured at 0 after six
+ten-second resolves with the blade off. "Moves nothing else at all" is still derived over every stat
+the universe publishes.
+- proof 4: met — The gate is `droptables`' `1 in 4:` wrapper around one `inflict: accelerated-vigor on
+me` on `# passive spurred`, and the shipped route `accelerated-vigor-stacks-behind-its-gate` ends on
+a recorded sheet holding six separate instances each with its own `expiresAt`. Mutation aimed at the
+rule that makes a second application a second instance rather than at the fold that spends the count:
+src/runtime/buffs.ts `  const stacks = source.tags.some((tag) => tag.kind === 'keyword' && tag.value
+=== STACKS);` rewritten to `  const stacks = false;` was KILLED by src/runtime/integration.test.ts >
+combat-expansion, read off the routes it ships > "separates what a stack pays from what the count is
+worth", re-run at its own file with the mutant still applied. That test still tells the two
+contributions apart by the plane rather than by the buff.
+- proof 5: met — `# passive retribution` is `when hit: drain: 5 health from them` and nothing else, and
+it is reached two ways that need no action. Mutation aimed at the moment itself rather than at the
+field or the walk the earlier passes broke: src/runtime/hooks.ts `  fireMoment(segment, 'whenHit',
+struck, swinger, reached);` deleted was KILLED by src/runtime/hooks.test.ts > a passive an entity
+declares is carried by it > "answers the moment for a character that swings nothing and declares no
+action", re-run at its own file with the mutant still applied. End to end, the shipped route
+`striking-a-thorned-enemy-costs-the-striker` leaves the player at 5 health of 30 and
+integration.test.ts asserts `shipped.entities.get('combat-expansion.spined-urchin').actions` is `[]`
+with the loss exactly `5 x attemptsMade`.
+- proof 6: met — `# item venom` is `poison, -30 regeneration, 20s` — the `# item` + tag-clause + duration
+mechanism `buffs-generalized` already had, with a minus — and the only new code is one result kind,
+now spelled `inflict:`. Mutation aimed at expiry itself rather than at the line that reads a declared
+duration: src/runtime/buffs.ts `    const left = held.filter((buff) => buff.expiresAt > at);`
+rewritten to `    const left = held;` was KILLED by src/runtime/integration.test.ts >
+combat-expansion, read off the routes it ships > "lifts the debuff on its own clock, with nothing else
+asked to end it", re-run at its own file with the mutant still applied. Both halves are shipped
+routes: `poison-holds-the-struck-enemy` and `poison-lifts-when-its-own-duration-runs-out`.
+- proof 7: met — `# passive` extends `HookCarrier` out of the same `HOOK_FIELDS` spread every other
+carrier uses, and the authored form survives a reload — which is what says the four fixtures are
+authored as carried passives rather than assembled in code. Mutation aimed at that round trip rather
+than at the schema or the modifier walk: src/content/serialize.ts `  hookLines(lines, passive);`
+deleted was KILLED by src/content/serialize.test.ts > serializeRegistryModule > "preserves the loaded
+semantics of every shipped module, as one universe", re-run at its own file with the mutant still
+applied. No fixture needs both routes: all four hook blocks sit under a `# passive`, and no `# item`
+or `# entity` in the module declares one.
+- proof 8: met — Both directions are proved by one line, and breaking it breaks both. Mutation:
+src/runtime/hooks.ts `  segment.parties = { me: carrier, them: other };` rewritten to
+`  segment.parties = { me: carrier, them: carrier };` was KILLED by src/runtime/buffs.test.ts > an
+inflicted buff is granted by the declaration it names > "lands on the other party when the phrase
+names one", re-run at its own file with the mutant still applied. What pass 2 filed against this
+clause is still true and was re-measured on this head: deleting the `inflict` arm of `partyPhrase` in
+src/grammar/actionResult.ts:326 SURVIVED the whole suite, 0 failed of 3137, so `inflict: venom on
+them` inside a `# droptable` would still load with nothing noticing. That is the open finding
+archetype-mods-pass2-no-test-refuses-an-apply-party-phrase-o, re-measured under the new verb rather
+than filed a second time; the clause's own two directions hold.
+- proof 9: met — Graded on its own evidence rather than on the change directed after pass 2. The
+property holds: `grep -rniE "\b(berserker|juggernaut|assassin)\b" src --include=*.ts --include=*.tsx
+and --exclude=*.test.ts --exclude=*.test.tsx` exits 1 with no output, there is no `cluster-effect:` line
+anywhere in content/combat-expansion.dsl, and archetype membership is carried only by the bare
+keyword tags `berserker`, `juggernaut` and `assassin` on passive bodies. What was missing at pass 2
+is present: the forbidden set now carries the tags that group as well as the ids, both derived from
+the module, and the exact plant pass 2 watched survive is dead. Mutation: src/runtime/clusterEffect.ts
+`export function allocatedPositions(registry: Registry, plane: Plane): { hex: Hex; position: number;
+passiveId: string }[] {` given a trailing `// juggernaut` was KILLED by
+src/runtime/integration.test.ts > no shipped identifier is named after this content > "finds no
+archetype, which is a tag and never an id", re-run at its own file with the mutant still applied. The
+same plant in a .tsx — src/ui/Meter.tsx's first import line given `// berserker` — was KILLED by the
+same named test, and before 73fbe88 that file was not read at all. The grouping is a derivation, not
+a list: `archetypeGrouping` keeps a keyword tag no passive outside the namespace carries and more
+than one jewel does, which over the shipped module is exactly berserker, juggernaut and assassin —
+`thorns` and `poison` sit on one jewel each and drop out, and reach the sweep through c2's own
+command instead. Two couplings are worth carrying forward and neither is held against the clause:
+the "unshared" half is a fact about tutorial-island's tag vocabulary, which is the open finding
+archetype-mods-pass2-the-pairing-derivation-reads-an-archety; and in the other direction, a fourth
+archetype named after an engine word would redden the sweep over files that never heard of it, so the
+protection the source comment claims for `state` and `range` holds only for a tag that groups
+nothing.
+- proof 10: met — Six jewels in three pairs, and the split is still graded per archetype by derivation:
+"gives every archetype one flat jewel and one percent jewel, and no archetype two of a kind" requires
+every jewel to fall in exactly one group and each group to hold one added-led and one increased-led
+jewel. Counted by hand off the module this pass: blood-frenzy 8 flat / 0 percent, wrath 3 / 6,
+iron-bulwark 9 / 0, retribution 1 / 4, wracking-blades 8 / 0, creeping-rot 1 / 2. Mutation aimed at
+the pair neither earlier pass flipped: content/combat-expansion.dsl `passives: 1
+tutorial-island.keen-eye, 3 tutorial-island.deadly-precision, 5 tutorial-island.evasive, 7 envenom`
+rewritten to `passives: 1 tutorial-island.keen-eye, 3 tutorial-island.marksman, 5
+tutorial-island.quickstep, 7 envenom` — giving assassin two added-led jewels while leaving the global
+3/3 count intact — was KILLED by src/runtime/integration.test.ts > the archetype jewels are paired
+added-then-increased > that named test, re-run at its own file with the mutant still applied.
+Positions still match the retired trial read back with `git show
+b00c105^:docs/smithing/cluster-jewels-draft.dsl`.
+- proof 11: met — One file, content/combat-expansion.dsl, one `# info combat-expansion` with
+`dependencies: tutorial-island`, and no loader change. Mutation aimed at the filter rather than at
+the glob both earlier passes narrowed: src/ui/shippedContent.ts `  .filter((source) => source.name
+!== LOCAL_CHANGES_MODULE_ID)` rewritten to also drop `combat-expansion` was KILLED by
+src/ui/shippedContent.test.ts > the content the build carries > "bundles every shipped DSL as text,
+with no path left for the browser to fetch", re-run at its own file with the mutant still applied.
+Deleting `dependencies: tutorial-island` was also tried and is recorded as ERROR rather than a
+verdict — the module then fails to resolve `tutorial-island.*` at load and no test collects. Three
+readers derive the module list from the tree (src/ui/shippedContent.test.ts,
+src/runtime/integration.test.ts, src/content/serialize.test.ts) and the whole universe round-trips
+green.
+- proof 12: met — `npm run tasks -- merge-ready` on 9cb75d8: tsc ok, npm test ok (3137 tests, inside the
+five-minute rule), layer-check ok, audit-status ok, doctor ok (23 warnings, none of which fails the
+leg), bytes ok, tree ok, base ok. The command exits NOT merge-ready on exactly the two legs that are
+this spec's own bookkeeping — `spec archetype-mods` (2 open members: the task record and the c9
+undelivered record, plus the unreviewed findings its audits filed) and `clauses archetype-mods` (c9
+outstanding across 2 passes, which is the clause this pass grades). Same standing passes 1 and 2
+graded met, re-measured on this head; both legs are what closing the spec and triaging its findings
+clear, which is what "before the spec is marked done" describes.
