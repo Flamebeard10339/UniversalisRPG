@@ -1168,7 +1168,8 @@
         "scripts/planeView.ts",
         "scripts/play-cli.test.ts",
         "scripts/play-cli.ts",
-        "scripts/probe.test.ts",
+        "scripts/printedWords.test.ts",
+    "scripts/probe.test.ts",
         "scripts/probe.ts",
         "scripts/session-timing.test.ts",
         "scripts/session-timing.ts"
