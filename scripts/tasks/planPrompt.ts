@@ -16,7 +16,9 @@ function printClauseFormat(): void {
   console.log('  Proof:');
   console.log('  - [c1] a checkable clause');
   console.log('  - [c2] another one, with its own proof: command or proof: vitest target on the line below');
-  console.log("The `[cN]` tag is optional on the way in — an untagged `- ` bullet is auto-numbered on next read — but the number is what `--discharges c1,c2` references from a task record, so writing it yourself is what keeps that reference pointed at the clause you mean. Anything that is not a `- ` bullet under a literal `Proof:` line is not a clause: `tasks spec show <slug>` reports its count, and 0 is what a numbered list or a bare paragraph gets.");
+  console.log("The `[cN]` tag is optional on the way in — an untagged `- ` bullet is auto-numbered on next read — but the number is what an audit pass grades, what a deferral names, and what the spec's own member discharges, so writing it yourself is what keeps every one of those pointed at the clause you mean. Anything that is not a `- ` bullet under a literal `Proof:` line is not a clause: `tasks spec show <slug>` reports its count, and 0 is what a numbered list or a bare paragraph gets.");
+  console.log("Every clause carries a `proof:` target on the line below it — `proof: vitest <path>` or `proof: command`. `audit-prompt` builds the mutation manifest from those targets, and a spec of pure prose hands an auditor nothing: 37 recorded occurrences, 25 to 45 minutes of hand-aiming per pass, across at least eight specs. It is the largest measured cost in this repository and it is paid at spec-writing time.");
+  console.log("If a clause says *every*, its proof derives its own subjects. A test that enumerates cannot grow when the code does, so an enumerated proof under a universal clause guarantees an audit grades the list rather than the sentence — which is how one clause was graded unmet across six consecutive passes, on a new surface each time.");
 }
 
 // The planner's whole brief, symmetric with `work-prompt` and `audit-prompt`:
@@ -66,7 +68,7 @@ export function cmdPlanPrompt(args: Flags, usage: string): void {
   printLessons('What repeated specs had to learn the hard way — carry it forward:', PLANNER_LESSONS);
   console.log('');
   console.log('Then:');
-  console.log('3. Decompose into tasks whose `--writes` regions are disjoint: `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids> --discharges c1,c2` — the number after `--discharges` is the one from the `[cN]` tag above.');
-  console.log('4. `tasks plan` grades the set for overlap, unstated dependencies and duplicated interfaces before anyone works it. It reports and refuses nothing.');
+  console.log('3. Register the spec as its own single member — a spec is the unit of work and is never cut into sub-tasks: `tasks add "<title>" --spec <slug> --writes <paths> --produces "<capability>" --discharges c1,c2,...` naming EVERY clause the spec has. Discharge them all: a member discharging none passes the clauses leg of `merge-ready` on nothing, so a missing number is a gate that goes green over a clause nobody answered.');
+  console.log('4. `tasks plan` grades the open specs against each other for overlap, unstated dependencies and duplicated interfaces before anyone is dispatched. It reports and refuses nothing.');
   console.log('5. Dispatch a worker with one instruction: run `npm run tasks -- work-prompt <id>` and do what it says.');
 }

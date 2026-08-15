@@ -55,16 +55,28 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    A branch may declare more than one spec, and each is graded and audited on its own. `audit-prompt`
    infers the spec from the branch name and withholds the pass file and the manifest when that
    inference disagrees with the slug asked for — so a branch working several specs audits each from
-   a worktree whose branch is named after it, per step 6.
-3. **`tasks plan`** — grades the open specs against each other for overlap, unstated dependencies
+   a worktree whose branch is named after it, per step 7.
+3. **Register the spec as its own single member.**
+   `tasks add "<title>" --spec <slug> --writes <paths> --produces "<capability>" --discharges c1,c2,…`
+   — **naming every clause the spec has.** A spec is the unit of work, so there is one member and it
+   owes all of it; this step exists because the store's unit is a record and the spec's is a
+   document, and it stays a hand step until the tool mints it. Discharge every number: the clauses
+   leg of `merge-ready` reads `discharges`, and a member discharging none passes that leg on
+   nothing, so a missing number is a gate going green over a clause nobody answered. A `--produces`
+   here is a **forecast** of a capability, answerable to the survey in step 1; the registration that
+   makes it durable happens in step 5, once someone has read the region. The grant is a forecast
+   too — declare the region you honestly mean, a directory included, rather than inventing file
+   paths to make step 4 quiet. Setting `--writes` prints everything that has ever claimed those
+   paths, so step 1's survey happens again whether or not anyone asked for it.
+4. **`tasks plan`** — grades the open specs against each other for overlap, unstated dependencies
    and duplicated interfaces before anyone is dispatched. It reports and refuses nothing. Two specs
    writing one region is the collision that costs, and it is the one this check exists for now that
    a spec is never cut into members. Then run `tasks work-prompt <slug>` and read what comes back,
    because it is the brief a dispatcher will hand a worker and a plan that grades clean can still
    put the wrong thing in front of one. `tasks system` / `tasks system "<name>"` / `tasks where
    <path>` answer the architecture.
-4. **Dispatch a worker with one instruction**: "run `npm run tasks -- work-prompt <id>` and do what
-   it says" — symmetric with the auditor's in step 6, and for the same reason: a hand-written brief
+5. **Dispatch a worker with one instruction**: "run `npm run tasks -- work-prompt <id>` and do what
+   it says" — symmetric with the auditor's in step 7, and for the same reason: a hand-written brief
    is a copy of the record that drifts from it, and composing one is where a planner smuggles in
    detail nobody asked it to hold. The brief invites refusal, and a planner must believe it. The
    argument is normally the **spec slug**, since the spec is the work. An exact task id wins over a
@@ -78,11 +90,11 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    just read the region and the planner has not, and `--grant commitment` is the word that turns
    the forecast into a promise. This is also the only place a durable capability gets registered:
    `tasks concept "<system>" "<name>" --paths <paths> --note "produced by <id>"`.
-5. **Work.** `tasks next` for what to pick up; commit after each logical chunk;
+6. **Work.** `tasks next` for what to pick up; commit after each logical chunk;
    `tasks done <id>... --commit HEAD` closes against the commit (several ids in one call). If the
    diff diverges from the grant, correct the record and say so in the commit body — that is
    information, not a violation.
-6. **Audit.** Commission an auditor with the one instruction "run
+7. **Audit.** Commission an auditor with the one instruction "run
    `npm run tasks -- audit-prompt <slug>` and do what it says" — the brief is generated and
    prints the eight steps an auditor takes, in order, above the data they act on. It writes two
    files: a mutation manifest wired to the clauses' own tests and refusing to run until the
@@ -103,14 +115,14 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    auditors fill theirs, one actor runs `--args-from` over each in turn. That is seconds against a
    parallel run, and it is the only place cross-auditor duplicates are caught — parallel auditors
    cannot read each other's filings the way a serial third one can.
-7. **Triage.** A separate step with a separate actor: the auditor files findings and never promotes
+8. **Triage.** A separate step with a separate actor: the auditor files findings and never promotes
    one, and `audit-prompt` tells it so. Findings from the branch's **own first pass** skip the walk:
    promote HIGHs and anything judged fix-now with `tasks promote <id>... ` — they are always
    promoted anyway, and a human can interrupt. From pass 2 on, promotion extends what the spec owes,
    so it waits for the human: `tasks triage` walks the queue (`[1] promote [2] defer [3] decline
    [4] redirect [a] ask [s] skip [q] quit`; `[a]` records a question on the finding and leaves it
    unreviewed).
-8. **Close and merge.** `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check,
+9. **Close and merge.** `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check,
     audit-status, doctor, byte check — plus this branch's standing. The specs a branch owes are read
     from nothing but its own store diff: every task record that changed between the merge base and
     this checkout, filtered to the ones naming a spec, is what this branch **declared** — a spec
@@ -131,7 +143,7 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
     state is meant to be read as noise: a red spec or clauses leg is real debt, on a member this
     branch itself worked. It stops short of merging: the merge body is the one
     artifact whoever did the work has to write.
-9. **Record what it cost**: a friction is filed into the store like anything else —
+10. **Record what it cost**: a friction is filed into the store like anything else —
     `tasks add "<what cost you>" --kind finding --fault tooling|contract|nobody`, with
     `--breaches <lesson-handle>` when what failed was an instruction that did not land. There is no
     second place: prose in a markdown file does not aggregate, so the friction that recurs is
@@ -141,7 +153,7 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
     nothing; reading a lesson and finding it clean is `tasks checked <handle> --note "..."`, which
     is what separates a lesson that is working from one nobody looked at. `tasks friction` is the
     one query over all of it, and none of it gates anything.
-10. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
+11. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
     `tasks decision "<one line>" --spec <slug>` as they happen; `tasks log --id <id>` /
     `--op decision` answers later, from the log alone, and `tasks show <id>` prints both back
     against the record they name. A decision made in a session and not recorded here is a
@@ -172,7 +184,7 @@ reproducing it — a stat, then a slot, then a skill — until the author stoppe
 one sweep applying one rule everywhere at once. Chunks touching one file are one task; one rule
 across forty files is also one task.
 
-**Forecast and commitment.** A grant also records which side of step 4 it is on, and `plan`
+**Forecast and commitment.** A grant also records which side of step 5 it is on, and `plan`
 grades an overlap as a **defect** only between two commitments. Anything else is a note naming
 the soft side. The reason is measured: four independent roadmap tasks reported five collisions
 because the honest grant on unread code is a directory and a directory overlaps everything

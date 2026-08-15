@@ -76,13 +76,29 @@ describe('tasks plan-prompt', () => {
       expect(result.stdout).toContain('--discharges');
     }));
 
-  it('ends with the decompose/plan/dispatch sequence, naming the next commands', () =>
+  it('ends with the register/plan/dispatch sequence, naming the next commands', () =>
     fixture(({ tasks }) => {
       const result = tasks('plan-prompt', 'demo-spec');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('3. Decompose into tasks whose `--writes` regions are disjoint');
-      expect(result.stdout).toContain('4. `tasks plan` grades the set');
+      expect(result.stdout).toContain('3. Register the spec as its own single member');
+      expect(result.stdout).toContain('4. `tasks plan` grades the open specs against each other');
       expect(result.stdout).toContain('5. Dispatch a worker with one instruction: run `npm run tasks -- work-prompt <id>` and do what it says.');
+    }));
+
+  // The clauses leg of `merge-ready` reads `discharges`, and a member that
+  // discharges none passes it on nothing — so the brief has to say "every".
+  it('tells the planner to discharge every clause on that one member', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).toContain('naming EVERY clause the spec has');
+      expect(result.stdout).not.toContain('Decompose into tasks');
+    }));
+
+  it('requires a proof target on every clause, and a derived proof under a universal one', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).toContain('Every clause carries a `proof:` target');
+      expect(result.stdout).toContain('derives its own subjects');
     }));
 });
 
