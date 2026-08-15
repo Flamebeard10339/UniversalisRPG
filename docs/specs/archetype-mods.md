@@ -363,3 +363,142 @@ warnings, none of which fails the leg), bytes ok, tree ok, base ok. The only two
 this spec's own bookkeeping — `spec archetype-mods` reports one open member, and
 `clauses archetype-mods` reports "has no recorded audit pass", which is the pass this file records.
 Re-run the same command after this pass is filed to see the clauses leg turn.
+
+### Pass 2 — 2026-08-15
+
+- base: `a00808630c5fbdac69d3ea4ebac0b5586cb80bbd`
+- head: `1c541beae3463ced3629560f0591e992ced9fee9`
+- proof 1: met — An effect reaches the player only through an allocated position, and the walk that
+carries it is now the mutated line rather than the allocation guard pass 1 broke. Mutation:
+src/runtime/stats.ts `for (const passiveId of carriedPassives(registry, item, itemInstance(state,
+wornId))) {` rewritten to `for (const passiveId of [] as string[]) {` was KILLED by
+src/runtime/itemContribution.test.ts > a passive standing on a spent point > "answers a moment for
+whoever wears the copy, and does not once the copy comes off", re-run at its own file with the
+mutant still applied. The player has no `# entity`, so `modifierCarriers` (src/runtime/stats.ts:102)
+reaches a passive only from `entity.passives` — which the player has none of — or from
+`carriedPassives`, which is `allocatedPositions` filtered on `isAllocated`. All four hook blocks in
+the module sit under a `# passive`: `grep -n "on hit:\|when hit:\|cluster-effect:"
+content/combat-expansion.dsl` returns 86, 94, 121, 142 and no `cluster-effect:` at all.
+- proof 2: met — The clause's own command is clean on 1c541be:
+`grep -rniE "\b(poison|rage|thorns|accelerated.?vigou?r)\b" src/ --include=*.ts --exclude=*.test.ts`
+exits 1 with no output. The derived sweep does go red on a planted fixture id: mutation appending
+`// envenom` to src/runtime/clusterEffect.ts's `export function allocatedPositions(...)` signature
+was KILLED by src/runtime/integration.test.ts > no shipped identifier is named after this content >
+"finds none of them in src, excluding tests", re-run at its own file with the mutant still applied.
+Graded on the command the clause names as its proof, which is clean; two blind spots in the sweep
+behind it are filed as findings rather than held against this clause. First: the same word planted
+in src/ui/PlanePane.tsx SURVIVED the whole suite — 19 `.tsx` files are outside `--include=*.ts` and
+outside `sourceFiles`'s `name.endsWith('.ts')`. Second: `words()` enumerates six registry maps by
+hand, so this module's `# location proving-ground`, `# droptable archetype-cache`, `# save` and
+`# test` ids are in no forbidden set.
+- proof 3: met — `# resource rage` carries both a ceiling (`max: max-rage`) and a rate
+(`rate: rage-drain`), and `# passive rising-fury` supplies both stats plus `on hit: restore: 3 rage`
+and reads the pool back as `+2% attack per rage`. The rise and the fall are the two shipped routes
+`rage-rises-as-swings-land` and `rage-drains-when-the-swinging-stops`. Mutation aimed at the line
+that lets a plane payload carry its counter out of the passive at all —
+src/runtime/clusterEffect.ts `payloads.push(tag.per === undefined ? { node, statId: tag.statId,
+bonus: tag, scale } : { node, statId: tag.statId, bonus: tag, scale, per: tag.per });` collapsed to
+the no-counter branch — was KILLED by src/runtime/integration.test.ts > combat-expansion, read off
+the routes it ships > "moves attack as rage accumulates, and moves nothing else at all", re-run at
+its own file with the mutant still applied. That test derives its subjects: it reads every stat the
+universe publishes at rage 20 and at rage 0 and asserts the moved set is exactly
+['tutorial-island.attack'], and asserts the step is linear per point.
+- proof 4: met — The gate is `droptables`' `1 in 4:` wrapper around one `apply: accelerated-vigor to me`
+on `# passive spurred`; the payload carries `stacks`, so `grantBuff` adds an instance rather than
+refreshing one, and the shipped route `accelerated-vigor-stacks-behind-its-gate` ends on a recorded
+sheet holding six separate instances each with its own `expiresAt`. Mutation: the one multiplication
+that spends a counter on a plane payload — src/runtime/itemContribution.ts
+`fold(payload.statId, payload.bonus, payload.scale * (payload.per === undefined ? 1 :
+counter(payload.per)));` reduced to `fold(payload.statId, payload.bonus, payload.scale);` — was
+KILLED by src/runtime/integration.test.ts > combat-expansion, read off the routes it ships >
+"separates what a stack pays from what the count is worth", re-run at its own file with the mutant
+still applied. That test tells the two contributions apart by the plane rather than by the buff: on
+the rage route (no `quickening` allocated) five stacks are worth exactly 5x one, and on the vigor
+route one stack is worth more than 2 and five are worth more than five times one.
+- proof 5: met — `# passive retribution` is `when hit: drain: 5 health from them` and nothing else, and
+it is reached two ways that need no action: `# entity spined-urchin` carries it through the new
+`passives:` field, and the `retribution` jewel holds it at a position. Mutation aimed at the field
+that lets an entity declare one rather than at the walk that reads it — src/content/entity.ts
+`passives: { parser: list(id), default: () => [] },` given a `keyword: 'carried-passives'` so
+`passives:` no longer names the field — was KILLED by src/runtime/hooks.test.ts > a passive an
+entity declares is carried by it > "answers the moment for a character that swings nothing and
+declares no action", re-run at its own file with the mutant still applied. End to end, the shipped
+route `striking-a-thorned-enemy-costs-the-striker` leaves the player at 5 health of 30, and
+integration.test.ts asserts `shipped.entities.get('combat-expansion.spined-urchin').actions` is `[]`
+and that the loss is exactly `5 x attemptsMade`.
+- proof 6: met — `# item venom` is `poison, -30 regeneration, 20s` — the `# item` + tag-clause + duration
+mechanism `buffs-generalized` already had, with a minus — and the only new code is one `apply:`
+result kind. Mutation: the one place a declaration's duration becomes an instance's clock,
+src/runtime/buffs.ts `return source.tags.find((tag): tag is Extract<TagClause, { kind: 'duration' }>
+=> tag.kind === 'duration')?.seconds ?? 0;` rewritten to `return 100000;`, was KILLED by
+src/runtime/buffs.test.ts > an applied buff is granted by the declaration it names > "expires on the
+clock its own declaration set, without a second one being named", re-run at its own file with the
+mutant still applied. Both halves of the clause are shipped routes:
+`poison-holds-the-struck-enemy` (buff under the post's name, player holding none, regeneration -30,
+and the same route replayed with the debuff lifted losing strictly less health over four seconds)
+and `poison-lifts-when-its-own-duration-runs-out`.
+- proof 7: met — `# passive` extends `HookCarrier` out of the same `HOOK_FIELDS` spread every other
+carrier uses, and a carried passive joins the one modifier walk as a hook carrier. Mutation aimed at
+that join rather than at the schema pass 1 broke — src/runtime/stats.ts
+`return paysOut ? { hooks: passive, tags: passive.tags } : { hooks: passive };` rewritten to
+`return paysOut ? { tags: passive.tags } : {};` — was KILLED by
+src/runtime/itemContribution.test.ts > a passive standing on a spent point > "answers a moment for
+whoever wears the copy, and does not once the copy comes off", re-run at its own file with the
+mutant still applied. No fixture needs both routes: the four hook blocks in
+content/combat-expansion.dsl all sit under a `# passive`, and no `# item` or `# entity` in the
+module declares one.
+- proof 8: met — Both directions are proved separately. Struck -> striker:
+src/runtime/hooks.test.ts > a passive an entity declares is carried by it > "answers the moment for
+a character that swings nothing and declares no action" takes 5 health off the player from an
+urchin's `when hit: drain: 5 health from them`, and the shipped urchin route does it end to end.
+Striker -> struck: src/runtime/buffs.test.ts > an applied buff is granted by the declaration it
+names > "lands on the other party when the phrase names one" puts venom on the rat and nothing on
+the player, and its sibling proves the carrier is the subject both for `to me` and for no phrase at
+all. What the clause does not cover, and what this pass found, is the refusal that keeps a party
+phrase inside a moment: mutation deleting src/grammar/actionResult.ts
+`if (result.kind === 'apply' && result.party !== undefined) return
+`${PREPOSITION.apply} ${result.party}`;` SURVIVED the whole suite, so `apply: venom to them` inside
+a `# droptable` would load with nothing noticing. Filed as a finding; the clause's own two
+directions hold.
+- proof 9: unmet — The property is true and re-runnable —
+`grep -rniE "\b(berserker|juggernaut|assassin)\b" src --include=*.ts --include=*.tsx --exclude=*.test.ts --exclude=*.test.tsx`
+exits 1 with no output, and there is no `cluster-effect:`
+and no selector anywhere in content/combat-expansion.dsl. What fails is the clause's own last
+sentence, "c2's command is what keeps that honest". It does not: c2's command names
+`poison|rage|thorns|accelerated vigor` and no archetype word, and pass 1's triage narrowed the
+derived sweep's forbidden set to declared ids, where an archetype is a keyword tag. Mutation: the
+exact plant pass 1 recorded as KILLED — an archetype word in shipped source, here
+`// Every effect on one cluster naming one stat joins one pool, so two 25% berserker` in
+src/runtime/clusterEffect.ts — now SURVIVED the whole suite, 0 failed of 3135. Archetype membership
+is currently asserted rather than checked, which is the one thing the Deliverable says this branch
+exists to prove. Unmet rather than a finding, because an unmet clause creates the work directly.
+- proof 10: met — Six jewels in three pairs, and the split is graded per archetype by derivation rather
+than by a global count: src/runtime/integration.test.ts > the archetype jewels are paired
+added-then-increased > "gives every archetype one flat jewel and one percent jewel, and no archetype
+two of a kind" groups jewels by an unshared keyword tag more than one of them carries, requires
+every jewel to fall in exactly one group, and requires each group to hold one added-led and one
+increased-led jewel. Mutation aimed at the grading rather than at the counting: rewriting the
+`retribution` jewel's `passives:` line in content/combat-expansion.dsl so its two
+`tutorial-island.hardened` positions become flat ones — giving juggernaut two added-led jewels while
+leaving the global 3/3 count intact — was KILLED by that named test, re-run at its own file with the
+mutant still applied. Positions still match the retired trial read back with
+`git show b00c105^:docs/smithing/cluster-jewels-draft.dsl`. One coupling in that derivation is filed
+as a finding: the grouping tag is "unshared", which is a fact about tutorial-island's tags.
+- proof 11: met — One file, content/combat-expansion.dsl, one `# info combat-expansion` with
+`dependencies: tutorial-island`, and no loader change: it reaches the browser through the same
+`import.meta.glob('../../content/*.dsl', ...)` src/ui/shippedContent.ts already had and reaches the
+tests through `readdirSync('content')` in three places that used to hold hand-written module lists
+(src/ui/shippedContent.test.ts, src/runtime/integration.test.ts, src/content/serialize.test.ts).
+Mutation: narrowing that glob to `'../../content/tutorial-island.dsl'` was KILLED by
+src/ui/shippedContent.test.ts > the content the build carries > "bundles every shipped DSL as text,
+with no path left for the browser to fetch", re-run at its own file with the mutant still applied.
+The whole universe also round-trips: `npm run tasks -- merge-ready` runs
+src/content/serialize.test.ts > "preserves the loaded semantics of every shipped module, as one
+universe" green.
+- proof 12: met — `npm run tasks -- merge-ready` on 1c541be: tsc ok, npm test ok (3135 tests, inside the
+five-minute rule), layer-check ok, audit-status ok, doctor ok (23 warnings, none of which fails the
+leg), bytes ok, tree ok, base ok, and `clauses archetype-mods` ok — that last leg turned green as
+pass 1 predicted it would. The command still exits NOT merge-ready on one leg, `spec
+archetype-mods`, which reports "1 open member(s): archetype-mods" — the branch's own in-progress
+task record, which is what "before the spec is marked done" describes. Same standing pass 1 graded
+met, re-measured on this head.
