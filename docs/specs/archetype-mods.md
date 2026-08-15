@@ -11,6 +11,12 @@ What changed underneath it: there is no `# mod` and no rolled graph. An item is 
 being allocated. The content this branch owes is unchanged in substance — the same four effects
 across the same three archetypes — and every section kind it names has moved.
 
+## Goal
+
+Three archetypes exist as content and as nothing else, so that the engine is shown to have
+generalized rather than grown special cases. Four effects of four different shapes, all authored as
+passives a player allocates, and no identifier below the DSL named after any of them.
+
 ## Deliverable
 
 The three archetypes, authored as content and nothing else. `combat-events` owes the primitives and
