@@ -130,6 +130,7 @@ export const ENGINE_KEYS = [
   // of them is drawing; `repl` is the terminal's alone, because a screen shows
   // a clock and a resource bar as shapes rather than as lines of text.
   'engine.shell.map',
+  'engine.shell.recentre',
   'engine.shell.edit',
   'engine.shell.home',
   'engine.shell.settings',

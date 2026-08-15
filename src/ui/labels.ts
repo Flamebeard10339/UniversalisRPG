@@ -18,6 +18,7 @@ export const LABELS = {
   equipment: 'engine.shell.equipment',
   inventory: 'engine.shell.inventory',
   command: 'engine.shell.command',
+  recentre: 'engine.shell.recentre',
   run: 'engine.shell.run',
   level: 'engine.shell.level',
   points: 'engine.shell.points',

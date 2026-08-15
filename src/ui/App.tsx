@@ -82,7 +82,7 @@ export function App({ driver, opening = OPENING }: { driver: Driver; opening?: W
       if (subpage.id === 'home') return <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} />;
       return subpage.id === 'edit' ? <Console onSend={driver.send} words={words} /> : null;
     }
-    if (layer.id === 'map') return <MapPane view={view} arrivals={arrivals} generation={generation} onChoose={driver.choose} />;
+    if (layer.id === 'map') return <MapPane view={view} arrivals={arrivals} generation={generation} words={words} onChoose={driver.choose} />;
     if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? [], localizer)} />;
     if (subpage.id === 'skills') return <Ledger entries={counted(view?.xp ?? [], localizer)} />;
     // Both sides of what the player has are rows that act, because c21 puts a

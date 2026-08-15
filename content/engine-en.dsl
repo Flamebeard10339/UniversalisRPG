@@ -121,6 +121,7 @@ engine.command.invalid-choice: invalid choice: {choice}
 engine.command.speed: Speed set to {speed}x.
 engine.command.stopped: Stopped.
 engine.shell.map: Map
+engine.shell.recentre: Recentre
 engine.shell.edit: Edit
 engine.shell.home: Home
 engine.shell.settings: Settings

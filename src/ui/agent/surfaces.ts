@@ -1,4 +1,5 @@
-import { clampZoom, type Point, type Sheet } from '../discovery';
+import type { Sheet } from '../discovery';
+import { clampZoom, type Point } from '../viewport';
 import { clampIndex } from '../gesture';
 import type { LabelId } from '../labels';
 import { LAYERS, subpageOf, toLayer, toSubpage, type LayerId, type Where } from '../nav';
@@ -111,6 +112,7 @@ export interface MapView {
 export interface MapControls {
   settle(pan: Point, zoom: number): void;
   plane(at: number): void;
+  recentre(): void;
 }
 
 export function mapState(map: MapView): MapState {
@@ -123,7 +125,7 @@ export function mapState(map: MapView): MapState {
   };
 }
 
-// The three things the map holds that the session does not, offered by their
+// The four things the map holds that the session does not, offered by their
 // own names. Each goes through the same settling a gesture does, so a pan an
 // agent asks for and a pan a finger asks for come to rest in the same place.
 export function mapSurface(map: MapView, controls: MapControls): TestSurface {
@@ -133,6 +135,7 @@ export function mapSurface(map: MapView, controls: MapControls): TestSurface {
       pan: (value) => controls.settle(pointFrom(value), map.zoom),
       zoom: (value) => controls.settle(map.pan, zoomFrom(value)),
       plane: (value) => controls.plane(planeFrom(value, map.sheet.planes)),
+      recentre: () => controls.recentre(),
     },
   };
 }
