@@ -84,7 +84,7 @@ Proof:
   namespace and language from the owner while the label came from the declaration, so an English
   action used by an entity in a module declaring another language renders its raw key to a player of
   either one, with no `# locale` line able to repair it.
-  proof: vitest src/content/locale.test.ts
+  proof: vitest src/content/locale.test.ts src/runtime/localized.test.ts
 - [c8] **What does not change is stated and proven.** Every `# test` over the shipped content passes,
   `scripts/drift.test.ts` still holds the two drivers' transcripts equal entry by entry, and no save
   field, `SAVE_VERSION` or authored content id moves. Three things a reader sees do move, and they

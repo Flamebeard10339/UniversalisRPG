@@ -6,7 +6,7 @@ import { HOOK_LABELS } from '../grammar/hook';
 import { ClusterJewel, clusterJewelProblem, clusterJewelSchema } from './clusterJewel';
 import { Dialogue, parseSegments, Spoken } from './dialogue';
 import { DropTable } from './dropTable';
-import { actionAddress, ActionDeclaration } from './action';
+import { actionAddress, ActionDeclaration, actionTextKey, actionTextOwner } from './action';
 import { AuthoredEntity, Entity, EntityBlock, entitySchema, Handler, isHandlerBlock } from './entity';
 import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
@@ -286,19 +286,23 @@ function recordBaseText(registry: Registry, kind: string, authored: Record<strin
   }
 }
 
-// An action is keyed on what addresses it, so its label is the entry under that
-// key and nothing else. Run over the built registry because an entity's actions
-// are assembled after its section is.
+// An action is keyed on what addresses it under whoever wrote its label, which
+// `actionTextOwner` decides: an address is unique per performer and the words
+// are not, so a declaration a dozen entities `use:` is one key and not a dozen
+// copies of one English string. Run over the built registry because an entity's
+// actions are assembled after its section is, so a used declaration is reached
+// once here and again from its own row — writing one key twice from one label
+// rather than needing an order between the two.
 function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly Action[]): void {
-  const namespace = registry.namespace.ownerOf(kind, id) ?? null;
-  const language = languages.get(namespace) ?? DEFAULT_LANGUAGE;
   const taken = new Set<string>();
   for (const action of actions) {
     const slug = actionAddress(action);
     const problem = actionSlugProblem(slug, action.label, taken);
     if (problem) throw new DslError(`# ${kind} ${id}: ${problem}`);
     taken.add(slug);
-    const key = localeKey(namespace, kind, id, slug);
+    const owner = actionTextOwner(registry.namespace, kind, id, action);
+    const language = languages.get(owner.namespace) ?? DEFAULT_LANGUAGE;
+    const key = actionTextKey(owner);
     registry.locales.addressable.add(key);
     // A generated label is `humanizeEn` of an id, so it is an entry for English
     // and for nothing else — the same gate `defaultTitle` applies, applied
@@ -414,7 +418,7 @@ function localeValueProblem(locales: Locales, language: string, key: string, val
 // visible string with two keys that a translator has to fill in twice.
 // Every table of actions a player can be offered one from, each beside the id
 // that owns it — which is what lets a refusal name the module to blame.
-function everyActionTable(registry: Registry): Array<[string, string, readonly Action[]]> {
+export function everyActionTable(registry: Registry): Array<[string, string, readonly Action[]]> {
   return [
     ...[...registry.entities.values()].map((entity) => ['entity', entity.id, entity.actions] as [string, string, readonly Action[]]),
     ...[...registry.locations.values()].map((location) => ['location', location.id, location.actions] as [string, string, readonly Action[]]),

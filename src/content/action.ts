@@ -1,6 +1,7 @@
 import { Action, actionBody, actionProblem, assembledActionProblem } from '../grammar/action';
-import { actionSlug } from './locale';
+import { actionSlug, localeKey } from './locale';
 import { declaredId } from './entity';
+import { Namespace } from './namespace';
 import { DslError } from '../grammar/parser';
 import { humanizeEn, lastSegment } from '../grammar/values';
 import { RawSection } from '../grammar/structure';
@@ -21,6 +22,28 @@ export function actionAddress(action: Action): string {
   const id = declaredId(action);
   return id === undefined ? actionSlug(action.label) : lastSegment(id);
 }
+
+// Where an action's display words are written, which is not where every
+// performer of it stands: a `# action` owns the label it was declared with, and
+// an entity's overload cannot retitle it because `overlayAction` drops `label`,
+// so a `use:` never authors words. One declaration is therefore one key however
+// many owners bring it, and the language those words are in is the declaring
+// module's rather than the performer's. An inline block has no declaration and
+// is owned by the object it was written under.
+export interface ActionTextOwner {
+  namespace: string | null;
+  kind: string;
+  id: string;
+  field: string;
+}
+
+export function actionTextOwner(namespace: Namespace, kind: string, ownerId: string, action: Action): ActionTextOwner {
+  const declared = declaredId(action);
+  const owner = declared === undefined ? { kind, id: ownerId } : { kind: 'action', id: declared };
+  return { ...owner, namespace: namespace.ownerOf(owner.kind, owner.id) ?? null, field: actionAddress(action) };
+}
+
+export const actionTextKey = (owner: ActionTextOwner): string => localeKey(owner.namespace, owner.kind, owner.id, owner.field);
 
 const TITLE = /^title:[ \t]*/;
 

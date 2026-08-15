@@ -1,3 +1,5 @@
+import { Action } from '../grammar/action';
+import { actionTextKey, actionTextOwner } from '../content/action';
 import { EngineKey, localeKey, Locales } from '../content/locale';
 import { parseSegments, TextSegment } from '../content/dialogue';
 import { Registry } from '../content/registry';
@@ -71,8 +73,11 @@ export interface Localizer {
   // that has one; this is for the caller that has something else to show (c1).
   words(kind: string, id: string, field: string, params?: Params): Localized | undefined;
   title(kind: string, id: string): Localized;
-  // An action's display, keyed on what addresses it under its owner.
-  actionLabel(kind: string, ownerId: string, slug: string): Localized;
+  // An action's display, keyed on what addresses it under whoever wrote its
+  // label — the declaration a `use:` brought, or the object that headed the
+  // block. The action is asked for rather than its slug, because which of the
+  // two owns the words is a property of the action and not of the performer.
+  actionLabel(kind: string, ownerId: string, action: Action): Localized;
   // Prose the DSL wrote, at the address the load path stamped on it: the object
   // that authored it and its place in that object (c6). The key is whole
   // already, so this is the one door that is handed one rather than told how to
@@ -104,20 +109,24 @@ const contentKey = (registry: Registry, kind: string, id: string, field: string)
 
 export function localizerFor(registry: Registry, language: string): Localizer {
   const { locales } = registry;
+  // The one door every other one is: the played language's words for a key, or
+  // the key itself where it has none (c3). Nothing that reaches a player is
+  // assembled anywhere else.
+  const keyed = (key: string, params: Params): Localized => {
+    const found = pattern(locales, language, key);
+    return (found === undefined ? key : substitute(found, key, params)) as Localized;
+  };
   const self: Localizer = {
     language,
-    engine: (key, params = {}) => {
-      const found = pattern(locales, language, key);
-      return (found === undefined ? key : substitute(found, key, params)) as Localized;
-    },
-    content: (kind, id, field, params = {}) => self.words(kind, id, field, params) ?? (contentKey(registry, kind, id, field) as Localized),
+    engine: (key, params = {}) => keyed(key, params),
+    content: (kind, id, field, params = {}) => keyed(contentKey(registry, kind, id, field), params),
     words: (kind, id, field, params = {}) => {
       const key = contentKey(registry, kind, id, field);
       const found = pattern(locales, language, key);
       return found === undefined ? undefined : (substitute(found, key, params) as Localized);
     },
     title: (kind, id) => self.content(kind, id, 'title'),
-    actionLabel: (kind, ownerId, slug) => self.content(kind, ownerId, slug),
+    actionLabel: (kind, ownerId, action) => keyed(actionTextKey(actionTextOwner(registry.namespace, kind, ownerId, action)), {}),
     spoken: (key) => (pattern(locales, language, key) ?? key) as Localized,
     line: (key, render) => render(parseSegments(self.spoken(key), 0)) as Localized,
     identifier: (id) => id as Localized,

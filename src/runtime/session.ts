@@ -214,7 +214,7 @@ function fightChoices(registry: Registry, state: GameState, location: Location):
       if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
       if (!requiresMet(action, state) || !actionVisible(action, state)) continue;
       if (action.depletes.side === 'their' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
-      choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, actionAddress(action)), detail: localizer.title('entity', entityId) });
+      choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action), detail: localizer.title('entity', entityId) });
     }
   }
   return choices;
@@ -242,7 +242,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     }
     for (const action of availableActions(entity, state)) {
       const slug = actionAddress(action);
-      choices.push({ id: useChoiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, slug), detail: localizer.title('entity', entityId), leadsTo: movesTo(action) });
+      choices.push({ id: useChoiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, action), detail: localizer.title('entity', entityId), leadsTo: movesTo(action) });
     }
   }
 
@@ -250,7 +250,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 
   for (const action of availableActions(location, state)) {
     const slug = actionAddress(action);
-    choices.push({ id: useChoiceId({ kind: 'use', obj: 'location', objId: location.id, actionId: slug }), kind: 'action', label: localizer.actionLabel('location', location.id, slug), detail: localizer.title('location', location.id) });
+    choices.push({ id: useChoiceId({ kind: 'use', obj: 'location', objId: location.id, actionId: slug }), kind: 'action', label: localizer.actionLabel('location', location.id, action), detail: localizer.title('location', location.id) });
   }
 
   // Item actions are offered per item the player has, however the copies are
@@ -265,7 +265,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     if (!item) continue;
     for (const action of availableActions(item, state)) {
       const slug = actionAddress(action);
-      choices.push({ id: useChoiceId({ kind: 'use', obj: 'item', objId: itemId, actionId: slug }), kind: 'action', label: localizer.actionLabel('item', itemId, slug), detail: localizer.title('item', itemId) });
+      choices.push({ id: useChoiceId({ kind: 'use', obj: 'item', objId: itemId, actionId: slug }), kind: 'action', label: localizer.actionLabel('item', itemId, action), detail: localizer.title('item', itemId) });
     }
   }
 
@@ -480,10 +480,10 @@ function publishResources(state: GameState, registry: Registry): PlayStatus['res
 // A travel action is compiled per pair of places rather than declared under
 // one, so there is no owner to key its display on and the engine's own pattern
 // says it — the same one the choice that started the walk was labelled with.
-function actionUnderWay(localizer: Localizer, obj: string, objId: string, slug: string): Localized {
+function actionUnderWay(localizer: Localizer, obj: string, objId: string, action: Action): Localized {
   if (obj === 'travel') return travelLabel(localizer, objId.slice(objId.indexOf(TRAVEL_PAIR) + 1));
   if (obj === 'recipe') return craftLabel(localizer, objId);
-  return localizer.actionLabel(obj, objId, slug);
+  return localizer.actionLabel(obj, objId, action);
 }
 
 function publishAction(state: GameState, registry: Registry): PlayAction | null {
@@ -493,11 +493,14 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
   const cycle = actionFirstUnit(obj, objId, active.actionSlug, registry, state);
   const clock = playerCadence(active);
   const localizer = localizerOf(registry, state);
+  // The performer's own copy, which is what the rest of this frame reads and
+  // what carries the declaration the display is keyed on.
+  const action = armedAction(state, registry);
   return {
-    label: actionUnderWay(localizer, obj, objId, active.actionSlug),
+    label: actionUnderWay(localizer, obj, objId, action),
     progress: cycle > 0 ? Math.min(1, Math.max(0, clock.progress / cycle)) : 1,
     attempts: clock.attemptsMade,
-    targeted: Boolean(armedAction(state, registry).depletes),
+    targeted: Boolean(action.depletes),
     completion: fromMilliUnits(active.implicitTarget),
   };
 }

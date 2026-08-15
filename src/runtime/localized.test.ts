@@ -2,6 +2,8 @@ import { readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { actionAddress } from '../content/action';
+import { declaredId } from '../content/entity';
+import { everyActionTable } from '../content/registry';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { ENGINE_KEYS } from '../content/locale';
 import { hasWords } from '../content/translation';
@@ -217,11 +219,38 @@ describe('an action is displayed under the address it is identified by', () => {
   const registry = loadUniverse([engineLocale(), { name: 'hall', text: DOOR }, { name: 'hall-es', text: DOOR_ES }]);
 
   it('looks the display up under the slug a use: and a # test spell', () => {
-    expect(localizerFor(registry, 'es').actionLabel('entity', 'hall.door', 'pick-lock')).toBe('Forzar la cerradura');
+    expect(localizerFor(registry, 'es').actionLabel('entity', 'hall.door', registry.entities.get('hall.door')!.actions[0])).toBe('Forzar la cerradura');
     expect(actionAddress(registry.entities.get('hall.door')!.actions[0])).toBe('pick-lock');
   });
 
   it('leaves the label the display text and nothing else', () => {
     expect(registry.entities.get('hall.door')?.actions[0].label).toBe('pick lock');
+  });
+});
+
+// c7, the half no content-layer test can reach: one `# locale` line under the
+// declaration has to move the words for every owner that performs it, which is
+// a lookup and not a table. Derived over the loader's own walk and the shipped
+// island, so a declaration added to the content is covered here unedited — and
+// over a translation minted from the declarations themselves rather than a
+// hand-written locale that would go stale beside them.
+describe('one line translates an action for every owner that performs it (c7)', () => {
+  const source = readFileSync('content/tutorial-island.dsl', 'utf8');
+  const english = loadUniverse([engineLocale(), { name: 'tutorial-island', text: source }]);
+  const declarations = [...english.actions.keys()];
+  const locale = ['# info isla-es', 'version: 1.0.0', 'dependencies:', '  tutorial-island', '', '# locale es', ...declarations.map((id) => `${english.namespace.ownerOf('action', id) ?? ''}.action.${id.split('.').pop()}.${id.split('.').pop()}: ES ${id}`)];
+  const registry = loadUniverse([engineLocale(), { name: 'tutorial-island', text: source }, { name: 'isla-es', text: locale.join('\n') }]);
+  const say = localizerFor(registry, 'es');
+  const performed = everyActionTable(registry).flatMap(([kind, ownerId, actions]) => actions.filter((action) => declaredId(action) !== undefined).map((action) => ({ kind, ownerId, action })));
+
+  it('has shipped declarations, performed under owners of more than one kind', () => {
+    expect(declarations.length).toBeGreaterThan(0);
+    expect(new Set(performed.map((each) => each.kind)).size).toBeGreaterThan(1);
+  });
+
+  it('shows every performer the translated words, and never the untranslated label', () => {
+    for (const { kind, ownerId, action } of performed) {
+      expect(say.actionLabel(kind, ownerId, action)).toBe(`ES ${declaredId(action)}`);
+    }
   });
 });

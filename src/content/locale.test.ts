@@ -1,6 +1,9 @@
+import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { actionSlug, actionSlugProblem, missingTranslations, unmatchedLocaleKeys } from './locale';
-import { CONTENT_SECTION_MAPS, loadModule, loadUniverse, type Registry } from './registry';
+import { declaredId } from './entity';
+import { actionAddress } from './action';
+import { actionSlug, actionSlugProblem, localeKey, missingTranslations, unmatchedLocaleKeys } from './locale';
+import { CONTENT_SECTION_MAPS, everyActionTable, loadModule, loadUniverse, type Registry } from './registry';
 import { sameValue } from './registryDiff';
 import { serializeRegistryModule } from './serialize';
 import type { ModuleSource } from './universe';
@@ -162,6 +165,63 @@ describe('an action is keyed on what addresses it, not on what it says', () => {
   it('takes an address opening with a digit, and refuses one that is no key at all', () => {
     expect(actionSlugProblem('3-card-monte', '3 card monte', new Set())).toBeUndefined();
     expect(actionSlugProblem('', '...', new Set())).toMatch(/give it a label with a letter or a digit in it/);
+  });
+});
+
+// c7. A declaration owns its label, so every owner a `use:` hands it to reads
+// one key rather than minting a copy of one English string per performer. The
+// subjects are derived: `everyActionTable` is the loader's own walk, so an
+// owner kind added later is covered here without this test being edited, and
+// the shipped island is walked rather than a fixture standing in for it.
+describe('an action declared once carries one key, however many owners perform it (c7)', () => {
+  const island = loadUniverse([{ name: 'tutorial-island', text: readFileSync('content/tutorial-island.dsl', 'utf8') }]);
+  const performed = everyActionTable(island).flatMap(([kind, ownerId, actions]) =>
+    actions.filter((action) => kind !== 'action' && declaredId(action) !== undefined).map((action) => ({ kind, ownerId, action })),
+  );
+
+  // The walk above is vacuous unless the shipped content actually hands one
+  // declaration to more than one owner, which is the shape the defect was in.
+  it('has shipped content that hands one declaration to several owners', () => {
+    const perDeclaration = new Map<string, number>();
+    for (const { action } of performed) perDeclaration.set(declaredId(action)!, (perDeclaration.get(declaredId(action)!) ?? 0) + 1);
+
+    expect([...perDeclaration.values()].some((count) => count > 1)).toBe(true);
+  });
+
+  it('writes the words under the declaration, in the language the declaration was written in', () => {
+    for (const { action } of performed) {
+      const id = declaredId(action)!;
+      const key = localeKey(island.namespace.ownerOf('action', id) ?? null, 'action', id, actionAddress(action));
+
+      expect(island.locales.base.get(key)?.text).toBe(action.label);
+      expect(island.locales.base.get(key)?.language).toBe('en');
+    }
+  });
+
+  it('writes none under the performer, so no translator fills one word once per performer', () => {
+    const perOwner = performed
+      .map(({ kind, ownerId, action }) => localeKey(island.namespace.ownerOf(kind, ownerId) ?? null, kind, ownerId, actionAddress(action)))
+      .filter((key) => island.locales.base.has(key) || island.locales.addressable.has(key));
+
+    expect(perOwner).toEqual([]);
+  });
+});
+
+// The other half of c7: the label came from the declaration all along, so
+// taking the language from the performer claimed an English string was Spanish
+// and left every player of either language with no line that could repair it.
+describe('an action crossing a language boundary keeps the language its declaration was written in (c7)', () => {
+  const ENGLISH = ['# info hall', 'version: 1.0.0', '', '# action pick-lock', 'title: Pick the lock', 'instant', 'say: click'].join('\n');
+  const SPANISH_USER = ['# info casa', 'version: 1.0.0', 'language: es', 'dependencies:', '  hall', '', '# entity puerta', 'title: Puerta', 'uses: hall.pick-lock'].join('\n');
+  const registry = loadUniverse([{ name: 'hall', text: ENGLISH }, { name: 'casa', text: SPANISH_USER }]);
+
+  it('keys the words under the English declaration and calls them English', () => {
+    expect(registry.locales.base.get('hall.action.pick-lock.pick-lock')).toEqual({ text: 'Pick the lock', language: 'en' });
+  });
+
+  it('leaves the Spanish performer no key of its own to disagree at', () => {
+    expect(registry.locales.base.has('casa.entity.puerta.pick-lock')).toBe(false);
+    expect(registry.locales.addressable.has('casa.entity.puerta.pick-lock')).toBe(false);
   });
 });
 
