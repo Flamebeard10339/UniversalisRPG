@@ -180,19 +180,33 @@ describe('a skill level feeding the stat it names', () => {
 });
 
 describe('crossing a level threshold', () => {
-  it('moves the stat the skill names and leaves the rest of the state alone', () => {
+  it('moves the stat the skill names, says so, and leaves the rest of the state alone', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
     initResources(state, registry);
     state.xp = { brawling: xpForLevel(4) - 1 };
 
-    const before = { ...structuredClone(state), xp: undefined };
+    const before = { ...structuredClone(state), xp: undefined, log: undefined };
     expect(statValue('attack', state, registry)).toBe(13);
 
     applyResultsNow(state, registry, [{ kind: 'xp', skill: 'brawling', amount: point(1) }]);
 
     expect(statValue('attack', state, registry)).toBe(14);
-    expect({ ...structuredClone(state), xp: undefined }).toEqual(before);
+    // The one thing besides the total that a crossing moves: the world says it,
+    // because a level is derived from the total and nothing else can tell.
+    expect(state.log).toEqual(['engine.skill.levelled']);
+    expect({ ...structuredClone(state), xp: undefined, log: undefined }).toEqual(before);
+  });
+
+  it('says nothing when the total moves without crossing anything', () => {
+    const registry = loaded();
+    const state = createGameState('nowhere');
+    initResources(state, registry);
+    state.xp = { brawling: xpForLevel(4) };
+
+    applyResultsNow(state, registry, [{ kind: 'xp', skill: 'brawling', amount: point(1) }]);
+
+    expect(state.log).toEqual([]);
   });
 
   it('stores the total and never the level, so the level is derived on demand', () => {

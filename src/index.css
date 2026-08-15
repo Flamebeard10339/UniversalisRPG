@@ -22,6 +22,7 @@
   --color-warning: #fbbf24;
   --color-scrim: rgb(11 16 32 / 0.72);
   --color-flash: rgb(103 232 249 / 0.22);
+  --color-gilt: rgb(251 191 36 / 0.35);
   background: var(--color-background);
   color: var(--color-text);
   font-family:
@@ -90,6 +91,35 @@ textarea {
   }
 }
 
+@keyframes drifted {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  15% {
+    opacity: 1;
+    transform: none;
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0.75rem);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+}
+
+@keyframes stirring {
+  0%,
+  100% {
+    background-image: none;
+  }
+  50% {
+    background-image: linear-gradient(100deg, transparent 20%, var(--color-gilt) 50%, transparent 80%);
+  }
+}
+
 @keyframes darkened {
   from {
     background-color: transparent;
@@ -108,6 +138,18 @@ textarea {
   animation: darkened 180ms ease-out;
 }
 
+/* The whole life of one line, so it leaves without anything asking it to. Kept
+   in step with NOTE_LIFETIME_MS by nothing but a reader: the queue drops the
+   line at two seconds and the animation has to be over by then. */
+.drifted {
+  animation: drifted 2000ms linear;
+}
+
+/* A slow gold wave over the banner, running until the player goes and looks. */
+.stirring {
+  animation: stirring 2400ms ease-in-out infinite;
+}
+
 /* Long enough to be seen landing and short enough that a cluster of a dozen is
    finished before a thumb has moved. */
 .sprouted {
@@ -118,7 +160,9 @@ textarea {
   .arrived,
   .risen,
   .darkened,
-  .sprouted {
+  .sprouted,
+  .drifted,
+  .stirring {
     animation: none;
   }
 }

@@ -121,11 +121,16 @@ engine.command.invalid-choice: invalid choice: {choice}
 engine.command.speed: Speed set to {speed}x.
 engine.command.stopped: Stopped.
 engine.shell.map: Map
+engine.skill.levelled: Congratulations! You have levelled up {skill} to level {level}!
 engine.shell.recentre: Recentre
 engine.shell.socket: Jewel socket
 engine.shell.allocate: Allocate
 engine.shell.insert: Socket a jewel
 engine.shell.feed: Feed
+engine.shell.experience: Experience
+engine.shell.to-next: To next level
+engine.shell.an-hour: Experience an hour
+engine.shell.until-next: Until next level
 engine.shell.edit: Edit
 engine.shell.home: Home
 engine.shell.settings: Settings

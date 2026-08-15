@@ -24,6 +24,7 @@ import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSa
 import { Directive, parseUseChoiceId, useChoiceId } from '../content/test';
 import { printDirective } from '../content/serialize';
 import { Answer, AnswerTable, Localized, Localizer, localizerOf } from './localized';
+import { skillLevel, xpForLevel } from './skills';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 import { say } from './said';
 
@@ -61,6 +62,18 @@ export interface CountedRow {
   id: Answer;
   title: Localized;
   value: number;
+}
+
+// A skill, which is a counted row that has a curve behind it. The level and
+// where inside it the total sits are published rather than left to be worked
+// out, because the curve is the engine's: a screen drawing a ring that filled
+// by its own arithmetic would be a second implementation of `xpForLevel`, and
+// the one place it is allowed to disagree with the stat it feeds.
+export interface SkillRow extends CountedRow {
+  level: number;
+  // Experience earned inside the current level, and what the whole level costs.
+  earned: number;
+  span: number;
 }
 
 // Everything the engine shows, as copies: a driver renders this and reaches
@@ -105,7 +118,7 @@ export interface PlayStatus {
   // What the player has learned and what the world has made of them: a row each,
   // carrying the title the page draws beside the number, so no page reads a
   // dictionary's keys as row names (c9, c10).
-  xp: CountedRow[];
+  xp: SkillRow[];
   stats: CountedRow[];
   flags: AnswerTable<boolean | number>;
   discovered: Array<{ id: Answer; title: Localized; x: number; y: number; z: number; adjacent: Array<{ to: Answer; open: boolean }> }>;
@@ -428,7 +441,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     planes: planeReports(registry, state),
     focus: modalFocus(state),
     equipment: wornRows(state, registry),
-    xp: Object.entries(state.xp).map(([id, value]) => ({ id, title: localizer.title('skill', id), value })),
+    xp: Object.entries(state.xp).map(([id, value]) => skillRow(id, value, localizer)),
     stats: [...registry.stats.values()].map((stat) => ({ id: stat.id, title: localizer.title('stat', stat.id), value: statValue(stat.id, state, registry) })),
     flags: { ...state.flags },
     discovered: publishDiscovered(state, registry),
@@ -436,6 +449,14 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     player: { ...state.player },
     action: publishAction(state, registry),
   };
+}
+
+// One skill as a screen reads it: the total, the level it has reached, and the
+// two figures that say where inside that level it stands.
+function skillRow(id: string, value: number, localizer: Localizer): SkillRow {
+  const level = skillLevel(value);
+  const foot = xpForLevel(level);
+  return { id, title: localizer.title('skill', id), value, level, earned: value - foot, span: xpForLevel(level + 1) - foot };
 }
 
 // What the inventory screen lists, for a driver that holds an id and needs the

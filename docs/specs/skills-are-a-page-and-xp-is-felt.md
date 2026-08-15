@@ -13,9 +13,10 @@ the xp total the view already publishes.
 
 Proof:
 
-- [c1] No level, threshold or progress figure is stored or restated. Every number the page draws is
-  derived from a published xp total through `src/runtime/skills.ts`, and the page's arithmetic is one
-  pure module with no clock and no view in it.
+- [c1] No level, threshold or progress figure is stored, and none is derived twice. The curve is read
+  once, in `src/runtime/skills.ts`, and the level a total has reached is published beside that total;
+  the page states it. The page's own arithmetic is one pure module with no clock, no curve and no
+  view in it.
   proof: vitest src/ui/skillPanels.test.ts
 - [c2] The page draws one panel per row the view publishes under `xp`, each carrying the skill's own
   title and its level inside a ring filled by the fraction of the way to the next one.
@@ -34,7 +35,7 @@ Proof:
   proof: vitest src/ui/xpNotes.test.ts
 - [c6] Crossing a level is said in the log, by the engine, in the played language, naming the skill
   and the level reached. It is said where the xp is granted, so every route that grants xp says it.
-  proof: vitest src/runtime/effects.test.ts
+  proof: vitest src/runtime/skills.test.ts
 - [c7] A crossed level marks the banner between the play surface and the character sheet and keeps it
   marked until the skills page has been looked at; opening that page acknowledges exactly the skills
   that crossed and settles everything back.
@@ -57,6 +58,12 @@ publishes and a curve that is already shipped.
 - **Extends** the one channel every played moment is begun on rather than opening a second: the xp
   line and the banner's mark are classes written in `transient.ts`, which is where the rule says an
   animation is named.
+- **Extends** what the view publishes for a skill rather than letting the shell read the curve.
+  `src/ui` may not reach into the runtime except through the play surface — the rule
+  `surface.test.ts` holds every module under it to — so a page deriving a level would either have
+  broken that rule or forced it open. Publishing `level`, `earned` and `span` on the skill row makes
+  the page a reader of the engine's answer, which is what every other page on the character sheet
+  already is, and leaves exactly one implementation of `xpForLevel` in the tree.
 - **Adds** one engine key and one log line to `src/runtime/effects.ts`. The level-up sentence is the
   engine's own words and belongs where the total moves, not in a shell that would have to infer the
   crossing from two views.

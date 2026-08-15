@@ -10,6 +10,7 @@ import type { ModalChoice } from './modals';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 import { apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
+import { skillLevel, xpForLevel } from './skills';
 import { inEnglish } from './sayFixture';
 import { parseDirectiveLine, useChoiceId, type UseDirective } from '../content/test';
 import { printDirective } from '../content/serialize';
@@ -798,7 +799,10 @@ describe('what the engine publishes', () => {
     expect(view(session).xp).toEqual([]);
 
     const forged = apply(session, 'craft:ingot');
-    expect(forged.xp).toEqual([{ id: 'smithing', title: 'Smithing', value: 5 }]);
+    // The level and where inside it the total stands are published beside the
+    // total, because the curve is the engine's and a screen drawing a ring must
+    // not re-derive it.
+    expect(forged.xp).toEqual([{ id: 'smithing', title: 'Smithing', value: 5, level: skillLevel(5), earned: 5 - xpForLevel(skillLevel(5)), span: xpForLevel(skillLevel(5) + 1) - xpForLevel(skillLevel(5)) }]);
     expect(forged.inventory).toEqual({ ingot: 1, gauntlet: 1 });
   });
 

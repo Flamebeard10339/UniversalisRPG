@@ -14,7 +14,7 @@ import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { LABELS, type LabelId } from './labels';
 import { wordsOf } from './words';
-import { LAYERS, OPENING, toLayer } from './nav';
+import { LAYERS, OPENING, toLayer, toSubpage } from './nav';
 
 // A run that is under way and going nowhere, which is what a test about what
 // is drawn wants: no timer, and the same frame however long the test takes.
@@ -195,6 +195,22 @@ function places(html: string): Array<{ id: string; runs: string[]; disabled: boo
     flashing: /\barrived\b/.test(attributes),
     left: offset(attributes, 'left'),
     top: offset(attributes, 'top'),
+  }));
+}
+
+// The skills page's panels, each as the skill it stands for and the runs inside
+// it. data-skill is written by SkillsPane and nothing else, and the runs are
+// taken whole rather than through `readable`, because a level is digits and
+// `readable` keeps only what has a letter in it.
+function skillPanels(html: string): Array<{ id: string; runs: string[]; ring: boolean }> {
+  return [...html.matchAll(/<button([^>]*data-skill="([^"]*)"[^>]*)>([\s\S]*?)<\/button>/g)].map(([, , id, inner]) => ({
+    id,
+    runs: inner
+      .replace(/<[^>]*>/g, '\n')
+      .split('\n')
+      .map((run) => run.trim())
+      .filter((run) => run !== ''),
+    ring: inner.includes('stroke-dashoffset'),
   }));
 }
 
@@ -611,6 +627,29 @@ describe('what the shell puts on the screen', () => {
       const centre = { x: ((Math.min(...xs) + Math.max(...xs)) / 2) * PER_UNIT, y: ((Math.min(...ys) + Math.max(...ys)) / 2) * PER_UNIT };
 
       expect(under).toEqual({ x: -centre.x, y: -centre.y, zoom: 1 });
+    });
+
+    it('draws one skill panel per row the view publishes, each with its own level in its own ring', () => {
+      const driver = createDriver([SURVEYED], { ticker: noTicks });
+      driver.choose(position(driver, LOOK_OUT));
+      const view = driver.snapshot().view!;
+      // Where the skills page is: the character layer, on the page the nav
+      // names, rather than an index this test would have to keep in step.
+      const skills = LAYERS[2].subpages.findIndex((subpage) => subpage.id === 'skills');
+      const where = toSubpage(toLayer(OPENING, 2), 2, skills);
+
+      const drawn = skillPanels(renderToStaticMarkup(<App driver={driver} opening={where} />));
+
+      expect(view.xp.length).toBeGreaterThan(0);
+      expect(drawn.map((panel) => panel.id).sort()).toEqual(view.xp.map((row) => row.id).sort());
+      for (const row of view.xp) {
+        const panel = drawn.find((each) => each.id === row.id)!;
+
+        expect(onScreen(panel.runs, row.title as unknown as string), `the panel does not name ${row.id}`).toBe(true);
+        // The level, inside the ring that fills toward the next one.
+        expect(onScreen(panel.runs, String(row.level)), `the panel does not draw the level of ${row.id}`).toBe(true);
+        expect(panel.ring, `the panel for ${row.id} draws no ring`).toBe(true);
+      }
     });
 
     it('draws the nav standing where it was opened, so a shell handing over a constant is markup that shows it', () => {

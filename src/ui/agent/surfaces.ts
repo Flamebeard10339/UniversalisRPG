@@ -5,6 +5,7 @@ import { clampIndex } from '../gesture';
 import type { LabelId } from '../labels';
 import { LAYERS, subpageOf, toLayer, toSubpage, type LayerId, type Where } from '../nav';
 import type { PlaneGraph, Plane } from '../planeGraph';
+import { filled, type SkillPanel } from '../skillPanels';
 import type { TestSurface } from '../testSurface';
 
 // Everything here exists to be driven and nothing here is drawn, so the whole
@@ -184,9 +185,32 @@ export function planeSurface(held: AgentSurfaces['plane']): TestSurface {
 
 // What each component hands over: the values it already holds and the callbacks
 // it already has, with no surface built at the call site.
+// What the skills page holds that the view does not: the levels and rings it
+// derived, and which panel is open. Opening one is offered by the skill's own
+// id, which is what the view names it by.
+export function skillsSurface(held: AgentSurfaces['skills']): TestSurface {
+  return {
+    state: () => ({
+      opened: held.opened,
+      greeted: held.greeted,
+      panels: held.panels.map((panel) => ({ id: panel.id, level: panel.level, total: panel.total, into: panel.into, span: panel.span, toNext: panel.toNext, filled: filled(panel) })),
+    }),
+    actions: {
+      open: (value) => held.controls.open(value === null ? null : skillNamed(held.panels, value)),
+    },
+  };
+}
+
+export function skillNamed(panels: readonly SkillPanel[], value: unknown): Answer {
+  const panel = panels.find((each) => each.id === value);
+  if (!panel) throw new Error(`the character has no skill called ${String(value)}`);
+  return panel.id;
+}
+
 export interface AgentSurfaces {
   shell: { where: Where; go: (where: Where) => void };
   map: { map: MapView; controls: MapControls };
+  skills: { panels: readonly SkillPanel[]; opened: Answer | null; greeted: readonly Answer[]; controls: { open(id: Answer | null): void } };
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
 }
 
@@ -194,4 +218,5 @@ export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurface
   shell: ({ where, go }) => shellSurface(where, go),
   map: ({ map, controls }) => mapSurface(map, controls),
   plane: (held) => planeSurface(held),
+  skills: (held) => skillsSurface(held),
 };
