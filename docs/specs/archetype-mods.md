@@ -176,6 +176,45 @@ was made.
   their cluster scale alone, so such a payload was silently worth its declared magnitude once. The
   fix is in the fold and the plane screen now prints the counter beside the number it states.
 
+## Triage of pass 1
+
+Every finding pass 1 filed was promoted and fixed on this branch. What each fix decided:
+
+- **The shipped round trip reads `content/`, and reloads it as one universe.** It named
+  `content/tutorial-island.dsl` literally, which was the third hand-written copy of "which modules
+  ship" and the one covering the two serializer branches this diff wrote. As one universe rather
+  than one module at a time, because a module naming another's ids does not load alone.
+- **One `applyDeclared` in `buffs.ts`, spent by both routes into a buff**, and an `apply:` naming a
+  source that declares no duration is refused at load. The two callers already disagreed about what
+  they refused, and a payload granted at an instant already past is gone at the next boundary with
+  nothing said anywhere. The refusal rides on the reference site the resolver already walks, keyed
+  by an exported constant so the walk that writes the site and the check that reads it cannot
+  disagree about its spelling.
+- **The dangling-reference prune reaches a passive, an entity's `passives:`, and a jewel's
+  positions.** A passive is rebuilt the way an item is rather than dropped, because what a jewel
+  placed it for outlives a payload whose stat went; a position whose passive is gone is an empty
+  position rather than a broken jewel. The prune still enumerates an entity's fields by hand — it
+  prunes partially where every other kind is all-or-nothing, and rewriting it to derive its fields
+  from `visitSection` is the open finding that already tracks three cluster sites with the same gap.
+- **The no-shipped-identifier sweep draws its words from declared ids alone.** Drawing them from
+  keyword tags as well made a content branch able to redden the sweep with a word choice: a passive
+  tagged `state` or `range` would have matched dozens of engine files that have never heard of it.
+  The four words c2 itself names are asserted by c2's own command beside it, because two of them are
+  tags rather than ids.
+- **The pairing is graded per archetype**, keyed off a tag that groups: an unshared keyword tag that
+  more than one jewel carries. `thorns` and `poison` name effects and sit on one jewel each; an
+  archetype sits on the pair. Every jewel must fall in exactly one group, so nothing escapes the
+  rule by carrying no archetype at all.
+- **Rage's ceiling rides on the passive beside its rate.** A global `max-rage` was read as full by
+  every actor a fight snapshots — `enterEncounter` deliberately takes each actor's max rather than
+  `start:` — which is the inverse of what a pool granted on a landed swing is for. `wrath` was
+  re-laid so nothing flat sits on its ring: the ceiling and the rate the rage passive carries are
+  bookkeeping rather than power, and they were enough to tip a percent-led jewel into a tie.
+- **A pool with no ceiling for a character is withheld rather than drawn.** It was the reason the
+  above was worth doing at all: every player in the universe was shown a Rage meter at empty from
+  the first turn of the tutorial. Nothing can be spent out of a pool with no capacity, so what gives
+  it a ceiling is what makes it appear.
+
 ## Out of scope
 
 Any fifth effect, and any archetype beyond the three. Rolled variance on a jewel and jewels that

@@ -714,6 +714,7 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
       const uses = entity.uses.filter((used) => referencesLoaded(() => visit('action', used, `# entity ${id} uses:`)));
       const faction = entity.faction.filter((named) => referencesLoaded(() => visit('faction', named, `# entity ${id} faction:`)));
       const allies = entity.allies.filter((entry) => referencesLoaded(() => visit('entity', entry.entity, `# entity ${id} allies:`)));
+      const passives = entity.passives.filter((named) => referencesLoaded(() => visit('passive', named, `# entity ${id} passives:`)));
       const onHit = pruneHook(entity.onHit, `# entity ${id} on hit:`, visit);
       const whenHit = pruneHook(entity.whenHit, `# entity ${id} when hit:`, visit);
       if (
@@ -722,10 +723,33 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
         uses.length !== entity.uses.length ||
         faction.length !== entity.faction.length ||
         allies.length !== entity.allies.length ||
+        passives.length !== entity.passives.length ||
         onHit !== entity.onHit ||
         whenHit !== entity.whenHit
       ) {
-        registry.entities.set(id, { ...entity, stats, blocks, uses, faction, allies, onHit, whenHit });
+        registry.entities.set(id, { ...entity, stats, blocks, uses, faction, allies, passives, onHit, whenHit });
+        changed = true;
+      }
+    }
+
+    // A passive is a carrier like an item is, so it is rebuilt rather than
+    // dropped: what a jewel placed it for survives a payload whose stat went.
+    for (const [id, passive] of registry.passives) {
+      const tags = passive.tags.filter((tag) => referencesLoaded(() => visitTags([tag], `# passive ${id}`, visit)));
+      const onHit = pruneHook(passive.onHit, `# passive ${id} on hit:`, visit);
+      const whenHit = pruneHook(passive.whenHit, `# passive ${id} when hit:`, visit);
+      if (tags.length !== passive.tags.length || onHit !== passive.onHit || whenHit !== passive.whenHit) {
+        registry.passives.set(id, { ...passive, tags, onHit, whenHit });
+        changed = true;
+      }
+    }
+
+    // A cluster jewel names passives by position, and a position whose passive
+    // is gone is an empty position rather than a broken jewel.
+    for (const [id, jewel] of registry.clusterJewels) {
+      const entries = Object.entries(jewel.positions).filter(([, passiveId]) => referencesLoaded(() => visit('passive', passiveId, `# cluster-jewel ${id} passives:`)));
+      if (entries.length !== Object.keys(jewel.positions).length) {
+        registry.clusterJewels.set(id, { ...jewel, positions: Object.fromEntries(entries.map(([position, passiveId]) => [Number(position), passiveId])) });
         changed = true;
       }
     }

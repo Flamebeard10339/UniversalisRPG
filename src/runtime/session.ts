@@ -466,15 +466,22 @@ function publishDiscovered(state: GameState, registry: Registry): PlayStatus['di
   }));
 }
 
+// A pool with no capacity for this character is not a pool: nothing can be
+// spent out of it and nothing put into it, so it is withheld rather than drawn
+// at an empty it can never leave. What gives it a ceiling — a passive, a worn
+// item — is what makes it appear, which is the same rule that decides whether
+// it can move at all.
 function publishResources(state: GameState, registry: Registry): PlayStatus['resources'] {
   const localizer = localizerOf(registry, state);
-  return [...registry.resources.values()].map((resource) => ({
-    id: resource.id,
-    title: localizer.title('resource', resource.id),
-    current: fromMilliUnits(state.resources[resource.id] ?? 0),
-    max: statValue(resource.max, state, registry),
-    display: resource.display,
-  }));
+  return [...registry.resources.values()]
+    .map((resource) => ({
+      id: resource.id,
+      title: localizer.title('resource', resource.id),
+      current: fromMilliUnits(state.resources[resource.id] ?? 0),
+      max: statValue(resource.max, state, registry),
+      display: resource.display,
+    }))
+    .filter((published) => published.max > 0);
 }
 
 // A travel action is compiled per pair of places rather than declared under

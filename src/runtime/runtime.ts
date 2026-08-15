@@ -62,11 +62,10 @@ import { Registry } from '../content/registry';
 import { BASE_LANGUAGE, Localized, localizerFor, localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { roadsFrom, routeTo } from './journey';
-import { clearBuffs, expireBuffs, grantBuff, nextBuffExpiry } from './buffs';
+import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs';
 import { advanceTime, endAction, FIGHT_SCOPED, GameState, isFightScoped, PLAYER, RuntimeError } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
-import { TagClause } from '../grammar/tagClause';
-import { msUntilEmpty, secondsToMs, toMilliUnits } from './units';
+import { msUntilEmpty, toMilliUnits } from './units';
 
 export { advanceTime, createGameState, endAction, endJourney, PLAYER, RuntimeError } from './state';
 export type { GameState } from './state';
@@ -585,8 +584,7 @@ function grantFoodBuff(item: Item, state: GameState): void {
   if (!item.tags.some((tag) => tag.kind === 'keyword' && tag.value === 'food')) return;
   if (!item.tags.some((tag) => tag.kind === 'stat-bonus')) return;
 
-  const durationTag = item.tags.find((tag): tag is Extract<TagClause, { kind: 'duration' }> => tag.kind === 'duration');
-  grantBuff(state, PLAYER, item, state.time + secondsToMs(durationTag?.seconds ?? 0));
+  applyDeclared(state, PLAYER, item, state.time);
 }
 
 // On COMPLETION: the one moment both ways of starting an action pass through.

@@ -53,8 +53,16 @@ xp: brawling 2
 stats: max-health 30, attack 10, attack-rate 25
 uses: strike
 
+# passive spined
++1 dr
+when hit: drain: 5 health from them
+
+# item balm
++2 regeneration, 30s
+
 # entity training-dummy
 stats: max-health 12, dr 2
+passives: spined
 on death: stop
 
 # dialogue caretaker
@@ -149,6 +157,19 @@ describe('load-time reference resolution', () => {
     expect(() => loadModule(`${VALID}\n# recipe weave\nin: 1 bogus\nout: 1 straw\n`)).toThrow(/# recipe weave in: names an unknown item: bogus/);
     expect(() => loadModule(`${VALID}\n# recipe weave\nout: 1 straw\nskill: bogus 1\n`)).toThrow(/# recipe weave skill: names an unknown skill: bogus/);
     expect(() => loadModule(`${VALID}\n# recipe weave\naccuracy: attack\nout: 1 straw\nburnt: 1 bogus\n`)).toThrow(/# recipe weave burnt: names an unknown item: bogus/);
+  });
+
+  it('checks what a character carries a passive by, and what an applied payload names', () => {
+    expect(loading('passives: spined', 'passives: spinned')).toThrow(/# entity training-dummy passives: names an unknown passive: spinned/);
+    expect(loading('when hit: drain: 5 health from them', 'when hit: drain: 5 helth from them')).toThrow(/# passive spined when hit: drain: names an unknown resource: helth/);
+    expect(loading('when hit: drain: 5 health from them', 'on hit: apply: bam to them')).toThrow(/# passive spined on hit: apply: names an unknown item: bam/);
+  });
+
+  // A payload with no duration is granted at an instant already past, so it is
+  // over before anything can read it and nothing anywhere says so.
+  it('refuses an applied payload that declares no duration', () => {
+    expect(loading('when hit: drain: 5 health from them', 'on hit: apply: straw to them')).toThrow(/apply: names straw, which declares no duration/);
+    expect(loading('when hit: drain: 5 health from them', 'on hit: apply: balm to them')).not.toThrow();
   });
 
   it('checks a food item tag, the other way a stat id reaches statRange', () => {

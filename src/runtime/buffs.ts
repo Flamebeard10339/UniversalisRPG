@@ -4,6 +4,7 @@ import { isTagClause, TagClause } from '../grammar/tagClause';
 import { localizerOf } from './localized';
 import type { PruneWarning } from './save';
 import type { GameState } from './state';
+import { secondsToMs } from './units';
 
 // One application of one source to one character, holding the tag-clause list
 // that source carries. Nothing is scaled by how many instances are held, and
@@ -48,6 +49,22 @@ export function buffsOf(state: GameState, actorId: string): readonly BuffInstanc
 // How many instances of one source a character is holding.
 export function stackCount(state: GameState, actorId: string, source: string): number {
   return buffsOf(state, actorId).filter((buff) => buff.source === source).length;
+}
+
+// How long one instance of a declaration runs. Zero where it names no duration,
+// which `applyDeclared`'s callers may not reach: the load path refuses an
+// `apply:` naming a source with none, and a `# item` with no duration clause
+// grants a buff that is gone at the next boundary, which is the behaviour food
+// has always had.
+export function declaredSeconds(source: BuffSource): number {
+  return source.tags.find((tag): tag is Extract<TagClause, { kind: 'duration' }> => tag.kind === 'duration')?.seconds ?? 0;
+}
+
+// The one place a declaration becomes an instance on a clock. Both authored
+// routes into a buff — eating one, and an `apply:` naming one — spend this, so
+// a later rule about what may be granted is written once.
+export function applyDeclared(state: GameState, actorId: string, source: BuffSource, now: number): void {
+  grantBuff(state, actorId, source, now + secondsToMs(declaredSeconds(source)));
 }
 
 export function grantBuff(state: GameState, actorId: string, source: BuffSource, expiresAt: number): void {

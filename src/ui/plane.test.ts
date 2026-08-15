@@ -194,6 +194,18 @@ describe('the plane the view says is in hand', () => {
     expect(rowsOf(view!)[0][ROW.worth]).toBe('+3 Attack, +12% Max Health, +2-6 Defense, +4.5 Attack ×1.5, -2 Attack');
   });
 
+  // The counter trails the magnitude and the factor both, because what is
+  // printed is what one point of it pays.
+  it('says what a payload is paid per, where the plane published a counter', () => {
+    const payloads = [
+      { ...flat('mod.attack', 3), perTitle: asLocalized('Fury') } as Payload,
+      { ...flat('mod.attack', 4.5, 1.5), perTitle: asLocalized('Tonic') } as Payload,
+    ];
+    const view = drawn([plane({ clusters: [cluster({ positions: [position({ payloads })] })] })], { instance: '1', hex: '0,0' });
+
+    expect(rowsOf(view!)[0][ROW.worth]).toBe('+3 Attack per Fury, +4.5 Attack ×1.5 per Tonic');
+  });
+
   it('invents no word: every one it draws is the engine’s or the shell’s own table', () => {
     const positions = [position({ standing: 'allocated', free: true, payloads: [flat('mod.attack', 3, 1.5)] }), position({ position: 2, standing: 'available' })];
     const slots = [slot({ standing: 'blocked', beyond: '1,0' }), slot({ direction: 'ne' })];

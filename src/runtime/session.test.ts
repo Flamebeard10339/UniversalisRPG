@@ -592,6 +592,17 @@ base: 4
 title: Fortitude
 base: 2
 
+// A ceiling nothing on a fresh sheet supplies, and one thing that supplies it.
+# stat max-ardour
+
+# resource ardour
+max: max-ardour
+start: 0
+
+# item censer
+slot: hand
++9 max-ardour
+
 # skill smithing
 
 # location forge
@@ -713,7 +724,21 @@ describe('what the engine publishes', () => {
     expect(v.stats.map((row) => [row.id, row.title])).toEqual([
       ['might', 'Might'],
       ['grit', 'Fortitude'],
+      ['max-ardour', 'Max Ardour'],
     ]);
+  });
+
+  // A pool nothing gives this character a ceiling for cannot move and is not
+  // drawn; what gives it one is what makes it appear.
+  it('publishes a pool once something gives the character a ceiling for it, and not before', () => {
+    const session = primed(loadInEnglish(PUBLISHED_MODULE), { inventory: { censer: 1 } });
+    expect(view(session).resources.map((each) => each.id)).toEqual([]);
+
+    applyDirective(session, { kind: 'equip', item: 'censer' });
+    expect(view(session).resources.map((each) => [each.id, each.max])).toEqual([['ardour', 9]]);
+
+    applyDirective(session, { kind: 'unequip', slot: 'hand' });
+    expect(view(session).resources.map((each) => each.id)).toEqual([]);
   });
 
   it('carries stat values, and recomputes them when equipment changes them', () => {

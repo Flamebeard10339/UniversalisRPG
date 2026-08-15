@@ -120,9 +120,13 @@ describe('combat-expansion, read off the routes it ships', () => {
 
     const moved = [...shipped.stats.keys()].filter((statId) => full[statId] !== empty[statId]);
     expect(moved).toEqual(['tutorial-island.attack']);
-    // +2% per point, twenty points held, over a blade and a flat passive worth
-    // 15 between them.
-    expect(full['tutorial-island.attack']).toBeCloseTo(empty['tutorial-island.attack'] * 1.4, 10);
+
+    // Per point, not per pool: the step from ten points to twenty is the step
+    // from none to ten, which is what `per` means and what a flat bonus of the
+    // same size would not do.
+    restorePools(state, { 'combat-expansion.rage': 10000 });
+    const half = sheet(state, shipped);
+    expect(half['tutorial-island.attack'] - empty['tutorial-island.attack']).toBeCloseTo(full['tutorial-island.attack'] - half['tutorial-island.attack'], 10);
   });
 
   // The two contributions the same buff makes, told apart by the plane rather
@@ -203,33 +207,57 @@ describe('the archetype jewels are paired added-then-increased', () => {
     return { flat: bonuses.filter((tag) => !tag.percent).length, percent: bonuses.filter((tag) => tag.percent).length };
   };
 
-  it('ships them in even numbers, half of each kind', () => {
-    const jewels = declared(shipped, 'combat-expansion');
-    expect(jewels.length).toBe(6);
+  // The tags a jewel's own passives carry that the rest of the universe does
+  // not use. `physical` and `life` are tutorial-island's too and drop out here.
+  const ownTags = (registry: Registry, namespace: string, jewel: { positions: Record<number, string> }): string[] => {
+    const shared = new Set(
+      [...registry.passives.values()].filter((passive) => !passive.id.startsWith(`${namespace}.`)).flatMap((passive) => passive.tags.filter((tag) => tag.kind === 'keyword').map((tag) => tag.value)),
+    );
+    const carried = Object.values(jewel.positions).flatMap((passiveId) => registry.passives.get(passiveId)?.tags ?? []);
+    return [...new Set(carried.filter((tag) => tag.kind === 'keyword' && !shared.has(tag.value)).map((tag) => (tag as { value: string }).value))];
+  };
 
-    const led = jewels.map((jewel) => {
-      const worth = channels(shipped, jewel);
-      expect(worth.flat + worth.percent).toBeGreaterThan(0);
-      return worth.percent > worth.flat ? 'increased' : 'added';
-    });
-    expect(led.filter((kind) => kind === 'added').length).toBe(jewels.length / 2);
-    expect(led.filter((kind) => kind === 'increased').length).toBe(jewels.length / 2);
+  // A tag that groups is one more than one jewel carries: `thorns` names an
+  // effect and sits on one jewel, where an archetype sits on the pair. Derived,
+  // so a fourth archetype is grouped by the rule that grouped the first three.
+  const grouping = (registry: Registry, namespace: string): Map<string, string[]> => {
+    const jewels = declared(registry, namespace);
+    const seen = new Map<string, string[]>();
+    for (const jewel of jewels) for (const tag of ownTags(registry, namespace, jewel)) seen.set(tag, [...(seen.get(tag) ?? []), jewel.id]);
+    return new Map([...seen.entries()].filter(([, carriers]) => carriers.length > 1));
+  };
+
+  it('gives every archetype one flat jewel and one percent jewel, and no archetype two of a kind', () => {
+    const jewels = declared(shipped, 'combat-expansion');
+    const groups = grouping(shipped, 'combat-expansion');
+    expect(groups.size).toBeGreaterThan(0);
+    // Every jewel is in exactly one group, so nothing is graded twice and
+    // nothing escapes the rule by carrying no archetype at all.
+    expect([...groups.values()].flat().sort()).toEqual(jewels.map((jewel) => jewel.id).sort());
+
+    for (const [archetype, carriers] of groups) {
+      const led = carriers.map((id) => {
+        const worth = channels(shipped, shipped.clusterJewels.get(id)!);
+        expect(worth.flat + worth.percent).toBeGreaterThan(0);
+        return worth.percent > worth.flat ? 'increased' : 'added';
+      });
+      expect({ archetype, led: [...led].sort() }).toEqual({ archetype, led: ['added', 'increased'] });
+    }
   });
 });
 
 // c2: nothing in the shipped runtime is named after anything this content
-// composes. Derived from the module itself — every id it declares and every tag
-// its passives carry, less the words the rest of the universe already uses — so
-// a fifth effect is covered by authoring it and by nothing else.
+// composes. Derived from the module itself — every id it declares, less the ids
+// the rest of the universe already declares — so a fifth effect is covered by
+// authoring it and by nothing else. Ids only: a keyword tag is a free-form word
+// an author picks, and drawing the set from tags would let a passive tagged
+// `state` or `range` redden the sweep over an engine file that has never heard
+// of it.
 describe('no shipped identifier is named after this content', () => {
   const words = (registry: Registry, namespace: string): Set<string> => {
     const own = new Set<string>();
     for (const map of [registry.passives, registry.items, registry.resources, registry.entities, registry.clusterJewels, registry.stats]) {
       for (const id of map.keys()) if (id.startsWith(`${namespace}.`)) own.add(id.slice(namespace.length + 1));
-    }
-    for (const passive of registry.passives.values()) {
-      if (!passive.id.startsWith(`${namespace}.`)) continue;
-      for (const tag of passive.tags) if (tag.kind === 'keyword') own.add(tag.value);
     }
     return own;
   };
@@ -255,6 +283,14 @@ describe('no shipped identifier is named after this content', () => {
       return patterns.filter((pattern) => pattern.test(text)).map((pattern) => `${file}: ${pattern.source}`);
     });
     expect(found).toEqual([]);
+  });
+
+  // The clause's own command, which names the four effects rather than deriving
+  // them: two of them are mechanical tags rather than ids, and a tag is not in
+  // the derived set above for the reason stated there.
+  it('finds none of the four effects the clause names either', () => {
+    const named = /\b(poison|rage|thorns|accelerated.?vigou?r)\b/i;
+    expect(sourceFiles('src').filter((file) => named.test(readFileSync(file, 'utf8')))).toEqual([]);
   });
 });
 
