@@ -1,6 +1,6 @@
 import type { SchemaKind } from './module';
 import { DslError } from '../grammar/parser';
-import { RawSection } from '../grammar/structure';
+import { RawSection, hasBlock } from '../grammar/structure';
 
 // A `# locale <lang>` section: key/value pairs and nothing else. It never
 // reaches a content map, so it can neither add, patch nor remove content — the
@@ -261,7 +261,7 @@ export function parseLocaleSection(section: RawSection): LocaleSection {
   const entries: Array<{ key: string; value: string }> = [];
   const seen = new Set<string>();
   for (const line of section.body) {
-    if (line.children.length > 0) throw new DslError(`# locale ${section.id}: a translation is one line`, line.span);
+    if (hasBlock(line)) throw new DslError(`# locale ${section.id}: a translation is one line`, line.span);
     const groups = KEY.exec(line.text)?.groups;
     if (!groups) throw new DslError(`# locale ${section.id}: expected \`<key>: <text>\`, got ${JSON.stringify(line.text)}`, line.span);
     if (seen.has(groups.key)) throw new DslError(`# locale ${section.id}: ${groups.key} is translated more than once`, line.span);

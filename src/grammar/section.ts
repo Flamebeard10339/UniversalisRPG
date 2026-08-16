@@ -1,7 +1,7 @@
 // Generic engine: field value-types are erased internally via the AnyFields casts; the rejected alternative was a hand-written parser per section kind.
 import { Cursor, DslError, Parser, Span } from './parser';
 import { ListParser } from './list';
-import { RawLine, RawSection } from './structure';
+import { RawLine, RawSection, hasBlock } from './structure';
 
 // What a default may know beyond the section it is filling in. A field-level
 // default cannot see the module its section came from, and c5 turns on that
@@ -160,7 +160,7 @@ function typoOf(key: string, known: readonly string[]): string | undefined {
 // is the only one that could take it — and a key that read its value inline
 // would drop it without a word. Asked after the value is read, because what
 // remains on the line is what says whether another key follows.
-const claimsTheBlock = (cursor: Cursor, line: RawLine): boolean => line.children.length > 0 && cursor.rest().replace(/[ \t,]+$/, '') === '';
+const claimsTheBlock = (cursor: Cursor, line: RawLine): boolean => hasBlock(line) && cursor.rest().replace(/[ \t,]+$/, '') === '';
 
 function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, keywords: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
@@ -187,7 +187,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         if (op !== undefined && !isListParser(fields[name].parser)) throw new DslError(`${kind} field ${key} is not a list, so it cannot take ${op}`, keySpan);
 
         const inline = !cursor.done;
-        const value = inline ? fields[name].parser.parse(cursor) : line.children.length > 0 ? parseBlock(fields[name].parser, line.children, line.span) : undefined;
+        const value = inline ? fields[name].parser.parse(cursor) : hasBlock(line) ? parseBlock(fields[name].parser, line.children, line.span) : undefined;
         if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} field ${key} is written inline and as a block; give it one`, keySpan);
         // an empty value with no block is unspecified: leave the field absent
         if (value === undefined) continue;

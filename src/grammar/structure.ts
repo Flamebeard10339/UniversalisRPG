@@ -15,13 +15,59 @@ export interface RawSection {
 
 const HEADING = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?[ \t]*$/;
 
+// Whether the line has an indented block, and the block itself, kept apart on
+// purpose: reading `children` is what records that somebody took the block, so
+// a reader merely deciding what to do asks this instead. Everything downstream
+// of `blocksWereRead` turns on that difference.
+export const hasBlock = (line: RawLine): boolean => blockOf(line).length > 0;
+
+const BLOCK = Symbol('block');
+const READ = Symbol('read');
+
+interface TrackedLine extends RawLine {
+  [BLOCK]: RawLine[];
+  [READ]: boolean;
+}
+
+const blockOf = (line: RawLine): RawLine[] => (line as TrackedLine)[BLOCK] ?? line.children;
+
+// A line whose block is behind an accessor. Nothing else can tell a block a
+// reader consumed from one it walked past, and the load path has forgotten to
+// refuse the second in five separate readers — so the record is kept by the act
+// of reading rather than by each reader remembering to say so.
+function trackedLine(text: string, span: Span): RawLine {
+  const block: RawLine[] = [];
+  const line = { text, span } as TrackedLine;
+  Object.defineProperty(line, BLOCK, { value: block });
+  Object.defineProperty(line, READ, { value: false, writable: true });
+  Object.defineProperty(line, 'children', {
+    enumerable: true,
+    get() {
+      line[READ] = true;
+      return block;
+    },
+  });
+  return line;
+}
+
 // The block half of the demand `requireEnd` makes of a line's text. A reader
 // that has no use for a line's indented block and says nothing about it has
 // dropped what an author wrote, which is the outcome a parse is not allowed to
 // have.
 export function requireNoBlock(line: RawLine): void {
-  if (line.children.length === 0) return;
+  if (!hasBlock(line)) return;
   throw new DslError(`${JSON.stringify(line.text)} takes no indented block`, line.span);
+}
+
+// The same demand made of a whole section once its parser has run, for every
+// line whose reader never asked for the block under it. Walked through the
+// tracked array rather than through `children`, because asking the question
+// must not answer it.
+export function requireBlocksRead(lines: readonly RawLine[]): void {
+  for (const line of lines) {
+    if (!(line as TrackedLine)[READ]) requireNoBlock(line);
+    requireBlocksRead(blockOf(line));
+  }
 }
 
 export function splitSections(source: string): RawSection[] {
@@ -51,10 +97,10 @@ export function splitSections(source: string): RawSection[] {
     const indent = textLine.length - textLine.trimStart().length;
     const text = textLine.trim();
     const start = textLineStart + indent;
-    const line: RawLine = { text, span: { start, end: start + text.length }, children: [] };
+    const line = trackedLine(text, { start, end: start + text.length });
 
     while (stack.length > 0 && stack[stack.length - 1].indent >= indent) stack.pop();
-    (stack.length > 0 ? stack[stack.length - 1].line.children : current.body).push(line);
+    (stack.length > 0 ? blockOf(stack[stack.length - 1].line) : current.body).push(line);
     stack.push({ indent, line });
     current.span.end = line.span.end;
   }

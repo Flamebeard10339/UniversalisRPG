@@ -35,14 +35,16 @@ Proof:
   bare, `+` and `-` forms of each field, because a patch is where a mod's typo arrives and the
   contribution system is what makes that reachable.
   proof: vitest src/content/parse.test.ts
-- [c3] **Inline and block agree, field by field, and over the shape of the text as well as the field.**
-  For every block-capable field, one authored text is accepted by both forms or refused by both, and
-  that holds for a nested block as well as a flat line — a block-form line has an indented block of
-  its own and no `list` element parser can read one. This is the property the finding states; c1 is
-  one implementation of it, and c3 is what notices if a later change re-opens the gap on another
-  route. The clause is universal and its proof derives its subjects the same way c2's does, taking
-  each field's nested probe from the text that field itself accepts.
-  proof: vitest src/content/parse.test.ts
+- [c3] **Inline and block agree field by field, and no line of any kind keeps a block nobody read.**
+  Two halves of one property. For every block-capable field, one authored text is accepted by both
+  forms or refused by both — the property the finding states, derived over the schemas the way c2's
+  is. And for every line of every section kind the loader can parse, an indented block put under a
+  line whose reader never asked for one is refused rather than discarded: passes 1 and 2 each found
+  that outcome surviving one level below where the previous proof looked, in five separate readers,
+  so this half derives its subjects from the shipped corpus — every childless line of every section
+  — rather than from a list of fields. Its subject set is held against `SECTION_KINDS`, so a kind
+  the corpus stops covering fails rather than going unprobed.
+  proof: vitest src/content/parse.test.ts src/content/blocks.test.ts
 - [c4] **Shipped content is unchanged, and a line the new refusal rejects is repaired here and named.**
   Measured at HEAD on 2026-08-15: every block-form line under a block-capable field in `content/`
   parses and leaves nothing behind, so this branch forecasts no content edit and every `# test` and
@@ -51,11 +53,14 @@ Proof:
   keep a content line loading is the one repair this clause forbids.
   proof: vitest src/runtime/integration.test.ts
   proof: command git diff --stat HEAD -- content/
-- [c5] **One refusal, reused.** `requireEnd` (`src/grammar/parser.ts:56`) is the end-of-input check and
-  this branch adds no second one and no second message. `dsl-load-path-2026-07-28-m2` already records
-  `action.ts` holding a second, laxer copy of the section field engine; a third copy is that finding
-  reproduced, not a fix delivered.
-  proof: command grep -rn "requireEnd" src/grammar --include=*.ts --exclude=*.test.ts
+- [c5] **One refusal, reused — and one for the block half.** `requireEnd` (`src/grammar/parser.ts:56`)
+  is the end-of-text check and this branch adds no second one and no second message. The block half
+  is `requireNoBlock`, which is not new either: it is `readResultLine`'s own throw hoisted into
+  `structure.ts` beside the `RawLine` it is about, with its message unchanged, and every demand made
+  of a block goes through it. The branch ends with strictly fewer copies of that refusal than it
+  started with. `dsl-load-path-2026-07-28-m2` already records `action.ts` holding a second, laxer
+  copy of the section field engine; a third copy is that finding reproduced, not a fix delivered.
+  proof: command grep -rn "requireEnd\|requireNoBlock\|takes no indented block" src/grammar src/content --include=*.ts --exclude=*.test.ts
 - [c6] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests, layer-check,
   audit-status, doctor and the byte check in one invocation.
   proof: command npm run tasks -- merge-ready
@@ -73,6 +78,23 @@ registered: one over `src/grammar/list.ts` would manufacture the two-concepts-on
 meant to mean "this file does two jobs", which is the shape of the 2026-08-07 and 2026-08-14 rulings
 on `an-action-pruned-for-a-dangling-reference` and `authored-prose-is-addressed-by-its-owner`. The
 `produces` forecast is cleared rather than registered.
+
+**The block demand is made where a section's value is assembled, not by each reader.** Passes 1 and 2
+found the same silence three times, one level apart each time, in five readers that consume
+`line.text` and never look at `line.children` — `parseSection`'s keyword, clause and bare branches,
+`parseActionLine`, `dialogue`'s node and choice loops, and `saveSection`. Teaching a sixth reader to
+refuse is what the first two attempts did. Instead `children` is behind an accessor that records the
+read, `hasBlock` answers "is there one" without recording it, and `requireBlocksRead` asks, after a
+section parser has run, for any line whose block nobody took. A reader that ignores a block cannot
+answer for it and never could; the record is now kept by the act of reading rather than by each
+reader remembering to keep it, which is the only version of this a reader written next month cannot
+forget.
+
+The demand is attached to every entry of `PARSERS` rather than written into `parseModule`'s body, so
+a kind added to `BESPOKE` inherits it — `dialogue` and `save` are two of the five that did not have
+it. `parseSection` on its own does not carry it, and that is the boundary rather than an oversight: a
+section parser is what receives a `RawSection`, `PARSERS` is the table of them, and no route content
+takes reaches one except through that table.
 
 **c3's agreement is asserted in one direction at the section level and in both at the parser level.**
 The walk compares a field's parser directly — `parseWhole(parser, text)` against

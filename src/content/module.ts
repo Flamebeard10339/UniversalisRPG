@@ -20,7 +20,7 @@ import { AnySchema, parseAnySection } from '../grammar/section';
 import { skillSchema } from './skill';
 import { slotSchema } from './slot';
 import { statSchema } from './stat';
-import { RawSection, splitSections } from '../grammar/structure';
+import { RawSection, requireBlocksRead, splitSections } from '../grammar/structure';
 import { parseTest } from './test';
 import { variableSchema } from './variable';
 
@@ -66,10 +66,23 @@ const BESPOKE: Record<string, (section: RawSection) => object> = {
   locale: parseLocaleSection,
 };
 
-const PARSERS: Record<string, (section: RawSection) => object> = {
-  ...Object.fromEntries(Object.entries(SCHEMAS).map(([kind, schema]) => [kind, (section: RawSection) => parseAnySection(section, schema)])),
-  ...BESPOKE,
+// What a section parser owes beyond its own value: every line it was handed
+// has an indented block or does not, and a line whose block the parser never
+// asked for has been read past in silence. Wrapped over the table rather than
+// written into each parser, because five readers in this tree had already
+// forgotten it and the sixth would too.
+const readingWholeSections = (parse: (section: RawSection) => object) => (section: RawSection) => {
+  const value = parse(section);
+  requireBlocksRead(section.body);
+  return value;
 };
+
+const PARSERS: Record<string, (section: RawSection) => object> = Object.fromEntries(
+  Object.entries({
+    ...Object.fromEntries(Object.entries(SCHEMAS).map(([kind, schema]) => [kind, (section: RawSection) => parseAnySection(section, schema)])),
+    ...BESPOKE,
+  }).map(([kind, parse]) => [kind, readingWholeSections(parse as (section: RawSection) => object)]),
+);
 
 export const SECTION_KINDS: readonly string[] = Object.keys(PARSERS);
 

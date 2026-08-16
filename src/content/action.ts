@@ -51,7 +51,6 @@ export function parseActionSection(section: RawSection): ActionDeclaration {
   if (!section.id) throw new DslError('# action requires an id', section.span);
   const titles = section.body.filter((line) => TITLE.test(line.text));
   if (titles.length > 1) throw new DslError(`# action ${section.id}: title is defined more than once`, titles[1].span);
-  if (titles[0]?.children.length) throw new DslError(`# action ${section.id}: title takes no indented block`, titles[0].span);
   const label = titles[0] ? titles[0].text.replace(TITLE, '') : humanizeEn(section.id);
   const body = section.body.filter((line) => !TITLE.test(line.text));
   const generated = titles[0] ? {} : { generatedLabel: true as const };

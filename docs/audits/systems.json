@@ -20,6 +20,7 @@
         "content/engine-en.dsl",
         "content/tutorial-island.dsl",
         "src/content/action.ts",
+        "src/content/blocks.test.ts",
         "src/content/clusterJewel.test.ts",
         "src/content/clusterJewel.ts",
         "src/content/dialogue.ts",

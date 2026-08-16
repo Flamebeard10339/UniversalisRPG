@@ -4,11 +4,11 @@ import { Action, entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
 import { loadModule, loadUniverse } from './registry';
-import { SCHEMAS, parseModule, schemaFor } from './module';
+import { SCHEMAS, SECTION_KINDS, parseModule, schemaFor } from './module';
 import { Cursor, DslError, Parser, parseWhole } from '../grammar/parser';
 import { ListParser } from '../grammar/list';
 import { point } from '../grammar/range';
-import { SectionSchema, hydrateSection, isPositionalField, parseAnySection, parseSection } from '../grammar/section';
+import { SectionSchema, hydrateSection, isPositionalField, parseSection } from '../grammar/section';
 import { skillSchema } from './skill';
 import { statSchema } from './stat';
 import { RawLine, splitSections } from '../grammar/structure';
@@ -763,11 +763,9 @@ const attempt = (parse: () => unknown): Outcome => {
   }
 };
 
-const parseProbe = (source: string): Outcome =>
-  attempt(() => {
-    const [section] = splitSections(source);
-    return parseAnySection(section, schemaFor(section.kind)!);
-  });
+// Through the loader's own entry point, because that is where a section parser
+// is asked whether it read every block it was handed.
+const parseProbe = (source: string): Outcome => attempt(() => parseModule(source)[0].value);
 
 const inlineSection = (field: WalkableField, op: string, authored: string): Outcome => parseProbe(`# ${field.kind} probe\n${op}${field.keyword}: ${authored}\n`);
 const blockSection = (field: WalkableField, op: string, authored: string): Outcome => parseProbe(`# ${field.kind} probe\n${op}${field.keyword}:\n  ${authored}\n`);
@@ -792,6 +790,17 @@ const OPS = ['', '+', '-'];
 describe('a field that takes a block reads one exactly where it reads the same text inline', () => {
   const fields = schemaFields();
   const blockCapable = fields.filter(takesABlock);
+
+  // The walk reaches its fields through `SCHEMAS`; this reaches them through
+  // `SECTION_KINDS`, which is keyed off the parser table rather than the schema
+  // table. Narrowing either route alone stops the two agreeing, which is what
+  // pass 2 measured missing — the subjects derived, but nothing held the set
+  // they derived to, and it could shrink without a word.
+  it('walks every field of every kind the loader parses through a schema', () => {
+    const declared = [...SECTION_KINDS].flatMap((kind) => Object.keys(schemaFor(kind)?.fields ?? {}).map((name) => `${kind}.${name}`));
+    expect(fields.map(fieldName).sort()).toEqual(declared.sort());
+    expect(declared.length).toBeGreaterThan(0);
+  });
 
   it('derives its subjects by the predicate the section engine decides a block by', () => {
     const addressable = fields.filter((field) => !field.positional);
