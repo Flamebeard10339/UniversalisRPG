@@ -283,3 +283,109 @@ doors on one surface and an auditor should not read one as the other; neither bl
  `git merge main` and re-run. Timing checked against the five-minute rule: command.test.ts,
  play-cli.test.ts and session.test.ts run 205 tests in 1.94s, so the four new filesystem-touching
  play-cli tests add nothing measurable.
+
+### Pass 3 — 2026-08-16
+
+- base: `75152857faf3c2958ed6c7ca32d7a6335dbdfc9b`
+- head: `ef5755621d99b2eafc2d551b7e04395dedaaf9b2`
+- proof 1: met — Re-graded from the diff at ef57556, not from passes 1-2, and re-measured over the merged
+ result. Aimed manifest C:\Users\yonat\AppData\Local\Temp\mutations-a-session-adopts-an-edit-or-refuses-it-whole-pass3.json
+ (12 entries, 12 KILLED / 0 survived / 0 unstable; re-run with `npm run mutate -- <that path>`).
+ Entries that carry c1: (a) command.ts:435 `return authoring.readLocalChanges();` -> `return
+ authoring.localSource.text;` KILLED at command.test.ts "reaches a location a different process added
+ to the local file, with no restart" — the reader is what is read, never the remembered copy;
+ (b) play-cli.ts:508 `readLocalChanges: () => readLocalChanges(localFile, dependencies),` ->
+ `() => initialLocalChangesModule(dependencies),` KILLED at play-cli.test.ts "picks up a location
+ another process wrote into the file, in the session already running", which writes a real file in a
+ real temp dir with a writeFileSync the session was never told about; (c) command.ts:503, the /local show
+ arm, `localChangesNow(authoring)` -> `authoring.localSource.text` KILLED at "lists, prints and deletes
+ what the file holds rather than what this session remembers"; (d) localChanges.ts:88 `const header =
+ info ? info.text : renderLocalChangesModule(dependencies).trimEnd();` -> the unconditional rebuild that
+ was there before 82bbdc2, KILLED at "keeps the header the other process wrote, not only the sections
+ under it" — the pass-2 fix has a witness that fails for the right reason. The one read of the remembered
+ copy that remains is the no-reader fallback at command.ts:433; I checked the cache behind it is still
+ written (command.ts:407 `authoring.localSource.text = text;` survives the diff), so a context with a
+ writer and no reader still composes successive edits against its own last write rather than against the
+ text it started with. Carried across from the header fix as a defect and filed, not graded here: the
+ header is now carried whole, including the module id, which is not the file's to choose.
+- proof 2: met — command.ts:396 `if (diagnostics.length > 0 || localStatus?.loaded !== true) {` weakened to
+ `if (diagnostics.length > 99999) {` is KILLED at command.test.ts "leaves registry, state, log and clock
+ untouched when the file does not load" (pass-3 manifest entry 3), re-run at its own file with the mutant
+ still applied. snapshotOf is a real witness rather than a restatement — serializeSession is diffState
+ over all 17 SAVE_FIELDS, and the test re-runs /wait 1 and asserts time===6, so play demonstrably
+ continues. The refusal reaches the write side too: pass 2 measured `persist?.(text);` inserted above the
+ refusal return as KILLED at "writes nothing over a file that no longer loads". New this pass, and the
+ reason c2 is still met after 82bbdc2 widened what refuses: command.ts:463 `listLocalSections(text);` ->
+ `void text;` is KILLED at "refuses in the local file's own name when the local file is what will not
+ parse" (entry 11), so the file-parses-before-the-line ordering that lets a refusal name the file and
+ name `/local clear` is watched and is not narration. I checked the widening for over-strictness rather
+ than taking it: with an unparseable file on disk, /dsl, /local list and /local delete refuse while
+ /local show and /local clear still work, and every command that now refuses is one that previously
+ succeeded by composing against the remembered copy and overwriting the other process's file, which is
+ the pass-1 defect — so no capability was lost there. Where a capability WAS lost is the header, filed
+ separately. Diagnostics land on the tool channel by construction: `noted` builds a ToolMessage with
+ words:'tool'.
+- proof 3: met — Proven the way the clause asks — one line broken, both commands fall. command.ts:408
+ `adoptRegistry(ctx.session, loaded.registry);` -> `void loaded;` filed as two separate manifest entries
+ against two separate named tests, both KILLED and both re-run at their own file with the mutant still
+ applied: command.test.ts "reaches a location a different process added to the local file, with no
+ restart" (the /reload caller, entry 4) and "/dsl stages a section, hands it to the writer it was given,
+ reloads it, and /local can show/delete it" (the /dsl caller, entry 5). Structural half re-derived rather
+ than trusted: `grep -n "adoptRegistry" src/runtime/command.ts` returns the import at :22 and exactly one
+ call at :408, and the test that pins it derives its own subject by scanning the file rather than
+ enumerating call sites. Read against the current file: /dsl (runSectionEdit), /local clear and /local
+ delete all route through commitLocalChanges -> adoptLocalChanges, and /reload is adoptLocalChanges with
+ a read in front and no `persist`; there is no second copy of load-gate-adopt anywhere in command.ts.
+ 82bbdc2 did not add one — it added `localSourceNow`, which reads and pre-parses and then hands its text
+ to the same commitLocalChanges, so the number of adopts is unchanged at one.
+- proof 4: met — Pruning reaches the new caller and every prune is said, proven at adoptRegistry's own seam
+ rather than only through the command. Two mutations in src/runtime/session.ts, both KILLED at
+ session.test.ts "prunes what the new registry cannot resolve, says every prune, and re-spreads
+ discovery" (pass-3 manifest entries 6 and 7): session.ts:385 `const warnings =
+ pruneStateForRegistry(state, registry);` emptied to `(pruneStateForRegistry(state, registry), [])`, and
+ session.ts:386 `for (const warning of warnings) state.log.push(warning.message);` -> `void warnings;`.
+ So that one test watches both halves — the state actually moving and the warnings actually being said —
+ and is not satisfiable by the registry swap alone. I read the test for the vacuity shape rather than
+ taking its title: its assertions are driven by ADOPT_AFTER, a second world that has no `outpost`, no
+ `relic` and no `charted`, and it additionally asserts a discovery flag (`tower.discovered`) read out of
+ serializeSession, which no registry swap produces on its own. The command-level half drives the case the
+ clause names literally — the player stands in local-changes.outpost holding local-changes.gem when the
+ file is emptied from elsewhere, and the test asserts a "Removed inventory local-changes.gem" line, a
+ line naming the deleted location, the item gone from the republished view, and
+ registry.locations.has(status.location) true afterwards.
+- proof 5: met — Met on all four halves for the first time; pass 2's open half is now proven and its finding
+ is really closed. THE LOG HALF: session.ts:387 `internals.logCursor = Math.max(0, state.log.length -
+ warnings.length);` -> `internals.logCursor = 0;` is KILLED at session.test.ts "publishes its own prunes
+ and not a line the session had said but nobody had read" (pass-3 manifest entry 8), re-run at
+ src/runtime/session.test.ts with the mutant still applied and failing there too. The same mutation
+ SURVIVED the whole 3272-test suite at pass 2, so d31e735's witness is the difference and it fails for
+ the right reason. That witness is not the false-proof shape either: it puts a line into state.log with
+ applyDirective and never drains it, then asserts the post-adopt view does NOT carry that line while it
+ DOES carry the prune warnings — so a cursor too low and a cursor too high both fail it, and it sits at
+ adoptRegistry's seam because, as its own comment records, nothing reachable through runCommand can leave
+ a line undrained. THE MESSAGE HALF: command.ts:452 `return adoptLocalChanges(ctx, authoring, text,
+ RELOADED);` rewritten to stage `${RELOADED} ${Math.random()}` is KILLED at command.test.ts "says the
+ same thing and leaves the same session however many times it is called" (entry 9), and that test reloads
+ three times comparing message text and a snapshot of sessionStatus, serializeSession and both registry
+ key sets each time. THE REPLAY HALF, re-measured this pass rather than carried forward: /reload's
+ CommandResult.recorded is [] — measured directly through runLine over a real AuthoringContext with
+ `npm run inspect` (recorded: [] on /reload and on /dsl alike) — so a /reload a driver types can never
+ reach a `# test`, and c5's nondeterminism argument holds by construction rather than by intention.
+- proof 6: met — `npm run tasks -- merge-ready` at ef57556 in this worktree: tsc pass, npm test pass,
+ layer-check pass, audit-status pass, doctor pass (23 warnings, which do not fail the leg), bytes pass,
+ tree pass, and BASE PASS — "main has not moved past the merge base", which is pass 2's one substantive
+ failure repaired by 7fda08e. Every leg the clause enumerates is green. The two legs still red are `spec`
+ and `clauses`, and both name only c6 itself: `clauses` is red for "1 outstanding across 2 pass(es): c6",
+ which is the verdict this pass replaces, and `spec` is red for "1 open member(s):
+ a-session-adopts-an-edit-or-refuses-it-whole-clause-6", the undelivered record pass 2's unmet grade
+ created and whose substance 7fda08e repaired without closing it. Graded met on the enumerated legs
+ rather than unmet on the invocation's exit code, because recording unmet a second time is what keeps the
+ invocation red: scripts/tasks/audit.ts:493 skips an already-open clause record and never closes one, so
+ no later met grade retires it and a clause of this shape becomes unmeetable after a single unmet pass.
+ The remaining repair is one store write, `npm run tasks -- done
+ a-session-adopts-an-edit-or-refuses-it-whole-clause-6`, filed below as a finding with what it costs.
+ I checked the merge itself rather than taking the gate's word for it: comparing docs/tasks.jsonl at
+ 7fda08e against both of its parents record by record, 0 of main's 1417 records and 0 of the branch's
+ 1391 are lost, no record appears that neither parent had, main's side differs in exactly the one record
+ the resolution was about, and the branch's side differs in 11 records which are all main's newer text
+ taken whole. Timing against the five-minute rule: the three touched test files run 209 tests in 2.0s.
