@@ -301,3 +301,79 @@ ok, tree ok with nothing uncommitted. All six legs the clause names pass. Two le
 fail: `clauses`, which is c3 and is this pass; and `base` — "main has moved past the merge base", so
 `git merge main` is required before this branch can merge and the behaviour of that merge is
 unmeasured at the head this pass graded.
+
+### Pass 3 — 2026-08-16
+
+- base: `75152857faf3c2958ed6c7ca32d7a6335dbdfc9b`
+- head: `b602dc6c292ce8efe96848e7b29ff65789e53c15`
+- proof 1: met — Two aimed mutations of the one line the branch changed, src/grammar/list.ts:22
+  `parseBlock: (lines) => lines.flatMap((raw) => parseWhole(line, raw.text, raw.span.start, 'a list item'))`.
+  Reverted to the pre-branch `parseInline(new Cursor(raw.text, 0, raw.span.start))` it KILLED, attributed to 7 named
+  tests re-run at their own files with the mutant still applied, among them parse.test.ts "reads a block line and the
+  same text handed to the whole parser identically" and "never reads through a section a block that section refuses
+  inline, in the bare, + and - forms". The accept half is watched too: appending ' leftover' to every block line
+  KILLED with 14 named tests, so the clause is not held by a suite that can only ever demand a throw. Manifest at
+  C:\Users\yonat\AppData\Local\Temp\mutations-nothing-authored-is-silently-dropped-pass3.json (9 killed, 0 survived,
+  0 unstable, 0 errored). Live outside the suite: piping a location whose `adjacent:` block line reads
+  `beach whille unlocked` into npm run probe prints `unexpected content after a list item: "whille unlocked"`, and
+  the three cases the finding measured (entities/miki oven, flags/alert typo, on success/xp: brawling 2.5) each
+  refuse in parse.test.ts "refuses the leftover the loader used to drop, on each field the finding measured".
+- proof 2: met — Both halves mutation-held, and the half pass 2 measured missing is now closed. The predicate half: widening
+  the engine's own gate at src/grammar/section.ts:108 from `'parseBlock' in parser` to `'parse' in parser` KILLED
+  parse.test.ts "derives its subjects by the predicate the section engine decides a block by", so
+  expect(declaresBlock).toEqual(engineReadsBlock) is load-bearing against the line the engine actually decides on.
+  The subject-set half: narrowing the walk's own source, `Object.keys(SCHEMAS)` in schemaFields at
+  src/content/parse.test.ts:739, to `['location']` KILLED "walks every field of every kind the loader parses through
+  a schema" — the same narrowing pass 2 measured SURVIVING the whole suite. What closed it is parse.test.ts:307,
+  which reaches the fields a second time through SECTION_KINDS (22 kinds, 15 schema-backed) and demands the two
+  routes agree, so the walk can no longer shrink in silence. Re-run: the two entries named
+  "c2 the walk is graded by the predicate the engine decides a block by" and
+  "c2 the walk's subject set cannot shrink in silence" in the pass 3 manifest.
+- proof 3: met — The seam is structural rather than enumerated, and every line of it is mutation-held. PARSERS is built by
+  mapping readingWholeSections over the merged SCHEMAS-derived and BESPOKE tables (src/content/module.ts:80), so a
+  kind added to either inherits the demand and there is no list of kinds anyone must keep in sync; requireBlocksRead
+  (src/grammar/structure.ts:66) recurses the whole tree, and `children` is an accessor that records the read while
+  hasBlock answers without recording it, so a reader that ignores a block cannot answer for it. Five aimed mutations,
+  all KILLED, each attributed to a named test re-run at its own file: removing `requireBlocksRead(section.body)` from
+  the wrapper, and removing the READ test inside requireBlocksRead, each killed blocks.test.ts "is refused, never
+  discarded, on every line the corpus writes" plus two more; reverting claimsTheBlock's `hasBlock(line)` to
+  `line.children.length > 0` killed blocks.test.ts "is refused on a line whose block one reader looked at and no
+  reader took", which is what proves asking is not taking; removing the recursion into blockOf(line) killed
+  parse.test.ts "refuses a block line carrying an indented block of its own, on every field a block can address",
+  which is pass 1's depth; and the accept half, removing `line[READ] = true`, KILLED with 10 named tests, so the
+  refusal is not vacuous. Both prior reproductions now refuse, measured live with npm run probe: a location whose
+  `adjacent:` block holds `beach` with `cove reef nonsense` indented under it gives `"beach" takes no indented
+  block`, and a `# item rock` writing `weapon` with an indented line under it gives `"weapon" takes no indented
+  block` — pass 1's and pass 2's HIGHs respectively. I hunted the third neighbour rather than confirming the second:
+  18 further authored shapes across all four branches of parseSection, parseActionLine, both dialogue loops (node,
+  choice, goto, when, sticky, say), parseTest, parseLocaleSection, parseSaveSection, parseRemoval, parseDropTable,
+  the + and - forms of the contribution system, `one of:` rows, `dependencies:`, and an action body two levels deep
+  — every one refuses, and the over-strictness direction was checked with 13 legitimate shapes, all of which still
+  parse. Inside the loader I could not find a fourth. Outside it I did: scripts/migrate-saves.ts:146 reaches
+  parseSaveSection directly, where a `# save` line with an indented block is accepted and the block dropped, while
+  parseModule refuses the same text — filed as a finding, since the loader is what this clause is about and no route
+  content takes reaches it.
+- proof 4: met — `git diff --stat HEAD -- content/` is empty and `git diff --stat 75152857..b602dc6 -- content/` is empty:
+  no content line needed repair and none was made, which is the forecast the clause recorded. merge-ready's npm test
+  leg passes including src/runtime/integration.test.ts over the shipped corpus, and its bytes leg passes, so every
+  `# test` and `# save` fixture stays byte-identical. That the corpus really flows through the new demand is measured
+  rather than assumed: removing `requireBlocksRead(section.body)` from the PARSERS wrapper KILLED blocks.test.ts
+  "is refused, never discarded, on every line the corpus writes", which walks every childless line of every shipped
+  section. The one lax move in the diff is the deleted `title takes no indented block` check in
+  src/content/action.ts:54, and it is not a weakening: probing an `# action` with an indented block under its
+  `title:` line still refuses, now through the derived demand. No check was weakened to keep a content line loading.
+- proof 5: met — `grep -rn "requireEnd\|requireNoBlock\|takes no indented block" src/grammar src/content --include=*.ts
+  --exclude=*.test.ts` names exactly the pre-branch requireEnd sites and no others: parser.ts:56 (the definition),
+  :66 (inside parseWhole), action.ts:188 'an action field', actionResult.ts:187 'one of:', :313 'a result'. list.ts
+  reaches the one check through parseWhole and adds no call and no message of its own. requireNoBlock has one
+  definition (structure.ts:57) carrying one message (structure.ts:59), verbatim the throw that stood at
+  actionResult.ts:315 before this branch, and two callers: actionResult.ts:316 and requireBlocksRead itself. The
+  branch ends with strictly fewer copies than it started with — src/content/action.ts:54's third copy, which read
+  `# action <id>: title takes no indented block`, is deleted in this range and its behaviour is now the one message.
+  No third copy of the section field engine appears in the range.
+- proof 6: met — `npm run tasks -- merge-ready` at b602dc6, 1m18s wall clock: tsc ok, npm test ok, layer-check ok,
+  audit-status ok, doctor ok (23 pre-existing warnings, none from this range), bytes ok, tree ok with nothing
+  uncommitted, base ok — main has not moved past the merge base, which pass 2 recorded failing and the merge at
+  8c01995 repaired — and spec ok with every declared member closed. Every leg the clause names passes. The one
+  failing leg is `clauses`, "1 outstanding across 2 pass(es): c3", which is passes 1 and 2 and is what this pass
+  answers.
