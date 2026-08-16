@@ -1,8 +1,9 @@
 import { readFileSync, readdirSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
-import { SECTION_KINDS, parseModule, parserFor } from './module';
+import { SECTION_KINDS, parseModule, parserFor, schemaFor } from './module';
 import { parseSaveSection } from './saveSection';
+import { parseAnySection } from '../grammar/section';
 import { answersForItsBlocks, splitSections } from '../grammar/structure';
 
 // A line nobody wrote, indented under one somebody did. Whatever the parser
@@ -49,6 +50,9 @@ interface Probe {
   kind: string;
   line: string;
   dropped: boolean;
+  // Why a section could not be read standalone, when it could not be. A
+  // section skipped here is a subject the walk lost.
+  unreadable?: string;
 }
 
 // Every body line that has no block of its own, given one. A parse that then
@@ -58,8 +62,10 @@ function probeSection({ kind, lines }: SectionSource): Probe[] {
   let before: string;
   try {
     before = parsed(lines);
-  } catch {
-    return [];
+  } catch (error) {
+    // Reported, never swallowed: a walk that proves nothing is dropped in
+    // silence must not lose its own subjects in silence.
+    return [{ kind, line: lines[0], dropped: false, unreadable: error instanceof Error ? error.message : String(error) }];
   }
   const probes: Probe[] = [];
   for (let at = 1; at < lines.length; at++) {
@@ -119,6 +125,12 @@ describe('an indented block under a line whose reader never asked for one', () =
     const saveSection = (...lines: string[]) => splitSections(lines.join('\n'))[0];
     expect(() => parseSaveSection(saveSection('# save start', '{"version":11}', '  ' + INTRUDER))).toThrow(/takes no indented block/);
     expect(() => parseSaveSection(saveSection('# save start', '{"version":11}'))).not.toThrow();
+    // The schema engine carries its own wrap, and the parser table wraps it a
+    // second time for the per-kind check above. Only a direct call tells the
+    // two apart, so only a direct call holds the inner one.
+    const location = schemaFor('location')!;
+    expect(() => parseAnySection(saveSection('# location bay', 'starting', '  ' + INTRUDER), location)).toThrow(/takes no indented block/);
+    expect(() => parseAnySection(saveSection('# location bay', 'starting'), location)).not.toThrow();
   });
 
   // The one check that does not depend on finding a droppable line: every kind
@@ -137,10 +149,20 @@ describe('an indented block under a line whose reader never asked for one', () =
     expect(checked.filter((kind) => !answersForItsBlocks(parserFor(kind)!))).toEqual([]);
   });
 
+  // The reporting path above, exercised: today no shipped section fails to
+  // read standalone, so the assertion guarding it would otherwise never run
+  // and could not fail.
+  it('reports a section it cannot read standalone rather than skipping it', () => {
+    const [only] = probeSection({ kind: 'location', lines: ['# location bay', '!!!'] });
+    expect(only.unreadable).toMatch(/expected a direction/);
+    expect(only.dropped).toBe(false);
+  });
+
   // Refusing everything satisfies the first test, and so does a corpus that
   // went missing. This is what says the walk had subjects worth grading; the
   // floor is far below what content holds and only ever catches an empty sweep.
   it('found lines to probe, in every kind that ships one', () => {
+    expect(probes.filter((probe) => probe.unreadable !== undefined).map((probe) => `${probe.line} — ${probe.unreadable}`)).toEqual([]);
     expect(probes.length).toBeGreaterThan(100);
     for (const entry of written) expect(probes.filter((probe) => probe.kind === entry.kind).length, `# ${entry.kind} was written here to be probed`).toBeGreaterThan(0);
   });
