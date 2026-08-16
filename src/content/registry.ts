@@ -10,7 +10,7 @@ import { actionAddress, ActionDeclaration, actionTextKey, actionTextOwner } from
 import { AuthoredEntity, Entity, EntityBlock, entitySchema, Handler, isHandlerBlock } from './entity';
 import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
-import { GameEvent, eventSchema } from './event';
+import { GameEvent, eventSchema, triggerArityProblem } from './event';
 import { Item, itemRoleProblem, itemSchema } from './item';
 import {
   actionSlugProblem,
@@ -453,8 +453,9 @@ function applySection(registry: Registry, section: ModuleSection, context: Hydra
     }
     case 'event': {
       const event = hydrateSection(section.value as Authored<GameEvent>, eventSchema, context);
-      if (!event.resource) throw new DslError(`# event ${event.id} requires a resource: to watch`);
       if (!event.trigger) throw new DslError(`# event ${event.id} requires a trigger:`);
+      const arity = triggerArityProblem(event);
+      if (arity) throw new DslError(`# event ${event.id}: ${arity}`);
       // An entity answers an event by writing `on <its name>:`, and a hook has
       // claimed one of those labels. Refused where the name is bound, because
       // the entity that would have handled it never sees a problem — it gets a
