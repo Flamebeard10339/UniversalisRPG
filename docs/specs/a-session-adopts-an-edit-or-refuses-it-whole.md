@@ -191,3 +191,95 @@ doors on one surface and an auditor should not read one as the other; neither bl
  it is the gate waiting on the auditor, not a failure of the branch. Re-run after filing. Timing checked
  against the five-minute rule: the two touched test files run 123 tests in 1.66s, so the three new
  filesystem-touching play-cli tests add no measurable load to the suite.
+
+### Pass 2 — 2026-08-16
+
+- base: `cb74060058051c3d6fbd4249cfa72bbbe6d3ef25`
+- head: `8ed8623bee67edceb9b00e1f125f932ede8a17bc`
+- proof 1: met — Re-graded from the diff, not from pass 1. Aimed manifest
+ C:\Users\yonat\AppData\Local\Temp\audit-a-session-adopts-an-edit-or-refuses-it-whole-pass2-mutations.json,
+ entries 1-3, all KILLED at their own named test and re-run with the mutant still applied:
+ (a) command.ts:441 `return authoring.readLocalChanges();` -> `return authoring.localSource.text;`
+ kills command.test.ts "reaches a location a different process added to the local file, with no
+ restart" — the reader is what is read, not the remembered copy; (b) command.ts:458
+ `return adoptLocalChanges(ctx, authoring, text, RELOADED);` -> `return noted('plain', RELOADED);`
+ kills the same test, so the "Reloaded" line alone cannot carry it; (c) play-cli.ts:508
+ `readLocalChanges: () => readLocalChanges(localFile, dependencies)` replaced by an IIFE closing over
+ the bytes read at construction kills play-cli.test.ts "picks up a location another process wrote
+ into the file, in the session already running" — the CLI reader closes over the path. That play-cli
+ test writes a real file in a real temp dir with a writeFileSync the session was never told about,
+ which is the clause's "different process", and it asserts both the registry entry and the travel
+ choice on the republished view. Re-run: npm run mutate -- <that manifest>.
+- proof 2: met — command.ts:395 `if (diagnostics.length > 0 || localStatus?.loaded !== true) {` weakened to
+ `if (diagnostics.length > 99999) {` is KILLED at command.test.ts "leaves registry, state, log and
+ clock untouched when the file does not load" (manifest entry 4). Its snapshotOf is a real witness:
+ serializeSession covers all 17 SAVE_FIELDS and the test re-runs /wait 1 and asserts time===6, so
+ play demonstrably continues. The no-partial-adoption half is watched from the write side too:
+ inserting `persist?.(text);` above the refusal return is KILLED at "writes nothing over a file that
+ no longer loads, so the other process keeps its text" (entry 6), the new test this branch added,
+ which pins the refusal for the /dsl caller as well. Diagnostics land on the tool channel by
+ construction — `noted` builds a ToolMessage with words:'tool'. Measured and reported rather than
+ filed: the gate's second disjunct `localStatus?.loaded !== true` is NOT watched — replacing the gate
+ with `if (diagnostics.length > 0) {` SURVIVED the whole suite (3272 tests, 0 failed). I looked for an
+ input that reaches it and found none: eight local-file texts through loadUniverseWithDiagnostics
+ (empty, no `# info` header, a different module id, a redeclaration of a base module, an unresolvable
+ `requires`, NUL/control bytes, header only, a bad field) each either loaded cleanly or produced a
+ diagnostic localDiagnosticsFor keeps, so the first disjunct always fires first. Treated as a
+ defensive disjunct with no reachable input rather than as dead code or as a hole.
+- proof 3: met — command.ts:407 `adoptRegistry(ctx.session, loaded.registry);` -> `void loaded;` is KILLED
+ twice, as two separate manifest entries against two separate named tests: command.test.ts "/dsl
+ stages a section, hands it to the writer it was given, reloads it, and /local can show/delete it"
+ and "reaches a location a different process added to the local file, with no restart". Removing the
+ shared function breaks both commands rather than one, which is what the clause asks for. Structural
+ half re-derived rather than trusted: `grep -n "adoptRegistry" src/runtime/command.ts` returns the
+ import at :21 and exactly one call at :407, and the test asserting it derives its own subject by
+ scanning the file. Both structural derivations were mutation-checked from the other direction —
+ rewriting /local show to read `authoring.localSource.text` instead of `localChangesNow(authoring)`
+ is KILLED at "lists, prints and deletes what the file holds rather than what this session remembers"
+ AND, as a separate entry, at "reads the remembered copy in exactly one place, which is the place
+ that consults the file", so the one-read invariant is watched behaviourally and structurally.
+ Confirmed by reading: /dsl, /local clear and /local delete all route through commitLocalChanges ->
+ adoptLocalChanges, /reload is the same function with a read in front, and there is no second copy of
+ load-gate-adopt in the file.
+- proof 4: met — Pruning reaches the new caller and every prune is said. Four mutations in
+ src/runtime/session.ts, all KILLED: emptying `const warnings = pruneStateForRegistry(state,
+ registry);` (session.ts:385) and deleting `for (const warning of warnings) state.log.push(...)`
+ (session.ts:386) both kill command.test.ts "prunes state the edit invalidated, saying each prune,
+ and leaves a state the registry resolves", so the test watches both halves and is not satisfiable by
+ the registry swap alone. The clause's second proof target is now real: emptying the same prune line
+ kills session.test.ts "prunes what the new registry cannot resolve, says every prune, and re-spreads
+ discovery", the seam test this branch added, which closes pass 1's low. Its third claim was checked
+ rather than taken from its title — deleting `spreadDiscovery(state, registry);` from adoptRegistry is
+ KILLED at that same test, so "re-spreads discovery" is asserted and not merely narrated. The
+ command-level test drives the case the clause names literally: the player stands in
+ local-changes.outpost holding local-changes.gem when the file is emptied from elsewhere, and it
+ asserts a "Removed inventory local-changes.gem" line, a line naming the deleted location, the item
+ gone from the view, and registry.locations.has(status.location) true afterwards.
+- proof 5: met — The behaviour holds and three of its four halves are proven; the log half is not, and is
+ filed. Proven: command.ts:458 rewritten to stage `${RELOADED} ${Math.random()}` is KILLED at
+ command.test.ts "says the same thing and leaves the same session however many times it is called",
+ and that test reloads three times comparing message text and a snapshot of sessionStatus,
+ serializeSession and both registry key sets each time. /reload contributes nothing to
+ recorder.history — its CommandResult.recorded is [] and applyResult pushes only that — so a /reload a
+ driver types can never reach a `# test`, and c5's replay argument holds by construction. Measured the
+ log half directly, because the test cannot see it: with the c5 fixture's base module, `/dsl item gem
+ title: Gem` + `/wait 4` leaves nothing undrained in state.log (measured 0 via npm run inspect), so
+ `expect(first.view?.said).toEqual([])` holds for any cursor, and snapshotOf covers neither log nor
+ logCursor — serializeSession is the 17 SAVE_FIELDS and sessionStatus is location, entities and time.
+ Consequently session.ts:387 `internals.logCursor = Math.max(0, state.log.length - warnings.length);`
+ replaced by `= 0` SURVIVED the whole suite (3272 tests, 0 failed). The real code is correct —
+ measured on a session that has actually spoken ("Empty." from an entity action, log non-empty and
+ drained), the following /reload republishes nothing, said length 0. So c5 is met on behaviour, and
+ the missing proof is filed as a finding rather than graded as a failure.
+- proof 6: unmet — `npm run tasks -- merge-ready` at 8ed8623 in this worktree: tsc pass, npm test pass,
+ layer-check pass, audit-status pass, doctor pass (25 pre-existing warnings, which do not fail the
+ leg), bytes pass, tree pass, spec pass, clauses pass — and `base FAIL — main has moved past the
+ merge base`, so the invocation exits "NOT merge-ready: base failed". main has advanced 24 commits
+ past cb74060 with the xp-from-events merge (1a75ee4), touching src/content/registry.ts,
+ src/runtime/runtime.ts, src/runtime/effects.ts and src/runtime/skillGrants.ts. Graded unmet rather
+ than met because the clause is that the invocation passes and it does not; it is routine and
+ mechanically repairable rather than a defect in the diff — `git merge-tree --write-tree main HEAD`
+ produces a tree with no conflict, and the two sides touch disjoint runtime files. The repair is
+ `git merge main` and re-run. Timing checked against the five-minute rule: command.test.ts,
+ play-cli.test.ts and session.test.ts run 205 tests in 1.94s, so the four new filesystem-touching
+ play-cli tests add nothing measurable.
