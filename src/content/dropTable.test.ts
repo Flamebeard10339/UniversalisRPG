@@ -148,6 +148,7 @@ describe('# droptable', () => {
     const registry = loadUniverse([{ name: 'pack', text: source }]);
     const trip = roundTripModule(registry, { info: { id: 'pack', version: [1, 0, 0] } }, (text) => loadUniverseWithDiagnostics([{ name: 'again', text }]));
     expect(trip.printed).toContain('1 in 5:');
+    expect(trip.diagnostics).toEqual([]);
     expect(trip.differences).toEqual([]);
   });
 

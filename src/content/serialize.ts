@@ -535,10 +535,8 @@ function inModule(moduleId: string, id: string): boolean {
   return id.startsWith(`${moduleId}.`);
 }
 
-// Private on purpose, and this is the whole of c2's guarantee: a module
-// printed and loaded back has to be compared to the universe it came from,
-// and the only callers that can exist are the three below. There is no door to
-// guard because there is no door — the export was the door.
+// Not exported, so that printed content cannot leave this file without the
+// comparison the three round trips below make of it.
 function serializeRegistryModule(registry: Registry, options: SerializeModuleOptions): string {
   const moduleId = options.info.id;
   const sections: string[] = [];
