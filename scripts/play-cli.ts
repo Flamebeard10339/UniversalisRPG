@@ -8,6 +8,8 @@ import { withEngineLocale } from '../src/content/engineLocale';
 import { type ModuleSource } from '../src/content/universe';
 import { initialLocalChangesModule } from '../src/content/localChanges';
 import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './lib/modportalCache';
+import { fileSlots } from './lib/slotFile';
+import { createSaveContext, type SaveContext } from '../src/runtime/saveSlots';
 import { type Localized, type Localizer } from '../src/runtime/localized';
 import { serializeSession, sessionLocalizer, startSession, view, type PlayChoice, type PlayStatus, type PlayView } from '../src/runtime/session';
 import {
@@ -31,6 +33,7 @@ import { formatPlane } from './planeView';
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
 const defaultLocalChanges = 'content/local-changes.dsl';
+const defaultSaves = '.saves';
 
 // TODO(quest-journal): quests are emergent from flags, not a DSL kind. See backlog.
 
@@ -245,6 +248,7 @@ const STARTUP_LINES = [
   '<a.dsl,b.dsl> at startup loads content files, comma-separated in one argument',
   'local=<file> at startup chooses the local DSL file',
   'modportal=<dir> at startup loads enabled portal mod DSL from a synced cache',
+  'saves=<dir> at startup chooses where slots are kept (saves=off keeps none)',
 ];
 
 export function formatOutput(output: CommandOutput, localizer: Localizer): ReplLine[] {
@@ -399,6 +403,7 @@ interface CliArgs {
   liveRequested: boolean;
   localFile: string;
   modportalDir?: string;
+  savesDir?: string;
 }
 
 function splitContentArg(arg: string | undefined): string[] {
@@ -409,6 +414,7 @@ function parseCliArgs(rawArgs: string[]): CliArgs {
   const positional: string[] = [];
   let localFile = defaultLocalChanges;
   let modportalDir: string | undefined = DEFAULT_MODPORTAL_CACHE;
+  let savesDir: string | undefined = defaultSaves;
   let liveRequested = false;
 
   for (let i = 0; i < rawArgs.length; i++) {
@@ -451,6 +457,24 @@ function parseCliArgs(rawArgs: string[]): CliArgs {
       modportalDir = value === 'off' ? undefined : value;
       continue;
     }
+    if (arg === '--no-saves' || arg === 'saves=off') {
+      savesDir = undefined;
+      continue;
+    }
+    if (arg === '--saves') {
+      savesDir = rawArgs[++i] ?? defaultSaves;
+      continue;
+    }
+    if (arg.startsWith('--saves=')) {
+      const value = arg.slice('--saves='.length);
+      savesDir = value === 'off' ? undefined : value;
+      continue;
+    }
+    if (arg.startsWith('saves=')) {
+      const value = arg.slice('saves='.length);
+      savesDir = value === 'off' ? undefined : value;
+      continue;
+    }
     positional.push(arg);
   }
 
@@ -460,7 +484,7 @@ function parseCliArgs(rawArgs: string[]): CliArgs {
     console.error(`Load several content files as one comma-separated argument, not ${positional.length} separate ones. Use local=<file> to choose where local changes are written.`);
     process.exit(1);
   }
-  return { files: splitContentArg(positional[0]), liveRequested, localFile, modportalDir };
+  return { files: splitContentArg(positional[0]), liveRequested, localFile, modportalDir, savesDir };
 }
 
 function repoPath(file: string): string {
@@ -493,6 +517,14 @@ function writeLocalChanges(file: string, text: string): void {
 function readLocalChanges(file: string, dependencies: readonly string[]): string {
   const target = repoPath(file);
   return existsSync(target) ? readFileSync(target, 'utf8') : initialLocalChangesModule(dependencies);
+}
+
+// The save context this driver hands the command table: one file per slot
+// under a directory of its own, and the wall clock the cadence is measured on.
+// The directory is not made until something is written to it, so a run that
+// saves nothing leaves nothing behind and starts the same way every time.
+export function fileSaves(dir: string, now: () => number = Date.now): SaveContext {
+  return createSaveContext(fileSlots(repoPath(dir)), now);
 }
 
 // The authoring context this driver hands the command table: a file it can
@@ -539,13 +571,13 @@ export interface Repl {
 // every line afterwards goes through. Lifted out of main so that the drift
 // proof drives the REPL rather than a second copy of it — a copy is what made
 // the previous cross-driver comparison measure only one of the two drivers.
-export function openRepl(sources: readonly ModuleSource[], options: { authoring?: AuthoringContext; driving?: boolean } = {}): Repl {
+export function openRepl(sources: readonly ModuleSource[], options: { authoring?: AuthoringContext; save?: SaveContext; driving?: boolean } = {}): Repl {
   const loaded = loadUniverseWithDiagnostics(withEngineLocale(sources));
   const session = startSession(loaded.registry);
   const recorder: Recorder = { history: [], startSave: serializeSession(session) };
   const opening = view(session);
   return {
-    context: newContext(session, opening, { recorder, authoring: options.authoring, driving: options.driving }),
+    context: newContext(session, opening, { recorder, authoring: options.authoring, save: options.save, driving: options.driving }),
     diagnostics: loaded.diagnostics.map((each) => `Disabled module: ${formatModuleDiagnostic(each)}`),
     opening: formatView(opening, sessionLocalizer(session)),
   };
@@ -568,7 +600,7 @@ async function main(): Promise<void> {
 
   let repl: Repl;
   try {
-    repl = openRepl(sources, { authoring, driving: liveMode });
+    repl = openRepl(sources, { authoring, save: args.savesDir ? fileSaves(args.savesDir) : undefined, driving: liveMode });
   } catch (err) {
     if (err instanceof RuntimeError) {
       console.error(`Error: ${err.message}`);

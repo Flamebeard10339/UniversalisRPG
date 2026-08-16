@@ -177,7 +177,7 @@ describe('the command table is the one definition of the command set', () => {
   it('gives a command no argument it does not declare, over every entry that declares none', () => {
     const { ctx, session } = fixture(SAVE_MODULE);
     const argumentless = COMMANDS.filter((spec) => spec.match === 'name' && spec.arg === 'none');
-    expect(argumentless.map((spec) => spec.name)).toEqual(['/look', '/state', '/cancel', '/reload', '/help', '/quit']);
+    expect(argumentless.map((spec) => spec.name)).toEqual(['/look', '/state', '/cancel', '/reload', '/export', '/save', '/restore', '/slots', '/help', '/quit']);
 
     for (const spec of argumentless) {
       for (const spelling of [spec.name, ...spec.aliases]) {

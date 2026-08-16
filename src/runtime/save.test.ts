@@ -4,7 +4,7 @@ import { armAction, armCraft, armFightAction, armTravel, buffsOf, createGameStat
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, ModalFrame, openModalNamed } from './modals';
-import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
+import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
 import { travelAction, TRAVEL_ADDRESS } from './actions';
@@ -712,5 +712,80 @@ describe('a fight under way survives its action being retitled', () => {
     const warnings = pruneStateForRegistry(state, universe('Combat'));
     expect(warnings.map((warning) => warning.message)).toEqual(['Detenida la accion entity.isla.comoda.fight-drawer: no existe la accion fight-drawer en entity.isla.comoda.']);
     expect(state.activeAction).toBeNull();
+  });
+});
+
+// c14. The subjects come off `SAVE_FIELDS`, so the field added to `GameState`
+// next month is walked here by the entry the compiler already forces somebody
+// to write for it, and nobody edits this file to make that happen. What each
+// case asserts is the whole clause: a value the gate accepts is a value the
+// loader reads, and never a raw `TypeError` from inside the gate that exists
+// to prevent one.
+describe('what checkSave accepts, loadSave can read, for every field there is', () => {
+  const registry = loadInEnglish(MODULE);
+  const entries = Object.entries(SAVE_FIELDS);
+
+  it('walks every field a save carries', () => {
+    expect(entries.length).toBeGreaterThan(15);
+  });
+
+  for (const [field, rule] of entries) {
+    // A sample the field's own `holds` rejects would prove nothing about the
+    // loader, because `checkSave` would refuse it before the loader was reached.
+    it(`admits the sparsest ${field}`, () => {
+      expect(rule.holds(rule.sparsest)).toBe(true);
+    });
+
+    it(`loads the sparsest ${field}`, () => {
+      const diff = rule.shape === 'record' ? { [field]: { 'nobody.declares-this': rule.sparsest } } : { [field]: rule.sparsest };
+      expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff }, registry)).not.toThrow();
+    });
+  }
+
+  it('refuses the shapes that used to reach the loader, naming the field rather than raising from inside it', () => {
+    const refuses = (diff: Record<string, unknown>) => expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff }, registry)).toThrow(/^save field/);
+
+    // Every one of these got past `isObject` and crashed the pruner below it.
+    refuses({ activeAction: {} });
+    refuses({ activeAction: { ownerRef: 'entity.chest', actionSlug: 'open', repeating: false, implicitTarget: 0 } });
+    refuses({ activeAction: { ownerRef: 'entity.chest', actionSlug: 'open', repeating: false, implicitTarget: 0, cadences: {}, actors: { rat: {} } } });
+    refuses({ journey: {} });
+    refuses({ journey: { to: 'camp' } });
+    refuses({ journey: { to: 'camp', legs: [3] } });
+    refuses({ player: {} });
+    refuses({ player: { name: 'Rowan' } });
+  });
+});
+
+// c5. Nothing on the way in reads a clock, so the time a save was written at is
+// the time the session stands at once it is loaded -- which is what lets
+// `offline-progression` put its own entry point outside this path later.
+describe('no load path advances time', () => {
+  const registry = loadInEnglish(MODULE);
+
+  it('leaves state.time at exactly what the payload holds', () => {
+    for (const time of [0, 1, 5_000, 90_061_000]) {
+      const state = initialState(registry);
+      state.time = 777;
+      loadSave(state, { version: SAVE_VERSION, diff: { time } }, registry);
+      expect(state.time).toBe(time);
+    }
+  });
+
+  it('leaves it at the baseline when the payload carries no time at all', () => {
+    const state = initialState(registry);
+    state.time = 777;
+    loadSave(state, { version: SAVE_VERSION, diff: {} }, registry);
+    expect(state.time).toBe(0);
+  });
+
+  it('round-trips a clock that was moved, through the bytes a `# save` section is made of', () => {
+    const state = initialState(registry);
+    state.time = 42_000;
+    const saved = parseSaveSection({ kind: 'save', id: 'x', body: [{ text: serializeSave(state, registry), span: { start: 0, end: 0 }, children: [] }], span: { start: 0, end: 0 } }).saved;
+
+    const target = initialState(registry);
+    loadSave(target, saved, registry);
+    expect(target.time).toBe(42_000);
   });
 });
