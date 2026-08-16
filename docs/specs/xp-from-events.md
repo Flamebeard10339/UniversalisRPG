@@ -206,3 +206,92 @@ uses.
   has already read. Inherited from `skill-levels-xp-events`, which recorded it and did not own it; this
   branch is the first that can actually cross a threshold mid-segment, so it inherits the question and
   may still hand it to whoever owns resources.
+
+## Audit passes
+
+### Pass 1 — 2026-08-16
+
+- base: `cb74060058051c3d6fbd4249cfa72bbbe6d3ef25`
+- head: `baf524ed8431b59b88cf31f1be6dcc14276e5618`
+- proof 1: met — Mutation "c1 a grant's event is walked by the shared reference machinery" KILLED: deleting the
+  one line src/content/referenceSites.ts adds to case 'skill' fails
+  src/content/event.test.ts > "refuses every trigger name written where an event name belongs", re-run at
+  its own file with the mutation still applied. That test derives its subjects from TRIGGER_NAMES, so every
+  engine moment written where an event name belongs is refused with "names an unknown event", and the
+  positive case asserts the same id resolves for a grant and for an entity handler label in one module.
+  A grep over src for any second enumeration of trigger names finds only src/content/event.ts, which is the
+  one closed list. Re-run: npm run mutate on the manifest, plus vitest src/content/event.test.ts.
+- proof 2: met — Mutation "c2 an unrecognised trigger is refused against the closed set" KILLED: narrowing
+  triggerValue's guard to "if (!normalized)" fails src/content/event.test.ts >
+  "accepts every name the table declares and nothing else". The accept half of that test is derived from
+  TRIGGER_NAMES rather than listed, so a trigger added to the table is covered on the line it is added, and
+  the second test asserts the refusal message contains every name in TRIGGER_NAMES. The vocabulary pin
+  asserts the ten names in order. Adding an eleventh is editing EVENT_TRIGGERS and nothing else, because
+  TRIGGER_NAMES, watchesAPool and triggerArityProblem are all functions of that object.
+- proof 3: met — Mutation "c3 a superfluous resource: is refused, not only a missing one" KILLED: replacing
+  triggerArityProblem's no-pool branch with "return undefined" fails src/content/event.test.ts >
+  "refuses a declaration that disagrees with what its trigger takes", which walks TRIGGER_NAMES and asserts
+  both directions per trigger. The arity is a property of the name (EVENT_TRIGGERS maps each to 'pool' or
+  'none') and is read off the assembled event, so a later module supplying resource: is still checked. The
+  message names the arity, not the field: "trigger: on empty watches a pool, so it needs a resource:
+  naming which one" and "trigger: damage-taken watches no pool, so it takes no resource:".
+- proof 4: met — Mutation "c4 the struck side is who damage-taken and evaded fire on" KILLED: replacing
+  "const struck = sideOf(action.depletes, self, other)" with "const struck = self" in resolveAttempt fails
+  src/runtime/skillGrants.test.ts > "trains the performer on what it dealt and the struck on what it took".
+  The fixture puts every skill on exactly one sheet, so which entity the moment fired on is readable off
+  which skill moved; the miss/evade pair is proved the same way and the cross-check asserts the other
+  side's skill stayed absent. credit: is untouched by this branch. Caveat, already filed by the
+  implementer as a-skill-grant-s-xp-lands-in-one-store-shared-by-every-earner: only the SUBJECT SELECTION
+  at fireEvents is provable, because state.xp is one map and the actor passed to applyResults reaches
+  nothing that reads it.
+- proof 5: met — Mutation "c5 a grant omitting both halves of the expression is a parse error" KILLED: making
+  the expression alternation optional in the GRANT regexp fails src/grammar/skillGrant.test.ts >
+  "refuses a grant that omits both halves, so a line always says a number". The same file proves 4*amount,
+  4 and amount all parse to the same shape, and that a second variable, a second term, a non-product
+  operator and a reversed product are each a parse error, so the one-coefficient-one-bound-amount rule is
+  the whole grammar rather than the common case of a general one.
+- proof 6: met — Two mutations KILLED. "c6 the line parses to one grant however the spacing is written":
+  dropping raw.trim() fails src/grammar/skillGrant.test.ts > "reads the same grant however the spacing is
+  written", which covers four spellings including leading and trailing whitespace. "c6 a grant is a bare
+  clause of the skill it is written under": deleting "clauses: 'grants'" from skillSchema fails
+  src/content/event.test.ts > "resolves a declared event exactly as a handler label does", which reads the
+  parsed grant back off registry.skills.get('melee').grants. The amended grammar ships: a line naming a
+  skill is refused, and the event is an ordinary namespaced reference (base.rat-bitten parses). Round trip
+  checked separately with npm run probe --round-trip over a skill carrying four grants of all four shapes:
+  clean.
+- proof 7: met — Mutation "c7 the earner is the entity the moment happened to, not the player" KILLED:
+  substituting PLAYER for actorId in the actorEntity lookup that feeds experienceFor fails
+  src/runtime/skillGrants.test.ts > "earns an authored enemy experience from its own events, by the same
+  path", where gnawing is on the rat's sheet and no other. The companion tests prove a skill the earner
+  does not carry trains nobody, and that an entity with no skills: at all earns nothing rather than
+  throwing. experienceFor and fireEvents name no PLAYER. Filed against this clause: applyOutcome does hard
+  wire PLAYER, so completed and unfinished are the two triggers no non-player can reach.
+- proof 8: met — Read off the diff and mutated. applyResults and applyOne are not in src/runtime/effects.ts's
+  diff; the only thing experienceFor returns is a list of ordinary {kind:'xp'} results, and the only
+  runtime state this branch adds is a WeakMap index derived from the registry, which holds no xp. Mutation
+  "c8 a grant reaches the accumulator through applyResults carrying the batch count" KILLED: pinning the
+  count to 1 fails src/runtime/skillGrants.test.ts > "grants once per completion a batched span produced".
+  The accumulation is the inherited one: the same test file asserts a grant that crosses a level threshold
+  mid-span produces exactly one level-up log line, which is the line applyOne pushes for any xp source.
+  No new save field, so no prune rule and no migration.
+- proof 9: met — Mutation "c9 the grant index is derived once and held against the registry" KILLED: defeating
+  the WeakMap hit fails src/runtime/skillGrants.test.ts > "walks the declared skills at most once however
+  many moments fire", which counts calls by wrapping registry.skills.values. A moment no event names costs
+  one Map.get. Two further tests in that file discharge the rest: a fight with 300 idle skills on the page
+  resolves to a state deep-equal to the same fight without them, and the same fight with every gain line
+  stripped produces an identical state and an identical log once level lines are removed. No fixture under
+  content/ is in the diff and the merge gate's integration leg is green. Recorded against this clause: the
+  spec points c9 at src/runtime/poolMoments.test.ts, which contains no cost test at all; the evidence above
+  is in src/runtime/skillGrants.test.ts. Filed.
+- proof 10: met — src/runtime/save.ts is not in the diff and no fixture is regenerated by it. Mutation
+  "c10 the save version this branch inherits is pinned" KILLED: moving SAVE_VERSION to 12 fails
+  src/runtime/skillGrants.test.ts > "keeps the save shape it inherited, so a state that earned a grant
+  reloads clean", which pins 11, serializes a state that earned only grant xp, asserts compareSave and
+  loadSave both report no differences, and asserts the reloaded xp map is identical. Grants themselves are
+  content: npm run probe --round-trip over a skill carrying four grants serializes and reloads clean, so
+  the serializer change carries them without a format move.
+- proof 11: met — npm run tasks -- merge-ready on baf524e: tsc pass, npm test pass, layer-check pass,
+  audit-status pass, doctor pass (25 warnings, which do not fail the leg), bytes pass, tree pass (nothing
+  uncommitted), base pass (main has not moved past the merge base), spec pass (every declared member
+  closed). The single failing leg is "clauses xp-from-events has no recorded audit pass", which is this
+  record. Re-run the command to reproduce.
