@@ -4,13 +4,14 @@ import { Action, entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
 import { loadModule, loadUniverse } from './registry';
-import { parseModule } from './module';
-import { Cursor, DslError } from '../grammar/parser';
+import { SCHEMAS, parseModule, schemaFor } from './module';
+import { Cursor, DslError, Parser, parseWhole } from '../grammar/parser';
+import { ListParser } from '../grammar/list';
 import { point } from '../grammar/range';
-import { SectionSchema, hydrateSection, parseSection } from '../grammar/section';
+import { SectionSchema, hydrateSection, parseAnySection, parseSection } from '../grammar/section';
 import { skillSchema } from './skill';
 import { statSchema } from './stat';
-import { splitSections } from '../grammar/structure';
+import { RawLine, splitSections } from '../grammar/structure';
 import { variableSchema } from './variable';
 import { tagClause } from '../grammar/tagClause';
 import { text } from '../grammar/values';
@@ -714,5 +715,153 @@ describe('a field name that is one letter off is a typo, not an action label', (
   it('leaves an action label that is merely short or unfamiliar alone', () => {
     const den = parseOne('# location den\neat: say: You eat.\npick lock: say: Click.\nrest: say: You rest.', locationSchema);
     expect(den.actions?.map((action) => action.label)).toEqual(['eat', 'pick lock', 'rest']);
+  });
+});
+
+// A schema seen the way the walk below needs it: `AnySchema` carries neither
+// the keyword a field is written under nor the two positions a field is
+// reached without one, and both decide what a probe line can say.
+interface WalkableSchema {
+  fields: Record<string, { parser: object; keyword?: string }>;
+  clauses?: string;
+  bare?: string;
+}
+
+interface WalkableField {
+  kind: string;
+  name: string;
+  keyword: string;
+  parser: object;
+  // Reached by its position in the line rather than by a `keyword:` label, so
+  // no probe below can address it and its block form does not exist.
+  positional: boolean;
+  // Whether this field's section absorbs an unclaimed word as a clause, which
+  // is the one thing that lets an inline line read past where its field parser
+  // stopped.
+  sectionTakesClauses: boolean;
+}
+
+function schemaFields(): WalkableField[] {
+  return Object.entries(SCHEMAS as unknown as Record<string, WalkableSchema>).flatMap(([kind, schema]) =>
+    Object.entries(schema.fields).map(([name, field]) => ({
+      kind,
+      name,
+      keyword: field.keyword ?? name,
+      parser: field.parser,
+      positional: name === schema.clauses || name === schema.bare,
+      sectionTakesClauses: schema.clauses !== undefined,
+    })),
+  );
+}
+
+const fieldName = (field: WalkableField): string => `${field.kind}.${field.name}`;
+const takesABlock = (field: WalkableField): boolean => 'parseBlock' in field.parser;
+
+type Outcome = { read: true; value: string } | { read: false; refusal: string };
+
+const attempt = (parse: () => unknown): Outcome => {
+  try {
+    return { read: true, value: JSON.stringify(parse()) };
+  } catch (error) {
+    return { read: false, refusal: error instanceof Error ? error.message : String(error) };
+  }
+};
+
+const parseProbe = (source: string): Outcome =>
+  attempt(() => {
+    const [section] = splitSections(source);
+    return parseAnySection(section, schemaFor(section.kind)!);
+  });
+
+const inlineSection = (field: WalkableField, op: string, authored: string): Outcome => parseProbe(`# ${field.kind} probe\n${op}${field.keyword}: ${authored}\n`);
+const blockSection = (field: WalkableField, op: string, authored: string): Outcome => parseProbe(`# ${field.kind} probe\n${op}${field.keyword}:\n  ${authored}\n`);
+
+const asOneLine = (authored: string): RawLine => ({ text: authored, span: { start: 0, end: authored.length }, children: [] });
+const inlineField = (field: WalkableField, authored: string): Outcome => attempt(() => parseWhole(field.parser as Parser<unknown>, authored, 0, 'a list item'));
+const blockField = (field: WalkableField, authored: string): Outcome => attempt(() => (field.parser as ListParser<unknown>).parseBlock([asOneLine(authored)]));
+
+const disagree = (a: Outcome, b: Outcome): boolean => a.read !== b.read || (a.read && b.read && a.value !== b.value);
+
+// One text per shape an author writes and per shape a typo leaves behind: a
+// clean item, an item with a word after it, a count, a decimal no id can
+// absorb, something that looks like the next key, a comma run, and a result
+// verb — the last because the two hook fields read a verb where every other
+// list reads an id.
+const AUTHORED = ['a', 'a b', 'a b c', '1 a', '2 a b', 'a 2.5', 'a b: c', 'a, b', 'drain: 5 health', 'drain: 5 health b'];
+
+// A patch is where a mod's typo arrives, so the walk covers what the
+// contribution system makes reachable as well as the bare assignment.
+const OPS = ['', '+', '-'];
+
+describe('a field that takes a block reads one exactly where it reads the same text inline', () => {
+  const fields = schemaFields();
+  const blockCapable = fields.filter(takesABlock);
+
+  it('derives its subjects by the predicate the section engine decides a block by', () => {
+    const addressable = fields.filter((field) => !field.positional);
+    const declaresBlock = addressable.filter(takesABlock).map(fieldName);
+    const engineReadsBlock = addressable
+      .filter((field) => {
+        const outcome = blockSection(field, '', 'a');
+        return outcome.read || !outcome.refusal.includes('cannot be written as a block');
+      })
+      .map(fieldName);
+
+    expect(declaresBlock).toEqual(engineReadsBlock);
+    expect(declaresBlock).toContain('location.adjacent');
+  });
+
+  it('reads a block line and the same text handed to the whole parser identically', () => {
+    expect(blockCapable.length).toBeGreaterThan(0);
+    const disagreements = blockCapable.flatMap((field) => AUTHORED.filter((authored) => disagree(inlineField(field, authored), blockField(field, authored))).map((authored) => `${fieldName(field)}: ${JSON.stringify(authored)}`));
+    expect(disagreements).toEqual([]);
+  });
+
+  it('never reads through a section a block that section refuses inline, in the bare, + and - forms', () => {
+    const readOnlyAsABlock = blockCapable.flatMap((field) =>
+      OPS.flatMap((op) =>
+        AUTHORED.filter((authored) => {
+          const inline = inlineSection(field, op, authored);
+          const block = blockSection(field, op, authored);
+          return (block.read && !inline.read) || (inline.read && block.read && inline.value !== block.value);
+        }).map((authored) => `${fieldName(field)} ${op}${field.keyword}: ${JSON.stringify(authored)}`),
+      ),
+    );
+    expect(readOnlyAsABlock).toEqual([]);
+  });
+
+  // The other direction is the line loop's, not the block reader's: a section
+  // with a clause field gives an unclaimed word a home, so its inline form
+  // reads past where the field parser stopped. Characterised rather than
+  // excused — a section without clauses that does this is a new defect.
+  it('reads inline past the field parser only where the section absorbs a clause', () => {
+    const inlineReadsMore = blockCapable.flatMap((field) => OPS.flatMap((op) => AUTHORED.filter((authored) => inlineSection(field, op, authored).read && !blockSection(field, op, authored).read).map(() => field)));
+    expect(inlineReadsMore.filter((field) => !field.sectionTakesClauses).map(fieldName)).toEqual([]);
+  });
+
+  // Agreement is satisfied by a pair that refuses everything, so the walk also
+  // says which fields it saw read something.
+  it('reads at least one authored text on every field a block can address', () => {
+    const silent = blockCapable.filter((field) => !field.positional && !AUTHORED.some((authored) => blockSection(field, '', authored).read)).map(fieldName);
+    expect(silent).toEqual([]);
+  });
+});
+
+describe('a block-form line carrying more than its parser read', () => {
+  const location =
+    (...lines: string[]) =>
+    () =>
+      parseModule(['# location bay', ...lines].join('\n'));
+
+  it('refuses the leftover the loader used to drop, on each field the finding measured', () => {
+    expect(location('entities:', '  miki oven')).toThrow(/unexpected content after a list item: "oven"/);
+    expect(location('flags:', '  alert typo')).toThrow(/unexpected content after a list item: "typo"/);
+    expect(location('adjacent:', '  beach whille unlocked')).toThrow(/unexpected content after a list item: "whille unlocked"/);
+    expect(() => parseModule('# action brawl\non success:\n  xp: brawling 2.5')).toThrow(/unexpected content after a result: "\.5"/);
+  });
+
+  it('refuses a while one letter off rather than dropping the condition it gates', () => {
+    expect(location('adjacent:', '  beach while unlocked')).not.toThrow();
+    expect(location('adjacent:', '  beach whille unlocked')).toThrow(DslError);
   });
 });
