@@ -490,6 +490,25 @@ function writeLocalChanges(file: string, text: string): void {
   writeFileSync(target, text, 'utf8');
 }
 
+function readLocalChanges(file: string, dependencies: readonly string[]): string {
+  const target = repoPath(file);
+  return existsSync(target) ? readFileSync(target, 'utf8') : initialLocalChangesModule(dependencies);
+}
+
+// The authoring context this driver hands the command table: a file it can
+// write and the same file read back on demand. Both close over the path rather
+// than over its contents, so a session that has been running for an hour reads
+// what is on disk now — including what another process put there.
+export function fileAuthoring(baseSources: ModuleSource[], dependencies: string[], localFile: string): AuthoringContext {
+  return {
+    baseSources,
+    dependencies,
+    localSource: { name: sourceName(localFile), text: readLocalChanges(localFile, dependencies) },
+    writeLocalChanges: (text) => writeLocalChanges(localFile, text),
+    readLocalChanges: () => readLocalChanges(localFile, dependencies),
+  };
+}
+
 export interface ModportalLoadResult {
   sources: ModuleSource[];
   warnings: string[];
@@ -544,15 +563,8 @@ async function main(): Promise<void> {
   const baseSources = [...loadContent(files), ...modportal.sources];
   const baseLoaded = loadUniverseWithDiagnostics(baseSources);
   const dependencies = baseLoaded.loadedModules;
-  const localText = existsSync(localPath) ? readFileSync(localPath, 'utf8') : initialLocalChangesModule(dependencies);
-  const localSource: ModuleSource = { name: sourceName(args.localFile), text: localText };
-  const sources = existsSync(localPath) ? [...baseSources, localSource] : baseSources;
-  const authoring: AuthoringContext = {
-    baseSources,
-    dependencies,
-    localSource,
-    writeLocalChanges: (text) => writeLocalChanges(args.localFile, text),
-  };
+  const authoring = fileAuthoring(baseSources, dependencies, args.localFile);
+  const sources = existsSync(localPath) ? [...baseSources, authoring.localSource] : baseSources;
 
   let repl: Repl;
   try {
