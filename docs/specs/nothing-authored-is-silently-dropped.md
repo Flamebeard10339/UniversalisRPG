@@ -509,3 +509,105 @@ only through splitSections-for-text-slicing and parseModuleSource, so it opens n
 but `git merge main` is required before this branch can merge and the behaviour of that merge is
 unmeasured at the head this pass graded, so every verdict above is a verdict on 99019012 and not on
 what will land.
+
+### Pass 5 — 2026-08-16
+
+- base: `11e1260f5b25739c693e0f0006df1166134693de`
+- head: `aa9a1ae60eee6486b92ddc5485c0df5895c3243d`
+- proof 1: met — Re-graded at the merge head aa9a1ae, which is what will land: `base` now passes, so this
+  is a verdict on the tree that merges rather than on 99019012. Six aimed mutations of the one line
+  the branch changed, src/grammar/list.ts:24
+  `parseBlock: (lines) => lines.flatMap((raw) => parseWhole(line, raw.text, raw.span.start, 'a list item'))`.
+  Reverted to the pre-branch `parseInline(new Cursor(raw.text, 0, raw.span.start))` it KILLED five
+  times, each attributed to a named test re-run at its own file with the mutant still applied:
+  list.test.ts "refuses what the element parser left behind, naming it", "points the refusal at the
+  leftover, in the whole source rather than the line", "refuses on the line that carries the leftover,
+  not on the first one"; parse.test.ts "refuses the leftover the loader used to drop, on each field
+  the finding measured" (which asserts entities:/miki oven, flags:/alert typo, adjacent:/beach whille
+  unlocked and on success:/xp: brawling 2.5 through parseModule) and "refuses a while one letter off
+  rather than dropping the condition it gates". The accept half is watched: appending ' leftover' to
+  every block line KILLED list.test.ts "reads a line the element parser consumes whole", so the clause
+  is not held by a suite that can only demand a throw. Manifest at
+  C:\Users\yonat\AppData\Local\Temp\mutations-nothing-authored-is-silently-dropped-pass5.json
+  (24 killed, 0 survived, 0 unstable, 1 errored — the errored entry is c4's, retargeted below).
+- proof 2: met — Both halves re-measured at this head. Predicate half: widening the engine's own gate at
+  src/grammar/section.ts:108 from `'parseBlock' in parser` to `'parse' in parser` KILLED parse.test.ts
+  "derives its subjects by the predicate the section engine decides a block by", so
+  `expect(declaresBlock).toEqual(engineReadsBlock)` is load-bearing against the line the engine
+  decides on. Subject-set half: narrowing schemaFields' own source, `Object.keys(SCHEMAS)` at
+  src/content/parse.test.ts:739, to `['location']` KILLED "walks every field of every kind the loader
+  parses through a schema", which reaches the same fields a second time through SECTION_KINDS. Counts
+  re-measured at this head with npm run inspect: 15 schemas, 76 fields, 26 block-capable — the
+  clause's numbers, unchanged by the two merges of main.
+- proof 3: met — Fresh grade on the seam as it stands after the two commits pass 4 did not see (d614de5,
+  a419bc8) and after main was merged in twice. Half one, field-by-field agreement: the list.ts revert
+  KILLED parse.test.ts "reads a block line and the same text handed to the whole parser identically"
+  and "never reads through a section a block that section refuses inline, in the bare, + and - forms".
+  Half two, no line keeps a block nobody read: eleven aimed mutations, all KILLED, each attributed to
+  a named test re-run at its own file — removing `requireBlocksRead(section.body)` from `sectionParser`
+  and inverting `if (!TAKEN.has(line))` each killed blocks.test.ts "is refused, never discarded, on
+  every line the corpus writes"; removing the `requireBlocksRead(line.children)` recursion killed
+  parse.test.ts "refuses a block line carrying an indented block of its own, on every field a block
+  can address"; replacing `hasBlock(line)` with `takeBlock(line).length > 0` in claimsTheBlock killed
+  "is refused on a line whose block one reader looked at and no reader took"; removing `TAKEN.add(line)`
+  killed "probes every kind the loader can parse", so the refusal is not vacuous; unwrapping
+  `parseSaveSection` at its definition killed "is refused by a section parser called directly, not only
+  through the module table"; and the new derivation this pass is the first to grade — unwrapping
+  `parseRemoval` (a kind no probe can reach: `remove` is absent from the corpus and refuses a body
+  outright), unwrapping `parseTest`, unwrapping the SCHEMAS map's own `sectionParser` in module.ts, and
+  deleting `ANSWERING.add(answering)` each killed blocks.test.ts "is demanded by every kind the loader
+  can parse, whoever wrote its parser". Both of that walk's subject sets are held: narrowing
+  `readdirSync('content')` killed "probes every kind the loader can parse" and narrowing
+  `const checked = [...SECTION_KINDS]` killed the derivation test. Neighbour hunt, on the five routes
+  the brief named, all negative except one filed below. (a) takeBlock-and-discard: all six call sites
+  consume what they return, and a derived sweep appending an intruder as the last child of every
+  shipped line that already has a block (43 probes) dropped nothing. (b) parsers reachable without
+  sectionParser: none unwrapped; 22 of 22 kinds registered. (c) hand-built RawSections: none outside
+  tests — `grep -rn "children: \[" src scripts` names only splitSections. (d) routes skipping
+  splitSections: localChanges.ts (slices source text, reads no value) and migrate-saves.ts:144 (through
+  the wrapped parseSaveSection); nothing main brought in adds a third — modportal.ts and
+  contribution.ts reach a parse only through parseModuleSource. (e) shapes nobody probed: three derived
+  sweeps of my own, all clean — 798 sibling-line intrusions across 169 shipped sections (151 of them
+  inside an existing block), 43 extra-last-child intrusions, and 169 extra-body-line intrusions, none
+  dropped; plus 21 hand-shaped probes across comments, entry removals, dialogue at three depths,
+  droptable rows, info dependencies, locale, test, save, item and passive positional fields — every one
+  refuses. Over-strictness checked as hard: seven legitimate deep shapes still parse (every failure was
+  at resolve, past the parser), the shipped corpus is byte-identical, `npm run probe --round-trip` over
+  all three modules is clean so the serializer's own output survives the new demand, and the suite is
+  3350 green. Where the seam is not held is durability rather than behaviour and it is filed as a
+  finding, not graded here: `parseSection`'s own wrap is now masked by module.ts's.
+- proof 4: met — `git diff --stat HEAD -- content/` is empty and `git diff --stat 11e1260..aa9a1ae --
+  content/` is empty: no content line needed repair and none was made, which is the forecast the
+  clause recorded. merge-ready's npm test leg passes (3350 tests, including
+  src/runtime/integration.test.ts over the shipped corpus) and its bytes leg passes, so every `# test`
+  and `# save` fixture stays byte-identical. That the corpus really flows through both new refusals is
+  measured rather than assumed, at two seams. Aiming at src/runtime/integration.test.ts ERRORed —
+  that file loads content at module scope, so a refusal fails collection and mutate can name no test —
+  so it was retargeted at src/ui/shippedContent.test.ts "opens a session out of what it bundled",
+  which loads inside its `it`: appending ' leftover' to every block-form list line KILLED it, and
+  inverting `requireNoBlock`'s early return to `if (hasBlock(line)) return` KILLED it too. Through the
+  loader's own walk, replacing `requireBlocksRead(section.body)` with `requireBlocksRead([])` KILLED
+  blocks.test.ts "is refused, never discarded, on every line the corpus writes". Retarget manifest at
+  C:\Users\yonat\AppData\Local\Temp\mutations-nothing-authored-is-silently-dropped-pass5-c4-retarget.json.
+  Nothing in the diff weakens a check to keep a content line loading; the one deletion,
+  src/content/action.ts:54's `title takes no indented block`, is a third copy retired in favour of the
+  one message, and an `# action` with a block under its `title:` line still refuses.
+- proof 5: met — The clause's own grep, run at aa9a1ae over src/grammar and src/content with the
+  include=*.ts and exclude=*.test.ts filters it names, reports exactly the pre-branch requireEnd sites
+  and no others: parser.ts:56 (the definition), :66 (inside parseWhole), action.ts:188 'an action
+  field', actionResult.ts:187 'one of:', :313 'a result'. list.ts reaches the one check through
+  parseWhole and adds no call and no message. requireNoBlock has one definition (structure.ts:41)
+  carrying one message (structure.ts:43) and two callers, actionResult.ts:316 and requireBlocksRead at
+  structure.ts:50 — which is every demand made of a block in the tree, because
+  `grep -rn "\.children" src scripts --include=*.ts` outside tests names only structure.ts itself. The
+  branch ends with strictly fewer copies than it started with: src/content/action.ts:54's third copy
+  is deleted in this range. That the one message is the one that fires is measured: deleting the throw
+  at structure.ts:43 KILLED blocks.test.ts "is refused, never discarded, on every line the corpus
+  writes". No third copy of the section field engine appears in the range.
+- proof 6: met — `npm run tasks -- merge-ready` at aa9a1ae, 1m09s wall clock, every leg green: tsc ok, npm
+  test ok (3350 tests), layer-check ok, audit-status ok, doctor ok (23 pre-existing warnings, none
+  from this range), bytes ok. Three legs the clause does not name also pass, and one of them is the
+  one pass 4 recorded failing: tree ok with nothing uncommitted, spec ok with every declared member
+  closed, clauses ok — and `base` ok, "main has not moved past the merge base", which the merge at
+  aa9a1ae repaired. `git rev-parse main` is 11e1260 and `git merge-base HEAD main` is 11e1260, so the
+  head graded above is the head that merges.
