@@ -15,7 +15,7 @@ import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
 import { hitChance, statValue } from './stats';
-import { divideRateRemainder, fromMilliUnits, toMilliUnits } from './units';
+import { divideRateRemainder, MILLI_UNITS, toMilliUnits } from './units';
 import { applyDeclared } from './buffs';
 
 export interface Segment {
@@ -410,16 +410,21 @@ function poolStores(state: GameState): PoolStore[] {
   return stores;
 }
 
-// Where a settle leaves a pool, and the movement that was. Rates, results and
-// the instant a pool runs out all write through here, so what `restored` and
-// `drained` report summed over a span is the pool's own net movement and does
-// not depend on where the span was split. A handler's own deltas settle below
-// without passing here, under the rule stated there.
+// Where a settle leaves a pool, and the whole units that moved. Rates, results
+// and the instant a pool runs out all write through here, so what `restored`
+// and `drained` report summed over a span is the pool's own net movement and
+// does not depend on where the span was split. A handler's own deltas settle
+// below without passing here, under the rule stated there.
+//
+// Whole units, because a settle can move a pool by a fraction of one: the
+// integer level is what a span's split cannot change, where a fractional
+// amount would be counted once per tick and again as one movement.
 function writeLevel(segment: Segment, store: PoolStore, resource: Resource, level: number): void {
   const before = store.levels[resource.id] ?? 0;
   store.levels[resource.id] = level;
-  if (level === before) return;
-  fireEvents(segment, store.actorId, level > before ? 'restored' : 'drained', resource.id, 1, fromMilliUnits(Math.abs(level - before)));
+  const units = Math.floor(level / MILLI_UNITS) - Math.floor(before / MILLI_UNITS);
+  if (units === 0) return;
+  fireEvents(segment, store.actorId, units > 0 ? 'restored' : 'drained', resource.id, 1, Math.abs(units));
 }
 
 // The one write of a pool level, for every actor alike. A rollover meter is one
