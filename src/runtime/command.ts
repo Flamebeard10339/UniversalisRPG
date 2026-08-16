@@ -457,15 +457,17 @@ function runReload(ctx: CommandContext): CommandResult {
 // line just typed reach the same catch and read identically there, so the file
 // is parsed before the argument is and only the file's failure can name the
 // file — and name `/local clear`, which reads nothing and is the way out.
-function localSourceNow(authoring: AuthoringContext): { text: string } | CommandResult {
+function localSourceNow(authoring: AuthoringContext): { read: true; text: string } | { read: false; refusal: CommandResult } {
   const text = localChangesNow(authoring);
   try {
     listLocalSections(text);
   } catch (error) {
-    if (error instanceof DslError) return noted('error', `${LOCAL_CHANGES_MODULE_ID} does not parse: ${error.message}`, ['/local clear replaces it.']);
+    if (error instanceof DslError) {
+      return { read: false, refusal: noted('error', `${LOCAL_CHANGES_MODULE_ID} does not parse: ${error.message}`, ['/local clear replaces it.']) };
+    }
     throw error;
   }
-  return { text };
+  return { read: true, text };
 }
 
 function runSectionEdit(ctx: CommandContext, section: SectionArg): CommandResult {
@@ -473,7 +475,7 @@ function runSectionEdit(ctx: CommandContext, section: SectionArg): CommandResult
   if (!authoring) return noted('error', UNAVAILABLE);
   try {
     const source = localSourceNow(authoring);
-    if (!('text' in source)) return source;
+    if (!source.read) return source.refusal;
     const edit = upsertLocalSection(source.text, authoring.dependencies, localSectionSource(section));
     const verb = edit.replaced ? 'Replaced' : 'Staged';
     return commitLocalChanges(ctx, authoring, edit.text, `${verb} # ${edit.section.kind} ${edit.section.id} in ${LOCAL_CHANGES_MODULE_ID}.`);
@@ -491,7 +493,7 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
     switch (op.op) {
       case 'list': {
         const source = localSourceNow(authoring);
-        if (!('text' in source)) return source;
+        if (!source.read) return source.refusal;
         const headings = localSectionHeadings(source.text);
         return headings.length > 0
           ? { output: [{ kind: 'source', words: 'tool', lines: headings }], quit: false, recorded: [] }
@@ -507,7 +509,7 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
         return commitLocalChanges(ctx, authoring, clearLocalSections(localChangesNow(authoring), authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
       case 'delete': {
         const source = localSourceNow(authoring);
-        if (!('text' in source)) return source;
+        if (!source.read) return source.refusal;
         const next = deleteLocalSection(source.text, authoring.dependencies, op.kind, op.id);
         if (!next.deleted) return noted('error', `no local # ${op.kind} ${op.id} is staged.`);
         return commitLocalChanges(ctx, authoring, next.text, `Deleted local # ${op.kind} ${op.id}.`);
