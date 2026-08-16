@@ -428,18 +428,32 @@ export const UNREADABLE = 'local changes cannot be re-read here.';
 // learn whether an author has just written. A driver may call it every turn.
 const RELOADED = `Reloaded ${LOCAL_CHANGES_MODULE_ID}.`;
 
+// What the local module says now, and the one place anything asks. Reading the
+// remembered `localSource` instead would be reading what this session last
+// adopted, which is a second copy of a file another process may have written
+// since — and every command below rewrites that file whole, so composing an
+// edit against the stale copy is how a session deletes what it never saw. A
+// context with no reader has nowhere else to look, and there the two are the
+// same thing.
+function localChangesNow(authoring: AuthoringContext): string {
+  if (!authoring.readLocalChanges) return authoring.localSource.text;
+  try {
+    return authoring.readLocalChanges();
+  } catch (error) {
+    throw new RuntimeError(`could not read local changes: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 function runReload(ctx: CommandContext): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
-  const read = authoring.readLocalChanges;
-  if (!read) return noted('error', UNREADABLE);
+  if (!authoring.readLocalChanges) return noted('error', UNREADABLE);
 
   let text: string;
   try {
-    text = read();
+    text = localChangesNow(authoring);
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    return noted('error', `could not read local changes: ${detail}`);
+    return refused(error);
   }
   return adoptLocalChanges(ctx, authoring, text, RELOADED);
 }
@@ -448,12 +462,12 @@ function runSectionEdit(ctx: CommandContext, section: SectionArg): CommandResult
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
   try {
-    const edit = upsertLocalSection(authoring.localSource.text, authoring.dependencies, localSectionSource(section));
+    const edit = upsertLocalSection(localChangesNow(authoring), authoring.dependencies, localSectionSource(section));
     const verb = edit.replaced ? 'Replaced' : 'Staged';
     return commitLocalChanges(ctx, authoring, edit.text, `${verb} # ${edit.section.kind} ${edit.section.id} in ${LOCAL_CHANGES_MODULE_ID}.`);
   } catch (error) {
     if (error instanceof DslError) return noted('error', error.message);
-    throw error;
+    return refused(error);
   }
 }
 
@@ -461,30 +475,29 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
 
-  switch (op.op) {
-    case 'list':
-      try {
-        const headings = localSectionHeadings(authoring.localSource.text);
+  try {
+    switch (op.op) {
+      case 'list': {
+        const headings = localSectionHeadings(localChangesNow(authoring));
         return headings.length > 0
           ? { output: [{ kind: 'source', words: 'tool', lines: headings }], quit: false, recorded: [] }
           : noted('plain', 'No local changes staged.');
-      } catch (error) {
-        if (error instanceof DslError) return noted('error', error.message);
-        throw error;
       }
-    case 'show':
-      return { output: [{ kind: 'source', words: 'tool', lines: authoring.localSource.text.trimEnd().split('\n') }], quit: false, recorded: [] };
-    case 'clear':
-      return commitLocalChanges(ctx, authoring, clearLocalSections(authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
-    case 'delete':
-      try {
-        const next = deleteLocalSection(authoring.localSource.text, authoring.dependencies, op.kind, op.id);
+      case 'show':
+        return { output: [{ kind: 'source', words: 'tool', lines: localChangesNow(authoring).trimEnd().split('\n') }], quit: false, recorded: [] };
+      // The one operation whose result does not depend on what the file said:
+      // emptying the local module is emptying it, so there is nothing to read.
+      case 'clear':
+        return commitLocalChanges(ctx, authoring, clearLocalSections(authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
+      case 'delete': {
+        const next = deleteLocalSection(localChangesNow(authoring), authoring.dependencies, op.kind, op.id);
         if (!next.deleted) return noted('error', `no local # ${op.kind} ${op.id} is staged.`);
         return commitLocalChanges(ctx, authoring, next.text, `Deleted local # ${op.kind} ${op.id}.`);
-      } catch (error) {
-        if (error instanceof DslError) return noted('error', error.message);
-        throw error;
       }
+    }
+  } catch (error) {
+    if (error instanceof DslError) return noted('error', error.message);
+    return refused(error);
   }
 }
 

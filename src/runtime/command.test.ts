@@ -1402,6 +1402,68 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     expect(staged.writes).toEqual([]);
   });
 
+  it('composes a staged section against the file, not against what this session last wrote', () => {
+    const { ctx, session, authoring, writes, elsewhere } = authoringFixture();
+    // The other process writes; this session is told nothing and does not reload.
+    elsewhere(TOWER);
+    expect(authoring.localSource.text).not.toContain('# location tower');
+
+    expect(errors(runLine(ctx, '/dsl item gem title: Gem'))).toEqual([]);
+
+    // Both sections in the file afterwards: the section this session staged, and
+    // the one it never saw.
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain('# location tower');
+    expect(writes[0]).toContain('# item gem');
+    expect(session.registry.locations.get('local-changes.tower')?.title).toBe('Tower');
+    expect(session.registry.items.get('local-changes.gem')?.title).toBe('Gem');
+  });
+
+  it('writes nothing over a file that no longer loads, so the other process keeps its text', () => {
+    const { ctx, writes, elsewhere } = authoringFixture();
+    elsewhere(BROKEN_CHEST);
+
+    expect(errors(runLine(ctx, '/dsl item gem title: Gem'))).toEqual(['local changes did not load.']);
+    expect(writes).toEqual([]);
+  });
+
+  it('lists, prints and deletes what the file holds rather than what this session remembers', () => {
+    const { ctx, writes, elsewhere } = authoringFixture();
+    elsewhere(TOWER);
+
+    const listed = runLine(ctx, '/local').output[0];
+    expect(listed.kind === 'source' && listed.lines).toEqual(['# location tower']);
+    const printed = runLine(ctx, '/local show').output[0];
+    expect(printed.kind === 'source' && printed.lines).toContain('# location tower');
+
+    const removed = runLine(ctx, '/local delete location tower');
+    expect(messages(removed)[0].text).toBe('Deleted local # location tower.');
+    expect(writes[0]).not.toContain('# location tower');
+  });
+
+  it('reports a reader that threw rather than staging against a copy it could not check', () => {
+    const { ctx, authoring, writes } = authoringFixture();
+    authoring.readLocalChanges = () => {
+      throw new Error('EACCES');
+    };
+
+    for (const line of ['/dsl item gem title: Gem', '/local', '/local show', '/local delete item gem']) {
+      expect(errors(runLine(ctx, line)), line).toEqual(['could not read local changes: EACCES']);
+    }
+    expect(writes).toEqual([]);
+  });
+
+  it('reads the remembered copy in exactly one place, which is the place that consults the file', () => {
+    // The other half of "one source of truth", and the half a behaviour test
+    // cannot state: a command added tomorrow that reaches for
+    // `localSource.text` is composing an edit against what this session last
+    // adopted, and rewriting the whole file from it is how the section another
+    // process wrote disappears. One read, inside `localChangesNow`, and the
+    // assignment that fills the cache is not a read.
+    const source = readFileSync('src/runtime/command.ts', 'utf8');
+    expect(source.match(/localSource\.text(?!\s*=)/g)).toHaveLength(1);
+  });
+
   it('adopts through the one path /dsl adopts through: the file has exactly one adopt in it', () => {
     // c3's structural half. `/dsl` is that path with a write in front and
     // `/reload` is it with a read; a second copy of the sequence would be a

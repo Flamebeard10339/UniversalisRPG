@@ -563,6 +563,21 @@ describe('play-cli reaches its local module through the file rather than a remem
     });
   });
 
+  it('stages a section into the file another process wrote, keeping both', () => {
+    inTempDir((localFile) => {
+      const { ctx } = opened(localFile);
+      writeFileSync(localFile, renderLocalChangesModule(['base'], [TOWER_SECTION]), 'utf8');
+
+      // No reload in between: the staging reads the file for itself.
+      expect(shown(runLine(ctx, '/dsl item gem title: Gem'))).toContain('Staged # item gem in local-changes.');
+
+      const onDisk = readFileSync(localFile, 'utf8');
+      expect(onDisk).toContain('# location tower');
+      expect(onDisk).toContain('# item gem');
+      expect(ctx.session.registry.locations.get('local-changes.tower')?.title).toBe('Tower');
+    });
+  });
+
   it('refuses the whole of an edit the file cannot load, and goes on playing', () => {
     inTempDir((localFile) => {
       const { ctx } = opened(localFile);
