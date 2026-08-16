@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildContributionIssueBody } from './contribution';
 import { loadUniverse, loadUniverseWithDiagnostics } from './registry';
 import { emptyModportalManifest, issueTier, materializeApprovedModIssue, planModportalSync } from './modportal';
+import { registryDiff } from './registryDiff';
 import type { MaterializedMod, ModportalManifest, ModTier } from './modportal';
 
 const BASE = `
@@ -69,6 +70,43 @@ function plan(materialized: readonly MaterializedMod[], intent: Record<string, b
 function enablement(manifest: ModportalManifest): Record<number, boolean> {
   return Object.fromEntries(manifest.entries.map((entry) => [entry.issue, entry.enabled]));
 }
+
+// contribution-system-2026-07-30-h1: canonicalising an approved mod serialises
+// it, and the serializer prints only what the module owns, so every edit to
+// base content and every `# remove` came out the far side missing. Each case
+// asserts the universe the maintainer ends up with rather than a substring of
+// the file, which is what let the defect ship green.
+describe('an approved mod is the universe its contributor loaded', () => {
+  const contributing = (...body: string[]): string => [['# info local-changes', 'version: 0.0.0', 'dependencies:', '  base', '', ...body].join('\n'), ''].join('\n');
+
+  const published = (issue: number, localModule: string) => {
+    const materialized = materialize({ number: issue, title: `Mod ${issue}`, body: issueBody(localModule) });
+    return {
+      staged: loadUniverse([...base, { name: 'local-changes', text: localModule }]),
+      reloaded: loadUniverse([...base, { name: materialized.file, text: materialized.text }]),
+      text: materialized.text,
+    };
+  };
+
+  it('carries an edit to base content, which the module it prints does not own', () => {
+    const { staged, reloaded } = published(51, contributing('# item base.rock', 'title: Boulder'));
+    expect(staged.items.get('base.rock')?.title).toBe('Boulder');
+    expect(registryDiff(staged, reloaded)).toEqual([]);
+  });
+
+  it('carries a removal of base content, which the module it prints cannot express', () => {
+    const { staged, reloaded } = published(52, contributing('# remove item.base.rock'));
+    expect(staged.items.has('base.rock')).toBe(false);
+    expect(registryDiff(staged, reloaded)).toEqual([]);
+  });
+
+  it('still canonicalises the contribution it can carry whole', () => {
+    const { staged, reloaded, text } = published(53, LOCAL);
+    expect(text).toContain('# info approved-mod-53');
+    expect(text).not.toContain('local-changes.');
+    expect(registryDiff(staged, reloaded).filter((line) => !line.includes('local-changes') && !line.includes('approved-mod-53'))).toEqual([]);
+  });
+});
 
 describe('approved mod issues', () => {
   it('turns a local-changes contribution into a unique issue module', () => {

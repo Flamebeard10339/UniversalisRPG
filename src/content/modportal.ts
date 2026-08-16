@@ -6,7 +6,7 @@ import { parseModuleSource } from './universe';
 import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, loadUniverseWithDiagnostics } from './registry';
 import type { Registry } from './registry';
 import type { ModuleSource } from './universe';
-import { serializeRegistryModule } from './serialize';
+import { declaredGlobalIds, republishModule } from './serialize';
 import { visitSection } from './referenceSites';
 
 export const MOD_PENDING_LABEL = 'mod-pending';
@@ -132,13 +132,10 @@ const RENAMED_SECTION_MAPS: readonly (readonly [string, keyof Registry])[] = [
   ['slot', 'slots'],
 ];
 
-function canonicalLocalChangesModule(source: string, moduleId: string, base: readonly ModuleSource[]): string {
-  const checked = loadUniverseWithDiagnostics([...base, { name: LOCAL_CHANGES_MODULE_ID, text: source }]);
-  if (checked.diagnostics.length > 0) return replaceInfoId(source, LOCAL_CHANGES_MODULE_ID, moduleId);
-  const parsed = parseModuleSource({ name: LOCAL_CHANGES_MODULE_ID, text: source });
-  const registry = { ...checked.registry };
+function renamedRegistry(loaded: Registry, moduleId: string): Registry {
+  const registry = { ...loaded };
   for (const [kind, mapName] of RENAMED_SECTION_MAPS) {
-    const sourceMap = checked.registry[mapName] as ReadonlyMap<string, { id: string }>;
+    const sourceMap = loaded[mapName] as ReadonlyMap<string, { id: string }>;
     const next = new Map(sourceMap);
     for (const [id, value] of sourceMap) {
       if (!id.startsWith(`${LOCAL_CHANGES_MODULE_ID}.`)) continue;
@@ -148,14 +145,31 @@ function canonicalLocalChangesModule(source: string, moduleId: string, base: rea
     }
     (registry[mapName] as Map<string, { id: string }>) = next;
   }
-  const saves = new Map(checked.registry.saves);
-  for (const [id, save] of checked.registry.saves) {
+  const saves = new Map(loaded.saves);
+  for (const [id, save] of loaded.saves) {
     if (!id.startsWith(`${LOCAL_CHANGES_MODULE_ID}.`)) continue;
     saves.delete(id);
     saves.set(renamedId(id, LOCAL_CHANGES_MODULE_ID, moduleId), cloned(save));
   }
   registry.saves = saves;
-  return serializeRegistryModule(registry, { info: { ...parsed.info, id: moduleId }, globals: localGlobalIds(parsed, moduleId) });
+  return registry;
+}
+
+// Canonicalising is an offer, not a promise: what the serializer cannot carry
+// travels as the author's own bytes under the new id instead. Every edit to
+// another module's content and every `# remove` is in that set.
+function canonicalLocalChangesModule(source: string, moduleId: string, base: readonly ModuleSource[]): string {
+  const asWritten = (): string => replaceInfoId(source, LOCAL_CHANGES_MODULE_ID, moduleId);
+  const checked = loadUniverseWithDiagnostics([...base, { name: LOCAL_CHANGES_MODULE_ID, text: source }]);
+  if (checked.diagnostics.length > 0) return asWritten();
+  const parsed = parseModuleSource({ name: LOCAL_CHANGES_MODULE_ID, text: source });
+  const republished = republishModule(
+    checked.registry,
+    { info: parsed.info, globals: declaredGlobalIds(parsed) },
+    (printed) => loadUniverseWithDiagnostics([...base, { name: LOCAL_CHANGES_MODULE_ID, text: printed }]),
+    { registry: renamedRegistry(checked.registry, moduleId), options: { info: { ...parsed.info, id: moduleId }, globals: localGlobalIds(parsed, moduleId) } },
+  );
+  return republished.printed ?? asWritten();
 }
 
 export function materializeApprovedModIssue(issue: ApprovedModIssue, baseSources: readonly ModuleSource[] = []): MaterializedMod {

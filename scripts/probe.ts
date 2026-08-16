@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatVersion } from '../src/grammar/dependency';
 import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, loadUniverseWithDiagnostics, type Registry } from '../src/content/registry';
-import { REGISTRY_DIFF_MAPS } from '../src/content/registryDiff';
-import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from '../src/content/roundTrip';
+import { registryDiffMaps } from '../src/content/registryDiff';
+import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from '../src/content/serialize';
 import { type ModuleSource, type ParsedModule } from '../src/content/universe';
 
 export type RoundTripMode = 'universe' | 'module';
@@ -24,7 +24,7 @@ export interface ProbeReport {
   ok: boolean;
 }
 
-const KINDLESS_MAPS = REGISTRY_DIFF_MAPS.filter((map) => !CONTENT_SECTION_MAPS.some(([, named]) => named === map));
+const KINDLESS_MAPS = registryDiffMaps().filter((map) => !CONTENT_SECTION_MAPS.some(([, named]) => named === map));
 const SHOWABLE = new Map<string, keyof Registry>([...CONTENT_SECTION_MAPS.map(([kind, map]) => [kind, map] as const), ...KINDLESS_MAPS.map((map) => [map as string, map] as const)]);
 
 export const DOCUMENT_SEPARATOR = '---';

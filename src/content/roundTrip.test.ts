@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadModule, loadUniverseWithDiagnostics, type ModuleDiagnostic, type UniverseLoadResult } from './registry';
-import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from './roundTrip';
+import { canSerialize, declaredGlobalIds, republishModule, roundTripModule, roundTripUniverse } from './serialize';
 import { parseUniverse, type ModuleSource } from './universe';
 
 const BASE = ['# info base', 'version: 1.0.0', '', '# item bread', 'title: Bread', '', '# location camp', 'x: 0, y: 0', 'starting'].join('\n');
@@ -112,6 +112,35 @@ describe('roundTripModule', () => {
     const declared = roundTripModule(withVariable, { info, globals: ['travel-seconds-per-unit'] }, reloadAlone);
     expect(declared.printed).toContain('# variable travel-seconds-per-unit');
     expect(declared.differences).toEqual([]);
+  });
+});
+
+describe('republishModule', () => {
+  const renamed = { info: { id: 'again', version: [1, 0, 0] as [number, number, number] } };
+
+  it('prints under the new id once the round trip under the old one came back clean', () => {
+    const result = republishModule(loadModule(BASE), { info }, reloadAlone, { registry: loadModule(BASE), options: renamed });
+    expect(result.differences).toEqual([]);
+    expect(result.printed).toContain('# info again');
+  });
+
+  // The refusal a caller acts on: nothing is printed, so publishing a module
+  // the serializer could not carry is not a thing a caller can do by ignoring a
+  // field.
+  it('prints nothing, and says what was lost, when the round trip found a difference', () => {
+    const result = republishModule(loadModule(BASE), { info }, (printed) => reloadAlone(without(printed, '# item bread')), {
+      registry: loadModule(BASE),
+      options: renamed,
+    });
+    expect(result.printed).toBeNull();
+    expect(result.differences).toEqual(['  items: missing base.bread']);
+  });
+
+  it('prints nothing when the round trip did not load, and carries the diagnostic', () => {
+    const failed: UniverseLoadResult = { registry: loadModule(['# info base', 'version: 1.0.0', ''].join('\n')), diagnostics: [diagnostic('nope')], modules: [], parsed: [], loadedModules: [], disabledModules: [] };
+    const result = republishModule(loadModule(BASE), { info }, () => failed, { registry: loadModule(BASE), options: renamed });
+    expect(result.printed).toBeNull();
+    expect(result.diagnostics.map((each) => each.message)).toEqual(['nope']);
   });
 });
 
