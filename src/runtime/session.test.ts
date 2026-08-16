@@ -9,7 +9,7 @@ import type { ModuleSource } from '../content/universe';
 import type { ModalChoice } from './modals';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
-import { apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, sessionStatus, startSession, submitModal, view, wait } from './session';
+import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, startSession, submitModal, view, wait } from './session';
 import { skillLevel, xpForLevel } from './skills';
 import { inEnglish } from './sayFixture';
 import { parseDirectiveLine, useChoiceId, type UseDirective } from '../content/test';
@@ -250,6 +250,70 @@ starting
 
     expect(v.said).toEqual(['Removed inventory mod.gem because its item is not loaded.']);
     expect(v.inventory).toEqual({});
+  });
+});
+
+// One world and the world that replaces it under a live session: the second
+// has no `outpost` for the player to be standing in, no `relic` for them to be
+// holding and no `charted` for them to be carrying, and it opens a road out of
+// the starting location to somewhere the first did not have at all.
+const ADOPT_BEFORE = ['# location camp', 'x: 0, y: 0', 'starting', '', '# location outpost', 'x: 1, y: 0', 'entities:', '  watcher', '', '# entity watcher', 'title: Watcher', 'poke:', '  say: Nothing here.', '', '# item relic', 'title: Relic', '', '# flag charted'].join('\n');
+const ADOPT_AFTER = ['# location camp', 'x: 0, y: 0', 'starting', 'adjacent:', '  tower', '', '# location tower', 'title: Tower', 'x: 0, y: 1'].join('\n');
+
+describe('adoptRegistry: content changed under a live session', () => {
+  it('prunes what the new registry cannot resolve, says every prune, and re-spreads discovery', () => {
+    const session = primed(loadInEnglish(ADOPT_BEFORE), { location: 'outpost', inventory: { relic: 1 }, flags: { charted: true } });
+    // Drained, so what `said` holds afterwards is the adopt's own words.
+    view(session);
+
+    adoptRegistry(session, loadInEnglish(ADOPT_AFTER));
+    const after = view(session);
+
+    // Every prune said, and the state each one left resolves against the
+    // registry that replaced it.
+    expect(after.said.some((line) => line.includes('outpost'))).toBe(true);
+    expect(after.said.some((line) => line.includes('relic'))).toBe(true);
+    expect(after.said.some((line) => line.includes('charted'))).toBe(true);
+    expect(after.location.id).toBe('camp');
+    expect(session.registry.locations.has(after.location.id)).toBe(true);
+    expect(after.inventory.relic).toBeUndefined();
+
+    // The roads may have moved: an edge the old registry did not have is a
+    // place the player can walk to, and knows about, without leaving and
+    // coming back. The flag is the half a choice list cannot show — a travel
+    // choice is offered whether or not the place has been discovered.
+    expect(ids(after)).toContain('travel:tower');
+    const flags = (JSON.parse(serializeSession(session)) as { flags: Record<string, boolean> }).flags;
+    expect(flags['tower.discovered']).toBe(true);
+    expect(flags['outpost.discovered']).toBeUndefined();
+  });
+
+  it('publishes its own prunes and not a line the session had said but nobody had read', () => {
+    const session = primed(loadInEnglish(ADOPT_BEFORE), { location: 'outpost', inventory: { relic: 1 }, flags: { charted: true } });
+    view(session);
+
+    // A line said and not yet read: `applyDirective` writes the log and `view`
+    // is what drains it, so not calling one leaves the line standing. Nothing a
+    // command can do reaches this — every route through `runCommand` that says
+    // anything views before it answers — which is why the witness for the log
+    // half of "a reload leaves the session identical" is here and not there.
+    applyDirective(session, { kind: 'use', obj: 'entity', objId: 'watcher', actionId: 'poke' });
+    adoptRegistry(session, loadInEnglish(ADOPT_AFTER));
+    const after = view(session);
+
+    expect(after.said.some((line) => line.includes('Nothing here.'))).toBe(false);
+    expect(after.said.some((line) => line.includes('relic'))).toBe(true);
+  });
+
+  it('says nothing and moves nothing when the registry resolves everything the state names', () => {
+    const session = primed(loadInEnglish(ADOPT_BEFORE), { location: 'outpost', inventory: { relic: 1 }, flags: { charted: true } });
+    const before = view(session);
+
+    adoptRegistry(session, loadInEnglish(ADOPT_BEFORE));
+    const after = view(session);
+
+    expect(after.said).toEqual([]);
+    expect({ ...after, said: [] }).toEqual({ ...before, said: [] });
   });
 });
 

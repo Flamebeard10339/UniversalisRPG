@@ -5,6 +5,7 @@ import {
   clearLocalSections,
   deleteLocalSection,
   LOCAL_CHANGES_MODULE_ID,
+  listLocalSections,
   localSectionHeadings,
   upsertLocalSection,
 } from '../content/localChanges';
@@ -104,6 +105,10 @@ export interface AuthoringContext {
   dependencies: string[];
   localSource: ModuleSource;
   writeLocalChanges?: (text: string) => void;
+  // The counterpart: what the local module says wherever it is kept, read at
+  // the moment of asking rather than remembered, so a process that wrote it
+  // after this session started is the one being read.
+  readLocalChanges?: () => string;
 }
 
 // Sim-seconds per real-second in live mode, which `/speed` turns and the live
@@ -373,7 +378,18 @@ function localDiagnosticsFor(authoring: AuthoringContext, diagnostics: ReturnTyp
     .map((diagnostic) => formatModuleDiagnostic(diagnostic));
 }
 
-function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, text: string, staged: string): CommandResult {
+// The one path a local module reaches a live session by: load its text beside
+// the base sources, refuse on any diagnostic without touching anything, and
+// otherwise adopt the registry that came out whole. `persist` is what a caller
+// puts in front of the adopt when the text is its own to keep; a caller reading
+// text that is already on disk passes none.
+function adoptLocalChanges(
+  ctx: CommandContext,
+  authoring: AuthoringContext,
+  text: string,
+  staged: string,
+  persist?: (text: string) => void,
+): CommandResult {
   const loaded = loadUniverseWithDiagnostics([...authoring.baseSources, { ...authoring.localSource, text }]);
   const localStatus = loaded.modules.find((module) => module.sourceName === authoring.localSource.name || module.moduleId === LOCAL_CHANGES_MODULE_ID);
   const diagnostics = localDiagnosticsFor(authoring, loaded.diagnostics);
@@ -382,7 +398,7 @@ function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, te
   }
 
   try {
-    authoring.writeLocalChanges?.(text);
+    persist?.(text);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return noted('error', `could not write local changes: ${detail}`);
@@ -401,18 +417,71 @@ function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, te
   }
 }
 
+function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, text: string, staged: string): CommandResult {
+  return adoptLocalChanges(ctx, authoring, text, staged, authoring.writeLocalChanges);
+}
+
 export const UNAVAILABLE = 'local authoring is unavailable.';
+
+export const UNREADABLE = 'local changes cannot be re-read here.';
+
+// Said whatever the file turned out to say, so that reloading is not a way to
+// learn whether an author has just written. A driver may call it every turn.
+const RELOADED = `Reloaded ${LOCAL_CHANGES_MODULE_ID}.`;
+
+function localChangesNow(authoring: AuthoringContext): string {
+  if (!authoring.readLocalChanges) return authoring.localSource.text;
+  try {
+    return authoring.readLocalChanges();
+  } catch (error) {
+    throw new RuntimeError(`could not read local changes: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function runReload(ctx: CommandContext): CommandResult {
+  const authoring = ctx.authoring;
+  if (!authoring) return noted('error', UNAVAILABLE);
+  if (!authoring.readLocalChanges) return noted('error', UNREADABLE);
+
+  let text: string;
+  try {
+    text = localChangesNow(authoring);
+  } catch (error) {
+    return refused(error);
+  }
+  return adoptLocalChanges(ctx, authoring, text, RELOADED);
+}
+
+// The local module's text, and a refusal in its own name when the text is what
+// is wrong. The order is the point: a `DslError` off the file and one off the
+// line just typed reach the same catch and read identically there, so the file
+// is parsed before the argument is and only the file's failure can name the
+// file — and name `/local clear`, which reads nothing and is the way out.
+function localSourceNow(authoring: AuthoringContext): { read: true; text: string } | { read: false; refusal: CommandResult } {
+  const text = localChangesNow(authoring);
+  try {
+    listLocalSections(text);
+  } catch (error) {
+    if (error instanceof DslError) {
+      return { read: false, refusal: noted('error', `${LOCAL_CHANGES_MODULE_ID} does not parse: ${error.message}`, ['/local clear replaces it.']) };
+    }
+    throw error;
+  }
+  return { read: true, text };
+}
 
 function runSectionEdit(ctx: CommandContext, section: SectionArg): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
   try {
-    const edit = upsertLocalSection(authoring.localSource.text, authoring.dependencies, localSectionSource(section));
+    const source = localSourceNow(authoring);
+    if (!source.read) return source.refusal;
+    const edit = upsertLocalSection(source.text, authoring.dependencies, localSectionSource(section));
     const verb = edit.replaced ? 'Replaced' : 'Staged';
     return commitLocalChanges(ctx, authoring, edit.text, `${verb} # ${edit.section.kind} ${edit.section.id} in ${LOCAL_CHANGES_MODULE_ID}.`);
   } catch (error) {
     if (error instanceof DslError) return noted('error', error.message);
-    throw error;
+    return refused(error);
   }
 }
 
@@ -420,30 +489,35 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
 
-  switch (op.op) {
-    case 'list':
-      try {
-        const headings = localSectionHeadings(authoring.localSource.text);
+  try {
+    switch (op.op) {
+      case 'list': {
+        const source = localSourceNow(authoring);
+        if (!source.read) return source.refusal;
+        const headings = localSectionHeadings(source.text);
         return headings.length > 0
           ? { output: [{ kind: 'source', words: 'tool', lines: headings }], quit: false, recorded: [] }
           : noted('plain', 'No local changes staged.');
-      } catch (error) {
-        if (error instanceof DslError) return noted('error', error.message);
-        throw error;
       }
-    case 'show':
-      return { output: [{ kind: 'source', words: 'tool', lines: authoring.localSource.text.trimEnd().split('\n') }], quit: false, recorded: [] };
-    case 'clear':
-      return commitLocalChanges(ctx, authoring, clearLocalSections(authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
-    case 'delete':
-      try {
-        const next = deleteLocalSection(authoring.localSource.text, authoring.dependencies, op.kind, op.id);
+      // Unparsed on purpose, and the only command that is: looking at the text
+      // is how a file nothing else will touch gets read.
+      case 'show':
+        return { output: [{ kind: 'source', words: 'tool', lines: localChangesNow(authoring).trimEnd().split('\n') }], quit: false, recorded: [] };
+      // Unparsed like `show`, and for the same reason turned around: this is
+      // the command that can proceed from a file nothing else can read.
+      case 'clear':
+        return commitLocalChanges(ctx, authoring, clearLocalSections(localChangesNow(authoring), authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
+      case 'delete': {
+        const source = localSourceNow(authoring);
+        if (!source.read) return source.refusal;
+        const next = deleteLocalSection(source.text, authoring.dependencies, op.kind, op.id);
         if (!next.deleted) return noted('error', `no local # ${op.kind} ${op.id} is staged.`);
         return commitLocalChanges(ctx, authoring, next.text, `Deleted local # ${op.kind} ${op.id}.`);
-      } catch (error) {
-        if (error instanceof DslError) return noted('error', error.message);
-        throw error;
       }
+    }
+  } catch (error) {
+    if (error instanceof DslError) return noted('error', error.message);
+    return refused(error);
   }
 }
 
@@ -712,6 +786,13 @@ export const COMMANDS: readonly CommandSpec[] = [
       return { problem: `unknown /local command: ${rest}` };
     },
     run: runLocal,
+  }),
+  define({
+    name: '/reload',
+    arg: 'none',
+    summary: 're-read the local DSL file and adopt it, or refuse the whole edit',
+    parse: nothing,
+    run: runReload,
   }),
   define({
     name: '/create-test',
