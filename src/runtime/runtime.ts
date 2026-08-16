@@ -21,6 +21,7 @@ import {
   clearActorDeltas,
   emptyPoolNow,
   eventsFor,
+  fireEvents,
   getDelta,
   newSegment,
   Segment,
@@ -65,7 +66,7 @@ import { roadsFrom, routeTo } from './journey';
 import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs';
 import { advanceTime, endAction, FIGHT_SCOPED, GameState, isFightScoped, PLAYER, RuntimeError } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
-import { msUntilEmpty, toMilliUnits } from './units';
+import { msUntilEmpty, toMilliUnits, fromMilliUnits } from './units';
 
 export { advanceTime, createGameState, endAction, endJourney, PLAYER, RuntimeError } from './state';
 export type { GameState } from './state';
@@ -243,8 +244,7 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
     const totalAttempts = player.attemptsMade + attemptsThisSegment;
     const fights = Math.floor(totalAttempts / attemptsToResolve);
     const remainder = totalAttempts - fights * attemptsToResolve;
-    const batch = fightBatch(action, fights, outcome);
-    applyResults(segment, batch.results, PLAYER, batch.count);
+    applyOutcome(segment, action, outcome, fights);
     if (segment.stopped) {
       endAction(state);
       return;
@@ -323,8 +323,30 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
   // neither block, and an implicit target is nobody to answer for one.
   const reached = dealt !== null && isTwoSided(action) ? fireHooks(segment, self, other) : [];
 
+  // Announced after the swing's own results have landed, and only where there
+  // is somebody struck: an implicit target is nobody to have a view.
+  if (action.depletes) {
+    const struck = sideOf(action.depletes, self, other);
+    if (dealt === null) {
+      fireEvents(segment, self, 'missed');
+      fireEvents(segment, struck, 'evaded');
+    } else {
+      fireEvents(segment, self, 'damage-dealt', undefined, 1, fromMilliUnits(dealt));
+      fireEvents(segment, struck, 'damage-taken', undefined, 1, fromMilliUnits(dealt));
+    }
+  }
+
   if (!action.depletes) return { felled: [], finished: targetLevel(state, registry, action, self, other) <= 0 };
   return { felled: felledBy(segment, action, self, other, reached), finished: false };
+}
+
+// A fight's end, applied to whoever performed it: the outcome's own results,
+// then the moment itself, so a handler and a grant see one instant.
+function applyOutcome(segment: Segment, action: Action, outcome: FightOutcome, times: number): void {
+  const batch = fightBatch(action, times, outcome);
+  if (batch.count <= 0) return;
+  applyResults(segment, batch.results, PLAYER, batch.count);
+  fireEvents(segment, PLAYER, outcome === 'completion' ? 'completed' : 'unfinished', undefined, batch.count);
 }
 
 // Whether a repeating fight has anything left to swing at. Asked here as well
@@ -406,8 +428,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
     else if (next.self === PLAYER && playerCadence(active).attemptsMade >= (action.attempts ?? Infinity)) fightOutcome = 'unfinished';
 
     if (fightOutcome) {
-      const batch = fightBatch(action, 1, fightOutcome);
-      applyResults(segment, batch.results, PLAYER, batch.count);
+      applyOutcome(segment, action, fightOutcome, 1);
       if (segment.stopped) {
         endAction(state);
         return;
@@ -473,8 +494,9 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
           const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
           // The only place a zero-`time:` action fires; no segment advances it.
           if (playerCadence(state.activeAction).attemptsMade >= attemptsToResolve || duration <= 0) {
-            const batch = fightBatch(action, 1, outcome);
-            applyResultsNow(state, registry, batch.results, batch.count);
+            const segment = newSegment(state, registry);
+            applyOutcome(segment, action, outcome, 1);
+            settlePools(state, registry, [], 0, segment.deltas);
             grantActionFoodBuff(state, registry);
             endAction(state);
             changed = true;
