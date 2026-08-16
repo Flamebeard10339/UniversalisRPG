@@ -67,7 +67,35 @@ Proof:
   `play-cli` as well as to the GUI, because it is computed below `src/ui` from the loaded modules. A
   diagnostic only one driver can see is a diagnostic living in the wrong layer.
   proof: vitest scripts/play-cli.test.ts
-- [c7] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests, layer-check,
+- [c7] **`/dsl` has three verbs and no unverbed form.** `fields` and `show` read, `stage` writes, and
+  an invocation naming no verb is an error that lists them rather than a write. `/dsl item gem`, the
+  reported defect, stages nothing.
+  proof: vitest scripts/play-cli.test.ts
+- [c8] **`/dsl fields <kind>` prints that kind's fields, derived from `SCHEMAS`.** Adding a field to a
+  schema makes it appear with no second edit, which is the property that keeps the help honest — and
+  it is c1's derivation answering a second caller, not a second derivation.
+  proof: vitest scripts/play-cli.test.ts
+- [c9] **Every field prints under the name an author writes.** The four fields whose authored spelling
+  differs from their property name — `stations`, `station`, `on empty`, `on full` — print as authored,
+  and the proof derives the set rather than naming the four, so a fifth added later cannot quietly
+  print wrong. This is the same widening c1 reads and the reason `AnySchema` gains
+  `keyword`/`keywords`/`clauses`/`bare`: without it the help is confidently wrong for four fields and
+  actively harmful for two, because `onEmpty:` does not parse.
+  proof: vitest scripts/play-cli.test.ts src/content/module.test.ts
+- [c10] **All sixteen section kinds answer.** The eleven with schemas answer from them; the five
+  bespoke ones — dialogue, droptable, test, save, remove — answer from one hand-written line each, and
+  the proof iterates `SECTION_KINDS` so a kind added later fails rather than answering nothing.
+  proof: vitest scripts/play-cli.test.ts
+- [c11] **`/dsl show <kind> <id>` reads an already-loaded section**, which nothing can do today. It
+  reads from the registry rather than from local changes, so it answers for shipped content as well as
+  staged.
+  proof: vitest scripts/play-cli.test.ts
+- [c12] **The field derivation is exported, not inlined in the CLI.** `grammar-docs-from-source` is a
+  second consumer of exactly this answer, and the shape it needs is a value it can render rather than
+  text printed to a terminal. c2's no-second-copy rule and this are the same rule read from the two
+  ends: the GUI must not copy the vocabulary, and neither must the CLI.
+  proof: vitest src/content/module.test.ts
+- [c13] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests, layer-check,
   audit-status, doctor and the byte check in one invocation.
   proof: command npm run tasks -- merge-ready
 
@@ -86,11 +114,21 @@ than beside the editor is c6's reason — a warning computed in a component is a
 cannot have, and the layer rule (`grammar < content < runtime < ui`) makes the lower home the only one
 both drivers can read.
 
-**Requires `dsl-kind-prints-fields`, which is the widening c1 depends on.** That branch widens
-`AnySchema` from field names alone to expose `keyword`/`keywords`/`clauses`/`bare`, and c1's offered
-set is exactly those five. Building the widening here would duplicate a settled, already-specced
-change and would leave `/dsl <kind>` still hand-listing the same things; requiring it is the cheaper
-and the correct order.
+**Absorbs `dsl-kind-prints-fields` whole, as c7-c12.** It was a requirement rather than a fold in the
+first plan, on the reasoning that its `AnySchema` widening is what c1's offered set is read from. That
+is still true and is now the argument for the fold rather than for the edge: one worker widens
+`AnySchema` once and both callers of the widened thing — the CLI's `/dsl fields` and the editor's
+completion — are written against it in one pass. Two workers would widen it and then read it, in
+sequence, over the same two files. The author ruled on 2026-08-16 that the push folds wherever folding
+costs no parallelism, and this one costs none: `scripts/play-cli.ts` is claimed by seven open records
+already.
+
+**The absorbed spec's own decisions are carried, not restated.** Verbs come first so no arity
+discriminator is ever created — `dsl-write-verb-not-visible-in-syntax` is declined into that reasoning
+and stays declined. Staging an empty section stays possible and stops being accidental. `/dsl show`
+fills a gap neither record noticed, which is why the verb split describes a real distinction rather
+than renaming one. And the bespoke kinds are five, not four — `droptable` is in `BESPOKE` beside
+dialogue, test, save and remove, and c10 counts them correctly where the record undercounts.
 
 **c3 makes a third caller of `Visit`, never a second walk.** `referenceSites.ts` is walked twice today
 — once by resolution, which rewrites an id into a namespaced key, and once by validation, which hands

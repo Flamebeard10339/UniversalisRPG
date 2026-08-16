@@ -15,6 +15,15 @@ thing it adds around that payload is when the slot was written. Autosave, export
 three small things on top of it, and the whole of it is exercised through `play-cli` before `src/ui`
 exists.
 
+The dev slot is the fourth, and it is here rather than beside it (c9–c13). `single-dev-mode` was
+written as its own branch because a dev mode sounds like a mode; read against this spec it is one
+rule about which slot receives a write, and its five clauses prove against `scripts/play-cli.test.ts`
+— the same file c4 through c8 prove against. The guarantee is unchanged and is still the whole point
+of it: entering dev mode persists a snapshot of the player's slot *before* anything is editable,
+everything done in dev goes to a separate slot, leaving restores the snapshot, and a crash in between
+costs nothing. What the fold removes is a second worker opening `play-cli.ts` to add a second rule
+about the same cadence.
+
 Proof:
 
 - [c1] Persistence is a named-slot store behind one interface, and nothing in that interface is
@@ -22,30 +31,60 @@ Proof:
   the store never parses. A driver supplies the implementation — a file under the CLI, an in-memory
   one under test — the way `writeLocalChanges` is supplied today, so nothing below the driver
   performs I/O of its own.
+  proof: vitest src/runtime/store.test.ts
 - [c2] A slot records when it was written, and the stamp belongs to the slot, never to the payload.
   `offline-progression` settled this and is built on it: the payload is exactly the text
   `serializeSave` returns, so an exported save and a `# save` fixture are the same bytes, and a
   payload carrying no store stamp reconciles nothing without anyone special-casing it.
+  proof: vitest src/runtime/store.test.ts
 - [c3] A slot reads back byte-identical to what was written. `single-dev-mode` c1 asks precisely
   this of the snapshot it takes on entering dev mode, and a store that normalises, reorders or
   re-encodes on the way through cannot give it.
+  proof: vitest src/runtime/store.test.ts
 - [c4] Autosave fires on a cadence and zero means never. The cadence is real seconds since the slot
   was last written, checked after a command that changed state and on each live tick, and it is held
   in a slot of its own — which is what proves c1's claim that the store is not save-specific rather
   than asserting it.
+  proof: vitest scripts/play-cli.test.ts
 - [c5] No load path advances time. Loading a slot, importing a payload, a `# save` fixture and a
   `# test` doing `load:` each leave `state.time` at exactly what the payload holds.
   `offline-progression` puts its entry point outside `loadSave` for this reason, and this branch must
   not pre-empt it by putting a clock read anywhere a load can reach.
+  proof: vitest src/runtime/save.test.ts scripts/play-cli.test.ts
 - [c6] Export and import use the spelling the DSL already has. `/export` prints the current save as a
   `# save` body, so its output pastes into `/dsl save <id>` unchanged and `/import` takes that same
   text back. No second save serialization is written.
+  proof: vitest scripts/play-cli.test.ts
 - [c7] A save that will not load changes nothing and says why. A payload the existing checks reject
   leaves the session exactly as it was, and a slot that is absent, empty or unparseable is a message
   rather than a crash.
+  proof: vitest scripts/play-cli.test.ts
 - [c8] All of it is exercised before `src/ui` exists. Every clause above is provable through
   `play-cli` against a file-backed store, and this branch ships no browser adapter and no stub of
-  one — `browser-save-store` owns that and requires `gui-rebuild`.
+  one — `the-browser-save-store-adapter` owns that and lands with the GUI's authoring door.
+  proof: vitest scripts/play-cli.test.ts
+- [c9] **Entering dev mode snapshots the player's slot before anything is editable, and leaving
+  restores it.** Anything done in between — content edits, play, cheats, a save-breaking mistake — is
+  gone on exit and the slot is byte-identical to the snapshot.
+  proof: vitest scripts/play-cli.test.ts
+- [c10] **Autosave follows the slot.** While dev mode is on, every write goes to the dev slot and the
+  player's slot receives nothing, so a session spent authoring cannot appear in the file being played.
+  This is c4's cadence pointed at whichever slot is live, not a second cadence.
+  proof: vitest scripts/play-cli.test.ts
+- [c11] **A crash while in dev loses nothing.** The snapshot is persisted at the moment dev mode is
+  entered, not held in memory, so a process that dies mid-session leaves the player's slot intact and
+  recoverable without an orderly exit.
+  proof: vitest scripts/play-cli.test.ts
+- [c12] **Not entering dev mode changes nothing.** With the mode off, saving, loading and autosave
+  behave exactly as c1–c8 leave them, and no dev slot is created.
+  proof: command npm test
+- [c13] **Which slot is live is answerable, not inferred.** A session reports whether it is in dev
+  mode and which slot it is writing, so a later surface renders an answer rather than tracking its own
+  copy of the state.
+  proof: vitest scripts/play-cli.test.ts
+- [c14] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests, layer-check,
+  audit-status, doctor and the byte check in one invocation.
+  proof: command npm run tasks -- merge-ready
 
 ## Goal
 
@@ -82,6 +121,19 @@ The player's progress survives closing the game, through a store three queued br
   hand-written `# save`; this branch makes it reachable by any corrupt slot a player's disk hands
   back, which is exactly the promotion "fixing one defect can promote another" describes. It is its
   own fix in its own file, so this branch requires it rather than growing a clause around it.
+- **`single-dev-mode` is absorbed, and its own spec is retired into c9–c13.** The author ruled on
+  2026-08-16 that the push folds where folding costs no parallelism, and this fold costs none: seven
+  open records claim `scripts/play-cli.ts`, so nothing that writes it was ever going to run beside
+  anything else that does. The absorbed spec's reasoning survives verbatim in the clauses — the
+  snapshot is persisted on entry rather than held in memory because the sessions most likely to crash
+  are the ones spent editing content, and `play-cli` stays ungated because dev mode is a mode of the
+  game and the CLI is not the game. Its presentation half was already split off and is now
+  `the-shell-draws-what-the-session-answers`, which reads c13's answer rather than holding a second
+  copy of it.
+- **The store and the commands are one member, not two.** This spec carried two members — the slot
+  store, split out ahead because three records needed slots rather than commands, and everything on
+  top of it. The split was about what the store *is*, which is settled and recorded here; it was never
+  a claim that two workers should build it. One member now discharges c1–c14 over one grant.
 - **The cadence is not a `# variable`.** Tuning variables are authored by content and are the same
   for every player; an autosave cadence is a preference of the person playing. They look alike, and
   putting the cadence in the registry would let a mod set how often someone's game is saved.
