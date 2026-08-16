@@ -74,3 +74,46 @@ describe('a grant names a declared event and never an engine moment', () => {
     expect(registry.entities.get('rat')!.handlers[0].event).toBe('moment');
   });
 });
+
+// A reference into a module that is not there is dropped rather than fatal —
+// that is what an optional dependency means — and a skill was the one section
+// kind the prune walk did not reach.
+const OPTIONAL = `
+# info m
+version: 1.0.0
+dependencies: ?absent
+
+# stat attack
+base: 4
+
+# event moment
+trigger: damage-dealt
+
+# skill melee
+stat-id: attack
+gain 4 experience on absent.gone
+gain 2 experience on moment
+
+# skill lost-cause
+stat-id: absent.brawn
+
+# entity player
+skills: melee, lost-cause
+`;
+
+describe('a grant into a module that is absent prunes like every other reference', () => {
+  it('drops the grant and keeps the skill, so the module still loads', () => {
+    const registry = loadModule(OPTIONAL);
+    expect(registry.skills.get('m.melee')!.grants).toEqual([{ coefficient: 2, amount: false, event: 'm.moment' }]);
+  });
+
+  it('drops a skill whose stat went with the absent module, and the sheets that named it', () => {
+    const registry = loadModule(OPTIONAL);
+    expect(registry.skills.has('m.lost-cause')).toBe(false);
+    expect(registry.entities.get('m.player')!.skills).toEqual(['m.melee']);
+  });
+
+  it('still refuses a name that no absent module could have supplied', () => {
+    expect(() => loadModule(OPTIONAL.replace('gain 4 experience on absent.gone', 'gain 4 experience on typo'))).toThrow('names an unknown event');
+  });
+});

@@ -74,13 +74,19 @@ Proof:
 - [c11] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests, layer-check,
   audit-status, doctor and the byte check in one invocation.
   proof: command npm run tasks -- merge-ready
-- [c12] **`restored` and `drained` report what the pool moved, and where a span is cut does not change
-  it.** Summed over a span, the two report the pool's own whole-unit movement — for a capped pool the
-  level it was left at, for a rollover meter the level the rise reached before it restarted, because a
-  meter that filled rose and did not fall. Cutting one span into any number of pieces reports the same
-  total. Added at pass 1: the rule was implemented and tested with no clause owning it, so nobody was
-  asked whether it held for a pool shape the fixture did not carry, and one did not.
-  proof: vitest src/runtime/poolMoments.test.ts
+- [c12] **A moment's firing count is a fact about what happened, not about how the span was cut.**
+  Every name in the vocabulary fires once per discrete thing that happened — the ten `trigger:` names
+  and the two hook blocks alike, because they are the same kind of thing — so resolving one span in any
+  number of pieces fires each of them the same number of times, and any effect hung off one lands the
+  same total whether it reads `amount` or ignores it. `restored` and `drained` are one firing per whole
+  unit the pool moved, as `on full` is one per rollover: a settle is a slice of a continuum and is not a
+  moment. A rollover meter's ceiling must be a whole number of units, because a wrap moves the origin
+  the next crossings are measured from. The proof derives its subjects from the vocabulary and refuses
+  to run unless its table covers all of it, so an eleventh name is covered on the line it is added
+  rather than on the line somebody remembers a fixture. The one stated exception predates this branch:
+  a handler's own deltas settle without firing, because a handler answering a pool moment by moving
+  that pool would re-enter it.
+  proof: vitest src/runtime/moments.test.ts
 
 ### Triggers
 
@@ -98,8 +104,8 @@ thing that happened, not a thing in progress. `resource:` marks the two arities.
 | `evaded` | none | the struck | a swing at it failed to land | 1 |
 | `completed` | none | the performer | an action ran to its end | 1 |
 | `unfinished` | none | the performer | an action ended before reaching it | 1 |
-| `restored` | required | the pool's owner | a settle raised that pool | units gained |
-| `drained` | required | the pool's owner | a settle lowered that pool | units lost |
+| `restored` | required | the pool's owner | the pool gained a whole unit | 1 |
+| `drained` | required | the pool's owner | the pool lost a whole unit | 1 |
 
 The performer of a bounded action is the player, and these two rows are the only place that is true:
 the engine arms exactly one action and it is the player's, while every other participant swings from a
@@ -200,6 +206,24 @@ uses.
 - **They fire after the swing's hooks, not before.** A hook is the swing's own consequence and the
   felling verdict is taken over the characters it reached; announcing the moment first would put a
   handler's drain inside that verdict. The moment is the announcement, so it goes last.
+- **A settle is not a moment; a unit crossing is.** Pass 2 graded c12 unmet on three mechanisms at
+  once, which is the signal that the rule was wrong rather than the instance list short. `restored` and
+  `drained` fired once per settle, and a settle is an arbitrary slice of continuous accrual — so the
+  *amount* telescoped while the *firing count* did not, and every shape that ignores the amount made
+  game state depend on where the caller cut the clock. Measured: one ten-second span ending at exactly
+  the same level grants `gain 4 experience` 4, 8, 20 and 40 at one, two, five and ten cuts. They now
+  fire once per whole unit moved, which is what `on full` already did per rollover, and a fractional
+  rollover ceiling — the second mechanism — is refused where the wrap is taken. The third, a handler's
+  own delta moving the pool unreported, is the pre-existing no-recursion rule and is stated in c12
+  rather than left implied: under per-unit firing it no longer makes the pool level itself depend on
+  the cut, which was its real harm.
+- **One walk over the whole vocabulary, and it refuses to be incomplete.** The moments are all the same
+  kind of thing — something happened some number of times and had a measurable effect — so they are
+  asked one question by one test whose table is checked against `TRIGGER_NAMES` and `HOOK_LABELS`. A
+  moment added to either and left uncovered reddens that check, which is what makes this a proof of
+  "every moment" rather than of the twelve that exist today. `on hit` and `when hit` are in the table
+  beside `on full` deliberately: a hook is an event with a block instead of a grant, and a test that
+  cannot tell them apart is the evidence for that.
 - **A rollover meter's rise is reported as a rise, and a clamp as what the pool did.** Pass 1 measured a
   meter with an `on full` name granting `drained` for the wrap and a different amount at every way the
   span was cut — the wrap takes the level backwards, so reading the level back reports a rise as a fall.

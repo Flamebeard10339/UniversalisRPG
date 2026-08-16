@@ -15,7 +15,7 @@ import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
 import { hitChance, statValue } from './stats';
-import { divideRateRemainder, MILLI_UNITS, toMilliUnits } from './units';
+import { divideRateRemainder, fromMilliUnits, MILLI_UNITS, toMilliUnits } from './units';
 import { applyDeclared } from './buffs';
 
 export interface Segment {
@@ -69,11 +69,28 @@ export function newSegment(state: GameState, registry: Registry, observers: read
   return { state, registry, deltas: new Map(), stopped: false, observers, causedBy: new Map() };
 }
 
-// Which names are bound to a pool crossing a threshold. Asked rather than
-// stored on the resource, because a `# resource` declares the pool's shape and
-// nothing else.
+// Which names are bound to a moment. Asked rather than stored on the resource,
+// because a `# resource` declares the pool's shape and nothing else — and
+// answered from an index derived once per registry, because this is asked on
+// every swing and every pool write and a registry does not change after it is
+// built.
+const eventIndexes = new WeakMap<Registry, Map<string, GameEvent[]>>();
+
+const NO_EVENTS: GameEvent[] = [];
+
 export function eventsFor(registry: Registry, resourceId: string | undefined, trigger: EventTrigger): GameEvent[] {
-  return [...registry.events.values()].filter((event) => event.resource === resourceId && event.trigger === trigger);
+  let index = eventIndexes.get(registry);
+  if (index === undefined) {
+    index = new Map();
+    for (const event of registry.events.values()) {
+      const key = `${event.trigger}|${event.resource ?? ''}`;
+      const held = index.get(key);
+      if (held) held.push(event);
+      else index.set(key, [event]);
+    }
+    eventIndexes.set(registry, index);
+  }
+  return index.get(`${trigger}|${resourceId ?? ''}`) ?? NO_EVENTS;
 }
 
 export function addDelta(deltas: PoolDeltas, actorId: string, resourceId: string, milliAmount: number): void {
@@ -367,6 +384,7 @@ export function handlersFor(registry: Registry, actorId: string, eventId: string
 // for it, and the experience the skills it carries are trained by. `amount` is
 // the moment's own quantity, in the units its row under `### Triggers` names.
 export function fireEvents(segment: Segment, actorId: string, trigger: EventTrigger, resourceId?: string, count = 1, amount = 1): void {
+  if (count <= 0) return;
   for (const event of eventsFor(segment.registry, resourceId, trigger)) {
     for (const results of handlersFor(segment.registry, actorId, event.id)) {
       applyResults(segment, results, actorId, count);
@@ -416,20 +434,22 @@ function poolStores(state: GameState): PoolStore[] {
 // does not depend on where the span was split. A handler's own deltas settle
 // below without passing here, under the rule stated there.
 //
-// Whole units, because a settle can move a pool by a fraction of one: the
-// integer level is what a span's split cannot change, where a fractional
-// amount would be counted once per tick and again as one movement.
+// One firing per whole unit the pool moved, which is what `on full` already
+// does per rollover: a settle is a slice of a continuum and is not a moment,
+// so counting settles would make the number of firings a fact about where the
+// caller cut the span rather than about what happened to the pool. A unit
+// crossing is a moment, and how many of them a span holds is not a question
+// about the span's shape.
 //
-// `reached` is where the movement got to before a rollover meter restarted it,
+// `reached` is where the rise got to before a rollover meter restarted it,
 // which is not where the level was left: a meter that filled and wrapped rose,
-// and reporting the level it came back to would report that rise as a fall and
-// make the amount depend on how many times the span happened to be cut.
+// and reading the level back would report that rise as a fall.
 function writeLevel(segment: Segment, store: PoolStore, resource: Resource, level: number, reached = level): void {
   const before = store.levels[resource.id] ?? 0;
   store.levels[resource.id] = level;
   const units = Math.floor(reached / MILLI_UNITS) - Math.floor(before / MILLI_UNITS);
   if (units === 0) return;
-  fireEvents(segment, store.actorId, units > 0 ? 'restored' : 'drained', resource.id, 1, Math.abs(units));
+  fireEvents(segment, store.actorId, units > 0 ? 'restored' : 'drained', resource.id, Math.abs(units));
 }
 
 // The one write of a pool level, for every actor alike. A rollover meter is one
@@ -438,6 +458,10 @@ function writeLevel(segment: Segment, store: PoolStore, resource: Resource, leve
 function setPoolLevel(segment: Segment, store: PoolStore, resource: Resource, current: number, raw: number, max: number): 'stored' | 'clamped' {
   if (raw > current && max > 0 && eventsFor(segment.registry, resource.id, 'on full').length > 0) {
     const fires = Math.floor(raw / max);
+    // A wrap moves the origin every unit crossing after it is measured from,
+    // so a ceiling that is not a whole number of units puts the crossings
+    // either side of a wrap out of step and `restored` stops telescoping.
+    if (max % MILLI_UNITS !== 0) throw new RuntimeError(`resource ${resource.id} rolls over, so its max: must be a whole number of units, and it read ${fromMilliUnits(max)}`);
     writeLevel(segment, store, resource, raw - fires * max, raw);
     if (fires > 0) fireEvents(segment, store.actorId, 'on full', resource.id, fires);
     return 'stored';
