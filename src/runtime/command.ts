@@ -104,6 +104,10 @@ export interface AuthoringContext {
   dependencies: string[];
   localSource: ModuleSource;
   writeLocalChanges?: (text: string) => void;
+  // The counterpart: what the local module says wherever it is kept, read at
+  // the moment of asking rather than remembered, so a process that wrote it
+  // after this session started is the one being read.
+  readLocalChanges?: () => string;
 }
 
 // Sim-seconds per real-second in live mode, which `/speed` turns and the live
@@ -373,7 +377,18 @@ function localDiagnosticsFor(authoring: AuthoringContext, diagnostics: ReturnTyp
     .map((diagnostic) => formatModuleDiagnostic(diagnostic));
 }
 
-function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, text: string, staged: string): CommandResult {
+// The one path a local module reaches a live session by: load its text beside
+// the base sources, refuse on any diagnostic without touching anything, and
+// otherwise adopt the registry that came out whole. `persist` is what a caller
+// puts in front of the adopt when the text is its own to keep; a caller reading
+// text that is already on disk passes none.
+function adoptLocalChanges(
+  ctx: CommandContext,
+  authoring: AuthoringContext,
+  text: string,
+  staged: string,
+  persist?: (text: string) => void,
+): CommandResult {
   const loaded = loadUniverseWithDiagnostics([...authoring.baseSources, { ...authoring.localSource, text }]);
   const localStatus = loaded.modules.find((module) => module.sourceName === authoring.localSource.name || module.moduleId === LOCAL_CHANGES_MODULE_ID);
   const diagnostics = localDiagnosticsFor(authoring, loaded.diagnostics);
@@ -382,7 +397,7 @@ function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, te
   }
 
   try {
-    authoring.writeLocalChanges?.(text);
+    persist?.(text);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return noted('error', `could not write local changes: ${detail}`);
@@ -401,7 +416,33 @@ function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, te
   }
 }
 
+function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, text: string, staged: string): CommandResult {
+  return adoptLocalChanges(ctx, authoring, text, staged, authoring.writeLocalChanges);
+}
+
 export const UNAVAILABLE = 'local authoring is unavailable.';
+
+export const UNREADABLE = 'local changes cannot be re-read here.';
+
+// Said whatever the file turned out to say, so that reloading is not a way to
+// learn whether an author has just written. A driver may call it every turn.
+const RELOADED = `Reloaded ${LOCAL_CHANGES_MODULE_ID}.`;
+
+function runReload(ctx: CommandContext): CommandResult {
+  const authoring = ctx.authoring;
+  if (!authoring) return noted('error', UNAVAILABLE);
+  const read = authoring.readLocalChanges;
+  if (!read) return noted('error', UNREADABLE);
+
+  let text: string;
+  try {
+    text = read();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return noted('error', `could not read local changes: ${detail}`);
+  }
+  return adoptLocalChanges(ctx, authoring, text, RELOADED);
+}
 
 function runSectionEdit(ctx: CommandContext, section: SectionArg): CommandResult {
   const authoring = ctx.authoring;
@@ -712,6 +753,13 @@ export const COMMANDS: readonly CommandSpec[] = [
       return { problem: `unknown /local command: ${rest}` };
     },
     run: runLocal,
+  }),
+  define({
+    name: '/reload',
+    arg: 'none',
+    summary: 're-read the local DSL file and adopt it, or refuse the whole edit',
+    parse: nothing,
+    run: runReload,
   }),
   define({
     name: '/create-test',

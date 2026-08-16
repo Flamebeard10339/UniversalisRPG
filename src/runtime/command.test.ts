@@ -5,7 +5,7 @@ import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { loadUniverse, type Registry } from '../content/registry';
 import { hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/translation';
 import { BASE_LANGUAGE, localizerFor } from './localized';
-import { initialLocalChangesModule } from '../content/localChanges';
+import { initialLocalChangesModule, renderLocalChangesModule } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 import { SAVE_VERSION } from './save';
 import type { ModalOption } from './modals';
@@ -177,7 +177,7 @@ describe('the command table is the one definition of the command set', () => {
   it('gives a command no argument it does not declare, over every entry that declares none', () => {
     const { ctx, session } = fixture(SAVE_MODULE);
     const argumentless = COMMANDS.filter((spec) => spec.match === 'name' && spec.arg === 'none');
-    expect(argumentless.map((spec) => spec.name)).toEqual(['/look', '/state', '/cancel', '/help', '/quit']);
+    expect(argumentless.map((spec) => spec.name)).toEqual(['/look', '/state', '/cancel', '/reload', '/help', '/quit']);
 
     for (const spec of argumentless) {
       for (const spelling of [spec.name, ...spec.aliases]) {
@@ -1125,18 +1125,28 @@ open:
 title: Coin
 `;
 
+// The local module as a file two processes share: this session reaches it
+// through the context it was handed, and `elsewhere` is the other process
+// writing it while this one is playing.
+function authoringFixture() {
+  const baseSources: ModuleSource[] = [engineLocale(), { name: 'base', text: AUTHORING_MODULE }];
+  const writes: string[] = [];
+  let onDisk = initialLocalChangesModule(['base']);
+  const authoring: AuthoringContext = {
+    baseSources,
+    dependencies: ['base'],
+    localSource: { name: 'local-changes', text: onDisk },
+    writeLocalChanges: (text) => {
+      writes.push(text);
+      onDisk = text;
+    },
+    readLocalChanges: () => onDisk,
+  };
+  const elsewhere = (...sections: string[]): void => void (onDisk = renderLocalChangesModule(['base'], sections));
+  return { ...fixture(AUTHORING_MODULE, authoring), authoring, writes, elsewhere };
+}
+
 describe('local DSL authoring takes its file as an argument, never reaching for one', () => {
-  function authoringFixture() {
-    const baseSources: ModuleSource[] = [engineLocale(), { name: 'base', text: AUTHORING_MODULE }];
-    const writes: string[] = [];
-    const authoring: AuthoringContext = {
-      baseSources,
-      dependencies: ['base'],
-      localSource: { name: 'local-changes', text: initialLocalChangesModule(['base']) },
-      writeLocalChanges: (text) => writes.push(text),
-    };
-    return { ...fixture(AUTHORING_MODULE, authoring), authoring, writes };
-  }
 
   it('/dsl stages a section, hands it to the writer it was given, reloads it, and /local can show/delete it', () => {
     const { ctx, session, authoring, writes } = authoringFixture();
@@ -1263,6 +1273,142 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     const { ctx } = fixture(AUTHORING_MODULE);
     expect(errors(runLine(ctx, '/dsl item gem'))).toEqual(['local authoring is unavailable.']);
     expect(errors(runLine(ctx, '/local'))).toEqual(['local authoring is unavailable.']);
+    expect(errors(runLine(ctx, '/reload'))).toEqual(['local authoring is unavailable.']);
+  });
+});
+
+// A place the base module does not have, written into the local file by whoever
+// is authoring it, and the base's own starting location routed to it. Together
+// they are the edit c1 asks a running session to pick up.
+const TOWER = ['# location tower', 'title: Tower', 'x: 1, y: 0'].join('\n');
+const ROAD_TO_TOWER = ['# location base.camp', 'adjacent:', '  tower'].join('\n');
+const BROKEN_CHEST = ['# entity base.chest', 'open:', '  give: missing-item'].join('\n');
+
+// What `view` would report if the session were asked again, and the bytes it
+// would serialize to: c5's "identical" spelled as the two things a session is,
+// so a reload that moved either is a reload that told an agent something. The
+// clock and the drained log come with the status.
+function snapshotOf(session: PlaySession) {
+  return {
+    status: JSON.stringify(sessionStatus(session)),
+    save: serializeSession(session),
+    locations: [...session.registry.locations.keys()].sort(),
+    items: [...session.registry.items.keys()].sort(),
+  };
+}
+
+describe('/reload adopts what another process wrote, or refuses the edit whole', () => {
+  it('reaches a location a different process added to the local file, with no restart', () => {
+    const { ctx, session, elsewhere } = authoringFixture();
+    expect(session.registry.locations.has('local-changes.tower')).toBe(false);
+
+    elsewhere(TOWER, ROAD_TO_TOWER);
+    const reloaded = runLine(ctx, '/reload');
+
+    expect(errors(reloaded)).toEqual([]);
+    expect(messages(reloaded)[0].text).toBe('Reloaded local-changes.');
+    expect(session.registry.locations.get('local-changes.tower')?.title).toBe('Tower');
+    expect(ctx.view.choices.map((choice) => choice.id)).toContain('travel:local-changes.tower');
+
+    runLine(ctx, 'travel: local-changes.tower');
+    expect(sessionStatus(session).location.id).toBe('local-changes.tower');
+  });
+
+  it('leaves registry, state, log and clock untouched when the file does not load', () => {
+    const { ctx, session, elsewhere } = authoringFixture();
+    runLine(ctx, '/wait 5');
+    const before = snapshotOf(session);
+
+    elsewhere(TOWER, BROKEN_CHEST);
+    const refused = runLine(ctx, '/reload');
+
+    expect(errors(refused)).toEqual(['local changes did not load.']);
+    expect(messages(refused)[0].detail?.some((line) => line.includes('missing-item'))).toBe(true);
+    expect(snapshotOf(session)).toEqual(before);
+    // Not the half that parsed either: there is no partial adoption.
+    expect(session.registry.locations.has('local-changes.tower')).toBe(false);
+    // Play continues, on the session the reload left alone.
+    expect(errors(runLine(ctx, '/wait 1'))).toEqual([]);
+    expect(sessionStatus(session).time).toBe(6);
+  });
+
+  it('prunes state the edit invalidated, saying each prune, and leaves a state the registry resolves', () => {
+    const { ctx, session, elsewhere } = authoringFixture();
+    runLine(ctx, '/dsl item gem title: Gem');
+    runLine(ctx, `/dsl save carried {"version":${SAVE_VERSION},"inventory":{"local-changes.gem":1}}`);
+    runLine(ctx, '/dsl location outpost x: 2, y: 0');
+    runLine(ctx, '/dsl location base.camp adjacent: |   outpost');
+    runLine(ctx, '/load local-changes.carried');
+    runLine(ctx, 'travel: local-changes.outpost');
+    expect(sessionStatus(session).location.id).toBe('local-changes.outpost');
+    expect(ctx.view.inventory['local-changes.gem']).toBe(1);
+
+    // The author deletes both, out from under a player standing in one of them.
+    elsewhere();
+    const reloaded = runLine(ctx, '/reload');
+
+    expect(errors(reloaded)).toEqual([]);
+    expect(reloaded.view?.said.some((line) => line.includes('Removed inventory local-changes.gem'))).toBe(true);
+    expect(reloaded.view?.said.some((line) => line.includes('local-changes.outpost'))).toBe(true);
+    expect(reloaded.view?.inventory['local-changes.gem']).toBeUndefined();
+    expect(session.registry.locations.has(sessionStatus(session).location.id)).toBe(true);
+  });
+
+  it('says the same thing and leaves the same session however many times it is called', () => {
+    const { ctx, session } = authoringFixture();
+    runLine(ctx, '/dsl item gem title: Gem');
+    runLine(ctx, '/wait 4');
+    const before = snapshotOf(session);
+    const first = runLine(ctx, '/reload');
+
+    expect(snapshotOf(session)).toEqual(before);
+    expect(first.view?.said).toEqual([]);
+    // Twice more, because a driver reloading every turn is what c5 makes safe.
+    for (const each of [runLine(ctx, '/reload'), runLine(ctx, '/reload')]) {
+      expect(messages(each).map((out) => out.text)).toEqual(messages(first).map((out) => out.text));
+      expect(snapshotOf(session)).toEqual(before);
+    }
+  });
+
+  it('refuses when the context has no reader, and says so without touching the session', () => {
+    const { ctx, session, authoring, elsewhere } = authoringFixture();
+    delete authoring.readLocalChanges;
+    elsewhere(TOWER);
+
+    expect(errors(runLine(ctx, '/reload'))).toEqual(['local changes cannot be re-read here.']);
+    expect(session.registry.locations.has('local-changes.tower')).toBe(false);
+  });
+
+  it('reports a reader that threw rather than crashing the session', () => {
+    const { ctx, session, authoring } = authoringFixture();
+    authoring.readLocalChanges = () => {
+      throw new Error('EACCES');
+    };
+
+    expect(errors(runLine(ctx, '/reload'))).toEqual(['could not read local changes: EACCES']);
+    expect(sessionStatus(session).location.id).toBe('base.camp');
+  });
+
+  it('refuses a bad edit identically whichever command carried it, which is the gate being one', () => {
+    const staged = authoringFixture();
+    const read = authoringFixture();
+    read.elsewhere(BROKEN_CHEST);
+
+    const byWrite = runLine(staged.ctx, '/dsl entity base.chest open: |   give: missing-item');
+    const byRead = runLine(read.ctx, '/reload');
+
+    const spoken = (result: CommandResult) => messages(result).map((out) => ({ tone: out.tone, text: out.text }));
+    expect(spoken(byRead)).toEqual(spoken(byWrite));
+    expect(staged.writes).toEqual([]);
+  });
+
+  it('adopts through the one path /dsl adopts through: the file has exactly one adopt in it', () => {
+    // c3's structural half. `/dsl` is that path with a write in front and
+    // `/reload` is it with a read; a second copy of the sequence would be a
+    // second place the diagnostic gate could be decided differently, which is
+    // the defect the clause names. Counted at the call, because the count is
+    // what a copy changes.
+    expect(readFileSync('src/runtime/command.ts', 'utf8').match(/\badoptRegistry\(/g)).toHaveLength(1);
   });
 });
 
