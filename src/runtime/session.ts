@@ -2,7 +2,7 @@ import { Action } from '../content/entity';
 import { DISCOVERED, Location } from '../content/location';
 import {
   actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, RuntimeError, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
-import { endJourney } from './state';
+import { createGameState, endJourney } from './state';
 import { itemCopies, Growth, grownItems } from './itemInstance';
 import { grow } from './growth';
 import { planeReports, type PlaneFocus, type PlaneReport } from './planeReport';
@@ -19,9 +19,10 @@ import { truthy } from './conditions';
 import { answerModal, dialogueFrame, Modal, modalFocus, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
 import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carriedScreen';
 import { Registry } from '../content/registry';
+import { type ParsedSave } from '../content/saveSection';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { ResourceDisplay } from '../content/resource';
-import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
+import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave, type PruneWarning } from './save';
 import { Directive, parseUseChoiceId, useChoiceId } from '../content/test';
 import { printDirective } from '../content/serialize';
 import { Answer, AnswerTable, Localized, Localizer, localizerOf } from './localized';
@@ -395,6 +396,29 @@ export function serializeSession(session: PlaySession): string {
   return serializeSave(stateOf(session), session.registry);
 }
 
+// The one route a payload becomes this session's state, whichever spelling
+// asked for it. It is built beside the session and adopted only once it stands:
+// the version gate, a field check and a prune that finds a walk to nowhere all
+// raise from inside `loadSave`, which mutates as it goes, so a session that
+// kept the half-applied state would be a session a bad payload could break.
+// Nothing here reads a clock — `state.time` is whatever the payload said.
+export function loadSaved(session: PlaySession, saved: ParsedSave): PruneWarning[] {
+  const internals = own(session);
+  const { registry } = internals;
+  const next = createGameState('', internals.state.language);
+  const warnings = loadSave(next, saved, registry);
+  // A save replaces the location and every flag at once, which is both of
+  // discovery's inputs arriving without passing through a result.
+  spreadDiscovery(next, registry);
+  // Copied in rather than swapped for: a caller partway through a `# test` is
+  // holding this object, so the session that comes out of a load has to be the
+  // one that went in. Every field a save carries is written, so what lands here
+  // is the loaded state whole and not a merge with what was standing.
+  Object.assign(internals.state, next);
+  internals.logCursor = Math.max(0, internals.state.log.length - warnings.length);
+  return warnings;
+}
+
 export const SAID_HEAD_KEPT = 40;
 export const SAID_TAIL_KEPT = 40;
 
@@ -687,11 +711,7 @@ function performDirective(session: PlaySession, directive: Directive): { failure
     case 'load': {
       const saved = registry.saves.get(directive.save);
       if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
-      const warnings = loadSave(state, saved, registry);
-      // A save replaces the location and every flag at once, which is both of
-      // discovery's inputs arriving without passing through a result.
-      spreadDiscovery(state, registry);
-      own(session).logCursor = Math.max(0, state.log.length - warnings.length);
+      loadSaved(session, saved);
       return {};
     }
     case 'cancel':
