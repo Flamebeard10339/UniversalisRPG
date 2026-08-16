@@ -23,7 +23,7 @@ Proof:
   proof: vitest src/content/event.test.ts
 - [c2] **The closed set lives in `trigger:`, beside the pool crossings that are already there.** The
   triggers are exactly the eight listed under `### Triggers` and nothing else. An unrecognised trigger
-  fails at load with an error naming the triggers that do exist, and adding an eleventh requires editing
+  fails at load with an error naming the triggers that do exist, and adding a ninth requires editing
   that list. This is where the closed set belongs because `trigger: on empty` already is one.
   proof: vitest src/content/event.test.ts
 - [c3] **A trigger's arity is `resource:`, and it is known at parse time.** Because the set is closed,
@@ -74,14 +74,27 @@ Proof:
 - [c11] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests, layer-check,
   audit-status, doctor and the byte check in one invocation.
   proof: command npm run tasks -- merge-ready
-- [c12] **A moment's firing count is a fact about what happened, not about how the span was cut.**
-  Every name in the vocabulary fires once per discrete thing that happened — the eight `trigger:` names
-  and the two hook blocks alike, because they are the same kind of thing — so resolving one span in any
-  number of pieces fires each of them the same number of times, and any effect hung off one lands the
-  same total whether it reads `amount` or ignores it. This is why the set holds only moments the
-  runtime produces exactly once, and why a settle is not one of them. The proof derives its subjects
-  from the vocabulary and refuses to run unless its table covers all of it, so a ninth name — or a
-  third hook — is covered on the line it is added rather than on the line somebody remembers a fixture.
+- [c12] **A moment this branch adds fires a number of times that is a fact about what happened, not
+  about how the span was cut.** `damage-dealt`, `damage-taken`, `missed`, `evaded`, `completed` and
+  `unfinished` are each produced by one discrete thing — a swing, or an action reaching its end — so
+  resolving one span in any number of pieces fires each the same number of times, and any effect hung
+  off one lands the same total whether it reads `amount` or ignores it. `on hit` and `when hit` are in
+  the proof beside them, unchanged by this branch, because a hook is an event with a block instead of a
+  grant and a walk that cannot tell them apart is the evidence for that.
+  **`on empty` and `on full` are excluded, and the exclusion is inherited rather than chosen.** Both
+  are decided by comparing a sampled level against a bound, and `settlePools` sums a segment's rate and
+  its deltas into one destination — so a rise and a fall inside one settle cancel, and whether they
+  share a settle is a fact about the cut. Measured at pass 4 with no grant, no hook and no handler
+  anywhere: `on full` fires 0, 0, 1, 0, 1, 4, 2, 4 times across cuts of one span that ends at the same
+  level every run. `setPoolLevel` is unchanged by this branch and the same numbers come out of the
+  merge base, so this is the engine's segment sampling and belongs to whoever owns resources. Unlike
+  the crossings that got `restored`/`drained` deleted it is fixable — there is at most one of each per
+  `max`, so a boundary can be forced at it the way `msUntilEmpty` already forces one for `on empty`
+  under a declared negative `rate:`, and no `msUntilFull` exists at all. Filed, with the successor.
+  The proof derives its subjects from the vocabulary and refuses to run unless its table covers all of
+  it, names and producing paths alike, so a ninth trigger — or a third hook, or a second way to reach
+  a name that already has one — is covered on the line it is added rather than on the line somebody
+  remembers a fixture.
   proof: vitest src/runtime/moments.test.ts
 
 ### Triggers
@@ -177,7 +190,8 @@ uses.
   the line is under. So `# skill` it is, and the phrase went, exactly as the question said it should.
   c5's error example and c6 are amended to the shape that ships rather than left describing one the
   branch refuses at load.
-- **`restored` and `drained` report the movement of the whole-unit level.** The question's binding
+- **Superseded with the two triggers it was about: `restored` and `drained` report the movement of
+  the whole-unit level.** The question's binding
   properties are that the sum of `amount` over a span equals the pool's net movement and that where the
   span is split does not change it. A fractional amount fails the second: `divideRateRemainder` hands a
   settle whatever whole milli-units the elapsed span earned, so a pool creeping up by 0.4 a tick would
@@ -227,6 +241,13 @@ uses.
   field shaped like `resourceRateRemainders`, which c10 forbids here — plus a `msUntilFull` twin of the
   existing boundary so both endpoints are exact, plus a per-firing amount for a meter that wraps several
   times in one settle where `fires` is collapsed into one call today. Filed for a planner.
+- **`on empty` and `on full` keep the property they had, which is not the one c12 promises.** Pass 4
+  found the same sampling divergence in the two triggers that predate this branch, with no grant
+  involved. Narrowing c12 to exclude them is not a concession: asserting a property over a name that
+  provably lacks it is what would have made the clause worthless, and the whole `restored`/`drained`
+  ruling rests on the assertion being true. What this branch owes is that its own six triggers have it,
+  that the walk says which names are being claimed, and that the two that are not are named, measured
+  and handed on rather than quietly included.
 - **Superseded, and kept for the reasoning: a settle is not a moment; a unit crossing is.** Pass 2 graded c12 unmet on three mechanisms at
   once, which is the signal that the rule was wrong rather than the instance list short. `restored` and
   `drained` fired once per settle, and a settle is an arbitrary slice of continuous accrual — so the
@@ -276,9 +297,9 @@ uses.
 
 - ~~**Where a grant is written.**~~ Answered: `# skill`, and `in <skill>` went with the answer. See the
   Decisions entry; c5's error example and c6 were amended to the shape that ships.
-- ~~**Whether `restored` and `drained` fire per settle tick or per crossing.**~~ Answered: per settle,
-  reporting the movement of the whole-unit level, which is the second of the three shapes this question
-  listed. See the Decisions entry.
+- ~~**Whether `restored` and `drained` fire per settle tick or per crossing.**~~ Answered by deleting
+  both: neither shape is a moment. See the Decisions entry, and the successor filed for what replaces
+  them.
 - **Whether a level-up is a boundary event.** `captureResourceRates` evaluates a resource's `rate` and
   `max` through `statValue`, so a stat that changes mid-segment is a stat the current segment's snapshot
   has already read. Inherited from `skill-levels-xp-events`, which recorded it and did not own it; this
