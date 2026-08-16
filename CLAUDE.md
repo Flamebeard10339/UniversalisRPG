@@ -16,6 +16,8 @@ Do not bloat CLAUDE.md with over 200 lines of instructions.
 
 ## Advice that is known good
 
+- Inference has caused a lot of problems and has only rarely been necessary. Where possible, 
+  don't create complicated systems that make guesses.  
 - Enforce where a value is assembled, not where it is written
 - Do not create systems that are required to be manually kept in sync
 - A gate earns its place by preventing something that actually happened.
