@@ -186,6 +186,27 @@ already turns a session into a replayable regression when one is wanted.
   necessary and not sufficient — a run caching nothing passes it. The proof it wants is a nonzero
   `cacheReadInputTokens` on the second turn. Note also a constant auxiliary claude-haiku call of
   ~520-580 tokens on every turn, in every configuration, that no option removed.
+- **A screen is a second input surface, and c6 does not survive it. Ruled by nobody yet.** A twelve-turn
+  spike on 2026-08-15 drove the real registry and a real model through tutorial island end to end, and
+  a third of its turns were not choices at all: talking to Miki, the mirror and character creation all
+  raise a modal, which `apply(session, choiceId)` cannot answer. A modal is answered by
+  `applyDirective(session, { kind: 'submit-modal', key, value })`, so the deliverable's one-call
+  description of a turn is short by a call. Worse for c6: the values a dialogue publishes are `0` and
+  `1` — the option's index. Character creation publishes real ones (`human`, and free text for a name),
+  so the engine is inconsistent rather than uniformly positional, and c6's promise that "an option list
+  that reorders between turns cannot change which action a reply selects" is exactly false on a
+  dialogue while it holds everywhere else. This matters most for the case c6 was written for: an author
+  editing a dialogue mid-run silently changes what `0` meant. Whether the fix is c6 narrowing to what
+  the engine can honour, or the engine giving dialogue options stable values, is the author's call and
+  is not a decision this spec can take on its own.
+- **The spike's own numbers, for whoever implements c3 and c5.** Per-turn billed input across twelve
+  turns: 1397, 1365, 1544, 1374, 1448, 1595, 1658, 1671, 1733, 1705, 1708, 1724. It rises while the
+  six-entry journal window fills and then plateaus, which is the shape c3 predicts — against a subagent
+  measured at ~44k and growing without bound, this is ~1.7k and bounded. Whole run: 18,922 tokens,
+  $0.15. But `cacheReadInputTokens` was zero on every single turn: the spike's system prompt sits near
+  1000 tokens, under the 1024 minimum, so the frozen prefix was re-billed at full price twelve times.
+  That is the c5 trap arriving in practice rather than in theory, and it is invisible without asking
+  for the number — the run looks correct and costs roughly twice what it needs to.
 - What ends a run. A turn count is the obvious bound and a usage budget is the honest one, but the
   budget figure must not reach the model's prompt (c5), so the loop holds it and the player does not.
   Which bound ships is a worker's call against a measured run; both are one line and neither changes a
