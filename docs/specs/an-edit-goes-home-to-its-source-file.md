@@ -238,3 +238,83 @@ tree and would only prove that this branch did not disturb it.
   All six legs the clause names pass. The two legs that report FAIL are the spec-standing ones, "1 open
   member" and "has no recorded audit pass", which cannot pass before this pass is filed and the member is
   closed, and are not among the six the clause enumerates.
+
+### Pass 2 — 2026-08-16
+
+- base: `878a05b24259f773e932538d176b0e2e2bd1c11f`
+- head: `ae7e8843a6c0830f906156bca69f9c7b505ee41a`
+- proof 1: met — Five aimed mutations killed at scripts/consolidate.test.ts, each re-run at that file with the
+mutation still applied. (a) src/content/resolve.ts `declaredKey`'s dotted-id null widened to always
+`qualify(namespace, id)`, killed by "splices the staged text over the declaring span, under the
+heading that file spells" — which is what makes pass 1's two-rules-into-one collapse load-bearing
+rather than decorative: consolidate genuinely places through the loader's own rule. (b) `rehead(
+declaration.heading, section.text)` replaced with `section.text`, killed by the same test, so the
+file's own spelling of the heading is what survives a splice. (c) the descending sort in `applyEdits`
+flipped to ascending, killed by "places two sections into one file without either moving the other" —
+this was pass 1's survivor and 060f9c7's new test now watches it. (d) `deletionEnd`'s blank-line scan
+short-circuited to `return stop + 1`, killed by "takes the declaring section out of its file when the
+staged section is a removal". (e) the two-declaring-files guard raised to `at.length > 99`, killed by
+"refuses a section two files both declare, rather than choosing one". One survivor, filed low:
+`matchingEndings` replaced with the identity survives at whole-suite scope, 0 failed of 3386, so the
+"line endings follow the file being written into" decision is unwatched. I checked the property by
+hand through `npm run inspect` over consolidate() with all three of CRLF-file/LF-local,
+CRLF-file/CRLF-local and LF-file/CRLF-local: all three come back byte-identical with no doubled CR,
+because listLocalSections normalises a staged section to LF, so this is a missing test and not a
+broken property. Manifest:
+C:\Users\yonat\AppData\Local\Temp\mutations-an-edit-goes-home-to-its-source-file-pass2.json
+- proof 2: met — The clause's own sentence is true of the tree today, checked by walking it rather than by
+trusting the guard: `serializeRegistryModule` has exactly one shipped importer, src/content/
+roundTrip.ts, and every other reach is a test that also imports the diff. Both halves mutation-proved.
+The h1 half: `republishModule`'s refusal in src/content/roundTrip.ts weakened to
+`trip.diagnostics.length > 99`, killed by src/content/modportal.test.ts "carries an edit to base
+content, which the module it prints does not own", re-run at its own file — so the mod portal
+publishing the author's own bytes instead of a print that loses them is what that test is holding.
+The derivation half, positive control: adding `import { serializeRegistryModule } from './serialize';`
+to src/content/modportal.ts was killed by src/content/registryDiff.test.ts "is the only thing shipped
+code can do with the serializer" at its own scope, so the ordinary way of writing a third caller does
+turn the test red. Two qualifications the next pass should carry. First, the Decisions' stronger
+reading ("a third caller cannot be written without ... turning that test red") is measurably false a
+second time, in a new form: `export { serializeRegistryModule } from './serialize';` added to
+roundTrip.ts SURVIVED at whole-suite scope, 0 failed of 3386, and with that door open a shipped file
+importing the serializer from './roundTrip' is invisible to the derivation — that mutation's named
+test survived, its file survived, and the whole-suite red came from scripts/modportal.test.ts and
+scripts/publish-local-changes.test.ts crashing as real processes on an export roundTrip.ts does not
+actually have, which is the suite noticing a broken build and not this clause proving itself. Filed
+high. Second, over-strictness, looked for and found: rewriting src/runtime/session.ts's
+`import { printDirective } from '../content/serialize';` as `import * as printer` — legitimate code
+that touches nothing but printDirective — was KILLED at registryDiff.test.ts's own scope. That is a
+stated and reasoned boundary in the test's own comment, so I record it as a measured cost rather than
+as a defect. Also recorded, unchanged from before the branch and settled in the Decisions:
+`republishModule`'s second print (the renamed registry) is serialized, written to a mod file and
+loaded by planModportalSync without a registryDiff.
+- proof 3: met — Two aimed mutations, both killed at scripts/consolidate.test.ts and re-run there with the
+mutation still applied. `const differences = registryDiff(before.registry, after.registry)` replaced
+with an empty list, killed by "names the difference a partial patch would make, and keeps every byte";
+and the differences branch made to return the edited `sources` and the emptied `text` instead of
+`[...base]` and `local.text`, killed by the same test — which is the all-or-nothing half, since that
+test asserts both `writable(result)` false and byte equality of the whole base file. Re-run with
+`npm run mutate` over the pass-2 manifest.
+- proof 4: met — The `deleteLocalSection` call in consolidate() replaced with `void section;` was killed by
+scripts/consolidate.test.ts "leaves the local module with nothing staged", which reads the local file
+back off disk after a real `run()` over a copy of the shipped content tree, and re-run at that file
+with the mutation still applied. The universe-equality half is asserted by "loads the same universe
+from the files alone as it did with the edit staged on top" in the same describe block, and the
+write-path mutation aimed at c5 killed it. One thing the next pass should not have to rediscover: the
+clause's `proof:` line still names src/runtime/integration.test.ts, which reads the shipped tree and
+cannot be influenced by anything in this diff — the spec's own Decisions section says exactly that and
+the line was not corrected, and 17 of the 116 entries this pass's generated manifest carries are aimed
+there as a result. Filed medium.
+- proof 5: met — Two aimed mutations killed by the describe block "the round trip is closed, on the content
+that ships", which stages `/dsl item tutorial-island.lockpick examine: ...` through `runLine` and the
+same AuthoringContext the REPL and the GUI use, over a copy of the real content tree, runs the CLI's
+own `run()`, and reloads from files alone. `write(files[index], source.text)` replaced with
+`write(files[index], base[index].text)` was killed by "loads the same universe from the files alone as
+it did with the edit staged on top". And `contentFiles`'s `.filter((name) => name.endsWith('.dsl'))`
+replaced with `.filter(() => false)` was killed by "defaults to every .dsl under content/ but the
+local file, and takes an override" — that was pass 1's survivor, and 060f9c7's command-surface test
+now watches the default content-set derivation the Decisions commit to.
+- proof 6: met — `npm run tasks -- merge-ready` on a clean tree at ae7e884: tsc ok, npm test ok, layer-check
+ok, audit-status ok, doctor ok (26 warnings, which that leg does not fail on), bytes ok, tree ok, base
+ok. All six legs the clause enumerates pass. The one FAIL is the spec-standing leg, "1 open member",
+which is this branch's own in-progress record and cannot pass before this pass is filed and the member
+closed; it is not among the six.
