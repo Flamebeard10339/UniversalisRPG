@@ -1495,6 +1495,31 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     expect(errors(runLine(ctx, '/dsl nosuchkind gem title: Gem'))).toEqual(['unknown section kind: nosuchkind']);
   });
 
+  it('stages against a header narrower than the session, rather than refusing what a wider one allows', () => {
+    // Pass 3's reproduction: a hand-authored file naming only what its author
+    // needed. Widening it is the caller's half of the header, and refusing to
+    // would make an edit depend on which process created the file.
+    const { ctx, session, writes, elsewhereWholeFile } = authoringFixture();
+    elsewhereWholeFile(['# info local-changes', 'version: 1.0.0', ''].join('\n'));
+
+    expect(errors(runLine(ctx, '/dsl entity watcher title: Watcher | poke: |   say: Hello.'))).toEqual([]);
+    expect(errors(runLine(ctx, '/dsl location depot x: 3, y: 0 | entities: |   base.chest'))).toEqual([]);
+
+    expect(writes[1]).toContain('version: 1.0.0');
+    expect(writes[1]).toContain('  base');
+    expect(session.registry.locations.get('local-changes.depot')?.entities).toEqual([{ entity: 'base.chest' }]);
+  });
+
+  it('stages under local-changes even when the file calls itself something else', () => {
+    const { ctx, session, elsewhereWholeFile } = authoringFixture();
+    elsewhereWholeFile(['# info some-other-module', 'version: 1.0.0', 'dependencies:', '  base', ''].join('\n'));
+
+    expect(messages(runLine(ctx, '/dsl item ruby title: Ruby'))[0].text).toBe('Staged # item ruby in local-changes.');
+    // The report said local-changes, so the item is under local-changes.
+    expect(session.registry.items.get('local-changes.ruby')?.title).toBe('Ruby');
+    expect(session.registry.items.has('some-other-module.ruby')).toBe(false);
+  });
+
   it('reads the remembered copy in exactly one place, which is the place that consults the file', () => {
     // The assignment that fills the cache is not a read.
     const source = readFileSync('src/runtime/command.ts', 'utf8');

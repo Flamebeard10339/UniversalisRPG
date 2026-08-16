@@ -501,10 +501,10 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
       // is how a file nothing else will touch gets read.
       case 'show':
         return { output: [{ kind: 'source', words: 'tool', lines: localChangesNow(authoring).trimEnd().split('\n') }], quit: false, recorded: [] };
-      // The one operation whose result does not depend on what the file said:
-      // emptying the local module is emptying it, so there is nothing to read.
+      // Unparsed like `show`, and for the same reason turned around: this is
+      // the command that can proceed from a file nothing else can read.
       case 'clear':
-        return commitLocalChanges(ctx, authoring, clearLocalSections(authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
+        return commitLocalChanges(ctx, authoring, clearLocalSections(localChangesNow(authoring), authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
       case 'delete': {
         const source = localSourceNow(authoring);
         if (!('text' in source)) return source;

@@ -1,7 +1,8 @@
-import { formatDependency } from '../grammar/dependency';
+import { formatDependency, type Dependency } from '../grammar/dependency';
 import { DslError } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
 import { SECTION_KINDS } from './module';
+import { parseModuleSource } from './universe';
 
 export const LOCAL_CHANGES_MODULE_ID = 'local-changes';
 
@@ -44,14 +45,20 @@ function bodySections(source: string): LocalSection[] {
   return readSections(source).filter((section) => section.kind !== MANAGED_INFO);
 }
 
-function dependencyLines(dependencies: readonly string[]): string[] {
-  const unique = [...new Set(dependencies)].filter((id) => id !== LOCAL_CHANGES_MODULE_ID).sort();
-  if (unique.length === 0) return [];
-  return ['dependencies:', ...unique.map((module) => `  ${formatDependency({ prefix: 'required', module })}`)];
+function required(modules: readonly string[]): Dependency[] {
+  return [...new Set(modules)]
+    .filter((id) => id !== LOCAL_CHANGES_MODULE_ID)
+    .sort()
+    .map((module) => ({ prefix: 'required' as const, module }));
+}
+
+function dependencyLines(dependencies: readonly Dependency[]): string[] {
+  if (dependencies.length === 0) return [];
+  return ['dependencies:', ...dependencies.map((each) => `  ${formatDependency(each)}`)];
 }
 
 export function renderLocalChangesModule(dependencies: readonly string[], sections: readonly string[] = []): string {
-  const header = [`# info ${LOCAL_CHANGES_MODULE_ID}`, 'version: 0.0.0', 'pack: local', ...dependencyLines(dependencies)];
+  const header = [`# info ${LOCAL_CHANGES_MODULE_ID}`, 'version: 0.0.0', 'pack: local', ...dependencyLines(required(dependencies))];
   const body = sections.map((section) => section.trim()).filter(Boolean);
   return [...header, '', ...body].join('\n').trimEnd() + '\n';
 }
@@ -78,16 +85,46 @@ function parseLocalSection(sectionSource: string): LocalSection {
   return section;
 }
 
-// An edit rewrites the whole file, so the header is carried across rather than
-// rebuilt: a version, a pack and a dependency the caller's list does not have
-// are lines somebody else wrote, and rendering a fresh header over them deletes
-// them without saying so. `dependencies` is what a source with no `# info` of
-// its own is given, which is a file nobody has written yet.
-function withBody(source: string, dependencies: readonly string[], sections: readonly LocalSection[]): string {
+// Where a `dependencies:` declaration sits in a header and how far it runs: the
+// keyword line, plus the indented lines under it when it was written as a
+// block. Everything else in the header is somebody's text and is not this
+// module's to read, reorder or drop.
+function withoutDependencies(lines: readonly string[]): { kept: string[]; at: number } {
+  const start = lines.findIndex((line) => /^dependencies[ \t]*:/.test(line));
+  if (start === -1) return { kept: [...lines], at: lines.length };
+  let end = start + 1;
+  while (end < lines.length && /^[ \t]/.test(lines[end])) end += 1;
+  return { kept: [...lines.slice(0, start), ...lines.slice(end)], at: start };
+}
+
+// The header of the file this edit is rewriting. Three owners, and which line
+// belongs to which is the whole of it. The id is the runtime's: this file is
+// the local-changes module by construction, and a header naming another one
+// would have every staged section land under a name the report does not use.
+// The dependencies are shared, so they are the union — a module the file
+// declares keeps the file's own spelling, because `? extra` and `extra >= 1.2`
+// are statements a caller holding only a list of loaded ids cannot make, and a
+// module only the caller knows about is added plainly. Every other line is the
+// file's alone and survives where it stands.
+//
+// Both halves were learned by getting them wrong: rebuilding the header dropped
+// what the file declared, and carrying it across whole made a header the
+// session could not stage against and a module id the session lied about.
+function headerFor(source: string, modules: readonly string[]): string[] {
   const info = readSections(source).find((section) => section.kind === MANAGED_INFO);
-  const header = info ? info.text : renderLocalChangesModule(dependencies).trimEnd();
+  if (!info) return [`# info ${LOCAL_CHANGES_MODULE_ID}`, 'version: 0.0.0', 'pack: local', ...dependencyLines(required(modules))];
+
+  const declared = parseModuleSource({ name: LOCAL_CHANGES_MODULE_ID, text: `${info.text}\n` }).info.dependencies;
+  const named = new Set(declared.map((each) => each.module));
+  const merged = [...declared, ...required(modules).filter((each) => !named.has(each.module))];
+
+  const { kept, at } = withoutDependencies(info.text.split('\n'));
+  return [`# info ${LOCAL_CHANGES_MODULE_ID}`, ...kept.slice(1, at), ...dependencyLines(merged), ...kept.slice(at)];
+}
+
+function withBody(source: string, modules: readonly string[], sections: readonly LocalSection[]): string {
   const body = sections.map((section) => section.text.trim()).filter(Boolean);
-  return [header, '', ...body].join('\n').trimEnd() + '\n';
+  return [...headerFor(source, modules), '', ...body].join('\n').trimEnd() + '\n';
 }
 
 export function upsertLocalSection(source: string, dependencies: readonly string[], sectionSource: string): LocalSectionEdit {
@@ -104,6 +141,16 @@ export function deleteLocalSection(source: string, dependencies: readonly string
   return { text: withBody(source, dependencies, kept), deleted: kept.length !== sections.length };
 }
 
-export function clearLocalSections(dependencies: readonly string[]): string {
-  return renderLocalChangesModule(dependencies);
+// Emptying the body is one more edit that rewrites only sections, so the header
+// survives it the way it survives a delete of the last section — the two used
+// to disagree about the same file. The exception is a file that will not parse:
+// there is no header to read out of it, and this is the one command that can
+// still proceed from there, which is what makes it the way out.
+export function clearLocalSections(source: string, dependencies: readonly string[]): string {
+  try {
+    return withBody(source, dependencies, []);
+  } catch (error) {
+    if (error instanceof DslError) return renderLocalChangesModule(dependencies);
+    throw error;
+  }
 }
