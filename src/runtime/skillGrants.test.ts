@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armFightAction, createGameState, GameState, initResources, resolve } from './runtime';
+import { armFightAction, createGameState, GameState, initResources, resolve, useAction } from './runtime';
 import { loadInEnglish } from '../content/engineLocale';
 import { compareSave, loadSave, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
@@ -266,6 +266,11 @@ rate: my attack-rate
 damage: my attack vs their dr
 depletes: their health
 
+# action forage
+title: forage
+continuous
+time: 1
+
 # action skirmish
 rate: my attack-rate
 damage: my attack vs their dr
@@ -276,7 +281,7 @@ attempts: 2
 faction: people
 stats: max-health 1000, attack 4, attack-rate 60
 skills: finishing, quitting
-uses: duel, skirmish
+uses: duel, skirmish, forage
 
 # entity rat
 faction: vermin
@@ -313,6 +318,20 @@ describe('an action that reached its end, and one that did not', () => {
 
     expect(state.activeAction).toBeNull();
     expect(state.xp).toEqual({ quitting: 6 });
+  });
+
+  // A repeating action with no target settles a whole span's completions in one
+  // batch, so this is the count reaching the moment rather than the moment
+  // firing once per segment.
+  it('grants once per completion a batched span produced', () => {
+    const registry = loadInEnglish(OUTCOMES);
+    const state = createGameState('burrow');
+    initResources(state, registry);
+    useAction('action', 'forage', 'forage', registry, state);
+    resolve(state, registry, secondsToMs(10));
+
+    expect(state.activeAction).not.toBeNull();
+    expect(state.xp).toEqual({ finishing: 100 });
   });
 
   it('grants once per completion a repeated span produced, and no more', () => {
