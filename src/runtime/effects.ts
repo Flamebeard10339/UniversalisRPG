@@ -15,7 +15,7 @@ import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
 import { hitChance, statValue } from './stats';
-import { divideRateRemainder, fromMilliUnits, MILLI_UNITS, toMilliUnits } from './units';
+import { divideRateRemainder, toMilliUnits } from './units';
 import { applyDeclared } from './buffs';
 
 export interface Segment {
@@ -406,10 +406,10 @@ export function requireResource(registry: Registry, resourceId: string): Resourc
 export function emptyPoolNow(segment: Segment, actorId: string, resourceId: string, credit: string): void {
   const store = poolStores(segment.state).find((each) => each.actorId === actorId);
   if (!store) return;
+  store.levels[resourceId] = 0;
   clearActorDeltas(segment.deltas, actorId);
   const previous = segment.credit;
   segment.credit = credit;
-  writeLevel(segment, store, requireResource(segment.registry, resourceId), 0);
   fireEvents(segment, actorId, 'on empty', resourceId);
   segment.credit = previous;
 }
@@ -428,46 +428,18 @@ function poolStores(state: GameState): PoolStore[] {
   return stores;
 }
 
-// Where a settle leaves a pool, and the whole units that moved. Rates, results
-// and the instant a pool runs out all write through here, so what `restored`
-// and `drained` report summed over a span is the pool's own net movement and
-// does not depend on where the span was split. A handler's own deltas settle
-// below without passing here, under the rule stated there.
-//
-// One firing per whole unit the pool moved, which is what `on full` already
-// does per rollover: a settle is a slice of a continuum and is not a moment,
-// so counting settles would make the number of firings a fact about where the
-// caller cut the span rather than about what happened to the pool. A unit
-// crossing is a moment, and how many of them a span holds is not a question
-// about the span's shape.
-//
-// `reached` is where the rise got to before a rollover meter restarted it,
-// which is not where the level was left: a meter that filled and wrapped rose,
-// and reading the level back would report that rise as a fall.
-function writeLevel(segment: Segment, store: PoolStore, resource: Resource, level: number, reached = level): void {
-  const before = store.levels[resource.id] ?? 0;
-  store.levels[resource.id] = level;
-  const units = Math.floor(reached / MILLI_UNITS) - Math.floor(before / MILLI_UNITS);
-  if (units === 0) return;
-  fireEvents(segment, store.actorId, units > 0 ? 'restored' : 'drained', resource.id, Math.abs(units));
-}
-
 // The one write of a pool level, for every actor alike. A rollover meter is one
 // whose pool has a name bound to `on full`; without one it is a plain capped
 // pool, which is the same rule the resource's own block used to carry.
 function setPoolLevel(segment: Segment, store: PoolStore, resource: Resource, current: number, raw: number, max: number): 'stored' | 'clamped' {
   if (raw > current && max > 0 && eventsFor(segment.registry, resource.id, 'on full').length > 0) {
     const fires = Math.floor(raw / max);
-    // A wrap moves the origin every unit crossing after it is measured from,
-    // so a ceiling that is not a whole number of units puts the crossings
-    // either side of a wrap out of step and `restored` stops telescoping.
-    if (max % MILLI_UNITS !== 0) throw new RuntimeError(`resource ${resource.id} rolls over, so its max: must be a whole number of units, and it read ${fromMilliUnits(max)}`);
-    writeLevel(segment, store, resource, raw - fires * max, raw);
+    store.levels[resource.id] = raw - fires * max;
     if (fires > 0) fireEvents(segment, store.actorId, 'on full', resource.id, fires);
     return 'stored';
   }
   const clamped = Math.min(max, Math.max(0, raw));
-  writeLevel(segment, store, resource, clamped);
+  store.levels[resource.id] = clamped;
   if (raw < current && current > 0 && clamped <= 0) fireEvents(segment, store.actorId, 'on empty', resource.id);
   return clamped === raw ? 'stored' : 'clamped';
 }

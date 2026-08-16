@@ -22,7 +22,7 @@ const wellFormed = (trigger: EventTrigger): string => withEvent(`trigger: ${trig
 describe('the closed set lives in trigger:', () => {
   it('accepts every name the table declares and nothing else', () => {
     for (const trigger of TRIGGER_NAMES) expect(() => loadModule(wellFormed(trigger)), trigger).not.toThrow();
-    for (const absent of ['succeeded', 'failed', 'escaped', 'on hit', 'damage', 'on damage-dealt', 'sneezed']) {
+    for (const absent of ['succeeded', 'failed', 'escaped', 'restored', 'drained', 'on hit', 'damage', 'on damage-dealt', 'sneezed']) {
       expect(() => loadModule(withEvent(`trigger: ${absent}\nresource: health`)), absent).toThrow('event trigger must be one of');
     }
   });
@@ -38,7 +38,7 @@ describe('the closed set lives in trigger:', () => {
   });
 
   it('is the whole vocabulary: ten names, each declaring one arity', () => {
-    expect(TRIGGER_NAMES).toEqual(['on empty', 'on full', 'damage-dealt', 'damage-taken', 'missed', 'evaded', 'completed', 'unfinished', 'restored', 'drained']);
+    expect(TRIGGER_NAMES).toEqual(['on empty', 'on full', 'damage-dealt', 'damage-taken', 'missed', 'evaded', 'completed', 'unfinished']);
     expect(Object.values(EVENT_TRIGGERS).every((arity) => arity === 'pool' || arity === 'none')).toBe(true);
   });
 });

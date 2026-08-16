@@ -319,7 +319,6 @@
         "src/runtime/planeReport.ts",
         "src/runtime/planeScreen.test.ts",
         "src/runtime/planeScreen.ts",
-        "src/runtime/poolMoments.test.ts",
         "src/runtime/population.ts",
         "src/runtime/published.test.ts",
         "src/runtime/recipe.test.ts",

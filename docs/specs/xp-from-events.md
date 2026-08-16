@@ -22,7 +22,7 @@ Proof:
   the invariant `docs/combat/encounter-grammar.md` is written to hold.
   proof: vitest src/content/event.test.ts
 - [c2] **The closed set lives in `trigger:`, beside the pool crossings that are already there.** The
-  triggers are exactly the ten listed under `### Triggers` and nothing else. An unrecognised trigger
+  triggers are exactly the eight listed under `### Triggers` and nothing else. An unrecognised trigger
   fails at load with an error naming the triggers that do exist, and adding an eleventh requires editing
   that list. This is where the closed set belongs because `trigger: on empty` already is one.
   proof: vitest src/content/event.test.ts
@@ -75,24 +75,26 @@ Proof:
   audit-status, doctor and the byte check in one invocation.
   proof: command npm run tasks -- merge-ready
 - [c12] **A moment's firing count is a fact about what happened, not about how the span was cut.**
-  Every name in the vocabulary fires once per discrete thing that happened — the ten `trigger:` names
+  Every name in the vocabulary fires once per discrete thing that happened — the eight `trigger:` names
   and the two hook blocks alike, because they are the same kind of thing — so resolving one span in any
   number of pieces fires each of them the same number of times, and any effect hung off one lands the
-  same total whether it reads `amount` or ignores it. `restored` and `drained` are one firing per whole
-  unit the pool moved, as `on full` is one per rollover: a settle is a slice of a continuum and is not a
-  moment. A rollover meter's ceiling must be a whole number of units, because a wrap moves the origin
-  the next crossings are measured from. The proof derives its subjects from the vocabulary and refuses
-  to run unless its table covers all of it, so an eleventh name is covered on the line it is added
-  rather than on the line somebody remembers a fixture. The one stated exception predates this branch:
-  a handler's own deltas settle without firing, because a handler answering a pool moment by moving
-  that pool would re-enter it.
+  same total whether it reads `amount` or ignores it. This is why the set holds only moments the
+  runtime produces exactly once, and why a settle is not one of them. The proof derives its subjects
+  from the vocabulary and refuses to run unless its table covers all of it, so a ninth name — or a
+  third hook — is covered on the line it is added rather than on the line somebody remembers a fixture.
   proof: vitest src/runtime/moments.test.ts
 
 ### Triggers
 
-Each trigger names a discrete moment the runtime already produces — a settle tick is as discrete as a
-landed swing, since time only ever advances in steps. Names are past tense throughout: a trigger is a
-thing that happened, not a thing in progress. `resource:` marks the two arities.
+Each trigger names a discrete moment the runtime produces exactly once — a swing, an outcome, or a
+pool reaching one of its two bounds. Names are past tense throughout: a trigger is a thing that
+happened, not a thing in progress. `resource:` marks the two arities.
+
+A settle is **not** on this list and cannot be. `restored` and `drained` were, and were removed at pass
+3 — see the Decisions entry. "How many whole units did the pool gain" is the upward total variation of
+a trajectory the engine only samples at segment boundaries, and total variation is not recoverable from
+a coarse sample of a path that both rises and falls: finer sampling always sees more. There is no
+number to report, which is a different thing from reporting it wrongly.
 
 | trigger | `resource:` | fires on | when | `amount` |
 | --- | --- | --- | --- | --- |
@@ -104,8 +106,6 @@ thing that happened, not a thing in progress. `resource:` marks the two arities.
 | `evaded` | none | the struck | a swing at it failed to land | 1 |
 | `completed` | none | the performer | an action ran to its end | 1 |
 | `unfinished` | none | the performer | an action ended before reaching it | 1 |
-| `restored` | required | the pool's owner | the pool gained a whole unit | 1 |
-| `drained` | required | the pool's owner | the pool lost a whole unit | 1 |
 
 The performer of a bounded action is the player, and these two rows are the only place that is true:
 the engine arms exactly one action and it is the player's, while every other participant swings from a
@@ -206,7 +206,28 @@ uses.
 - **They fire after the swing's hooks, not before.** A hook is the swing's own consequence and the
   felling verdict is taken over the characters it reached; announcing the moment first would put a
   handler's drain inside that verdict. The moment is the announcement, so it goes last.
-- **A settle is not a moment; a unit crossing is.** Pass 2 graded c12 unmet on three mechanisms at
+- **`restored` and `drained` are removed: a settle is not a moment, and neither is a unit crossing.**
+  Ruled by the author 2026-08-16, after the two names failed c12 at three consecutive passes on three
+  independent mechanisms — per-settle firing, a fractional rollover ceiling, and a settle's net movement
+  cancelling a rise against a fall. Each repair was aimed at a real defect and each left a fourth, which
+  is the store's own tell for a rule that is wrong rather than an instance list that is short. The
+  reason it is wrong: "how many whole units did the pool gain" is the upward total variation of a
+  trajectory the engine samples only at segment boundaries, and finer sampling always sees more, so the
+  count is a fact about the sampling and not about the span. The engine's existing answer to that class
+  is to force a boundary at the moment — `nextBoundary` does exactly this for `on empty`, via
+  `msUntilEmpty` — and it cannot be used here, because there is a unit crossing per unit and c9 forbids
+  the segment count from moving. What remains is eight triggers and two hooks, all of them moments the
+  runtime produces exactly once, and c12 is provable as written over the lot. Nothing about pools
+  changes: `rate:` still accrues, meters still roll over, `on empty` and `on full` are untouched, and a
+  skill trained by recovery is a meter with `rate:` and an `on full` name, which is discrete and is in
+  the walk.
+- **What replaces it is a duration, and it is a successor spec rather than a repair.** A duration is
+  exactly additive under refinement where a crossing count is not, so `on full` carrying the time since
+  the pool was last full is well posed. It needs a remembered instant per actor per resource — a save
+  field shaped like `resourceRateRemainders`, which c10 forbids here — plus a `msUntilFull` twin of the
+  existing boundary so both endpoints are exact, plus a per-firing amount for a meter that wraps several
+  times in one settle where `fires` is collapsed into one call today. Filed for a planner.
+- **Superseded, and kept for the reasoning: a settle is not a moment; a unit crossing is.** Pass 2 graded c12 unmet on three mechanisms at
   once, which is the signal that the rule was wrong rather than the instance list short. `restored` and
   `drained` fired once per settle, and a settle is an arbitrary slice of continuous accrual — so the
   *amount* telescoped while the *firing count* did not, and every shape that ignores the amount made
@@ -217,14 +238,15 @@ uses.
   own delta moving the pool unreported, is the pre-existing no-recursion rule and is stated in c12
   rather than left implied: under per-unit firing it no longer makes the pool level itself depend on
   the cut, which was its real harm.
-- **One walk over the whole vocabulary, and it refuses to be incomplete.** The moments are all the same
+- **One walk over the whole vocabulary, and it refuses to be incomplete.** This is what survived the
+  three passes, and it is the reason the fourth mechanism was found rather than shipped. The moments are all the same
   kind of thing — something happened some number of times and had a measurable effect — so they are
   asked one question by one test whose table is checked against `TRIGGER_NAMES` and `HOOK_LABELS`. A
   moment added to either and left uncovered reddens that check, which is what makes this a proof of
   "every moment" rather than of the twelve that exist today. `on hit` and `when hit` are in the table
   beside `on full` deliberately: a hook is an event with a block instead of a grant, and a test that
   cannot tell them apart is the evidence for that.
-- **A rollover meter's rise is reported as a rise, and a clamp as what the pool did.** Pass 1 measured a
+- **Superseded with the two triggers it was about: a rollover meter's rise is reported as a rise.** Pass 1 measured a
   meter with an `on full` name granting `drained` for the wrap and a different amount at every way the
   span was cut — the wrap takes the level backwards, so reading the level back reports a rise as a fall.
   What is reported is now the level the rise reached before the meter restarted, which telescopes across

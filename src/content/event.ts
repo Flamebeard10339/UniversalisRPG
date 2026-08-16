@@ -17,8 +17,6 @@ export const EVENT_TRIGGERS = {
   evaded: 'none',
   completed: 'none',
   unfinished: 'none',
-  restored: 'pool',
-  drained: 'pool',
 } as const;
 
 export type EventTrigger = keyof typeof EVENT_TRIGGERS;
