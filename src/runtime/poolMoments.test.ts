@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armFightAction, createGameState, GameState, initResources, resolve, useAction } from './runtime';
+import { createGameState, GameState, initResources, resolve, useAction } from './runtime';
 import { loadInEnglish } from '../content/engineLocale';
 import { secondsToMs, toMilliUnits } from './units';
 
