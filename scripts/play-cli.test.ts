@@ -1176,7 +1176,7 @@ describe('a session writes back only what it came out of (c4, c7, c9)', () => {
     rmSync(game.dir, { recursive: true, force: true });
   });
 
-  it('leaves the session alone when there was no slot to come back to, and writes nothing to one', () => {
+  it('leaves the session alone when there was no slot to come back to, and keeps it out of one', () => {
     const game = playing();
     runLine(game.ctx, '/autosave 1');
     runLine(game.ctx, '/dev on');
@@ -1185,13 +1185,40 @@ describe('a session writes back only what it came out of (c4, c7, c9)', () => {
 
     const left = runLine(game.ctx, '/dev off');
     expect(errorsOf(left)).toEqual([]);
+    // Nothing to go back to, so the session stays where it is — and stays out
+    // of the slot a player would open next, which an empty slot would
+    // otherwise be free to take.
     expect(sessionStatus(game.ctx.session).inventory.gold).toBe(1);
     expect(game.slot(PLAYER_SLOT)).toBeNull();
 
     game.pass(60_000);
-    runLine(game.ctx, 'use: entity.chest.open');
-    // No player slot existed, so there is nothing this session could destroy.
+    const after = runLine(game.ctx, 'use: entity.chest.open');
+    expect(game.slot(PLAYER_SLOT)).toBeNull();
+    expect(after.output.some((each) => each.kind === 'message' && each.tone === 'warn')).toBe(true);
+
+    // And saying so outright is still the way to take it.
+    runLine(game.ctx, '/save');
     expect(game.slot(PLAYER_SLOT)).toBe(serializeSession(game.ctx.session));
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('stays in dev, with every slot where it was, when the snapshot cannot be loaded back', () => {
+    const game = playing();
+    runLine(game.ctx, '/save');
+    const played = game.slot(PLAYER_SLOT);
+    runLine(game.ctx, '/dev on');
+    runLine(game.ctx, 'use: entity.chest.open');
+    runLine(game.ctx, '/save');
+
+    // A snapshot this build can no longer read, which is what a SAVE_VERSION
+    // bump between writing it and leaving would be.
+    writeFileSync(path.join(game.dir, `${DEV_SNAPSHOT_SLOT}.slot`), JSON.stringify({ writtenAt: 1, payload: JSON.stringify(`{"version":${SAVE_VERSION + 900}}`) }), 'utf8');
+
+    const left = runLine(game.ctx, '/dev off');
+    expect(errorsOf(left)[0]).toMatch(/version/);
+    expect(linesOf(runLine(game.ctx, '/slots'))[0]).toBe('writing dev, dev mode on');
+    expect(game.slot(DEV_SLOT)).toBe(serializeSession(game.ctx.session));
+    expect(game.slot(PLAYER_SLOT)).toBe(played);
     rmSync(game.dir, { recursive: true, force: true });
   });
 

@@ -32,29 +32,55 @@ export function createSaveContext(driver: SlotDriver, now: () => number): SaveCo
   return { store: slotStore(driver, now), now, dev: false };
 }
 
-// The slots a session came out of: one it loaded, or one it was written into.
-// Autosave writes no other, which is the whole of what stops a session that
-// never read a slot from replacing what is in it — a game reopened, or one that
-// has just left dev mode. `/save` is how a session takes a slot it did not come
-// from, and it is deliberately the explicit spelling.
+// What a session knows about its own standing in each slot: the ones it *is*
+// what they hold, and the ones it is known *not* to be. Autosave writes no
+// other, which is the whole of what stops a session that never read a slot from
+// replacing what is in it — a game reopened, or one that has just left dev mode.
+// `/save` is how a session takes a slot it did not come from, and it is
+// deliberately the explicit spelling.
+//
+// Two sets rather than one, because an absent slot answers differently to each:
+// a game nobody has loaded may take an empty slot, and a session that has just
+// been told it is nobody's may not — which is the only reason `withheld` exists
+// and is the case a single set got wrong.
 //
 // Beside the context rather than on it, the way a session's internals sit
 // beside a `PlaySession`: what a driver holds is published, and this is a fact
 // about a running process that no surface renders. A context nobody built here
-// — a restart, reading the same directory back — starts having adopted nothing,
-// which is exactly what a restart has.
-const ADOPTED = new WeakMap<SaveContext, Set<string>>();
+// — a restart, reading the same directory back — starts knowing nothing, which
+// is exactly what a restart knows.
+interface Standing {
+  is: Set<string>;
+  isNot: Set<string>;
+}
 
-function adoptedBy(save: SaveContext): Set<string> {
-  const held = ADOPTED.get(save) ?? new Set<string>();
-  ADOPTED.set(save, held);
+const STANDING = new WeakMap<SaveContext, Standing>();
+
+function standingOf(save: SaveContext): Standing {
+  const held = STANDING.get(save) ?? { is: new Set<string>(), isNot: new Set<string>() };
+  STANDING.set(save, held);
   return held;
 }
 
+// A slot, or nothing — where nothing covers both "there is none" and "there is
+// one and the store cannot make sense of it". Every reader here wants the same
+// answer to those two, and reading one of them is not a reason to refuse the
+// question that was asked.
+function readable(store: SlotStore, name: string): Slot | null {
+  try {
+    return store.read(name);
+  } catch (error) {
+    if (error instanceof RuntimeError) return null;
+    throw error;
+  }
+}
+
 // Whether this session is entitled to write the slot without being asked twice:
-// it came out of it, or there is nothing there to lose.
+// it is what that slot holds, or there is nothing in it to lose and nothing has
+// said this session is not its.
 export function adopts(save: SaveContext, slot: string): boolean {
-  return adoptedBy(save).has(slot) || save.store.read(slot) === null;
+  const standing = standingOf(save);
+  return standing.is.has(slot) || (!standing.isNot.has(slot) && readable(save.store, slot) === null);
 }
 
 export function liveSlot(save: SaveContext): string {
@@ -78,12 +104,7 @@ export function setAutosaveSeconds(save: SaveContext, seconds: number): void {
 // a slot the store cannot read is a slot the next autosave replaces, so being
 // unable to date it is a reason to write rather than a reason to refuse.
 function liveWrittenAt(save: SaveContext): number | null {
-  try {
-    return save.store.read(liveSlot(save))?.writtenAt ?? null;
-  } catch (error) {
-    if (error instanceof RuntimeError) return null;
-    throw error;
-  }
+  return readable(save.store, liveSlot(save))?.writtenAt ?? null;
 }
 
 export function autosaveDue(save: SaveContext): boolean {
@@ -104,7 +125,7 @@ export function autosave(save: SaveContext, payload: () => string): Autosaved {
   const slot = liveSlot(save);
   if (!adopts(save, slot)) return { kind: 'held', slot };
   save.store.write(slot, payload());
-  adoptedBy(save).add(slot);
+  adopted(save, slot);
   return { kind: 'wrote', slot };
 }
 
@@ -113,7 +134,7 @@ export function autosave(save: SaveContext, payload: () => string): Autosaved {
 export function saveNow(save: SaveContext, payload: string): string {
   const slot = liveSlot(save);
   save.store.write(slot, payload);
-  adoptedBy(save).add(slot);
+  adopted(save, slot);
   return slot;
 }
 
@@ -121,7 +142,17 @@ export function saveNow(save: SaveContext, payload: string): string {
 // before. Told to the context rather than inferred by it, because only the
 // caller that ran the load knows whether it stood.
 export function adopted(save: SaveContext, slot: string): void {
-  adoptedBy(save).add(slot);
+  const standing = standingOf(save);
+  standing.is.add(slot);
+  standing.isNot.delete(slot);
+}
+
+// The other direction, and the reason it is not merely "forget the adoption":
+// a session told it is not a slot's stays that way when the slot is empty too.
+function withhold(save: SaveContext, slot: string): void {
+  const standing = standingOf(save);
+  standing.is.delete(slot);
+  standing.isNot.add(slot);
 }
 
 // What the player's slot held when dev mode was entered, as JSON so that "there
@@ -143,20 +174,29 @@ export function enterDev(save: SaveContext): void {
   // Persisted before the mode is on, so nothing done in dev can precede it.
   save.store.write(DEV_SNAPSHOT_SLOT, encodeSnapshot(player?.payload ?? null));
   // A dev slot left behind by a session that crashed is not this session's, and
-  // is protected by the same rule everything else is.
-  adoptedBy(save).delete(DEV_SLOT);
+  // is protected by the same rule everything else is. Not withheld: an absent
+  // dev slot is a scratch slot this session may take.
+  standingOf(save).is.delete(DEV_SLOT);
   save.dev = true;
 }
 
-// What the player's slot holds again, which is what a session leaving dev has
-// to be put back to — null when there was no slot, and so nothing to go back
-// to. Restoring the slot is this module's; restoring the session is the
-// caller's, because loading a payload is not something a store does.
-export function leaveDev(save: SaveContext): string | null {
+// What the player's slot held when dev mode was entered, which is what a
+// session leaving dev has to be put back to — null when there was no slot, and
+// so nothing to go back to. Asked before anything is committed, so a caller
+// that cannot load it back is still in dev with every slot where it was.
+export function devSnapshot(save: SaveContext): string | null {
   if (!save.dev) throw new RuntimeError('not in dev mode');
   const snapshot = save.store.read(DEV_SNAPSHOT_SLOT);
   if (!snapshot) throw new RuntimeError(`slot ${DEV_SNAPSHOT_SLOT} is gone, so leaving dev mode cannot restore ${PLAYER_SLOT}; it is left as it is`);
-  const held = decodeSnapshot(snapshot.payload);
+  return decodeSnapshot(snapshot.payload);
+}
+
+// The commit, taking back what `devSnapshot` handed out: the slot goes back to
+// it and the dev pair goes. Restoring the *session* is the caller's — loading a
+// payload is not something a store does — and this runs after that stood, so
+// leaving dev is all-or-nothing the way a load is.
+export function leaveDev(save: SaveContext, held: string | null): void {
+  if (!save.dev) throw new RuntimeError('not in dev mode');
 
   // Rewritten only when it differs, so the stamp on a slot nothing touched is
   // still the stamp of the write that made it.
@@ -169,12 +209,13 @@ export function leaveDev(save: SaveContext): string | null {
 
   save.store.remove(DEV_SLOT);
   save.store.remove(DEV_SNAPSHOT_SLOT);
-  adoptedBy(save).delete(DEV_SLOT);
-  // The session standing here is the one dev built, not the one the restored
-  // slot holds. Until something loads that back, this session may not write it.
-  adoptedBy(save).delete(PLAYER_SLOT);
+  standingOf(save).is.delete(DEV_SLOT);
+  // The session standing here is the one dev built, not the one the player's
+  // slot holds — and that is true whether or not there is a slot to be unlike,
+  // which is why it is withheld rather than merely forgotten. Until something
+  // loads the player's game back, this session may not write it.
+  withhold(save, PLAYER_SLOT);
   save.dev = false;
-  return held;
 }
 
 export interface SlotStanding {
@@ -207,11 +248,5 @@ export function saveReport(save: SaveContext): SaveReport {
 }
 
 function standing(store: SlotStore, name: string): number | null {
-  try {
-    const slot: Slot | null = store.read(name);
-    return slot?.writtenAt ?? null;
-  } catch (error) {
-    if (error instanceof RuntimeError) return null;
-    throw error;
-  }
+  return readable(store, name)?.writtenAt ?? null;
 }

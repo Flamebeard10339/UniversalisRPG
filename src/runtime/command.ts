@@ -22,6 +22,7 @@ import {
   PLAYER_SLOT,
   adopted,
   autosave,
+  devSnapshot,
   enterDev,
   leaveDev,
   liveSlot,
@@ -622,18 +623,17 @@ function withSaves(ctx: CommandContext, run: (save: SaveContext) => CommandResul
 
 // The one route a payload becomes this session, whether it came off a slot or
 // off the end of a typed line. `loadSaved` adopts nothing until the whole of it
-// stands, so a payload refused here leaves the session where it was — and the
-// view that follows is inside the same guard, because a session that could not
-// be drawn is one this command has to refuse rather than hand on half-drawn.
+// stands — including that it can be drawn — so a payload refused here leaves the
+// session where it was and the view below it cannot be the one that fails.
 function importPayload(ctx: CommandContext, payload: string, done: string): CommandResult {
   const saved = savedGameFromSerialized(payload);
   if (!saved) return noted('error', `that is not a # save body: ${JSON.stringify(payload.slice(0, 60))}`);
   try {
     loadSaved(ctx.session, saved);
-    return shown(view(ctx.session), [note('ok', done)]);
   } catch (error) {
     return refused(error);
   }
+  return shown(view(ctx.session), [note('ok', done)]);
 }
 
 const loaded = (result: CommandResult): boolean => !result.output.some((each) => each.kind === 'message' && each.tone === 'error');
@@ -678,15 +678,25 @@ function devOn(save: SaveContext): CommandResult {
   return noted('ok', `Dev mode on, writing slot ${liveSlot(save)}.`);
 }
 
-// Everything done in dev goes with the mode: the slot is put back by `leaveDev`
-// and the session is put back here, out of the same bytes. A snapshot of
-// nothing is the one case with nowhere to go back to — the session is left
-// where it is, and `player` stays unadopted, so nothing it does can reach it.
+// Everything done in dev goes with the mode: the slot goes back to the snapshot
+// and the session goes back out of the same bytes. The session first, and the
+// slots only once it stood — a snapshot this build can no longer read would
+// otherwise leave the mode off, the dev slot deleted and an author's work in
+// memory with nowhere to put it.
+//
+// A snapshot of nothing is the one case with nowhere to go back to. The session
+// is left where it is and `player` is withheld, so what dev built cannot reach
+// the slot a player would open next.
 function devOff(ctx: CommandContext, save: SaveContext): CommandResult {
-  const restored = leaveDev(save);
-  if (restored === null) return noted('ok', `Dev mode off, writing slot ${liveSlot(save)}. There was no ${PLAYER_SLOT} slot to come back to, so this session is left as it is.`);
-  const result = importPayload(ctx, restored, `Dev mode off, ${PLAYER_SLOT} restored.`);
-  if (loaded(result)) adopted(save, PLAYER_SLOT);
+  const snapshot = devSnapshot(save);
+  if (snapshot === null) {
+    leaveDev(save, null);
+    return noted('ok', `Dev mode off, writing slot ${liveSlot(save)}. There was no ${PLAYER_SLOT} slot to come back to, so this session is left as it is and will not be written to one.`);
+  }
+  const result = importPayload(ctx, snapshot, `Dev mode off, ${PLAYER_SLOT} restored.`);
+  if (!loaded(result)) return result;
+  leaveDev(save, snapshot);
+  adopted(save, PLAYER_SLOT);
   return result;
 }
 
