@@ -67,13 +67,20 @@ Proof:
   an event no grant references, does no per-moment work proportional to the number of declared skills;
   the resolve loop runs the same number of segments with grants authored and without, and no fixture
   in shipped content changes because this branch loaded.
-  proof: vitest src/runtime/poolMoments.test.ts
+  proof: vitest src/runtime/skillGrants.test.ts
 - [c10] **The save format is unchanged.** Grants are derived from content, levels are derived from xp,
   and no new field, no `SAVE_VERSION` move and no regenerated fixture belongs to this branch.
   proof: vitest src/runtime/skillGrants.test.ts
 - [c11] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests, layer-check,
   audit-status, doctor and the byte check in one invocation.
   proof: command npm run tasks -- merge-ready
+- [c12] **`restored` and `drained` report what the pool moved, and where a span is cut does not change
+  it.** Summed over a span, the two report the pool's own whole-unit movement — for a capped pool the
+  level it was left at, for a rollover meter the level the rise reached before it restarted, because a
+  meter that filled rose and did not fall. Cutting one span into any number of pieces reports the same
+  total. Added at pass 1: the rule was implemented and tested with no clause owning it, so nobody was
+  asked whether it held for a pool shape the fixture did not carry, and one did not.
+  proof: vitest src/runtime/poolMoments.test.ts
 
 ### Triggers
 
@@ -89,10 +96,15 @@ thing that happened, not a thing in progress. `resource:` marks the two arities.
 | `damage-taken` | none | the struck | a swing landed on it | damage taken |
 | `missed` | none | the performer | a swing it performed failed to land | 1 |
 | `evaded` | none | the struck | a swing at it failed to land | 1 |
-| `completed` | none | the performer | an action reached its `attempts:` bound | 1 |
-| `unfinished` | none | the performer | an action ended without reaching it | 1 |
+| `completed` | none | the performer | an action ran to its end | 1 |
+| `unfinished` | none | the performer | an action ended before reaching it | 1 |
 | `restored` | required | the pool's owner | a settle raised that pool | units gained |
 | `drained` | required | the pool's owner | a settle lowered that pool | units lost |
+
+The performer of a bounded action is the player, and these two rows are the only place that is true:
+the engine arms exactly one action and it is the player's, while every other participant swings from a
+roster seat and finishes nothing. The other eight triggers reach any entity that carries the pool or
+the swing. Recorded rather than written as if general — see the Decisions entry.
 
 ```
 # event rat-bitten
@@ -188,6 +200,26 @@ uses.
 - **They fire after the swing's hooks, not before.** A hook is the swing's own consequence and the
   felling verdict is taken over the characters it reached; announcing the moment first would put a
   handler's drain inside that verdict. The moment is the announcement, so it goes last.
+- **A rollover meter's rise is reported as a rise, and a clamp as what the pool did.** Pass 1 measured a
+  meter with an `on full` name granting `drained` for the wrap and a different amount at every way the
+  span was cut — the wrap takes the level backwards, so reading the level back reports a rise as a fall.
+  What is reported is now the level the rise reached before the meter restarted, which telescopes across
+  any split. A clamp keeps reporting the level: a `max:` that fell and truncated the pool lowered it, and
+  `drained` says the pool went down whatever took it down. c12 was added to own the rule, because the
+  reason nobody asked whether it held for a meter is that no clause was asking.
+- **A fight outcome belongs to the player by construction, and the table says so rather than implying
+  otherwise.** `completed` and `unfinished` fire on the performer of a bounded action, and the engine
+  arms exactly one action, the player's; every other participant swings from a roster seat and finishes
+  nothing to complete. Threading a performer parameter that is `PLAYER` at both call sites would look
+  general and be the same thing, so the boundary is written into the trigger table instead. c7 is
+  unchanged and untouched by this: it promises that the mechanism reads no `PLAYER`, and the two
+  triggers an enemy can be the subject of — `damage-dealt` and `damage-taken` — prove it on a rat.
+- **A skill's references prune like every other kind's.** Pass 1 measured `registry.skills` as the one
+  section kind `pruneRegistryDanglingReferences` never walked, so a grant into an absent optional
+  dependency failed the whole module where an event's `resource:` into the same absent module is dropped
+  and loads. Skills are walked now: a dangling grant is filtered off the skill, a dangling `stat-id:`
+  drops the skill, and an entity's `skills:` is filtered with it. The `stat-id:` half predates this
+  branch and is repaired with the same walk rather than left as the one reference site the rule skips.
 - **The subject is enforced at the sheet, because the store is not keyed by actor.** `experienceFor`
   grants only into a skill the entity the moment happened to declares, which is what makes an enemy earn
   its own xp; `state.xp` itself is one map, which `skill-levels-xp-events` c4 reserved to whoever makes

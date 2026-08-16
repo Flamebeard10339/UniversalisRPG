@@ -419,10 +419,15 @@ function poolStores(state: GameState): PoolStore[] {
 // Whole units, because a settle can move a pool by a fraction of one: the
 // integer level is what a span's split cannot change, where a fractional
 // amount would be counted once per tick and again as one movement.
-function writeLevel(segment: Segment, store: PoolStore, resource: Resource, level: number): void {
+//
+// `reached` is where the movement got to before a rollover meter restarted it,
+// which is not where the level was left: a meter that filled and wrapped rose,
+// and reporting the level it came back to would report that rise as a fall and
+// make the amount depend on how many times the span happened to be cut.
+function writeLevel(segment: Segment, store: PoolStore, resource: Resource, level: number, reached = level): void {
   const before = store.levels[resource.id] ?? 0;
   store.levels[resource.id] = level;
-  const units = Math.floor(level / MILLI_UNITS) - Math.floor(before / MILLI_UNITS);
+  const units = Math.floor(reached / MILLI_UNITS) - Math.floor(before / MILLI_UNITS);
   if (units === 0) return;
   fireEvents(segment, store.actorId, units > 0 ? 'restored' : 'drained', resource.id, 1, Math.abs(units));
 }
@@ -433,7 +438,7 @@ function writeLevel(segment: Segment, store: PoolStore, resource: Resource, leve
 function setPoolLevel(segment: Segment, store: PoolStore, resource: Resource, current: number, raw: number, max: number): 'stored' | 'clamped' {
   if (raw > current && max > 0 && eventsFor(segment.registry, resource.id, 'on full').length > 0) {
     const fires = Math.floor(raw / max);
-    writeLevel(segment, store, resource, raw - fires * max);
+    writeLevel(segment, store, resource, raw - fires * max, raw);
     if (fires > 0) fireEvents(segment, store.actorId, 'on full', resource.id, fires);
     return 'stored';
   }
