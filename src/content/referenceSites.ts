@@ -10,6 +10,7 @@ import { ACTION_MEMBER, isActionOwnerKind, memberKey } from './namespace';
 import { lastSegment } from '../grammar/values';
 import { mayBeInstanceId } from './instanceId';
 import { Quantified } from '../grammar/values';
+import { SkillGrant } from '../grammar/skillGrant';
 import { TagClause } from '../grammar/tagClause';
 
 // The tail every `inflict:` site's `where` ends with, so the walk that writes it
@@ -367,6 +368,7 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       return;
     case 'skill':
       put(section, 'stat-id', 'stat', `${where} stat-id:`, visit);
+      for (const grant of listMembers<SkillGrant>(section.grants)) put(grant, 'event', 'event', `${where} gain`, visit);
       return;
     case 'recipe':
       for (const field of ['in', 'out', 'burnt'] as const) quantified(section[field], 'item', `${where} ${field}:`, visit);

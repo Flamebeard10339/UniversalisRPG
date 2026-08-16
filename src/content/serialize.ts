@@ -5,6 +5,7 @@ import { formatDependency, formatVersion, Version } from '../grammar/dependency'
 import { HookCarrier } from '../grammar/hook';
 import { isPoint, Range, scaleRange } from '../grammar/range';
 import { BonusAmount, Counter, TagClause } from '../grammar/tagClause';
+import { SkillGrant } from '../grammar/skillGrant';
 import { Produced, Quantified } from '../grammar/values';
 import { Dialogue, TextSegment } from './dialogue';
 import { DropTable } from './dropTable';
@@ -401,12 +402,15 @@ function actionSection(moduleId: string, action: ActionDeclaration): string {
 }
 
 function eventSection(registry: Registry, moduleId: string, event: GameEvent): string {
-  return [`# event ${moduleLocalId(moduleId, event.id)}`, ...titleLine(registry, moduleId, 'event', event), `resource: ${event.resource}`, `trigger: ${event.trigger}`].join('\n');
+  return [`# event ${moduleLocalId(moduleId, event.id)}`, ...titleLine(registry, moduleId, 'event', event), ...(event.resource ? [`resource: ${event.resource}`] : []), `trigger: ${event.trigger}`].join('\n');
 }
 
 function factionSection(registry: Registry, moduleId: string, faction: Faction): string {
   return [`# faction ${moduleLocalId(moduleId, faction.id)}`, ...titleLine(registry, moduleId, 'faction', faction)].join('\n');
 }
+
+// The bare line a `# skill` carries one of per thing that trains it.
+const grantLine = (grant: SkillGrant): string => `gain ${grant.coefficient === 1 && grant.amount ? '' : n(grant.coefficient)}${grant.coefficient !== 1 && grant.amount ? ' * ' : ''}${grant.amount ? 'amount' : ''} experience on ${grant.event}`;
 
 const population = (value: Population): string => (value.count === undefined ? value.entity : `${n(value.count)} ${value.entity}`);
 
@@ -534,7 +538,7 @@ export function serializeRegistryModule(registry: Registry, options: SerializeMo
   for (const skill of registry.skills.values())
     if (inModule(moduleId, skill.id))
       sections.push(
-        [`# skill ${moduleLocalId(moduleId, skill.id)}`, ...titleLine(registry, moduleId, 'skill', skill), ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : []), ...(skill['per-level'] ? [`per-level: ${bonusAmount(skill['per-level'])}`] : [])].join('\n'),
+        [`# skill ${moduleLocalId(moduleId, skill.id)}`, ...titleLine(registry, moduleId, 'skill', skill), ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : []), ...(skill['per-level'] ? [`per-level: ${bonusAmount(skill['per-level'])}`] : []), ...skill.grants.map(grantLine)].join('\n'),
       );
   for (const item of registry.items.values()) if (inModule(moduleId, item.id)) sections.push(itemSection(registry, moduleId, item));
   for (const passive of registry.passives.values()) if (inModule(moduleId, passive.id)) sections.push(passiveSection(registry, moduleId, passive));
