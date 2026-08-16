@@ -157,19 +157,27 @@ already turns a session into a replayable regression when one is wanted.
 
 ## Open questions
 
-- **What one turn actually costs on this substrate, measured before anything else is built.** c4 says
-  the harness adds nothing to the turn; whether the Agent SDK can be configured that far is unverified,
-  and it could not be checked while writing this — the `claude` CLI is not on `PATH` in a worktree
-  shell. The first thing a worker does is run a single turn with the system prompt replaced and tools
-  off and read the token usage back. A small floor means the design holds and the rest of the clauses
-  are worth implementing. A floor in the tens of thousands means c4 is unmet on this substrate, and the
-  right move is to stop and say so rather than build eight clauses on top of it — the whole spec exists
-  because a per-turn cost of that size is what made the subagent unusable. If the floor turns out to be
-  a configuration the SDK will not give up, the fallback before abandoning c4 is the loop's working
-  directory: a tree holding nothing but a minimal `CLAUDE.md` loads no repository instructions, no
-  skills and no commands, because there are none there to load. That is a property of where the process
-  runs rather than of what it was asked for, so it holds whatever the defaults do — and it is moot the
-  moment a turn carries no tools, because then the directory is unreachable anyway.
+- **RETIRED 2026-08-15 by measurement; c4 needs an author ruling.** Measured on
+  `@anthropic-ai/claude-agent-sdk` 0.3.233 against claude-sonnet-5, one turn, main-model input
+  tokens: full harness default 45,927; the loop's own prompt with built-in tools still loaded 35,245;
+  with tools off but settings loaded 5,849; with both off 932. So the cost half of c4 holds with room
+  to spare — `tools: []` is worth ~34k of the ~45k and `settingSources: []` ~5k — and the floor is
+  three figures rather than the tens of thousands that would have killed the spec. Two things the
+  clause did not anticipate came out of the same run. **First, `settingSources: []` does not isolate.**
+  At 932 tokens the turn still named this project, its path, `CLAUDE.md`, and a convention that lives
+  only in the author's user-level memory index: working directory, git status and auto-memory ride a
+  dynamic section that a custom string system prompt does not remove, and the SDK's own
+  `excludeDynamicSections` is documented to have no effect when `systemPrompt` is a string. Pointing
+  `cwd` at an empty directory outside the repository removes all of it — the same probe answers "NONE,
+  I don't have access to any repository" and the floor falls to 296. The fallback recorded above is
+  therefore not a fallback; it is the only lever for c4's correctness half, and c4 as written names
+  three opt-outs where four are needed. Adding the fourth is a clause change and waits on the author.
+  **Second, a frozen prefix under 1024 tokens does not cache at all** on this model: three consecutive
+  turns on a 932-token prefix each billed 932 fresh with zero cache reads, while a 6,450-token prefix
+  wrote once and read 6,450 on every turn after. c5 asserts byte identity of the system block, which is
+  necessary and not sufficient — a run caching nothing passes it. The proof it wants is a nonzero
+  `cacheReadInputTokens` on the second turn. Note also a constant auxiliary claude-haiku call of
+  ~520-580 tokens on every turn, in every configuration, that no option removed.
 - What ends a run. A turn count is the obvious bound and a usage budget is the honest one, but the
   budget figure must not reach the model's prompt (c5), so the loop holds it and the player does not.
   Which bound ships is a worker's call against a measured run; both are one line and neither changes a
