@@ -15,6 +15,15 @@ export interface RawSection {
 
 const HEADING = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?[ \t]*$/;
 
+// The block half of the demand `requireEnd` makes of a line's text. A reader
+// that has no use for a line's indented block and says nothing about it has
+// dropped what an author wrote, which is the outcome a parse is not allowed to
+// have.
+export function requireNoBlock(line: RawLine): void {
+  if (line.children.length === 0) return;
+  throw new DslError(`${JSON.stringify(line.text)} takes no indented block`, line.span);
+}
+
 export function splitSections(source: string): RawSection[] {
   const sections: RawSection[] = [];
   let current: RawSection | null = null;

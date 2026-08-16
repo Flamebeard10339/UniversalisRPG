@@ -8,7 +8,7 @@ import { SCHEMAS, parseModule, schemaFor } from './module';
 import { Cursor, DslError, Parser, parseWhole } from '../grammar/parser';
 import { ListParser } from '../grammar/list';
 import { point } from '../grammar/range';
-import { SectionSchema, hydrateSection, parseAnySection, parseSection } from '../grammar/section';
+import { SectionSchema, hydrateSection, isPositionalField, parseAnySection, parseSection } from '../grammar/section';
 import { skillSchema } from './skill';
 import { statSchema } from './stat';
 import { RawLine, splitSections } from '../grammar/structure';
@@ -718,15 +718,6 @@ describe('a field name that is one letter off is a typo, not an action label', (
   });
 });
 
-// A schema seen the way the walk below needs it: `AnySchema` carries neither
-// the keyword a field is written under nor the two positions a field is
-// reached without one, and both decide what a probe line can say.
-interface WalkableSchema {
-  fields: Record<string, { parser: object; keyword?: string }>;
-  clauses?: string;
-  bare?: string;
-}
-
 interface WalkableField {
   kind: string;
   name: string;
@@ -741,17 +732,22 @@ interface WalkableField {
   sectionTakesClauses: boolean;
 }
 
+// Every field of every kind, read through the shape the engine publishes, so
+// the walk shares the engine's own answers about which fields exist, what they
+// are written as, and which have no keyword form at all.
 function schemaFields(): WalkableField[] {
-  return Object.entries(SCHEMAS as unknown as Record<string, WalkableSchema>).flatMap(([kind, schema]) =>
-    Object.entries(schema.fields).map(([name, field]) => ({
-      kind,
-      name,
-      keyword: field.keyword ?? name,
-      parser: field.parser,
-      positional: name === schema.clauses || name === schema.bare,
-      sectionTakesClauses: schema.clauses !== undefined,
-    })),
-  );
+  return Object.keys(SCHEMAS)
+    .map((kind) => schemaFor(kind)!)
+    .flatMap((schema) =>
+      Object.entries(schema.fields).map(([name, field]) => ({
+        kind: schema.kind,
+        name,
+        keyword: field.keyword ?? name,
+        parser: field.parser as object,
+        positional: isPositionalField(schema, name),
+        sectionTakesClauses: schema.clauses !== undefined,
+      })),
+    );
 }
 
 const fieldName = (field: WalkableField): string => `${field.kind}.${field.name}`;
@@ -837,6 +833,25 @@ describe('a field that takes a block reads one exactly where it reads the same t
   it('reads inline past the field parser only where the section absorbs a clause', () => {
     const inlineReadsMore = blockCapable.flatMap((field) => OPS.flatMap((op) => AUTHORED.filter((authored) => inlineSection(field, op, authored).read && !blockSection(field, op, authored).read).map(() => field)));
     expect(inlineReadsMore.filter((field) => !field.sectionTakesClauses).map(fieldName)).toEqual([]);
+  });
+
+  // The shape of the text, not only the field it sits under: a block line has
+  // an indented block of its own, and every reader `list` builds ignores it.
+  // The nested text is the field's own accepted one, so nothing here is a
+  // per-field input somebody wrote down.
+  it('refuses a block line carrying an indented block of its own, on every field a block can address', () => {
+    const swallowed = blockCapable
+      .filter((field) => !field.positional)
+      .filter((field) => {
+        const accepted = AUTHORED.find((authored) => blockSection(field, '', authored).read);
+        return accepted !== undefined && parseProbe(`# ${field.kind} probe
+${field.keyword}:
+  ${accepted}
+    ${accepted}
+`).read;
+      })
+      .map(fieldName);
+    expect(swallowed).toEqual([]);
   });
 
   // Agreement is satisfied by a pair that refuses everything, so the walk also

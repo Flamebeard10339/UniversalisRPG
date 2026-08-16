@@ -2,7 +2,7 @@ import { Condition, condition } from './condition';
 import { ListParser } from './list';
 import { Cursor, DslError, Parser, Span, requireEnd } from './parser';
 import { Range, scaleRange } from './range';
-import { RawLine } from './structure';
+import { RawLine, requireNoBlock } from './structure';
 import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantified, refuseRange, REFERENCE } from './values';
 
 // Whose pool an amount moves between. `me` is the character the result is read
@@ -313,9 +313,7 @@ function readResultLine(line: RawLine): ActionResult[] {
   requireEnd(cursor, 'a result');
   // A leaf line has no block to hold; the alternative is the silent drop that
   // this repo has already been bitten by once.
-  if (line.children.length > 0 && !results.some((result) => nestedResults(result).length > 0)) {
-    throw new DslError(`${JSON.stringify(line.text)} takes no indented block`, line.span);
-  }
+  if (!results.some((result) => nestedResults(result).length > 0)) requireNoBlock(line);
   return results;
 }
 

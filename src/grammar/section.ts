@@ -56,13 +56,21 @@ export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H
 // caller that does not know the kind can act on.
 export interface AnySchema {
   kind: string;
-  fields: Record<string, { parser: unknown }>;
+  fields: Record<string, { parser: unknown; keyword?: string }>;
+  clauses?: string;
+  bare?: string;
   entries?: { into: string };
 }
 
 const isListParser = (parser: unknown): boolean => typeof parser === 'object' && parser !== null && 'element' in parser;
 
 export const isListField = (schema: AnySchema, name: string): boolean => isListParser(schema.fields[name]?.parser);
+
+// A field the section reaches by a line's position — as its clause list or as
+// its bare value — rather than by a `name:` label. Asked by the line reader
+// below and by anything walking the schemas, so the two cannot disagree about
+// which fields have no keyword form.
+export const isPositionalField = (schema: Pick<AnySchema, 'clauses' | 'bare'>, name: string): boolean => name === schema.clauses || name === schema.bare;
 
 // What a `+key:`/`-key:` line contributes, kept apart from a bare assignment so
 // that merging can tell "add these" from "this is now the whole list".
@@ -165,7 +173,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
     const key = heading?.key;
     const op = heading?.op?.trim() as '+' | '-' | undefined;
     const name = key !== undefined ? byKeyword[key] : undefined;
-    const labelsBareField = name !== undefined && (name === clauses || name === bare);
+    const labelsBareField = name !== undefined && isPositionalField({ clauses, bare }, name);
     if (key !== undefined && !labelsBareField && (name !== undefined || entries !== undefined)) {
       const keySpan = { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + (heading!.op?.length ?? 0) + key.length) };
       const meantField = name !== undefined ? undefined : typoOf(key, [...Object.keys(byKeyword), ...keywords]);

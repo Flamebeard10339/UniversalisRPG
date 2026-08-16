@@ -39,4 +39,9 @@ describe('a list block line', () => {
   it('refuses on the line that carries the leftover, not on the first one', () => {
     expect(() => ids.parseBlock(block('cove', 'beach oven', 'reef'))).toThrow(/"oven"/);
   });
+
+  it('refuses an indented block of its own, which no element parser can read', () => {
+    const [beach, cove] = block('beach', 'cove');
+    expect(() => ids.parseBlock([{ ...beach, children: [cove] }])).toThrow(/"beach" takes no indented block/);
+  });
 });
