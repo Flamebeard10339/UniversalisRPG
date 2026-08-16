@@ -61,7 +61,7 @@ Proof:
   proof: vitest scripts/play-cli.test.ts
 - [c8] All of it is exercised before `src/ui` exists. Every clause above is provable through
   `play-cli` against a file-backed store, and this branch ships no browser adapter and no stub of
-  one — `the-browser-save-store-adapter` owns that and lands with the GUI's authoring door.
+  one — `the-gui-authors-through-the-same-door` c11–c15 owns the browser adapter and requires this.
   proof: vitest scripts/play-cli.test.ts
 - [c9] **Entering dev mode snapshots the player's slot before anything is editable, and leaving
   restores it.** Anything done in between — content edits, play, cheats, a save-breaking mistake — is
@@ -82,7 +82,19 @@ Proof:
   mode and which slot it is writing, so a later surface renders an answer rather than tracking its own
   copy of the state.
   proof: vitest scripts/play-cli.test.ts
-- [c14] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests, layer-check,
+- [c14] **A payload the validator accepts is a payload the loader can read, for every field.** No
+  input reaches `loadSave` past `checkSave` and then throws — a corrupt slot is a diagnostic naming
+  the field, never a raw `TypeError` from inside the gate that exists to prevent one. The clause is
+  universal over `SAVE_FIELDS` and its proof derives its subjects from that table: for each field,
+  the emptiest value its own `holds` admits is fed through `checkSave` and `loadSave`, and the field
+  added next month is covered without an edit to the test. Three fields fail this today —
+  `activeAction`, `journey` and `player` are gated on `isObject` alone while the code downstream
+  destructures `ownerRef`, `actionLabel` and `cadences` — which is `runtime-2026-07-30-h1`, and the
+  intent was already the opposite: `activeActionProblem` (`src/runtime/save.ts:119`) wraps
+  `findActionOwner` in a `try`/`catch` that converts a `RuntimeError` into a warning, and the next
+  statement defeats it.
+  proof: vitest src/runtime/save.test.ts
+- [c15] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests, layer-check,
   audit-status, doctor and the byte check in one invocation.
   proof: command npm run tasks -- merge-ready
 
@@ -115,7 +127,16 @@ The player's progress survives closing the game, through a store three queued br
   `single-dev-mode` behind `first-class-modals` and the entire GUI chain for no gain. The
   injected-effect pattern this branch uses is the one that seam generalizes, so nothing is built
   twice.
-- **`runtime-2026-07-30-h1` is required, not absorbed.** `checkSave` gives `activeAction`, `player`
+- **`runtime-2026-07-30-h1` is absorbed as c14 — the author overruled this spec's own earlier ruling
+  on 2026-08-16.** What stood here said it was required rather than absorbed, on the reasoning that
+  it is its own fix in its own file. The author's instruction is that the push runs in as few
+  sessions as it can, and a one-file fix that blocks the whole chain is a session bought for nothing.
+  Two things make the fold cheap rather than a smuggled scope increase: the fix lands in
+  `src/runtime/save.ts`, which no other member of this push writes, and c14 states the property as a
+  derivation over `SAVE_FIELDS` rather than as three named fields — so it is a clause this spec would
+  have wanted anyway, given that this branch is what makes a corrupt payload reachable from a
+  player's disk instead of only from a hand-written `# save`. The original reasoning is kept below
+  because the defect it describes is what c14 must fix: `checkSave` gives `activeAction`, `player`
   and `activeBuffs` no check past `isObject`, so `loadSave` crashes with a raw `TypeError` from
   inside the validator that exists to prevent it. Today that is reachable only through a
   hand-written `# save`; this branch makes it reachable by any corrupt slot a player's disk hands
