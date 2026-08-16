@@ -336,3 +336,103 @@ ok, audit-status ok, doctor ok (26 warnings, which that leg does not fail on), b
 ok. All six legs the clause enumerates pass. The one FAIL is the spec-standing leg, "1 open member",
 which is this branch's own in-progress record and cannot pass before this pass is filed and the member
 closed; it is not among the six.
+
+### Pass 3 — 2026-08-16
+
+- base: `878a05b24259f773e932538d176b0e2e2bd1c11f`
+- head: `c88415ca460176d1ed83af6a4b21ebaeda95a621`
+- proof 1: met — Six aimed mutations, all KILLED at scripts/consolidate.test.ts and each re-run at that file with
+  the mutation still applied. (a) src/content/resolve.ts declaredKey's dotted-id null widened to always
+  qualify(namespace, id), killed by "splices the staged text over the declaring span, under the heading that
+  file spells". (b) rehead(declaration.heading, section.text) replaced with section.text, killed by the same
+  test. (c) the descending sort in applyEdits flipped to ascending, killed by "places two sections into one
+  file without either moving the other". (d) deletionEnd's blank-line scan short-circuited to return stop + 1,
+  killed by "takes the declaring section out of its file when the staged section is a removal". (e) the
+  two-declaring-files guard raised to at.length > 99, killed by "refuses a section two files both declare,
+  rather than choosing one". (f) matchingEndings replaced with the identity, KILLED by "keeps the line endings
+  of a CRLF file it splices into" — that is pass 2's one survivor closed: 704bb24 added an it.each over a CRLF
+  file and an LF file, restaged and edited, and the "line endings follow the file being written into" decision
+  is now watched rather than only probed by hand. scripts/consolidate.ts is byte-identical to the tree pass 2
+  measured, so (a)-(e) are re-measurements rather than new claims. Manifest, 20 entries, 19 killed 1 survived
+  (the survivor is c2's over-strictness control, below):
+  C:\Users\yonat\AppData\Local\Temp\mutations-an-edit-goes-home-to-its-source-file-pass3.json
+  One qualification for the next pass, not filed: matchingEndings decides a file's convention from
+  file.includes('\r\n'), so a file with mixed endings would be spliced all-CRLF. Both tests use a pure
+  convention. A mixed-ending .dsl is not a state the loader, the checkout or .gitattributes produces, so this
+  is a stated boundary rather than a hole.
+- proof 2: met — The clause's own sentence is true of the tree, checked by walking it rather than by trusting a
+  guard, and the repair is proved five ways. What the walk found: serializeRegistryModule is a module-private
+  function declaration in src/content/serialize.ts with exactly three call sites, all in that file
+  (roundTripModule, republishModule twice, roundTripUniverse). The module's runtime export surface is 7 names,
+  measured directly rather than read off the test — importing it as a namespace prints 7. Every shipped caller
+  of the three round trips checks both halves before using anything: scripts/squash-local-changes.ts fails on
+  diagnostics then on differences, scripts/probe.ts does the same in universe mode and in module mode, and
+  src/content/modportal.ts takes republished.printed ?? asWritten(). Pass 2's HIGH is dead at the compiler
+  rather than at a test: export { serializeRegistryModule } from './serialize' no longer type-checks anywhere,
+  because there is no such export, and pass 1's import * as printer reproduction resolves to nothing.
+  Five aimed mutations of the repaired surface, all KILLED and each re-run at its own file. (a) function
+  serializeRegistryModule made exported again, killed by src/content/registryDiff.test.ts "offers the round
+  trip and the section printers, and nothing else". (b) export const printModule = serializeRegistryModule
+  added beside canSerialize, killed by the same test — that is the residual pass 2 named, a second whole-module
+  printer handed out under another name, and it now turns red. (c) compare's differences:
+  registryDiff(loaded, checked.registry) replaced with [], killed by src/content/modportal.test.ts "carries an
+  edit to base content, which the module it prints does not own". (d) republishModule's refusal weakened to
+  trip.diagnostics.length > 99, killed by the same. (e) republishModule made to hand back trip.printed instead
+  of null when the trip refused, killed by the same — so holding a print the diff refused is watched at the one
+  caller that could.
+  The reload identity, which is the seam c2 actually rests on, is watched at both script callers: dropping
+  "text: printed" from squash-local-changes.ts's reload, so it reloads the original source instead of the
+  print, was killed at scripts/squash-local-changes.test.ts (the named test survived, the file killed it, via
+  "emits a target module when local changes only patch that module" and "absorbs local-created variables as
+  target globals when squashing"); the same mutation in scripts/probe.ts was killed by scripts/probe.test.ts
+  "asks the per-module question under --round-trip=module, and reports what publishing one alone would lose"
+  at its own scope.
+  Over-strictness, measured, and this is a straight improvement over pass 2. Pass 2 recorded a cost: rewriting
+  src/runtime/session.ts's import { printDirective } as import * as printer — legitimate code touching nothing
+  but printDirective — was KILLED by the old import-reading derivation. Re-run against this tree it SURVIVED,
+  0 failed of 3383, at the named test, at its file, and at whole-suite scope. The repair closed the bypass and
+  stopped refusing legitimate input in the same move.
+  Third-bypass hunt, since a third would mean the structural repair failed too: I looked for a way to hold the
+  printer that Object.keys of the module cannot see, and did not find one. export * re-exports nothing that is
+  not exported; a default export, an alias and a second printer all change the key list; and the other six
+  exports are section printers and predicates that cannot reconstruct a module. What remains is not a way to
+  hold the printer but a way to hold its output, and it is unchanged from the merge base: RoundTrip.printed is
+  returned whatever the verdict, and RoundTrip.differences is [] both when nothing differed and when nothing
+  was compared. Measured: a trip whose supplied reload produced 1 diagnostic came back { diagnostics: 1,
+  differences: [], printed: 52 chars }. 878a05b's src/content/roundTrip.ts carries the identical compare(), so
+  this is a residual and not this branch's regression — filed medium, not unmet, and it is what the rewritten
+  dropTable case (the other medium) already cost.
+- proof 3: met — Two aimed mutations, both KILLED at scripts/consolidate.test.ts and re-run there with the mutation
+  still applied. const differences = registryDiff(before.registry, after.registry) replaced with an empty list,
+  killed by "names the difference a partial patch would make, and keeps every byte"; and the differences branch
+  made to return the edited sources and the emptied text instead of [...base] and local.text, killed by the
+  same test — which is the all-or-nothing half, since that test asserts both writable(result) false and byte
+  equality of the whole base file. Same manifest as c1.
+- proof 4: met — The deleteLocalSection call in consolidate() replaced with void section; was KILLED by
+  scripts/consolidate.test.ts "leaves the local module with nothing staged", which reads the local file back
+  off disk after a real run() over a copy of the shipped content tree, and re-run at that file with the
+  mutation still applied. The universe-equality half is carried by "loads the same universe from the files
+  alone as it did with the edit staged on top" in the same describe block, which the c5 write-path mutation
+  killed. Pass 2's medium is closed: the clause's proof: line now names scripts/consolidate.test.ts, matching
+  the Decisions, and the generated manifest aimed there instead of at src/runtime/integration.test.ts. Pass 1's
+  qualification still stands and is not a new finding — the shipped-# test replay assertion is defence in
+  depth, and the byte-equality and universe-equality assertions are what carry the clause.
+- proof 5: met — Two aimed mutations killed by the describe block "the round trip is closed, on the content that
+  ships", which stages an edit through runLine and the same AuthoringContext the REPL and the GUI use over a
+  copy of the real content/ tree, runs the CLI's own run(), and reloads from files alone.
+  write(files[index], source.text) replaced with write(files[index], base[index].text) was killed by "loads the
+  same universe from the files alone as it did with the edit staged on top"; contentFiles's
+  .filter((name) => name.endsWith('.dsl')) replaced with .filter(() => false) was killed by "defaults to every
+  .dsl under content/ but the local file, and takes an override". Both re-run at scripts/consolidate.test.ts
+  with the mutation still applied.
+- proof 6: met — npm run tasks -- merge-ready on a clean tree at c88415c: tsc ok, npm test ok, layer-check ok,
+  audit-status ok, doctor ok (27 warnings, which that leg does not fail on), bytes ok, plus tree ok and base
+  ok. All six legs the clause enumerates pass. The one FAIL is the spec-standing leg, "1 open member", which is
+  this branch's own in-progress record and cannot pass before this pass is filed and the member closed; it is
+  not among the six. Separately checked, because the merge gate does not cover it and this branch closed a new
+  runtime import cycle serialize -> registryDiff -> registry -> serialize: npm run build (tsc + vite) is clean,
+  and the production bundle tree-shakes registryDiff and the round trip out of the browser entirely, so the
+  cycle does not exist there; entering the cycle at each of its three members in node ESM evaluates without a
+  TDZ (7, 3 and 10 exports respectively); and no member reads another's binding at module-evaluation time —
+  registryDiffMaps() is the lazy call the repair introduced, registry.ts's only serialize import is the hoisted
+  function declaration printSegments, and every top-level const in serialize.ts is an arrow body.
