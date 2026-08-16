@@ -21,20 +21,28 @@ Proof:
   `  xp: brawling 2.5`) all refuse, and so does the `adjacent: beach whille unlocked` that motivated
   it.
   proof: vitest src/grammar/list.test.ts src/content/parse.test.ts
-- [c2] **The proof derives its subjects from the schemas, and by the right predicate.** The test walks
-  `SCHEMAS` (`src/content/module.ts:32`) and takes every field whose parser exposes `parseBlock` — not
-  a hand-written list of field names, and *not* `isListField`. Measured at HEAD on 2026-08-15: 15
-  schemas declare 26 block-capable fields; shipped content exercises 11 lines of them; and
-  `location.adjacent`, the field the finding's own reproduction used, answers `isListField` false
-  while accepting a block. A predicate that misses the motivating case is the enumeration failure
-  wearing a derivation's clothes. The walk covers the bare, `+` and `-` forms of each field, because a
-  patch is where a mod's typo arrives and the contribution system is what makes that reachable.
-  proof: vitest src/grammar/list.test.ts
-- [c3] **Inline and block agree, field by field.** For every block-capable field, one authored text is
-  accepted by both forms or refused by both. This is the property the finding states; c1 is one
-  implementation of it, and c3 is what notices if a later change re-opens the gap on another route.
-  The clause is universal and its proof derives its subjects the same way c2's does.
-  proof: vitest src/grammar/list.test.ts
+- [c2] **The proof derives its subjects from the schemas, and by the predicate the engine decides on.**
+  The test walks `SCHEMAS` (`src/content/module.ts:32`) and takes every field whose parser exposes
+  `parseBlock`, rather than a hand-written list of field names. `parseBlock` is the predicate because
+  `src/grammar/section.ts:100` is the line that decides whether a block is legal, and a walk grading
+  the engine by a predicate the engine does not use is grading something else — so the walk asserts
+  the two sets are equal rather than restating the choice in prose. Measured at HEAD on 2026-08-16: 15
+  schemas declare 76 fields, 26 of them block-capable; shipped content exercises 11 lines of them.
+  `isListField` is not that line: it gates `+`/`-`, and it answers *true* for `location.adjacent` — an
+  earlier measurement here said false, which pass 1 disproved. The two predicates are
+  indistinguishable at HEAD, so nothing in the suite would notice the substitution; what stops the
+  drift is the equality against the engine's gate, not the name in this sentence. The walk covers the
+  bare, `+` and `-` forms of each field, because a patch is where a mod's typo arrives and the
+  contribution system is what makes that reachable.
+  proof: vitest src/content/parse.test.ts
+- [c3] **Inline and block agree, field by field, and over the shape of the text as well as the field.**
+  For every block-capable field, one authored text is accepted by both forms or refused by both, and
+  that holds for a nested block as well as a flat line — a block-form line has an indented block of
+  its own and no `list` element parser can read one. This is the property the finding states; c1 is
+  one implementation of it, and c3 is what notices if a later change re-opens the gap on another
+  route. The clause is universal and its proof derives its subjects the same way c2's does, taking
+  each field's nested probe from the text that field itself accepts.
+  proof: vitest src/content/parse.test.ts
 - [c4] **Shipped content is unchanged, and a line the new refusal rejects is repaired here and named.**
   Measured at HEAD on 2026-08-15: every block-form line under a block-capable field in `content/`
   parses and leaves nothing behind, so this branch forecasts no content edit and every `# test` and
@@ -66,6 +74,17 @@ meant to mean "this file does two jobs", which is the shape of the 2026-08-07 an
 on `an-action-pruned-for-a-dangling-reference` and `authored-prose-is-addressed-by-its-owner`. The
 `produces` forecast is cleared rather than registered.
 
+**c3's agreement is asserted in one direction at the section level and in both at the parser level.**
+The walk compares a field's parser directly — `parseWhole(parser, text)` against
+`parser.parseBlock([one line])` — and demands they be identical, which is the invariant with no
+section grammar in the way. Through `parseAnySection`, where `+` and `-` live, it demands only that a
+block never read what the same section refuses inline. The other direction survives and is
+characterised rather than excused: a section declaring a clause field gives an unclaimed word a home,
+so `on hit: drain: 5 health b` on a `# item` reads `b` as a tag where the block form refuses it, and
+the walk fails if that ever happens on a section without clauses. Nothing is dropped there — a word
+no demand references is read as a tag — so it belongs to the third invariant above, the one about
+vocabulary, and it is filed as its own finding rather than closed here.
+
 **This branch takes the totality half of the silent-acceptance cluster and no other half.** Five open
 records share the surface symptom "the loader accepts what it does not understand", and reading them
 together they are three different invariants with three different enforcement points, not one:
@@ -91,11 +110,17 @@ Splitting them this way is the sizing rule applied, not a scope dodge: each of t
 subjects from a different surface, and a spec that carried all three would be graded by enumeration
 because no single walk covers a parser, a namespace and a vocabulary at once.
 
-**The derivation predicate is `parseBlock`, decided by measurement rather than by name.** The obvious
-reading — walk `isListField` — was tried first and returns false for `location.adjacent`, which is
-where the finding's headline reproduction lives. A derivation aimed by the wrong predicate is an
-enumeration that looks universal, which `a-clause-that-enumerates-instances-is-graded-on-the-enumerat`
-records as this repository's most-repeated grading failure. c2 names the predicate for that reason.
+**The derivation predicate is `parseBlock`, because that is the line the engine decides on.**
+`src/grammar/section.ts:100` gates a block on `'parseBlock' in parser`, so a walk that picks its
+subjects any other way is grading a set the engine does not use. The obvious alternative,
+`isListField`, gates `+`/`-` rather than blocks. This spec first justified the choice by claiming
+`isListField` answers false for `location.adjacent`; pass 1 measured it true, and measured the two
+predicates agreeing on all 76 fields, so no test can tell them apart. The decision stands and its
+reason is now the engine's gate rather than that measurement — and the walk asserts equality against
+that gate, so the predicate is held by something executable instead of by this paragraph. A
+derivation aimed by the wrong predicate is an enumeration that looks universal, which
+`a-clause-that-enumerates-instances-is-graded-on-the-enumerat` records as this repository's
+most-repeated grading failure.
 
 **Ordered before `starting-zone`.** Every one of these defects is silent at load and surfaces as
 misbehaving content hours later, so the cost of each scales with how much content exists and how far
