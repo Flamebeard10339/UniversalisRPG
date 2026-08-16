@@ -30,6 +30,32 @@ export function roundTripModule(loaded: Registry, options: SerializeModuleOption
   return compare(loaded, printed, reload(printed));
 }
 
+export interface Republished {
+  // Null when the round trip refused, which is a caller's cue to publish the
+  // author's own bytes rather than a print that would lose something.
+  printed: string | null;
+  diagnostics: ModuleDiagnostic[];
+  differences: string[];
+}
+
+// A module serialized under an id other than the one it loaded under. The round
+// trip is taken first and under the loaded id, because that is the only
+// comparison whose two sides hold the same keys: renaming a module moves the
+// compiled locale keys and inline action ids with it, and a diff against a
+// hand-renamed registry reports every one of those as a loss. What the trip
+// proves is the thing the rename does not touch — that the serializer carries
+// this module whole, which is what an edit to another module's content is not.
+export function republishModule(
+  loaded: Registry,
+  options: SerializeModuleOptions,
+  reload: (printed: string) => UniverseLoadResult,
+  as: { registry: Registry; options: SerializeModuleOptions },
+): Republished {
+  const trip = roundTripModule(loaded, options, reload);
+  if (trip.diagnostics.length > 0 || trip.differences.length > 0) return { printed: null, diagnostics: trip.diagnostics, differences: trip.differences };
+  return { printed: serializeRegistryModule(as.registry, as.options), diagnostics: [], differences: [] };
+}
+
 // Deliberately not a RoundTrip. A universe has no single reloadable text — the
 // concatenation of several modules declares `# info` more than once and will not
 // load — so `printed` would carry a second meaning on an inherited field.
