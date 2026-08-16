@@ -105,3 +105,72 @@ authoring sits from reading. A zone is the first work that makes both large. `st
 ## Open questions
 
 None.
+
+## Audit passes
+
+### Pass 1 — 2026-08-16
+
+- base: `cb74060058051c3d6fbd4249cfa72bbbe6d3ef25`
+- head: `47760fd9c15b44506afbb1ab56c3d5a58af8efd1`
+- proof 1: met — Aimed mutation of the one line this branch changed, src/grammar/list.ts:24
+  `parseWhole(line, raw.text, raw.span.start, 'a list item')` reverted to the pre-branch
+  `parseInline(new Cursor(raw.text, 0, raw.span.start))`: KILLED five times, each by a named test
+  re-run at its own file with the mutant still applied. list.test.ts "refuses what the element
+  parser left behind, naming it", "points the refusal at the leftover, in the whole source rather
+  than the line", "refuses on the line that carries the leftover, not on the first one"; and
+  parse.test.ts "refuses the leftover the loader used to drop, on each field the finding measured",
+  "refuses a while one letter off rather than dropping the condition it gates". The accept half is
+  watched too: appending ' leftover' to every block line KILLED "reads a line the element parser
+  consumes whole", so the clause is not held by a test that only ever demands a throw. Manifest at
+  C:\Users\yonat\AppData\Local\Temp\audit-nothing-authored-is-silently-dropped-pass1-mutations-aimed.json
+  (9 killed, 2 survived, both survivors c2's, below). Live check outside the suite: piping
+  a location whose `adjacent:` block line reads `beach whille unlocked` into npm run probe prints
+  `stdin:3:9 parse: unexpected content after a list item: "whille unlocked"`. The fourth measured
+  case, an `on success:` block line reading `xp: brawling 2.5`, already refused before this branch
+  (requireEnd sits at actionResult.ts:313 in cb74060 too), so that expectation records an outcome
+  rather than a change.
+- proof 2: met — The walk is a derivation and mutation proves it: narrowing
+  `Object.entries(SCHEMAS as unknown as Record<string, WalkableSchema>)` in src/content/parse.test.ts
+  to a single schema KILLED "derives its subjects by the predicate the section engine decides a block
+  by", so the subjects come from SCHEMAS and not from a written list. Counts re-measured at HEAD with
+  npm run inspect: 15 schemas, 76 fields, 26 of them carrying `parseBlock` — the clause's numbers.
+  The predicate half is met in the code (`takesABlock = 'parseBlock' in field.parser`) and pinned to
+  the engine by `expect(declaresBlock).toEqual(engineReadsBlock)`. But the clause's stated reason for
+  that predicate is false at HEAD and nothing can tell the two predicates apart: measured
+  `isListField(locationSchema, 'adjacent')` is true, and over all 76 schema fields `'parseBlock' in
+  parser` and `'element' in parser` agree exactly by field name. Two mutations confirm it — swapping
+  the test's predicate to `'element' in field.parser`, and swapping the engine's own gate at
+  section.ts:100 to `'element' in parser` — each SURVIVED the whole 3264-test suite. Graded met on the
+  operative requirement; the false premise is filed as a finding rather than graded here.
+- proof 3: unmet — The walk proves agreement for the ten single-line texts it enumerates and passes, but the
+  clause is universal and a counterexample sits one indentation level below where it looked. A
+  block-form list item's own indented children are never read: src/grammar/list.ts:24 maps over
+  `lines` and never touches `raw.children`. Measured with npm run probe: a location whose `adjacent:`
+  block holds `beach` with `cove reef nonsense` indented under it loads clean, and the parsed
+  location shows `adjacent: [{ target: "beach" }]` — `cove reef nonsense` is gone with no word said.
+  A `flags:` block holding `alert` with `typo here` under it, and an `entities:` block holding `miki`
+  with `oven` under it, behave the same. The inline twin of that text, `adjacent: beach` with the same
+  indented line under it, is refused: `location field adjacent is written inline and as a block; give
+  it one`. Accepted as a block, refused inline, on a block-capable field: the disagreement c3 forbids,
+  and the third outcome the Deliverable says does not exist. It costs nothing to close — a mutation
+  adding `if (raw.children.length > 0) throw ...` to parseBlock SURVIVED the whole 3264-test suite, so
+  no shipped content, fixture or test writes such a line and no over-strictness is risked. Manifest at
+  C:\Users\yonat\AppData\Local\Temp\audit-nothing-authored-is-silently-dropped-pass1-mutations-children.json.
+  Filed as the HIGH finding below; the repair belongs to this clause rather than to a new spec.
+- proof 4: met — `git diff --stat HEAD -- content/` is empty and `git diff --stat cb74060..47760fd -- content/`
+  is empty: no content line needed repair and none was made, which is the forecast the clause
+  recorded. `npx vitest run src/runtime/integration.test.ts` passes 28 of 28 over the shipped content,
+  and merge-ready's bytes leg passes, so every `# test` and `# save` fixture stays byte-identical.
+  Nothing in the diff weakens the check to keep a content line loading: the only source change is the
+  added end-of-line demand, which moves in the strict direction.
+- proof 5: met — `grep -rn "requireEnd" src/grammar --include=*.ts --exclude=*.test.ts` names exactly the
+  pre-branch sites: parser.ts:56 (the definition) and :66 (inside parseWhole), action.ts:188 'an
+  action field', actionResult.ts:187 'one of:' and :313 'a result'. The diff adds no `requireEnd` call
+  and no new message — list.ts reaches the one check through `parseWhole`, and the refusal an author
+  reads, `unexpected content after a list item: "..."`, is parser.ts:60's single template with a new
+  `what` string. No third copy of the section field engine appears in the range.
+- proof 6: met — `npm run tasks -- merge-ready` is green on every behavioural leg: tsc ok, npm test ok
+  (3264 tests), layer-check ok, audit-status ok, doctor ok (25 pre-existing warnings, none from this
+  range), bytes ok, tree ok with nothing uncommitted, base ok with main not moved past the merge
+  base, and spec ok with every declared member closed. The one failing leg is `clauses` — "has no
+  recorded audit pass" — which is this pass; it stays red while c3 is unmet.
