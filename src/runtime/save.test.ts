@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { armAction, armCraft, armFightAction, armTravel, buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
+import { armAction, armCraft, armFightAction, armTravel, buffsOf, createGameState, grantBuff, PLAYER, RuntimeError, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, ModalFrame, openModalNamed } from './modals';
@@ -741,6 +741,25 @@ describe('what checkSave accepts, loadSave can read, for every field there is', 
       expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff }, registry)).not.toThrow();
     });
   }
+
+  // The list above says what is worth refusing by name. This says what happens
+  // to the field nobody here thought of — `roster` was one until an audit found
+  // it, and `Seat` can gain a fourth. Whatever the pruner reaches into, a
+  // payload leaves this function as a diagnostic and never as a raw TypeError.
+  it('turns a raise from below the checks into a diagnostic, whatever raised', () => {
+    const raising = loadInEnglish(MODULE);
+    const asking = raising.locations.has.bind(raising.locations);
+    raising.locations.has = () => {
+      throw new TypeError("Cannot read properties of undefined (reading 'indexOf')");
+    };
+
+    try {
+      expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { time: 5 } }, raising)).toThrow(RuntimeError);
+      expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { time: 5 } }, raising)).toThrow(/this save cannot be loaded/);
+    } finally {
+      raising.locations.has = asking;
+    }
+  });
 
   it('refuses the shapes that used to reach the loader, naming the field rather than raising from inside it', () => {
     const refuses = (diff: Record<string, unknown>) => expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff }, registry)).toThrow(/^save field/);

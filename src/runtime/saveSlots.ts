@@ -32,6 +32,31 @@ export function createSaveContext(driver: SlotDriver, now: () => number): SaveCo
   return { store: slotStore(driver, now), now, dev: false };
 }
 
+// The slots a session came out of: one it loaded, or one it was written into.
+// Autosave writes no other, which is the whole of what stops a session that
+// never read a slot from replacing what is in it — a game reopened, or one that
+// has just left dev mode. `/save` is how a session takes a slot it did not come
+// from, and it is deliberately the explicit spelling.
+//
+// Beside the context rather than on it, the way a session's internals sit
+// beside a `PlaySession`: what a driver holds is published, and this is a fact
+// about a running process that no surface renders. A context nobody built here
+// — a restart, reading the same directory back — starts having adopted nothing,
+// which is exactly what a restart has.
+const ADOPTED = new WeakMap<SaveContext, Set<string>>();
+
+function adoptedBy(save: SaveContext): Set<string> {
+  const held = ADOPTED.get(save) ?? new Set<string>();
+  ADOPTED.set(save, held);
+  return held;
+}
+
+// Whether this session is entitled to write the slot without being asked twice:
+// it came out of it, or there is nothing there to lose.
+export function adopts(save: SaveContext, slot: string): boolean {
+  return adoptedBy(save).has(slot) || save.store.read(slot) === null;
+}
+
 export function liveSlot(save: SaveContext): string {
   return save.dev ? DEV_SLOT : PLAYER_SLOT;
 }
@@ -68,19 +93,35 @@ export function autosaveDue(save: SaveContext): boolean {
   return writtenAt === null || save.now() - writtenAt >= seconds * 1000;
 }
 
-// The slot written, or nothing when the cadence said not yet. `payload` is
-// taken as a thunk because serializing a session costs more than reading a
-// stamp, and this is asked after every command and on every live tick.
-export function autosave(save: SaveContext, payload: () => string): string | null {
-  if (!autosaveDue(save)) return null;
+// What an autosave check did. `held` is the one that has something to say: the
+// cadence had elapsed and the slot was not this session's to replace.
+export type Autosaved = { kind: 'waited' } | { kind: 'wrote'; slot: string } | { kind: 'held'; slot: string };
+
+// `payload` is taken as a thunk because serializing a session costs more than
+// reading a stamp, and this is asked after every command and on every live tick.
+export function autosave(save: SaveContext, payload: () => string): Autosaved {
+  if (!autosaveDue(save)) return { kind: 'waited' };
   const slot = liveSlot(save);
+  if (!adopts(save, slot)) return { kind: 'held', slot };
   save.store.write(slot, payload());
+  adoptedBy(save).add(slot);
+  return { kind: 'wrote', slot };
+}
+
+// Said out loud, so it replaces whatever the slot holds and the session owns it
+// from here: this is the way a session takes a slot it did not come from.
+export function saveNow(save: SaveContext, payload: string): string {
+  const slot = liveSlot(save);
+  save.store.write(slot, payload);
+  adoptedBy(save).add(slot);
   return slot;
 }
 
-export function saveNow(save: SaveContext, payload: string): string {
-  save.store.write(liveSlot(save), payload);
-  return liveSlot(save);
+// A session is what a slot holds once it has been loaded out of it, and not
+// before. Told to the context rather than inferred by it, because only the
+// caller that ran the load knows whether it stood.
+export function adopted(save: SaveContext, slot: string): void {
+  adoptedBy(save).add(slot);
 }
 
 // What the player's slot held when dev mode was entered, as JSON so that "there
@@ -101,10 +142,17 @@ export function enterDev(save: SaveContext): void {
   const player = save.store.read(PLAYER_SLOT);
   // Persisted before the mode is on, so nothing done in dev can precede it.
   save.store.write(DEV_SNAPSHOT_SLOT, encodeSnapshot(player?.payload ?? null));
+  // A dev slot left behind by a session that crashed is not this session's, and
+  // is protected by the same rule everything else is.
+  adoptedBy(save).delete(DEV_SLOT);
   save.dev = true;
 }
 
-export function leaveDev(save: SaveContext): void {
+// What the player's slot holds again, which is what a session leaving dev has
+// to be put back to — null when there was no slot, and so nothing to go back
+// to. Restoring the slot is this module's; restoring the session is the
+// caller's, because loading a payload is not something a store does.
+export function leaveDev(save: SaveContext): string | null {
   if (!save.dev) throw new RuntimeError('not in dev mode');
   const snapshot = save.store.read(DEV_SNAPSHOT_SLOT);
   if (!snapshot) throw new RuntimeError(`slot ${DEV_SNAPSHOT_SLOT} is gone, so leaving dev mode cannot restore ${PLAYER_SLOT}; it is left as it is`);
@@ -121,7 +169,12 @@ export function leaveDev(save: SaveContext): void {
 
   save.store.remove(DEV_SLOT);
   save.store.remove(DEV_SNAPSHOT_SLOT);
+  adoptedBy(save).delete(DEV_SLOT);
+  // The session standing here is the one dev built, not the one the restored
+  // slot holds. Until something loads that back, this session may not write it.
+  adoptedBy(save).delete(PLAYER_SLOT);
   save.dev = false;
+  return held;
 }
 
 export interface SlotStanding {
@@ -136,6 +189,9 @@ export interface SlotStanding {
 export interface SaveReport {
   dev: boolean;
   slot: string;
+  // Whether autosave may write the live slot, which is the difference between
+  // a session that is being kept and one that is only being played.
+  adopted: boolean;
   autosaveSeconds: number;
   slots: SlotStanding[];
 }
@@ -144,6 +200,7 @@ export function saveReport(save: SaveContext): SaveReport {
   return {
     dev: save.dev,
     slot: liveSlot(save),
+    adopted: adopts(save, liveSlot(save)),
     autosaveSeconds: autosaveSeconds(save),
     slots: save.store.list().map((name) => ({ name, writtenAt: standing(save.store, name) })),
   };

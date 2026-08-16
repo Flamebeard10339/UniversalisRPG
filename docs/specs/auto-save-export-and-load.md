@@ -212,6 +212,42 @@ The player's progress survives closing the game, through a store three queued br
   the one case where erasing is worse than staying in dev: the player's slot is left exactly as it
   is and the mode stays on.
 
+- **A session writes back only the slot it came out of.** Pass 1 found two ways the branch destroyed a
+  player's save, and they are one rule missing rather than two bugs: the cadence lives in a slot and
+  outlives the process, so a game reopened found the cadence due at its first command and wrote a
+  brand-new session over an hour of play; and `leaveDev` restored the slot while the session went on
+  holding everything dev had done, so the next check wrote it straight back. Autosave now writes a slot
+  only when this session was loaded out of it, was written into it, or there is nothing in it to lose.
+  `/save` is how a session takes a slot it did not come from, and it is deliberately the explicit
+  spelling — the question the fix answers is not whether a run resumes, which is settled above, but
+  whether a run that did not resume may write over what it never read. A held autosave says so on the
+  command it happened on, because a game quietly not being saved is the worse failure.
+- **What a session has adopted sits beside its context, not on it.** `src/runtime/published.test.ts`
+  refused a `Set` on `SaveContext`, and it was right to: what a driver holds is a published surface and
+  this is a fact about a running process that no surface renders. A `WeakMap` keyed by the context, the
+  way a `PlaySession`'s internals sit beside it. It also gives the right answer for free — a context
+  built over the same directory by a restarted process has adopted nothing, which is what a restart is.
+- **Leaving dev mode puts the session back, not only the slot.** c9 says what was done in dev is gone
+  on exit, and a session still holding it while the slot no longer does is the state the leak came out
+  of. `leaveDev` hands back what the player's slot holds again and the command loads it, because loading
+  a payload is not something a store does. A snapshot of nothing has nowhere to go back to: the session
+  is left where it is and `player` stays unadopted, so nothing it does can reach a slot.
+- **Two backstops, rather than a longer list of field checks.** Pass 1 found `activeAction.roster`
+  unchecked — declared on `ActiveAction`, destructured by the pruner, and missing from a gate written
+  as a hand-listed set of fields. Adding `roster` was the too-small fix, because `Seat` can gain a
+  fourth field and nothing would force that one to be checked either. So `holds` keeps saying what is
+  worth refusing *by name*, and two conversions say what happens to everything else: `pruned` inside
+  `loadSave` turns any raise from the pruner into a diagnostic, and `standable` inside `loadSaved`
+  proves the built state can be drawn — through `sessionStatus`, which reads across fields the load
+  path wrote one at a time — before the session adopts it. `sessionStatus` rather than `view` because
+  reading the log is what drains it, and the warnings a load just wrote are owed to whoever asked.
+- **A live tick carries nothing to `end`, because it does not have to.** Pass 1 read the tick
+  discarding what the autosave check returned as a run going silent about a cadence slot it could not
+  read. The carry was written, and the mutation that removed it survived: a run that ticked ends with
+  a wait or a cancel to record, so `end` settles like any other command and asks again there, on a
+  session the answer is still true of. The test the carry was written for stays — it is what proves
+  the report does reach the end of a run — and the machinery came out.
+
 ## Open questions
 
 - Where the store interface lives, and whether the autosave decision — has the cadence elapsed,
@@ -221,3 +257,122 @@ The player's progress survives closing the game, through a store three queued br
   tell, which is the point of c1, so the first implementation decides.
 - How many player slots the game eventually offers. This branch needs the one being played and
   whatever `single-dev-mode` names; a save-slot picker is a question no record has asked yet.
+
+## Audit passes
+
+### Pass 1 — 2026-08-16
+
+- base: `878a05b24259f773e932538d176b0e2e2bd1c11f`
+- head: `886350d041e033d2b956ee5c9213593297c95984`
+- proof 1: met — Three aimed mutations on src/runtime/store.ts, all KILLED by src/runtime/store.test.ts:
+deleting `driver.remove(name)` killed by "reads, writes, removes and lists, and an absent slot is
+nothing rather than a raise"; making the store parse the payload into the envelope killed by "never
+parses a payload"; adding `import { readFileSync } from 'node:fs'` killed by "reaches neither a save
+nor the filesystem", which asserts store.ts's import list equals exactly `['./runtime']` and so
+derives the no-I/O claim rather than asserting it. Re-run:
+npm run mutate -- C:\Users\yonat\AppData\Local\Temp\audit-auto-save-export-and-load-pass1-mutations.json
+- proof 2: met — Two aimed mutations, both KILLED. `writtenAt: now()` -> `writtenAt: 0` killed by
+store.test.ts "stamps the write off the clock it was built with". Folding the stamp into the payload
+on the way to the driver killed by "stamps a payload that carries no stamp of its own, and leaves it
+carrying none", which writes one fixture into two slots 60s apart and asserts the payloads are equal
+while the stamps differ by 60_000 -- so a stamp riding inside the exported bytes cannot pass.
+- proof 3: met — `decode` normalising the payload (`parsed.payload.trim()`) is KILLED by two of the nine
+parametrised store.test.ts round-trips -- `"   "` and the mixed CRLF/LF body. The nine payloads cover
+non-JSON, empty, whitespace-only, unicode, mixed line endings and key-order/whitespace variants of a
+`# save` body, so the case a normalising store would silently pass is in the table.
+- proof 4: met — Five aimed mutations, all KILLED by scripts/play-cli.test.ts against a file-backed store.
+Deleting `if (seconds === 0) return false` killed by "writes nothing at all until somebody asks for a
+cadence" (which asserts the directory is never created). `>= seconds * 1000` -> `>= seconds` killed by
+"measures real seconds since the slot was written". Making `settle` return before the check killed by
+that same test; making it check unconditionally killed by "is not checked after a command that changed
+nothing". Deleting `autosaved(ctx)` from the live-run tick killed by "is checked on each live tick".
+The cadence lives in its own `autosave` slot holding `'30'`, asserted at the file level.
+- proof 5: met — All four spellings converge on one function: `/load <id>` and a `# test` `load:` both
+reach performDirective's 'load' arm, which now calls `loadSaved` (src/runtime/session.ts:404-419), and
+`/import` and `/restore` reach it through `importPayload`. Nothing on that path reads a clock. Two
+aimed mutations, both KILLED: adding `next.time += (Date.now() % 1000) + 1` after `loadSave` inside
+`loadSaved` killed by play-cli.test.ts "leaves the clock at what the payload holds, through a # save,
+an import and a slot"; making `loadSave` source `time` from `Date.now()` killed by save.test.ts
+"leaves state.time at exactly what the payload holds".
+- proof 6: met — `/export` returns `[serializeSession(ctx.session)]` and nothing else, and no second
+serialization exists anywhere in the diff. Three aimed mutations, all KILLED: pretty-printing the
+exported bytes killed by both "prints the bytes serializeSession returns and nothing else" and "pastes
+into /dsl save <id> unchanged, and comes back through /load" (which pastes the printed line verbatim
+into the staging command, reloads it and asserts the clock came back to 5); making `/import` a no-op
+killed by "takes its own output back through /import, to the same bytes".
+- proof 7: unmet — The three enumerated cases are delivered and mutation-proved (four aimed mutations
+KILLED: a non-transactional load, the withSaves catch removed, the absent-slot message downgraded, the
+importPayload catch removed). The clause's own leading sentence is not: a slot that parses and that
+checkSave accepts can still leave the session changed and crash instead of saying why. Reproduce with
+npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-auto-save-export-and-load-pass1-probe4.ts
+ -- a `player.slot` holding `{"version":11,"activeAction":{...,"roster":{"player":3}}}` gives
+`gateAdmits: true`, `/restore` reports `THREW OUT OF runLine -- TypeError: Cannot read properties of
+undefined (reading 'indexOf')`, and afterwards every `view()` raises the same, so the session is
+bricked with the bad state already adopted. Two independent causes: the gate is incomplete (c14), and
+`importPayload` (src/runtime/command.ts:625-633) adopts the state through `loadSaved` and only then
+calls `view()`, outside its own try -- the transaction boundary is drawn before anything proves the
+loaded state renderable, and `refused()` rethrows a non-RuntimeError past the command layer.
+- proof 8: met — c4-c7 and c9-c13 are all proved in scripts/play-cli.test.ts against `fileSaves(dir)` over
+a real temp directory, asserted by reading the `.slot` files back off disk. Deleting `writeFileSync`
+from scripts/lib/slotFile.ts is KILLED by "keeps the slots as files, which is the store a player would
+have". No browser adapter ships: "ships no browser adapter and no stub of one" walks `src/ui`
+recursively and asserts no `.ts`/`.tsx` there imports store, saveSlots or slotFile -- derived from the
+tree rather than listed, so a stub added next month fails it. Confirmed independently:
+`git diff 878a05b..886350d --stat` touches no file under src/ui.
+- proof 9: unmet — The two halves the clause names are delivered and mutation-proved: deleting the
+DEV_SNAPSHOT write is KILLED by play-cli.test.ts "snapshots the player slot on the way in and restores
+it byte-identically on the way out", and deleting the restore write is KILLED by saveSlots.test.ts
+"restores byte-identically over a slot something did overwrite". What is not delivered is "anything
+done in between ... is gone on exit". `leaveDev` restores the slot and leaves the running session
+holding everything dev did, so the next autosave writes it straight back over the player. Reproduce:
+npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-auto-save-export-and-load-pass1-probe2.ts
+ -- the player slot holds 1 gold, ten commands in dev take the session to 11, `/dev off` restores the
+slot to 1 gold (`slotRestoredOnLeaving: true`), and one ordinary command afterwards leaves
+`playerOneCommandLater` at 12 gold (`survivedOneMoreCommand: false`). The Deliverable's own words --
+"authoring cannot damage the slot being played" -- fail one command after the mode is off.
+- proof 10: met — `liveSlot` is the single answer both `saveNow` and `autosave` write through. Collapsing
+it to `return PLAYER_SLOT` is KILLED by play-cli.test.ts "snapshots the player slot on the way in and
+restores it byte-identically on the way out", which turns `/autosave 1` on inside dev, passes 60s,
+plays, and asserts the dev slot holds the current session while the player slot still holds what was
+played before entry. Confirmed independently by probe2 above: `playerWhileInDev` stays at 1 gold while
+`devSlot` reaches 11. The leak probe2 finds happens after the mode is off, which is c9's scope and
+not this clause's.
+- proof 11: met — Two aimed mutations, both KILLED by play-cli.test.ts "loses nothing when the process dies
+in dev, without an orderly exit", which never calls `/dev off` and rebuilds a second SaveContext over
+the same directory -- the restarted context reads the player slot and the snapshot back off disk.
+Holding the snapshot in memory (`void encodeSnapshot(...)`) kills it, and so does pointing writes at
+the player slot. `enterDev` writes DEV_SNAPSHOT before `save.dev = true`, so no dev write can precede
+the snapshot.
+- proof 12: met — `npm run tasks -- merge-ready` on this HEAD reports `npm test ok pass`. On top of that,
+play-cli.test.ts "creates no dev slot while the mode is off (c12)" drives save, load, restore, export
+and wait with `/autosave 1` and a clock that passes 5s between each, then asserts the directory holds
+exactly `autosave.slot` and `player.slot`; `return save.dev ? DEV_SLOT : PLAYER_SLOT` ->
+`return DEV_SLOT` is KILLED by it. saveSlots.test.ts "creates no dev slot at all while the mode is off"
+asserts the same at the store level.
+- proof 13: met — `saveReport` (src/runtime/saveSlots.ts:143-150) answers dev, live slot, cadence and every
+slot's stamp, and every line the terminal prints comes off it (`slotStanding`,
+src/runtime/command.ts:643-651). Two aimed mutations, both KILLED by play-cli.test.ts "answers which
+slot is live and whether the mode is on, rather than leaving it to be inferred (c13)": pinning
+`report.slot` to PLAYER_SLOT inside the report, and having the renderer override `dev` and
+`autosaveSeconds` with a copy of its own. A slot the store cannot read reports `writtenAt: null`
+rather than failing the whole report (saveSlots.test.ts "reports a slot it cannot read as one with no
+date").
+- proof 14: unmet — The derivation over SAVE_FIELDS is real and works: save.test.ts walks
+`Object.entries(SAVE_FIELDS)` and per field asserts `holds(sparsest)` and that `loadSave` accepts it,
+and `sparsest` is a column of a `Record<SaveField, ...>`, so a new GameState field is a compile error
+until somebody fills it in. Five aimed mutations KILLED, two of which prove the walk consults each
+field's own `holds` against that field's own sample. But the derivation stops at the top level:
+`isActiveAction` (src/runtime/save.ts:72-79) is a hand-written list of ActiveAction's fields and it
+omits `roster`, which `ActiveAction` declares (src/runtime/encounter.ts:31) and which `seatedAction`
+and `armedAction` destructure without asking. Reproduce with
+npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-auto-save-export-and-load-pass1-probe3.ts
+ -- `SAVE_FIELDS.activeAction.holds({...,roster:{player:3}})` returns true, `checkSave` and `loadSave`
+both accept it, and the `view()` that follows raises `TypeError: Cannot read properties of undefined
+(reading 'indexOf')` out of encounter.ts:138: a raw TypeError from a payload the gate that exists to
+prevent one waved through. The clause is universal over fields; the check is not universal over the
+fields of the objects those fields hold, and nothing makes it grow when ActiveAction or Seat does.
+- proof 15: met — `npm run tasks -- merge-ready` on 886350d: tsc ok, npm test ok, layer-check ok,
+audit-status ok, doctor ok (23 warnings, which the leg does not fail on), bytes ok, tree ok (nothing
+uncommitted), base ok. All six legs the clause names pass. The two legs that do not -- `spec` (one open
+member) and `clauses` (no recorded audit pass) -- are the ones this pass exists to close and are not
+among the six.

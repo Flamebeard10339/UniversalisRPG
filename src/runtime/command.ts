@@ -19,6 +19,8 @@ import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal, type ModalOption } from './modals';
 import { anId, say, says, type Said } from './said';
 import {
+  PLAYER_SLOT,
+  adopted,
   autosave,
   enterDev,
   leaveDev,
@@ -620,17 +622,21 @@ function withSaves(ctx: CommandContext, run: (save: SaveContext) => CommandResul
 
 // The one route a payload becomes this session, whether it came off a slot or
 // off the end of a typed line. `loadSaved` adopts nothing until the whole of it
-// stands, so a payload refused here leaves the session where it was.
+// stands, so a payload refused here leaves the session where it was — and the
+// view that follows is inside the same guard, because a session that could not
+// be drawn is one this command has to refuse rather than hand on half-drawn.
 function importPayload(ctx: CommandContext, payload: string, done: string): CommandResult {
   const saved = savedGameFromSerialized(payload);
   if (!saved) return noted('error', `that is not a # save body: ${JSON.stringify(payload.slice(0, 60))}`);
   try {
     loadSaved(ctx.session, saved);
+    return shown(view(ctx.session), [note('ok', done)]);
   } catch (error) {
     return refused(error);
   }
-  return shown(view(ctx.session), [note('ok', done)]);
 }
+
+const loaded = (result: CommandResult): boolean => !result.output.some((each) => each.kind === 'message' && each.tone === 'error');
 
 const SLOT_COLUMN = 14;
 
@@ -643,24 +649,45 @@ function slotAge(save: SaveContext, writtenAt: number | null): string {
 function slotStanding(save: SaveContext): string[] {
   const report = saveReport(save);
   return [
-    `writing ${report.slot}, dev mode ${report.dev ? 'on' : 'off'}`,
+    `writing ${report.slot}, dev mode ${report.dev ? 'on' : 'off'}${report.adopted ? '' : ` — ${NOT_ADOPTED}`}`,
     `autosave ${report.autosaveSeconds === 0 ? 'never' : `every ${report.autosaveSeconds}s`}`,
     ...report.slots.map((slot) => `${slot.name.padEnd(SLOT_COLUMN)} ${slotAge(save, slot.writtenAt)}`),
   ];
 }
 
+const NOT_ADOPTED = 'this session did not come out of that slot, so autosave will not write it: /restore to pick it up or /save to replace it';
+
 // Checked after a command that changed the world and on every live tick, which
-// is the whole of what makes the cadence real seconds rather than turns. A
-// cadence slot nobody can read is the one thing it has to say out loud.
+// is the whole of what makes the cadence real seconds rather than turns. Two
+// things it has to say out loud: a cadence slot nobody can read, and a slot the
+// cadence came due on that this session is not entitled to replace — silence
+// there would be a game quietly not being saved.
 function autosaved(ctx: CommandContext): ToolMessage | null {
   if (!ctx.save) return null;
   try {
-    autosave(ctx.save, () => serializeSession(ctx.session));
-    return null;
+    const outcome = autosave(ctx.save, () => serializeSession(ctx.session));
+    return outcome.kind === 'held' ? note('warn', `autosave held: slot ${outcome.slot} — ${NOT_ADOPTED}`) : null;
   } catch (error) {
     if (error instanceof RuntimeError) return note('error', `autosave: ${error.message}`);
     throw error;
   }
+}
+
+function devOn(save: SaveContext): CommandResult {
+  enterDev(save);
+  return noted('ok', `Dev mode on, writing slot ${liveSlot(save)}.`);
+}
+
+// Everything done in dev goes with the mode: the slot is put back by `leaveDev`
+// and the session is put back here, out of the same bytes. A snapshot of
+// nothing is the one case with nowhere to go back to — the session is left
+// where it is, and `player` stays unadopted, so nothing it does can reach it.
+function devOff(ctx: CommandContext, save: SaveContext): CommandResult {
+  const restored = leaveDev(save);
+  if (restored === null) return noted('ok', `Dev mode off, writing slot ${liveSlot(save)}. There was no ${PLAYER_SLOT} slot to come back to, so this session is left as it is.`);
+  const result = importPayload(ctx, restored, `Dev mode off, ${PLAYER_SLOT} restored.`);
+  if (loaded(result)) adopted(save, PLAYER_SLOT);
+  return result;
 }
 
 // --- argument parsers -----------------------------------------------------
@@ -906,9 +933,14 @@ export const COMMANDS: readonly CommandSpec[] = [
     parse: nothing,
     run: (ctx) =>
       withSaves(ctx, (save) => {
-        const slot = save.store.read(liveSlot(save));
-        if (!slot) return noted('error', `slot ${liveSlot(save)} holds nothing.`);
-        return importPayload(ctx, slot.payload, `Loaded slot ${liveSlot(save)}.`);
+        const name = liveSlot(save);
+        const slot = save.store.read(name);
+        if (!slot) return noted('error', `slot ${name} holds nothing.`);
+        const result = importPayload(ctx, slot.payload, `Loaded slot ${name}.`);
+        // Only now is this session what that slot holds, and only now may
+        // autosave write it back.
+        if (loaded(result)) adopted(save, name);
+        return result;
       }),
   }),
   define({
@@ -940,12 +972,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     argHint: 'on | off',
     summary: 'author against a slot of its own, and put the player\'s back on the way out',
     parse: (rest) => (rest === 'on' || rest === 'off' ? rest : { problem: '/dev requires on or off' }),
-    run: (ctx, mode) =>
-      withSaves(ctx, (save) => {
-        if (mode === 'on') enterDev(save);
-        else leaveDev(save);
-        return noted('ok', `Dev mode ${mode}, writing slot ${liveSlot(save)}.`);
-      }),
+    run: (ctx, mode) => withSaves(ctx, (save) => (mode === 'on' ? devOn(save) : devOff(ctx, save))),
   }),
   define({
     name: '/create-test',
@@ -1219,8 +1246,10 @@ function driveChoice(ctx: CommandContext, index: number): CommandResult {
       const progress = tickOnce(ctx, latest, elapsedMs, armed);
       latest = progress.view;
       // A run is the one stretch of play no command punctuates, so the cadence
-      // is checked here too or a long fight saves nothing until it ends. What
-      // it has to say waits for `end`, which settles like any other command.
+      // is checked here too or a long fight saves nothing until it ends. A tick
+      // has nowhere to speak and nothing to carry: a run that ticked ends with
+      // a wait or a cancel to record, so `end` settles like any other command
+      // and asks again there, on a session the answer is still true of.
       autosaved(ctx);
       if (!progress.active) over = progress;
       return progress;

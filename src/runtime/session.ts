@@ -410,6 +410,7 @@ export function loadSaved(session: PlaySession, saved: ParsedSave): PruneWarning
   // A save replaces the location and every flag at once, which is both of
   // discovery's inputs arriving without passing through a result.
   spreadDiscovery(next, registry);
+  standable(registry, next);
   // Copied in rather than swapped for: a caller partway through a `# test` is
   // holding this object, so the session that comes out of a load has to be the
   // one that went in. Every field a save carries is written, so what lands here
@@ -417,6 +418,22 @@ export function loadSaved(session: PlaySession, saved: ParsedSave): PruneWarning
   Object.assign(internals.state, next);
   internals.logCursor = Math.max(0, internals.state.log.length - warnings.length);
   return warnings;
+}
+
+// A state that loaded is not yet a state anything can be done with: the load
+// path reads a payload field by field, and the screen reads across them — a
+// seat naming an owner, a pool naming a resource. Asked here, over a session
+// nobody is playing, so a payload that gets past every check and still cannot
+// be drawn is refused while the live session is untouched. `sessionStatus`
+// rather than `view` because reading the log is what drains it, and the
+// warnings the load just wrote are owed to whoever asked for it.
+function standable(registry: Registry, state: GameState): void {
+  try {
+    sessionStatus(sessionOver(registry, state));
+  } catch (error) {
+    if (error instanceof RuntimeError) throw error;
+    throw new RuntimeError(`this save loads but cannot be played: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 export const SAID_HEAD_KEPT = 40;

@@ -6,6 +6,7 @@ import {
   DEV_SLOT,
   DEV_SNAPSHOT_SLOT,
   PLAYER_SLOT,
+  adopted,
   autosave,
   autosaveDue,
   autosaveSeconds,
@@ -32,7 +33,7 @@ describe('the cadence is a slot like any other (c4)', () => {
     expect(autosaveSeconds(save)).toBe(0);
     pass(10 * 60 * 1000);
     expect(autosaveDue(save)).toBe(false);
-    expect(autosave(save, () => 'payload')).toBeNull();
+    expect(autosave(save, () => 'payload')).toEqual({ kind: 'waited' });
     expect(save.store.list()).toEqual([]);
   });
 
@@ -40,17 +41,18 @@ describe('the cadence is a slot like any other (c4)', () => {
     const { save, pass } = turning();
     setAutosaveSeconds(save, 30);
 
-    // Nothing written yet: there is no span to be inside of.
-    expect(autosave(save, () => 'first')).toBe(PLAYER_SLOT);
+    // Nothing written yet: there is no span to be inside of, and no slot to
+    // be somebody else's.
+    expect(autosave(save, () => 'first')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
 
     pass(29_999);
     expect(autosaveDue(save)).toBe(false);
-    expect(autosave(save, () => 'second')).toBeNull();
+    expect(autosave(save, () => 'second')).toEqual({ kind: 'waited' });
     expect(save.store.read(PLAYER_SLOT)?.payload).toBe('first');
 
     pass(1);
     expect(autosaveDue(save)).toBe(true);
-    expect(autosave(save, () => 'second')).toBe(PLAYER_SLOT);
+    expect(autosave(save, () => 'second')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
     expect(save.store.read(PLAYER_SLOT)?.payload).toBe('second');
   });
 
@@ -86,6 +88,83 @@ describe('the cadence is a slot like any other (c4)', () => {
       throw new RuntimeError('slot player does not parse');
     };
     expect(autosaveDue(save)).toBe(true);
+  });
+});
+
+describe('a session writes back only what it came out of (c4, c9)', () => {
+  it('will not autosave over a slot it never read, which is what a reopened game is', () => {
+    const first = turning();
+    setAutosaveSeconds(first.save, 30);
+    first.save.store.write(PLAYER_SLOT, 'an hour of play');
+
+    // The same directory, a session later. The cadence outlives the process and
+    // the adoption does not, which is the whole of the difference.
+    const restarted: SaveContext = { ...first.save, dev: false };
+    first.pass(3_600_000);
+
+    expect(autosaveDue(restarted)).toBe(true);
+    expect(autosave(restarted, () => 'a brand new game')).toEqual({ kind: 'held', slot: PLAYER_SLOT });
+    expect(restarted.store.read(PLAYER_SLOT)?.payload).toBe('an hour of play');
+  });
+
+  it('writes it once the session has been told it came out of it', () => {
+    const { save, pass } = turning();
+    setAutosaveSeconds(save, 30);
+    save.store.write(PLAYER_SLOT, 'an hour of play');
+    const restarted: SaveContext = { ...save, dev: false };
+    pass(3_600_000);
+
+    adopted(restarted, PLAYER_SLOT);
+    expect(autosave(restarted, () => 'an hour and one command')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
+    expect(restarted.store.read(PLAYER_SLOT)?.payload).toBe('an hour and one command');
+  });
+
+  it('takes the slot outright when it is said out loud', () => {
+    const { save, pass } = turning();
+    setAutosaveSeconds(save, 30);
+    save.store.write(PLAYER_SLOT, 'an hour of play');
+    const restarted: SaveContext = { ...save, dev: false };
+
+    saveNow(restarted, 'replaced deliberately');
+    pass(30_000);
+    expect(autosave(restarted, () => 'and kept from here')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
+    expect(restarted.store.read(PLAYER_SLOT)?.payload).toBe('and kept from here');
+  });
+
+  it('holds the player slot again the moment dev mode is left', () => {
+    const { save, pass } = turning();
+    setAutosaveSeconds(save, 30);
+    saveNow(save, 'the player');
+
+    enterDev(save);
+    pass(30_000);
+    autosave(save, () => 'authoring');
+    expect(leaveDev(save)).toBe('the player');
+
+    pass(30_000);
+    expect(autosave(save, () => 'authoring, one command later')).toEqual({ kind: 'held', slot: PLAYER_SLOT });
+    expect(save.store.read(PLAYER_SLOT)?.payload).toBe('the player');
+  });
+
+  it('will not autosave over a dev slot a crashed session left behind', () => {
+    const { save, pass } = turning();
+    setAutosaveSeconds(save, 30);
+    save.store.write(DEV_SLOT, 'what the last dev session was doing');
+
+    enterDev(save);
+    pass(30_000);
+    expect(autosave(save, () => 'a different dev session')).toEqual({ kind: 'held', slot: DEV_SLOT });
+    expect(save.store.read(DEV_SLOT)?.payload).toBe('what the last dev session was doing');
+  });
+
+  it('reports which it is, so a surface draws the answer rather than guessing', () => {
+    const { save } = turning();
+    save.store.write(PLAYER_SLOT, 'somebody else');
+    const restarted: SaveContext = { ...save, dev: false };
+
+    expect(saveReport(restarted).adopted).toBe(false);
+    adopted(restarted, PLAYER_SLOT);
+    expect(saveReport(restarted).adopted).toBe(true);
   });
 });
 
@@ -195,6 +274,7 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
     expect(saveReport(save)).toEqual({
       dev: false,
       slot: PLAYER_SLOT,
+      adopted: true,
       autosaveSeconds: 30,
       slots: [
         { name: AUTOSAVE_SLOT, writtenAt: 1_000 },

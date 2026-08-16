@@ -703,6 +703,10 @@ interface Playing {
   // The same directory read by a context that never saw this session, which is
   // what a restarted process holds.
   restarted: () => SaveContext;
+  // And the whole of what a restarted process holds: a new session over a new
+  // context over the same files, which is what closing the game and opening it
+  // again amounts to.
+  reopened: () => CommandContext;
   slot: (name: string) => string | null;
 }
 
@@ -722,6 +726,10 @@ function playing(text: string = SAVING_SOURCE, driving = false): Playing {
     save,
     pass: (ms) => void (at += ms),
     restarted: () => fileSaves(dir, now),
+    reopened: () => {
+      const reopenedSession = startSession(loadInEnglish(text));
+      return newContext(reopenedSession, view(reopenedSession), { recorder: { history: [], startSave: serializeSession(reopenedSession) }, save: fileSaves(dir, now), driving });
+    },
     slot: (name) => {
       const file = path.join(dir, `${name}.slot`);
       return existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as { payload: string }).payload : null;
@@ -790,6 +798,9 @@ describe('a save that will not load changes nothing and says why (c7)', () => {
     [`{"version":${SAVE_VERSION},"time":"potato"}`, /save field time/],
     // The three the validator used to wave through into a raw TypeError.
     [`{"version":${SAVE_VERSION},"activeAction":{}}`, /save field activeAction/],
+    // And the one a hand-written list of an object's fields missed: `roster` is
+    // declared on ActiveAction and read without asking, and was not checked.
+    [`{"version":${SAVE_VERSION},"activeAction":{"ownerRef":"entity.chest","actionSlug":"open","repeating":false,"implicitTarget":0,"cadences":{"player":{"progress":0,"attemptsMade":0}},"roster":{"player":3}}}`, /save field activeAction/],
     [`{"version":${SAVE_VERSION},"journey":{"to":"camp"}}`, /save field journey/],
     [`{"version":${SAVE_VERSION},"player":{}}`, /save field player/],
   ] as const;
@@ -856,6 +867,29 @@ describe('a save that will not load changes nothing and says why (c7)', () => {
     expect(errorsOf(runLine(game.ctx, '/restore'))[0]).toMatch(/not a # save body/);
 
     expect(serializeSession(game.ctx.session)).toBe(before);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  // The other half of the same promise: a payload can load and still be one
+  // nothing can draw, and the session that adopted it would have no way back.
+  // Proved by raising out of the seam a screen reads entities through, because
+  // the shipped checks are what keep a real payload from doing it.
+  it('leaves the session standing when a payload loads but cannot be drawn', () => {
+    const game = playing();
+    runLine(game.ctx, 'use: entity.chest.open');
+    const before = serializeSession(game.ctx.session);
+
+    const entities = game.ctx.session.registry.entities;
+    const asking = entities.get.bind(entities);
+    entities.get = () => {
+      throw new TypeError("Cannot read properties of undefined (reading 'indexOf')");
+    };
+    const result = runLine(game.ctx, `/import {"version":${SAVE_VERSION},"time":9000}`);
+    entities.get = asking;
+
+    expect(errorsOf(result)[0]).toMatch(/this save loads but cannot be played/);
+    expect(serializeSession(game.ctx.session)).toBe(before);
+    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(1);
     rmSync(game.dir, { recursive: true, force: true });
   });
 
@@ -935,6 +969,21 @@ describe('autosave fires on a cadence and zero means never (c4)', () => {
     // Still running: the slot moved before anything ended it.
     expect(result.live!.tick(0).active).toBe(true);
     expect(midRun).toBe(serializeSession(game.ctx.session));
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('says what it could not do at the end of a live run, rather than swallowing it for the whole of one', () => {
+    const game = playing(SAVING_SOURCE, true);
+    runLine(game.ctx, '/autosave 2');
+    const result = armed(game.ctx, 'use:entity.chest.haul');
+    writeFileSync(path.join(game.dir, `${AUTOSAVE_SLOT}.slot`), JSON.stringify({ writtenAt: 1, payload: 'often' }), 'utf8');
+
+    for (let tick = 0; tick < 3; tick += 1) {
+      game.pass(1_000);
+      result.live!.tick(1_000);
+    }
+
+    expect(errorsOf(result.live!.end(true))[0]).toMatch(/autosave: slot autosave holds "often"/);
     rmSync(game.dir, { recursive: true, force: true });
   });
 
@@ -1050,6 +1099,109 @@ describe('dev mode moves which slot is written, through the same table (c9, c10,
     runLine(game.ctx, '/dev on');
     expect(errorsOf(runLine(game.ctx, '/dev on'))[0]).toMatch(/already in dev mode/);
     expect(errorsOf(runLine(game.ctx, '/dev sideways'))[0]).toMatch(/on or off/);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+});
+
+describe('a session writes back only what it came out of (c4, c7, c9)', () => {
+  it('does not let a reopened game overwrite the save it never read', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 30');
+    for (let each = 0; each < 3; each += 1) {
+      runLine(game.ctx, 'use: entity.chest.open');
+      game.pass(30_000);
+    }
+    runLine(game.ctx, '/save');
+    const played = game.slot(PLAYER_SLOT);
+    expect(played).toBe(serializeSession(game.ctx.session));
+
+    // Close the game, leave it closed for an hour, open it again.
+    const next = game.reopened();
+    game.pass(3_600_000);
+    const first = runLine(next, 'use: entity.chest.open');
+
+    expect(game.slot(PLAYER_SLOT)).toBe(played);
+    expect(first.output.some((each) => each.kind === 'message' && each.tone === 'warn')).toBe(true);
+
+    // And picking it up is what makes the session that slot's again.
+    expect(errorsOf(runLine(next, '/restore'))).toEqual([]);
+    expect(sessionStatus(next.session).inventory.gold).toBe(3);
+    game.pass(30_000);
+    runLine(next, 'use: entity.chest.open');
+    expect(game.slot(PLAYER_SLOT)).toBe(serializeSession(next.session));
+    expect(sessionStatus(next.session).inventory.gold).toBe(4);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('takes the slot when /save says so, over a session that came from somewhere else', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 30');
+    runLine(game.ctx, 'use: entity.chest.open');
+
+    const next = game.reopened();
+    game.pass(3_600_000);
+    runLine(next, '/save');
+    expect(game.slot(PLAYER_SLOT)).toBe(serializeSession(next.session));
+
+    game.pass(30_000);
+    runLine(next, 'use: entity.chest.open');
+    expect(game.slot(PLAYER_SLOT)).toBe(serializeSession(next.session));
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('puts the session back with the slot on the way out of dev, so nothing done in dev survives it', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 1');
+    runLine(game.ctx, 'use: entity.chest.open');
+    const played = game.slot(PLAYER_SLOT);
+    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(1);
+
+    runLine(game.ctx, '/dev on');
+    for (let each = 0; each < 10; each += 1) {
+      game.pass(2_000);
+      runLine(game.ctx, 'use: entity.chest.open');
+    }
+    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(11);
+    expect(game.slot(PLAYER_SLOT)).toBe(played);
+
+    expect(errorsOf(runLine(game.ctx, '/dev off'))).toEqual([]);
+    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(1);
+    expect(game.slot(PLAYER_SLOT)).toBe(played);
+
+    // The command the leak used to show up on.
+    game.pass(60_000);
+    runLine(game.ctx, 'use: entity.chest.open');
+    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(2);
+    expect(game.slot(PLAYER_SLOT)).toBe(serializeSession(game.ctx.session));
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('leaves the session alone when there was no slot to come back to, and writes nothing to one', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 1');
+    runLine(game.ctx, '/dev on');
+    game.pass(2_000);
+    runLine(game.ctx, 'use: entity.chest.open');
+
+    const left = runLine(game.ctx, '/dev off');
+    expect(errorsOf(left)).toEqual([]);
+    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(1);
+    expect(game.slot(PLAYER_SLOT)).toBeNull();
+
+    game.pass(60_000);
+    runLine(game.ctx, 'use: entity.chest.open');
+    // No player slot existed, so there is nothing this session could destroy.
+    expect(game.slot(PLAYER_SLOT)).toBe(serializeSession(game.ctx.session));
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('says which it is when asked', () => {
+    const game = playing();
+    runLine(game.ctx, '/save');
+    expect(linesOf(runLine(game.ctx, '/slots'))[0]).toBe('writing player, dev mode off');
+
+    const next = game.reopened();
+    expect(linesOf(runLine(next, '/slots'))[0]).toMatch(/writing player, dev mode off — this session did not come out of that slot/);
     rmSync(game.dir, { recursive: true, force: true });
   });
 });

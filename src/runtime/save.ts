@@ -64,10 +64,19 @@ function everyValue(value: unknown, holds: (held: unknown) => boolean): boolean 
 
 // What the pruner and the engine under it reach into without asking first.
 // `isObject` alone let a payload past this gate and into a `TypeError` raised
-// by the destructuring below it, which is the shape c14 forbids.
+// by the destructuring below it, which is the shape c14 forbids. These say what
+// a field is worth refusing *by name* for; what makes the clause hold for a
+// field nobody here thought of is `pruned` below, not the length of this list.
 const isActor = (value: unknown): boolean => at(value, 'resources', (held) => everyValue(held, isNumber)) && at(value, 'rateRemainders', (held) => everyValue(held, isNumber));
 
 const isCadence = (value: unknown): boolean => at(value, 'progress', isNumber) && at(value, 'attemptsMade', isInteger);
+
+const isSeat = (value: unknown): boolean => at(value, 'ownerRef', isText) && at(value, 'actionSlug', isText) && at(value, 'target', isText);
+
+const optional = (value: unknown, field: string, holds: (held: unknown) => boolean): boolean => {
+  const held = (value as Record<string, unknown>)[field];
+  return held === undefined || holds(held);
+};
 
 const isActiveAction = (value: unknown): boolean =>
   at(value, 'ownerRef', isText) &&
@@ -75,7 +84,8 @@ const isActiveAction = (value: unknown): boolean =>
   at(value, 'repeating', (held) => typeof held === 'boolean') &&
   at(value, 'implicitTarget', isNumber) &&
   at(value, 'cadences', (held) => everyValue(held, isCadence)) &&
-  ((value as { actors?: unknown }).actors === undefined || everyValue((value as { actors?: unknown }).actors, isActor));
+  optional(value, 'actors', (held) => everyValue(held, isActor)) &&
+  optional(value, 'roster', (held) => everyValue(held, isSeat));
 
 const isJourney = (value: unknown): boolean => at(value, 'to', isText) && at(value, 'legs', (held) => Array.isArray(held) && held.every(isText));
 
@@ -286,6 +296,22 @@ function checkSave(saved: ParsedSave): void {
   }
 }
 
+// The gate that exists to keep a corrupt payload out of the engine may not
+// itself be the thing that crashes on one. `checkSave` refuses what it knows to
+// look for and names the field; anything it did not think to look at reaches the
+// pruner and arrives here as a raw `TypeError` from a destructuring below. It
+// leaves as a diagnostic — which is what makes c14 hold for the field `Seat`
+// gains next month as well as for the ones written above, because a gate spelled
+// out as a list of fields is a list somebody has to keep in step with a type.
+function pruned(state: GameState, registry: Registry): PruneWarning[] {
+  try {
+    return pruneStateForRegistry(state, registry);
+  } catch (error) {
+    if (error instanceof RuntimeError) throw error;
+    throw new RuntimeError(`this save cannot be loaded: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 // Mutates `state` in place: resets every field to initialState, then applies
 export function loadSave(state: GameState, saved: ParsedSave, registry: Registry): PruneWarning[] {
   checkSave(saved);
@@ -305,7 +331,7 @@ export function loadSave(state: GameState, saved: ParsedSave, registry: Registry
     else delete target[field];
   }
   state.log = base.log;
-  const warnings = pruneStateForRegistry(state, registry);
+  const warnings = pruned(state, registry);
   for (const warning of warnings) state.log.push(warning.message);
   return warnings;
 }
