@@ -77,6 +77,7 @@
         "src/grammar/condition.ts",
         "src/grammar/dependency.ts",
         "src/grammar/hook.ts",
+        "src/grammar/list.test.ts",
         "src/grammar/list.ts",
         "src/grammar/parser.ts",
         "src/grammar/range.test.ts",
