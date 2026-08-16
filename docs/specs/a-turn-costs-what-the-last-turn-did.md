@@ -164,7 +164,12 @@ already turns a session into a replayable regression when one is wanted.
   off and read the token usage back. A small floor means the design holds and the rest of the clauses
   are worth implementing. A floor in the tens of thousands means c4 is unmet on this substrate, and the
   right move is to stop and say so rather than build eight clauses on top of it — the whole spec exists
-  because a per-turn cost of that size is what made the subagent unusable.
+  because a per-turn cost of that size is what made the subagent unusable. If the floor turns out to be
+  a configuration the SDK will not give up, the fallback before abandoning c4 is the loop's working
+  directory: a tree holding nothing but a minimal `CLAUDE.md` loads no repository instructions, no
+  skills and no commands, because there are none there to load. That is a property of where the process
+  runs rather than of what it was asked for, so it holds whatever the defaults do — and it is moot the
+  moment a turn carries no tools, because then the directory is unreachable anyway.
 - What ends a run. A turn count is the obvious bound and a usage budget is the honest one, but the
   budget figure must not reach the model's prompt (c5), so the loop holds it and the player does not.
   Which bound ships is a worker's call against a measured run; both are one line and neither changes a
