@@ -1259,6 +1259,7 @@
         "scripts/lib/layers.ts",
         "scripts/lib/sessionTiming.test.ts",
         "scripts/lib/sessionTiming.ts",
+        "scripts/lib/slotFile.test.ts",
         "scripts/lib/slotFile.ts",
         "scripts/lib/sourceFiles.ts",
         "scripts/lib/stripComments.test.ts",
