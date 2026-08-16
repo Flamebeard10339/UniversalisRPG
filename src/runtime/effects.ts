@@ -11,6 +11,7 @@ import { stockItem } from './itemInstance';
 import { openModalNamed } from './modals';
 import { localizerOf } from './localized';
 import { nextRandom } from './rng';
+import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
 import { hitChance, statValue } from './stats';
@@ -68,11 +69,31 @@ export function newSegment(state: GameState, registry: Registry, observers: read
   return { state, registry, deltas: new Map(), stopped: false, observers, causedBy: new Map() };
 }
 
-// Which names are bound to a pool crossing a threshold. Asked rather than
-// stored on the resource, because a `# resource` declares the pool's shape and
-// nothing else.
-export function eventsFor(registry: Registry, resourceId: string, trigger: EventTrigger): GameEvent[] {
-  return [...registry.events.values()].filter((event) => event.resource === resourceId && event.trigger === trigger);
+// Which names are bound to a moment. Asked rather than stored on the resource,
+// because a `# resource` declares the pool's shape and nothing else — and
+// answered from an index derived once per registry, because this is asked on
+// every swing and every pool write and a registry does not change after it is
+// built.
+const eventIndexes = new WeakMap<Registry, Map<string, GameEvent[]>>();
+
+const NO_EVENTS: readonly GameEvent[] = [];
+
+// Readonly, because what comes back is the index's own array rather than a
+// copy of it: a caller that sorted or spliced its answer would be editing what
+// every later moment reads.
+export function eventsFor(registry: Registry, resourceId: string | undefined, trigger: EventTrigger): readonly GameEvent[] {
+  let index = eventIndexes.get(registry);
+  if (index === undefined) {
+    index = new Map();
+    for (const event of registry.events.values()) {
+      const key = `${event.trigger}|${event.resource ?? ''}`;
+      const held = index.get(key);
+      if (held) held.push(event);
+      else index.set(key, [event]);
+    }
+    eventIndexes.set(registry, index);
+  }
+  return index.get(`${trigger}|${resourceId ?? ''}`) ?? NO_EVENTS;
 }
 
 export function addDelta(deltas: PoolDeltas, actorId: string, resourceId: string, milliAmount: number): void {
@@ -362,11 +383,17 @@ export function handlersFor(registry: Registry, actorId: string, eventId: string
   return (entity?.handlers ?? []).filter((handler) => handler.event === eventId).map((handler) => handler.results);
 }
 
-function fireEvents(segment: Segment, actorId: string, resourceId: string, trigger: EventTrigger, count: number): void {
+// What a moment does to whoever it happened to: the handlers that entity wrote
+// for it, and the experience the skills it carries are trained by. `amount` is
+// the moment's own quantity, in the units its row under `### Triggers` names.
+export function fireEvents(segment: Segment, actorId: string, trigger: EventTrigger, resourceId?: string, count = 1, amount = 1): void {
+  if (count <= 0) return;
   for (const event of eventsFor(segment.registry, resourceId, trigger)) {
     for (const results of handlersFor(segment.registry, actorId, event.id)) {
       applyResults(segment, results, actorId, count);
     }
+    const earned = experienceFor(segment.registry, actorEntity(segment.registry, actorId), event.id, amount);
+    if (earned.length > 0) applyResults(segment, earned, actorId, count);
   }
 }
 
@@ -386,7 +413,7 @@ export function emptyPoolNow(segment: Segment, actorId: string, resourceId: stri
   clearActorDeltas(segment.deltas, actorId);
   const previous = segment.credit;
   segment.credit = credit;
-  fireEvents(segment, actorId, resourceId, 'on empty', 1);
+  fireEvents(segment, actorId, 'on empty', resourceId);
   segment.credit = previous;
 }
 
@@ -411,12 +438,12 @@ function setPoolLevel(segment: Segment, store: PoolStore, resource: Resource, cu
   if (raw > current && max > 0 && eventsFor(segment.registry, resource.id, 'on full').length > 0) {
     const fires = Math.floor(raw / max);
     store.levels[resource.id] = raw - fires * max;
-    if (fires > 0) fireEvents(segment, store.actorId, resource.id, 'on full', fires);
+    if (fires > 0) fireEvents(segment, store.actorId, 'on full', resource.id, fires);
     return 'stored';
   }
   const clamped = Math.min(max, Math.max(0, raw));
   store.levels[resource.id] = clamped;
-  if (raw < current && current > 0 && clamped <= 0) fireEvents(segment, store.actorId, resource.id, 'on empty', 1);
+  if (raw < current && current > 0 && clamped <= 0) fireEvents(segment, store.actorId, 'on empty', resource.id);
   return clamped === raw ? 'stored' : 'clamped';
 }
 

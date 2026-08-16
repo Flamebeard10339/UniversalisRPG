@@ -10,7 +10,7 @@ import { actionAddress, ActionDeclaration, actionTextKey, actionTextOwner } from
 import { AuthoredEntity, Entity, EntityBlock, entitySchema, Handler, isHandlerBlock } from './entity';
 import { Faction, factionSchema, WORLD_FACTION } from './faction';
 import { Flag, flagSchema } from './flag';
-import { GameEvent, eventSchema } from './event';
+import { GameEvent, eventSchema, triggerArityProblem } from './event';
 import { Item, itemRoleProblem, itemSchema } from './item';
 import {
   actionSlugProblem,
@@ -453,8 +453,9 @@ function applySection(registry: Registry, section: ModuleSection, context: Hydra
     }
     case 'event': {
       const event = hydrateSection(section.value as Authored<GameEvent>, eventSchema, context);
-      if (!event.resource) throw new DslError(`# event ${event.id} requires a resource: to watch`);
       if (!event.trigger) throw new DslError(`# event ${event.id} requires a trigger:`);
+      const arity = triggerArityProblem(event);
+      if (arity) throw new DslError(`# event ${event.id}: ${arity}`);
       // An entity answers an event by writing `on <its name>:`, and a hook has
       // claimed one of those labels. Refused where the name is bound, because
       // the entity that would have handled it never sees a problem — it gets a
@@ -715,6 +716,7 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
       const faction = entity.faction.filter((named) => referencesLoaded(() => visit('faction', named, `# entity ${id} faction:`)));
       const allies = entity.allies.filter((entry) => referencesLoaded(() => visit('entity', entry.entity, `# entity ${id} allies:`)));
       const passives = entity.passives.filter((named) => referencesLoaded(() => visit('passive', named, `# entity ${id} passives:`)));
+      const skills = entity.skills.filter((named) => referencesLoaded(() => visit('skill', named, `# entity ${id} skills:`)));
       const onHit = pruneHook(entity.onHit, `# entity ${id} on hit:`, visit);
       const whenHit = pruneHook(entity.whenHit, `# entity ${id} when hit:`, visit);
       if (
@@ -724,10 +726,28 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
         faction.length !== entity.faction.length ||
         allies.length !== entity.allies.length ||
         passives.length !== entity.passives.length ||
+        skills.length !== entity.skills.length ||
         onHit !== entity.onHit ||
         whenHit !== entity.whenHit
       ) {
-        registry.entities.set(id, { ...entity, stats, blocks, uses, faction, allies, passives, onHit, whenHit });
+        registry.entities.set(id, { ...entity, stats, blocks, uses, faction, allies, passives, skills, onHit, whenHit });
+        changed = true;
+      }
+    }
+
+    // Rebuilt where a grant's event went with an absent module, and dropped
+    // where the stat it raises did: `per-level:` needs a `stat-id:` to raise,
+    // so a skill that outlived its stat is one the build would refuse anyway.
+    for (const [id, skill] of registry.skills) {
+      const statId = skill['stat-id'];
+      if (statId !== undefined && !referencesLoaded(() => visit('stat', statId, `# skill ${id} stat-id:`))) {
+        dropContent(registry, 'skill', id, pruned, [registry.skills]);
+        changed = true;
+        continue;
+      }
+      const grants = skill.grants.filter((grant) => referencesLoaded(() => visit('event', grant.event, `# skill ${id} gain`)));
+      if (grants.length !== skill.grants.length) {
+        registry.skills.set(id, { ...skill, grants });
         changed = true;
       }
     }
