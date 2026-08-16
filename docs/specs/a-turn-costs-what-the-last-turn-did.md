@@ -42,8 +42,16 @@ Proof:
   proof: vitest scripts/playbot.test.ts
 - [c4] **A turn carries the loop's own prompt and nothing the harness would add to it.** The agent runs
   with this branch's system prompt in place of the harness's rather than appended to it, with no
-  built-in tools, and with no automatic load of any `.claude/` directory — not this repository's
-  `CLAUDE.md`, not its skills, commands or agents, and not the user-level ones. This is the floor that
+  built-in tools, with no automatic load of any `.claude/` directory — not this repository's
+  `CLAUDE.md`, not its skills, commands or agents, and not the user-level ones — and from a working
+  directory outside this repository. That last one is not implied by the others and is the opt-out this
+  clause originally missed: measured 2026-08-15, a turn with settings and tools both off still named
+  this project, its path, `CLAUDE.md`, and a convention held nowhere but the author's user-level
+  memory, because the working directory, git status and auto-memory ride a section that a custom
+  string system prompt does not remove and the SDK's own switch for stripping it is documented not to
+  apply to one. An empty directory removes all of it and takes the floor from 932 tokens to 296, so the
+  proof derives its subject rather than listing it: the resolved working directory of a turn does not
+  lie under the repository root. This is the floor that
   makes c3's flatness worth having: a turn that inherits the coding harness's system prompt, its tool
   schemas and this repository's own instructions is tens of thousands of tokens before the game is
   described, which is exactly the measured cost of the subagent this loop replaces. It is also a
