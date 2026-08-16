@@ -1,5 +1,5 @@
 import { DslError } from '../grammar/parser';
-import { RawSection } from '../grammar/structure';
+import { RawSection, sectionParser } from '../grammar/structure';
 
 export interface ParsedSave {
   version: number;
@@ -7,7 +7,7 @@ export interface ParsedSave {
 }
 
 // The body is one line of JSON; the grammar has no multi-line support.
-export function parseSaveSection(section: RawSection): { id: string; saved: ParsedSave } {
+export const parseSaveSection = sectionParser((section: RawSection): { id: string; saved: ParsedSave } => {
   if (!section.id) throw new DslError('# save requires an id', section.span);
 
   const raw = section.body.map((line) => line.text).join('');
@@ -25,4 +25,4 @@ export function parseSaveSection(section: RawSection): { id: string; saved: Pars
   if (typeof version !== 'number') throw new DslError(`# save ${section.id}: requires a numeric version`, section.span);
 
   return { id: section.id, saved: { version, diff } };
-}
+});

@@ -1,6 +1,6 @@
 import { Condition, condition } from '../grammar/condition';
 import { DslError, parseWhole } from '../grammar/parser';
-import { RawSection } from '../grammar/structure';
+import { RawSection, sectionParser, hasBlock } from '../grammar/structure';
 import { Direction, DIRECTIONS, Hex, parseHexKey, PlaneNode } from './hex';
 
 export type Directive =
@@ -246,12 +246,12 @@ export function parseDirectiveLine(text: string): Directive | null {
   return null;
 }
 
-export function parseTest(section: RawSection): Test {
+export const parseTest = sectionParser((section: RawSection): Test => {
   if (!section.id) throw new DslError('# test requires an id', section.span);
   const directives: Directive[] = [];
 
   for (const line of section.body) {
-    if (line.children.length > 0) throw new DslError(`# test directives are single-line: ${line.text}`, line.span);
+    if (hasBlock(line)) throw new DslError(`# test directives are single-line: ${line.text}`, line.span);
 
     const directive = parseDirectiveLine(line.text);
     if (!directive) throw new DslError(`unexpected line in # test: ${JSON.stringify(line.text)}`, line.span);
@@ -259,4 +259,4 @@ export function parseTest(section: RawSection): Test {
   }
 
   return { id: section.id, directives };
-}
+});

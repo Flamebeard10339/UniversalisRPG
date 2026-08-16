@@ -2,7 +2,7 @@ import { Condition, condition } from './condition';
 import { ListParser } from './list';
 import { Cursor, DslError, Parser, Span, requireEnd } from './parser';
 import { Range, scaleRange } from './range';
-import { RawLine } from './structure';
+import { RawLine, hasBlock, requireNoBlock, takeBlock } from './structure';
 import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantified, refuseRange, REFERENCE } from './values';
 
 // Whose pool an amount moves between. `me` is the character the result is read
@@ -133,15 +133,15 @@ function wrapperBody(cursor: Cursor, line: RawLine | null, what: string, span: S
   cursor.take(/[ \t]*/);
   if (!cursor.done) {
     const inline = parseResults(cursor, null);
-    if (line !== null && line.children.length > 0) throw new DslError(`${what} is written inline and as a block; give it one`, span);
+      if (line !== null && hasBlock(line)) throw new DslError(`${what} is written inline and as a block; give it one`, span);
     return inline;
   }
-  if (line === null || line.children.length === 0) throw new DslError(`${what} has an empty body`, span);
+  if (line === null || !hasBlock(line)) throw new DslError(`${what} has an empty body`, span);
   // The unchecked reader: a wrapper's body is part of the list its opener
   // belongs to, and `refuseParty` at that list's entry point already walks into
   // it. Reading it through the checked one would refuse a party phrase inside a
   // hook's own `1 in 20:`.
-  return readResultBlock(line.children);
+  return readResultBlock(takeBlock(line));
 }
 
 const WEIGHT = /\d+x(?![\w-])/;
@@ -175,7 +175,7 @@ function parseRow(line: RawLine): DropRow {
   // The one spelling for an empty body, which is the one empty case the grammar
   // cannot otherwise write.
   if (cursor.take(/nothing[ \t]*$/) !== null) {
-    if (line.children.length > 0) throw new DslError(`${where} says nothing and then holds a block`, line.span);
+    if (hasBlock(line)) throw new DslError(`${where} says nothing and then holds a block`, line.span);
     return requires === undefined ? { weight, results: [] } : { weight, requires, results: [] };
   }
   const results = wrapperBody(cursor, line, where, line.span);
@@ -185,8 +185,8 @@ function parseRow(line: RawLine): DropRow {
 function parseOneOf(cursor: Cursor, line: RawLine | null, span: Span): ActionResult {
   cursor.take(ONE_OF);
   requireEnd(cursor, 'one of:');
-  if (line === null || line.children.length === 0) throw new DslError('one of: needs indented rows, as in `5x: give: 20 coins`', span);
-  return { kind: 'one-of', rows: line.children.map(parseRow) };
+  if (line === null || !hasBlock(line)) throw new DslError('one of: needs indented rows, as in `5x: give: 20 coins`', span);
+  return { kind: 'one-of', rows: takeBlock(line).map(parseRow) };
 }
 
 function parseChance(cursor: Cursor, line: RawLine | null, span: Span): ActionResult {
@@ -313,9 +313,7 @@ function readResultLine(line: RawLine): ActionResult[] {
   requireEnd(cursor, 'a result');
   // A leaf line has no block to hold; the alternative is the silent drop that
   // this repo has already been bitten by once.
-  if (line.children.length > 0 && !results.some((result) => nestedResults(result).length > 0)) {
-    throw new DslError(`${JSON.stringify(line.text)} takes no indented block`, line.span);
-  }
+  if (!results.some((result) => nestedResults(result).length > 0)) requireNoBlock(line);
   return results;
 }
 

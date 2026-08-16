@@ -1,7 +1,7 @@
 // Generic engine: field value-types are erased internally via the AnyFields casts; the rejected alternative was a hand-written parser per section kind.
 import { Cursor, DslError, Parser, Span } from './parser';
 import { ListParser } from './list';
-import { RawLine, RawSection } from './structure';
+import { RawLine, RawSection, hasBlock, sectionParser, takeBlock } from './structure';
 
 // What a default may know beyond the section it is filling in. A field-level
 // default cannot see the module its section came from, and c5 turns on that
@@ -56,13 +56,21 @@ export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H
 // caller that does not know the kind can act on.
 export interface AnySchema {
   kind: string;
-  fields: Record<string, { parser: unknown }>;
+  fields: Record<string, { parser: unknown; keyword?: string }>;
+  clauses?: string;
+  bare?: string;
   entries?: { into: string };
 }
 
 const isListParser = (parser: unknown): boolean => typeof parser === 'object' && parser !== null && 'element' in parser;
 
 export const isListField = (schema: AnySchema, name: string): boolean => isListParser(schema.fields[name]?.parser);
+
+// A field the section reaches by a line's position — as its clause list or as
+// its bare value — rather than by a `name:` label. Asked by the line reader
+// below and by anything walking the schemas, so the two cannot disagree about
+// which fields have no keyword form.
+export const isPositionalField = (schema: Pick<AnySchema, 'clauses' | 'bare'>, name: string): boolean => name === schema.clauses || name === schema.bare;
 
 // What a `+key:`/`-key:` line contributes, kept apart from a bare assignment so
 // that merging can tell "add these" from "this is now the whole list".
@@ -102,6 +110,10 @@ function parseBlock(parser: Parser<unknown>, children: RawLine[], span: Span): u
 }
 
 export function parseSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
+  return sectionParser((read: RawSection) => readSection(read, schema))(section);
+}
+
+function readSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
   if (section.kind !== schema.kind) throw new DslError(`expected # ${schema.kind}, got # ${section.kind}`, section.span);
   if (!section.id) throw new DslError(`# ${schema.kind} requires an id`, section.span);
 
@@ -152,7 +164,7 @@ function typoOf(key: string, known: readonly string[]): string | undefined {
 // is the only one that could take it — and a key that read its value inline
 // would drop it without a word. Asked after the value is read, because what
 // remains on the line is what says whether another key follows.
-const claimsTheBlock = (cursor: Cursor, line: RawLine): boolean => line.children.length > 0 && cursor.rest().replace(/[ \t,]+$/, '') === '';
+const claimsTheBlock = (cursor: Cursor, line: RawLine): boolean => hasBlock(line) && cursor.rest().replace(/[ \t,]+$/, '') === '';
 
 function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, keywords: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
@@ -165,7 +177,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
     const key = heading?.key;
     const op = heading?.op?.trim() as '+' | '-' | undefined;
     const name = key !== undefined ? byKeyword[key] : undefined;
-    const labelsBareField = name !== undefined && (name === clauses || name === bare);
+    const labelsBareField = name !== undefined && isPositionalField({ clauses, bare }, name);
     if (key !== undefined && !labelsBareField && (name !== undefined || entries !== undefined)) {
       const keySpan = { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + (heading!.op?.length ?? 0) + key.length) };
       const meantField = name !== undefined ? undefined : typoOf(key, [...Object.keys(byKeyword), ...keywords]);
@@ -179,7 +191,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         if (op !== undefined && !isListParser(fields[name].parser)) throw new DslError(`${kind} field ${key} is not a list, so it cannot take ${op}`, keySpan);
 
         const inline = !cursor.done;
-        const value = inline ? fields[name].parser.parse(cursor) : line.children.length > 0 ? parseBlock(fields[name].parser, line.children, line.span) : undefined;
+        const value = inline ? fields[name].parser.parse(cursor) : hasBlock(line) ? parseBlock(fields[name].parser, takeBlock(line), line.span) : undefined;
         if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} field ${key} is written inline and as a block; give it one`, keySpan);
         // an empty value with no block is unspecified: leave the field absent
         if (value === undefined) continue;
@@ -193,7 +205,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         ((authored[entries!.into] ??= []) as object[]).push({ label: key, removed: true });
       } else {
         const inline = !cursor.done;
-        const body = inline ? entries!.body.parse(cursor, key) : entries!.body.parseBlock(line.children, key);
+        const body = inline ? entries!.body.parse(cursor, key) : entries!.body.parseBlock(takeBlock(line), key);
         if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} ${key}: is written inline and as a block; give it one`, keySpan);
         ((authored[entries!.into] ??= []) as object[]).push({ label: key, ...body });
       }

@@ -4,7 +4,7 @@ import { declaredId } from './entity';
 import { Namespace } from './namespace';
 import { DslError } from '../grammar/parser';
 import { humanizeEn, lastSegment } from '../grammar/values';
-import { RawSection } from '../grammar/structure';
+import { RawSection, sectionParser } from '../grammar/structure';
 
 // An action written once and named by everything that performs it. Its `label`
 // is its title, which is what an inline action's label already is, so both forms
@@ -47,11 +47,10 @@ export const actionTextKey = (owner: ActionTextOwner): string => localeKey(owner
 
 const TITLE = /^title:[ \t]*/;
 
-export function parseActionSection(section: RawSection): ActionDeclaration {
+export const parseActionSection = sectionParser((section: RawSection): ActionDeclaration => {
   if (!section.id) throw new DslError('# action requires an id', section.span);
   const titles = section.body.filter((line) => TITLE.test(line.text));
   if (titles.length > 1) throw new DslError(`# action ${section.id}: title is defined more than once`, titles[1].span);
-  if (titles[0]?.children.length) throw new DslError(`# action ${section.id}: title takes no indented block`, titles[0].span);
   const label = titles[0] ? titles[0].text.replace(TITLE, '') : humanizeEn(section.id);
   const body = section.body.filter((line) => !TITLE.test(line.text));
   const generated = titles[0] ? {} : { generatedLabel: true as const };
@@ -61,4 +60,4 @@ export function parseActionSection(section: RawSection): ActionDeclaration {
   const problem = assembledActionProblem(declared);
   if (problem) throw new DslError(`# action ${section.id}: ${actionProblem(label, problem)}`, section.span);
   return declared;
-}
+});
