@@ -98,6 +98,16 @@ same text. A claim that no route reaches a parser except through the table is a 
 and it was already false. Wrapped at the definition there is no unwrapped export to reach, and the
 fifteen schema kinds are covered by one wrapper inside `parseSection`.
 
+**That each parser carries the demand is derived, not remembered.** Wrapping at the definition site
+closed the reach-past route and opened a forget-to-wrap one: pass 4 removed four of the eight wraps
+with the whole suite green, and built a new kind that walked through the corpus walk's own
+`refusesABody` excuse — parser unwrapped, block dropped, six of six tests green. A probe cannot reach
+a kind whose parser forgets, because a probe needs a body that parser accepts and a new kind can be
+excused for having none. So `sectionParser` records what it wraps and `answersForItsBlocks` is asked
+of every kind in `SECTION_KINDS`, which is the parser table itself. The wrapping is still written by
+hand; that it happened is not, and the check does not depend on finding a droppable line. Pass 4's
+reproduction now fails and names the kind.
+
 **Forgetting is refused, not dropped.** `children` stays an ordinary field and `takeBlock` is the one
 act that records a reader consumed a block, so a consumer that forgets to call it has its line
 refused rather than its author's words discarded. The first shape of this guard recorded any property

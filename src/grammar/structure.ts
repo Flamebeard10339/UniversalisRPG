@@ -59,12 +59,22 @@ export function requireBlocksRead(lines: readonly RawLine[]): void {
 // caller to reach past the table for — a migration script reading `# save`
 // fixtures did exactly that.
 export function sectionParser<S extends RawSection, T>(parse: (section: S) => T): (section: S) => T {
-  return (section) => {
+  const answering = (section: S): T => {
     const value = parse(section);
     requireBlocksRead(section.body);
     return value;
   };
+  ANSWERING.add(answering);
+  return answering;
 }
+
+const ANSWERING = new WeakSet<(section: never) => unknown>();
+
+// Whether a function is a section parser in the sense above. Asked of every
+// kind the loader can parse, so that "each parser carries the demand" is
+// derived from the table rather than from eight people remembering to wrap
+// theirs — which is the failure this repository names first.
+export const answersForItsBlocks = (parse: (section: never) => unknown): boolean => ANSWERING.has(parse);
 
 export function splitSections(source: string): RawSection[] {
   const sections: RawSection[] = [];

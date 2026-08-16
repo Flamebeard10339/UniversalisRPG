@@ -1,9 +1,9 @@
 import { readFileSync, readdirSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
-import { SECTION_KINDS, parseModule } from './module';
+import { SECTION_KINDS, parseModule, parserFor } from './module';
 import { parseSaveSection } from './saveSection';
-import { splitSections } from '../grammar/structure';
+import { answersForItsBlocks, splitSections } from '../grammar/structure';
 
 // A line nobody wrote, indented under one somebody did. Whatever the parser
 // above it reads, it cannot read this and call it what the author meant.
@@ -119,6 +119,22 @@ describe('an indented block under a line whose reader never asked for one', () =
     const saveSection = (...lines: string[]) => splitSections(lines.join('\n'))[0];
     expect(() => parseSaveSection(saveSection('# save start', '{"version":11}', '  ' + INTRUDER))).toThrow(/takes no indented block/);
     expect(() => parseSaveSection(saveSection('# save start', '{"version":11}'))).not.toThrow();
+  });
+
+  // The one check that does not depend on finding a droppable line: every kind
+  // the loader can parse is answered for by a parser that makes the demand.
+  // Pass 3 moved that demand off the parser table and onto eight hand-written
+  // wraps, and pass 4 measured four of them removable with the whole suite
+  // still green — a kind whose parser forgets to wrap has no probe that can
+  // reach it, because the probe needs a body the parser accepts and a new kind
+  // can be excused for having none.
+  it('is demanded by every kind the loader can parse, whoever wrote its parser', () => {
+    const checked = [...SECTION_KINDS];
+    // Held against the corpus route rather than against itself: every kind the
+    // walk above reached, or excused, has to be one of the subjects here.
+    const reached = new Set([...probes.map((probe) => probe.kind), ...UNPROBED_BY_CONTENT.map((entry) => entry.kind)]);
+    expect([...reached].filter((kind) => !checked.includes(kind))).toEqual([]);
+    expect(checked.filter((kind) => !answersForItsBlocks(parserFor(kind)!))).toEqual([]);
   });
 
   // Refusing everything satisfies the first test, and so does a corpus that

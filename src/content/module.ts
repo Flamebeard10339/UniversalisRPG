@@ -20,7 +20,7 @@ import { AnySchema, parseAnySection } from '../grammar/section';
 import { skillSchema } from './skill';
 import { slotSchema } from './slot';
 import { statSchema } from './stat';
-import { RawSection, splitSections } from '../grammar/structure';
+import { RawSection, sectionParser, splitSections } from '../grammar/structure';
 import { parseTest } from './test';
 import { variableSchema } from './variable';
 
@@ -67,9 +67,14 @@ const BESPOKE: Record<string, (section: RawSection) => object> = {
 };
 
 const PARSERS: Record<string, (section: RawSection) => object> = {
-  ...Object.fromEntries(Object.entries(SCHEMAS).map(([kind, schema]) => [kind, (section: RawSection) => parseAnySection(section, schema)])),
+  ...Object.fromEntries(Object.entries(SCHEMAS).map(([kind, schema]) => [kind, sectionParser((section: RawSection) => parseAnySection(section, schema))])),
   ...BESPOKE,
 };
+
+// The table as something to ask questions of. `blocks.test.ts` asks whether
+// every kind's parser answers for the blocks it was handed, which is what
+// keeps that from being eight hand-written wraps nobody checks.
+export const parserFor = (kind: string): ((section: RawSection) => object) | undefined => PARSERS[kind];
 
 export const SECTION_KINDS: readonly string[] = Object.keys(PARSERS);
 
