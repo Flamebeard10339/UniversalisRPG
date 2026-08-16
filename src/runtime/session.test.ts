@@ -257,7 +257,7 @@ starting
 // has no `outpost` for the player to be standing in, no `relic` for them to be
 // holding and no `charted` for them to be carrying, and it opens a road out of
 // the starting location to somewhere the first did not have at all.
-const ADOPT_BEFORE = ['# location camp', 'x: 0, y: 0', 'starting', '', '# location outpost', 'x: 1, y: 0', '', '# item relic', 'title: Relic', '', '# flag charted'].join('\n');
+const ADOPT_BEFORE = ['# location camp', 'x: 0, y: 0', 'starting', '', '# location outpost', 'x: 1, y: 0', 'entities:', '  watcher', '', '# entity watcher', 'title: Watcher', 'poke:', '  say: Nothing here.', '', '# item relic', 'title: Relic', '', '# flag charted'].join('\n');
 const ADOPT_AFTER = ['# location camp', 'x: 0, y: 0', 'starting', 'adjacent:', '  tower', '', '# location tower', 'title: Tower', 'x: 0, y: 1'].join('\n');
 
 describe('adoptRegistry: content changed under a live session', () => {
@@ -286,6 +286,23 @@ describe('adoptRegistry: content changed under a live session', () => {
     const flags = (JSON.parse(serializeSession(session)) as { flags: Record<string, boolean> }).flags;
     expect(flags['tower.discovered']).toBe(true);
     expect(flags['outpost.discovered']).toBeUndefined();
+  });
+
+  it('publishes its own prunes and not a line the session had said but nobody had read', () => {
+    const session = primed(loadInEnglish(ADOPT_BEFORE), { location: 'outpost', inventory: { relic: 1 }, flags: { charted: true } });
+    view(session);
+
+    // A line said and not yet read: `applyDirective` writes the log and `view`
+    // is what drains it, so not calling one leaves the line standing. Nothing a
+    // command can do reaches this — every route through `runCommand` that says
+    // anything views before it answers — which is why the witness for the log
+    // half of "a reload leaves the session identical" is here and not there.
+    applyDirective(session, { kind: 'use', obj: 'entity', objId: 'watcher', actionId: 'poke' });
+    adoptRegistry(session, loadInEnglish(ADOPT_AFTER));
+    const after = view(session);
+
+    expect(after.said.some((line) => line.includes('Nothing here.'))).toBe(false);
+    expect(after.said.some((line) => line.includes('relic'))).toBe(true);
   });
 
   it('says nothing and moves nothing when the registry resolves everything the state names', () => {
