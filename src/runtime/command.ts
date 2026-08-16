@@ -19,6 +19,7 @@ import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal, type ModalOption } from './modals';
 import { anId, say, says, type Said } from './said';
 import {
+  DEV_SLOT,
   PLAYER_SLOT,
   adopted,
   autosave,
@@ -30,6 +31,7 @@ import {
   saveReport,
   setAutosaveSeconds,
   type SaveContext,
+  type SlotWrites,
 } from './saveSlots';
 import {
   adoptRegistry,
@@ -649,13 +651,19 @@ function slotAge(save: SaveContext, writtenAt: number | null): string {
 function slotStanding(save: SaveContext): string[] {
   const report = saveReport(save);
   return [
-    `writing ${report.slot}, dev mode ${report.dev ? 'on' : 'off'}${report.adopted ? '' : ` — ${NOT_ADOPTED}`}`,
+    `writing ${report.slot}, dev mode ${report.dev ? 'on' : 'off'}${WHY_NOT[report.writes]}`,
     `autosave ${report.autosaveSeconds === 0 ? 'never' : `every ${report.autosaveSeconds}s`}`,
     ...report.slots.map((slot) => `${slot.name.padEnd(SLOT_COLUMN)} ${slotAge(save, slot.writtenAt)}`),
   ];
 }
 
 const NOT_ADOPTED = 'this session did not come out of that slot, so autosave will not write it: /restore to pick it up or /save to replace it';
+
+const UNREADABLE_SLOT = 'that slot holds bytes nothing here can read, so autosave leaves them alone: look at the file, or /save to replace it';
+
+// One sentence per answer the session gives, so the terminal renders what it
+// was told rather than working it out a second time.
+const WHY_NOT: Record<SlotWrites, string> = { yes: '', 'not-ours': ` — ${NOT_ADOPTED}`, unreadable: ` — ${UNREADABLE_SLOT}` };
 
 // Checked after a command that changed the world and on every live tick, which
 // is the whole of what makes the cadence real seconds rather than turns. Two
@@ -666,7 +674,9 @@ function autosaved(ctx: CommandContext): ToolMessage | null {
   if (!ctx.save) return null;
   try {
     const outcome = autosave(ctx.save, () => serializeSession(ctx.session));
-    return outcome.kind === 'held' ? note('warn', `autosave held: slot ${outcome.slot} — ${NOT_ADOPTED}`) : null;
+    if (outcome.kind === 'held') return note('warn', `autosave held: slot ${outcome.slot} — ${NOT_ADOPTED}`);
+    if (outcome.kind === 'unreadable') return note('warn', `autosave held: slot ${outcome.slot} — ${UNREADABLE_SLOT}`);
+    return null;
   } catch (error) {
     if (error instanceof RuntimeError) return note('error', `autosave: ${error.message}`);
     throw error;
@@ -678,26 +688,28 @@ function devOn(save: SaveContext): CommandResult {
   return noted('ok', `Dev mode on, writing slot ${liveSlot(save)}.`);
 }
 
-// Everything done in dev goes with the mode: the slot goes back to the snapshot
-// and the session goes back out of the same bytes. The session first, and the
-// slots only once it stood — a snapshot this build can no longer read would
-// otherwise leave the mode off, the dev slot deleted and an author's work in
-// memory with nowhere to put it.
-//
-// A snapshot of nothing is the one case with nowhere to go back to. The session
-// is left where it is and `player` is withheld, so what dev built cannot reach
-// the slot a player would open next.
+// Everything done in dev goes with the mode: the player's slot goes back to the
+// snapshot, and the session goes back out of the same bytes when they will load.
+// The slot goes back either way — putting bytes back where they were cannot
+// fail, and a snapshot this build can no longer read must not be a reason to
+// strand somebody in dev with no command that leaves it. What a failed restore
+// costs is the session, which stays where it is and is told so; `player` is
+// withheld, so what dev built cannot reach the slot a player would open next,
+// and the dev slot is still there to `/restore` from.
 function devOff(ctx: CommandContext, save: SaveContext): CommandResult {
   const snapshot = devSnapshot(save);
   if (snapshot === null) {
     leaveDev(save, null);
     return noted('ok', `Dev mode off, writing slot ${liveSlot(save)}. There was no ${PLAYER_SLOT} slot to come back to, so this session is left as it is and will not be written to one.`);
   }
+
   const result = importPayload(ctx, snapshot, `Dev mode off, ${PLAYER_SLOT} restored.`);
-  if (!loaded(result)) return result;
   leaveDev(save, snapshot);
-  adopted(save, PLAYER_SLOT);
-  return result;
+  if (loaded(result)) {
+    adopted(save, PLAYER_SLOT);
+    return result;
+  }
+  return { ...result, output: [...result.output, note('warn', `Dev mode off and slot ${PLAYER_SLOT} is back as it was, but this session could not be put back with it, so it will not be written there. Slot ${DEV_SLOT} still holds what dev did.`)] };
 }
 
 // --- argument parsers -----------------------------------------------------

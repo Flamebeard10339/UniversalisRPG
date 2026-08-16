@@ -1050,10 +1050,12 @@ describe('dev mode moves which slot is written, through the same table (c9, c10,
     // c10: a session spent authoring cannot appear in the file being played.
     expect(game.slot(PLAYER_SLOT)).toBe(played);
 
+    const authored = game.slot(DEV_SLOT);
     runLine(game.ctx, '/dev off');
     expect(game.slot(PLAYER_SLOT)).toBe(played);
-    expect(game.slot(DEV_SLOT)).toBeNull();
     expect(game.slot(DEV_SNAPSHOT_SLOT)).toBeNull();
+    // What dev wrote is an author's work and outlives the mode.
+    expect(game.slot(DEV_SLOT)).toBe(authored);
     rmSync(game.dir, { recursive: true, force: true });
   });
 
@@ -1212,22 +1214,46 @@ describe('a session writes back only what it came out of (c4, c7, c9)', () => {
     rmSync(game.dir, { recursive: true, force: true });
   });
 
-  it('stays in dev, with every slot where it was, when the snapshot cannot be loaded back', () => {
+  it('puts the slot back on the way out even when something spoiled it while dev was on', () => {
     const game = playing();
     runLine(game.ctx, '/save');
     const played = game.slot(PLAYER_SLOT);
     runLine(game.ctx, '/dev on');
     runLine(game.ctx, 'use: entity.chest.open');
-    runLine(game.ctx, '/save');
+    // Dev writes no player slot, so this is another process or a hand — and
+    // whatever it is, the snapshot is still what was there when dev began.
+    writeFileSync(path.join(game.dir, `${PLAYER_SLOT}.slot`), '{{{ truncated', 'utf8');
 
-    // A snapshot this build can no longer read, which is what a SAVE_VERSION
-    // bump between writing it and leaving would be.
-    writeFileSync(path.join(game.dir, `${DEV_SNAPSHOT_SLOT}.slot`), JSON.stringify({ writtenAt: 1, payload: JSON.stringify(`{"version":${SAVE_VERSION + 900}}`) }), 'utf8');
+    expect(errorsOf(runLine(game.ctx, '/dev off'))).toEqual([]);
+    expect(game.slot(PLAYER_SLOT)).toBe(played);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('leaves dev with the slot back and the session where it is when the snapshot will not load', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 1');
+    // A slot from a build this one can no longer read: the envelope is fine,
+    // and the save inside it is a version this engine refuses. Dev mode can be
+    // entered on it, because snapshotting bytes does not read them.
+    const played = `{"version":${SAVE_VERSION + 900}}`;
+    game.write(PLAYER_SLOT, played);
+
+    runLine(game.ctx, '/dev on');
+    runLine(game.ctx, 'use: entity.chest.open');
+    runLine(game.ctx, '/save');
+    const authored = game.slot(DEV_SLOT);
 
     const left = runLine(game.ctx, '/dev off');
     expect(errorsOf(left)[0]).toMatch(/version/);
-    expect(linesOf(runLine(game.ctx, '/slots'))[0]).toBe('writing dev, dev mode on');
-    expect(game.slot(DEV_SLOT)).toBe(serializeSession(game.ctx.session));
+    // Out of the mode rather than stuck in it, the slot back as it was, and
+    // the authoring still on disk to go back to.
+    expect(linesOf(runLine(game.ctx, '/slots'))[0]).toMatch(/^writing player, dev mode off —/);
+    expect(game.slot(PLAYER_SLOT)).toBe(played);
+    expect(game.slot(DEV_SLOT)).toBe(authored);
+
+    // And the session it could not put back cannot reach the player's slot.
+    game.pass(60_000);
+    runLine(game.ctx, 'use: entity.chest.open');
     expect(game.slot(PLAYER_SLOT)).toBe(played);
     rmSync(game.dir, { recursive: true, force: true });
   });
@@ -1243,37 +1269,40 @@ describe('a session writes back only what it came out of (c4, c7, c9)', () => {
   });
 });
 
-// c9 stated as one property over every shape the question comes in, rather than
-// as the two reproductions two audits happened to find. Both of those were the
-// same sentence — a session that came out of dev reaching the player's slot —
-// and both were graded unmet on evidence the other did not have, which is the
-// tell that the clause was being checked by instance. The subjects below are
-// derived from the two things that vary: what the player's slot held when dev
-// was entered, and what dev did.
+// c9 stated as one property over the two things that vary, with both of them
+// derived rather than listed. Two passes graded this clause unmet by finding a
+// fresh instance each time — the tell CLAUDE.md names for a clause being
+// checked by enumeration — and both instances were the same sentence: a session
+// that came out of dev reaching the player's slot. What varies is the state the
+// player's slot was in when dev was entered, and what dev then did; the second
+// of those is `COMMANDS`, the table this driver dispatches every line through,
+// so a command added tomorrow is walked here on the day it exists.
 const SOMEONE_ELSES_SAVE = `{"version":${SAVE_VERSION},"inventory":{"gold":5},"flags":{"camp.discovered":true}}`;
 
-const DEV_GOLD = 20;
+// What a dev session is marked with: a count no restored session can reach in
+// the commands that follow, so the slot saying it is the slot holding dev's.
+const DEV_MARK = 999;
+const MARKED = `{"version":${SAVE_VERSION},"inventory":{"gold":${DEV_MARK}},"flags":{"camp.discovered":true}}`;
 
-// Every state dev mode can be entered from. A slot the store cannot read is
-// not one of them — entering is refused there, which is its own case below.
+// Every state dev mode can be entered from. A slot the store cannot read is not
+// one of them — entering is refused there, which is its own case below.
 const ENTERED_HOLDING: ReadonlyArray<readonly [string, (game: Playing) => void]> = [
   ['nothing at all', () => undefined],
   ['what this session saved', (game) => void runLine(game.ctx, '/save')],
   ['a game from somewhere else', (game) => game.write(PLAYER_SLOT, SOMEONE_ELSES_SAVE)],
+  ['a save this build cannot read', (game) => game.write(PLAYER_SLOT, `{"version":${SAVE_VERSION + 900}}`)],
 ];
 
-const DID_IN_DEV: ReadonlyArray<readonly [string, (game: Playing) => void]> = [
-  ['played', (game) => void runLine(game.ctx, '/look')],
-  ['saved outright', (game) => void runLine(game.ctx, '/save')],
-  ['imported a game from somewhere else', (game) => void runLine(game.ctx, `/import ${SOMEONE_ELSES_SAVE}`)],
-  ['wrote over the player slot by hand', (game) => game.write(PLAYER_SLOT, 'a save-breaking mistake')],
-];
+// The three table entries whose names are shapes rather than words, given one
+// line each of that shape — the same carve-out `drift.test.ts` makes, and for
+// the same reason.
+const SHAPED_IN_DEV: Record<string, string> = { '<N>': '1', '<enter>': '', '<directive>': 'use: entity.chest.open' };
 
 // What the slot holds, read as the one number that says whose session it is.
 function goldIn(payload: string | null): number | null {
   if (payload === null) return null;
   try {
-    return ((JSON.parse(payload) as { inventory?: Record<string, number> }).inventory?.gold ?? 0);
+    return (JSON.parse(payload) as { inventory?: Record<string, number> }).inventory?.gold ?? 0;
   } catch {
     return null;
   }
@@ -1281,42 +1310,50 @@ function goldIn(payload: string | null): number | null {
 
 describe('nothing done in dev mode reaches the slot being played (c9)', () => {
   for (const [holding, enter] of ENTERED_HOLDING) {
-    for (const [did, inDev] of DID_IN_DEV) {
-      it(`entering on ${holding}, having ${did}`, () => {
-        const game = playing();
-        runLine(game.ctx, '/autosave 1');
-        enter(game);
-        const atEntry = game.slot(PLAYER_SLOT);
+    it(`over every line the command table takes, entering on ${holding}`, () => {
+      const leaked: string[] = [];
 
-        runLine(game.ctx, '/dev on');
-        for (let each = 0; each < DEV_GOLD; each += 1) {
-          game.pass(2_000);
-          runLine(game.ctx, 'use: entity.chest.open');
+      for (const spec of COMMANDS) {
+        const bare = SHAPED_IN_DEV[spec.name] ?? spec.name;
+        for (const line of [bare, `${bare} 1`]) {
+          const game = playing();
+          try {
+            runLine(game.ctx, '/autosave 1');
+            enter(game);
+            const atEntry = game.slot(PLAYER_SLOT);
+
+            runLine(game.ctx, '/dev on');
+            // Marked, then the line under test, whatever it turns out to do.
+            runLine(game.ctx, `/import ${MARKED}`);
+            game.pass(2_000);
+            runLine(game.ctx, line);
+
+            game.pass(2_000);
+            runLine(game.ctx, '/dev off');
+            const atExit = game.slot(PLAYER_SLOT);
+            if (atExit !== atEntry) leaked.push(`${JSON.stringify(line)}: slot changed at exit`);
+
+            // And still nobody's dev session three commands later, which is
+            // where both of the graded reproductions actually appeared.
+            for (let each = 0; each < 3; each += 1) {
+              game.pass(2_000);
+              runLine(game.ctx, 'use: entity.chest.open');
+              const gold = goldIn(game.slot(PLAYER_SLOT));
+              if (gold !== null && gold >= DEV_MARK) leaked.push(`${JSON.stringify(line)}: dev's session in the slot ${each + 1} command(s) later`);
+            }
+          } finally {
+            rmSync(game.dir, { recursive: true, force: true });
+          }
         }
-        inDev(game);
+      }
 
-        runLine(game.ctx, '/dev off');
-        // Byte-identical at the moment the mode is off, whatever dev did.
-        expect(game.slot(PLAYER_SLOT), 'at exit').toBe(atEntry);
-
-        // And still nobody's dev session five commands later, which is where
-        // both of the graded reproductions actually showed up.
-        for (let each = 0; each < 5; each += 1) {
-          game.pass(2_000);
-          runLine(game.ctx, 'use: entity.chest.open');
-          // The dev session reached DEV_GOLD; a restored one starts at 5 at
-          // the most and gains one per command, so anything at or above this
-          // is dev's and nothing below it can be.
-          const gold = goldIn(game.slot(PLAYER_SLOT));
-          expect(gold === null || gold < DEV_GOLD - 5, `after ${each + 1} more command(s), slot holds gold ${gold}`).toBe(true);
-        }
-        rmSync(game.dir, { recursive: true, force: true });
-      });
-    }
+      expect(leaked).toEqual([]);
+    });
   }
 
-  it('covers every shape of the question it is derived over', () => {
-    expect(ENTERED_HOLDING.length * DID_IN_DEV.length).toBe(12);
+  // A walk over an empty table would report no leak either.
+  it('walks the whole command table, twice per entry', () => {
+    expect(COMMANDS.length).toBeGreaterThan(20);
   });
 
   // The state left out of the table above, because there is no snapshot to be
@@ -1329,7 +1366,7 @@ describe('nothing done in dev mode reaches the slot being played (c9)', () => {
     expect(errorsOf(runLine(game.ctx, '/dev on'))[0]).toMatch(/slot player does not parse/);
     expect(readFileSync(path.join(game.dir, `${PLAYER_SLOT}.slot`), 'utf8')).toBe(corrupt);
     expect(existsSync(path.join(game.dir, `${DEV_SNAPSHOT_SLOT}.slot`))).toBe(false);
-    expect(linesOf(runLine(game.ctx, '/slots'))[0]).toBe('writing player, dev mode off');
+    expect(linesOf(runLine(game.ctx, '/slots'))[0]).toMatch(/^writing player, dev mode off — that slot holds bytes nothing here can read/);
     rmSync(game.dir, { recursive: true, force: true });
   });
 });

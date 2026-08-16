@@ -283,6 +283,41 @@ The player's progress survives closing the game, through a store three queued br
   there is no snapshot to take of it and no way to put it back. Entering is refused there and the
   bytes are left where they are, which is its own case beside the twelve.
 
+- **The slot write is staged and renamed, which is the cause the three passes were arguing about the
+  symptom of.** `writeFileSync` truncates the file and then streams into it, so a process that dies
+  inside that window leaves a prefix and the save it was replacing is already gone. Every argument
+  about what autosave should do with bytes nobody can read was an argument about the wreckage. A
+  rename cannot half-happen, so a slot holds either what was there or what was going in, and a write
+  that never finished costs nothing. `docs/tasks.jsonl` reached the same conclusion for the same
+  reason (`scripts/lib/taskStore.ts`), and `tasks produces "atomic store write"` is what says so — the
+  driver just was not doing it. Deliberately without that store's retry loop around the rename: the
+  task store is written by whichever `tasks` processes are in flight and has to win the race, where a
+  save slot is written by the one game playing it, so a rename that loses says so and the next
+  autosave comes back in a cadence. The author ruled the rotation of autosave generations out of this
+  branch on 2026-08-16 and it is filed as its own record: rotation protects against a *bad save*,
+  which is a different thing from a *broken file*, and it needs clauses of its own about which
+  generation is the save and how `offline-progression` reads a stamp across one.
+- **A slot has three states, not two.** Dating a slot and being entitled to replace it are different
+  questions, and an unreadable slot answers them differently: there is no date, and there is
+  everything to lose. Collapsing them behind one `readable` helper is what pass 3 found — the helper
+  was written for the date question and reused for the entitlement one, which turned "report and
+  preserve" into "silently overwrite" for exactly the file an interrupted write leaves. `SlotState` is
+  the three answers named, `datable` and `adopts` are the two questions asked, and a fifth reader
+  picks a question rather than a helper.
+- **Leaving dev mode cannot fail, so it never strands anybody.** Putting bytes back where they were is
+  the one step that cannot go wrong, so it runs whether or not the session could be put back with
+  them; a snapshot this build can no longer read costs the session, which stays where it is and is
+  told so, and never the way out of the mode. The dev slot stays too — removing it was tidiness, and
+  it is an author's work, so a session that could not be restored still has somewhere to go back to.
+  Nothing adopts a stale dev slot, so nothing writes over it either. This replaces the pass-2 ruling
+  that leaving dev is all-or-nothing: the reason that ruling existed was that a failed restore lost
+  the dev slot, and now no step loses anything.
+- **c9's proof derives both of its axes.** Pass 3 was right that the first version was a hand-listed
+  table with a coverage assertion that could only fail if somebody widened the table. What dev can do
+  is `COMMANDS` — the table this driver dispatches every line through — so the walk takes its acts
+  from there, twice per entry, over four states the player's slot can be in at dev entry. A command
+  added tomorrow is walked on the day it exists, which is what `SAVE_FIELDS` does for c14.
+
 ## Open questions
 
 - Where the store interface lives, and whether the autosave decision — has the cadence elapsed,

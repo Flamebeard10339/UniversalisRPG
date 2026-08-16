@@ -62,25 +62,39 @@ function standingOf(save: SaveContext): Standing {
   return held;
 }
 
-// A slot, or nothing — where nothing covers both "there is none" and "there is
-// one and the store cannot make sense of it". Every reader here wants the same
-// answer to those two, and reading one of them is not a reason to refuse the
-// question that was asked.
-function readable(store: SlotStore, name: string): Slot | null {
+// What is in a slot, in three answers rather than two. Collapsing the last two
+// is what a reader written for one question and reused for another does: dating
+// a slot nobody can read and dating an empty one both give nothing, and writing
+// over an empty one is free where writing over bytes nobody can read destroys
+// whatever they were. Named here so the next reader picks a question rather
+// than a helper.
+type SlotState = { kind: 'empty' } | { kind: 'held'; slot: Slot } | { kind: 'unreadable' };
+
+function stateOf(store: SlotStore, name: string): SlotState {
   try {
-    return store.read(name);
+    const slot = store.read(name);
+    return slot === null ? { kind: 'empty' } : { kind: 'held', slot };
   } catch (error) {
-    if (error instanceof RuntimeError) return null;
+    if (error instanceof RuntimeError) return { kind: 'unreadable' };
     throw error;
   }
 }
 
+// The date question: when was this written, and nothing when it cannot be told.
+function datable(store: SlotStore, name: string): Slot | null {
+  const state = stateOf(store, name);
+  return state.kind === 'held' ? state.slot : null;
+}
+
 // Whether this session is entitled to write the slot without being asked twice:
-// it is what that slot holds, or there is nothing in it to lose and nothing has
-// said this session is not its.
+// it is what that slot holds, or the slot is empty and nothing has said this
+// session is not its. Bytes nobody can read are neither — they are somebody's
+// save that a half-finished write or a hand edit left behind, and replacing
+// them is a thing to be asked for rather than assumed.
 export function adopts(save: SaveContext, slot: string): boolean {
   const standing = standingOf(save);
-  return standing.is.has(slot) || (!standing.isNot.has(slot) && readable(save.store, slot) === null);
+  if (standing.is.has(slot)) return true;
+  return !standing.isNot.has(slot) && stateOf(save.store, slot).kind === 'empty';
 }
 
 export function liveSlot(save: SaveContext): string {
@@ -104,7 +118,7 @@ export function setAutosaveSeconds(save: SaveContext, seconds: number): void {
 // a slot the store cannot read is a slot the next autosave replaces, so being
 // unable to date it is a reason to write rather than a reason to refuse.
 function liveWrittenAt(save: SaveContext): number | null {
-  return readable(save.store, liveSlot(save))?.writtenAt ?? null;
+  return datable(save.store, liveSlot(save))?.writtenAt ?? null;
 }
 
 export function autosaveDue(save: SaveContext): boolean {
@@ -114,16 +128,20 @@ export function autosaveDue(save: SaveContext): boolean {
   return writtenAt === null || save.now() - writtenAt >= seconds * 1000;
 }
 
-// What an autosave check did. `held` is the one that has something to say: the
-// cadence had elapsed and the slot was not this session's to replace.
-export type Autosaved = { kind: 'waited' } | { kind: 'wrote'; slot: string } | { kind: 'held'; slot: string };
+// What an autosave check did. The last two are the ones with something to say,
+// and they are two rather than one because the reasons are different and so is
+// what the player would do about them: a slot this session did not come out of
+// is picked up or replaced on purpose, and a slot nobody can read is a file to
+// go and look at.
+export type Autosaved = { kind: 'waited' } | { kind: 'wrote'; slot: string } | { kind: 'held'; slot: string } | { kind: 'unreadable'; slot: string };
 
 // `payload` is taken as a thunk because serializing a session costs more than
 // reading a stamp, and this is asked after every command and on every live tick.
 export function autosave(save: SaveContext, payload: () => string): Autosaved {
   if (!autosaveDue(save)) return { kind: 'waited' };
   const slot = liveSlot(save);
-  if (!adopts(save, slot)) return { kind: 'held', slot };
+  const writes = writesLive(save);
+  if (writes !== 'yes') return { kind: writes === 'unreadable' ? 'unreadable' : 'held', slot };
   save.store.write(slot, payload());
   adopted(save, slot);
   return { kind: 'wrote', slot };
@@ -191,23 +209,29 @@ export function devSnapshot(save: SaveContext): string | null {
   return decodeSnapshot(snapshot.payload);
 }
 
-// The commit, taking back what `devSnapshot` handed out: the slot goes back to
-// it and the dev pair goes. Restoring the *session* is the caller's — loading a
-// payload is not something a store does — and this runs after that stood, so
-// leaving dev is all-or-nothing the way a load is.
+// The commit, taking back what `devSnapshot` handed out: the player's slot goes
+// back to what it held and the snapshot goes with the mode. No step here can
+// lose anything, which is why it is safe to run whether or not the caller could
+// put the *session* back — restoring that is the caller's, since loading a
+// payload is not something a store does, and a snapshot this build can no
+// longer read must not be a reason to strand somebody in dev.
+//
+// The dev slot stays. Removing it was tidiness and it is an author's work, so a
+// session that cannot be restored still has somewhere to go back to; a stale one
+// is not adopted, so nothing writes over it either.
 export function leaveDev(save: SaveContext, held: string | null): void {
   if (!save.dev) throw new RuntimeError('not in dev mode');
 
   // Rewritten only when it differs, so the stamp on a slot nothing touched is
-  // still the stamp of the write that made it.
-  const current = save.store.read(PLAYER_SLOT);
+  // still the stamp of the write that made it. Bytes nobody can read differ
+  // from everything, including from the snapshot they were taken of.
+  const current = stateOf(save.store, PLAYER_SLOT);
   if (held === null) {
-    if (current) save.store.remove(PLAYER_SLOT);
-  } else if (current?.payload !== held) {
+    if (current.kind !== 'empty') save.store.remove(PLAYER_SLOT);
+  } else if (current.kind !== 'held' || current.slot.payload !== held) {
     save.store.write(PLAYER_SLOT, held);
   }
 
-  save.store.remove(DEV_SLOT);
   save.store.remove(DEV_SNAPSHOT_SLOT);
   standingOf(save).is.delete(DEV_SLOT);
   // The session standing here is the one dev built, not the one the player's
@@ -227,26 +251,37 @@ export interface SlotStanding {
 
 // What is true of this session's saving, answered rather than inferred: a
 // surface drawing it holds no copy of the mode, the slot or the cadence.
+// Whether autosave may write the live slot, and when it may not, why. One
+// field with three answers rather than a boolean beside a reason, because the
+// two refusals are different things to do something about: a slot this session
+// did not come out of is picked up or replaced, and one nobody can read is a
+// file to go and look at.
+export type SlotWrites = 'yes' | 'not-ours' | 'unreadable';
+
 export interface SaveReport {
   dev: boolean;
   slot: string;
-  // Whether autosave may write the live slot, which is the difference between
-  // a session that is being kept and one that is only being played.
-  adopted: boolean;
+  writes: SlotWrites;
   autosaveSeconds: number;
   slots: SlotStanding[];
+}
+
+export function writesLive(save: SaveContext): SlotWrites {
+  const slot = liveSlot(save);
+  if (adopts(save, slot)) return 'yes';
+  return stateOf(save.store, slot).kind === 'unreadable' ? 'unreadable' : 'not-ours';
 }
 
 export function saveReport(save: SaveContext): SaveReport {
   return {
     dev: save.dev,
     slot: liveSlot(save),
-    adopted: adopts(save, liveSlot(save)),
+    writes: writesLive(save),
     autosaveSeconds: autosaveSeconds(save),
     slots: save.store.list().map((name) => ({ name, writtenAt: standing(save.store, name) })),
   };
 }
 
 function standing(store: SlotStore, name: string): number | null {
-  return readable(store, name)?.writtenAt ?? null;
+  return datable(store, name)?.writtenAt ?? null;
 }

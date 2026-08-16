@@ -169,7 +169,7 @@ describe('a session writes back only what it came out of (c4, c9)', () => {
     expect(authoring.save.store.read(PLAYER_SLOT)).toBeNull();
   });
 
-  it('takes an unreadable slot as one with nothing to lose, rather than refusing every answer', () => {
+  it('leaves bytes nobody can read alone, and still answers every question about them', () => {
     const { save, pass } = turning();
     setAutosaveSeconds(save, 30);
     save.store.write(PLAYER_SLOT, 'good');
@@ -179,12 +179,17 @@ describe('a session writes back only what it came out of (c4, c9)', () => {
       throw new RuntimeError('slot player does not parse');
     };
 
-    // The report still answers, and the next write is allowed to replace bytes
-    // nothing can read — which is what the reader beside it already decided.
+    // Dating it and being entitled to replace it are different questions, and
+    // an unreadable slot answers them differently: the report still stands, and
+    // the bytes stay where they are until somebody asks for them to go.
     expect(saveReport(save).slots).toContainEqual({ name: PLAYER_SLOT, writtenAt: null });
-    expect(saveReport(save).adopted).toBe(true);
+    expect(saveReport(save).writes).toBe('unreadable');
     pass(30_000);
-    expect(autosave(save, () => 'replaced')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
+    expect(autosave(save, () => 'replaced')).toEqual({ kind: 'unreadable', slot: PLAYER_SLOT });
+
+    // And saying so outright is what replaces them.
+    saveNow(save, 'replaced');
+    expect(saveReport(save).writes).toBe('yes');
   });
 
   it('will not autosave over a dev slot a crashed session left behind', () => {
@@ -203,9 +208,9 @@ describe('a session writes back only what it came out of (c4, c9)', () => {
     save.store.write(PLAYER_SLOT, 'somebody else');
     const restarted: SaveContext = { ...save, dev: false };
 
-    expect(saveReport(restarted).adopted).toBe(false);
+    expect(saveReport(restarted).writes).toBe('not-ours');
     adopted(restarted, PLAYER_SLOT);
-    expect(saveReport(restarted).adopted).toBe(true);
+    expect(saveReport(restarted).writes).toBe('yes');
   });
 });
 
@@ -225,8 +230,10 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
 
     leaveDev(save, devSnapshot(save));
     expect(save.store.read(PLAYER_SLOT)?.payload).toBe('the player');
-    expect(save.store.read(DEV_SLOT)).toBeNull();
     expect(save.store.read(DEV_SNAPSHOT_SLOT)).toBeNull();
+    // The dev slot is an author's work and stays; nothing has adopted it, so
+    // nothing writes over it either.
+    expect(save.store.read(DEV_SLOT)?.payload).toBe('more authoring');
   });
 
   it('leaves the stamp alone on a slot nothing touched', () => {
@@ -319,7 +326,7 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
     expect(saveReport(save)).toEqual({
       dev: false,
       slot: PLAYER_SLOT,
-      adopted: true,
+      writes: 'yes',
       autosaveSeconds: 30,
       slots: [
         { name: AUTOSAVE_SLOT, writtenAt: 1_000 },

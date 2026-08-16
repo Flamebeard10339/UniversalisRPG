@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { RuntimeError } from '../../src/runtime/runtime';
 import type { SlotDriver } from '../../src/runtime/store';
@@ -14,6 +14,31 @@ function fileFor(dir: string, name: string): string {
   return path.join(dir, `${name}${SLOT_SUFFIX}`);
 }
 
+// Whatever is at the staging path, gone: the path is this write's own, and a
+// failure that left something there must not be reported as that something.
+function clear(staging: string): void {
+  rmSync(staging, { force: true, recursive: true });
+}
+
+// Staged beside the slot and renamed over it, because `writeFileSync` truncates
+// and then streams: a process that dies inside that window leaves a prefix, and
+// the save it was replacing is already gone. A rename is atomic, so a slot holds
+// either the bytes that were there or the bytes going in, and a write that never
+// finished costs nothing at all.
+//
+// Deliberately without the retry loop `docs/tasks.jsonl` takes around the same
+// rename. That store is written by whichever `tasks` processes are in flight and
+// has to win the race; a save slot is written by the one game playing it, so a
+// rename that loses says so and the next autosave comes back in a cadence.
+function replace(staging: string, file: string, name: string): void {
+  try {
+    renameSync(staging, file);
+  } catch (error) {
+    clear(staging);
+    throw new RuntimeError(`slot ${name} could not be replaced: ${error instanceof Error ? error.message : String(error)}. It still holds what it held.`);
+  }
+}
+
 // One file per slot under one directory, created on the first write. Nothing
 // here reads the text it moves: what a slot means is decided above this.
 export function fileSlots(dir: string): SlotDriver {
@@ -25,7 +50,14 @@ export function fileSlots(dir: string): SlotDriver {
     write(name, text) {
       const file = fileFor(dir, name);
       mkdirSync(path.dirname(file), { recursive: true });
-      writeFileSync(file, text, 'utf8');
+      const staging = `${file}.${process.pid}.tmp`;
+      try {
+        writeFileSync(staging, text, 'utf8');
+      } catch (error) {
+        clear(staging);
+        throw new RuntimeError(`slot ${name} could not be written: ${error instanceof Error ? error.message : String(error)}. It still holds what it held.`);
+      }
+      replace(staging, file, name);
     },
     remove(name) {
       rmSync(fileFor(dir, name), { force: true });
