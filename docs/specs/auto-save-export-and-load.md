@@ -271,6 +271,18 @@ The player's progress survives closing the game, through a store three queued br
   has already copied the state in by the time the view is drawn, and `standable` is what makes the
   draw safe — so the wider `try` was a guard against nothing, with a comment claiming otherwise.
 
+- **c9 is proved by derivation, because two passes graded it unmet on evidence the other did not
+  have.** CLAUDE.md names that shape: a clause failing twice on different instances is being checked
+  by instance, and what it needs is a derivation rather than a third reproduction. Both instances were
+  one sentence — a session that came out of dev reaching the player's slot — so the proof is now one
+  property over the two things that vary: what the player's slot held when dev was entered, and what
+  dev did. Twelve cases, derived from those two tables, each asserting byte-identity at the moment the
+  mode goes off *and* that nothing the dev session did is in the slot five ordinary commands later,
+  which is where both graded reproductions actually appeared. Writing it found a thirteenth state the
+  tables could not hold: a slot the store cannot read is not one dev can be entered from, because
+  there is no snapshot to take of it and no way to put it back. Entering is refused there and the
+  bytes are left where they are, which is its own case beside the twelve.
+
 ## Open questions
 
 - Where the store interface lives, and whether the autosave decision — has the cadence elapsed,

@@ -708,6 +708,7 @@ interface Playing {
   // again amounts to.
   reopened: () => CommandContext;
   slot: (name: string) => string | null;
+  write: (name: string, payload: string) => void;
 }
 
 // File-backed, because c8 asks for these clauses against the store a player
@@ -732,8 +733,17 @@ function playing(text: string = SAVING_SOURCE, driving = false): Playing {
     },
     slot: (name) => {
       const file = path.join(dir, `${name}.slot`);
-      return existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as { payload: string }).payload : null;
+      if (!existsSync(file)) return null;
+      const text = readFileSync(file, 'utf8');
+      // The payload when there is an envelope round it, and the bytes as they
+      // lie when there is not — either way, what is on disk for that slot.
+      try {
+        return (JSON.parse(text) as { payload: string }).payload;
+      } catch {
+        return text;
+      }
     },
+    write: (name, payload) => save.store.write(name, payload),
   };
 }
 
@@ -1229,6 +1239,97 @@ describe('a session writes back only what it came out of (c4, c7, c9)', () => {
 
     const next = game.reopened();
     expect(linesOf(runLine(next, '/slots'))[0]).toMatch(/writing player, dev mode off — this session did not come out of that slot/);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+});
+
+// c9 stated as one property over every shape the question comes in, rather than
+// as the two reproductions two audits happened to find. Both of those were the
+// same sentence — a session that came out of dev reaching the player's slot —
+// and both were graded unmet on evidence the other did not have, which is the
+// tell that the clause was being checked by instance. The subjects below are
+// derived from the two things that vary: what the player's slot held when dev
+// was entered, and what dev did.
+const SOMEONE_ELSES_SAVE = `{"version":${SAVE_VERSION},"inventory":{"gold":5},"flags":{"camp.discovered":true}}`;
+
+const DEV_GOLD = 20;
+
+// Every state dev mode can be entered from. A slot the store cannot read is
+// not one of them — entering is refused there, which is its own case below.
+const ENTERED_HOLDING: ReadonlyArray<readonly [string, (game: Playing) => void]> = [
+  ['nothing at all', () => undefined],
+  ['what this session saved', (game) => void runLine(game.ctx, '/save')],
+  ['a game from somewhere else', (game) => game.write(PLAYER_SLOT, SOMEONE_ELSES_SAVE)],
+];
+
+const DID_IN_DEV: ReadonlyArray<readonly [string, (game: Playing) => void]> = [
+  ['played', (game) => void runLine(game.ctx, '/look')],
+  ['saved outright', (game) => void runLine(game.ctx, '/save')],
+  ['imported a game from somewhere else', (game) => void runLine(game.ctx, `/import ${SOMEONE_ELSES_SAVE}`)],
+  ['wrote over the player slot by hand', (game) => game.write(PLAYER_SLOT, 'a save-breaking mistake')],
+];
+
+// What the slot holds, read as the one number that says whose session it is.
+function goldIn(payload: string | null): number | null {
+  if (payload === null) return null;
+  try {
+    return ((JSON.parse(payload) as { inventory?: Record<string, number> }).inventory?.gold ?? 0);
+  } catch {
+    return null;
+  }
+}
+
+describe('nothing done in dev mode reaches the slot being played (c9)', () => {
+  for (const [holding, enter] of ENTERED_HOLDING) {
+    for (const [did, inDev] of DID_IN_DEV) {
+      it(`entering on ${holding}, having ${did}`, () => {
+        const game = playing();
+        runLine(game.ctx, '/autosave 1');
+        enter(game);
+        const atEntry = game.slot(PLAYER_SLOT);
+
+        runLine(game.ctx, '/dev on');
+        for (let each = 0; each < DEV_GOLD; each += 1) {
+          game.pass(2_000);
+          runLine(game.ctx, 'use: entity.chest.open');
+        }
+        inDev(game);
+
+        runLine(game.ctx, '/dev off');
+        // Byte-identical at the moment the mode is off, whatever dev did.
+        expect(game.slot(PLAYER_SLOT), 'at exit').toBe(atEntry);
+
+        // And still nobody's dev session five commands later, which is where
+        // both of the graded reproductions actually showed up.
+        for (let each = 0; each < 5; each += 1) {
+          game.pass(2_000);
+          runLine(game.ctx, 'use: entity.chest.open');
+          // The dev session reached DEV_GOLD; a restored one starts at 5 at
+          // the most and gains one per command, so anything at or above this
+          // is dev's and nothing below it can be.
+          const gold = goldIn(game.slot(PLAYER_SLOT));
+          expect(gold === null || gold < DEV_GOLD - 5, `after ${each + 1} more command(s), slot holds gold ${gold}`).toBe(true);
+        }
+        rmSync(game.dir, { recursive: true, force: true });
+      });
+    }
+  }
+
+  it('covers every shape of the question it is derived over', () => {
+    expect(ENTERED_HOLDING.length * DID_IN_DEV.length).toBe(12);
+  });
+
+  // The state left out of the table above, because there is no snapshot to be
+  // taken of bytes the store cannot read and no way to put them back.
+  it('refuses to enter at all on a slot it cannot read, and touches nothing', () => {
+    const game = playing();
+    const corrupt = '{{{ truncated';
+    writeFileSync(path.join(game.dir, `${PLAYER_SLOT}.slot`), corrupt, 'utf8');
+
+    expect(errorsOf(runLine(game.ctx, '/dev on'))[0]).toMatch(/slot player does not parse/);
+    expect(readFileSync(path.join(game.dir, `${PLAYER_SLOT}.slot`), 'utf8')).toBe(corrupt);
+    expect(existsSync(path.join(game.dir, `${DEV_SNAPSHOT_SLOT}.slot`))).toBe(false);
+    expect(linesOf(runLine(game.ctx, '/slots'))[0]).toBe('writing player, dev mode off');
     rmSync(game.dir, { recursive: true, force: true });
   });
 });
