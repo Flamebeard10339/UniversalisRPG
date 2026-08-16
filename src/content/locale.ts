@@ -1,6 +1,6 @@
 import type { SchemaKind } from './module';
 import { DslError } from '../grammar/parser';
-import { RawSection, hasBlock } from '../grammar/structure';
+import { RawSection, sectionParser, hasBlock } from '../grammar/structure';
 
 // A `# locale <lang>` section: key/value pairs and nothing else. It never
 // reaches a content map, so it can neither add, patch nor remove content — the
@@ -256,7 +256,7 @@ export const GENERATED_FIELD = 'title';
 // file is addressable by the language the rest of the DSL already speaks.
 const KEY = /^(?<key>[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)*):[ \t]?(?<value>.*)$/;
 
-export function parseLocaleSection(section: RawSection): LocaleSection {
+export const parseLocaleSection = sectionParser((section: RawSection): LocaleSection => {
   if (!section.id) throw new DslError('# locale requires a language, as in `# locale en`', section.span);
   const entries: Array<{ key: string; value: string }> = [];
   const seen = new Set<string>();
@@ -269,7 +269,7 @@ export function parseLocaleSection(section: RawSection): LocaleSection {
     entries.push({ key: groups.key, value: groups.value });
   }
   return { id: section.id, entries };
-}
+});
 
 // The path a piece of player-visible text is addressed by: the module that owns
 // it, the kind, the id under that module, and the field. A module-less universe

@@ -15,39 +15,23 @@ export interface RawSection {
 
 const HEADING = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?[ \t]*$/;
 
-// Whether the line has an indented block, and the block itself, kept apart on
-// purpose: reading `children` is what records that somebody took the block, so
-// a reader merely deciding what to do asks this instead. Everything downstream
-// of `blocksWereRead` turns on that difference.
-export const hasBlock = (line: RawLine): boolean => blockOf(line).length > 0;
+// Whether a line has an indented block. The question, asked without answering
+// it: a reader deciding what to do is not a reader that consumed one.
+export const hasBlock = (line: RawLine): boolean => line.children.length > 0;
 
-const BLOCK = Symbol('block');
-const READ = Symbol('read');
+// Lines whose block a reader took. Weak because it is a fact about a parse in
+// flight and nothing outside one may ask it.
+const TAKEN = new WeakSet<RawLine>();
 
-interface TrackedLine extends RawLine {
-  [BLOCK]: RawLine[];
-  [READ]: boolean;
-}
-
-const blockOf = (line: RawLine): RawLine[] => (line as TrackedLine)[BLOCK] ?? line.children;
-
-// A line whose block is behind an accessor. Nothing else can tell a block a
-// reader consumed from one it walked past, and the load path has forgotten to
-// refuse the second in five separate readers — so the record is kept by the act
-// of reading rather than by each reader remembering to say so.
-function trackedLine(text: string, span: Span): RawLine {
-  const block: RawLine[] = [];
-  const line = { text, span } as TrackedLine;
-  Object.defineProperty(line, BLOCK, { value: block });
-  Object.defineProperty(line, READ, { value: false, writable: true });
-  Object.defineProperty(line, 'children', {
-    enumerable: true,
-    get() {
-      line[READ] = true;
-      return block;
-    },
-  });
-  return line;
+// The block itself, taken rather than looked at. Calling this is what records
+// that a reader consumed it, which is the only thing that tells that apart from
+// a reader that walked past — five readers in this tree walked past, and no
+// rule they each had to remember would have caught the sixth. Reading
+// `children` directly stays the inspection, so a consumer that forgets this
+// call has its line refused rather than its author's words dropped.
+export function takeBlock(line: RawLine): RawLine[] {
+  TAKEN.add(line);
+  return line.children;
 }
 
 // The block half of the demand `requireEnd` makes of a line's text. A reader
@@ -59,15 +43,27 @@ export function requireNoBlock(line: RawLine): void {
   throw new DslError(`${JSON.stringify(line.text)} takes no indented block`, line.span);
 }
 
-// The same demand made of a whole section once its parser has run, for every
-// line whose reader never asked for the block under it. Walked through the
-// tracked array rather than through `children`, because asking the question
-// must not answer it.
+// The same demand made of a whole section once its parser has run, over every
+// line whose block nobody took.
 export function requireBlocksRead(lines: readonly RawLine[]): void {
   for (const line of lines) {
-    if (!(line as TrackedLine)[READ]) requireNoBlock(line);
-    requireBlocksRead(blockOf(line));
+    if (!TAKEN.has(line)) requireNoBlock(line);
+    requireBlocksRead(line.children);
   }
+}
+
+// A section parser: a function from a `RawSection` to a value that answers for
+// every line it was handed. It returns its value, and then this asks whether
+// any line kept a block nobody took. Applied where each parser is defined
+// rather than where they are tabulated, so there is no unwrapped one for a
+// caller to reach past the table for — a migration script reading `# save`
+// fixtures did exactly that.
+export function sectionParser<S extends RawSection, T>(parse: (section: S) => T): (section: S) => T {
+  return (section) => {
+    const value = parse(section);
+    requireBlocksRead(section.body);
+    return value;
+  };
 }
 
 export function splitSections(source: string): RawSection[] {
@@ -97,10 +93,10 @@ export function splitSections(source: string): RawSection[] {
     const indent = textLine.length - textLine.trimStart().length;
     const text = textLine.trim();
     const start = textLineStart + indent;
-    const line = trackedLine(text, { start, end: start + text.length });
+    const line: RawLine = { text, span: { start, end: start + text.length }, children: [] };
 
     while (stack.length > 0 && stack[stack.length - 1].indent >= indent) stack.pop();
-    (stack.length > 0 ? blockOf(stack[stack.length - 1].line) : current.body).push(line);
+    (stack.length > 0 ? stack[stack.length - 1].line.children : current.body).push(line);
     stack.push({ indent, line });
     current.span.end = line.span.end;
   }

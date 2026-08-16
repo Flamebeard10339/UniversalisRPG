@@ -4,7 +4,7 @@ import { HOOK_FIELD_REFUSALS, hookLabelProblem } from './hook';
 import { list } from './list';
 import { Cursor, DslError, requireEnd, Span } from './parser';
 import { EntryBody } from './section';
-import { RawLine, hasBlock } from './structure';
+import { RawLine, hasBlock, takeBlock } from './structure';
 import { TagClause, tagClause } from './tagClause';
 import { decimal, DECIMAL, id, refuseRange } from './values';
 
@@ -108,7 +108,7 @@ const conditionValue: ActionValue = (cursor) => (cursor.done ? undefined : condi
 const contestValue = (written: string): ActionValue => (cursor, line, label) => named(written, label, line, () => contest(cursor));
 const sidedValue = (written: string): ActionValue => (cursor, line, label) => named(written, label, line, () => sided(cursor));
 const resultsValue: ActionValue = (cursor, line, label) => {
-  if (cursor.done) return hasBlock(line) ? results.parseBlock(line.children) : undefined;
+  if (cursor.done) return hasBlock(line) ? results.parseBlock(takeBlock(line)) : undefined;
   const inline = results.parse(cursor);
   if (hasBlock(line)) throw new DslError(actionProblem(label, 'a result group is written inline and as a block; give it one'), line.span);
   return inline;

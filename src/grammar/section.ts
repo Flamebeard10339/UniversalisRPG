@@ -1,7 +1,7 @@
 // Generic engine: field value-types are erased internally via the AnyFields casts; the rejected alternative was a hand-written parser per section kind.
 import { Cursor, DslError, Parser, Span } from './parser';
 import { ListParser } from './list';
-import { RawLine, RawSection, hasBlock } from './structure';
+import { RawLine, RawSection, hasBlock, sectionParser, takeBlock } from './structure';
 
 // What a default may know beyond the section it is filling in. A field-level
 // default cannot see the module its section came from, and c5 turns on that
@@ -110,6 +110,10 @@ function parseBlock(parser: Parser<unknown>, children: RawLine[], span: Span): u
 }
 
 export function parseSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
+  return sectionParser((read: RawSection) => readSection(read, schema))(section);
+}
+
+function readSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
   if (section.kind !== schema.kind) throw new DslError(`expected # ${schema.kind}, got # ${section.kind}`, section.span);
   if (!section.id) throw new DslError(`# ${schema.kind} requires an id`, section.span);
 
@@ -187,7 +191,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         if (op !== undefined && !isListParser(fields[name].parser)) throw new DslError(`${kind} field ${key} is not a list, so it cannot take ${op}`, keySpan);
 
         const inline = !cursor.done;
-        const value = inline ? fields[name].parser.parse(cursor) : hasBlock(line) ? parseBlock(fields[name].parser, line.children, line.span) : undefined;
+        const value = inline ? fields[name].parser.parse(cursor) : hasBlock(line) ? parseBlock(fields[name].parser, takeBlock(line), line.span) : undefined;
         if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} field ${key} is written inline and as a block; give it one`, keySpan);
         // an empty value with no block is unspecified: leave the field absent
         if (value === undefined) continue;
@@ -201,7 +205,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         ((authored[entries!.into] ??= []) as object[]).push({ label: key, removed: true });
       } else {
         const inline = !cursor.done;
-        const body = inline ? entries!.body.parse(cursor, key) : entries!.body.parseBlock(line.children, key);
+        const body = inline ? entries!.body.parse(cursor, key) : entries!.body.parseBlock(takeBlock(line), key);
         if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} ${key}: is written inline and as a block; give it one`, keySpan);
         ((authored[entries!.into] ??= []) as object[]).push({ label: key, ...body });
       }

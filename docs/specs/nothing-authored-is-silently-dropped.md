@@ -90,11 +90,22 @@ answer for it and never could; the record is now kept by the act of reading rath
 reader remembering to keep it, which is the only version of this a reader written next month cannot
 forget.
 
-The demand is attached to every entry of `PARSERS` rather than written into `parseModule`'s body, so
-a kind added to `BESPOKE` inherits it — `dialogue` and `save` are two of the five that did not have
-it. `parseSection` on its own does not carry it, and that is the boundary rather than an oversight: a
-section parser is what receives a `RawSection`, `PARSERS` is the table of them, and no route content
-takes reaches one except through that table.
+The demand is attached where each section parser is **defined**, through `sectionParser`, rather than
+where the kinds are tabulated. Attaching it to the `PARSERS` table was the first attempt and pass 3
+measured what it left open: `scripts/migrate-saves.ts` imports `parseSaveSection` and reaches past
+the table, so a `# save` fixture's indented block was dropped there while `parseModule` refused the
+same text. A claim that no route reaches a parser except through the table is a claim nothing derives
+and it was already false. Wrapped at the definition there is no unwrapped export to reach, and the
+fifteen schema kinds are covered by one wrapper inside `parseSection`.
+
+**Forgetting is refused, not dropped.** `children` stays an ordinary field and `takeBlock` is the one
+act that records a reader consumed a block, so a consumer that forgets to call it has its line
+refused rather than its author's words discarded. The first shape of this guard recorded any property
+access, which pass 3 measured failing both ways: `JSON.stringify(section)` before the check turned the
+guard off for that whole section, and a line whose block genuinely was consumed by a caller holding
+its own `RawLine` was refused. Both are gone, and the polarity earned itself immediately — converting
+the guard surfaced two consumers this branch had not yet wired, `dialogue`'s two loops and `one of:`'s
+rows, as failing tests rather than as silent drops.
 
 **c3's agreement is asserted in one direction at the section level and in both at the parser level.**
 The walk compares a field's parser directly — `parseWhole(parser, text)` against

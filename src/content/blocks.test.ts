@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import { SECTION_KINDS, parseModule } from './module';
+import { parseSaveSection } from './saveSection';
 import { splitSections } from '../grammar/structure';
 
 // A line nobody wrote, indented under one somebody did. Whatever the parser
@@ -108,6 +109,16 @@ describe('an indented block under a line whose reader never asked for one', () =
   it('is refused on a line whose block one reader looked at and no reader took', () => {
     expect(() => parsed(['# faction birds', '# entity gull', 'faction: birds aggressive', '  ' + INTRUDER])).toThrow(/"faction: birds aggressive" takes no indented block/);
     expect(() => parsed(['# faction birds', '# entity gull', 'faction: birds aggressive'])).not.toThrow();
+  });
+
+  // A section parser carries the demand wherever it is reached from, because it
+  // is wrapped where it is defined rather than where the kinds are tabulated.
+  // `scripts/migrate-saves.ts` reads `# save` fixtures through this import and
+  // was measured dropping a block that `parseModule` refuses.
+  it('is refused by a section parser called directly, not only through the module table', () => {
+    const saveSection = (...lines: string[]) => splitSections(lines.join('\n'))[0];
+    expect(() => parseSaveSection(saveSection('# save start', '{"version":11}', '  ' + INTRUDER))).toThrow(/takes no indented block/);
+    expect(() => parseSaveSection(saveSection('# save start', '{"version":11}'))).not.toThrow();
   });
 
   // Refusing everything satisfies the first test, and so does a corpus that

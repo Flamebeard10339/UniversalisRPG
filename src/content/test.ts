@@ -1,6 +1,6 @@
 import { Condition, condition } from '../grammar/condition';
 import { DslError, parseWhole } from '../grammar/parser';
-import { RawSection, hasBlock } from '../grammar/structure';
+import { RawSection, sectionParser, hasBlock } from '../grammar/structure';
 import { Direction, DIRECTIONS, Hex, parseHexKey, PlaneNode } from './hex';
 
 export type Directive =
@@ -246,7 +246,7 @@ export function parseDirectiveLine(text: string): Directive | null {
   return null;
 }
 
-export function parseTest(section: RawSection): Test {
+export const parseTest = sectionParser((section: RawSection): Test => {
   if (!section.id) throw new DslError('# test requires an id', section.span);
   const directives: Directive[] = [];
 
@@ -259,4 +259,4 @@ export function parseTest(section: RawSection): Test {
   }
 
   return { id: section.id, directives };
-}
+});

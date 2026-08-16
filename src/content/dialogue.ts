@@ -1,7 +1,7 @@
 import { ActionResult, parseResultLine, startsResult } from '../grammar/actionResult';
 import { Condition, condition, Reference } from '../grammar/condition';
 import { Cursor, DslError, parseWhole } from '../grammar/parser';
-import { RawLine, RawSection } from '../grammar/structure';
+import { RawLine, RawSection, sectionParser, takeBlock } from '../grammar/structure';
 import { REFERENCE } from '../grammar/values';
 
 export type TextSegment =
@@ -91,7 +91,7 @@ function parseChoice(source: RawLine): Choice {
   if (!match?.text) throw new DslError(`malformed choice: ${source.text}`, source.span);
   const choice: Choice = { segments: parseSegments(match.text, source.span.start), effects: [] };
   if (match.cond) choice.when = parseWhole(condition, match.cond, source.span.start, 'a choice when');
-  for (const line of source.children) {
+  for (const line of takeBlock(source)) {
     const goto = GOTO.exec(line.text)?.groups;
     if (goto) choice.goto = goto.target;
     else choice.effects.push(...parseResultLine(line));
@@ -107,7 +107,7 @@ function parseNode(name: string, source: RawLine): DialogueNode {
     menu = null;
   };
 
-  for (const line of source.children) {
+  for (const line of takeBlock(source)) {
     if (line.text.startsWith('->')) {
       (menu ??= []).push(parseChoice(line));
       continue;
@@ -129,7 +129,7 @@ function parseNode(name: string, source: RawLine): DialogueNode {
   return node;
 }
 
-export function parseDialogue(section: RawSection): Dialogue {
+export const parseDialogue = sectionParser((section: RawSection): Dialogue => {
   if (!section.id) throw new DslError('# dialogue requires an id', section.span);
   const dialogue: Dialogue = { id: section.id, nodes: [] };
 
@@ -141,4 +141,4 @@ export function parseDialogue(section: RawSection): Dialogue {
     else throw new DslError(`unexpected line in # dialogue: ${JSON.stringify(line.text)}`, line.span);
   }
   return dialogue;
-}
+});
