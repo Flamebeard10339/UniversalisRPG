@@ -2,14 +2,16 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadInEnglish } from '../src/content/engineLocale';
+import { loadInEnglish, withEngineLocale } from '../src/content/engineLocale';
 import { ENGINE_KEYS } from '../src/content/locale';
+import { renderLocalChangesModule } from '../src/content/localChanges';
+import type { ModuleSource } from '../src/content/universe';
 import { localizerFor } from '../src/runtime/localized';
 import { asLocalized } from '../src/runtime/localizedFixture';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { serializeSession, startSession, view } from '../src/runtime/session';
 import { COMMANDS, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
-import { driveRun, formatLive, formatOutput, formatResult, formatTick, loadModportalSources, openRepl, printed, type ReplLine } from './play-cli';
+import { driveRun, fileAuthoring, formatLive, formatOutput, formatResult, formatTick, loadModportalSources, openRepl, printed, type ReplLine } from './play-cli';
 
 // Every word this driver prints comes from an engine key, and the content text
 // it puts into one arrives localized on the view, so one English localizer
@@ -513,6 +515,84 @@ describe('play-cli modportal cache loading', () => {
 
 // The loop itself, with the terminal taken out of it. runLiveAction keeps raw
 // mode, the keypress and readline, and has no decision left in it to test.
+// A world with one place in it, so the place the local file adds is the only
+// one there is to reach.
+const RELOAD_BASE = ['# info base', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting'].join('\n');
+const TOWER_SECTION = ['# location tower', 'title: Tower', 'x: 1, y: 0'].join('\n');
+const ROAD_SECTION = ['# location base.camp', 'adjacent:', '  tower'].join('\n');
+
+describe('play-cli reaches its local module through the file rather than a remembered copy', () => {
+  function inTempDir(body: (localFile: string) => void): void {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'play-cli-local-'));
+    try {
+      body(path.join(dir, 'local-changes.dsl'));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  function opened(localFile: string) {
+    const baseSources = withEngineLocale([{ name: 'base', text: RELOAD_BASE } as ModuleSource]);
+    const authoring = fileAuthoring(baseSources, ['base'], localFile);
+    const repl = openRepl(baseSources, { authoring });
+    return { ctx: repl.context, authoring };
+  }
+
+  it('picks up a location another process wrote into the file, in the session already running', () => {
+    inTempDir((localFile) => {
+      const { ctx } = opened(localFile);
+      expect(ctx.session.registry.locations.has('local-changes.tower')).toBe(false);
+
+      // The other process, which this one never told about the edit.
+      writeFileSync(localFile, renderLocalChangesModule(['base'], [TOWER_SECTION, ROAD_SECTION]), 'utf8');
+
+      expect(shown(runLine(ctx, '/reload'))).toContain('Reloaded local-changes.');
+      expect(ctx.session.registry.locations.get('local-changes.tower')?.title).toBe('Tower');
+      expect(ctx.view.choices.map((choice) => choice.id)).toContain('travel:local-changes.tower');
+    });
+  });
+
+  it('writes and re-reads the same file, so a staged section survives a reload', () => {
+    inTempDir((localFile) => {
+      const { ctx } = opened(localFile);
+      runLine(ctx, '/dsl item gem title: Gem');
+      expect(readFileSync(localFile, 'utf8')).toContain('# item gem');
+
+      expect(shown(runLine(ctx, '/reload'))).toContain('Reloaded local-changes.');
+      expect(ctx.session.registry.items.get('local-changes.gem')?.title).toBe('Gem');
+    });
+  });
+
+  it('stages a section into the file another process wrote, keeping both', () => {
+    inTempDir((localFile) => {
+      const { ctx } = opened(localFile);
+      writeFileSync(localFile, renderLocalChangesModule(['base'], [TOWER_SECTION]), 'utf8');
+
+      // No reload in between: the staging reads the file for itself.
+      expect(shown(runLine(ctx, '/dsl item gem title: Gem'))).toContain('Staged # item gem in local-changes.');
+
+      const onDisk = readFileSync(localFile, 'utf8');
+      expect(onDisk).toContain('# location tower');
+      expect(onDisk).toContain('# item gem');
+      expect(ctx.session.registry.locations.get('local-changes.tower')?.title).toBe('Tower');
+    });
+  });
+
+  it('refuses the whole of an edit the file cannot load, and goes on playing', () => {
+    inTempDir((localFile) => {
+      const { ctx } = opened(localFile);
+      const before = ctx.session.registry.locations.size;
+      writeFileSync(localFile, renderLocalChangesModule(['base'], [TOWER_SECTION, '# item gem\ngrows-into: nothing.at.all']), 'utf8');
+
+      const lines = shown(runLine(ctx, '/reload'));
+      expect(lines[0]).toBe('✗ local changes did not load.');
+      expect(lines.some((line) => line.includes('nothing.at.all'))).toBe(true);
+      expect(ctx.session.registry.locations.size).toBe(before);
+      expect(shown(runLine(ctx, '/look')).length).toBeGreaterThan(0);
+    });
+  });
+});
+
 describe('play-cli drives a live run', () => {
   function handTicker(): Ticker & { advance(elapsedMs: number): void; stops: number } {
     let ticking: ((elapsedMs: number) => void) | null = null;
