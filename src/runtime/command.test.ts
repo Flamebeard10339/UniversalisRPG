@@ -1143,7 +1143,10 @@ function authoringFixture() {
     readLocalChanges: () => onDisk,
   };
   const elsewhere = (...sections: string[]): void => void (onDisk = renderLocalChangesModule(['base'], sections));
-  return { ...fixture(AUTHORING_MODULE, authoring), authoring, writes, elsewhere };
+  // The whole file, header included, for the cases where the other process
+  // wrote lines this session would never have rendered.
+  const elsewhereWholeFile = (text: string): void => void (onDisk = text);
+  return { ...fixture(AUTHORING_MODULE, authoring), authoring, writes, elsewhere, elsewhereWholeFile };
 }
 
 describe('local DSL authoring takes its file as an argument, never reaching for one', () => {
@@ -1453,13 +1456,47 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     expect(writes).toEqual([]);
   });
 
+  it('keeps the header the other process wrote, not only the sections under it', () => {
+    const { ctx, writes, elsewhereWholeFile } = authoringFixture();
+    elsewhereWholeFile(['# info local-changes', 'version: 3.2.1', 'pack: shared', 'dependencies:', '  base', '', '# item gem', 'title: Gem', ''].join('\n'));
+
+    expect(errors(runLine(ctx, '/dsl item ruby title: Ruby'))).toEqual([]);
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain('version: 3.2.1');
+    expect(writes[0]).toContain('pack: shared');
+    expect(writes[0]).toContain('# item gem');
+    expect(writes[0]).toContain('# item ruby');
+  });
+
+  it('refuses in the local file’s own name when the local file is what will not parse', () => {
+    const { ctx, writes, elsewhereWholeFile } = authoringFixture();
+    // A section with no id, which `splitSections` refuses — not a load
+    // diagnostic but a parse failure, and the other process left it there.
+    elsewhereWholeFile(['# info local-changes', 'version: 0.0.0', 'pack: local', 'dependencies:', '  base', '', '# item', 'title: Nameless', ''].join('\n'));
+
+    for (const line of ['/dsl item gem title: Gem', '/local', '/local delete item gem']) {
+      const refusal = messages(runLine(ctx, line))[0];
+      expect(refusal.text, line).toBe('local-changes does not parse: # item requires an id');
+      expect(refusal.detail, line).toEqual(['/local clear replaces it.']);
+    }
+    expect(writes).toEqual([]);
+
+    // The two commands that still work, and they are the pair an author needs:
+    // one to look at the text, one to replace it.
+    const printed = runLine(ctx, '/local show').output[0];
+    expect(printed.kind === 'source' && printed.lines).toContain('# item');
+    expect(messages(runLine(ctx, '/local clear'))[0].text).toBe('Cleared local-changes.');
+  });
+
+  it('refuses a bad line in the line’s own name, so the two failures do not sound alike', () => {
+    const { ctx } = authoringFixture();
+    // The file parses; it is the typed section that does not.
+    expect(errors(runLine(ctx, '/dsl nosuchkind gem title: Gem'))).toEqual(['unknown section kind: nosuchkind']);
+  });
+
   it('reads the remembered copy in exactly one place, which is the place that consults the file', () => {
-    // The other half of "one source of truth", and the half a behaviour test
-    // cannot state: a command added tomorrow that reaches for
-    // `localSource.text` is composing an edit against what this session last
-    // adopted, and rewriting the whole file from it is how the section another
-    // process wrote disappears. One read, inside `localChangesNow`, and the
-    // assignment that fills the cache is not a read.
+    // The assignment that fills the cache is not a read.
     const source = readFileSync('src/runtime/command.ts', 'utf8');
     expect(source.match(/localSource\.text(?!\s*=)/g)).toHaveLength(1);
   });

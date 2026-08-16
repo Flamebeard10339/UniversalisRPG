@@ -78,22 +78,30 @@ function parseLocalSection(sectionSource: string): LocalSection {
   return section;
 }
 
+// An edit rewrites the whole file, so the header is carried across rather than
+// rebuilt: a version, a pack and a dependency the caller's list does not have
+// are lines somebody else wrote, and rendering a fresh header over them deletes
+// them without saying so. `dependencies` is what a source with no `# info` of
+// its own is given, which is a file nobody has written yet.
+function withBody(source: string, dependencies: readonly string[], sections: readonly LocalSection[]): string {
+  const info = readSections(source).find((section) => section.kind === MANAGED_INFO);
+  const header = info ? info.text : renderLocalChangesModule(dependencies).trimEnd();
+  const body = sections.map((section) => section.text.trim()).filter(Boolean);
+  return [header, '', ...body].join('\n').trimEnd() + '\n';
+}
+
 export function upsertLocalSection(source: string, dependencies: readonly string[], sectionSource: string): LocalSectionEdit {
   const section = parseLocalSection(sectionSource);
   const sections = bodySections(source);
   const found = sections.findIndex((existing) => existing.kind === section.kind && existing.id === section.id);
   const next = found === -1 ? [...sections, section] : sections.map((existing, index) => (index === found ? section : existing));
-  return {
-    text: renderLocalChangesModule(dependencies, next.map((existing) => existing.text)),
-    section,
-    replaced: found !== -1,
-  };
+  return { text: withBody(source, dependencies, next), section, replaced: found !== -1 };
 }
 
 export function deleteLocalSection(source: string, dependencies: readonly string[], kind: string, id: string): LocalSectionDelete {
   const sections = bodySections(source);
   const kept = sections.filter((section) => section.kind !== kind || section.id !== id);
-  return { text: renderLocalChangesModule(dependencies, kept.map((section) => section.text)), deleted: kept.length !== sections.length };
+  return { text: withBody(source, dependencies, kept), deleted: kept.length !== sections.length };
 }
 
 export function clearLocalSections(dependencies: readonly string[]): string {

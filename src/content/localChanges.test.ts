@@ -32,6 +32,26 @@ describe('local-changes module text helpers', () => {
     expect(localSectionHeadings(deleted.text)).toEqual([]);
   });
 
+  it('carries across the `# info` the source already has, so an edit rewrites only its sections', () => {
+    // A header this caller did not write and could not reconstruct: a version
+    // it does not know, a pack it does not know, and a dependency missing from
+    // the list it was handed.
+    const foreign = ['# info local-changes', 'version: 3.2.1', 'pack: shared', 'dependencies:', '  base', '  extra', '', '# item gem', 'title: Gem', ''].join('\n');
+
+    const staged = upsertLocalSection(foreign, ['base'], '# item ruby\ntitle: Ruby\n');
+    expect(staged.text.split('\n').slice(0, 6)).toEqual(['# info local-changes', 'version: 3.2.1', 'pack: shared', 'dependencies:', '  base', '  extra']);
+    expect(localSectionHeadings(staged.text)).toEqual(['# item gem', '# item ruby']);
+
+    const deleted = deleteLocalSection(staged.text, ['base'], 'item', 'gem');
+    expect(deleted.text.split('\n').slice(0, 6)).toEqual(['# info local-changes', 'version: 3.2.1', 'pack: shared', 'dependencies:', '  base', '  extra']);
+    expect(localSectionHeadings(deleted.text)).toEqual(['# item ruby']);
+  });
+
+  it('renders a header from the dependency list only for a source that has none', () => {
+    const staged = upsertLocalSection('', ['base'], '# item gem\ntitle: Gem\n');
+    expect(staged.text.split('\n').slice(0, 5)).toEqual(['# info local-changes', 'version: 0.0.0', 'pack: local', 'dependencies:', '  base']);
+  });
+
   it('clears back to only the managed module header', () => {
     const cleared = clearLocalSections(['base']);
     expect(localSectionHeadings(cleared)).toEqual([]);
