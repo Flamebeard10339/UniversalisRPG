@@ -199,3 +199,83 @@ None.
   range), bytes ok, tree ok with nothing uncommitted, base ok with main not moved past the merge
   base, and spec ok with every declared member closed. The one failing leg is `clauses` — "has no
   recorded audit pass" — which is this pass; it stays red while c3 is unmet.
+
+### Pass 2 — 2026-08-16
+
+- base: `cb74060058051c3d6fbd4249cfa72bbbe6d3ef25`
+- head: `fc839d432159b2561f6d9dccc33e607fd0e2d155`
+- proof 1: met — Five aimed mutations of the one line this branch changed, src/grammar/list.ts:26
+`const items = parseWhole(line, raw.text, raw.span.start, 'a list item');`. Reverted to the
+pre-branch `parseInline(new Cursor(raw.text, 0, raw.span.start))` it KILLED four times, each by a
+named test re-run at its own file with the mutant still applied: list.test.ts "refuses what the
+element parser left behind, naming it" and "points the refusal at the leftover, in the whole source
+rather than the line"; parse.test.ts "refuses the leftover the loader used to drop, on each field
+the finding measured" and "refuses a while one letter off rather than dropping the condition it
+gates". The accept half is watched too — appending ' leftover' to every block line KILLED
+list.test.ts "reads a line the element parser consumes whole" — so the clause is not held by a test
+that can only ever demand a throw. Over-strictness checked in the other direction: the demand is
+requireEnd, which eats trailing whitespace, and splitSections already trims each line, so the only
+text it newly refuses is text the inline form was already refusing. No content line, fixture or test
+writes one. Manifest at
+C:\Users\yonat\AppData\Local\Temp\mutations-nothing-authored-is-silently-dropped-pass2.json
+(11 killed, 3 survived, 2 errored).
+- proof 2: met — The derivation covers a subject nobody wrote a test for, measured rather than argued: a
+new block-capable field injected into locationSchema — a hand-rolled ListParser whose parseBlock
+drops both the leftover and the children, named by no test anywhere — was caught twice, KILLED at
+parse.test.ts "refuses a block line carrying an indented block of its own, on every field a block
+can address" and at "reads a block line and the same text handed to the whole parser identically".
+The predicate half is pinned to the engine and not to prose: widening the engine's own gate at
+src/grammar/section.ts:108 from `'parseBlock' in parser` to `'parse' in parser` KILLED "derives its
+subjects by the predicate the section engine decides a block by", so the
+expect(declaresBlock).toEqual(engineReadsBlock) is load-bearing. Manifest at
+C:\Users\yonat\AppData\Local\Temp\audit-nothing-authored-is-silently-dropped-pass2-mutations-derivation.json.
+What is not held is the walk's own subject set — narrowing `Object.keys(SCHEMAS)` to `['location']`,
+and dropping one kind from it, each SURVIVED the whole 3266-test suite — and that is filed as a
+finding rather than graded here, because the clause's operative promise is that the engine's
+subjects reach the walk, which the injected field proves.
+- proof 3: unmet — 26 fields are block-capable at HEAD; the nested-block walk probes 24. The two it never
+probes in any shape, `item.tags` and `passive.tags`, are exactly where the property still fails.
+Measured with npm run probe: `# item rock` / `title: Rock` / `weapon` / an indented `utter nonsense
+here` loads clean and the parsed item carries tags [{ kind: keyword, value: weapon }] — the indented
+line is gone with no word said; `# passive tough` / `foo` / an indented line behaves the same. Both
+are block-capable fields, so this is the clause's own universal failing, not a neighbouring one. The
+walk cannot reach them because its only probe shape is `<keyword>:` followed by an indented block,
+and a positional field's `tags:` label is refused before any block is read ("item field tags must be
+written bare"), so AUTHORED.find(...) returns undefined and the field is skipped. The
+`!field.positional` filter on that test is therefore inert — removing it changed no verdict
+(mutation UNSTABLE; the named test did not fail) — which is why nothing reported the gap.
+The seam is the diagnosis: list.parseBlock is one reader among several, and the drop is decided a
+level above it, in parseSection's line loop (src/grammar/section.ts:165-229), which reads
+`line.text` through a Cursor and never asks whether anything claimed `line.children`. Three of its
+four branches drop a block today — the clauses branch (above), the keyword branch (`# location bay`
+/ `starting` / an indented line), and the bare branch (`north of cove` / an indented line) — and
+parseActionLine (src/grammar/action.ts:185-189) is a second loop of the same shape. One
+requireNoBlock at the end of each loop, where the value is assembled rather than where it is
+written, retires the clauses route this clause owns and the others with it, and derives its own
+subjects the way c2's walk does. The two routes outside this clause's wording are filed as a
+finding.
+- proof 4: met — `git diff --stat HEAD -- content/` is empty and `git diff --stat cb74060..fc839d4 --
+content/` is empty: no content line needed repair and none was made, which is the forecast the
+clause recorded. merge-ready's npm test leg passes 3266 tests including
+src/runtime/integration.test.ts over the shipped corpus, and its bytes leg passes, so every
+`# test` and `# save` fixture stays byte-identical. That the shipped corpus really flows through
+both new refusals is measured, not assumed: appending ' leftover' to every block-form list line, and
+making requireNoBlock's early return never fire, each made content/ refuse at load — the run
+printed the DslError raised through src/grammar/list.ts:26 and through
+src/grammar/actionResult.ts:316 respectively. Nothing in the diff weakens a check to keep a content
+line loading; both source changes move in the strict direction.
+- proof 5: met — `grep -rn "requireEnd" src/grammar --include=*.ts --exclude=*.test.ts` names exactly the
+pre-branch sites and no others: parser.ts:56 (the definition), :66 (inside parseWhole),
+action.ts:188 'an action field', actionResult.ts:187 'one of:', :313 'a result'. list.ts reaches the
+one check through parseWhole and adds no call and no message of its own. The one function the
+branch adds, requireNoBlock (src/grammar/structure.ts:22), is a hoist rather than a copy: its
+message `"..." takes no indented block` is verbatim the throw that stood at actionResult.ts:315
+before this branch, actionResult.ts:316 now calls it, and the old `line.children.length > 0 &&`
+guard it replaced is requireNoBlock's own early return, so the two are behaviourally identical. Two
+callers, one message. No third copy of the section field engine appears in the range.
+- proof 6: met — `npm run tasks -- merge-ready` at fc839d4: tsc ok, npm test ok (3266 tests),
+layer-check ok, audit-status ok, doctor ok (25 pre-existing warnings, none from this range), bytes
+ok, tree ok with nothing uncommitted. All six legs the clause names pass. Two legs it does not name
+fail: `clauses`, which is c3 and is this pass; and `base` — "main has moved past the merge base", so
+`git merge main` is required before this branch can merge and the behaviour of that merge is
+unmeasured at the head this pass graded.
