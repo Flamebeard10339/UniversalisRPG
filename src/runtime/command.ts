@@ -30,6 +30,7 @@ import {
   saveNow,
   saveReport,
   setAutosaveSeconds,
+  withhold,
   type SaveContext,
   type SlotWrites,
 } from './saveSlots';
@@ -652,7 +653,7 @@ function slotStanding(save: SaveContext): string[] {
   const report = saveReport(save);
   return [
     `writing ${report.slot}, dev mode ${report.dev ? 'on' : 'off'}${WHY_NOT[report.writes]}`,
-    `autosave ${report.autosaveSeconds === 0 ? 'never' : `every ${report.autosaveSeconds}s`}`,
+    `autosave ${report.autosaveSeconds === null ? `— ${UNREADABLE_CADENCE}` : report.autosaveSeconds === 0 ? 'never' : `every ${report.autosaveSeconds}s`}`,
     ...report.slots.map((slot) => `${slot.name.padEnd(SLOT_COLUMN)} ${slotAge(save, slot.writtenAt)}`),
   ];
 }
@@ -660,6 +661,8 @@ function slotStanding(save: SaveContext): string[] {
 const NOT_ADOPTED = 'this session did not come out of that slot, so autosave will not write it: /restore to pick it up or /save to replace it';
 
 const UNREADABLE_SLOT = 'that slot holds bytes nothing here can read, so autosave leaves them alone: look at the file, or /save to replace it';
+
+const UNREADABLE_CADENCE = 'the slot the cadence lives in does not hold one, so nothing is saved on a cadence: /autosave <s> sets it again';
 
 // One sentence per answer the session gives, so the terminal renders what it
 // was told rather than working it out a second time.
@@ -683,9 +686,22 @@ function autosaved(ctx: CommandContext): ToolMessage | null {
   }
 }
 
-function devOn(save: SaveContext): CommandResult {
-  enterDev(save);
-  return noted('ok', `Dev mode on, writing slot ${liveSlot(save)}.`);
+// The mirror of leaving: the session goes to whatever the dev slot holds, so it
+// is what the slot it is about to write holds and an author picks up where they
+// left off. Nothing there is the ordinary case — the session carries on and
+// takes the empty slot. Something there that will not load costs the pick-up
+// and nothing else: the mode is on, the slot is withheld, and `/save` is what
+// takes it deliberately.
+function devOn(ctx: CommandContext, save: SaveContext): CommandResult {
+  const authoring = enterDev(save);
+  if (authoring === null) return noted('ok', `Dev mode on, writing slot ${liveSlot(save)}.`);
+
+  const result = importPayload(ctx, authoring, `Dev mode on, slot ${DEV_SLOT} picked up.`);
+  if (loaded(result)) {
+    adopted(save, DEV_SLOT);
+    return result;
+  }
+  return { ...result, output: [...result.output, note('warn', `Dev mode is on, but slot ${DEV_SLOT} could not be picked up, so this session is left as it is and will not be written there. /save takes it.`)] };
 }
 
 // Everything done in dev goes with the mode: the player's slot goes back to the
@@ -697,14 +713,19 @@ function devOn(save: SaveContext): CommandResult {
 // withheld, so what dev built cannot reach the slot a player would open next,
 // and the dev slot is still there to `/restore` from.
 function devOff(ctx: CommandContext, save: SaveContext): CommandResult {
-  const snapshot = devSnapshot(save);
-  if (snapshot === null) {
-    leaveDev(save, null);
-    return noted('ok', `Dev mode off, writing slot ${liveSlot(save)}. There was no ${PLAYER_SLOT} slot to come back to, so this session is left as it is and will not be written to one.`);
+  const exit = devSnapshot(save);
+  // Said before anything else, so whatever fails below it this session cannot
+  // write the slot it is on its way out of.
+  withhold(save, DEV_SLOT);
+
+  if (exit.kind !== 'restore') {
+    leaveDev(save, exit);
+    const why = exit.kind === 'was-empty' ? `There was no ${PLAYER_SLOT} slot to come back to` : `${exit.why}, so ${PLAYER_SLOT} is left exactly as it is`;
+    return noted('ok', `Dev mode off, writing slot ${liveSlot(save)}. ${why}, so this session is left as it is and will not be written to one. Slot ${DEV_SLOT} still holds what dev did.`);
   }
 
-  const result = importPayload(ctx, snapshot, `Dev mode off, ${PLAYER_SLOT} restored.`);
-  leaveDev(save, snapshot);
+  const result = importPayload(ctx, exit.payload, `Dev mode off, ${PLAYER_SLOT} restored.`);
+  leaveDev(save, exit);
   if (loaded(result)) {
     adopted(save, PLAYER_SLOT);
     return result;
@@ -994,7 +1015,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     argHint: 'on | off',
     summary: 'author against a slot of its own, and put the player\'s back on the way out',
     parse: (rest) => (rest === 'on' || rest === 'off' ? rest : { problem: '/dev requires on or off' }),
-    run: (ctx, mode) => withSaves(ctx, (save) => (mode === 'on' ? devOn(save) : devOff(ctx, save))),
+    run: (ctx, mode) => withSaves(ctx, (save) => (mode === 'on' ? devOn(ctx, save) : devOff(ctx, save))),
   }),
   define({
     name: '/create-test',

@@ -73,7 +73,7 @@ describe('the cadence is a slot like any other (c4)', () => {
     expect(() => setAutosaveSeconds(save, Number.NaN)).toThrow(RuntimeError);
 
     save.store.write(AUTOSAVE_SLOT, 'often');
-    expect(() => autosaveSeconds(save)).toThrow(/slot autosave holds "often"/);
+    expect(() => autosaveSeconds(save)).toThrow(/slot autosave does not hold a cadence/);
   });
 
   it('is due when the live slot cannot be dated, because the next write replaces it anyway', () => {
@@ -141,7 +141,7 @@ describe('a session writes back only what it came out of (c4, c9)', () => {
     pass(30_000);
     autosave(save, () => 'authoring');
     const snapshot = devSnapshot(save);
-    expect(snapshot).toBe('the player');
+    expect(snapshot).toEqual({ kind: 'restore', payload: 'the player' });
     leaveDev(save, snapshot);
 
     pass(30_000);
@@ -267,6 +267,7 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
     saveNow(save, 'authoring');
     save.store.write(PLAYER_SLOT, 'written by something in dev');
 
+    expect(devSnapshot(save)).toEqual({ kind: 'was-empty' });
     leaveDev(save, devSnapshot(save));
     expect(save.store.read(PLAYER_SLOT)).toBeNull();
   });
@@ -292,10 +293,13 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
     saveNow(save, 'authoring');
     save.store.remove(DEV_SNAPSHOT_SLOT);
 
-    expect(() => devSnapshot(save)).toThrow(/slot dev-snapshot is gone/);
-    expect(save.dev).toBe(true);
+    // Not being able to restore a slot is a reason to leave it alone, never a
+    // reason to keep somebody in a mode with no way out of it.
+    const exit = devSnapshot(save);
+    expect(exit).toEqual({ kind: 'no-snapshot', why: 'slot dev-snapshot is gone' });
+    leaveDev(save, exit);
+    expect(save.dev).toBe(false);
     expect(save.store.read(PLAYER_SLOT)?.payload).toBe('the player');
-    // Nothing was committed, so the authoring is still where it was.
     expect(save.store.read(DEV_SLOT)?.payload).toBe('authoring');
   });
 
@@ -303,7 +307,7 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
     const { save } = turning();
 
     expect(() => devSnapshot(save)).toThrow(/not in dev mode/);
-    expect(() => leaveDev(save, null)).toThrow(/not in dev mode/);
+    expect(() => leaveDev(save, { kind: 'was-empty' })).toThrow(/not in dev mode/);
     enterDev(save);
     expect(() => enterDev(save)).toThrow(/already in dev mode/);
   });
@@ -340,6 +344,51 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
     expect(report.dev).toBe(true);
     expect(report.slot).toBe(DEV_SLOT);
     expect(report.slots.map((slot) => slot.name)).toEqual([AUTOSAVE_SLOT, DEV_SNAPSHOT_SLOT, PLAYER_SLOT]);
+  });
+
+  it('reports a cadence it cannot read as no cadence, rather than refusing the whole answer', () => {
+    const { save } = turning();
+    setAutosaveSeconds(save, 30);
+    saveNow(save, 'the player');
+    save.store.write(AUTOSAVE_SLOT, 'whenever');
+
+    const report = saveReport(save);
+    expect(report.autosaveSeconds).toBeNull();
+    // Everything else the report is for still answers.
+    expect(report.slot).toBe(PLAYER_SLOT);
+    expect(report.writes).toBe('yes');
+    expect(report.slots.map((slot) => slot.name)).toEqual([AUTOSAVE_SLOT, PLAYER_SLOT]);
+    // And what has to act on a cadence still refuses to guess at one.
+    expect(() => autosaveSeconds(save)).toThrow(/does not hold a cadence/);
+  });
+
+  it('picks the dev slot up on the way in, so a second visit is not a session refused', () => {
+    const { save, pass } = turning();
+    setAutosaveSeconds(save, 1);
+    saveNow(save, 'the player');
+
+    expect(enterDev(save)).toBeNull();
+    pass(2_000);
+    expect(autosave(save, () => 'the first authoring session')).toEqual({ kind: 'wrote', slot: DEV_SLOT });
+    leaveDev(save, devSnapshot(save));
+
+    // Second visit: the slot is still there, and this is what it holds.
+    expect(enterDev(save)).toBe('the first authoring session');
+    adopted(save, DEV_SLOT);
+    pass(2_000);
+    expect(autosave(save, () => 'the second')).toEqual({ kind: 'wrote', slot: DEV_SLOT });
+  });
+
+  it('withholds the dev slot until the caller says it picked it up', () => {
+    const { save, pass } = turning();
+    setAutosaveSeconds(save, 1);
+    save.store.write(DEV_SLOT, 'what the last dev session was doing');
+
+    expect(enterDev(save)).toBe('what the last dev session was doing');
+    pass(2_000);
+    // The caller has not said it loaded, so it is nobody's yet.
+    expect(autosave(save, () => 'a different dev session')).toEqual({ kind: 'held', slot: DEV_SLOT });
+    expect(save.store.read(DEV_SLOT)?.payload).toBe('what the last dev session was doing');
   });
 
   it('reports a slot it cannot read as one with no date rather than refusing the whole answer', () => {

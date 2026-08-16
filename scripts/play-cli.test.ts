@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -993,7 +993,7 @@ describe('autosave fires on a cadence and zero means never (c4)', () => {
       result.live!.tick(1_000);
     }
 
-    expect(errorsOf(result.live!.end(true))[0]).toMatch(/autosave: slot autosave holds "often"/);
+    expect(errorsOf(result.live!.end(true))[0]).toMatch(/autosave: slot autosave does not hold a cadence/);
     rmSync(game.dir, { recursive: true, force: true });
   });
 
@@ -1003,7 +1003,7 @@ describe('autosave fires on a cadence and zero means never (c4)', () => {
     writeFileSync(path.join(game.dir, `${AUTOSAVE_SLOT}.slot`), JSON.stringify({ writtenAt: 1, payload: 'often' }), 'utf8');
 
     const result = runLine(game.ctx, 'use: entity.chest.open');
-    expect(errorsOf(result)[0]).toMatch(/autosave: slot autosave holds "often"/);
+    expect(errorsOf(result)[0]).toMatch(/autosave: slot autosave does not hold a cadence/);
     // The command itself still happened.
     expect(sessionStatus(game.ctx.session).inventory.gold).toBe(1);
     rmSync(game.dir, { recursive: true, force: true });
@@ -1258,6 +1258,98 @@ describe('a session writes back only what it came out of (c4, c7, c9)', () => {
     rmSync(game.dir, { recursive: true, force: true });
   });
 
+  it('picks the dev slot back up on a second visit, so authoring carries on where it stopped', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 1');
+    runLine(game.ctx, '/save');
+    const played = game.slot(PLAYER_SLOT);
+
+    runLine(game.ctx, '/dev on');
+    for (let each = 0; each < 4; each += 1) {
+      game.pass(2_000);
+      runLine(game.ctx, 'use: entity.chest.open');
+    }
+    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(4);
+    runLine(game.ctx, '/dev off');
+    expect(sessionStatus(game.ctx.session).inventory.gold ?? 0).toBe(0);
+    const authored = game.slot(DEV_SLOT);
+
+    // Back in, and the session is what the dev slot holds rather than a session
+    // refused for not being it.
+    expect(errorsOf(runLine(game.ctx, '/dev on'))).toEqual([]);
+    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(4);
+    game.pass(2_000);
+    const carried = runLine(game.ctx, 'use: entity.chest.open');
+    expect(carried.output.some((each) => each.kind === 'message' && each.tone === 'warn')).toBe(false);
+    expect(game.slot(DEV_SLOT)).toBe(serializeSession(game.ctx.session));
+    expect(game.slot(DEV_SLOT)).not.toBe(authored);
+    expect(game.slot(PLAYER_SLOT)).toBe(played);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('goes into dev without picking up a dev slot it cannot read, and will not write it either', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 1');
+    game.write(DEV_SLOT, 'what the last dev session was doing');
+
+    const entered = runLine(game.ctx, '/dev on');
+    expect(entered.output.some((each) => each.kind === 'message' && each.tone === 'warn')).toBe(true);
+    game.pass(2_000);
+    runLine(game.ctx, 'use: entity.chest.open');
+    expect(game.slot(DEV_SLOT)).toBe('what the last dev session was doing');
+
+    // And saying so outright is what takes it.
+    runLine(game.ctx, '/save');
+    expect(game.slot(DEV_SLOT)).toBe(serializeSession(game.ctx.session));
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('leaves dev without a snapshot to come back to rather than keeping the session in it', () => {
+    const game = playing();
+    runLine(game.ctx, '/save');
+    const played = game.slot(PLAYER_SLOT);
+    runLine(game.ctx, '/dev on');
+    runLine(game.ctx, 'use: entity.chest.open');
+    runLine(game.ctx, '/save');
+    // Whatever became of it, there is nothing to restore from.
+    writeFileSync(path.join(game.dir, `${DEV_SNAPSHOT_SLOT}.slot`), '{{{ truncated', 'utf8');
+
+    expect(errorsOf(runLine(game.ctx, '/dev off'))).toEqual([]);
+    expect(linesOf(runLine(game.ctx, '/slots'))[0]).toMatch(/^writing player, dev mode off —/);
+    // Left exactly as it is, which is the only safe thing to do with a slot
+    // nothing here knows how to put back.
+    expect(game.slot(PLAYER_SLOT)).toBe(played);
+    game.pass(60_000);
+    runLine(game.ctx, 'use: entity.chest.open');
+    expect(game.slot(PLAYER_SLOT)).toBe(played);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('cannot write the dev slot once it is on its way out, even when the way out fails', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 1');
+    runLine(game.ctx, '/save');
+    runLine(game.ctx, '/dev on');
+    // Five, so the authoring and a restored session that plays on afterwards
+    // cannot serialize to the same bytes and hide the difference.
+    for (let each = 0; each < 5; each += 1) runLine(game.ctx, 'use: entity.chest.open');
+    runLine(game.ctx, '/save');
+    const authored = game.slot(DEV_SLOT);
+
+    // Something standing where the player's slot goes, so putting it back
+    // fails after the session has already been put back.
+    rmSync(path.join(game.dir, `${PLAYER_SLOT}.slot`), { force: true });
+    mkdirSync(path.join(game.dir, `${PLAYER_SLOT}.slot`));
+    writeFileSync(path.join(game.dir, `${PLAYER_SLOT}.slot`, 'in the way'), 'x', 'utf8');
+
+    expect(errorsOf(runLine(game.ctx, '/dev off')).length).toBeGreaterThan(0);
+    game.pass(60_000);
+    runLine(game.ctx, 'use: entity.chest.open');
+    // The session is the player's game now; the authoring is not its to replace.
+    expect(game.slot(DEV_SLOT)).toBe(authored);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
   it('says which it is when asked', () => {
     const game = playing();
     runLine(game.ctx, '/save');
@@ -1369,6 +1461,31 @@ describe('nothing done in dev mode reaches the slot being played (c9)', () => {
     expect(linesOf(runLine(game.ctx, '/slots'))[0]).toMatch(/^writing player, dev mode off — that slot holds bytes nothing here can read/);
     rmSync(game.dir, { recursive: true, force: true });
   });
+});
+
+// Every verb the driver has, over a directory standing where a slot should be:
+// the shape a hand, a sync tool or an interrupted `git checkout` leaves. What a
+// driver raises reaches the command table, and `refused` rethrows anything that
+// is not a `RuntimeError`, so a verb that does not speak this language ends the
+// session standing behind it rather than printing a line.
+describe('a filesystem that refuses reaches the command table as a message (c7)', () => {
+  const LINES = ['/slots', '/save', '/restore', '/dev on', 'use: entity.chest.open'];
+
+  for (const line of LINES) {
+    it(`answers ${JSON.stringify(line)} rather than ending the session`, () => {
+      const game = playing();
+      runLine(game.ctx, '/autosave 1');
+      game.pass(2_000);
+      mkdirSync(path.join(game.dir, `${PLAYER_SLOT}.slot`));
+      writeFileSync(path.join(game.dir, `${PLAYER_SLOT}.slot`, 'in the way'), 'x', 'utf8');
+
+      const result = runLine(game.ctx, line);
+      expect(result.output.length).toBeGreaterThan(0);
+      // Still playing: the world moved and the next line still runs.
+      expect(shown(runLine(game.ctx, '/look')).length).toBeGreaterThan(0);
+      rmSync(game.dir, { recursive: true, force: true });
+    });
+  }
 });
 
 describe('all of it is exercised before src/ui exists (c8)', () => {

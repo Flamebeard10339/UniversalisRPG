@@ -101,11 +101,22 @@ export function liveSlot(save: SaveContext): string {
   return save.dev ? DEV_SLOT : PLAYER_SLOT;
 }
 
+// The cadence, or nothing when the slot it lives in cannot be made sense of.
+// A setting is not a save: what a report owes a reader is the rest of the
+// answer, not a refusal, so the two callers ask different questions of it the
+// way `datable` and `adopts` do of a slot.
+export function cadenceOrNone(save: SaveContext): number | null {
+  const state = stateOf(save.store, AUTOSAVE_SLOT);
+  if (state.kind === 'empty') return DEFAULT_AUTOSAVE_SECONDS;
+  if (state.kind === 'unreadable') return null;
+  const seconds = Number(state.slot.payload);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+}
+
+// The cadence for whoever has to act on it, which cannot act on nothing.
 export function autosaveSeconds(save: SaveContext): number {
-  const slot = save.store.read(AUTOSAVE_SLOT);
-  if (!slot) return DEFAULT_AUTOSAVE_SECONDS;
-  const seconds = Number(slot.payload);
-  if (!Number.isFinite(seconds) || seconds < 0) throw new RuntimeError(`slot ${AUTOSAVE_SLOT} holds ${JSON.stringify(slot.payload)}, which is not a cadence in seconds`);
+  const seconds = cadenceOrNone(save);
+  if (seconds === null) throw new RuntimeError(`slot ${AUTOSAVE_SLOT} does not hold a cadence in seconds`);
   return seconds;
 }
 
@@ -167,7 +178,7 @@ export function adopted(save: SaveContext, slot: string): void {
 
 // The other direction, and the reason it is not merely "forget the adoption":
 // a session told it is not a slot's stays that way when the slot is empty too.
-function withhold(save: SaveContext, slot: string): void {
+export function withhold(save: SaveContext, slot: string): void {
   const standing = standingOf(save);
   standing.is.delete(slot);
   standing.isNot.add(slot);
@@ -186,27 +197,46 @@ function decodeSnapshot(text: string): string | null {
   return parsed;
 }
 
-export function enterDev(save: SaveContext): void {
+// What the dev slot holds, which is what a session entering dev has to be put
+// into — null when there is none, and so nothing to pick up. Symmetrical with
+// leaving: `/dev on` goes to the dev slot and `/dev off` comes back from it, so
+// the session is always what the live slot holds and autosave never has to
+// choose between refusing an author and writing over their last session.
+// Loading it is the caller's, because loading a payload is not a store's job.
+export function enterDev(save: SaveContext): string | null {
   if (save.dev) throw new RuntimeError('already in dev mode');
   const player = save.store.read(PLAYER_SLOT);
   // Persisted before the mode is on, so nothing done in dev can precede it.
   save.store.write(DEV_SNAPSHOT_SLOT, encodeSnapshot(player?.payload ?? null));
-  // A dev slot left behind by a session that crashed is not this session's, and
-  // is protected by the same rule everything else is. Not withheld: an absent
-  // dev slot is a scratch slot this session may take.
-  standingOf(save).is.delete(DEV_SLOT);
   save.dev = true;
+  // Nothing is said about standing here: an empty dev slot is a scratch slot
+  // this session takes, the way a game nobody has loaded takes an empty player
+  // slot, and anything already in it is refused by that same rule until the
+  // caller says it picked it up. Leaving is where a session stops being the dev
+  // slot's, so entering has nothing left to withhold.
+  const authoring = stateOf(save.store, DEV_SLOT);
+  return authoring.kind === 'held' ? authoring.slot.payload : null;
 }
 
-// What the player's slot held when dev mode was entered, which is what a
-// session leaving dev has to be put back to — null when there was no slot, and
-// so nothing to go back to. Asked before anything is committed, so a caller
-// that cannot load it back is still in dev with every slot where it was.
-export function devSnapshot(save: SaveContext): string | null {
+// How leaving dev will go: back to what the player's slot held, back to having
+// no slot at all, or — when the snapshot itself is gone or unreadable — out of
+// the mode without touching the player's slot. That third answer is why this is
+// a value rather than a raise: not being able to restore a slot is a reason to
+// leave it alone, never a reason to keep somebody in a mode with no way out.
+export type DevExit = { kind: 'restore'; payload: string } | { kind: 'was-empty' } | { kind: 'no-snapshot'; why: string };
+
+export function devSnapshot(save: SaveContext): DevExit {
   if (!save.dev) throw new RuntimeError('not in dev mode');
-  const snapshot = save.store.read(DEV_SNAPSHOT_SLOT);
-  if (!snapshot) throw new RuntimeError(`slot ${DEV_SNAPSHOT_SLOT} is gone, so leaving dev mode cannot restore ${PLAYER_SLOT}; it is left as it is`);
-  return decodeSnapshot(snapshot.payload);
+  const state = stateOf(save.store, DEV_SNAPSHOT_SLOT);
+  if (state.kind === 'empty') return { kind: 'no-snapshot', why: `slot ${DEV_SNAPSHOT_SLOT} is gone` };
+  if (state.kind === 'unreadable') return { kind: 'no-snapshot', why: `slot ${DEV_SNAPSHOT_SLOT} cannot be read` };
+  let held: string | null;
+  try {
+    held = decodeSnapshot(state.slot.payload);
+  } catch {
+    return { kind: 'no-snapshot', why: `slot ${DEV_SNAPSHOT_SLOT} does not hold a snapshot` };
+  }
+  return held === null ? { kind: 'was-empty' } : { kind: 'restore', payload: held };
 }
 
 // The commit, taking back what `devSnapshot` handed out: the player's slot goes
@@ -219,26 +249,26 @@ export function devSnapshot(save: SaveContext): string | null {
 // The dev slot stays. Removing it was tidiness and it is an author's work, so a
 // session that cannot be restored still has somewhere to go back to; a stale one
 // is not adopted, so nothing writes over it either.
-export function leaveDev(save: SaveContext, held: string | null): void {
+export function leaveDev(save: SaveContext, exit: DevExit): void {
   if (!save.dev) throw new RuntimeError('not in dev mode');
 
   // Rewritten only when it differs, so the stamp on a slot nothing touched is
   // still the stamp of the write that made it. Bytes nobody can read differ
   // from everything, including from the snapshot they were taken of.
   const current = stateOf(save.store, PLAYER_SLOT);
-  if (held === null) {
+  if (exit.kind === 'was-empty') {
     if (current.kind !== 'empty') save.store.remove(PLAYER_SLOT);
-  } else if (current.kind !== 'held' || current.slot.payload !== held) {
-    save.store.write(PLAYER_SLOT, held);
+  } else if (exit.kind === 'restore' && (current.kind !== 'held' || current.slot.payload !== exit.payload)) {
+    save.store.write(PLAYER_SLOT, exit.payload);
   }
 
   save.store.remove(DEV_SNAPSHOT_SLOT);
-  standingOf(save).is.delete(DEV_SLOT);
-  // The session standing here is the one dev built, not the one the player's
-  // slot holds — and that is true whether or not there is a slot to be unlike,
-  // which is why it is withheld rather than merely forgotten. Until something
-  // loads the player's game back, this session may not write it.
+  // The session standing here is the one dev built: it is not what the player's
+  // slot holds, and it is no longer the dev slot's either once the mode is off.
+  // Withheld rather than forgotten, because an empty slot answers those two
+  // differently and either of these may be empty.
   withhold(save, PLAYER_SLOT);
+  withhold(save, DEV_SLOT);
   save.dev = false;
 }
 
@@ -262,7 +292,9 @@ export interface SaveReport {
   dev: boolean;
   slot: string;
   writes: SlotWrites;
-  autosaveSeconds: number;
+  // Null when the slot the cadence lives in cannot be made sense of, which is
+  // a thing to draw rather than a reason to have no report.
+  autosaveSeconds: number | null;
   slots: SlotStanding[];
 }
 
@@ -277,7 +309,7 @@ export function saveReport(save: SaveContext): SaveReport {
     dev: save.dev,
     slot: liveSlot(save),
     writes: writesLive(save),
-    autosaveSeconds: autosaveSeconds(save),
+    autosaveSeconds: cadenceOrNone(save),
     slots: save.store.list().map((name) => ({ name, writtenAt: standing(save.store, name) })),
   };
 }

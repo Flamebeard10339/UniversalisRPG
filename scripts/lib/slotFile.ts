@@ -39,34 +39,52 @@ function replace(staging: string, file: string, name: string): void {
   }
 }
 
+// What the filesystem says, in this driver's own words. Every verb goes through
+// it: a directory where a slot should be, a permission, a handle another
+// process is holding — those reach the command table as a message it can print
+// rather than as an exception that ends the session standing behind it.
+function attempting<T>(what: string, act: () => T): T {
+  try {
+    return act();
+  } catch (error) {
+    if (error instanceof RuntimeError) throw error;
+    throw new RuntimeError(`${what}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 // One file per slot under one directory, created on the first write. Nothing
 // here reads the text it moves: what a slot means is decided above this.
 export function fileSlots(dir: string): SlotDriver {
   return {
     read(name) {
       const file = fileFor(dir, name);
-      return existsSync(file) ? readFileSync(file, 'utf8') : null;
+      return attempting(`slot ${name} could not be read`, () => (existsSync(file) ? readFileSync(file, 'utf8') : null));
     },
     write(name, text) {
       const file = fileFor(dir, name);
-      mkdirSync(path.dirname(file), { recursive: true });
       const staging = `${file}.${process.pid}.tmp`;
-      try {
-        writeFileSync(staging, text, 'utf8');
-      } catch (error) {
-        clear(staging);
-        throw new RuntimeError(`slot ${name} could not be written: ${error instanceof Error ? error.message : String(error)}. It still holds what it held.`);
-      }
+      attempting(`slot ${name} could not be written. It still holds what it held`, () => {
+        mkdirSync(path.dirname(file), { recursive: true });
+        try {
+          writeFileSync(staging, text, 'utf8');
+        } catch (error) {
+          clear(staging);
+          throw error;
+        }
+      });
       replace(staging, file, name);
     },
     remove(name) {
-      rmSync(fileFor(dir, name), { force: true });
+      const file = fileFor(dir, name);
+      attempting(`slot ${name} could not be removed`, () => rmSync(file, { force: true }));
     },
     names() {
       if (!existsSync(dir)) return [];
-      return readdirSync(dir)
-        .filter((entry) => entry.endsWith(SLOT_SUFFIX))
-        .map((entry) => entry.slice(0, -SLOT_SUFFIX.length));
+      return attempting('the slots kept here could not be listed', () =>
+        readdirSync(dir)
+          .filter((entry) => entry.endsWith(SLOT_SUFFIX))
+          .map((entry) => entry.slice(0, -SLOT_SUFFIX.length)),
+      );
     },
   };
 }

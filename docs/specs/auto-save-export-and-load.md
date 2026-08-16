@@ -318,6 +318,27 @@ The player's progress survives closing the game, through a store three queued br
   from there, twice per entry, over four states the player's slot can be in at dev entry. A command
   added tomorrow is walked on the day it exists, which is what `SAVE_FIELDS` does for c14.
 
+- **`/dev on` goes to the dev slot the way `/dev off` comes back from the player's.** Pass 3 kept the
+  dev slot on exit because it is an author's work; pass 4 found the other half of that had not been
+  written, so a second `/dev on` met a slot the session was not, and every command in it warned that
+  autosave was held. The symmetry is the fix rather than a special case: entering loads what the dev
+  slot holds, so the session is always what the live slot holds and autosave never has to choose
+  between refusing an author and writing over their last session. A dev slot that will not load costs
+  the pick-up and nothing else — the mode is on, the slot is left alone, `/save` takes it.
+- **Leaving dev has three ways to go, and none of them is a raise.** A snapshot that is gone or
+  unreadable used to keep the session in the mode with no command that left it. It is now a third
+  answer beside "back to what was there" and "back to having no slot": out of the mode without
+  touching the player's slot at all. Not being able to restore a slot is a reason to leave it alone,
+  never a reason to strand somebody.
+- **Every verb of the file driver speaks this engine's language.** `write` wrapped its filesystem
+  errors and the other three did not, so a directory standing where a slot should be — a hand, a sync
+  tool, an interrupted checkout — reached `refused`, which rethrows anything that is not a
+  `RuntimeError`, and ended the session standing behind it. One wrapper over all four.
+- **The cadence answers the same two questions a slot does.** `saveReport` read it through the
+  throwing reader, so one unreadable settings slot cost the whole report — the same shape as the
+  finding closed one pass earlier, one caller further on. `cadenceOrNone` is what a report asks and
+  `autosaveSeconds` is what has to act on one, and neither guesses.
+
 ## Open questions
 
 - Where the store interface lives, and whether the autosave decision — has the cadence elapsed,
