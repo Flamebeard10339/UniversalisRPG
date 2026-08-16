@@ -27,6 +27,7 @@
         "src/content/dropTable.ts",
         "src/content/engineLocale.ts",
         "src/content/entity.ts",
+        "src/content/event.test.ts",
         "src/content/event.ts",
         "src/content/faction.ts",
         "src/content/flag.ts",
@@ -82,6 +83,8 @@
         "src/grammar/range.test.ts",
         "src/grammar/range.ts",
         "src/grammar/section.ts",
+        "src/grammar/skillGrant.test.ts",
+        "src/grammar/skillGrant.ts",
         "src/grammar/structure.ts",
         "src/grammar/tagClause.ts",
         "src/grammar/values.ts"
@@ -315,6 +318,7 @@
         "src/runtime/planeReport.ts",
         "src/runtime/planeScreen.test.ts",
         "src/runtime/planeScreen.ts",
+        "src/runtime/poolMoments.test.ts",
         "src/runtime/population.ts",
         "src/runtime/published.test.ts",
         "src/runtime/recipe.test.ts",
@@ -330,6 +334,8 @@
         "src/runtime/sayFixture.ts",
         "src/runtime/session.test.ts",
         "src/runtime/session.ts",
+        "src/runtime/skillGrants.test.ts",
+        "src/runtime/skillGrants.ts",
         "src/runtime/skills.test.ts",
         "src/runtime/skills.ts",
         "src/runtime/stat.test.ts",
@@ -593,6 +599,13 @@
             "src/runtime/stats.ts"
           ],
           "note": "produced by archetype-mods"
+        },
+        {
+          "name": "skill xp grants",
+          "paths": [
+            "src/runtime/skillGrants.ts"
+          ],
+          "note": "produced by xp-from-events: which skills a fired event trains, and what one moment is worth to each. The line itself is parsed in src/grammar/skillGrant.ts, which the DSL load path owns."
         }
       ]
     },

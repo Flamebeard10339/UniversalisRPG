@@ -3,9 +3,9 @@
 ## Deliverable
 
 Experience is earned from what happened, not only from an authored `xp:` result someone remembered to
-write. A skill grant says `gain <expression> experience in <skill> on <event>`, where `<event>` is an
-ordinary authored `# event` name — the same name an entity handler writes after `on` — so the language
-has one event vocabulary and not two. What this branch adds to `# event` is the other half of that
+write. A skill grant says `gain <expression> experience on <event>` in the body of the `# skill` it
+trains, where `<event>` is an ordinary authored `# event` name — the same name an entity handler writes
+after `on` — so the language has one event vocabulary and not two. What this branch adds to `# event` is the other half of that
 unification: `trigger:` grows from the two pool crossings `full-refactor-of-enemies-and-combat` ships
 with to a closed set that also names the discrete combat and settle moments the runtime already
 produces. This branch was clauses c7–c9 of `skill-levels-xp-events` until 2026-08-09; it left because
@@ -20,46 +20,60 @@ Proof:
   writable directly in a grant, and no second closed list of names exists anywhere in the language. A
   reader holding the page can tell what an event is by looking at its `# event` declaration, which is
   the invariant `docs/combat/encounter-grammar.md` is written to hold.
+  proof: vitest src/content/event.test.ts
 - [c2] **The closed set lives in `trigger:`, beside the pool crossings that are already there.** The
   triggers are exactly the ten listed under `### Triggers` and nothing else. An unrecognised trigger
   fails at load with an error naming the triggers that do exist, and adding an eleventh requires editing
   that list. This is where the closed set belongs because `trigger: on empty` already is one.
+  proof: vitest src/content/event.test.ts
 - [c3] **A trigger's arity is `resource:`, and it is known at parse time.** Because the set is closed,
   each name declares whether it requires a `resource:` line: `trigger: on empty` does, `trigger:
   damage-taken` does not. A declaration violating its trigger's arity is a load error that names the
   arity it violated, in either direction — a missing `resource:` and a superfluous one are both refused.
+  proof: vitest src/content/event.test.ts
 - [c4] **A trigger name says whose view it is, and the entity it fires on follows from the name alone.**
   One swing produces `damage-dealt` on the performer and `damage-taken` on the struck; a swing that does
   not land produces `missed` on the performer and `evaded` on the struck. That is why there are four
   names for two moments rather than two names plus a rule. An event fires on the entity whose view its
   name is, and `credit:` remains the one marked way for a result to reach anyone else, unchanged from
   the refactor's c9.
+  proof: vitest src/runtime/skillGrants.test.ts
 - [c5] **The grant expression is `<coefficient> * <amount>` with either side omittable, but not both.**
-  `4 * amount`, `4` and `amount` all parse; `gain experience in cooking on dish-cooked` is a parse
+  `4 * amount`, `4` and `amount` all parse; `gain experience on dish-cooked` is a parse
   error. Every event binds exactly one variable, `amount`, and anything more general than one
   coefficient and one bound amount is a parse error rather than a feature — a general expression here
   would be a second evaluator with its own variable binding, and no authored case needs one.
-- [c6] **`in` delimits the expression from the skill.** The grammar is `gain <expression> experience in
-  <skill> on <event>`, `<skill>` is a `# skill` id resolved like every other reference, and the line
-  parses to one grant however the spacing is written.
+  proof: vitest src/grammar/skillGrant.test.ts
+- [c6] **The `# skill` a grant is written on is the skill it trains, and `on` delimits the expression
+  from the event.** The grammar is `gain <expression> experience on <event>`, written bare in the body
+  of `# skill <id>`, `<event>` is a `# event` id resolved like every other reference, and the line
+  parses to one grant however the spacing is written. Amended from `gain <expression> experience in
+  <skill> on <event>` when the Open question below was answered; see the Decisions entry.
+  proof: vitest src/grammar/skillGrant.test.ts
 - [c7] **Any entity that declares `skills:` earns experience from its own events, and the player is not
   special.** The refactor made the player an entity; nothing here reads `PLAYER`, and an authored enemy
   with `skills:` accumulates xp by the same path with no code change. That shipped content declares
   `skills:` on the player alone is a fact about the content, not about this mechanism.
+  proof: vitest src/runtime/skillGrants.test.ts
 - [c8] **There is one xp accumulator and one place that writes it.** A grant lands through the same
   accumulation the existing `xp:` result already uses; this branch adds no second store, no second
-  write site and no per-event tally. The runtime hook is one entry appended to `RESULT_OBSERVERS` in
-  `src/runtime/effects.ts`, and the module holding the observer is this branch's alone — a diff that
-  changes `applyResults` or `applyOne` is the signal that the seam is short of something, and it is
-  filed as a finding rather than worked around.
+  write site and no per-event tally. A grant becomes ordinary `xp:` results and reaches the
+  accumulator through `applyResults`, so neither `applyResults` nor `applyOne` is in this branch's
+  diff, and the module that evaluates a grant is this branch's alone. Amended from "the runtime hook
+  is one entry appended to `RESULT_OBSERVERS`", which no moment in the closed set can reach; see the
+  Decisions entry and the finding filed against that seam.
+  proof: vitest src/runtime/skillGrants.test.ts
 - [c9] **A grant costs nothing when nobody wrote one.** Evaluating a moment that no `# event` names, or
   an event no grant references, does no per-moment work proportional to the number of declared skills;
   the resolve loop runs the same number of segments with grants authored and without, and no fixture
   in shipped content changes because this branch loaded.
+  proof: vitest src/runtime/poolMoments.test.ts
 - [c10] **The save format is unchanged.** Grants are derived from content, levels are derived from xp,
   and no new field, no `SAVE_VERSION` move and no regenerated fixture belongs to this branch.
+  proof: vitest src/runtime/skillGrants.test.ts
 - [c11] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests, layer-check,
   audit-status, doctor and the byte check in one invocation.
+  proof: command npm run tasks -- merge-ready
 
 ### Triggers
 
@@ -87,8 +101,11 @@ trigger: damage-dealt
 # event dish-cooked
 trigger: completed
 
-gain 4*amount experience in melee on rat-bitten
-gain 4 experience in cooking on dish-cooked
+# skill melee
+gain 4*amount experience on rat-bitten
+
+# skill cooking
+gain 4 experience on dish-cooked
 ```
 
 ## Goal
@@ -130,19 +147,60 @@ uses.
   **adds** `skill xp grants`, the `gain … experience in … on …` line and its evaluation, which is the
   one durable capability registered here.
 
+### Decisions taken while implementing
+
+- **A grant is written on `# skill`, and `in <skill>` went with it.** The Open question offered `# skill`,
+  the entity and top level. The entity is out on the constraint the question itself names — a hundred
+  enemies restating one line. Top level does not exist: `splitSections` refuses content before the
+  first heading, so every line in the language belongs to a section, and the spec's own example block
+  would have parsed into the `# event` above it. A section of its own would keep `in <skill>` literally,
+  and costs an id-less section kind fighting every mechanism the loader has — a registry map, a merge
+  rule, a prune pass, a `# remove` address and a round trip, all for a phrase that restates the heading
+  the line is under. So `# skill` it is, and the phrase went, exactly as the question said it should.
+  c5's error example and c6 are amended to the shape that ships rather than left describing one the
+  branch refuses at load.
+- **`restored` and `drained` report the movement of the whole-unit level.** The question's binding
+  properties are that the sum of `amount` over a span equals the pool's net movement and that where the
+  span is split does not change it. A fractional amount fails the second: `divideRateRemainder` hands a
+  settle whatever whole milli-units the elapsed span earned, so a pool creeping up by 0.4 a tick would
+  report three amounts under one split and one under another. The integer level cannot: it is a
+  function of the level alone, so any two splits of one span agree. Proven at 1, 2, 3, 7, 10 and 100
+  cuts. The residue is that the xp *derived* from an amount is rounded to whole — a level is decided by
+  integer comparison — so a fractional coefficient still rounds per moment; filed rather than hidden.
+- **The forecast `RESULT_OBSERVERS` seam cannot carry a grant, and c8 is amended to what does.** An
+  observer sees an applied result, which is the seam's whole point — the 2026-08-08 ruling that created
+  it says so, and its first subscriber is a log line that has to interleave with the result that caused
+  it. None of the ten triggers is a result application: four are pool writes inside `setPoolLevel`, four
+  are read off a swing in `resolveAttempt`, and two are a fight's outcome. So the grant fires where the
+  moment does, from `fireEvents`, and what it produces is ordinary `xp:` results applied through
+  `applyResults` — which is what makes the accumulation the inherited one. `applyResults` and `applyOne`
+  are untouched, which is the countable half of c8 and the half a diff can be read for. Filed as a
+  finding against the forecast, per the clause's own instruction.
+- **`completed` is the outcome the engine already calls `completion`, not the attempts bound.** The
+  trigger table's `when` column reads "an action reached its `attempts:` bound" for `completed`, which
+  is what the engine calls `unfinished` — `on escape:` was renamed `on unfinished:` precisely because
+  attempts ran out. Reading the table literally would swap the pair against the rest of the language, so
+  `completed` is `FightOutcome` `completion` and `unfinished` is `unfinished`.
+- **A swing's moments fire only where there is somebody struck.** `damage-dealt`, `damage-taken`,
+  `missed` and `evaded` are gated on `depletes:`, the same gate `logSwing` carries, because c4 defines
+  all four in terms of a performer and a struck and an implicit target is nobody to have a view. A
+  craft that failed its `accuracy:` roll is `unfinished`, not `missed`.
+- **They fire after the swing's hooks, not before.** A hook is the swing's own consequence and the
+  felling verdict is taken over the characters it reached; announcing the moment first would put a
+  handler's drain inside that verdict. The moment is the announcement, so it goes last.
+- **The subject is enforced at the sheet, because the store is not keyed by actor.** `experienceFor`
+  grants only into a skill the entity the moment happened to declares, which is what makes an enemy earn
+  its own xp; `state.xp` itself is one map, which `skill-levels-xp-events` c4 reserved to whoever makes
+  the player an entity. A mutation swapping the actor at the application site survives the whole suite
+  for exactly that reason, and it is filed.
+
 ## Open questions
 
-- **Where a grant is written.** `# skill`, the entity, or top level are all defensible, and the choice
-  interacts with c6's `in <skill>` — on `# skill melee` the phrase is redundant and should go. The
-  binding constraint, and the one that is not the worker's call: a grant must not need restating per
-  entity, because a hundred enemies restating one line is the duplication `# entitytype` was deleted
-  for.
-- **Whether `restored` and `drained` fire per settle tick or per crossing.** A settle can move a pool by
-  a fraction of a unit; whether that is an event with a fractional `amount`, an event only when the
-  integer level moves, or an accumulation flushed at a segment boundary decides how much work c9's
-  no-cost property has to survive. The worker decides after reading `settlePools` and
-  `captureResourceRates`; the properties that are not its call are that the sum of `amount` over a span
-  equals the pool's net movement over that span, and that where a span is split does not change it.
+- ~~**Where a grant is written.**~~ Answered: `# skill`, and `in <skill>` went with the answer. See the
+  Decisions entry; c5's error example and c6 were amended to the shape that ships.
+- ~~**Whether `restored` and `drained` fire per settle tick or per crossing.**~~ Answered: per settle,
+  reporting the movement of the whole-unit level, which is the second of the three shapes this question
+  listed. See the Decisions entry.
 - **Whether a level-up is a boundary event.** `captureResourceRates` evaluates a resource's `rate` and
   `max` through `statValue`, so a stat that changes mid-segment is a stat the current segment's snapshot
   has already read. Inherited from `skill-levels-xp-events`, which recorded it and did not own it; this
