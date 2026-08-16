@@ -157,9 +157,7 @@ function renamedRegistry(loaded: Registry, moduleId: string): Registry {
 
 // Canonicalising is an offer, not a promise: what the serializer cannot carry
 // travels as the author's own bytes under the new id instead. Every edit to
-// another module's content and every `# remove` is in that set, and publishing
-// one of those as a canonical print is contribution-system-2026-07-30-h1 — an
-// approved mod that silently makes none of the changes it was approved for.
+// another module's content and every `# remove` is in that set.
 function canonicalLocalChangesModule(source: string, moduleId: string, base: readonly ModuleSource[]): string {
   const asWritten = (): string => replaceInfoId(source, LOCAL_CHANGES_MODULE_ID, moduleId);
   const checked = loadUniverseWithDiagnostics([...base, { name: LOCAL_CHANGES_MODULE_ID, text: source }]);

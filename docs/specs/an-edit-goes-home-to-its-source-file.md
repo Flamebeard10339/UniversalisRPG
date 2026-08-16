@@ -38,7 +38,7 @@ Proof:
   from through `registryDiff`. The proof derives its subjects from the tree rather than naming the
   script and the mod portal, because the third caller is the one this clause exists to catch. This
   closes `contribution-system-2026-07-30-h1`.
-  proof: vitest src/content/registryDiff.test.ts scripts/modportal.test.ts
+  proof: vitest src/content/registryDiff.test.ts src/content/modportal.test.ts
 - [c3] **A consolidation that would change the universe writes nothing.** Any difference `registryDiff`
   reports aborts the whole run: no file is written, the local module is untouched, and the difference is
   named. All-or-nothing, because a half-distributed edit is a state neither the file nor the local module
@@ -146,7 +146,9 @@ a time. A restage of what a CRLF file already says leaves it byte-identical, whi
 
 **c2's proof runs in `src/content/registryDiff.test.ts` and `src/content/modportal.test.ts`, not
 `scripts/modportal.test.ts`.** `materializeApprovedModIssue` is where the second caller lives and it is
-in `src/content`; the script is a CLI over it. c4's `# test` replay runs in `scripts/consolidate.test.ts`
+in `src/content`; the script is a CLI over it. The clause's own `proof:` line said the script and has
+been corrected to say the file, because a wrong `proof:` line misaims the generated mutation manifest —
+it cost pass 1 eleven entries. c4's `# test` replay runs in `scripts/consolidate.test.ts`
 over the consolidated tree rather than in `src/runtime/integration.test.ts`, which reads the shipped
 tree and would only prove that this branch did not disturb it.
 

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { splitSections } from '../src/grammar/structure';
 import { deleteLocalSection, listLocalSections, LOCAL_CHANGES_MODULE_ID, type LocalSection } from '../src/content/localChanges';
-import { NAMESPACED_KINDS, qualify } from '../src/content/namespace';
+import { declaredKey } from '../src/content/resolve';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
 import { registryDiff } from '../src/content/registryDiff';
 import type { Removal } from '../src/content/removal';
@@ -56,18 +56,17 @@ function headingLine(text: string, start: number): string {
 
 const declarationKey = (kind: string, id: string): string => `${kind} ${id}`;
 
-// A bare heading declares an id under its module's namespace and a dotted one
-// edits somebody else's, which is `targetKey`'s rule read from the file rather
-// than from the merged registry — the only rule under which "the file that
-// declared it" has one answer.
+// Which file declared an id, asked of the loader's own rule rather than of a
+// second spelling of it: `declaredKey` is what settles a section's id during a
+// load, and null there means the heading is an edit rather than a declaration.
 function declarations(sources: readonly ModuleSource[], namespaces: ReadonlyMap<string, string | null>): Map<string, Declaration[]> {
   const found = new Map<string, Declaration[]>();
   for (const source of sources) {
     for (const section of splitSections(source.text)) {
       if (section.kind === 'info' || section.id === undefined) continue;
-      const namespaced = NAMESPACED_KINDS.includes(section.kind);
-      if (namespaced && section.id.includes('.')) continue;
-      const key = declarationKey(section.kind, namespaced ? qualify(namespaces.get(source.name) ?? null, section.id) : section.id);
+      const declared = declaredKey(namespaces.get(source.name) ?? null, section.kind, section.id);
+      if (declared === null) continue;
+      const key = declarationKey(section.kind, declared);
       const at = found.get(key) ?? [];
       at.push({ source: source.name, heading: headingLine(source.text, section.span.start), start: section.span.start, end: section.span.end });
       found.set(key, at);
@@ -207,7 +206,7 @@ const repoRoot = path.join(import.meta.dirname, '..');
 const defaultLocal = 'content/local-changes.dsl';
 const contentDirectory = 'content';
 
-interface Args {
+export interface Args {
   contentFiles: string[] | null;
   localFile: string;
   dryRun: boolean;
@@ -255,7 +254,7 @@ const sourceName = (file: string): string => path.basename(file).replace(/\.[^.]
 // The directory is the manifest, the way it is for the browser's glob and for
 // the shipped-content replay: a `.dsl` added to content/ is a file an edit can
 // go home to on the commit that authors it.
-function contentFiles(args: Args): string[] {
+export function contentFiles(args: Args): string[] {
   if (args.contentFiles) return args.contentFiles;
   const local = repoPath(args.localFile);
   return readdirSync(repoPath(contentDirectory))

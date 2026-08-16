@@ -18,27 +18,52 @@ function sourceFiles(root: string): string[] {
   return found;
 }
 
-interface Import {
+const SERIALIZER = 'serializeRegistryModule';
+
+const SERIALIZE_MODULE = /(^|\/)serialize$/;
+
+// `export … from` as well as `import … from`, so a barrel that hands the
+// serializer on under its own name is the same reach as importing it.
+const FROM = /(?:import|export)\s+(?<names>[^'"]*?)\s+from\s+['"](?<specifier>[^'"]+)['"]/g;
+
+const DIFF_MODULE = /(^|\/)(registryDiff|roundTrip)$/;
+
+const DYNAMIC = /import\s*\(\s*['"](?<specifier>[^'"]+)['"]/g;
+
+interface Clause {
   names: string;
   specifier: string;
 }
 
-const IMPORT = /import\s+(?:type\s+)?(?<names>[^'"]*?)\s+from\s+['"](?<specifier>[^'"]+)['"]/g;
+const clauses = (text: string): Clause[] => [...text.matchAll(FROM)].map((match) => match.groups as unknown as Clause);
 
-const imports = (text: string): Import[] => [...text.matchAll(IMPORT)].map((match) => match.groups as unknown as Import);
+const dynamicSpecifiers = (text: string): string[] => [...text.matchAll(DYNAMIC)].map((match) => match.groups!.specifier);
 
-const importsFrom = (file: string, module: RegExp, name?: RegExp): boolean =>
-  imports(readFileSync(file, 'utf8')).some((each) => module.test(each.specifier) && (name === undefined || name.test(each.names)));
+// Every way a file can end up holding the serializer. A namespace import counts
+// whatever it is used for, because `* as printer` grants the whole module and
+// nothing downstream of it can be read off an import list — the named form of
+// this same rule let `import * as printer from './serialize'` through the whole
+// suite. `serialize.ts` itself imports nothing and so answers false, which is
+// why it needs no exemption.
+function reachesSerializer(text: string): boolean {
+  const named = clauses(text).some((clause) => SERIALIZE_MODULE.test(clause.specifier) && (clause.names.includes('*') || clause.names.includes(SERIALIZER)));
+  const dynamic = dynamicSpecifiers(text).some((specifier) => SERIALIZE_MODULE.test(specifier));
+  // A re-export under any specifier: `export { serializeRegistryModule }` in a
+  // module that already imported it hands it on without naming `./serialize`.
+  const passedOn = new RegExp(`export\\s*\\{[^}]*\\b${SERIALIZER}\\b`).test(text);
+  return named || dynamic || passedOn;
+}
 
-const files = ROOTS.flatMap(sourceFiles);
+const diffs = (text: string): boolean => clauses(text).some((clause) => DIFF_MODULE.test(clause.specifier));
 
-// Whole-module serialization, wherever it is reached from. `serialize.ts` is
-// where it is defined and so imports nothing.
-const serializes = (file: string): boolean => importsFrom(file, /(^|\/)serialize$/, /\bserializeRegistryModule\b/);
+// This file carries one counterexample per way of reaching the serializer, as
+// text, and so answers its own question true. It states the rule; it is not one
+// of the rule's subjects.
+const STATES_THE_RULE = 'src/content/registryDiff.test.ts';
 
-const diffs = (file: string): boolean => importsFrom(file, /(^|\/)(registryDiff|roundTrip)$/);
+const read = new Map(ROOTS.flatMap(sourceFiles).filter((file) => file !== STATES_THE_RULE).map((file) => [file, readFileSync(file, 'utf8')]));
 
-const serializers = files.filter(serializes);
+const serializers = [...read].filter(([, text]) => reachesSerializer(text)).map(([file]) => file);
 
 describe('a serialize-and-reload is a diffed serialize-and-reload', () => {
   it('has subjects to be a claim about', () => {
@@ -54,6 +79,24 @@ describe('a serialize-and-reload is a diffed serialize-and-reload', () => {
   });
 
   it('holds in tests too, which reach the serializer only beside the diff', () => {
-    expect(serializers.filter((file) => !diffs(file))).toEqual([]);
+    expect(serializers.filter((file) => !diffs(read.get(file)!))).toEqual([]);
+  });
+
+  // The rule reads imports, so it can only be as good as what it counts as one.
+  // Each of these is a reach a named-import check does not see, and each of them
+  // was a way to hold the serializer with the suite still green.
+  it.each([
+    ["import * as printer from './serialize';", 'a namespace import'],
+    ["export * from './serialize';", 'a barrel'],
+    [`export { ${SERIALIZER} } from './serialize';`, 'a re-export'],
+    [`const printer = await import('./serialize');`, 'a dynamic import'],
+    [`import { ${SERIALIZER} as print } from './serialize';`, 'a rename'],
+  ])('counts %s as reaching the serializer (%s)', (line) => {
+    expect(reachesSerializer(line)).toBe(true);
+  });
+
+  it('does not count the other things serialize.ts exports, which no diff is owed', () => {
+    expect(reachesSerializer("import { printSegments } from './serialize';")).toBe(false);
+    expect(reachesSerializer("import { printDirective } from '../content/serialize';")).toBe(false);
   });
 });

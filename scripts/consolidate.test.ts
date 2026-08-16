@@ -1,12 +1,12 @@
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
-import { consolidate, run, writable } from './consolidate';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { consolidate, contentFiles, parseArgs, run, writable } from './consolidate';
 import { openRepl } from './play-cli';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { initialLocalChangesModule, localSectionHeadings, LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
-import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/registry';
+import { loadUniverse, loadUniverseWithDiagnostics, type Registry } from '../src/content/registry';
 import { registryDiff } from '../src/content/registryDiff';
 import type { ModuleSource } from '../src/content/universe';
 import { runLine, type AuthoringContext } from '../src/runtime/command';
@@ -45,6 +45,15 @@ describe('a consolidation writes each section into the file that declared its id
     const result = consolidate(base(), local('# remove item.base.bell'));
     expect(writable(result)).toBe(true);
     expect(written(result, 'base')).toBe(BASE.replace('# item bell\ntitle: Bell\n\n', ''));
+  });
+
+  // Two spans in one file, the earlier one growing. Applied in the order they
+  // were found, the second edit's offsets would already have moved and the
+  // splice would land inside somebody else's section.
+  it('places two sections into one file without either moving the other', () => {
+    const result = consolidate(base(), local('# item base.rope', 'title: A Considerably Longer Rope', '', '# item base.bell', 'title: Chime'));
+    expect(writable(result)).toBe(true);
+    expect(written(result, 'base')).toBe(BASE.replace('title: Rope', 'title: A Considerably Longer Rope').replace('title: Bell', 'title: Chime'));
   });
 
   it('reports a section no file under content/ declares by id, and leaves it staged', () => {
@@ -152,12 +161,26 @@ function stage(tree: Tree, line: string): void {
   expect(result.output.filter((each) => each.kind === 'message' && each.tone === 'error')).toEqual([]);
 }
 
+// The copy is made and removed by hooks rather than in the describe body and an
+// `it`, because a name-filtered run — which is every run `mutate` makes — skips
+// the `it` that would have cleaned up while the body has already copied the
+// tree. Forty leaked copies of content/ were how that read from outside.
 describe('the round trip is closed, on the content that ships', () => {
-  const tree = copiedTree();
-  stage(tree, STAGED);
-  const staged = loadUniverse(withEngineLocale([...sourcesOf(tree), { name: LOCAL_CHANGES_MODULE_ID, text: readFileSync(tree.localFile, 'utf8') }]));
-  consolidateTree(tree);
-  const after = loadUniverse(withEngineLocale(sourcesOf(tree)));
+  let tree: Tree;
+  let staged: Registry;
+  let after: Registry;
+
+  beforeAll(() => {
+    tree = copiedTree();
+    stage(tree, STAGED);
+    staged = loadUniverse(withEngineLocale([...sourcesOf(tree), { name: LOCAL_CHANGES_MODULE_ID, text: readFileSync(tree.localFile, 'utf8') }]));
+    consolidateTree(tree);
+    after = loadUniverse(withEngineLocale(sourcesOf(tree)));
+  });
+
+  afterAll(() => {
+    rmSync(tree.dir, { recursive: true, force: true });
+  });
 
   it('loads the same universe from the files alone as it did with the edit staged on top', () => {
     expect(registryDiff(staged, after)).toEqual([]);
@@ -177,9 +200,101 @@ describe('the round trip is closed, on the content that ships', () => {
     expect(after.tests.size).toBeGreaterThan(0);
     for (const id of after.tests.keys()) expect(runTest(id, after, createGameState()), id).toEqual({ passed: true });
   });
+});
 
-  it('leaves the tree it started from behind', () => {
-    rmSync(tree.dir, { recursive: true, force: true });
+// A visible module and a dependency the file it goes home to does not declare:
+// what resolves in the local module's namespace need not resolve in the target's,
+// and this is the only refusal registryDiff cannot also reach — the spliced tree
+// never loads, so there is no second registry to diff against.
+describe('a consolidation whose result does not load writes nothing either', () => {
+  const CHESTED = ['# info base', 'version: 1.0.0', '', '# item rope', 'title: Rope', '', '# entity chest', 'title: Chest', 'open:', '  give: rope', '', '# location camp', 'x: 0, y: 0', 'starting', 'entities: chest', ''].join('\n');
+  const extra: ModuleSource = { name: 'extra', text: ['# info extra', 'version: 1.0.0', 'dependencies:', '  base', '', '# item ribbon', 'title: Ribbon', ''].join('\n') };
+  const staging = (...body: string[]): ModuleSource => ({
+    name: LOCAL_CHANGES_MODULE_ID,
+    text: [`# info ${LOCAL_CHANGES_MODULE_ID}`, 'version: 0.0.0', 'dependencies:', '  base', '  extra', '', ...body, ''].join('\n'),
+  });
+
+  it('names the diagnostic the splice would have caused, and keeps every byte', () => {
+    const sources = [{ name: 'base', text: CHESTED }, extra];
+    const result = consolidate(sources, staging('# entity base.chest', 'title: Chest', 'open:', '  give: extra.ribbon'));
+    expect(result.placed.map((each) => each.heading)).toEqual(['# entity base.chest']);
+    expect(result.diagnostics.join(' ')).toMatch(/ribbon/);
+    expect(result.differences).toEqual([]);
+    expect(writable(result)).toBe(false);
+    expect(written(result, 'base')).toBe(CHESTED);
+  });
+});
+
+describe('the command surface', () => {
+  it('defaults to every .dsl under content/ but the local file, and takes an override', () => {
+    expect(contentFiles(parseArgs([]))).toEqual(shippedNames().map((name) => `content/${name}`));
+    expect(contentFiles(parseArgs([`local=content/${LOCAL_CHANGES_MODULE_ID}.dsl`]))).not.toContain(`content/${LOCAL_CHANGES_MODULE_ID}.dsl`);
+    expect(contentFiles(parseArgs(['content=a.dsl, b.dsl']))).toEqual(['a.dsl', 'b.dsl']);
+  });
+
+  it('reads the flags it documents', () => {
+    expect(parseArgs(['--dry-run']).dryRun).toBe(true);
+    expect(parseArgs(['local=x.dsl']).localFile).toBe('x.dsl');
+    expect(parseArgs([]).localFile).toBe(`content/${LOCAL_CHANGES_MODULE_ID}.dsl`);
+  });
+
+  const said = (argv: readonly string[]): { out: string[]; err: string[]; code: number | undefined } => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const log = vi.spyOn(console, 'log').mockImplementation((line) => void out.push(String(line)));
+    const error = vi.spyOn(console, 'error').mockImplementation((line) => void err.push(String(line)));
+    process.exitCode = undefined;
+    try {
+      run(argv);
+      return { out, err, code: process.exitCode };
+    } finally {
+      process.exitCode = undefined;
+      log.mockRestore();
+      error.mockRestore();
+    }
+  };
+
+  it('says so and stops when there is no local file, and when there is nothing in it', () => {
+    const tree = copiedTree();
+    try {
+      const missing = said([`content=${tree.files.join(',')}`, `local=${tree.localFile}`]);
+      expect(missing.out.join(' ')).toContain('does not exist');
+      expect(missing.code).toBeUndefined();
+
+      writeFileSync(tree.localFile, initialLocalChangesModule(['tutorial-island']), 'utf8');
+      const empty = said([`content=${tree.files.join(',')}`, `local=${tree.localFile}`]);
+      expect(empty.out.join(' ')).toContain('Nothing staged in');
+      expect(now(tree)).toEqual(tree.before);
+    } finally {
+      rmSync(tree.dir, { recursive: true, force: true });
+    }
+  });
+
+  it('prints the plan and writes nothing under --dry-run', () => {
+    const tree = copiedTree();
+    try {
+      stage(tree, STAGED);
+      const staged = readFileSync(tree.localFile, 'utf8');
+      const result = said([`content=${tree.files.join(',')}`, `local=${tree.localFile}`, '--dry-run']);
+      expect(result.out.join(' ')).toContain('Would write # item tutorial-island.lockpick into tutorial-island.dsl');
+      expect(now(tree)).toEqual(tree.before);
+      expect(readFileSync(tree.localFile, 'utf8')).toBe(staged);
+    } finally {
+      rmSync(tree.dir, { recursive: true, force: true });
+    }
+  });
+
+  it('exits non-zero and writes nothing when nothing staged could be placed', () => {
+    const tree = copiedTree();
+    try {
+      stage(tree, '/dsl item gem title: Gem');
+      const result = said([`content=${tree.files.join(',')}`, `local=${tree.localFile}`]);
+      expect(result.err.join(' ')).toContain('Left staged: # item gem');
+      expect(result.code).toBe(1);
+      expect(now(tree)).toEqual(tree.before);
+    } finally {
+      rmSync(tree.dir, { recursive: true, force: true });
+    }
   });
 });
 
