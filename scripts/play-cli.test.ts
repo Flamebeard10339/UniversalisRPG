@@ -1,17 +1,20 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish, withEngineLocale } from '../src/content/engineLocale';
 import { ENGINE_KEYS } from '../src/content/locale';
 import { renderLocalChangesModule } from '../src/content/localChanges';
+import { loadUniverseWithDiagnostics } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
+import { RuntimeError } from '../src/runtime/runtime';
 import { localizerFor } from '../src/runtime/localized';
 import { asLocalized } from '../src/runtime/localizedFixture';
 import { SAVE_VERSION } from '../src/runtime/save';
-import { serializeSession, startSession, view } from '../src/runtime/session';
-import { COMMANDS, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
-import { driveRun, fileAuthoring, formatLive, formatOutput, formatResult, formatTick, loadModportalSources, openRepl, printed, type ReplLine } from './play-cli';
+import { serializeSession, sessionStatus, startSession, view } from '../src/runtime/session';
+import { COMMANDS, NO_SAVES, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
+import { AUTOSAVE_SLOT, DEV_SLOT, DEV_SNAPSHOT_SLOT, PLAYER_SLOT, type SaveContext } from '../src/runtime/saveSlots';
+import { driveRun, fileAuthoring, fileSaves, formatLive, formatOutput, formatResult, formatTick, loadModportalSources, openRepl, printed, type ReplLine } from './play-cli';
 
 // Every word this driver prints comes from an engine key, and the content text
 // it puts into one arrives localized on the view, so one English localizer
@@ -653,5 +656,424 @@ describe('play-cli drives a live run', () => {
     expect(run.ticker.stops).toBe(1);
     expect(shown(run.closed[0])).toContain('Stopped.');
     expect(run.ctx.view.time).toBe(1);
+  });
+});
+
+// --- the save slots, driven through the same table a player types at ---------
+
+// A world with one instant action and one that takes a while, so the cadence
+// can be measured across a command and across a live run in the same fixture.
+const SAVING_SOURCE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  chest
+
+# item gold
+title: Gold
+
+# entity chest
+title: Chest
+open:
+  give: 1 gold
+haul:
+  continuous
+  time: 4
+  give: 2 gold
+
+# save stashed
+{"version":${SAVE_VERSION},"inventory":{"gold":7},"time":42000}
+`;
+
+const EXPORT_SOURCE = `
+# info exported
+version: 0.0.0
+
+# location camp
+x: 0, y: 0
+starting
+`;
+
+interface Playing {
+  ctx: CommandContext;
+  dir: string;
+  save: SaveContext;
+  pass: (ms: number) => void;
+  // The same directory read by a context that never saw this session, which is
+  // what a restarted process holds.
+  restarted: () => SaveContext;
+  slot: (name: string) => string | null;
+}
+
+// File-backed, because c8 asks for these clauses against the store a player
+// would have and not against a convenient one. The clock is the test's, so a
+// cadence is a fact this file decided.
+function playing(text: string = SAVING_SOURCE, driving = false): Playing {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-saves-'));
+  let at = 1_000_000;
+  const now = (): number => at;
+  const save = fileSaves(dir, now);
+  const session = startSession(loadInEnglish(text));
+  const recorder: Recorder = { history: [], startSave: serializeSession(session) };
+  return {
+    ctx: newContext(session, view(session), { recorder, save, driving }),
+    dir,
+    save,
+    pass: (ms) => void (at += ms),
+    restarted: () => fileSaves(dir, now),
+    slot: (name) => {
+      const file = path.join(dir, `${name}.slot`);
+      return existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as { payload: string }).payload : null;
+    },
+  };
+}
+
+// The detail rides with the text, because a refusal whose reason is in the
+// detail is a refusal this file would otherwise report as a bare sentence.
+const errorsOf = (result: CommandResult): string[] =>
+  result.output.flatMap((each) => (each.kind === 'message' && each.tone === 'error' ? [[each.text, ...(each.detail ?? [])].join(' ')] : []));
+
+const linesOf = (result: CommandResult): string[] => result.output.flatMap((each) => (each.kind === 'source' ? each.lines : []));
+
+describe('export and import use the spelling the DSL already has (c6)', () => {
+  it('prints the bytes serializeSession returns and nothing else', () => {
+    const game = playing();
+    runLine(game.ctx, 'use: entity.chest.open');
+
+    expect(linesOf(runLine(game.ctx, '/export'))).toEqual([serializeSession(game.ctx.session)]);
+  });
+
+  it('pastes into /dsl save <id> unchanged, and comes back through /load', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-export-'));
+    try {
+      // Named by an `# info`, because staging into the local module puts a
+      // third module beside this one, and an unnamespaced module is refused
+      // once it is not the only one loaded.
+      const sources: ModuleSource[] = withEngineLocale([{ name: 'exported', text: EXPORT_SOURCE }]);
+      const authoring = fileAuthoring(sources, loadUniverseWithDiagnostics(sources).loadedModules, path.join(dir, 'local-changes.dsl'));
+      const repl = openRepl(sources, { authoring });
+      runLine(repl.context, '/wait 5');
+      const exported = linesOf(runLine(repl.context, '/export'))[0];
+
+      // The one line /export printed, handed to the staging command verbatim.
+      expect(errorsOf(runLine(repl.context, `/dsl save carried ${exported}`))).toEqual([]);
+      runLine(repl.context, '/wait 9');
+      expect(sessionStatus(repl.context.session).time).toBe(14);
+
+      expect(errorsOf(runLine(repl.context, '/load local-changes.carried'))).toEqual([]);
+      expect(sessionStatus(repl.context.session).time).toBe(5);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('takes its own output back through /import, to the same bytes', () => {
+    const game = playing();
+    runLine(game.ctx, 'use: entity.chest.open');
+    const exported = linesOf(runLine(game.ctx, '/export'))[0];
+
+    runLine(game.ctx, 'use: entity.chest.open');
+    expect(serializeSession(game.ctx.session)).not.toBe(exported);
+
+    expect(errorsOf(runLine(game.ctx, `/import ${exported}`))).toEqual([]);
+    expect(serializeSession(game.ctx.session)).toBe(exported);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+});
+
+describe('a save that will not load changes nothing and says why (c7)', () => {
+  const REFUSED = [
+    ['not a payload at all', /not a # save body/],
+    ['[1,2,3]', /not a # save body/],
+    [`{"version":${SAVE_VERSION + 900}}`, /version/],
+    [`{"version":${SAVE_VERSION},"time":"potato"}`, /save field time/],
+    // The three the validator used to wave through into a raw TypeError.
+    [`{"version":${SAVE_VERSION},"activeAction":{}}`, /save field activeAction/],
+    [`{"version":${SAVE_VERSION},"journey":{"to":"camp"}}`, /save field journey/],
+    [`{"version":${SAVE_VERSION},"player":{}}`, /save field player/],
+  ] as const;
+
+  for (const [payload, why] of REFUSED) {
+    it(`leaves the session standing after ${payload.slice(0, 40)}`, () => {
+      const game = playing();
+      runLine(game.ctx, 'use: entity.chest.open');
+      runLine(game.ctx, '/wait 5');
+      const before = serializeSession(game.ctx.session);
+
+      const result = runLine(game.ctx, `/import ${payload}`);
+
+      expect(errorsOf(result)).toHaveLength(1);
+      expect(errorsOf(result)[0]).toMatch(why);
+      expect(serializeSession(game.ctx.session)).toBe(before);
+      expect(sessionStatus(game.ctx.session).time).toBe(5);
+      rmSync(game.dir, { recursive: true, force: true });
+    });
+  }
+
+  // The clause has to hold for a raise the checks did not catch as well as for
+  // one they did, or it holds only for as long as `checkSave` stays complete.
+  // c14 is what keeps the shipped prune rules from raising, so a raise is put
+  // into one here on purpose: `loadSave` mutates as it goes, and the state it
+  // mutates has to be one this session is not standing in.
+  it('leaves the session standing when a payload gets past the checks and raises below them', () => {
+    const game = playing();
+    runLine(game.ctx, 'use: entity.chest.open');
+    runLine(game.ctx, '/wait 5');
+    const before = serializeSession(game.ctx.session);
+
+    const locations = game.ctx.session.registry.locations;
+    const asking = locations.has.bind(locations);
+    locations.has = (id: string) => {
+      throw new RuntimeError(`pruning ${id} raised`);
+    };
+    const result = runLine(game.ctx, `/import {"version":${SAVE_VERSION},"time":9000,"inventory":{"gold":99}}`);
+    locations.has = asking;
+
+    expect(errorsOf(result)[0]).toMatch(/pruning camp raised/);
+    expect(serializeSession(game.ctx.session)).toBe(before);
+    expect(sessionStatus(game.ctx.session).time).toBe(5);
+    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(1);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('says so when the live slot is absent, empty or unreadable, and plays on', () => {
+    const game = playing();
+    runLine(game.ctx, 'use: entity.chest.open');
+    const before = serializeSession(game.ctx.session);
+
+    expect(errorsOf(runLine(game.ctx, '/restore'))[0]).toMatch(/slot player holds nothing/);
+
+    writeFileSync(path.join(game.dir, `${PLAYER_SLOT}.slot`), '', 'utf8');
+    expect(errorsOf(runLine(game.ctx, '/restore'))[0]).toMatch(/slot player is empty/);
+
+    writeFileSync(path.join(game.dir, `${PLAYER_SLOT}.slot`), '{{{ truncated', 'utf8');
+    expect(errorsOf(runLine(game.ctx, '/restore'))[0]).toMatch(/slot player does not parse/);
+
+    // A slot that reads but holds something that is not a save.
+    runLine(game.ctx, '/save');
+    writeFileSync(path.join(game.dir, `${PLAYER_SLOT}.slot`), JSON.stringify({ writtenAt: 1, payload: 'rubbish' }), 'utf8');
+    expect(errorsOf(runLine(game.ctx, '/restore'))[0]).toMatch(/not a # save body/);
+
+    expect(serializeSession(game.ctx.session)).toBe(before);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('refuses every slot command with one sentence when there is nowhere to keep slots', () => {
+    const ctx = driver(SAVING_SOURCE);
+
+    for (const line of ['/save', '/restore', '/slots', '/autosave 5', '/dev on']) {
+      expect(errorsOf(runLine(ctx, line)), line).toEqual([NO_SAVES]);
+    }
+  });
+});
+
+describe('autosave fires on a cadence and zero means never (c4)', () => {
+  it('writes nothing at all until somebody asks for a cadence', () => {
+    const game = playing();
+
+    for (let each = 0; each < 5; each += 1) {
+      runLine(game.ctx, 'use: entity.chest.open');
+      game.pass(60_000);
+    }
+
+    expect(existsSync(game.dir) ? readdirSync(game.dir) : []).toEqual([]);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('measures real seconds since the slot was written, and is checked after a command that changed state', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 30');
+    expect(game.slot(AUTOSAVE_SLOT)).toBe('30');
+
+    runLine(game.ctx, 'use: entity.chest.open');
+    const first = game.slot(PLAYER_SLOT);
+    expect(first).toBe(serializeSession(game.ctx.session));
+
+    game.pass(29_000);
+    runLine(game.ctx, 'use: entity.chest.open');
+    expect(game.slot(PLAYER_SLOT)).toBe(first);
+
+    game.pass(1_000);
+    runLine(game.ctx, 'use: entity.chest.open');
+    expect(game.slot(PLAYER_SLOT)).not.toBe(first);
+    expect(game.slot(PLAYER_SLOT)).toBe(serializeSession(game.ctx.session));
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('is not checked after a command that changed nothing', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 1');
+    runLine(game.ctx, 'use: entity.chest.open');
+    const first = game.slot(PLAYER_SLOT);
+
+    game.pass(60_000);
+    for (const line of ['/look', '/state', '/help', '/slots', '/export']) runLine(game.ctx, line);
+
+    expect(game.slot(PLAYER_SLOT)).toBe(first);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('is checked on each live tick, so a long run does not go unsaved until it ends', () => {
+    const game = playing(SAVING_SOURCE, true);
+    runLine(game.ctx, '/autosave 2');
+    const result = armed(game.ctx, 'use:entity.chest.haul');
+
+    // Arming is a command and settles like one, so what the run has to beat is
+    // the slot that write left behind rather than an empty directory.
+    const atArming = game.slot(PLAYER_SLOT);
+    expect(atArming).not.toBeNull();
+
+    game.pass(1_000);
+    result.live!.tick(1_000);
+    expect(game.slot(PLAYER_SLOT)).toBe(atArming);
+
+    game.pass(1_000);
+    result.live!.tick(1_000);
+    const midRun = game.slot(PLAYER_SLOT);
+    expect(midRun).not.toBe(atArming);
+    // Still running: the slot moved before anything ended it.
+    expect(result.live!.tick(0).active).toBe(true);
+    expect(midRun).toBe(serializeSession(game.ctx.session));
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('says so rather than crashing when the cadence slot holds something that is not a cadence', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 5');
+    writeFileSync(path.join(game.dir, `${AUTOSAVE_SLOT}.slot`), JSON.stringify({ writtenAt: 1, payload: 'often' }), 'utf8');
+
+    const result = runLine(game.ctx, 'use: entity.chest.open');
+    expect(errorsOf(result)[0]).toMatch(/autosave: slot autosave holds "often"/);
+    // The command itself still happened.
+    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(1);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+});
+
+describe('no load path advances time (c5)', () => {
+  it('leaves the clock at what the payload holds, through a # save, an import and a slot', () => {
+    const game = playing();
+
+    runLine(game.ctx, '/load stashed');
+    expect(sessionStatus(game.ctx.session).time).toBe(42);
+
+    runLine(game.ctx, '/wait 8');
+    runLine(game.ctx, `/import {"version":${SAVE_VERSION},"time":9000}`);
+    expect(sessionStatus(game.ctx.session).time).toBe(9);
+
+    runLine(game.ctx, '/save');
+    runLine(game.ctx, '/wait 100');
+    game.pass(600_000);
+    runLine(game.ctx, '/restore');
+    expect(sessionStatus(game.ctx.session).time).toBe(9);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+});
+
+describe('dev mode moves which slot is written, through the same table (c9, c10, c11, c12, c13)', () => {
+  it('snapshots the player slot on the way in and restores it byte-identically on the way out', () => {
+    const game = playing();
+    runLine(game.ctx, 'use: entity.chest.open');
+    runLine(game.ctx, '/save');
+    const played = game.slot(PLAYER_SLOT)!;
+
+    runLine(game.ctx, '/dev on');
+    expect(game.slot(DEV_SNAPSHOT_SLOT)).toBe(JSON.stringify(played));
+
+    runLine(game.ctx, '/autosave 1');
+    game.pass(60_000);
+    runLine(game.ctx, 'use: entity.chest.open');
+    runLine(game.ctx, '/save');
+
+    expect(game.slot(DEV_SLOT)).toBe(serializeSession(game.ctx.session));
+    expect(game.slot(DEV_SLOT)).not.toBe(played);
+    // c10: a session spent authoring cannot appear in the file being played.
+    expect(game.slot(PLAYER_SLOT)).toBe(played);
+
+    runLine(game.ctx, '/dev off');
+    expect(game.slot(PLAYER_SLOT)).toBe(played);
+    expect(game.slot(DEV_SLOT)).toBeNull();
+    expect(game.slot(DEV_SNAPSHOT_SLOT)).toBeNull();
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('loses nothing when the process dies in dev, without an orderly exit', () => {
+    const game = playing();
+    runLine(game.ctx, 'use: entity.chest.open');
+    runLine(game.ctx, '/save');
+    const played = game.slot(PLAYER_SLOT)!;
+
+    runLine(game.ctx, '/dev on');
+    runLine(game.ctx, 'use: entity.chest.open');
+    runLine(game.ctx, '/save');
+    // No /dev off: the process is gone. What is on disk is all there is.
+    const restarted = game.restarted();
+
+    expect(restarted.dev).toBe(false);
+    expect(restarted.store.read(PLAYER_SLOT)?.payload).toBe(played);
+    expect(restarted.store.read(DEV_SNAPSHOT_SLOT)?.payload).toBe(JSON.stringify(played));
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('creates no dev slot while the mode is off (c12)', () => {
+    const game = playing();
+    runLine(game.ctx, '/autosave 1');
+    for (const line of ['use: entity.chest.open', '/save', '/wait 3', '/restore', '/export']) {
+      game.pass(5_000);
+      runLine(game.ctx, line);
+    }
+
+    expect(readdirSync(game.dir).sort()).toEqual([`${AUTOSAVE_SLOT}.slot`, `${PLAYER_SLOT}.slot`]);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('answers which slot is live and whether the mode is on, rather than leaving it to be inferred (c13)', () => {
+    const game = playing();
+
+    expect(linesOf(runLine(game.ctx, '/slots'))).toEqual(['writing player, dev mode off', 'autosave never']);
+
+    runLine(game.ctx, '/autosave 30');
+    runLine(game.ctx, '/dev on');
+    const lines = linesOf(runLine(game.ctx, '/slots'));
+
+    expect(lines[0]).toBe('writing dev, dev mode on');
+    expect(lines[1]).toBe('autosave every 30s');
+    expect(lines.slice(2).map((line) => line.split(' ')[0])).toEqual([AUTOSAVE_SLOT, DEV_SNAPSHOT_SLOT]);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('refuses on and off in the wrong order, and says which', () => {
+    const game = playing();
+
+    expect(errorsOf(runLine(game.ctx, '/dev off'))[0]).toMatch(/not in dev mode/);
+    runLine(game.ctx, '/dev on');
+    expect(errorsOf(runLine(game.ctx, '/dev on'))[0]).toMatch(/already in dev mode/);
+    expect(errorsOf(runLine(game.ctx, '/dev sideways'))[0]).toMatch(/on or off/);
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+});
+
+describe('all of it is exercised before src/ui exists (c8)', () => {
+  it('keeps the slots as files, which is the store a player would have', () => {
+    const game = playing();
+    runLine(game.ctx, '/save');
+
+    expect(readdirSync(game.dir)).toEqual([`${PLAYER_SLOT}.slot`]);
+    expect(game.slot(PLAYER_SLOT)).toBe(serializeSession(game.ctx.session));
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  // Derived rather than asserted: the adapter is a file under src/ui that
+  // imports the store, so the proof that none was shipped is that no file
+  // there names one. `the-gui-authors-through-the-same-door` c11-c15 is what
+  // makes this expectation change.
+  it('ships no browser adapter and no stub of one', () => {
+    const reaching = readdirSync('src/ui', { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
+      .filter((entry) => /from '[^']*(store|saveSlots|slotFile)'/.test(readFileSync(path.join(entry.parentPath, entry.name), 'utf8')))
+      .map((entry) => entry.name);
+
+    expect(reaching).toEqual([]);
   });
 });
