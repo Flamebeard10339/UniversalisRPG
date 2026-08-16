@@ -22,16 +22,15 @@ Dragging a location is not an exception to it. A drag computes new `x:`/`y:` val
 same section edit any other route would; there is no coordinate the map writes that the console
 cannot write, and no path to the registry that skips validation.
 
-The door's own hinge is already hung. `a-session-adopts-an-edit-or-refuses-it-whole` was folded into
-this spec and then landed on its own after all, so `adoptRegistry` now has a second caller,
-`AuthoringContext` has the `readLocalChanges` half it never had, and the read, the load, the
-diagnostic gate and the adopt are one function with `/dsl` and `/reload` in front of it. Nothing below
-`src/ui` is left to build for that; what remains of it here is c2, which is the rule that the surfaces
-this branch adds do not go around it.
-
-One branch that was going to land beside this one is still inside it, because both write
-`src/ui/driver.ts`: persistence, the named-slot store's browser implementation, without which c9's
-"closing the tab loses nothing" has nowhere to be true.
+Two branches that were going to land on either side of this one are inside it instead, because all
+three write `src/ui/driver.ts` and none of them could have run beside the others. The first is the
+door's own hinge: `adoptRegistry` (`src/runtime/session.ts:381`) already swaps a registry under a live
+session, prunes what no longer resolves and re-spreads discovery, but `commitLocalChanges` is its only
+caller and it writes and adopts in one act inside one process — so a second process editing the same
+file is invisible until restart. Making the read half exist, and making the read, the load, the
+diagnostic gate and the adopt *one* function with `/dsl` and `/reload` as its two callers, is what c2
+through c6 own. The second is persistence: the named-slot store's browser implementation, without
+which c9's "closing the tab loses nothing" has nowhere to be true.
 
 Proof:
 
@@ -42,14 +41,42 @@ Proof:
   `play-cli`: stage, validate, and adopt or refuse. The proof runs the same command lines against both
   drivers and compares the resulting serialized session.
   proof: vitest src/ui/driver.test.ts scripts/play-cli.test.ts
-- [c2] **No surface goes around the one load-and-adopt path.** That path exists and is proved
-  elsewhere; this clause is that nothing added here reaches past it. No module under `src/ui` imports
-  `upsertLocalSection`, `deleteLocalSection`, `clearLocalSections` or `renderLocalChangesModule`, and
-  none calls `adoptRegistry`: every control on every editing surface reaches the registry through
-  `driver.send` and through nothing else. The proof derives its subjects from the exported surface of
-  `src/content/localChanges.ts` and from the tree, not from a list of components, because the fourth
-  surface is the one this clause exists to catch.
-  proof: vitest src/ui/authoringSurface.test.ts
+- [c2] **One load-and-adopt path, with more than one caller and no second copy.** The read, the load,
+  the diagnostic gate and the adopt are one function; `/dsl` is that function with a write in front of
+  it and `/reload` is that function with none. A second copy of the sequence is what this clause
+  forbids, and the proof is that removing the shared function breaks every caller rather than one. No
+  module under `src/ui` imports `upsertLocalSection`, `deleteLocalSection`, `clearLocalSections` or
+  `renderLocalChangesModule`, and none calls `adoptRegistry`: every control on every editing surface
+  reaches the registry through `driver.send` and through nothing else. The proof derives its subjects
+  from the exported surface of `src/content/localChanges.ts` and from the tree, not from a list of
+  components, because the fourth surface is the one this clause exists to catch.
+  proof: vitest src/ui/authoringSurface.test.ts src/runtime/command.test.ts
+  proof: command grep -n "adoptRegistry" src/runtime/command.ts
+- [c3] **A session re-reads its local module on demand and shows what another process wrote.** A
+  `/reload` command re-reads the local module through a `readLocalChanges` on `AuthoringContext` — the
+  counterpart of the `writeLocalChanges` already there — loads it beside the base sources, and adopts
+  the result. A location added to that module by a different process is reachable in the running
+  session after it, with no restart and no save.
+  proof: vitest src/runtime/command.test.ts scripts/play-cli.test.ts
+- [c4] **A reload that does not load changes nothing.** On any diagnostic, the session's registry,
+  state, log and clock are exactly what they were, the diagnostics print on the tool channel, and play
+  continues. There is no partial adoption: the load either produces a registry that is adopted whole or
+  produces none. This is the shape `commitLocalChanges` already has, and c2 is what stops the second
+  caller re-deciding it.
+  proof: vitest src/runtime/command.test.ts
+- [c5] **State the edit invalidates is pruned with the warning already emitted, never silently.** A
+  session standing in a location the edit deletes, holding an item it removes, or carrying a flag it
+  drops, comes out of the reload with `pruneStateForRegistry`'s warnings in its log and a state the
+  registry resolves. This is `adoptRegistry`'s existing behaviour and the clause pins it for the new
+  callers, because a reload is the first way a player can be standing somewhere an author just deleted.
+  proof: vitest src/runtime/command.test.ts src/runtime/session.test.ts
+- [c6] **Reload carries no information, so a driver may call it unconditionally.** Reloading an
+  unchanged module leaves the session identical — same registry contents, same state, same log length,
+  same clock — so a driver that reloads every turn is indistinguishable from one that never does until
+  the module actually changes. A reload that only did something when something had changed would tell
+  an agent playing the session that an author had just written, and a file watcher would do the same
+  while making a session nondeterministic under `# test` replay.
+  proof: vitest src/runtime/command.test.ts
 - [c7] **The three surfaces are three predicates over one list.** Map, Local and Global are one
   function from the loaded registry to addressable sections, filtered three ways, and the three filters
   partition it: every section the registry holds is offered by exactly one of them, and adding a kind
@@ -133,21 +160,16 @@ browser. The second is registered as persistence rather than as a store, because
 ruled on that wording: there is one slot-store interface, owned by `auto-save-export-and-load`, and
 c11 is an implementation of it.
 
-**Absorbs `the-browser-save-store-adapter`, and no longer absorbs
-`a-session-adopts-a-module-edit-or-refuses-it-whole`.** Both were edges on either side of this branch
-in the first plan, and the 2026-08-16 ruling that the push folds wherever folding costs no parallelism
-took both: `tasks where src/ui/driver.ts` returns all three, so no two could have run together. The
-second fold was reversed the same day. It had assumed the region was unread, and it was not — a branch
-had already built the reload path, audited it twice and graded its clauses met before the fold was
-written, so the fold would have thrown that away to avoid a cost that had already been paid. The
-author ruled that branch lands and this spec's grant shrinks to `src/ui`. What it delivered is c3
-through c6 as they were written here, which is why they are gone from the list above rather than
-renumbered: a clause number in this file names the same clause it always did, and the gap says
-something left. c2 keeps only the half that is this branch's — that no surface added here goes around
-the path — and its `src/runtime/command.ts` proof went with the rest.
-
-The store half stands as it was: the browser adapter is this branch's, and the interface stays
-`auto-save-export-and-load`'s to own.
+**Absorbs `the-browser-save-store-adapter` and `a-session-adopts-a-module-edit-or-refuses-it-whole`,
+which were the two edges on either side of this branch in the first plan.** The author ruled on
+2026-08-16 that the push folds wherever folding costs no parallelism. It costs none here and the
+survey is why: `tasks where src/ui/driver.ts` returns all three, so no two of them could have run
+together, and `a-session-adopts` additionally shares `src/runtime/command.ts` and `scripts/play-cli.ts`
+with the rest of the push. Sequencing them would have meant three workers reading the same region
+three times to produce one coherent path — which is the shape of the fold, not an argument against it.
+Both absorbed specs' reasoning is carried in the clauses rather than restated: `adoptRegistry` is the
+mechanism and is not built here, the diagnostic gate is `commitLocalChanges`' existing shape, and the
+store interface stays `auto-save-export-and-load`'s to own.
 
 **c16 is here rather than with the consolidation that consumes it.** Handing the author the local
 module's bytes is a control on a surface this branch builds, over text this branch's
@@ -157,6 +179,11 @@ control there would have made that branch write `src/ui/driver.ts`, which this b
 `the-shell-draws-what-the-session-answers` both write — three branches on one file, where two of them
 have nothing else to say to each other. Moving one clause keeps the consolidation entirely inside
 `scripts/` and `src/content/`, where it runs beside the whole GUI chain instead of behind it.
+
+**c6 is kept from the absorbed spec even though this branch has no polling driver.** A reload that
+carries information is a reload an agent can read a signal out of, and it is the property that makes a
+watcher safe to add later without making `# test` replay nondeterministic. Dropping it because nothing
+polls yet would be discarding the constraint at exactly the moment it is cheap to hold.
 
 **Subsumes `edit-mode-memory`, which is retired into c10.** That record asks for the module being
 edited, cursor, scroll, map position and notes to be remembered across a tab switch. Every one of those
