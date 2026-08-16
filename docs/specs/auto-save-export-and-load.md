@@ -159,6 +159,59 @@ The player's progress survives closing the game, through a store three queued br
   for every player; an autosave cadence is a preference of the person playing. They look alike, and
   putting the cadence in the registry would let a mod set how often someone's game is saved.
 
+- **The stamp rides in an envelope the driver never opens.** A driver deals in text in and text out;
+  the store wraps `{writtenAt, payload}` around it and unwraps on the way back. The alternative — a
+  driver handing back a `Slot` — would put stamping in every implementation, so the file store and
+  the browser one could stamp differently and c2 would be a sentence rather than a property. The
+  payload survives the wrap byte for byte, which is c3.
+- **The autosave decision lives in `src/runtime/saveSlots.ts`, above the store and below `ui`.** That
+  answers the first open question. `store.ts` stays the four verbs over opaque text and imports
+  nothing but `RuntimeError`, which is what `store.test.ts` asserts structurally rather than in
+  prose; `saveSlots.ts` holds which slot is live, whether the cadence has elapsed, and the dev pair.
+  One clock, built into the store and held beside it in the same context, so the stamp a write lays
+  down and the span the cadence measures cannot come from two readings that disagree.
+- **One file per slot, `<name>.slot`, under one directory.** That answers the second open question.
+  A slot name is a file name, so it is held to `[a-z][a-z0-9-]*` and nothing that could climb out of
+  the directory reaches the filesystem.
+- **The cadence defaults to never, and `play-cli` does not resume from a slot at startup.** CLAUDE.md
+  records that `play-cli` starts fresh every run, and a CLI that silently picks up whatever the last
+  run left in `.saves/player` is a CLI whose runs are not repeatable — every `# test`, every drift
+  proof and every hand-driven session would start somewhere nobody chose. The cadence lives in a
+  slot, so `/autosave 30` is said once and outlives the session that said it. The directory is not
+  created until something is written to it, so a run that was not asked to save leaves nothing.
+- **"A command that changed state" is `result.recorded.length > 0`.** The table already defines
+  `recorded` as empty for a read-only command, so the autosave check reads that answer rather than
+  growing a second one beside it.
+- **`/export` and `/import` need no store; the five slot commands do.** An export is the bytes
+  `serializeSession` already returns and an import is those bytes going back through `loadSaved`, so
+  neither touches persistence and both work on a driver that keeps nothing. That is what keeps the
+  drift proof comparing the two drivers over them rather than carving them out.
+- **`loadSaved` is transactional by construction, not by catching each way a load can fail.** It
+  builds the state beside the session and copies it in only once the whole of it stands. `checkSave`
+  runs before `loadSave` mutates anything, so every refusal this branch can name today is caught
+  before the state moves — the mutation testing said so outright, by surviving. What the transaction
+  is for is a raise from *below* the checks, which is exactly what c14 keeps the shipped prune rules
+  from doing; the proof therefore raises out of one on purpose, at the seam the pruner asks about
+  locations through. Copied in rather than swapped for, because a `# test` partway through a replay
+  is holding the state object and a swap left it running against the state the load replaced.
+- **`/import` records nothing, so a `# test` built after one does not replay it.** A `load:` line
+  addresses a `# save` by id and an imported payload has none. `/export` into `/dsl save <id>` is
+  the spelling that gives a payload an id, and that route does record.
+- **The slot commands speak in the tool's own words.** `/state` and `/local` already do: what they
+  print is the record behind the game rather than anything the world said, and no new engine key is
+  minted for a slot name or a cadence. c13's answer is `saveReport`, which is structured — the later
+  surface renders that, and the terminal's three lines are this driver's own rendering of it.
+- **Every field in `SAVE_FIELDS` carries a `sparsest` value.** c14 is universal over that table and
+  its proof has to derive its subjects from it, so the sample each field is walked with is a column
+  of the table the compiler already forces somebody to fill in when a `GameState` field is added. A
+  nullable field names its emptiest object rather than its null, because null is the case the loader
+  already has an answer for.
+- **Leaving dev mode rewrites the player's slot only when it differs from the snapshot, and refuses
+  outright when the snapshot is gone.** Rewriting unconditionally would move the stamp on a slot
+  nothing touched, and c1's four verbs have no way to restore one. A snapshot somebody deleted is
+  the one case where erasing is worse than staying in dev: the player's slot is left exactly as it
+  is and the mode stays on.
+
 ## Open questions
 
 - Where the store interface lives, and whether the autosave decision — has the cadence elapsed,
