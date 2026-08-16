@@ -115,7 +115,8 @@ carried the design since 2026-07-29 — "standalone Node loop holding a live ses
 each turn to play and report bugs/softlocks/immersion" — and is correct about the shape. It `requires
 starting-zone`, which was right when the loop was scoped as a bug-hunter for a finished zone and is
 backwards now that it is also the authoring rig: the zone is what the loop produces, not what it waits
-on. The edge is dropped and `exploratory-playbot` is closed against this spec rather than worked twice.
+on. The edge was dropped on that reasoning and `exploratory-playbot` closed against this spec rather
+than worked twice. **The edge is restored — see the ruling below; only the closure survives.**
 
 **`scripts/playbot.ts` is Testing procedure, not Runtime.** It imports downward from `src/runtime` and
 drives a session the way `scripts/play-cli.ts` does, and the layer order `grammar < content < runtime <
@@ -214,6 +215,25 @@ wrote once and read 6,450 on every turn after. c5 asserts byte identity of the s
 necessary and not sufficient — a run caching nothing passes it. The proof it wants is a nonzero
 `cacheReadInputTokens` on the second turn. Note also a constant auxiliary claude-haiku call of
 ~520-580 tokens on every turn, in every configuration, that no option removed.
+
+**The ordering edge goes back on, ruled by the author 2026-08-15, because the authoring story is
+thinner than the ruling that dropped it assumed.** The edge above was inverted on one premise: that the
+loop is the authoring rig, so the zone is its output rather than its input. A spike the same day tested
+that premise and it half held. The player's `expected` field is genuinely authoring output — on
+tutorial island it asked for an examine on the chest's blade, for a way to take the roasted chestnuts,
+and four separate times for something to do with a mirror the room keeps announcing — and that is a
+work queue, not a bug list. But a player cannot walk to the edge of a world with no rooms. Demand
+generation needs a floor, so the loop cannot bootstrap a zone from nothing, which is exactly what the
+inversion assumed it could. With that premise gone the original edge was right, and the playbot member
+requires `starting-zone` again.
+
+Two things ruled out along the way, recorded so they are not re-proposed. The loop must not author the
+world it plays: an agent that writes a room can never be surprised by it, `expected` collapses to
+nothing, and the run becomes a closed loop validating its own content — which is c9's reason for
+existing, read from the other end. And "an agent prompts me and I GM" is a presentation over this same
+log rather than a second architecture: the player already emits what the world owes, c7 already lands
+the author's answer mid-run, and what is missing is a queue to answer rather than a channel to build.
+That shape is a second system prompt, which is the slot c1 already reserves.
 
 ## Open questions
 
