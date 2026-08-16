@@ -1323,9 +1323,10 @@
         {
           "name": "file-backed slot driver",
           "paths": [
-            "scripts/lib/slotFile.ts"
+            "scripts/lib/slotFile.ts",
+            "scripts/lib/slotFile.test.ts"
           ],
-          "note": "produced by auto-save-export-and-load: one file per slot under one directory, which is the store play-cli supplies to the command table"
+          "note": "produced by auto-save-export-and-load: one file per slot under one directory, which is the store play-cli supplies to the command table; the slot-name guard is what its test proves"
         }
       ]
     },
