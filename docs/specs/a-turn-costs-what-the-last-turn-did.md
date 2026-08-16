@@ -20,7 +20,7 @@ the author 2026-08-15 and recorded as a decision against this spec.
 Proof:
 
 - [c1] **One loop, two prompts.** Exploring a half-built world and hunting bugs in a finished one are
-  the same turn — show a view, pick a `choiceId`, report what could not be done — and differ only in
+  the same turn — show a view, answer it, report what could not be done — and differ only in
   the text of the system prompt. Below the point where a prompt is selected there is no branch on
   which prompt was chosen: no mode field threaded into the turn, no conditional in the request
   builder, the log writer or the session driver. The proof runs one turn under each prompt and asserts
@@ -66,12 +66,17 @@ Proof:
   the budget figure additionally reads to a player as a reason to wind down. The proof asserts byte
   identity of the system block across a multi-turn run.
   proof: vitest scripts/playbot.test.ts
-- [c6] **A turn is chosen by id, never by position.** The loop reads the choice id out of the model's
-  reply and hands it to `apply(session, choiceId)`; it constructs no index, and no numbering it prints
-  for the model is ever read back as a selector. This is what makes the loop correct while the
-  game-master is editing: an option list that reorders between turns cannot change which action a
-  reply selects. A reply naming an id the view does not offer is refused as c8 requires, not
-  approximated to a nearby one.
+- [c6] **A selector is a token the engine published, and the loop invents none.** A turn is answered by
+  one of two calls, because the engine has two input surfaces: a choice goes to
+  `apply(session, choiceId)`, and an open screen goes to
+  `applyDirective(session, { kind: 'submit-modal', key, value })` under the key and the value that
+  screen published. In both the loop echoes a token it was handed and constructs nothing — no index of
+  its own, and no numbering it prints for the model is ever read back as a selector. A reply naming a
+  token the view does not offer is refused as c8 requires, not approximated to a nearby one. The proof
+  derives its subjects rather than listing them: it walks the view each turn was taken from and asserts
+  the selector sent appears verbatim among that view's offered ids, or among the values its asked
+  option published. What this promises is that the loop adds no positional coupling. It deliberately
+  does not promise there is none — that is the narrowing, and the reason for it is in `## Decisions`.
   proof: vitest scripts/playbot.test.ts
 - [c7] **Content edits land between turns without a restart.** Each turn re-reads the content sources
   and adopts the result into the live session before the view is taken, so a location authored while
@@ -163,50 +168,55 @@ the DSL's `# test` system applies here for the same reason: a driver's own conce
 grammar. A run is reproducible from its log plus the content it ran against, and `/create-valid-test`
 already turns a session into a replayable regression when one is wanted.
 
+**c6 narrows to what the engine can honour, ruled by the author 2026-08-15.** A twelve-turn spike drove
+the real registry and a real model through tutorial island before any of this was built, and a third of
+its turns were not choices: talking to the guide, the mirror and character creation each raise a modal,
+which `apply(session, choiceId)` cannot answer. A modal takes an `applyDirective` `submit-modal`, so a
+turn is two call shapes and the clause said one. The harder half is that the engine is inconsistent
+about stability. A choice id is a name — `use:entity.tutorial-island.mirror.look-in` — and survives an
+edit. A character-creation value is a name too, `human`, with free text for the name itself. A dialogue
+option's value is its index, `0` and `1`. So the original promise, that a list reordering between turns
+cannot change what a reply selects, is false on exactly the surface an author edits most often. The
+author's ruling is that the clause tells the truth rather than the engine being changed to fit it: c6
+now promises only that the loop introduces no positional coupling of its own, and the residue — an
+author who reorders a dialogue mid-run changes what `0` means — is a known engine property, out of
+scope here, and wants its own record if it is ever to be fixed. Narrowing rather than deleting keeps
+the part that has teeth: the loop still never constructs an index, never reads its own numbering back,
+and still refuses a token the view did not offer instead of approximating it.
+
+**What the spike measured, for whoever implements c3 and c5.** Per-turn billed input over twelve turns:
+1397, 1365, 1544, 1374, 1448, 1595, 1658, 1671, 1733, 1705, 1708, 1724. It rises while the six-entry
+journal window fills and then plateaus, which is the shape c3 predicts — against a subagent measured at
+~44k and growing without bound, this is ~1.7k and bounded. Whole run 18,922 tokens, $0.15. But
+`cacheReadInputTokens` was zero on every turn: the spike's system prompt sat near 1000 tokens, under
+the 1024 minimum, so the frozen prefix was re-billed at full price twelve times. That is the c5 trap
+arriving in practice rather than in theory, and it is invisible without asking for the number — the run
+looks correct and costs about twice what it needs to.
+
+**What one turn costs on this substrate, measured 2026-08-15 before anything was built.** Measured on
+`@anthropic-ai/claude-agent-sdk` 0.3.233 against claude-sonnet-5, one turn, main-model input
+tokens: full harness default 45,927; the loop's own prompt with built-in tools still loaded 35,245;
+with tools off but settings loaded 5,849; with both off 932. So the cost half of c4 holds with room
+to spare — `tools: []` is worth ~34k of the ~45k and `settingSources: []` ~5k — and the floor is
+three figures rather than the tens of thousands that would have killed the spec. Two things the
+clause did not anticipate came out of the same run. **First, `settingSources: []` does not isolate.**
+At 932 tokens the turn still named this project, its path, `CLAUDE.md`, and a convention that lives
+only in the author's user-level memory index: working directory, git status and auto-memory ride a
+dynamic section that a custom string system prompt does not remove, and the SDK's own
+`excludeDynamicSections` is documented to have no effect when `systemPrompt` is a string. Pointing
+`cwd` at an empty directory outside the repository removes all of it — the same probe answers "NONE,
+I don't have access to any repository" and the floor falls to 296. The empty directory recorded above is
+therefore not a fallback; it is the only lever for c4's correctness half, and c4 as written named three
+opt-outs where four are needed. The author ruled the fourth in and c4 now carries it.
+**Second, a frozen prefix under 1024 tokens does not cache at all** on this model: three consecutive
+turns on a 932-token prefix each billed 932 fresh with zero cache reads, while a 6,450-token prefix
+wrote once and read 6,450 on every turn after. c5 asserts byte identity of the system block, which is
+necessary and not sufficient — a run caching nothing passes it. The proof it wants is a nonzero
+`cacheReadInputTokens` on the second turn. Note also a constant auxiliary claude-haiku call of
+~520-580 tokens on every turn, in every configuration, that no option removed.
+
 ## Open questions
 
-- **RETIRED 2026-08-15 by measurement; c4 needs an author ruling.** Measured on
-  `@anthropic-ai/claude-agent-sdk` 0.3.233 against claude-sonnet-5, one turn, main-model input
-  tokens: full harness default 45,927; the loop's own prompt with built-in tools still loaded 35,245;
-  with tools off but settings loaded 5,849; with both off 932. So the cost half of c4 holds with room
-  to spare — `tools: []` is worth ~34k of the ~45k and `settingSources: []` ~5k — and the floor is
-  three figures rather than the tens of thousands that would have killed the spec. Two things the
-  clause did not anticipate came out of the same run. **First, `settingSources: []` does not isolate.**
-  At 932 tokens the turn still named this project, its path, `CLAUDE.md`, and a convention that lives
-  only in the author's user-level memory index: working directory, git status and auto-memory ride a
-  dynamic section that a custom string system prompt does not remove, and the SDK's own
-  `excludeDynamicSections` is documented to have no effect when `systemPrompt` is a string. Pointing
-  `cwd` at an empty directory outside the repository removes all of it — the same probe answers "NONE,
-  I don't have access to any repository" and the floor falls to 296. The fallback recorded above is
-  therefore not a fallback; it is the only lever for c4's correctness half, and c4 as written names
-  three opt-outs where four are needed. Adding the fourth is a clause change and waits on the author.
-  **Second, a frozen prefix under 1024 tokens does not cache at all** on this model: three consecutive
-  turns on a 932-token prefix each billed 932 fresh with zero cache reads, while a 6,450-token prefix
-  wrote once and read 6,450 on every turn after. c5 asserts byte identity of the system block, which is
-  necessary and not sufficient — a run caching nothing passes it. The proof it wants is a nonzero
-  `cacheReadInputTokens` on the second turn. Note also a constant auxiliary claude-haiku call of
-  ~520-580 tokens on every turn, in every configuration, that no option removed.
-- **A screen is a second input surface, and c6 does not survive it. Ruled by nobody yet.** A twelve-turn
-  spike on 2026-08-15 drove the real registry and a real model through tutorial island end to end, and
-  a third of its turns were not choices at all: talking to Miki, the mirror and character creation all
-  raise a modal, which `apply(session, choiceId)` cannot answer. A modal is answered by
-  `applyDirective(session, { kind: 'submit-modal', key, value })`, so the deliverable's one-call
-  description of a turn is short by a call. Worse for c6: the values a dialogue publishes are `0` and
-  `1` — the option's index. Character creation publishes real ones (`human`, and free text for a name),
-  so the engine is inconsistent rather than uniformly positional, and c6's promise that "an option list
-  that reorders between turns cannot change which action a reply selects" is exactly false on a
-  dialogue while it holds everywhere else. This matters most for the case c6 was written for: an author
-  editing a dialogue mid-run silently changes what `0` meant. Whether the fix is c6 narrowing to what
-  the engine can honour, or the engine giving dialogue options stable values, is the author's call and
-  is not a decision this spec can take on its own.
-- **The spike's own numbers, for whoever implements c3 and c5.** Per-turn billed input across twelve
-  turns: 1397, 1365, 1544, 1374, 1448, 1595, 1658, 1671, 1733, 1705, 1708, 1724. It rises while the
-  six-entry journal window fills and then plateaus, which is the shape c3 predicts — against a subagent
-  measured at ~44k and growing without bound, this is ~1.7k and bounded. Whole run: 18,922 tokens,
-  $0.15. But `cacheReadInputTokens` was zero on every single turn: the spike's system prompt sits near
-  1000 tokens, under the 1024 minimum, so the frozen prefix was re-billed at full price twelve times.
-  That is the c5 trap arriving in practice rather than in theory, and it is invisible without asking
-  for the number — the run looks correct and costs roughly twice what it needs to.
 - What ends a run. A turn count is the obvious bound and a usage budget is the honest one, but the
   budget figure must not reach the model's prompt (c5), so the loop holds it and the player does not.
   Which bound ships is a worker's call against a measured run; both are one line and neither changes a
