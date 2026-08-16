@@ -76,9 +76,12 @@ export function newSegment(state: GameState, registry: Registry, observers: read
 // built.
 const eventIndexes = new WeakMap<Registry, Map<string, GameEvent[]>>();
 
-const NO_EVENTS: GameEvent[] = [];
+const NO_EVENTS: readonly GameEvent[] = [];
 
-export function eventsFor(registry: Registry, resourceId: string | undefined, trigger: EventTrigger): GameEvent[] {
+// Readonly, because what comes back is the index's own array rather than a
+// copy of it: a caller that sorted or spliced its answer would be editing what
+// every later moment reads.
+export function eventsFor(registry: Registry, resourceId: string | undefined, trigger: EventTrigger): readonly GameEvent[] {
   let index = eventIndexes.get(registry);
   if (index === undefined) {
     index = new Map();

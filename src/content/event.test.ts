@@ -37,7 +37,7 @@ describe('the closed set lives in trigger:', () => {
     }
   });
 
-  it('is the whole vocabulary: ten names, each declaring one arity', () => {
+  it('is the whole vocabulary: eight names, each declaring one arity', () => {
     expect(TRIGGER_NAMES).toEqual(['on empty', 'on full', 'damage-dealt', 'damage-taken', 'missed', 'evaded', 'completed', 'unfinished']);
     expect(Object.values(EVENT_TRIGGERS).every((arity) => arity === 'pool' || arity === 'none')).toBe(true);
   });

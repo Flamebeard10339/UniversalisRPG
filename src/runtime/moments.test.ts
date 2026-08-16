@@ -150,6 +150,18 @@ describe('every moment the language has', () => {
     expect(Object.keys(MOMENTS).sort()).toEqual([...TRIGGER_NAMES, ...HOOK_LABELS].sort());
   });
 
+  // A key with an empty page under it would satisfy the check above and prove
+  // nothing, so the entry has to be wired to the name it is filed under and
+  // has to make the moment happen at least once.
+  it('wires every entry to the name it is filed under, and makes that moment happen', () => {
+    for (const [name, moment] of Object.entries(MOMENTS)) {
+      const wiring = (HOOK_LABELS.includes(name) ? [moment.playerBlock, moment.ratBlock] : [moment.content]).filter((part): part is string => part !== undefined);
+      const wired = HOOK_LABELS.includes(name) ? `${name}:` : `trigger: ${name}`;
+      expect(wiring.join(' '), name).toContain(wired);
+      expect(moment.times, name).toBeGreaterThan(0);
+    }
+  });
+
   for (const [name, moment] of Object.entries(MOMENTS)) {
     it(`fires ${moment.times} time(s) for ${name}, however the span is cut`, () => {
       for (const cuts of [1, 2, 3, 5, 10]) expect(counted(moment, cuts), `${cuts} cuts`).toBe(moment.times);
