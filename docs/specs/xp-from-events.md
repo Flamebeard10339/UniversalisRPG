@@ -460,3 +460,124 @@ uses.
  tests in src/runtime/poolMoments.test.ts — so the failure is not weak testing of the implemented
  rule, it is that the rule implemented is narrower than the clause. Re-run: pipe the three temp files
  through `npm run inspect -- -`.
+
+### Pass 3 — 2026-08-16
+
+- base: `cb74060058051c3d6fbd4249cfa72bbbe6d3ef25`
+- head: `9ad0141eb507f7e53d7425f70cbcf323f0292b7f`
+- proof 1: met — Mutation "c1 a grant's event is walked by the shared reference machinery" KILLED this pass:
+replacing the `for (const grant of listMembers<SkillGrant>(section.grants)) put(grant, 'event', ...)`
+line in src/content/referenceSites.ts case 'skill' with a no-op fails three named tests in
+src/content/event.test.ts — "refuses every trigger name written where an event name belongs", "drops
+the grant and keeps the skill, so the module still loads" and one more — re-run at that file with the
+mutation still applied. The refusal test derives its subjects from TRIGGER_NAMES, so every engine
+moment written where an event name belongs is refused. A grep over src for a second enumeration of
+the names finds only src/content/event.ts (the fire sites in runtime.ts pass string literals that the
+EventTrigger type checks against that one object). Checked this pass that the prune has not weakened
+the error path it shares: with no absent module in play, a `stat-id:` naming a stat that does not
+exist, a `gain ... on <unknown>` and an entity's `skills:` naming an unknown skill are all still load
+errors (audit-xp-from-events-pass3-prune.js through `npm run inspect -- -`), so the prune reaches only
+references into modules an optional dependency left out.
+- proof 2: met — Mutation "c2 an unrecognised trigger is refused against the closed set" KILLED this pass:
+narrowing triggerValue's guard to `if (!normalized)` fails src/content/event.test.ts > "accepts every
+name the table declares and nothing else" and "names the triggers that do exist when it refuses one",
+re-run at that file with the mutation still applied. Separately measured that an eleventh trigger is
+one edit and nothing else: mutation "c12 an eleventh trigger added to the closed set reddens the walk
+on the line it is added" adds `stumbled: 'none'` to EVENT_TRIGGERS, compiles, and its only failure is
+the coverage walk — TRIGGER_NAMES, watchesAPool and triggerArityProblem are each a function of that
+one object. Re-run: npm run mutate on mutations-xp-from-events-pass3.json and
+mutations-xp-from-events-pass3-derivation.json.
+- proof 3: met — Mutation "c3 a superfluous resource: is refused, not only a missing one" KILLED this
+pass: replacing triggerArityProblem's no-pool branch with `return undefined` fails
+src/content/event.test.ts > "refuses a declaration that disagrees with what its trigger takes" and
+"names the arity it violated rather than only the field", re-run at that file with the mutation still
+applied. Both tests walk TRIGGER_NAMES and assert both directions per trigger, and the check is asked
+of the assembled event in applySection, which is what pass 2 proved cannot be smuggled past by
+splitting a declaration across modules.
+- proof 4: met — Mutation "c4 the struck side is who damage-taken and evaded fire on" KILLED this pass:
+replacing `const struck = sideOf(action.depletes, self, other)` with `const struck = self` in the new
+block at the end of resolveAttempt fails three named tests in src/runtime/skillGrants.test.ts,
+including "trains the performer on what it dealt and the struck on what it took" and "trains the
+performer on a miss and the struck on the evasion of it", re-run at that file with the mutation still
+applied. The fixture puts each skill on exactly one sheet, so which entity a moment fired on is
+readable off which skill moved. credit: is untouched by this branch. Caveat unchanged and already
+filed by the implementer: only the subject SELECTION is provable, because state.xp is one map.
+- proof 5: met — Mutation "c5 a grant omitting both halves of the expression is a parse error" KILLED this
+pass: making the expression alternation optional in the GRANT regexp fails
+src/grammar/skillGrant.test.ts > "refuses a grant that omits both halves, so a line always says a
+number", re-run at that file with the mutation still applied. The same file proves 4*amount, 4 and
+amount all parse to the same shape and that a second variable, a second term, a non-product operator
+and a reversed product are each a parse error.
+- proof 6: met — Mutation "c6 the line parses to one grant however the spacing is written" KILLED this
+pass: dropping raw.trim() from skillGrant.parse fails src/grammar/skillGrant.test.ts > "reads the
+same grant however the spacing is written", re-run at that file with the mutation still applied. Pass
+1's second mutation on `clauses: 'grants'` in skillSchema stands, and grantLine in
+src/content/serialize.ts emits all four spellings back — the `coefficient === 1 && !amount` case
+prints `gain 1 experience on X`, which reparses to the same grant.
+- proof 7: met — Mutation "c7 a grant lands only in a skill the entity the moment happened to carries"
+KILLED this pass: dropping `earner.skills.includes(skill)` from src/runtime/skillGrants.ts fails six
+named tests in src/runtime/skillGrants.test.ts, including "earns an authored enemy experience from its
+own events, by the same path" and "leaves a skill alone where its moment landed on the other side",
+re-run at that file with the mutation still applied. experienceFor and fireEvents name no PLAYER. The
+completed/unfinished boundary is a stated limit in the trigger table rather than an unmet promise.
+- proof 8: met — Read off the diff again this pass: `git diff cb74060..9ad0141 -- src/runtime/effects.ts`
+contains neither applyResults nor applyOne, experienceFor returns nothing but ordinary {kind:'xp'}
+results, and the only state the branch adds is two WeakMaps keyed by the registry that hold no xp.
+Mutation "c8 a grant reaches the accumulator through applyResults carrying the moment count" KILLED
+this pass: pinning fireEvents' grant application to count 1 fails src/runtime/skillGrants.test.ts >
+"grants once per completion a batched span produced", re-run at that file with the mutation still
+applied. No new save field, so no prune rule and no migration.
+- proof 9: met — Mutation "c9 the grant index is derived once and held against the registry" KILLED this
+pass: defeating the byRegistry WeakMap hit fails src/runtime/skillGrants.test.ts > "walks the declared
+skills at most once however many moments fire", which counts calls by wrapping registry.skills.values.
+Re-run at that file with the mutation still applied. "resolves the same segments, log and clock
+whether or not a grant was authored" and the three-hundred-idle-skills test discharge the rest, and no
+fixture under content/ is in the diff. Recorded as an improvement over pass 2: eventsFor was still
+`[...registry.events.values()].filter(...)` at 78ab9c8 (`git show 78ab9c8:src/runtime/effects.ts`) and
+is now an index held in a WeakMap, so the per-settle allocation pass 2 filed as LOW is retired. The
+index's invalidation assumption is filed separately as LOW.
+- proof 10: met — src/runtime/save.ts is not in the diff and no fixture is regenerated by it. Mutation
+"c10 the save version this branch inherits is pinned" KILLED this pass: moving SAVE_VERSION to 12
+fails src/runtime/skillGrants.test.ts > "keeps the save shape it inherited, so a state that earned a
+grant reloads clean", which pins 11 and asserts compareSave and loadSave both report no differences,
+re-run at that file with the mutation still applied. Grants are content and round-trip through the
+serializer.
+- proof 11: met — `npm run tasks -- merge-ready` on 9ad0141 this pass: tsc pass, npm test pass (3306
+tests), layer-check pass, audit-status pass, doctor pass (25 warnings, which do not fail the leg),
+bytes pass, tree pass, base pass, spec pass. The one failing leg is "clauses xp-from-events 1
+outstanding across 2 pass(es): c12", which is this record. Re-run the command to reproduce.
+- proof 12: unmet — Checked and fails, on a fourth mechanism that is none of pass 2's three. The per-settle
+firing is genuinely fixed and the walk genuinely proves it — mutation "c12 restored/drained are one
+firing per whole unit, not one per settle" puts pass 2's defect back and is KILLED by
+src/runtime/moments.test.ts alone ("fires 10 time(s) for restored", "fires 8 time(s) for drained" and
+one more), and the fractional-ceiling refusal and the per-crossing count are killed there too. The
+completeness derivation is also real: adding an eleventh trigger to EVENT_TRIGGERS, or an eleventh
+label to HOOK_FIELDS, is each KILLED by the walk's own coverage assertion.
+ What still fails is the clause's own sentence. writeLevel takes `units` from the settle's NET
+movement (`Math.floor(reached / MILLI_UNITS) - Math.floor(before / MILLI_UNITS)` at
+src/runtime/effects.ts:450, over `raw = current + delta + rate.units` at :494), so a rise and a fall
+that land in the same settle cancel — and whether they land in the same settle is exactly a fact about
+where the caller cut the span. Measured with no hooks and no handlers anywhere
+(audit-xp-from-events-pass3-netgross2.js): one twenty-second span, a pool at `rate: trickle` +1/s that
+an ordinary `depletes:` swing takes 5 out of every 10s, identical end level 10000 milli-units in every
+run — `restored` fires 10, 10, 10, 12, 16, 18, 18 times at 1, 2, 4, 5, 10, 20 and 40 cuts and
+`drained` fires 0, 0, 0, 2, 6, 8, 8. `gain amount experience` on the restored event totals 10 at one
+cut and 18 at twenty, so the amount is split-dependent as well as the count. The same measurement with
+an `on hit:` hook supplying the drain instead of a swing gives the same numbers
+(audit-xp-from-events-pass3-netgross.js).
+ The branch already contains the rule this violates: src/runtime/poolMoments.test.ts:141 asserts that
+one second moving a pool +1 by rate and -3 by a result reports `restored` 1 and `drained` 3, and its
+comment says the two settle apart, so they are reported apart and their sum is the units the pool
+actually moved. That holds only because the instant-action path settles the rate and the result in two
+writes. Inside a segment they are summed into one `raw` and reported once, so the same +1/-5 second
+reports `drained` 4 and no `restored` at all.
+ Every pool fixture in the walk is monotone — `restored` is a pure positive rate with no deltas,
+`drained` a pure negative one, and the handler fixture's own drain is the stated exception that never
+reports — which is why the file that claims to prove every moment cannot see this. Separately measured
+that the derivation covers the key set and not the moment: mutation "c12 a covered name whose fixture
+exercises nothing is caught by something" reduces the `restored` entry to a page with no event and no
+grant and `times: 0`, leaving the name covered, and SURVIVED the whole suite (0 failed of 3306).
+ Filed as F1 with the shape of the fix rather than a fourth patch, per the third-pass rule that a
+clause failing repeatedly is a rule to narrow rather than an instance list to extend. Re-run: pipe
+audit-xp-from-events-pass3-netgross2.js through `npm run inspect -- -`, and npm run mutate on
+mutations-xp-from-events-pass3.json, -derivation.json and -vacuous.json.
