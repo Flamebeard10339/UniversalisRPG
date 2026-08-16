@@ -1,0 +1,327 @@
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { splitSections } from '../src/grammar/structure';
+import { deleteLocalSection, listLocalSections, LOCAL_CHANGES_MODULE_ID, type LocalSection } from '../src/content/localChanges';
+import { NAMESPACED_KINDS, qualify } from '../src/content/namespace';
+import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
+import { registryDiff } from '../src/content/registryDiff';
+import type { Removal } from '../src/content/removal';
+import type { ModuleSource, ParsedModule } from '../src/content/universe';
+
+export interface Declaration {
+  source: string;
+  heading: string;
+  start: number;
+  end: number;
+}
+
+export interface Placed {
+  heading: string;
+  kind: string;
+  id: string;
+  source: string;
+}
+
+export interface Unplaced {
+  heading: string;
+  reason: string;
+}
+
+export interface Consolidation {
+  sources: ModuleSource[];
+  local: string;
+  placed: Placed[];
+  unplaced: Unplaced[];
+  diagnostics: string[];
+  differences: string[];
+}
+
+export const writable = (result: Consolidation): boolean =>
+  result.diagnostics.length === 0 && result.differences.length === 0 && result.placed.length > 0;
+
+const refusal = (base: readonly ModuleSource[], local: ModuleSource, diagnostics: string[]): Consolidation => ({
+  sources: [...base],
+  local: local.text,
+  placed: [],
+  unplaced: [],
+  diagnostics,
+  differences: [],
+});
+
+function headingLine(text: string, start: number): string {
+  const stop = text.indexOf('\n', start);
+  return (stop === -1 ? text.slice(start) : text.slice(start, stop)).replace(/\r$/, '');
+}
+
+const declarationKey = (kind: string, id: string): string => `${kind} ${id}`;
+
+// A bare heading declares an id under its module's namespace and a dotted one
+// edits somebody else's, which is `targetKey`'s rule read from the file rather
+// than from the merged registry — the only rule under which "the file that
+// declared it" has one answer.
+function declarations(sources: readonly ModuleSource[], namespaces: ReadonlyMap<string, string | null>): Map<string, Declaration[]> {
+  const found = new Map<string, Declaration[]>();
+  for (const source of sources) {
+    for (const section of splitSections(source.text)) {
+      if (section.kind === 'info' || section.id === undefined) continue;
+      const namespaced = NAMESPACED_KINDS.includes(section.kind);
+      if (namespaced && section.id.includes('.')) continue;
+      const key = declarationKey(section.kind, namespaced ? qualify(namespaces.get(source.name) ?? null, section.id) : section.id);
+      const at = found.get(key) ?? [];
+      at.push({ source: source.name, heading: headingLine(source.text, section.span.start), start: section.span.start, end: section.span.end });
+      found.set(key, at);
+    }
+  }
+  return found;
+}
+
+interface Target {
+  kind: string;
+  id: string;
+  remove: boolean;
+}
+
+const targetOf = (section: ParsedModule['sections'][number]): Target =>
+  section.kind === 'remove'
+    ? { kind: (section.value as Removal).kind, id: (section.value as Removal).target, remove: true }
+    : { kind: section.kind, id: (section.value as { id: string }).id, remove: false };
+
+// The staged sections paired with the ids the loader settled them on. The pair
+// is what makes placement derived rather than guessed: the text comes from the
+// file and the id from the load that just accepted it, and neither is
+// re-resolved here.
+function staged(local: ModuleSource, parsed: readonly ParsedModule[]): { section: LocalSection; target: Target }[] | null {
+  const module = parsed.find((each) => each.source.name === local.name);
+  if (!module) return null;
+  const sections = listLocalSections(local.text);
+  if (sections.length !== module.sections.length) return null;
+  return sections.map((section, index) => {
+    const settled = module.sections[index];
+    if (settled.kind !== section.kind) throw new Error(`${LOCAL_CHANGES_MODULE_ID} section ${index} parsed as ${settled.kind}, not ${section.kind}`);
+    return { section, target: targetOf(settled) };
+  });
+}
+
+interface Edit {
+  start: number;
+  end: number;
+  text: string | null;
+}
+
+// A deletion takes the section's own lines and the blank ones separating it
+// from the next section, so removing the middle of three does not leave the gap
+// two sections wide.
+function deletionEnd(text: string, end: number): number {
+  let stop = end;
+  while (stop < text.length && text[stop] !== '\n') stop += 1;
+  for (;;) {
+    if (stop >= text.length) return text.length;
+    let scan = stop + 1;
+    while (scan < text.length && text[scan] !== '\n') scan += 1;
+    if (text.slice(stop + 1, scan).trim() !== '') return stop + 1;
+    stop = scan;
+  }
+}
+
+const matchingEndings = (file: string, text: string): string => (file.includes('\r\n') ? text.replace(/\n/g, '\r\n') : text);
+
+function applyEdits(text: string, edits: readonly Edit[]): string {
+  let out = text;
+  for (const edit of [...edits].sort((a, b) => b.start - a.start)) {
+    const end = edit.text === null ? deletionEnd(out, edit.end) : edit.end;
+    out = out.slice(0, edit.start) + (edit.text === null ? '' : matchingEndings(text, edit.text)) + out.slice(end);
+  }
+  return out;
+}
+
+const rehead = (heading: string, section: string): string => [heading, ...section.split('\n').slice(1)].join('\n');
+
+export function consolidate(base: readonly ModuleSource[], local: ModuleSource): Consolidation {
+  const before = loadUniverseWithDiagnostics([...base, local]);
+  if (before.diagnostics.length > 0) return refusal(base, local, before.diagnostics.map(formatModuleDiagnostic));
+
+  const sections = staged(local, before.parsed);
+  if (!sections) return refusal(base, local, [`${LOCAL_CHANGES_MODULE_ID} does not parse the same way twice; nothing was consolidated`]);
+
+  const namespaces = new Map(before.parsed.map((module) => [module.source.name, module.namespace]));
+  const declared = declarations(base, namespaces);
+
+  const resolved: { section: LocalSection; target: Target; declaration: Declaration | null; refused: string }[] = sections.map(({ section, target }) => {
+    const at = declared.get(declarationKey(target.kind, target.id)) ?? [];
+    if (at.length === 0) return { section, target, declaration: null, refused: `no file under content/ declares ${target.kind} ${target.id}` };
+    if (at.length > 1) return { section, target, declaration: null, refused: `${at.map((each) => each.source).sort().join(' and ')} both declare ${target.kind} ${target.id}` };
+    return { section, target, declaration: at[0], refused: '' };
+  });
+
+  // Two staged sections resolving onto one span leave both staged rather than
+  // one of them: which of the two the file should end up saying is exactly what
+  // an author has not said.
+  const span = (declaration: Declaration): string => `${declaration.source}:${declaration.start}`;
+  const claims = new Map<string, number>();
+  for (const each of resolved) if (each.declaration) claims.set(span(each.declaration), (claims.get(span(each.declaration)) ?? 0) + 1);
+
+  const placed: Placed[] = [];
+  const unplaced: Unplaced[] = [];
+  const edits = new Map<string, Edit[]>();
+
+  for (const { section, target, declaration, refused } of resolved) {
+    const heading = `# ${section.kind} ${section.id}`;
+    if (!declaration) {
+      unplaced.push({ heading, reason: refused });
+      continue;
+    }
+    if (claims.get(span(declaration))! > 1) {
+      unplaced.push({ heading, reason: `two staged sections go home to ${declaration.source}'s ${declaration.heading}` });
+      continue;
+    }
+    const into = edits.get(declaration.source) ?? [];
+    into.push({ start: declaration.start, end: declaration.end, text: target.remove ? null : rehead(declaration.heading, section.text) });
+    edits.set(declaration.source, into);
+    placed.push({ heading, kind: target.kind, id: target.id, source: declaration.source });
+  }
+
+  const sources = base.map((source) => (edits.has(source.name) ? { ...source, text: applyEdits(source.text, edits.get(source.name)!) } : source));
+
+  // No dependencies are offered, so the header the author wrote survives a
+  // consolidation whole: what the local module depends on is its own statement
+  // and taking sections out of it is not a reason to restate it.
+  let text = local.text;
+  for (const { section } of sections) {
+    if (!placed.some((each) => each.heading === `# ${section.kind} ${section.id}`)) continue;
+    text = deleteLocalSection(text, [], section.kind, section.id).text;
+  }
+
+  const remaining = listLocalSections(text).length > 0;
+  const after = loadUniverseWithDiagnostics(remaining ? [...sources, { ...local, text }] : sources);
+  if (after.diagnostics.length > 0) {
+    return { sources: [...base], local: local.text, placed, unplaced, diagnostics: after.diagnostics.map(formatModuleDiagnostic), differences: [] };
+  }
+
+  const differences = registryDiff(before.registry, after.registry);
+  if (differences.length > 0) return { sources: [...base], local: local.text, placed, unplaced, diagnostics: [], differences };
+  return { sources, local: text, placed, unplaced, diagnostics: [], differences: [] };
+}
+
+const repoRoot = path.join(import.meta.dirname, '..');
+const defaultLocal = 'content/local-changes.dsl';
+const contentDirectory = 'content';
+
+interface Args {
+  contentFiles: string[] | null;
+  localFile: string;
+  dryRun: boolean;
+}
+
+function usage(): never {
+  console.error(
+    [
+      'Usage: tsx scripts/consolidate.ts [local=<file>] [content=<a.dsl,b.dsl>] [--dry-run]',
+      '',
+      'Writes every staged section back into the file that declared its id and empties the local module.',
+      'Refuses as a whole if the result would load into a different universe.',
+    ].join('\n'),
+  );
+  process.exit(1);
+}
+
+const splitFiles = (value: string): string[] => value.split(',').map((file) => file.trim()).filter(Boolean);
+
+export function parseArgs(raw: readonly string[]): Args {
+  const args: Args = { contentFiles: null, localFile: defaultLocal, dryRun: false };
+  for (const arg of raw) {
+    if (arg === '--help' || arg === '-h') usage();
+    if (arg === '--dry-run') {
+      args.dryRun = true;
+      continue;
+    }
+    if (arg.startsWith('local=')) {
+      args.localFile = arg.slice('local='.length);
+      continue;
+    }
+    if (arg.startsWith('content=')) {
+      args.contentFiles = splitFiles(arg.slice('content='.length));
+      continue;
+    }
+    usage();
+  }
+  return args;
+}
+
+const repoPath = (file: string): string => path.resolve(repoRoot, file);
+
+const sourceName = (file: string): string => path.basename(file).replace(/\.[^.]*$/, '');
+
+// The directory is the manifest, the way it is for the browser's glob and for
+// the shipped-content replay: a `.dsl` added to content/ is a file an edit can
+// go home to on the commit that authors it.
+function contentFiles(args: Args): string[] {
+  if (args.contentFiles) return args.contentFiles;
+  const local = repoPath(args.localFile);
+  return readdirSync(repoPath(contentDirectory))
+    .filter((name) => name.endsWith('.dsl'))
+    .map((name) => `${contentDirectory}/${name}`)
+    .filter((file) => repoPath(file) !== local);
+}
+
+const read = (file: string): ModuleSource => ({ name: sourceName(file), text: readFileSync(repoPath(file), 'utf8') });
+
+function write(file: string, text: string): void {
+  const target = repoPath(file);
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, text, 'utf8');
+}
+
+export function run(argv: readonly string[]): void {
+  const args = parseArgs(argv);
+  if (!existsSync(repoPath(args.localFile))) {
+    console.log(`Nothing staged: ${args.localFile} does not exist.`);
+    return;
+  }
+
+  const files = contentFiles(args);
+  const base = files.map(read);
+  const local = read(args.localFile);
+  if (listLocalSections(local.text).length === 0) {
+    console.log(`Nothing staged in ${args.localFile}.`);
+    return;
+  }
+
+  const result = consolidate(base, local);
+  for (const each of result.unplaced) console.error(`Left staged: ${each.heading} — ${each.reason}`);
+
+  if (result.diagnostics.length > 0) {
+    console.error('Consolidation did not load, so nothing was written:');
+    for (const line of result.diagnostics) console.error(`  ${line}`);
+    process.exitCode = 1;
+    return;
+  }
+  if (result.differences.length > 0) {
+    console.error('Consolidation would not preserve the universe, so nothing was written:');
+    for (const line of result.differences) console.error(line);
+    console.error('A staged section replaces the whole section it goes home to; a partial edit has to be staged whole.');
+    process.exitCode = 1;
+    return;
+  }
+  if (!writable(result)) {
+    console.error('Nothing could be placed, so nothing was written.');
+    process.exitCode = 1;
+    return;
+  }
+
+  if (args.dryRun) {
+    for (const each of result.placed) console.log(`Would write ${each.heading} into ${each.source}.dsl`);
+    return;
+  }
+
+  for (const [index, source] of result.sources.entries()) {
+    if (source.text !== base[index].text) write(files[index], source.text);
+  }
+  write(args.localFile, result.local);
+  for (const each of result.placed) console.log(`Wrote ${each.heading} into ${each.source}.dsl`);
+  console.log(`Consolidated ${result.placed.length} section(s); ${result.unplaced.length} left staged.`);
+}
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  run(process.argv.slice(2));
+}

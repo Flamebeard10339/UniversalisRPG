@@ -99,6 +99,57 @@ GUI hands over bytes and this command places them — two surfaces because of wh
 neither a second implementation of the other. Nothing here is reachable from the game, and nothing has
 to be.
 
+**`squash-local-changes` survives, unchanged.** It is not a second implementation of c2's guard — it
+already reaches the guard through `roundTripModule`, which is the shared thing c9c88e1 built. Its job
+is still its own: print one module canonically, which is what publishing a mod as its own module wants
+and what sending an edit home does not.
+
+**c2 is enforced on the serializer's import graph, not on a list of callers.** `roundTrip.ts` is the
+only non-test file that may import `serializeRegistryModule`, and every test that imports it imports
+the diff beside it; both are read off the tree in `src/content/registryDiff.test.ts`. A third caller
+cannot be written without either going through the round trip or turning that test red, which is what
+the clause asks for and what a list naming the script and the mod portal could not have given.
+
+**The mod portal's round trip is taken before the rename, and the rename is not diffed — c2.**
+Comparing a hand-renamed registry against a reload reports every compiled locale key and inline action
+id the rename did not reach, and completing that rename is a table somebody has to keep in sync, which
+is the failure this repository names first. What the trip proves is the property h1 is about: that the
+serializer carries this module whole. An edit to another module's content and a `# remove` both fail
+it, and `republishModule` returns no text at all in that case, so the mod is published as the author's
+own bytes under the new id. That is a behaviour change beyond the clause's letter — a contribution
+that edits base content used to be published as a bare `# info` — and it is the clause's point.
+
+**A staged section replaces the whole section it goes home to, so a partial patch is refused — c1, c3.**
+Splicing is what keeps the diff reviewable, and a splice has nothing to merge with: the fields the
+staged section does not name are the fields the file stops saying. Merging them in text would be a
+second implementation of `mergeSection` that has to be kept in sync with the first. So the run aborts
+and `registryDiff` names the id, which is c3 doing exactly its job; staging the section whole is the
+repair, and `/dsl` takes a whole section.
+
+**The command consolidates everything staged and takes no filter.** c3's all-or-nothing is then a
+statement about the local module rather than about an argument, and there is no way to ask for half of
+it. `--dry-run` is what a reader wanting to see the plan first gets instead.
+
+**Its content set is `content/*.dsl`, read from the directory.** The same derivation the browser's glob
+and the shipped-content replay already make, so a `.dsl` added to `content/` is a file an edit can go
+home to on the commit that authors it. `content=` overrides it, which is what the tests point at a
+temporary tree with.
+
+**A removal goes home as a deletion, and takes the blank line separating it from its neighbour.** The
+span `splitSections` gives is the section's own lines; leaving the gap two lines wide where a section
+used to be is not "every other byte untouched" in any useful sense, and the alternative reading leaves
+a growing pile of blank lines behind every consolidated removal.
+
+**Line endings follow the file being written into.** A CRLF checkout is a real configuration the loader
+already holds for, and splicing LF text into it would rewrite the file's own convention one section at
+a time. A restage of what a CRLF file already says leaves it byte-identical, which is the test.
+
+**c2's proof runs in `src/content/registryDiff.test.ts` and `src/content/modportal.test.ts`, not
+`scripts/modportal.test.ts`.** `materializeApprovedModIssue` is where the second caller lives and it is
+in `src/content`; the script is a CLI over it. c4's `# test` replay runs in `scripts/consolidate.test.ts`
+over the consolidated tree rather than in `src/runtime/integration.test.ts`, which reads the shipped
+tree and would only prove that this branch did not disturb it.
+
 ## Open questions
 
 - Whether the command takes a filter — one kind, one id, one file — or always consolidates everything is
