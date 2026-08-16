@@ -158,3 +158,81 @@ tree and would only prove that this branch did not disturb it.
   must be refused rather than guessed, under c1's own rule. Whether that case can arise at all depends
   on `refuse-two-objects-of-different-kinds-sharing-an-id-while-ei`; until it lands, refusing is correct
   and costs nothing.
+
+## Audit passes
+
+### Pass 1 — 2026-08-16
+
+- base: `878a05b24259f773e932538d176b0e2e2bd1c11f`
+- head: `acf40f02ae7231826d7ae5800bbab8b79d6d1710`
+- proof 1: met — Seven aimed mutations of the splice itself were killed by the test the clause names, each
+  re-run at scripts/consolidate.test.ts with the mutation still applied: narrowing the spliced span to
+  `end: declaration.start`, replacing `rehead` with the staged heading, dropping the namespace
+  qualification in `declarationKey`, unconditionally returning from `deletionEnd` before it eats the
+  separating blank line, raising the two-declaring-files guard to `at.length > 99`, disabling the
+  one-span-two-sections guard, and replacing the unreachable-section reason with one that does not name
+  the id. Manifest at C:\Users\yonat\AppData\Local\Temp\mutations-an-edit-goes-home-to-its-source-file-pass1.json
+  (plus the -reports.json beside it); `npm run mutate -- <it>` re-runs all of it. The "every other byte"
+  half is asserted twice over: byte equality of the whole file against a restage that says what the file
+  already said, and, over a copy of the shipped tree, byte equality of every content file except the one
+  tutorial-island.dsl edit. One aimed mutation survived and is filed: flipping the descending sort in
+  `applyEdits` changes nothing any test can see, because no test consolidates two sections into one file.
+  I probed that case directly through `npm run inspect` (two edits, and two edits plus a removal, into
+  one file) and both spliced correctly, so the survivor is a missing test rather than a broken property.
+- proof 2: met — Both halves hold. The h1 half: replacing the refusal in `republishModule`
+  (src/content/roundTrip.ts:55) with `if (false)` was killed twice at src/content/modportal.test.ts, by
+  "carries an edit to base content, which the module it prints does not own" and by "carries a removal of
+  base content, which the module it prints cannot express", so the mod portal now publishes the author's
+  own bytes rather than a canonical print that loses them, which is contribution-system-2026-07-30-h1
+  closed. The derivation half: adding `serializeRegistryModule` to src/content/registry.ts's existing
+  import of `./serialize` was killed by src/content/registryDiff.test.ts "is the only thing shipped code
+  can do with the serializer", so a new shipped caller does turn the test red. Graded met because the
+  clause's own sentence, that no path in the repository serializes and reloads without registryDiff, is
+  true of the tree today and proven by a walk of the tree rather than a list. The Decisions' stronger
+  reading ("a third caller cannot be written without ... turning that test red") is measurably not true of
+  every form: `import * as printer from './serialize'; void printer.serializeRegistryModule;` added to
+  registry.ts survived at whole-suite scope, 0 failed of 3374. Filed as a medium finding, not as unmet.
+  Note for the next pass: the clause's `proof:` line names scripts/modportal.test.ts, which is the CLI
+  test file and has nothing to do with c2; the Decisions section says src/content/modportal.test.ts and is
+  right. I graded against the latter.
+- proof 3: met — Six aimed mutations, five killed at scripts/consolidate.test.ts. Making the differences
+  branch return the edited sources and the emptied local instead of `[...base]` and `local.text` was killed
+  three separate ways: by "names the difference a partial patch would make, and keeps every byte", by
+  "refuses as a whole, so a placeable section beside an unloadable one is not written either", and by
+  "leaves every byte on disk where it was", which is the on-disk claim and the only one an in-memory result
+  cannot make. Stubbing `registryDiff` to `[]` and dropping the differences term from `writable` were both
+  killed by the first of those. The difference is named: the test asserts the exact line
+  "  locations: changed base.camp". One survivor is filed: `if (after.diagnostics.length > 0)` changed to
+  `if (false)` changes nothing any test sees. That branch is reachable and correct, probed with a staged
+  `# location base.camp` carrying `adjacent: other.hall`, giving "base [base] resolve: ... but other is not
+  this module or one of its dependencies", nothing written and the local module untouched; it survives only
+  because registryDiff refuses the same input by a second route. Low, not a hole in the clause.
+- proof 4: met — Replacing the local-emptying `deleteLocalSection` call with a no-op was killed by
+  scripts/consolidate.test.ts "leaves the local module with nothing staged", which reads the local file back
+  off disk after a real `run()` over a copy of the shipped tree; deleting `write(args.localFile,
+  result.local)` was killed by the same test. Replacing the after-load with `before` was killed by "names the
+  difference a partial patch would make, and keeps every byte". "Loading content/ alone yields a universe
+  registryDiff cannot distinguish" is the assertion registryDiff(staged, after) equals [] over the shipped
+  tree, and the write-nothing mutation on `run()` killed it. One honest qualification for the next pass: the
+  shipped-test-replay assertion, "passes every test the consolidated tree declares", never failed on its
+  own. Both mutations I aimed at it, breaking the splice span and writing the original bytes back instead of
+  the edit, were killed by neighbours in the same file at the escalated scope and survived at the replay's
+  own scope, because the one staged edit is examine prose that no shipped test exercises. The clause still
+  holds; the replay is defence in depth rather than the thing proving it, and the byte-equality and
+  universe-equality assertions are what carry c4.
+- proof 5: met — The whole describe block "the round trip is closed, on the content that ships" runs against a
+  copy of the real content/ tree: it stages "/dsl item tutorial-island.lockpick examine: ..." through
+  `runLine` and the same AuthoringContext the REPL and the GUI use, runs the CLI's own `run()`, and reloads
+  from files alone. Three aimed mutations of `run()`'s write path were killed there: writing the original
+  bytes back instead of the edit (killed by "loads the same universe from the files alone as it did with the
+  edit staged on top"), dropping the local-module write (killed by "leaves the local module with nothing
+  staged"), and appending a newline to every file (killed by "wrote the edit into the file that declared the
+  id, and touched no other file"). One survivor is filed: every test in the file passes `content=` and
+  `local=`, so `.filter((name) => name.endsWith('.dsl'))` in `contentFiles` can be replaced with
+  `.filter(() => false)` with the whole suite green. That is the default content-set derivation the
+  Decisions section commits to, untested.
+- proof 6: met — `npm run tasks -- merge-ready` at acf40f0 with a clean tree: tsc ok, npm test ok, layer-check
+  ok, audit-status ok, doctor ok (23 warnings, which that leg does not fail on), bytes ok, tree ok, base ok.
+  All six legs the clause names pass. The two legs that report FAIL are the spec-standing ones, "1 open
+  member" and "has no recorded audit pass", which cannot pass before this pass is filed and the member is
+  closed, and are not among the six the clause enumerates.
