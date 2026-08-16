@@ -1,4 +1,4 @@
-import { Cursor, Parser } from './parser';
+import { Cursor, Parser, parseWhole } from './parser';
 import { RawLine } from './structure';
 
 export interface ListParser<E> extends Parser<E[]> {
@@ -16,9 +16,11 @@ export function list<E>(element: Parser<E>): ListParser<E> {
     return items;
   };
 
+  const line: Parser<E[]> = { parse: parseInline };
+
   return {
     element,
     parse: parseInline,
-    parseBlock: (lines) => lines.flatMap((line) => parseInline(new Cursor(line.text, 0, line.span.start))),
+    parseBlock: (lines) => lines.flatMap((raw) => parseWhole(line, raw.text, raw.span.start, 'a list item')),
   };
 }
