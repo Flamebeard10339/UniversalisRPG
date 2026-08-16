@@ -11,10 +11,11 @@ import { stockItem } from './itemInstance';
 import { openModalNamed } from './modals';
 import { localizerOf } from './localized';
 import { nextRandom } from './rng';
+import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
 import { hitChance, statValue } from './stats';
-import { divideRateRemainder, toMilliUnits } from './units';
+import { divideRateRemainder, fromMilliUnits, toMilliUnits } from './units';
 import { applyDeclared } from './buffs';
 
 export interface Segment {
@@ -71,7 +72,7 @@ export function newSegment(state: GameState, registry: Registry, observers: read
 // Which names are bound to a pool crossing a threshold. Asked rather than
 // stored on the resource, because a `# resource` declares the pool's shape and
 // nothing else.
-export function eventsFor(registry: Registry, resourceId: string, trigger: EventTrigger): GameEvent[] {
+export function eventsFor(registry: Registry, resourceId: string | undefined, trigger: EventTrigger): GameEvent[] {
   return [...registry.events.values()].filter((event) => event.resource === resourceId && event.trigger === trigger);
 }
 
@@ -362,11 +363,16 @@ export function handlersFor(registry: Registry, actorId: string, eventId: string
   return (entity?.handlers ?? []).filter((handler) => handler.event === eventId).map((handler) => handler.results);
 }
 
-function fireEvents(segment: Segment, actorId: string, resourceId: string, trigger: EventTrigger, count: number): void {
+// What a moment does to whoever it happened to: the handlers that entity wrote
+// for it, and the experience the skills it carries are trained by. `amount` is
+// the moment's own quantity, in the units its row under `### Triggers` names.
+export function fireEvents(segment: Segment, actorId: string, trigger: EventTrigger, resourceId?: string, count = 1, amount = 1): void {
   for (const event of eventsFor(segment.registry, resourceId, trigger)) {
     for (const results of handlersFor(segment.registry, actorId, event.id)) {
       applyResults(segment, results, actorId, count);
     }
+    const earned = experienceFor(segment.registry, actorEntity(segment.registry, actorId), event.id, amount);
+    if (earned.length > 0) applyResults(segment, earned, actorId, count);
   }
 }
 
@@ -382,11 +388,11 @@ export function requireResource(registry: Registry, resourceId: string): Resourc
 export function emptyPoolNow(segment: Segment, actorId: string, resourceId: string, credit: string): void {
   const store = poolStores(segment.state).find((each) => each.actorId === actorId);
   if (!store) return;
-  store.levels[resourceId] = 0;
   clearActorDeltas(segment.deltas, actorId);
   const previous = segment.credit;
   segment.credit = credit;
-  fireEvents(segment, actorId, resourceId, 'on empty', 1);
+  writeLevel(segment, store, requireResource(segment.registry, resourceId), 0);
+  fireEvents(segment, actorId, 'on empty', resourceId);
   segment.credit = previous;
 }
 
@@ -404,19 +410,31 @@ function poolStores(state: GameState): PoolStore[] {
   return stores;
 }
 
+// Where a settle leaves a pool, and the movement that was. Rates, results and
+// the instant a pool runs out all write through here, so what `restored` and
+// `drained` report summed over a span is the pool's own net movement and does
+// not depend on where the span was split. A handler's own deltas settle below
+// without passing here, under the rule stated there.
+function writeLevel(segment: Segment, store: PoolStore, resource: Resource, level: number): void {
+  const before = store.levels[resource.id] ?? 0;
+  store.levels[resource.id] = level;
+  if (level === before) return;
+  fireEvents(segment, store.actorId, level > before ? 'restored' : 'drained', resource.id, 1, fromMilliUnits(Math.abs(level - before)));
+}
+
 // The one write of a pool level, for every actor alike. A rollover meter is one
 // whose pool has a name bound to `on full`; without one it is a plain capped
 // pool, which is the same rule the resource's own block used to carry.
 function setPoolLevel(segment: Segment, store: PoolStore, resource: Resource, current: number, raw: number, max: number): 'stored' | 'clamped' {
   if (raw > current && max > 0 && eventsFor(segment.registry, resource.id, 'on full').length > 0) {
     const fires = Math.floor(raw / max);
-    store.levels[resource.id] = raw - fires * max;
-    if (fires > 0) fireEvents(segment, store.actorId, resource.id, 'on full', fires);
+    writeLevel(segment, store, resource, raw - fires * max);
+    if (fires > 0) fireEvents(segment, store.actorId, 'on full', resource.id, fires);
     return 'stored';
   }
   const clamped = Math.min(max, Math.max(0, raw));
-  store.levels[resource.id] = clamped;
-  if (raw < current && current > 0 && clamped <= 0) fireEvents(segment, store.actorId, resource.id, 'on empty', 1);
+  writeLevel(segment, store, resource, clamped);
+  if (raw < current && current > 0 && clamped <= 0) fireEvents(segment, store.actorId, 'on empty', resource.id);
   return clamped === raw ? 'stored' : 'clamped';
 }
 
