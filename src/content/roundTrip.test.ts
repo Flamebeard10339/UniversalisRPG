@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadModule, loadUniverseWithDiagnostics, type ModuleDiagnostic, type UniverseLoadResult } from './registry';
-import { canSerialize, declaredGlobalIds, republishModule, roundTripModule, roundTripUniverse } from './roundTrip';
+import { canSerialize, declaredGlobalIds, republishModule, roundTripModule, roundTripUniverse } from './serialize';
 import { parseUniverse, type ModuleSource } from './universe';
 
 const BASE = ['# info base', 'version: 1.0.0', '', '# item bread', 'title: Bread', '', '# location camp', 'x: 0, y: 0', 'starting'].join('\n');

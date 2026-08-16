@@ -41,6 +41,23 @@ describe('a consolidation writes each section into the file that declared its id
     expect(written(result, 'base')).toBe(BASE);
   });
 
+  // A CRLF checkout is a real configuration — .gitattributes pins LF in the
+  // index and the CI matrix runs Windows — and a staged section is always LF,
+  // because `listLocalSections` normalises it. Splicing one in without matching
+  // the file would rewrite that file's own convention one section at a time.
+  it.each([
+    ['a CRLF file', true],
+    ['an LF file', false],
+  ])('keeps the line endings of %s it splices into', (_name, crlf) => {
+    const text = crlf ? BASE.split('\n').join('\r\n') : BASE;
+    const restaged = consolidate([{ name: 'base', text }], local('# item base.rope', 'title: Rope'));
+    expect(writable(restaged)).toBe(true);
+    expect(written(restaged, 'base')).toBe(text);
+
+    const edited = consolidate([{ name: 'base', text }], local('# item base.rope', 'title: Cord'));
+    expect(written(edited, 'base')).toBe(text.replace('title: Rope', 'title: Cord'));
+  });
+
   it('takes the declaring section out of its file when the staged section is a removal', () => {
     const result = consolidate(base(), local('# remove item.base.bell'));
     expect(writable(result)).toBe(true);

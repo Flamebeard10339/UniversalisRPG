@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ActionResult } from '../grammar/actionResult';
-import { loadModule, loadUniverse } from './registry';
-import { registryDiff } from './registryDiff';
-import { serializeRegistryModule } from './serialize';
+import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './registry';
+import { roundTripModule } from './serialize';
 
 const load = (...lines: string[]) => () => loadModule(lines.join('\n'));
 
@@ -147,9 +146,9 @@ describe('# droptable', () => {
   it('prints an action whose only result is a wrapper as a block, not as one line', () => {
     const source = ['# info pack', 'version: 1.0.0', '# item gem', '# entity g', 'p:', '  1 in 5: give: 1 gem'].join('\n');
     const registry = loadUniverse([{ name: 'pack', text: source }]);
-    const printed = serializeRegistryModule(registry, { info: { id: 'pack', version: [1, 0, 0] } });
-    expect(printed).toContain('1 in 5:');
-    expect(registryDiff(registry, loadUniverse([{ name: 'again', text: printed }]))).toEqual([]);
+    const trip = roundTripModule(registry, { info: { id: 'pack', version: [1, 0, 0] } }, (text) => loadUniverseWithDiagnostics([{ name: 'again', text }]));
+    expect(trip.printed).toContain('1 in 5:');
+    expect(trip.differences).toEqual([]);
   });
 
   it('round-trips through serialize, wrappers and all', () => {
@@ -182,8 +181,9 @@ describe('# droptable', () => {
       '  say: Already.',
     ].join('\n');
     const registry = loadUniverse([{ name: 'pack', text: source }]);
-    const printed = serializeRegistryModule(registry, { info: { id: 'pack', version: [1, 0, 0] } });
-    expect(registryDiff(registry, loadUniverse([{ name: 'again', text: printed }]))).toEqual([]);
+    const trip = roundTripModule(registry, { info: { id: 'pack', version: [1, 0, 0] } }, (text) => loadUniverseWithDiagnostics([{ name: 'again', text }]));
+    expect(trip.diagnostics).toEqual([]);
+    expect(trip.differences).toEqual([]);
   });
 });
 

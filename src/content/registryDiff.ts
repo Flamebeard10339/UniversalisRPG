@@ -1,7 +1,10 @@
 import { localeLines } from './locale';
 import { CONTENT_SECTION_MAPS, Registry } from './registry';
 
-export const REGISTRY_DIFF_MAPS: readonly (keyof Registry)[] = [...CONTENT_SECTION_MAPS.map(([, map]) => map), 'flags', 'variables', 'slots', 'saves'];
+// Asked for rather than held. This module is inside the cycle `serialize.ts`
+// closes now that the round trip lives there, so a binding read at load time
+// is a binding whose own module has not run yet.
+export const registryDiffMaps = (): readonly (keyof Registry)[] => [...CONTENT_SECTION_MAPS.map(([, map]) => map), 'flags', 'variables', 'slots', 'saves'];
 
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable);
@@ -28,7 +31,7 @@ export function registryDiff(before: Registry, after: Registry): string[] {
   for (const line of left) if (!right.has(line)) lines.push(`  locales: missing ${line}`);
   const held = new Set(left);
   for (const line of right) if (!held.has(line)) lines.push(`  locales: added ${line}`);
-  for (const name of REGISTRY_DIFF_MAPS) {
+  for (const name of registryDiffMaps()) {
     const left = before[name] as ReadonlyMap<string, unknown>;
     const right = after[name] as ReadonlyMap<string, unknown>;
     for (const key of [...left.keys()].sort()) {

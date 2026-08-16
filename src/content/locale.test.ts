@@ -5,9 +5,9 @@ import { actionAddress } from './action';
 import { actionSlug, actionSlugProblem, localeKey, missingTranslations, TEXT_FIELDS, unmatchedLocaleKeys } from './locale';
 import { SCHEMAS } from './module';
 import { text } from '../grammar/values';
-import { CONTENT_SECTION_MAPS, everyActionTable, loadModule, loadUniverse, type Registry } from './registry';
+import { CONTENT_SECTION_MAPS, everyActionTable, loadModule, loadUniverse, loadUniverseWithDiagnostics, type Registry } from './registry';
 import { sameValue } from './registryDiff';
-import { serializeRegistryModule } from './serialize';
+import { roundTripModule } from './serialize';
 import type { ModuleSource } from './universe';
 
 const ISLAND = [
@@ -268,7 +268,7 @@ describe('an action crossing a language boundary keeps the language its declarat
 describe('text survives the trip a contribution makes', () => {
   const trip = (text: string, language: string): Registry => {
     const info = { id: 'isla', version: [1, 0, 0] as [number, number, number], language };
-    const printed = serializeRegistryModule(loadUniverse([{ name: 'isla', text }]), { info });
+    const printed = roundTripModule(loadUniverse([{ name: 'isla', text }]), { info }, (again) => loadUniverseWithDiagnostics([{ name: 'isla', text: again }])).printed;
     return loadUniverse([{ name: 'isla', text: printed }]);
   };
 
@@ -341,7 +341,8 @@ describe('a translation may not name a parameter nothing supplies', () => {
 describe('no kind prints a title the loader would make for itself', () => {
   it('keeps a stat with no title of its own unentered across a round trip', () => {
     const text = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# stat ataque', 'base: 10'].join('\n');
-    const printed = serializeRegistryModule(loadUniverse([{ name: 'isla', text }]), { info: { id: 'isla', version: [1, 0, 0], language: 'es' } });
+    const info = { id: 'isla', version: [1, 0, 0] as [number, number, number], language: 'es' };
+    const printed = roundTripModule(loadUniverse([{ name: 'isla', text }]), { info }, (again) => loadUniverseWithDiagnostics([{ name: 'isla', text: again }])).printed;
 
     expect(loadUniverse([{ name: 'isla', text: printed }]).locales.base.has('isla.stat.ataque.title')).toBe(false);
   });

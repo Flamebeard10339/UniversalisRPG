@@ -6,7 +6,7 @@ import { parseModuleSource } from './universe';
 import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, loadUniverseWithDiagnostics } from './registry';
 import type { Registry } from './registry';
 import type { ModuleSource } from './universe';
-import { declaredGlobalIds, republishModule } from './roundTrip';
+import { declaredGlobalIds, republishModule } from './serialize';
 import { visitSection } from './referenceSites';
 
 export const MOD_PENDING_LABEL = 'mod-pending';

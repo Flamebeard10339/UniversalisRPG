@@ -634,7 +634,6 @@
         "src/content/registryDiff.test.ts",
         "src/content/registryDiff.ts",
         "src/content/roundTrip.test.ts",
-        "src/content/roundTrip.ts",
         "src/content/serialize.test.ts",
         "src/content/serialize.ts"
       ],

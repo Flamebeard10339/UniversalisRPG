@@ -48,7 +48,7 @@ Proof:
   `content/` alone after the run yields a universe `registryDiff` cannot distinguish from the one loaded
   before it with the local module on top, every `# test` over shipped content passes, and
   `/local list` reports nothing staged.
-  proof: vitest scripts/consolidate.test.ts src/runtime/integration.test.ts
+  proof: vitest scripts/consolidate.test.ts
 - [c5] **The round trip is closed, and it is closed on real content.** An edit staged through `/dsl`,
   consolidated home, and loaded back from files alone produces the same universe as the same edit left
   staged — proven over the shipped `content/` tree rather than over a fixture, because the shipped tree
@@ -104,11 +104,27 @@ already reaches the guard through `roundTripModule`, which is the shared thing c
 is still its own: print one module canonically, which is what publishing a mod as its own module wants
 and what sending an edit home does not.
 
-**c2 is enforced on the serializer's import graph, not on a list of callers.** `roundTrip.ts` is the
-only non-test file that may import `serializeRegistryModule`, and every test that imports it imports
-the diff beside it; both are read off the tree in `src/content/registryDiff.test.ts`. A third caller
-cannot be written without either going through the round trip or turning that test red, which is what
-the clause asks for and what a list naming the script and the mod portal could not have given.
+**c2 is enforced by `serializeRegistryModule` not being exported — there is no door to guard.** The
+round trip moved into `src/content/serialize.ts` and the printer became private to it, so the only
+callers that can exist are `roundTripModule`, `roundTripUniverse` and `republishModule`, all three of
+which diff before they return, and `tsc` refuses anybody else. `src/content/registryDiff.test.ts` now
+asserts three things and models no import syntax at all: the serializer is not among the module's
+exports, the module's whole export surface is the seven names it means to offer, and the identifier
+appears in no other file.
+
+This replaced a test that read import statements and decided which reached the serializer. It was
+wrong twice — audit pass 1 found `import * as printer from './serialize'` walking past it, and pass 2
+found `export { serializeRegistryModule } from './serialize'` added to the one file the rule exempted,
+after which any caller could import it from there. Both were closed at the time by adding a case. The
+second HIGH is the signal that adding cases was the wrong move: the set of ways to spell "I hold this
+binding" is not a set anybody can finish writing down, so the repair is to leave nothing to spell. The
+export was the door.
+
+The cost, taken deliberately: `src/content/serialize.ts` grows by the round trip, and three test files
+that printed a module directly now reach `.printed` through `roundTripModule`. `REGISTRY_DIFF_MAPS`
+became `registryDiffMaps()` because `serialize.ts` importing `registryDiff` closes an import cycle
+through `registry.ts`, and a top-level read of another module's binding inside a cycle is a read of a
+binding whose module has not run.
 
 **The mod portal's round trip is taken before the rename, and the rename is not diffed — c2.**
 Comparing a hand-renamed registry against a reload reports every compiled locale key and inline action
@@ -146,11 +162,13 @@ a time. A restage of what a CRLF file already says leaves it byte-identical, whi
 
 **c2's proof runs in `src/content/registryDiff.test.ts` and `src/content/modportal.test.ts`, not
 `scripts/modportal.test.ts`.** `materializeApprovedModIssue` is where the second caller lives and it is
-in `src/content`; the script is a CLI over it. The clause's own `proof:` line said the script and has
-been corrected to say the file, because a wrong `proof:` line misaims the generated mutation manifest —
-it cost pass 1 eleven entries. c4's `# test` replay runs in `scripts/consolidate.test.ts`
-over the consolidated tree rather than in `src/runtime/integration.test.ts`, which reads the shipped
-tree and would only prove that this branch did not disturb it.
+in `src/content`; the script is a CLI over it. c4's `# test` replay runs in
+`scripts/consolidate.test.ts` over the consolidated tree rather than in `src/runtime/integration.test.ts`,
+which reads the shipped tree and would only prove that this branch did not disturb it. Both clauses'
+`proof:` lines said otherwise and have been corrected, because a wrong `proof:` line misaims the
+generated mutation manifest — c2's cost pass 1 eleven entries and c4's cost pass 2 seventeen. c2's was
+fixed on its own in pass-1 triage and c4's, the identical defect one clause away, was left standing:
+aiming at the finding rather than at the property, which is the failure this workflow names.
 
 ## Open questions
 
