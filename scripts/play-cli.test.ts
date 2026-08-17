@@ -1445,6 +1445,7 @@ const SHAPED_IN_DEV: Record<string, string> = { '<N>': '1', '<enter>': '', '<dir
 // added with an argument is walked on the day it exists or the suite says so.
 const ACTS_ON: Record<string, string> = {
   '/inventory': 'gold',
+  '/goto': 'camp',
   '/wait': '1',
   '/speed': '2',
   '/test': 'replay',

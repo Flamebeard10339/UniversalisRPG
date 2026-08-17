@@ -300,6 +300,8 @@ export function printDirective(value: Directive): string {
       return `use: ${value.action} on ${value.target}`;
     case 'travel':
       return `travel: ${value.location}`;
+    case 'goto':
+      return `goto: ${value.location}`;
     case 'craft':
       return `craft: ${value.recipe}`;
     case 'begin':

@@ -212,6 +212,15 @@ export function spreadDiscovery(state: GameState, registry: Registry): void {
   }
 }
 
+// Standing somewhere, and everything that follows from standing there. The one
+// statement of it: `relocate:` says it, a placement into an unset location says
+// it, and `goto:` says it, so a third caller cannot arrive somewhere without
+// the place learning it has been seen.
+export function relocateTo(state: GameState, registry: Registry, location: string): void {
+  state.location = location;
+  spreadDiscovery(state, registry);
+}
+
 // Whose pool an amount moves. An unmarked result lands on whoever the list is
 // being applied to, which under a hook is the carrier that wrote it.
 function subjectOf(segment: Segment, party: Party | undefined, actor: string): string {
@@ -267,8 +276,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       return amount;
     }
     case 'relocate':
-      state.location = result.location;
-      spreadDiscovery(state, registry);
+      relocateTo(state, registry, result.location);
       return 0;
     case 'discover':
       state.flags[`${result.location}.${DISCOVERED}`] = true;

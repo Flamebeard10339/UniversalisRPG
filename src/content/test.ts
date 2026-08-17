@@ -12,6 +12,11 @@ export type Directive =
   // brought by the player and applied to what it names.
   | { kind: 'use-on'; action: string; target: string }
   | { kind: 'travel'; location: string }
+  // Standing somewhere at once, which is what a walk arrives at with the walk
+  // taken out of it. Beside `travel:` rather than a flag on it: one crosses the
+  // roads and spends the time, the other does neither, and a line a session
+  // records has to say which of the two happened.
+  | { kind: 'goto'; location: string }
   | { kind: 'craft'; recipe: string }
   | { kind: 'begin'; inner: Extract<Directive, { kind: 'use' | 'use-on' | 'travel' | 'craft' }> }
   | { kind: 'assert'; condition: Condition }
@@ -62,6 +67,7 @@ const USE_VERB = 'use:';
 const USE = new RegExp(`^${USE_VERB}[ \\t]*${USE_PAYLOAD}$`);
 const USE_ON = new RegExp(`^${USE_VERB}[ \\t]*${USE_ON_PAYLOAD}$`);
 const TRAVEL = new RegExp(`^travel:[ \\t]*${TRAVEL_PAYLOAD}$`);
+const GOTO = new RegExp(`^goto:[ \\t]*${TRAVEL_PAYLOAD}$`);
 const CRAFT = new RegExp(`^craft:[ \\t]*${CRAFT_PAYLOAD}$`);
 const BEGIN = /^begin:[ \t]*(?<verb>use|travel|craft)[ \t]+(?<rest>.+)$/;
 const BEGIN_USE = new RegExp(`^${USE_PAYLOAD}$`);
@@ -198,6 +204,9 @@ export function parseDirectiveLine(text: string): Directive | null {
 
   const travel = TRAVEL.exec(text)?.groups;
   if (travel) return { kind: 'travel', location: travel.id };
+
+  const goingTo = GOTO.exec(text)?.groups;
+  if (goingTo) return { kind: 'goto', location: goingTo.id };
 
   const craft = CRAFT.exec(text)?.groups;
   if (craft) return { kind: 'craft', recipe: craft.id };

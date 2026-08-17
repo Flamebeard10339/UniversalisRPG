@@ -13,6 +13,8 @@ import { runTest, serializeSession, sessionStatus, startSession, view, type Play
 import {
   COMMANDS,
   createTicker,
+  DEV_TOKENS,
+  devTokenIn,
   findCommand,
   helpEntries,
   isChoiceLine,
@@ -87,6 +89,22 @@ adjacent:
 
 # location ruins
 x: 1, y: 0
+`;
+
+// Two places with no road between them, so nothing a walk can do reaches the
+// second — which is the state the teleport is about.
+const CUT_OFF_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# location island
+x: 40, y: 0
+adjacent:
+  cave
+
+# location cave
+x: 41, y: 0
 `;
 
 interface Fixture {
@@ -481,6 +499,47 @@ describe('the commands a player plays with', () => {
     expect(errors(runLine(ctx, '/speed nope'))).toEqual(['/speed requires a positive number, got "nope"']);
     expect(errors(runLine(ctx, '/speed'))).toEqual(['/speed requires a positive number, got ""']);
     expect(ctx.live.speed).toBe(4);
+  });
+
+  // c8, c9. The teleport reaches a place no road does, spreads discovery the
+  // way an arrival does, and leaves a line behind that a `# test` replays.
+  it('/goto stands the player somewhere no road reaches, and records a line that replays', () => {
+    const { ctx, session, recorder } = fixture(CUT_OFF_MODULE);
+    expect(ctx.view.choices.some((choice) => choice.leadsTo === 'island')).toBe(false);
+
+    const result = runLine(ctx, '/goto island');
+
+    expect(errors(result)).toEqual([]);
+    expect(result.view?.location.id).toBe('island');
+    expect(recorder.history).toEqual(['goto: island']);
+    // The arrival's own consequence: the place is known, and so is what it
+    // leads on to.
+    expect(sessionStatus(session).flags).toMatchObject({ 'island.discovered': true, 'cave.discovered': true });
+
+    const replayed = fixture(`${CUT_OFF_MODULE}\n# test teleported\ngoto: island\nassert: cave.discovered\n`);
+    expect(errors(runLine(replayed.ctx, '/test teleported'))).toEqual([]);
+    expect(replayed.ctx.view.location.id).toBe('island');
+  });
+
+  it('/goto refuses a place the registry does not hold, and leaves the player where they were', () => {
+    const { ctx } = fixture(CUT_OFF_MODULE);
+
+    expect(errors(runLine(ctx, '/goto nowhere'))).toEqual(['typed directive goto: names an unknown location: nowhere']);
+    expect(errors(runLine(ctx, '/goto'))).toEqual(['unknown command: /goto']);
+    expect(ctx.view.location.id).toBe('camp');
+  });
+
+  // c11's half of the mark: the table carries it, and the table acts on nothing
+  // — the CLI has every command whatever the session is.
+  it('marks the dev-only commands, and the tokens are read off the marks', () => {
+    expect(DEV_TOKENS).toEqual(COMMANDS.filter((spec) => spec.dev).flatMap((spec) => [spec.name, ...spec.aliases]));
+    expect(DEV_TOKENS).toContain('/goto');
+
+    for (const token of DEV_TOKENS) expect(devTokenIn(`${token} somewhere`), token).toBe(token);
+    expect(devTokenIn('/look')).toBeUndefined();
+    expect(devTokenIn('  /goto  island  ')).toBe('/goto');
+    // A leading token that merely starts with one is a different command.
+    expect(devTokenIn('/gotofar island')).toBeUndefined();
   });
 
   it('a typed travel: directive moves the player and records the canonical form', () => {

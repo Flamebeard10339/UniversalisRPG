@@ -25,8 +25,8 @@ import {
   getDelta,
   newSegment,
   Segment,
+  relocateTo,
   settlePools,
-  spreadDiscovery,
 } from './effects';
 import {
   ActiveAction,
@@ -786,10 +786,8 @@ function stepJourney(state: GameState, registry: Registry): boolean {
 
 export function useTravel(origin: string, dest: string, registry: Registry, state: GameState): void {
   if (!origin) {
-    state.location = dest;
-    // Placed rather than walked, and standing somewhere is what discovers it:
-    // a journey reaches this through `relocate:`, which spreads on its own.
-    spreadDiscovery(state, registry);
+    // Placed rather than walked, through the same door `relocate:` goes.
+    relocateTo(state, registry, dest);
     return;
   }
   useAction('travel', travelPair(origin, dest), actionAddress(travelAction(origin, dest, registry)), registry, state);
