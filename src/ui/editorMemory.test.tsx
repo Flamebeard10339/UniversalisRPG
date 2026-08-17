@@ -5,6 +5,8 @@ import { App } from './App';
 import { pageStorage } from './agent/pageStorage';
 import { browserSlots } from './browserStore';
 import { createDriver } from './driver';
+import { addressable } from './authoringSurface';
+import { sectionKey } from './editControls';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { EDITOR_SLOT, FORGOTTEN, recorded, remembered, type Editing } from './editorMemory';
 
@@ -80,18 +82,41 @@ function reopened(where: Editing | null): string {
 
 const attribute = (html: string, name: string): string[] => [...html.matchAll(new RegExp(`${name}="([^"]*)"`, 'g'))].map(([, value]) => value);
 
-// The section the tutorial opens standing next to, which is one the Local
-// surface offers — found rather than named, so it survives the content moving.
-const OPENED = 'entity tutorial-island.miki';
+// Which tab is showing and which row is open, read as the pair each is: the
+// attribute that names the thing, on the element that also says it is the one.
+const paired = (html: string, names: string, marks: string): string[] =>
+  [...html.matchAll(new RegExp(`${names}="([^"]*)"[^>]*${marks}="yes"`, 'g'))].map(([, value]) => value);
+
+const showing = (html: string): string[] => paired(html, 'data-surface', 'data-showing');
+
+const opened = (html: string): string[] => paired(html, 'data-section', 'data-opened');
+
+// Two sections an author could have been left in the middle of, found rather
+// than named so they survive the content moving: one the Local surface offers
+// where the tutorial opens, and one the Global surface offers under a kind
+// filter. `reopened` seeds the store with them, so a literal that stopped
+// naming anything would be a case that proved the restore over nothing.
+const SECTIONS = addressable(SHIPPED_SOURCES);
+
+const found = (kind: string): string => {
+  const section = SECTIONS.find((each) => each.kind === kind);
+  if (!section) throw new Error(`the shipped modules hold no # ${kind}`);
+  return sectionKey(section);
+};
+
+const OPENED = found('entity');
+
+const NARROWED = found('item');
 
 describe('where the author was is on the screen when the page opens (c10)', () => {
   it('opens on the surface it was left on, with the section it had open', () => {
-    const html = reopened({ ...FORGOTTEN, surface: 'global', kind: 'item', open: 'item tutorial-island.iron-sword' });
+    const html = reopened({ ...FORGOTTEN, surface: 'global', kind: 'item', open: NARROWED });
 
-    expect(html).toContain('data-surface="global"');
-    expect(html).toContain('data-showing="yes"');
-    expect(attribute(html, 'data-opened')).toEqual(['yes']);
-    expect(html).toContain('data-section="item tutorial-island.iron-sword"');
+    // The pair, not the two halves: every render this component can produce
+    // carries a `data-surface="global"` tab and a `data-showing="yes"`
+    // somewhere, so only the one being on the other says which is showing.
+    expect(showing(html)).toEqual(['global']);
+    expect(opened(html)).toEqual([NARROWED]);
     // And the filter it was narrowed to, which is what makes the list the one
     // the author left rather than the whole of it.
     expect(attribute(html, 'data-section').every((section) => section.startsWith('item '))).toBe(true);
@@ -113,17 +138,18 @@ describe('where the author was is on the screen when the page opens (c10)', () =
   it('opens on none of it over a store that was never written', () => {
     const html = reopened(null);
 
-    expect(attribute(html, 'data-opened')).toEqual([]);
-    expect(html).toContain('data-surface="local"');
+    expect(opened(html)).toEqual([]);
+    expect(showing(html)).toEqual(['local']);
     expect(html).toContain('translate(0px, 0px) scale(1)');
     expect(html).not.toContain('data-floor="-1" data-drawn="yes"');
   });
 
   // The two positions a static render cannot show, carried as far as it can be
   // seen: they are fields of the same value the assertions above prove came out
-  // of the store. Assigning them to a DOM node is an effect, and this suite
-  // runs none — that inch is the author's to look at, and it is said here
-  // rather than left to be discovered.
+  // of the store. Putting them back on a DOM node is an effect, and so is the
+  // write half of this round trip — where the boundary runs is stated once for
+  // the whole layer in surface.test.ts and counted off the tree, because saying
+  // it here as a list of two is how it was last found to be short by two.
   it('opens holding the cursor and the scroll it was left with', () => {
     const storage = pageStorage();
     const slots = browserSlots(() => storage);

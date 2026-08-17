@@ -484,3 +484,117 @@ is what this pass discharges; it will report c10 after this pass is filed, which
 rather than a leg this clause can be held to. Two of doctor's warnings are this branch's own:
 the-gui-authors-through-the-same-door-pass1-a-test-fixture-s names src/ui/pageStorage.ts:1, the path the
 fix for that very finding moved away from.
+
+### Pass 3 — 2026-08-17
+
+- base: `fa790124d4c1cc281a80245b6540a34771767671`
+- head: `6eba2d02a4ef62c0c35079e04a468bef8f51192b`
+- proof 1: met — Leaned on pass 2 and said so: no production source changed between 6996181 and 6eba2d0.
+`git diff --stat 6996181..6eba2d0` names only docs/, scripts/play-cli.test.ts, src/ui/dragSheet.test.ts,
+src/ui/driver.test.ts and the editorMemory.test.ts -> .tsx rename, and the only hunk in driver.test.ts is
+inside the c13 describe. scripts/drift.test.ts is byte-identical to the tree pass 2 re-derived this on, so
+its "reaches byte-identical state and says the same things, over a scripted sequence" and pass 2's kill of
+src/ui/driver.ts `readLocalChanges: stored,` to `() => ''` stand unchanged. Not re-derived here.
+- proof 2: met — Leaned on pass 2 for the clause and said so: src/ui/authoringSurface.test.ts and every module
+it walks are unchanged since 6996181. What I did check, because the rename could have moved the subject set:
+the walk's filter is `if (!/\.tsx?$/.test(entry.name) || entry.name.includes('.test.')) return [];`
+(src/ui/authoringSurface.test.ts:182), which excludes by name and not by extension, so editorMemory.test.tsx
+is excluded exactly as editorMemory.test.ts was and the set of scanned modules is the same set pass 2
+measured. Pass 2's kill — `void 'adoptRegistry';` planted in src/ui/agent/pageStorage.ts — stands.
+- proof 7: met — Leaned on passes 1 and 2 and said so: src/ui/authoringSurface.ts and
+src/ui/authoringSurface.test.ts are unchanged since 6996181. Pass 2's two kills — the LOCAL_CHANGES_MODULE_ID
+branch dropped from addressOf, and surfaceOf collapsed to `return 'global'`, killed at file scope by "draws
+every location on the map surface and nothing else there" and "narrows Local to what is standing where the
+player is" — stand. Carried forward unchanged: the assertion named after the partition cannot fail while
+surfaceOf is present at all; the partition is carried by its two neighbours.
+- proof 8: met — Half leaned on, half re-derived. src/ui/mapEdit.ts and src/ui/mapEdit.test.ts are unchanged
+since 6996181, so pass 2's kills (settledOn stripped of Math.round; droppedAt with the placedAt nudge inverse
+removed) stand and I did not re-derive them. What moved is src/ui/dragSheet.test.ts, which decides whether a
+tap can stage the edit pass 1 filed, so I measured that half myself: src/ui/DragSheet.tsx
+`carriedFar = (by, zoom) => Math.abs(by.x * zoom) > DRAG_SLOP_PX || ...` with the `* zoom` dropped is KILLED
+by "measures the slop where the finger is and not where the sheet is, at x0.4", re-run at
+src/ui/dragSheet.test.ts with the mutant still applied (manifest
+C:\Users\yonat\AppData\Local\Temp\audit-the-gui-authors-through-the-same-door-pass3-neighbours.json). Pass 2
+measured that mutation only at one zoom, where dropping `* zoom` is invisible. The single case at
+`carrying(8)` that the loop replaced tested a zoom outside the sheet's own range (ZOOM_MIN 0.4, ZOOM_MAX 3),
+so nothing reachable was given up for it.
+- proof 9: met — Leaned on pass 2 and said so: src/ui/driver.ts is unchanged since 6996181 and the "opens a
+second driver over the same store with the edit already applied" case is untouched by the c13 hunk. Pass 2's
+kill — `const loaded = held.trim() === '' ? base : loadUniverseWithDiagnostics(...)` replaced with
+`const loaded = base;` — stands.
+- proof 10: met — Re-derived from scratch against the current tree. Pass 2 graded this unmet on three restore
+seedings that could each be deleted with the whole suite green; two of the three are now killed, and I aimed
+the mutations myself rather than reading the fix. Manifest
+C:\Users\yonat\AppData\Local\Temp\audit-the-gui-authors-through-the-same-door-pass3-c10.json:
+(a) src/ui/App.tsx `useState<Editing>(() => remembered(driver.editorMemory.read()))` to `remembered(null)`
+KILLED by src/ui/editorMemory.test.tsx "opens on the surface it was left on, with the section it had open";
+(b) src/ui/MapPane.tsx `useSheetHold(..., where, ...)` to `undefined` KILLED by "opens where the map was
+looking, at the zoom and on the floor it was left at"; and a third of my own, aimed past pass 2's list,
+(d) src/ui/MapPane.tsx `useState<number | null>(where.plane)` to `useState<number | null>(null)` KILLED by
+the same case. Each re-run at src/ui/editorMemory.test.tsx with the mutant still applied and failing there
+too. So four of the six things the clause names — the section open (with the kind filter that makes the list
+the one the author left), the map's pan, its zoom and its floor — are proved from a store that already holds
+where the author was, which is what reopening the tab is.
+What is not proved is every effect involved, and it is more than the two the fix declares. Surviving the
+whole suite at 0 failed of 3662: (c) src/ui/EditPane.tsx `list.current.scrollTop = editing.scroll` and
+src/ui/EditPane.tsx `field.current.setSelectionRange(...)` — the two the 087ae9d body and the test file's own
+comment declare untested — and also src/ui/App.tsx:118 `driver.editorMemory.write(recorded(editing))` and
+src/ui/MapPane.tsx:193 `onWhere({ pan, zoom, plane })`, which are the write half of the round trip and are
+declared nowhere. Filed as a medium finding rather than graded unmet, because I measured the boundary instead
+of arguing it: two effects that predate this branch entirely — src/ui/Pager.tsx's
+`node.style.transform = restingAt(index)` and src/ui/PlaneModal.tsx's newlyDrawn sprout — also SURVIVE the
+whole suite at 0 failed of 3662 (manifest
+C:\Users\yonat\AppData\Local\Temp\audit-the-gui-authors-through-the-same-door-pass3-boundary.json). There is
+no jsdom and no act() in this repository: `test.environment` is unset in vitest.config.ts and neither jsdom
+nor @testing-library is a dependency, so no React effect anywhere in src/ui is exercised by this suite and
+never has been. That is the standing state CLAUDE.md's testing rule 5 rules on, not a shortfall of this
+branch, and holding c10 to a standard no clause in the repository meets would be the longer exclusion list
+that auditor/rule-may-be-wrong warns about. The clause is graded on what a suite with no effect runner can
+reach, and all of that is now derived and killed.
+- proof 11: met — Leaned on pass 2 and said so: src/ui/browserStore.ts, src/runtime/storeContract.ts,
+src/runtime/store.ts and src/ui/browserStore.test.ts are all unchanged since 6996181. Pass 2's kill —
+`const keyed = (name: string): string => backtick-prefix-name` to `=> name`, killed by three contract cases —
+stands, as does the DECLARED/Proxy pair that derives the contract's subjects from the interface.
+- proof 12: met — Leaned on pass 2 and said so: nothing in src/runtime/storeContract.ts, src/ui/browserStore.ts
+or src/ui/agent/pageStorage.ts moved since 6996181. Pass 2's kill — `getItem(keyed(name))` to
+`getItem(keyed(name))?.trimStart() ?? null`, killed by the byte-for-byte whitespace cases — stands.
+- proof 13: met — Re-derived, because this is the one clause whose proof the diff touched.
+`expect(Object.keys(MOMENTS)).toHaveLength(3)` — pass 2's finding, the test's own constant against itself —
+is now `toHaveLength(STORE_REACHES)`, where STORE_REACHES counts `save\.store\.\w+\(` in src/ui/driver.ts,
+and MOMENTS gained the fourth reach pass 2 found unwatched. I broke it in both directions (neighbours
+manifest): adding a fifth reach, `save.store.read('notes')` beside `stored()` with no moment for it, KILLED
+by "asks every moment of the driver that the store could refuse at"; and removing one, editorMemory.write's
+`save.store.write(EDITOR_SLOT, text)` replaced with `void text`, KILLED by the same case. Both re-run at
+src/ui/driver.test.ts with the mutant still applied. The correspondence is 1:1 today — read and write of
+local-changes, read and write of the editor slot, against opening, staging, remembering and reading — so
+recorded for a fourth pass rather than re-derived by it: this is a count over reaches and not an identity
+map between them, so two reaches exchanged for two others would still balance. It bites for the case it was
+built for and pass 2's residue is discharged. The universal over modes is unchanged since pass 2: REFUSING is
+Record<StorageRefusal, ...>, driver.test.ts asserts its own set contains all of STORAGE_REFUSALS plus
+`unrecognised`, and no message text is named anywhere in it.
+- proof 14: met — Leaned on pass 2 and said so: src/ui/browserStore.test.ts is unchanged since 6996181 and
+pass 2's kill — `// window.localStorage` planted into src/ui/agent/surfaces.ts — stands. Checked because the
+rename could have moved the walk's subjects: the filter at src/ui/browserStore.test.ts:124 is
+`entry.name.includes('.test.')`, extension-agnostic, so editorMemory.test.tsx is excluded exactly as
+editorMemory.test.ts was and the ">20 modules" floor is measured over the same set.
+- proof 15: met — Leaned on pass 2 and said so: scripts/drift.test.ts, scripts/lib/slotFile.ts,
+src/ui/browserStore.ts and src/ui/driver.ts are all unchanged since 6996181. Pass 2's two kills — the
+injected clock dropped from createSaveContext, and writeLocalChanges writing to a slot named 'local' — stand.
+- proof 16: met — Leaned on pass 2 and said so: the "hands over the same bytes /local show prints and the slot
+holds" case is untouched by the c13 hunk and src/ui/driver.ts has not moved. Pass 2's kill — `localChanges()`
+returning `authoring.localSource.text` instead of `stored()` — stands, and c2's scan forbidding
+renderLocalChangesModule anywhere under src/ui is re-derived above at proof 2.
+- proof 17: met — Leaned on pass 2 for the scanner and said so: src/ui/surface.test.ts and every component it
+scans are unchanged since 6996181, so pass 2's kill — src/ui/EditPane.tsx `data-drive="edit.open"`
+retargeted to `data-drive="edit.reveal"` — stands. What I checked, because the tree gained a .tsx file
+carrying JSX: the scanner's filter at src/ui/surface.test.ts:26 is the same
+`entry.name.includes('.test.')`, so editorMemory.test.tsx is not in SOURCES and neither the control rule nor
+c6's shipped-reaches-agent rule changed subject. Green on the npm test leg of merge-ready at 6eba2d0.
+- proof 18: met — npm run tasks -- merge-ready at 6eba2d0 in this worktree: tsc ok, npm test ok, layer-check ok,
+audit-status ok, doctor ok (28 warnings, none of which fail the leg), bytes ok, tree ok (nothing
+uncommitted), base ok, spec ok (every member closed). The one failing leg is "clauses
+the-gui-authors-through-the-same-door — 1 outstanding across 2 pass(es): c10", which is pass 2's grade and is
+what this pass discharges; re-running merge-ready after this pass is filed is what a next reader should do.
+One of doctor's warnings is still this branch's own and was not cleared by 6eba2d0:
+the-gui-authors-through-the-same-door-pass1-a-test-fixture-s names src/ui/pageStorage.ts:1, the path the fix
+for that very finding moved away from. It does not fail the leg.

@@ -359,3 +359,45 @@ describe('the rules the driver is held to', () => {
     }
   });
 });
+
+// Every effect this layer schedules, counted off the tree rather than listed.
+// An effect is where a component reaches the DOM or the world after a render —
+// putting a scroll position back, writing a slot, measuring a node — and what
+// is below is the one statement about all of them.
+const EFFECTS = SOURCES.flatMap((source) => [...source.text.matchAll(/\buse(?:Layout)?Effect\s*\(/g)].map(() => source.file));
+
+// What would have to be here for this suite to run one. The environment is
+// unset in the vite config and none of these is a dependency, so nothing in
+// the suite mounts a component: `renderToStaticMarkup` produces the first
+// frame and stops. Named by what they are rather than by version, so a runner
+// added under any of these names trips the rule.
+const AN_EFFECT_RUNNER = ['jsdom', 'happy-dom', '@testing-library', '@vitest/browser'];
+
+const CONFIG = readFileSync(resolve(here, '..', '..', 'vite.config.ts'), 'utf8');
+
+const MANIFEST = readFileSync(resolve(here, '..', '..', 'package.json'), 'utf8');
+
+// The boundary of what this suite reaches, stated once for the layer instead of
+// per component in a commit body. Two effects were declared untested where
+// there were four, which is the enumeration failure this repository names
+// first; a count and a reason cannot be born short.
+//
+// This is CLAUDE.md's testing rule 5 as a check rather than as prose: a UI
+// feature is tested by the author, and what an agent owes is the pure decision
+// beside the component. Every effect below wires one of those — `editControls`,
+// `gripFor`, `remembered`, `rowsIn` — and the wiring is the author's to look at.
+// If a runner is ever added, this fails, and the declaration is rewritten
+// against a suite that can reach them rather than quietly outliving its reason.
+describe('what this suite reaches, and what it leaves to the author', () => {
+  it('schedules effects under src/ui, so the statement below is about something', () => {
+    expect(EFFECTS.length).toBeGreaterThan(6);
+    expect(new Set(EFFECTS).size).toBeGreaterThan(3);
+  });
+
+  it('runs none of them, because there is nothing here that could', () => {
+    expect(CONFIG, 'vite.config.ts names a test environment, so effects may now run').not.toMatch(/\benvironment\s*:/);
+    for (const runner of AN_EFFECT_RUNNER) {
+      expect(MANIFEST, `${runner} is a dependency, so effects may now run`).not.toContain(`"${runner}`);
+    }
+  });
+});
