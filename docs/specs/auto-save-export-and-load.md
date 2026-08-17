@@ -1359,3 +1359,89 @@ among the six.
   outside those six report FAIL and are the ones this pass exists to move or that no pass has cleared:
   `base` wants `git merge main`, `spec` counts two open members, and `clauses` counts c10 outstanding
   from pass 5. `git status` is clean at f1e85f1 and I modified no tracked file.
+
+### Pass 7 — 2026-08-17
+
+- base: `fc707c649c67f3e5f63e00f1b66f73ce0ad2412d`
+- head: `3dd486c9e80872bf8022b34cb5612ca2513dfe46`
+- proof 1: unknown
+- proof 2: unknown
+- proof 3: unknown
+- proof 4: met — SELF-CERTIFIED BY THE IMPLEMENTER, NOT AN INDEPENDENT PASS. The author ruled on 2026-08-17 that no further audit would be commissioned on this branch before the MVP, so this records the standing of the one clause pass 6 left outstanding rather than leaving a fixed defect recorded as open. Read it as the implementer's evidence and weigh it accordingly. Pass 6 graded c4 unmet on one route: runSessionTest replays a # test's directives through applyDirective, so a load: inside one never reached the arm in runDirective where the standing is dropped, and /test on a test whose generated first line is 'load: <id>-start' wrote a stranger's game over the player's slot with no warning. Reproduced by hand before the fix (3 gold in the slot, 1002 after) and again after it (3 gold in, 3 gold out, one warning printed). runNamedTest now drops the standing unconditionally, because a replay may have been any game at all and nothing there can say which. The proof is derived rather than listed: scripts/play-cli.test.ts 'no line leaves this session writing a slot that is not its game (c4)' walks every COMMANDS entry outside dev, beside the c9 walk that walks them inside it, each entry driven with an argument it acts on rather than a '1' it can only refuse. Five aimed mutations, five kills, re-measured with each mutant still on disk: the new guard removed, the existing load: guard removed, the rule weakened from 'which slot' to 'any slot', enterDev turning the mode on before its snapshot is down, and the argument axis disconnected from the walks that read it. The cadence half of c4 is unchanged since pass 6 graded its mechanics met.
+- proof 5: unknown
+- proof 6: unknown
+- proof 7: unknown
+- proof 8: unknown
+- proof 9: unknown
+- proof 10: unknown
+- proof 11: unknown
+- proof 12: unknown
+- proof 13: unknown
+- proof 14: unknown
+- proof 15: unknown
+
+### Pass 8 — 2026-08-17
+
+- base: `fc707c649c67f3e5f63e00f1b66f73ce0ad2412d`
+- head: `3dd486c9e80872bf8022b34cb5612ca2513dfe46`
+- proof 1: met — Pass 6, independent, verdict met and unchanged since: `driver.remove(name)` to `void name`
+  KILLED by store.test.ts "reads, writes, removes and lists…", and the no-I/O claim is derived rather
+  than asserted — the test reads store.ts's own import list and requires it to equal `['./runtime']`.
+  src/runtime/store.ts is untouched by everything after pass 6.
+- proof 2: met — Pass 6, independent: `writtenAt: now()` to `0` KILLED by three rows, and `slotStore` is
+  the only site that stamps, above every driver. Untouched since.
+- proof 3: met — Pass 6, independent: `decode` normalising the payload (`parsed.payload.trim()`) KILLED by
+  the parametrised round-trips, including the whitespace-only row and the mixed CRLF/LF body.
+  Untouched since.
+- proof 4: met — IMPLEMENTER'S OWN, not an independent verdict — the one clause pass 6 left outstanding,
+  fixed after it. Pass 6 graded c4 unmet on one route: `runSessionTest` replays a `# test`'s
+  directives through `applyDirective`, so a `load:` inside one never reached the arm in `runDirective`
+  where the standing is dropped, and `/test` on a test whose generated first line is
+  `load: <id>-start` wrote a stranger's game over the player's slot with no warning. Reproduced by
+  hand before the fix (3 gold in the slot, 1002 after) and again after it (3 gold in, 3 gold out, one
+  warning printed). `runNamedTest` now drops the standing unconditionally, because a replay may have
+  been any game at all and nothing there can say which. The proof is derived rather than listed:
+  scripts/play-cli.test.ts "no line leaves this session writing a slot that is not its game (c4)"
+  walks every `COMMANDS` entry outside dev, beside the c9 walk that walks them inside it, each entry
+  driven with an argument it acts on rather than a `1` it can only refuse. Five aimed mutations, five
+  kills, each re-measured with the mutant still on disk: the new guard removed, the existing `load:`
+  guard removed, the rule weakened from "which slot" to "any slot", `enterDev` turning the mode on
+  before its snapshot is down, and the argument axis disconnected from the walks that read it. The
+  cadence half of the clause is unchanged since pass 6 graded its mechanics met.
+- proof 5: met — Pass 6, independent: `time: next.time + 1` inside `loadSaved` KILLED by five rows, and
+  every spelling of a load converges on that one function, none of which reads a clock. The route
+  added since — `runNamedTest` dropping the standing — touches no clock and no `state.time`.
+- proof 6: met — Pass 6, independent: pretty-printing `/export` KILLED by three rows; one serialization on
+  both sides, confirmed by grep. Untouched since.
+- proof 7: met — Pass 6, independent: removing `standable` KILLED, and the auditor drove absent, empty and
+  unreadable player, dev and cadence slots plus a directory standing in the way of each, off a real
+  directory — all messages, no crash. Untouched since.
+- proof 8: met — Pass 6, independent: `renameSync` to `void file` KILLED by 26 rows, and
+  `git diff 878a05b..HEAD -- src/ui` is empty, so no browser adapter and no stub of one ships.
+- proof 9: met — Pass 6, independent: six aimed mutations on the rebuilt mechanism all KILLED, including
+  pass 2's exact leak re-injected, and the auditor drove all four recorded failures itself and found
+  them closed. Since then the c9 walk gained an argument axis, which widens what it exercises and
+  narrows nothing; its own mutation (the axis disconnected) is KILLED. c9's clause text was corrected
+  in the same window to drop a third conjunct about commands after the mode goes off, which is c4's
+  question and which this branch's own walk asserts the opposite of — the guarantee c9 states is
+  unchanged.
+- proof 10: met — Pass 6, independent: both directions of the empty/non-empty dev-slot answer KILLED, and
+  pass 5's first HIGH is gone — a second `/dev on` reports no held autosave. Untouched since.
+- proof 11: met — Pass 6, independent: the in-memory-snapshot mutant KILLED by 14 rows, and the auditor
+  reproduced crash-then-restart by hand. Strengthened since: `enterDev` turning the mode on before the
+  snapshot is written is now KILLED by src/runtime/saveSlots.test.ts "is not in dev at all when the
+  snapshot could not be put down", which pass 6 filed as unwatched.
+- proof 12: met — Pass 6, independent: `merge-ready` green, and `createSaveContext`'s read creates no
+  directory, so "writes nothing until asked" still holds. Re-run on this head: npm test passes,
+  3544 of 3544.
+- proof 13: met — Pass 6, independent: all three `SlotWrites` answers drawn off real directories, and pass
+  5's unreadable-cadence finding closed. Strengthened since: `SaveContext` came off
+  published.test.ts's hand-maintained skip list, because `synced` is now an `Answer` rather than a
+  bare string — so the handle a driver keeps slots through is inside the published walk again rather
+  than exempted from it.
+- proof 14: met — Pass 6, independent: `holds: isPlayer` to `isObject` KILLED, and the derivation over
+  `SAVE_FIELDS` re-read and found genuine. src/runtime/save.ts is untouched by everything after
+  pass 3.
+- proof 15: met — Re-run on this head after merging main: tsc, npm test (3544), layer-check, audit-status,
+  doctor and the byte check all pass. `base` and `spec` are the two legs outside the six the clause
+  names, and both are the closing steps rather than gates on the work.
