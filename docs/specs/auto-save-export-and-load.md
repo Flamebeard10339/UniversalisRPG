@@ -918,3 +918,142 @@ among the six.
   bytes ok pass, tree ok pass. All six legs the clause names pass. Two legs outside those six report FAIL
   and are expected here: `base` wants `git merge main` because main has moved past the merge base, and
   `spec` counts the member still in-progress, which is what closing it after this pass clears.
+
+### Pass 5 — 2026-08-17
+
+- base: `878a05b24259f773e932538d176b0e2e2bd1c11f`
+- head: `3e6232a3f1a6937aad578761e8b603e240ac8b91`
+- proof 1: met — Two aimed mutations of my own on src/runtime/store.ts, both KILLED and re-measured at
+  their own file with the mutant still applied. `driver.remove(name)` to `void name` is killed by
+  src/runtime/store.test.ts "reads, writes, removes and lists, and an absent slot is nothing rather
+  than a raise", so the store owns none of the four verbs itself. The no-I/O half stays derived
+  rather than listed: store.test.ts asserts store.ts's import list equals exactly ['./runtime'].
+  Read at HEAD: src/runtime/store.ts is 80 lines, its four verbs move opaque `string` payloads, and
+  nothing in `SlotStore` is save-shaped. Re-run:
+  npm run mutate -- C:\Users\yonat\AppData\Local\Temp\mutations-auto-save-export-and-load-pass5.json
+- proof 2: met — One aimed mutation, KILLED. `const slot: Slot = { writtenAt: now(), payload }` to
+  `writtenAt: 0` in `slotStore`'s write arm is killed by store.test.ts "stamps the write off the
+  clock it was built with", re-measured at its own file. `slotStore` (src/runtime/store.ts:52-70) is
+  the only place a stamp is laid down and it sits above every driver, so a file store and a browser
+  store cannot stamp differently. Confirmed by hand in my probe1: the payload read back off
+  `player.slot` is `serializeSession`'s bytes with no stamp inside them. Same manifest as c1.
+- proof 3: met — One aimed mutation, KILLED by two named rows. `parsed.payload` to `parsed.payload.trim()`
+  in `decode` (src/runtime/store.ts:49) is killed by store.test.ts `round-trips "   "` and the mixed
+  CRLF/LF row, so both cases a normalising store would silently pass are in the parametrised table
+  rather than absent from it. Same manifest.
+- proof 4: met — One aimed mutation, KILLED. `if (seconds === 0) return false` to `return true` in
+  `autosaveDue` (src/runtime/saveSlots.ts:137) is killed by scripts/play-cli.test.ts "writes nothing
+  at all until somebody asks for a cadence", which asserts the saves directory is never created at
+  all, against `fileSaves(dir)` over a real temp directory. The cadence is a slot in its own right:
+  my probe1 read `autosave.slot` off disk beside `player.slot`, and `settle`
+  (src/runtime/command.ts:1125-1133) fires the check only on `result.recorded.length > 0`. One route
+  the cadence is not watched on is filed as finding 3 rather than graded down here: the `unreadable`
+  arm of `cadenceOrNone` survives the whole suite. Same manifest.
+- proof 5: met — One aimed mutation, KILLED. `Object.assign(internals.state, next)` to
+  `Object.assign(internals.state, { ...next, time: next.time + 1 })` inside `loadSaved`
+  (src/runtime/session.ts:418) is killed by play-cli.test.ts "leaves the clock at what the payload
+  holds, through a # save, an import and a slot". I re-read the spellings at HEAD: `/load <id>` and a
+  `# test` `load:` reach performDirective's 'load' arm, `/import` and `/restore` reach
+  `importPayload`, and `/dev on` and `/dev off` now reach it too — all six converge on `loadSaved`,
+  and nothing on that path reads a clock. Same manifest.
+- proof 6: met — One aimed mutation, KILLED. Pretty-printing what `/export` prints
+  (src/runtime/command.ts:953) is killed by play-cli.test.ts "prints the bytes serializeSession
+  returns and nothing else". `/export`'s whole body is `[serializeSession(ctx.session)]`, `/import`
+  is `importPayload(ctx, body, 'Imported.')`, and the neighbouring test pastes the printed line
+  verbatim into `/dsl save <id>` and reloads it. No second serialization was added in this window.
+  Same manifest.
+- proof 7: met — Two aimed mutations, both KILLED. Removing `standable(registry, next)` from `loadSaved`
+  (src/runtime/session.ts:413) is killed by play-cli.test.ts "leaves the session standing when a
+  payload loads but cannot be drawn" — the clause's leading sentence, which pass 1 graded unmet.
+  Making the file driver's `attempting` wrapper rethrow the raw filesystem error rather than a
+  `RuntimeError` (scripts/lib/slotFile.ts:50) is KILLED by five named rows, four of them the new
+  "a filesystem that refuses reaches the command table as a message (c7)" table — so the pass-5
+  wrapper is watched on every verb rather than only on `write`. I drove the three named slot states
+  myself off a real directory in probe2: absent, empty and unparseable each answer with a message
+  and the session plays on. What a *failing write* does on the way out of dev is outside this
+  clause's three words and is filed as finding 2. Same manifest, plus
+  C:\Users\yonat\AppData\Local\Temp\audit-auto-save-export-and-load-pass5-probe2.js
+- proof 8: met — One aimed mutation, KILLED: `renameSync(staging, file)` to `void file` in
+  scripts/lib/slotFile.ts is killed by play-cli.test.ts "keeps the slots as files, which is the store
+  a player would have", so the staged write's second half is watched and the clauses proved through
+  play-cli are proved against files on disk. Every probe of mine drove `fileSlots` over a real temp
+  directory and read the `.slot` files back with `readFileSync`. No browser adapter ships, derived
+  rather than listed: the test walks src/ui recursively for an import of store/saveSlots/slotFile.
+  Confirmed independently: `git diff 878a05b..HEAD --stat` touches no file under src/ui, and neither
+  does the pass-5 window `git diff 9055116..HEAD`. Same manifest.
+- proof 9: met — Graded on a derivation of my own, over the axis pass 4's walk cannot reach. The branch's
+  walk enters dev once, from four player-slot states, over every COMMANDS entry — and because each
+  case gets a fresh temp directory the dev slot is always empty at entry, so the pass-5 change that
+  makes `/dev on` *load* a payload is never walked by it. I drove the missing axis: four player-slot
+  states at entry crossed with three states the dev slot can be in at a *second* entry (emptied by
+  the first visit, left as the first visit wrote it, bytes nothing can read), two full dev cycles per
+  case with `/autosave 1`, a `/import` mark of 999 gold inside dev, then the player's slot compared
+  byte for byte against what it held at entry and re-read after each of three ordinary commands.
+  Twelve cases, `leaks: []` — the player's slot never differed at exit and dev's session never
+  reached it afterwards. Re-run:
+  npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-auto-save-export-and-load-pass5-probe3.js
+  Two aimed mutations back the mechanism: `withhold(save, PLAYER_SLOT)` to `adopted(save,
+  PLAYER_SLOT)` in `leaveDev` is KILLED by five named play-cli rows, and turning a missing snapshot
+  into `{ kind: 'was-empty' }` (which would *erase* the player's slot rather than leave it) is KILLED
+  by saveSlots.test.ts "refuses to leave when the snapshot is gone rather than erasing what it cannot
+  restore". The same run shows what the second axis costs: eight of those twelve second visits warn
+  that autosave is held, which is finding 1 and belongs to c10.
+- proof 10: unmet — The isolation half is met and mutation-proved: `return save.dev ? DEV_SLOT :
+  PLAYER_SLOT` to `return PLAYER_SLOT` is KILLED by play-cli.test.ts "snapshots the player slot on
+  the way in and restores it byte-identically on the way out", and my twelve-case cross found no
+  write reaching the player's slot in either dev cycle. The other half, that *every write goes to the
+  dev slot*, is false on a second dev visit whose dev slot is empty, which is pass 4's finding 1 one
+  branch over. Pass 4 fixed it by making `/dev on` pick the dev slot up, but it also added
+  `withhold(save, DEV_SLOT)` to `leaveDev` and to `devOff`, and nothing takes that withholding back
+  on the way in: `enterDev` returns null for an empty dev slot, `devOn` therefore never calls
+  `adopted`, and `adopts` refuses because `isNot` still holds `dev` from the previous exit.
+  Reproduce (case A, a first dev visit that wrote nothing, then a second):
+  npm run inspect -- - < C:\Users\yonat\AppData\Local\Temp\audit-auto-save-export-and-load-pass5-probe1.js
+  every command in the second visit answers "autosave held: slot dev", `dev.slot` is never created,
+  and `/slots` reports "writing dev, dev mode on — this session did not come out of that slot". Four
+  of the four "left empty by the first visit" cases in probe3 do the same, from every player-slot
+  entry state. It is a regression against 9055116, where `withhold` was never called with `DEV_SLOT`
+  at all and an empty dev slot was adoptable. Graded unmet rather than filed only as a finding
+  because the clause has now failed at two passes on two branches of one rule, which CLAUDE.md names
+  as the tell that a fix aimed at the reproduction was too small; an unmet clause creates the work
+  and a pass-5 finding does not. The line that does it is unwatched: deleting `withhold(save,
+  DEV_SLOT)` from `leaveDev` SURVIVED the whole suite (3502 tests) in my manifest.
+- proof 11: met — One aimed mutation, KILLED. `save.store.write(DEV_SNAPSHOT_SLOT, encodeSnapshot(...))`
+  to `void encodeSnapshot(...)` (src/runtime/saveSlots.ts:210) is killed by play-cli.test.ts "loses
+  nothing when the process dies in dev, without an orderly exit", which never calls `/dev off` and
+  rebuilds a second SaveContext over the same directory. I re-read the order at HEAD against the
+  pass-5 change: `enterDev` still writes the snapshot before `save.dev = true`, and the new read of
+  the dev slot happens after both, so no dev write and no pick-up can precede the snapshot. Same
+  manifest.
+- proof 12: met — `npm run tasks -- merge-ready` at 3e6232a, run by me, reports `npm test ok pass`, which
+  is this clause's own proof target. One aimed mutation on top of it, KILLED: `createSaveContext`
+  returning `dev: true` is killed by play-cli.test.ts "creates no dev slot while the mode is off
+  (c12)", which drives save, load, restore, export and wait with `/autosave 1` and then asserts the
+  directory holds exactly `autosave.slot` and `player.slot`. Checked the question the pass-5 change
+  raises: `enterDev`'s new read of `DEV_SLOT` is reached only from `devOn`, `liveSlot` is
+  `PLAYER_SLOT` while the mode is off, and my probe1 case B and probe2 case D both left directories
+  holding only the slots a mode-off run writes. Same manifest.
+- proof 13: met — One aimed mutation, KILLED. `writes: writesLive(save)` to `writes: 'yes'` in
+  `saveReport` (src/runtime/saveSlots.ts:311) is killed by play-cli.test.ts "says which it is when
+  asked", re-measured at its own file. Every line `slotStanding` (src/runtime/command.ts:652-659)
+  prints comes off `saveReport`, including the new `autosaveSeconds === null` arm, so the later
+  surface holds no copy. Confirmed by hand: in probe1 `/slots` answered "writing dev, dev mode on —
+  this session did not come out of that slot" off a real directory, and in probe2 it answered
+  "player  unreadable" in the date column while the file on disk was a directory. One arm of the new
+  report has no proof at all and is filed as finding 3: mutating `cadenceOrNone`'s `unreadable`
+  answer from `null` to the default SURVIVED the whole suite.
+- proof 14: met — One aimed mutation, KILLED, and I re-read the derivation at HEAD. Weakening one field's
+  gate back to what it was (`player`'s `holds: isPlayer` to `holds: isObject`,
+  src/runtime/save.ts:110) is killed by save.test.ts "refuses the shapes that used to reach the
+  loader, naming the field rather than raising from inside it". The derivation is genuine:
+  save.test.ts walks `Object.entries(SAVE_FIELDS)` and takes each field's sample from that field's
+  own `sparsest`, a column of a `Record<SaveField, SaveFieldRule>` the compiler forces somebody to
+  fill in when a `GameState` field is added, so a field added next month is walked with no edit to
+  the test. This clause's ground did not move in the pass-5 window: `git diff 9055116..HEAD` touches
+  src/runtime/save.ts not at all. Same manifest.
+- proof 15: met — `npm run tasks -- merge-ready` at 3e6232a, run by me: tsc ok pass, npm test ok pass,
+  layer-check ok pass, audit-status ok pass, doctor ok pass (23 warnings, which that leg does not
+  fail on), bytes ok pass, tree ok pass (nothing uncommitted). All six legs the clause names pass.
+  Two legs outside those six report FAIL and are the same two every pass has recorded: `base` wants
+  `git merge main` because main has moved past the merge base, and `spec` counts the one member still
+  in-progress. `git status` is clean at 3e6232a and I modified no tracked file.
