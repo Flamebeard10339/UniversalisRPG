@@ -771,7 +771,7 @@
         "src/ui/driver.ts",
         "src/ui/editControls.test.ts",
         "src/ui/editControls.ts",
-        "src/ui/editorMemory.test.ts",
+        "src/ui/editorMemory.test.tsx",
         "src/ui/editorMemory.ts",
         "src/ui/format.test.ts",
         "src/ui/format.ts",

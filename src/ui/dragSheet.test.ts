@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { gripFor, type Carried, type Grip } from './DragSheet';
-import type { Point } from './viewport';
+import { ZOOM_MAX, ZOOM_MIN, type Point } from './viewport';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -124,15 +124,26 @@ describe('picking a thing up off the sheet and putting it down', () => {
   });
 
   // The same slop the pan is held to, measured on the screen rather than on the
-  // sheet: zoomed in, a finger that moved six pixels moved less of the sheet
-  // and is still a tap.
-  it('measures the slop where the finger is, not where the sheet is', () => {
-    const near = carrying(8);
-    press(near.grip, pressing(0, 0));
-    lift(near.grip, pressing(5, 0));
+  // sheet, and at both ends of the zoom the sheet allows. Zoomed in, five
+  // pixels of finger is less of the sheet and still a tap; zoomed out it is
+  // more of the sheet and still a tap, which is the half a single zoom hides.
+  for (const zoom of [ZOOM_MIN, 1, ZOOM_MAX]) {
+    it(`measures the slop where the finger is and not where the sheet is, at ×${zoom}`, () => {
+      const near = carrying(zoom);
+      press(near.grip, pressing(0, 0));
+      lift(near.grip, pressing(5, 0));
 
-    expect(near.rested).toEqual([null]);
-  });
+      expect(near.rested).toEqual([null]);
+    });
+
+    it(`reports a press that travelled at ×${zoom}`, () => {
+      const far = carrying(zoom);
+      press(far.grip, pressing(0, 0));
+      lift(far.grip, pressing(40, 0));
+
+      expect(far.rested).toEqual([{ id: 'hall', by: { x: 40 / zoom, y: 0 } }]);
+    });
+  }
 
   it('lets go when the browser takes the pointer away, and reports nothing', () => {
     const carried = carrying();

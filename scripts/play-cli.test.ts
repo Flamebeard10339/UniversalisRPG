@@ -1661,7 +1661,7 @@ describe('all of it is exercised before src/ui exists (c8)', () => {
   it('reaches no browser adapter, so the CLI stands in its own store', () => {
     const reaching = readdirSync('scripts', { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name) && !entry.name.includes('.test.'))
-      .filter((entry) => /from '[^']*\/ui\/(browserStore|pageStorage)'/.test(readFileSync(path.join(entry.parentPath, entry.name), 'utf8')))
+      .filter((entry) => /from '[^']*\/ui\/[^']*(browserStore|pageStorage)'/.test(readFileSync(path.join(entry.parentPath, entry.name), 'utf8')))
       .map((entry) => entry.name);
 
     expect(reaching).toEqual([]);

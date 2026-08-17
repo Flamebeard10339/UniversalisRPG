@@ -71,7 +71,7 @@ Proof:
   scroll offset, and the map's pan, zoom and floor are restored on reopen, so switching to Home and back
   does not change what is on screen. This is `edit-mode-memory`, and it is here rather than beside it
   because it is the same store write and the same restore.
-  proof: vitest src/ui/editorMemory.test.ts
+  proof: vitest src/ui/editorMemory.test.tsx
 - [c11] **One implementation of one store interface, and the interface is not this branch's.** The
   browser adapter is a value satisfying the interface `src/runtime/store.ts` exports, constructed in
   `src/ui` and passed in; nothing below `src/ui` learns that a browser exists, and no file under
@@ -333,3 +333,154 @@ old carve-out — the GUI had no authoring context, so a section edit was counte
   uncommitted), base ok, spec ok (every declared member closed). The one failing leg is
   "clauses the-gui-authors-through-the-same-door — has no recorded audit pass", which is the leg this pass
   discharges; re-running merge-ready after this pass is filed is what a next reader should do.
+
+### Pass 2 — 2026-08-17
+
+- base: `fa790124d4c1cc281a80245b6540a34771767671`
+- head: `6996181acc8acd13c9b9b7ed5456eca2442e2be7`
+- proof 1: met — Re-derived rather than re-read. scripts/drift.test.ts "reaches byte-identical state and says the
+same things, over a scripted sequence" runs one script through openRepl (fileSlots over a temp dir) and
+createDriver (browserSlots over pageStorage) and asserts, per line, identical transcript entries and
+identical serializeSession bytes; the script carries /dsl location tutorial-island.guide-house x: 9, y: 9,
+/local list, /local show, /reload and /save. My own mutation, aimed at the half of the AuthoringContext
+pass 1 did not break: src/ui/driver.ts `readLocalChanges: stored,` to `readLocalChanges: () => '',`
+KILLED by that named test, re-run at its own file with the mutant still applied
+(manifest C:\Users\yonat\AppData\Local\Temp\audit-the-gui-authors-through-the-same-door-pass2-neighbours.json).
+The carve-out this file used to carry is gone and nothing replaced it: every line in the script and every
+entry in COMMANDS is now compared, not counted.
+- proof 2: met — src/ui/authoringSurface.test.ts "reaches the local-changes module for its name and for nothing
+else" derives the forbidden names by matching ^export (const|function|interface|type) (\w+) over
+src/content/localChanges.ts, then walks every non-test .ts/.tsx under src/ui recursively plus src/main.tsx.
+Pass 1 aimed at src/ui/editControls.ts, a file at the top of the tree; I aimed at the subdirectory the
+branch added, to ask whether the walk recurses: planting `void 'adoptRegistry';` into
+src/ui/agent/pageStorage.ts KILLED by that named test (neighbours manifest). Subjects come from two trees,
+not a list of components.
+- proof 7: met — Two derived tests carry it and I broke a third property pass 1 did not.
+src/ui/authoringSurface.test.ts "addresses every section the loaded registry holds" walks
+CONTENT_SECTION_MAPS and every key of every registry map (checked > 50); "draws every location on the map
+surface and nothing else there" compares the map slice against REGISTRY.locations.keys(). My mutations:
+dropping the LOCAL_CHANGES_MODULE_ID branch from `addressOf` — so a staged copy is qualified and stands
+beside the shipped section instead of shadowing it — KILLED by "shadows a shipped section with the copy
+staged over it, rather than offering both"; and collapsing surfaceOf's whole body to `return 'global'`
+KILLED only at file scope, by "draws every location on the map surface and nothing else there" and
+"narrows Local to what is standing where the player is"
+(scope reported as "offers every section by exactly one surface, standing in nowhere" -> the file).
+Pass 1's caveat re-derived and confirmed unchanged: the assertion that states the partition cannot fail
+while surfaceOf is present at all, because surfaceOf is a total function into SURFACES. The partition is
+carried by its two neighbours, not by the case named after it.
+- proof 8: met — src/ui/mapEdit.test.ts derives its subjects from offeredBy(SECTIONS, NOWHERE, 'map') and splits
+them on a `relative:` regex; for each absolute one it sends the produced line through createDriver and
+asserts the reloaded registry entry equals the shipped one with only x and y changed, and for each relative
+one a refusal naming the address with no `line`. My mutations, both aimed away from pass 1's two:
+`settledOn` stripped of Math.round, so a drag settles on a coordinate the grammar's integer parser cannot
+take, KILLED by 5 named "stages <place> where it was dropped" cases; and `droppedAt` with the placedAt
+nudge inverse removed KILLED by "takes the drawing nudge back out for a place 2 floors up" and "... 2
+floors down". The gesture-to-line path pass 1 filed as unreachable is now out of the component in
+placedInto/droppedAt and is what those cases call.
+- proof 9: met — src/ui/driver.test.ts "opens a second driver over the same store with the edit already applied"
+builds two drivers over one pageStorage-backed browserSlots, stages through the first and asserts the
+second opens with the coordinates applied, the same /local list detail lines and the same localChanges()
+bytes; no save command anywhere in it. My mutation, aimed at the branch pass 1 left alone:
+`const loaded = held.trim() === '' ? base : loadUniverseWithDiagnostics([...sources, authoring.localSource]);`
+replaced with `const loaded = base;` — the driver opens on the shipped modules and forgets what was staged —
+KILLED by that named test (neighbours manifest).
+- proof 10: unmet — Checked, and the proof fails. The clause promises a restore; what is proved is a serializer.
+src/ui/editorMemory.test.ts walks Object.keys(FORGOTTEN) against an exhaustive Record<keyof Editing, ...>
+and proves remembered(recorded(x)) === x field by field. Nothing anywhere opens a shell over a store that
+already holds an `editor` slot. Three mutations, each of which deletes a restore, all SURVIVED the whole
+suite at 0 failed of 3653 (neighbours manifest):
+(a) src/ui/App.tsx `useState<Editing>(() => remembered(driver.editorMemory.read()))` to `remembered(null)`;
+(b) src/ui/MapPane.tsx `useSheetHold(..., where, ...)` to `useSheetHold(..., undefined, ...)`;
+(c) src/ui/EditPane.tsx `list.current.scrollTop = editing.scroll` to `void list.current`.
+The commit body's declaration covers (c) and nothing else: it says the suite renders with
+renderToStaticMarkup and runs no effect, which is true of the scroll and cursor useEffects and false of
+(a) and (b), both of which are useState initializers that a static render reaches. I measured this rather
+than argued it. Rendering <App driver={driver} .../> over a browserSlots store seeded with
+recorded({...FORGOTTEN, surface:'global', kind:'item', open:'item tutorial-island.bread',
+map:{pan:{x:-77,y:33}, zoom:2.5, plane:0}}) produces, in 78ms and with no effect run:
+data-surface="global" data-showing, data-section="item tutorial-island.bread" data-opened, the textarea
+drawn, and transform translate(-77px, 33px) scale(2.5); the same App over an empty store gives
+translate(0px, 0px) scale(1). So the behaviour is right and four of the six things c10 names — the section
+open, the map's pan, its zoom and its floor — are provable from the suite that already exists, using the
+drawnAt() transform reader render.test.tsx already has. Graded unmet rather than deferred because the
+restore is built and works; what is absent is any test that would notice it being deleted.
+- proof 11: met — src/ui/browserStore.test.ts calls describeSlotDriver('one localStorage key per slot', () =>
+overStorage()), the same exported contract scripts/lib/slotFile.test.ts runs against the file-backed
+driver. The contract derives its subjects from the interface twice: `const DECLARED: Record<keyof
+SlotDriver, true>` stops it compiling when a verb is added, and a Proxy records which verbs the cases
+reached and asserts the set equals the interface's. My mutation, aimed away from pass 1's no-op remove:
+`const keyed = (name: string): string => \`${prefix}${name}\`` to `=> name` KILLED by three contract cases
+including "keeps slots apart, and lists every one that was written". The other two halves hold on
+inspection: src/ui/browserStore.ts imports SlotDriver rather than restating it, src/runtime/store.ts names
+no browser, and src/main.tsx is where browserSlots() is constructed and passed in.
+- proof 12: met — src/runtime/storeContract.ts CONTRACT_PAYLOADS drives ten values through a real Storage
+implementation (src/ui/agent/pageStorage.ts, an object satisfying the DOM Storage shape rather than a mock
+of the adapter): empty, whitespace-only, non-JSON, JSON with and without incidental whitespace, nested
+non-ASCII, CRLF, leading and trailing newlines, and a 400 000-character value of 'é 😀 line\n'. The stamp
+cases assert writtenAt comes from the store's clock beside an unparsed payload. My mutation, at the read
+side rather than pass 1's write side: `getItem(keyed(name))` to `getItem(keyed(name))?.trimStart() ?? null`
+KILLED by the "   " and "\n\n trailing and leading \n\n" byte-for-byte cases.
+- proof 13: met — Pass 1's unmet is discharged, and I re-derived it rather than taking the fix on trust. The
+proof no longer counts tool-channel lines: src/ui/driver.test.ts runs the same session over a refusing
+store and over a working one and requires, at each moment the refusing store actually refuses at, a line
+the working store never produced at that moment. Which moments a mode refuses at is asked of a store built
+the same way rather than named, and REFUSING is derived — pageStorage's REFUSING is
+Record<StorageRefusal, ...>, so a mode added to STORAGE_REFUSALS stops the file compiling until it can be
+induced, and driver.test.ts asserts its own set contains all of STORAGE_REFUSALS plus the store's own
+`unrecognised`. No message text is named anywhere in it. I aimed five mutations, including all three pass 1
+recorded as surviving the whole suite; all five KILLED, each re-run at src/ui/driver.test.ts with the
+mutant still applied (manifest
+C:\Users\yonat\AppData\Local\Temp\audit-the-gui-authors-through-the-same-door-pass2-c13.json):
+(a) the body of `complain` replaced with `void text` — KILLED, unavailable;
+(b) the open-time complaints.push replaced with `void error` — KILLED, unavailable;
+(c) writeLocalChanges wrapped in a try/catch that swallows — KILLED, quota;
+(d) editorMemory.write's complain replaced with `void error` — KILLED, quota;
+(e) browserStore's RuntimeError wrap replaced with `throw error` — KILLED, unavailable.
+Residue, recorded so pass 3 does not re-derive it and filed as a finding rather than left here: the moment
+list is an enumeration, not a derivation. MOMENTS holds three entries and is pinned by
+`expect(Object.keys(MOMENTS)).toHaveLength(3)`, which is the test's own constant against itself, and there
+is a fourth reach outside it — editorMemory.read. Replacing its
+`complain(\`where the editor was could not be read: ...\`)` with `void error` SURVIVED the whole suite at 0
+failed of 3653 (neighbours manifest). Graded met rather than unmet because the clause states its own
+universal over the refusal modes, not over the moments, and over the modes the proof is derived and bites;
+but if a third pass finds a fifth reach, the answer is a derivation — drive the driver through a Storage
+that refuses the Nth reach and walk N — and not a fourth moment.
+- proof 14: met — src/ui/browserStore.test.ts "names browser storage in the adapter and nowhere else" walks
+src/ui recursively for non-test .ts/.tsx plus src/main.tsx, asserts the walk found the adapter, main.tsx
+and more than 20 modules, and asserts /\b(?:window\s*\.\s*)?(?:localStorage|sessionStorage|indexedDB)\b/
+matches nothing outside src/ui/browserStore.ts; a companion case proves the regex catches four spellings.
+My mutation, aimed at the subdirectory rather than pass 1's top-level file: planting `// window.localStorage`
+into src/ui/agent/surfaces.ts KILLED by that named test (neighbours manifest), so the walk recurses.
+- proof 15: met — scripts/drift.test.ts builds two real stores — fileSlots over a temp directory for the REPL
+and browserSlots over pageStorage for the GUI, deliberately not shared — with one clock at 1700000000000,
+and after the scripted sequence asserts Object.keys(slotBytes(repl)) equals [local-changes, player] and
+slotBytes(gui) deep-equals slotBytes(repl); a second case walks the whole COMMANDS table bare and with an
+argument and compares again, requiring more than one slot written. Two mutations of mine, both away from
+pass 1's:
+`createSaveContext(options.slots ?? memoryDriver(), options.now ?? (() => Date.now()))` with the injected
+clock dropped KILLED by both cases; and `writeLocalChanges` writing to a slot named 'local' instead of
+LOCAL_CHANGES_MODULE_ID KILLED by "reaches byte-identical state ...". The bytes, not a message, are what
+moved in each.
+- proof 16: met — src/ui/driver.test.ts "hands over the same bytes /local show prints and the slot holds" stages
+an edit, runs /local show, and holds three spellings to one value: driver.localChanges(), the joined detail
+lines of that command, and slotStore(slots).read('local-changes').payload. My mutation, aimed at where the
+bytes come from rather than pass 1's trimEnd: `localChanges()` returning `authoring.localSource.text` — the
+module the session opened on — instead of `stored()` KILLED at file scope by "offers nothing to hand over
+when the store cannot be read". That no second serialization exists in src/ui is carried by c2's scan,
+which forbids renderLocalChangesModule anywhere under src/ui, re-derived above.
+- proof 17: met — src/ui/surface.test.ts "names on every control the harness action that drives it, or why it
+needs none" is the existing scanner, deriving button/input/select/textarea from the tree and checking each
+data-drive name against what installTestHarness and the surface builders offer; green over the three new
+surfaces. Pass 1 deleted an attribute; I asked the other half — whether a name that is present but wrong is
+caught. Retargeting src/ui/EditPane.tsx `data-drive="edit.open"` to `data-drive="edit.reveal"` KILLED by
+that named test (neighbours manifest). The map bubble erosion pass 1 filed is fixed by construction: the
+bubble is now two controls over one appearance, data-drive="map.place" while places are being moved and
+data-drive="choose" otherwise, rather than one tag that lies in a mode.
+- proof 18: met — npm run tasks -- merge-ready at 6996181 in this worktree: tsc ok, npm test ok, layer-check ok,
+audit-status ok, doctor ok (28 warnings, none of which fail the leg), bytes ok, tree ok (nothing
+uncommitted), base ok, spec ok (every declared member closed). The one failing leg is "clauses
+the-gui-authors-through-the-same-door — 1 outstanding across 1 pass(es): c13", which is pass 1's grade and
+is what this pass discharges; it will report c10 after this pass is filed, which is the work c10 creates
+rather than a leg this clause can be held to. Two of doctor's warnings are this branch's own:
+the-gui-authors-through-the-same-door-pass1-a-test-fixture-s names src/ui/pageStorage.ts:1, the path the
+fix for that very finding moved away from.

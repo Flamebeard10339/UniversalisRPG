@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { engineLocale } from '../content/engineLocale';
 import { loadUniverseWithDiagnostics } from '../content/registry';
@@ -362,7 +363,16 @@ describe('a store that refuses leaves the session playing (c13)', () => {
       drive: (driver) => driver.editorMemory.write(recorded(FORGOTTEN)),
       asks: (store) => void store.write(EDITOR_SLOT, recorded(FORGOTTEN)),
     },
+    reading: {
+      drive: (driver) => void driver.editorMemory.read(),
+      asks: (store) => void store.read(EDITOR_SLOT),
+    },
   };
+
+// Every place the driver reaches the store on its own account, counted off the
+// module rather than listed here. A reach added there without a moment above is
+// a reach nothing asks about, which is what this clause was unmet for once.
+const STORE_REACHES = [...readFileSync('src/ui/driver.ts', 'utf8').matchAll(/save\.store\.\w+\(/g)].length;
 
   const refusesAt = (slots: () => SlotDriver, moment: string): boolean => {
     try {
@@ -395,7 +405,7 @@ describe('a store that refuses leaves the session playing (c13)', () => {
   });
 
   it('asks every moment of the driver that the store could refuse at', () => {
-    expect(Object.keys(MOMENTS)).toHaveLength(3);
+    expect(Object.keys(MOMENTS)).toHaveLength(STORE_REACHES);
     // A probe that never refuses would leave every assertion below vacuous.
     expect(Object.keys(MOMENTS).filter((moment) => refusesAt(REFUSING.unavailable, moment))).toEqual(Object.keys(MOMENTS));
   });
