@@ -138,6 +138,18 @@ function open(loaded: Loaded, authoring: AuthoringContext, save: SaveContext, be
 
 const because = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
+// What is wrong with one module in a universe that loaded, and nothing when it
+// is in there whole. Both halves of the same question, because a module can be
+// dropped with something said about it and can also be absent with nothing
+// said: only "it is loaded and nobody complained" is a module the session is
+// actually playing.
+function troubleWith(name: string, loaded: Loaded): string | null {
+  const complaints = loaded.diagnostics.filter((diagnostic) => diagnostic.sourceName === name || diagnostic.moduleId === LOCAL_CHANGES_MODULE_ID);
+  if (complaints.length > 0) return complaints.map(formatModuleDiagnostic).join('; ');
+  const status = loaded.modules.find((module) => module.sourceName === name || module.moduleId === LOCAL_CHANGES_MODULE_ID);
+  return status?.loaded === true ? null : `${name} is not in the universe that loaded`;
+}
+
 // The GUI's session container: it holds the one context every dispatch goes
 // through, and hands React a snapshot to render. Every route in spells a line
 // the shared table already parses, so the table decides what a command does and
@@ -226,12 +238,20 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     let setAside: string | null = null;
     if (local.text.trim() !== '') {
       try {
-        seated(before, open(loadUniverseWithDiagnostics([...shipped, authoring.localSource]), authoring, save, [...said, ...shadowing(local.text)]), null);
-        return;
+        const loaded = loadUniverseWithDiagnostics([...shipped, authoring.localSource]);
+        // The load path drops a module it cannot make sense of and says so in a
+        // diagnostic rather than raising, so whether the local module is in the
+        // universe that came back is asked of the report and not of a catch —
+        // the same question `/reload` asks before it adopts anything.
+        setAside = troubleWith(authoring.localSource.name, loaded);
+        if (setAside === null) {
+          seated(before, open(loaded, authoring, save, [...said, ...shadowing(local.text)]), null);
+          return;
+        }
       } catch (error) {
         setAside = because(error);
-        said.push(warn(`${LOCAL_CHANGES_MODULE_ID} was set aside, so this session is the shipped content alone — it is still in the store to read or clear: ${setAside}`));
       }
+      said.push(warn(`${LOCAL_CHANGES_MODULE_ID} was set aside, so this session is the shipped content alone — it is still in the store to read or clear: ${setAside}`));
     }
 
     try {
