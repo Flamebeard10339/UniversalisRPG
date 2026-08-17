@@ -11,7 +11,7 @@ import { serializeSession } from '../src/runtime/session';
 import { slotStore, type SlotDriver } from '../src/runtime/store';
 import { browserSlots } from '../src/ui/browserStore';
 import { createDriver, type Driver } from '../src/ui/driver';
-import { pageStorage } from '../src/ui/pageStorage';
+import { pageStorage } from '../src/ui/agent/pageStorage';
 import { SHIPPED_SOURCES } from '../src/ui/shippedContent';
 import { appendOutputs } from '../src/ui/transcript';
 import { fileSlots } from './lib/slotFile';

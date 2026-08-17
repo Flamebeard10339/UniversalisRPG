@@ -1,12 +1,12 @@
-import type { StorageRefusal } from './browserStore';
+import type { StorageRefusal } from '../browserStore';
 
 // The browser's storage stood up in memory, for whoever has no browser under
-// them. It is a fixture: nothing that ships imports it, and both this driver's
-// own tests and the cross-driver proof in scripts/ drive the adapter through it
-// rather than standing in for the adapter, which is what makes what they
-// exercise the code a browser would run. It lives beside the adapter rather
-// than inside one test file because two test files need it and a test that
-// imports another test runs that one's cases twice.
+// them. It exists to be driven and nothing that ships imports it, which is what
+// puts it in this directory: a module is agent-only by where it is, and a
+// fixture beside the adapter would have been one more thing the rule about that
+// directory could not see. It lives in a module of its own rather than inside
+// one test file because three test files need it, and a test that imports
+// another test runs that one's cases twice.
 
 // A `Storage` as the DOM declares one: keyed strings, an index and a length,
 // and nothing that knows what a slot is. The adapter is driven through this

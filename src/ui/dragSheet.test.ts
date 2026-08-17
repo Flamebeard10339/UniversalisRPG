@@ -2,6 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { gripFor, type Carried, type Grip } from './DragSheet';
+import type { Point } from './viewport';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -64,5 +66,95 @@ describe('the sheet every pannable surface is drawn on', () => {
 
     for (const gesture of THE_GESTURE) expect(sheet.text, `${SHEET} does not hold ${gesture}`).toMatch(gesture);
     for (const clamp of THE_CLAMP) expect(sheet.text, `${SHEET} does not hold ${clamp}`).toMatch(clamp);
+  });
+});
+
+// A pointer as the handlers read one. The two effects a press has on the DOM —
+// stopping the event reaching the sheet, and capturing the pointer — are
+// recorded rather than performed, because they are the wiring and what is under
+// test is the decision.
+function pressing(x: number, y: number): { clientX: number; clientY: number; stopPropagation(): void; pointerId: number; currentTarget: { setPointerCapture(id: number): void } } {
+  return { clientX: x, clientY: y, stopPropagation: () => undefined, pointerId: 1, currentTarget: { setPointerCapture: () => undefined } };
+}
+
+// What one press did: what the sheet was told to draw, and what it was told to
+// report when the gesture ended.
+function carrying(zoom = 1): { grip: Grip; held: { current: { id: string; from: Point } | null }; drawn: Array<Carried | null>; rested: Array<Carried | null> } {
+  const held: { current: { id: string; from: Point } | null } = { current: null };
+  const drawn: Array<Carried | null> = [];
+  const rested: Array<Carried | null> = [];
+  return { grip: gripFor('hall', held, zoom, { hold: (next) => void drawn.push(next), rest: (report) => void rested.push(report) }), held, drawn, rested };
+}
+
+const press = (grip: Grip, event: ReturnType<typeof pressing>): void => grip.onPointerDown(event as never);
+const move = (grip: Grip, event: ReturnType<typeof pressing>): void => grip.onPointerMove(event as never);
+const lift = (grip: Grip, event: ReturnType<typeof pressing>): void => grip.onPointerUp(event as never);
+
+describe('picking a thing up off the sheet and putting it down', () => {
+  it('draws it where the finger has taken it, in the sheet own pixels', () => {
+    const carried = carrying(2);
+    press(carried.grip, pressing(100, 100));
+    move(carried.grip, pressing(140, 80));
+
+    // Halved, because the sheet is drawn at twice the size: what the finger
+    // moved on the screen is half that much of the sheet.
+    expect(carried.drawn).toEqual([{ id: 'hall', by: { x: 0, y: 0 } }, { id: 'hall', by: { x: 20, y: -10 } }]);
+  });
+
+  it('reports where it was let go of, once, when the finger has taken it somewhere', () => {
+    const carried = carrying();
+    press(carried.grip, pressing(0, 0));
+    move(carried.grip, pressing(30, 40));
+    lift(carried.grip, pressing(30, 40));
+
+    expect(carried.rested).toEqual([{ id: 'hall', by: { x: 30, y: 40 } }]);
+    expect(carried.held.current).toBeNull();
+  });
+
+  // The whole of what a tap is: a press that ended where it started. Reporting
+  // one would stage a section edit restating coordinates nothing moved.
+  it('reports nothing for a press that went nowhere, and nothing for one inside the slop', () => {
+    for (const [x, y] of [[0, 0], [3, 0], [0, -4], [4, 4]]) {
+      const carried = carrying();
+      press(carried.grip, pressing(50, 50));
+      lift(carried.grip, pressing(50 + x, 50 + y));
+
+      expect(carried.rested, `let go ${x},${y} from where it was picked up`).toEqual([null]);
+    }
+  });
+
+  // The same slop the pan is held to, measured on the screen rather than on the
+  // sheet: zoomed in, a finger that moved six pixels moved less of the sheet
+  // and is still a tap.
+  it('measures the slop where the finger is, not where the sheet is', () => {
+    const near = carrying(8);
+    press(near.grip, pressing(0, 0));
+    lift(near.grip, pressing(5, 0));
+
+    expect(near.rested).toEqual([null]);
+  });
+
+  it('lets go when the browser takes the pointer away, and reports nothing', () => {
+    const carried = carrying();
+    press(carried.grip, pressing(0, 0));
+    move(carried.grip, pressing(90, 90));
+    carried.grip.onPointerCancel(pressing(90, 90) as never);
+
+    expect(carried.rested).toEqual([null]);
+    // The sheet can be panned again: a grip left held stands off every press.
+    expect(carried.held.current).toBeNull();
+  });
+
+  it('ignores a pointer that belongs to something else', () => {
+    const carried = carrying();
+    carried.held.current = { id: 'beach', from: { x: 0, y: 0 } };
+
+    move(carried.grip, pressing(90, 90));
+    lift(carried.grip, pressing(90, 90));
+    carried.grip.onPointerCancel(pressing(90, 90) as never);
+
+    expect(carried.drawn).toEqual([]);
+    expect(carried.rested).toEqual([]);
+    expect(carried.held.current).toEqual({ id: 'beach', from: { x: 0, y: 0 } });
   });
 });

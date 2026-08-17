@@ -56,7 +56,6 @@ export function EditPane({ held, onSend, words }: { held: EditHeld; onSend: (lin
         {editing.surface === 'global' ? (
           <select
             data-drive="edit.kind"
-            data-words="tool"
             aria-label={words('every-kind')}
             value={editing.kind ?? OPEN_TO_ALL}
             onChange={(event) => controls.kind(event.target.value === OPEN_TO_ALL ? null : event.target.value)}
@@ -88,7 +87,6 @@ export function EditPane({ held, onSend, words }: { held: EditHeld; onSend: (lin
             <button
               key={sectionKey(section)}
               data-drive="edit.open"
-              data-words="tool"
               type="button"
               data-section={sectionKey(section)}
               data-opened={sectionKey(section) === editing.open ? 'yes' : undefined}
@@ -108,7 +106,6 @@ export function EditPane({ held, onSend, words }: { held: EditHeld; onSend: (lin
           <textarea
             ref={field}
             data-drive="edit.text"
-            data-words="tool"
             aria-label={words('section')}
             value={draftIn(sections, editing)}
             rows={8}

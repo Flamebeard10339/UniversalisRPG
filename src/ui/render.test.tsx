@@ -7,6 +7,8 @@ import { loadUniverseWithDiagnostics } from '../content/registry';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
 import { App } from './App';
+import { addressable } from './authoringSurface';
+import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { PER_UNIT } from './discovery';
 import { createDriver, type Driver } from './driver';
 import { MapPane } from './MapPane';
@@ -35,17 +37,8 @@ const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>
 // one of those runs: a control named for a screen reader is prose a player
 // reads, and leaving it out would exempt from the clause the one place a glyph
 // control is allowed to say anything at all.
-// The tool's own channel, taken out whole. Whose words a run is is the
-// discriminant `CommandOutput` already carries and the transcript already
-// holds; a component declares it on the element it draws, so a parser
-// diagnostic and a section an author is editing are not read as prose the
-// shell wrote. It is the exemption the REPL's tool lines already have, derived
-// from the markup rather than from a region of this file naming components.
-const TOOL_CHANNEL = /<(\w+)[^>]*\bdata-words="tool"[^>]*>[\s\S]*?<\/\1>/g;
-
 function readable(html: string): string[] {
   return html
-    .replace(TOOL_CHANNEL, '')
     .replace(/aria-label="([^"]*)"/g, '\n$1\n')
     .replace(/<[^>]*>/g, '\n')
     .split('\n')
@@ -140,6 +133,15 @@ const shellWord = wordsOf(localizerFor(loadInEnglish(''), 'en'));
 const NODE = { position: 1, direction: asLocalized('ne') };
 
 const SHELL_WORDS: readonly string[] = (Object.keys(LABELS) as LabelId[]).map((id) => shellWord(id, NODE));
+
+// What the editing page draws that is neither an engine word nor one of the
+// shell's own: the heading of each section the loaded modules hold. Accounted
+// for rather than exempted — the page is held to drawing what came out of the
+// modules and nothing else, which is a stronger thing to be held to than an
+// attribute a component could write on anything. Derived from the same list the
+// page is built from, so a section added to content/ is accounted for here.
+const authored = (driver: Driver): string[] =>
+  addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }]).map((section) => `# ${section.kind} ${section.address}`);
 
 // The engine's half of what is drawn, with the shell's own words taken out by
 // what they are rather than by where they sit: excising a region left every
@@ -336,7 +338,7 @@ describe('what the shell puts on the screen', () => {
       const runs = readable(html);
       seen += runs.length;
       for (const run of runs) {
-        expect(accountedFor(run, [...engine, ...SHELL_WORDS]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
+        expect(accountedFor(run, [...engine, ...SHELL_WORDS, ...authored(driver)]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
       }
     };
 
@@ -369,7 +371,7 @@ describe('what the shell puts on the screen', () => {
     const engine = new Set<string>(published(view));
     expect(idsPublished(view).filter((id) => engine.has(id))).toEqual([]);
     for (const run of readable(renderToStaticMarkup(<App driver={driver} />))) {
-      expect(accountedFor(run, [...engine, ...SHELL_WORDS]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
+      expect(accountedFor(run, [...engine, ...SHELL_WORDS, ...authored(driver)]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
     }
   });
 

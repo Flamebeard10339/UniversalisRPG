@@ -24,6 +24,11 @@ interface Pinch {
   scale: number;
 }
 
+const AT_REST: Point = { x: 0, y: 0 };
+
+// How far a finger travels before what it is doing is a drag and not a tap.
+const DRAG_SLOP_PX = 6;
+
 // A thing drawn on the sheet, picked up and carried across it. The sheet owns
 // this rather than whoever drew the thing, for the two reasons the pan is
 // owned here: the arithmetic is the sheet's — a gesture is measured on the
@@ -41,6 +46,67 @@ export interface Grip {
   onPointerDown(event: React.PointerEvent<HTMLElement>): void;
   onPointerMove(event: React.PointerEvent<HTMLElement>): void;
   onPointerUp(event: React.PointerEvent<HTMLElement>): void;
+  // A pointer the browser took away — a scroll claiming it, a call arriving.
+  // Without it the grip is never let go of and the sheet can never be panned
+  // again, because a press that is still held is a press the sheet stands off.
+  onPointerCancel(event: React.PointerEvent<HTMLElement>): void;
+}
+
+// Whether a press moved far enough to be a carry rather than a tap, held to the
+// same slop a pan is: a place that has not moved must not stage an edit
+// restating where it already was.
+export const carriedFar = (by: Point, zoom: number): boolean => Math.abs(by.x * zoom) > DRAG_SLOP_PX || Math.abs(by.y * zoom) > DRAG_SLOP_PX;
+
+// What one press does to what is being carried, with the drawing and the state
+// passed in. Pure and out here rather than inside the hook, because a decision
+// inside one is a decision no test in this suite can reach: the three lines
+// left in each handler below are wiring, and this is what they wire.
+export interface Carrier {
+  // What the sheet draws moved while the finger is down, and null when nothing.
+  hold(next: Carried | null): void;
+  // The gesture ended: what to report, or null where there is nothing to.
+  rest(report: Carried | null): void;
+}
+
+// How far a press has come, in the sheet's own pixels.
+const cameBy = (from: Point, at: Point, zoom: number): Point => ({ x: (at.x - from.x) / zoom, y: (at.y - from.y) / zoom });
+
+// The handlers that pick one thing up. `held` is the grip the sheet's own press
+// handler reads to know it must stand off, which is why it is a ref and not the
+// state beside it: a state set has not happened yet when mousedown follows
+// pointerdown in the same gesture.
+export function gripFor(id: string, held: { current: { id: string; from: Point } | null }, zoom: number, carrier: Carrier): Grip {
+  const at = (event: { clientX: number; clientY: number }): Point => ({ x: event.clientX, y: event.clientY });
+  const mine = (): boolean => held.current?.id === id;
+
+  return {
+    onPointerDown: (event) => {
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      held.current = { id, from: at(event) };
+      carrier.hold({ id, by: AT_REST });
+    },
+    onPointerMove: (event) => {
+      if (!mine()) return;
+      carrier.hold({ id, by: cameBy(held.current!.from, at(event), zoom) });
+    },
+    onPointerUp: (event) => {
+      if (!mine()) return;
+      const by = cameBy(held.current!.from, at(event), zoom);
+      held.current = null;
+      // Under the slop the press was a tap: nothing moved, so nothing is
+      // reported, and a place is not restated where it already was.
+      carrier.rest(carriedFar(by, zoom) ? { id, by } : null);
+    },
+    // A pointer the browser took away — a scroll claiming it, a call arriving.
+    // The same release as a press that ended, with nothing to report: without
+    // it the grip is never let go of and the sheet can never be panned again.
+    onPointerCancel: () => {
+      if (!mine()) return;
+      held.current = null;
+      carrier.rest(null);
+    },
+  };
 }
 
 // Where the sheet has got to, and everything that moves it. Built by the hook
@@ -73,11 +139,6 @@ export interface SheetHold {
   // offering to carry anything — which is what makes a press a tap.
   grip(id: string): Grip;
 }
-
-const AT_REST: Point = { x: 0, y: 0 };
-
-// How far a finger travels before what it is doing is a drag and not a tap.
-const DRAG_SLOP_PX = 6;
 
 // Where the sheet opens, for a caller that remembers where it was left. A
 // caller that does not passes none and opens at rest.
@@ -142,31 +203,14 @@ export function useSheetHold(
     gesture,
     travelled,
     carried,
-    grip: (id) => {
-      const by = (event: { clientX: number; clientY: number }): Point => {
-        const from = grip.current?.from ?? AT_REST;
-        return { x: (event.clientX - from.x) / zoom, y: (event.clientY - from.y) / zoom };
-      };
-      return {
-        onPointerDown: (event) => {
-          event.stopPropagation();
-          event.currentTarget.setPointerCapture(event.pointerId);
-          grip.current = { id, from: { x: event.clientX, y: event.clientY } };
-          setCarried({ id, by: AT_REST });
-        },
-        onPointerMove: (event) => {
-          if (grip.current?.id !== id) return;
-          setCarried({ id, by: by(event) });
-        },
-        onPointerUp: (event) => {
-          if (grip.current?.id !== id) return;
-          const rested = by(event);
-          grip.current = null;
+    grip: (id) =>
+      gripFor(id, grip, zoom, {
+        hold: setCarried,
+        rest: (report) => {
           setCarried(null);
-          onCarried?.(id, rested);
+          if (report) onCarried?.(report.id, report.by);
         },
-      };
-    },
+      }),
     gripped: grip,
   };
 }

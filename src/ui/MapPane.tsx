@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
-import { MAPPED_KIND, type Section } from './authoringSurface';
+import type { Section } from './authoringSurface';
 import { DragSheet, useSheetHold, type Grip } from './DragSheet';
-import { drawnFor, onWalk, PER_UNIT, placedAt, spotOf, walkLine, type Node } from './discovery';
+import { drawnFor, onWalk, spotOf, walkLine, type Node } from './discovery';
 import type { MapWhere } from './editorMemory';
-import { movedTo } from './mapEdit';
+import { answering, droppedAt, placedInto } from './mapEdit';
 import { useTestSurface } from './testSurface';
 import { useMoment } from './transient';
 import { bounds, panOnto, tapTarget, type Point } from './viewport';
@@ -53,30 +53,51 @@ function Bubble({
   const spot = spotOf(node);
   const flash = useMoment('arrival', arrived, node.place.id);
 
-  return (
-    <button
-      ref={held}
-      data-drive="choose"
-      type="button"
-      data-place={node.place.id}
-      data-walk={walking}
-      disabled={grip === null && position === undefined}
-      {...(grip ?? {})}
-      onClick={() => {
-        if (grip || dragged() || position === undefined) return;
-        onChoose(position);
-      }}
-      style={{ left: spot.x + carried.x, top: spot.y + carried.y }}
-      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-3 py-2 text-xs ${flash} ${
-        node.here ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-panel'
-      } ${walking === 'going' ? 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong' : ''} ${
-        walking === 'crossing' ? 'border-accent text-accent' : ''
-      } ${node.climb !== 0 ? 'opacity-70' : ''} ${position === undefined && !grip ? 'text-text-subtle' : ''}`}
-    >
+  // What the bubble looks like either way, and what is inside it. A control
+  // names on its own tag the action that drives it, and a tag cannot say
+  // "choose, unless places are being moved" — so the two behaviours are two
+  // controls over one appearance rather than one control that lies in a mode.
+  const look = {
+    ref: held,
+    'data-place': node.place.id,
+    'data-walk': walking,
+    style: { left: spot.x + carried.x, top: spot.y + carried.y },
+    className: `absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-3 py-2 text-xs ${flash} ${
+      node.here ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-panel'
+    } ${walking === 'going' ? 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong' : ''} ${
+      walking === 'crossing' ? 'border-accent text-accent' : ''
+    } ${node.climb !== 0 ? 'opacity-70' : ''} ${position === undefined && !grip ? 'text-text-subtle' : ''}`,
+  };
+
+  const inside = (
+    <>
       {/* Inside the control, so what it covers is what the control answers, and
           sized against the zoom the sheet is drawn at. */}
       <span data-tap-target className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: tapTarget(scale), height: tapTarget(scale) }} />
       <span className="block max-w-[8rem] truncate">{node.place.title}</span>
+    </>
+  );
+
+  if (grip) {
+    return (
+      <button data-drive="map.place" type="button" {...grip} {...look}>
+        {inside}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      data-drive="choose"
+      type="button"
+      disabled={position === undefined}
+      onClick={() => {
+        if (dragged() || position === undefined) return;
+        onChoose(position);
+      }}
+      {...look}
+    >
+      {inside}
     </button>
   );
 }
@@ -150,26 +171,13 @@ export function MapPane({
     hold.settle(standing ? panOnto(spotOf(standing), bounds(drawn.sheet.nodes.map(spotOf)), 1) : { x: 0, y: 0 }, 1);
   };
 
-  // Where a place now is, as the section edit that says so. The one route out
-  // of a gesture, and it is the `/dsl` line the console types: a refusal — a
-  // place declared relative to another, a section that will not parse — is a
-  // reason said out loud and nothing sent.
-  const place = (id: string, at: Point): void => {
-    const section = sections.find((each) => each.kind === MAPPED_KIND && each.address === id);
-    if (!section) return onNote(`the map is drawing ${id}, which no module declares`);
-    const staged = movedTo(section, at);
-    if ('refused' in staged) return onNote(staged.refused);
-    onSend(staged.line);
-  };
+  const answer = { send: onSend, note: onNote };
 
-  // Where a place was let go of, in the units a location declares: the sheet's
-  // pixels back into units, and the drawing's own nudge undone — a place off
-  // the floor being looked at is drawn along the diagonal from where it is.
+  const place = (id: string, at: Point): void => answering(placedInto(sections, id, at), answer);
+
   function letGo(id: string, carried: Point): void {
     const node = sheet.nodes.find((each) => each.place.id === id);
-    if (!node) return;
-    const spot = spotOf(node);
-    place(id, placedAt({ x: (spot.x + carried.x) / PER_UNIT, y: (spot.y + carried.y) / PER_UNIT }, node.climb));
+    if (node) answering(droppedAt(sections, node, carried), answer);
   }
 
   // The one value the map both draws and hands over, assembled here and not

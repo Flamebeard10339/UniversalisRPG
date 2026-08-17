@@ -748,6 +748,7 @@
         "src/ui/TabBar.tsx",
         "src/ui/VStack.tsx",
         "src/ui/XpOverlay.tsx",
+        "src/ui/agent/pageStorage.ts",
         "src/ui/agent/surfaces.test.ts",
         "src/ui/agent/surfaces.ts",
         "src/ui/agent/testHarness.test.ts",
@@ -785,7 +786,6 @@
         "src/ui/moments.test.ts",
         "src/ui/nav.test.ts",
         "src/ui/nav.ts",
-        "src/ui/pageStorage.ts",
         "src/ui/pageZoom.test.ts",
         "src/ui/pages.test.ts",
         "src/ui/phone.test.tsx",
@@ -978,7 +978,7 @@
           "name": "localStorage persistence",
           "paths": [
             "src/ui/browserStore.ts",
-            "src/ui/pageStorage.ts"
+            "src/ui/agent/pageStorage.ts"
           ],
           "note": "produced by the-gui-authors-through-the-same-door"
         }

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { RuntimeError, slotStore } from '../runtime/store';
 import { describeSlotDriver } from '../runtime/storeContract';
 import { browserSlots, SLOT_PREFIX, STORAGE_REFUSALS } from './browserStore';
-import { pageStorage, REFUSING } from './pageStorage';
+import { pageStorage, REFUSING } from './agent/pageStorage';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 

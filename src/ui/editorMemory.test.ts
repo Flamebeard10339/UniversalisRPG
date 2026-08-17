@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { slotStore } from '../runtime/store';
 import { browserSlots } from './browserStore';
 import { EDITOR_SLOT, FORGOTTEN, recorded, remembered, type Editing } from './editorMemory';
-import { pageStorage } from './pageStorage';
+import { pageStorage } from './agent/pageStorage';
 
 // One distinct value per thing the memory holds, exhaustive over the type: a
 // field added to `Editing` stops this compiling until it has a value here, and

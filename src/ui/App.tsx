@@ -102,15 +102,21 @@ function useCrossings(rows: PlayView['xp'], onSkills: boolean): Crossings {
   return held;
 }
 
+// How long the shell waits before writing down where the author is. A pan
+// settles the sheet on every frame and a slot is not a thing to write sixty
+// times a second; short enough that a reload after a pause loses nothing, which
+// is what c10 asks and the whole of what it asks about the cadence. A staged
+// edit does not wait on this — it goes through the driver as it is staged.
+export const REMEMBER_AFTER_MS = 400;
+
 // What the author is looking at, kept in the store the edits are in. Read once,
-// because it is where a page opens and not a thing the store goes on deciding;
-// written whenever it moves, because closing the tab is not an event this can
-// wait for.
-function useEditing(driver: Driver): [Editing, (next: Editing) => void] {
+// because it is where a page opens and not a thing the store goes on deciding.
+function useEditing(driver: Driver, after: number): [Editing, (next: Editing) => void] {
   const [editing, setEditing] = useState<Editing>(() => remembered(driver.editorMemory.read()));
 
   useEffect(() => {
-    driver.editorMemory.write(recorded(editing));
+    const timer = setTimeout(() => driver.editorMemory.write(recorded(editing)), after);
+    return () => clearTimeout(timer);
   }, [editing]);
 
   return [editing, setEditing];
@@ -120,10 +126,20 @@ function useEditing(driver: Driver): [Editing, (next: Editing) => void] {
 // narrowed to is a fact read off the session rather than one worked out here.
 const standingIn = (view: PlayView | null): Standing => (view ? { location: view.location.id, entities: view.entities.map((entity) => entity.id) } : NOWHERE);
 
-export function App({ driver, opening = OPENING, clock = () => Date.now() }: { driver: Driver; opening?: Where; clock?: () => number }): JSX.Element {
+export function App({
+  driver,
+  opening = OPENING,
+  clock = () => Date.now(),
+  remembering = REMEMBER_AFTER_MS,
+}: {
+  driver: Driver;
+  opening?: Where;
+  clock?: () => number;
+  remembering?: number;
+}): JSX.Element {
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
   const [where, setWhere] = useState(opening);
-  const [editing, setEditing] = useEditing(driver);
+  const [editing, setEditing] = useEditing(driver, remembering);
   const view = snapshot.view;
   // Read every render rather than held: `/dsl` adopts a new registry, and the
   // language being played is the session's rather than the shell's (c3).
@@ -168,8 +184,13 @@ export function App({ driver, opening = OPENING, clock = () => Date.now() }: { d
   // The one list, rebuilt when the module an author is editing changes and not
   // on every frame: splitting every shipped module into sections is the whole
   // survey, and what makes it move is a staged edit landing.
-  const staged = driver.localChanges() ?? '';
-  const sections = useMemo(() => addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: staged }]), [staged]);
+  // Read off the store once per snapshot rather than once per render: the store
+  // moves when the driver publishes and at no other time, and where the map is
+  // looking moves far more often than that.
+  const sections = useMemo(
+    () => addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }]),
+    [snapshot],
+  );
   const held = {
     sections,
     standing: standingIn(view),

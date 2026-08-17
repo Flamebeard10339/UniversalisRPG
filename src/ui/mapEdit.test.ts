@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { Location } from '../content/location';
 import { loadUniverseWithDiagnostics } from '../content/registry';
 import { addressable, MAPPED_KIND, NOWHERE, offeredBy, type Section } from './authoringSurface';
-import { drawnAt, placedAt } from './discovery';
+import { drawnAt, PER_UNIT, placedAt, type Node } from './discovery';
 import { createDriver, type Driver } from './driver';
-import { movedTo, settledOn } from './mapEdit';
+import { answering, droppedAt, movedTo, placedInto, settledOn } from './mapEdit';
 import { SHIPPED_SOURCES } from './shippedContent';
 
 const SECTIONS = addressable(SHIPPED_SOURCES);
@@ -22,6 +22,16 @@ const withStaged = (local: string): Map<string, Location> =>
   loadUniverseWithDiagnostics([...SHIPPED_SOURCES, { name: 'local-changes', text: local }]).registry.locations;
 
 const opened = (): Driver => createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
+
+const REGISTRY_PLACES = shipped();
+
+// The staged module a line would have produced, without a session: the line
+// through the driver and the store is proved above, so this is about the line.
+function bodyOf(staged: { line: string }): string {
+  const driver = opened();
+  driver.send(staged.line);
+  return driver.localChanges() ?? '';
+}
 
 const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.map((entry) => String(entry.text));
 
@@ -120,5 +130,74 @@ describe('where a drag lets go is where the place is (c8)', () => {
         expect(placedAt(drawnAt(place, plane), z - plane)).toEqual({ x: 3, y: -4 });
       }
     }
+  });
+});
+
+// The path a gesture takes, out of the component and into a function a test can
+// call. What is left in MapPane is three lines of wiring: find the node the
+// sheet drew, hand what came back to `send` or to `note`.
+describe('where the map lets a place go (c8)', () => {
+  const drawn = (address: string, climb = 0): Node => {
+    const place = REGISTRY_PLACES.get(address)!;
+    return { place: { id: address, title: place.title as never, x: place.x, y: place.y, z: place.z, adjacent: [] }, here: false, climb, at: drawnAt({ x: place.x, y: place.y, z: place.z } as never, place.z - climb) };
+  };
+
+  const moved = ABSOLUTE[0].address;
+
+  it('turns the pixels a finger carried a place into the line that says where it is', () => {
+    const node = drawn(moved);
+    const before = shipped().get(moved)!;
+
+    const staged = droppedAt(DRAWN, node, { x: PER_UNIT * 3, y: PER_UNIT * -2 });
+
+    expect(staged).toHaveProperty('line');
+    expect(withStaged(bodyOf(staged as { line: string })).get(moved)).toEqual({ ...before, x: before.x + 3, y: before.y - 2 });
+  });
+
+  // Two floors up or down, because one floor's nudge is 0.42 of a unit and a
+  // coordinate is a whole one: an inverse that was never applied would round
+  // back to where it started and the case would pass over the bug.
+  for (const climb of [-2, 2]) {
+    it(`takes the drawing nudge back out for a place ${Math.abs(climb)} floors ${climb > 0 ? 'up' : 'down'}`, () => {
+      const place = shipped().get(moved)!;
+      const off: Node = { place: { id: moved, title: place.title as never, x: place.x, y: place.y, z: place.z, adjacent: [] }, here: false, climb, at: drawnAt({ ...place, adjacent: [] } as never, place.z - climb) };
+
+      // Let go exactly where it was drawn: the place has not moved, so the line
+      // restates where it already was rather than the nudge it was drawn with.
+      const staged = droppedAt(DRAWN, off, { x: 0, y: 0 });
+
+      expect(withStaged(bodyOf(staged as { line: string })).get(moved)).toEqual(place);
+    });
+  }
+
+  it('refuses a place the map is drawing that no module declares', () => {
+    const stray: Node = { place: { id: 'nowhere.at-all', title: '' as never, x: 0, y: 0, z: 0, adjacent: [] }, here: false, climb: 0, at: { x: 0, y: 0 } };
+
+    expect(droppedAt(DRAWN, stray, { x: 0, y: 0 })).toEqual({ refused: 'the map is drawing nowhere.at-all, which no module declares' });
+    expect(placedInto(DRAWN, 'nowhere.at-all', { x: 1, y: 1 })).toHaveProperty('refused');
+  });
+
+  it('carries a refusal out of the section itself rather than swallowing it', () => {
+    const relative = RELATIVE[0];
+
+    expect(placedInto(DRAWN, relative.address, { x: 5, y: 5 })).toHaveProperty('refused');
+  });
+});
+
+describe('what a staged edit does from a surface (c8)', () => {
+  const watching = (): { act: { send(line: string): void; note(text: string): void }; sent: string[]; said: string[] } => {
+    const sent: string[] = [];
+    const said: string[] = [];
+    return { act: { send: (line) => void sent.push(line), note: (text) => void said.push(text) }, sent, said };
+  };
+
+  it('sends a line down the one route and says a refusal out loud', () => {
+    const taken = watching();
+    answering({ line: '/dsl location a.b x: 1, y: 1' }, taken.act);
+    const refused = watching();
+    answering({ refused: 'that one is placed relative to another' }, refused.act);
+
+    expect([taken.sent, taken.said]).toEqual([['/dsl location a.b x: 1, y: 1'], []]);
+    expect([refused.sent, refused.said]).toEqual([[], ['that one is placed relative to another']]);
   });
 });
