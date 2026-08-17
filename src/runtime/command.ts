@@ -19,12 +19,26 @@ import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal, type ModalOption } from './modals';
 import { anId, say, says, type Said } from './said';
 import {
+  DEV_SLOT,
+  autosave,
+  devSnapshot,
+  enterDev,
+  leaveDev,
+  liveSlot,
+  saveNow,
+  saveReport,
+  setAutosaveSeconds,
+  type SaveContext,
+  type SlotWrites,
+} from './saveSlots';
+import {
   adoptRegistry,
   apply,
   applyDirective,
   beginAction,
   carriedListing,
   choiceToDirective,
+  loadSaved,
   runSessionTest,
   serializeSession,
   sessionLocalizer,
@@ -126,12 +140,16 @@ export interface CommandContext {
   readonly recorder: Recorder;
   readonly live: LiveSettings;
   readonly authoring?: AuthoringContext;
+  // Where this driver keeps slots, when it keeps any. Absent is a driver with
+  // nowhere to write, which refuses the same way one with nowhere to author
+  // does; exporting and importing need none of it and work either way.
+  readonly save?: SaveContext;
 }
 
 export function newContext(
   session: PlaySession,
   current: PlayView,
-  options: { recorder?: Recorder; authoring?: AuthoringContext; speed?: number; driving?: boolean } = {},
+  options: { recorder?: Recorder; authoring?: AuthoringContext; save?: SaveContext; speed?: number; driving?: boolean } = {},
 ): CommandContext {
   return {
     session,
@@ -139,6 +157,7 @@ export function newContext(
     recorder: options.recorder ?? { history: [], startSave: '' },
     live: { speed: options.speed ?? 1, driving: options.driving ?? false },
     authoring: options.authoring,
+    save: options.save,
   };
 }
 
@@ -300,6 +319,11 @@ function formatElapsed(seconds: number): string {
 function runNamedTest(ctx: CommandContext, testId: string): CommandResult {
   try {
     const result = runSessionTest(ctx.session, testId);
+    // A `# test` replays whatever it was written with, and its first line is a
+    // `load:` whenever `/create-test` wrote it, so this session may be any game
+    // at all now. Nothing here can say which, and a standing that cannot be
+    // said is one that has to go.
+    if (ctx.save) ctx.save.synced = null;
     const next = view(ctx.session);
     const verdict = result.passed ? `Test '${testId}' PASSED` : `Test '${testId}' FAILED: ${result.failure}`;
     return shown(next, [note('plain', verdict)]);
@@ -351,6 +375,13 @@ function runDirective(ctx: CommandContext, directive: Directive): CommandResult 
 
   try {
     const outcome = applyDirective(ctx.session, directive);
+    // A payload becoming this session by any route other than `importPayload`,
+    // which is the one route that can say which slot it came from. A `load:`
+    // addresses a `# save` by id, so what the session is now came out of the
+    // content and out of no slot. `runNamedTest` above answers the same
+    // question for the same reason, and the walk in play-cli.test.ts over
+    // `COMMANDS` is what says those two are the whole of it.
+    if (directive.kind === 'load' && ctx.save) ctx.save.synced = null;
     const next = view(ctx.session);
     return { ...shown(next), recorded: [recordedOutcome(directive, outcome)] };
   } catch (error) {
@@ -524,12 +555,15 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
 // --- the recorder's own commands ------------------------------------------
 
 function savedGameFromSerialized(serialized: string): ParsedSave | null {
+  let parsed: unknown;
   try {
-    const { version, ...diff } = JSON.parse(serialized) as { version: number } & Record<string, unknown>;
-    return { version, diff };
+    parsed = JSON.parse(serialized);
   } catch {
     return null;
   }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+  const { version, ...diff } = parsed as { version: number } & Record<string, unknown>;
+  return { version, diff };
 }
 
 // Never throws: a failure comes back as an error message.
@@ -581,6 +615,129 @@ function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean
     quit: false,
     recorded: [],
   };
+}
+
+// --- the save slots -------------------------------------------------------
+
+export const NO_SAVES = 'this session has nowhere to keep slots.';
+
+// Everything a slot command does can raise: an unreadable slot, a cadence
+// somebody hand-edited, a snapshot that is gone. One catch, so the answer is a
+// message in every one of those cases and a crash in none of them (c7).
+function withSaves(ctx: CommandContext, run: (save: SaveContext) => CommandResult): CommandResult {
+  if (!ctx.save) return noted('error', NO_SAVES);
+  try {
+    return run(ctx.save);
+  } catch (error) {
+    return refused(error);
+  }
+}
+
+// The one route a payload becomes this session, whether it came off a slot or
+// off the end of a typed line. `loadSaved` adopts nothing until the whole of it
+// stands — including that it can be drawn — so a payload refused here leaves the
+// session where it was and the view below it cannot be the one that fails.
+//
+// `from` names the slot this payload came out of, and nothing when it came from
+// somewhere that is not a slot. Required rather than defaulted, because a load
+// is exactly the event that changes which slot's game this session is: answered
+// here once, it is what stops an imported payload inheriting the standing of the
+// session it replaced and being autosaved over a player's slot, and a caller
+// added next month cannot leave the question unanswered.
+function importPayload(ctx: CommandContext, payload: string, done: string, from: string | null): CommandResult {
+  const saved = savedGameFromSerialized(payload);
+  if (!saved) return noted('error', `that is not a # save body: ${JSON.stringify(payload.slice(0, 60))}`);
+  try {
+    loadSaved(ctx.session, saved);
+  } catch (error) {
+    return refused(error);
+  }
+  if (ctx.save) ctx.save.synced = from;
+  return shown(view(ctx.session), [note('ok', done)]);
+}
+
+const loaded = (result: CommandResult): boolean => !result.output.some((each) => each.kind === 'message' && each.tone === 'error');
+
+const SLOT_COLUMN = 14;
+
+function slotAge(save: SaveContext, writtenAt: number | null): string {
+  return writtenAt === null ? 'unreadable' : `written ${formatElapsed((save.now() - writtenAt) / 1000)}s ago`;
+}
+
+// c13 read out: every line of it comes off `saveReport`, so a surface drawing
+// the same answer asks the same question rather than keeping a copy.
+function slotStanding(save: SaveContext): string[] {
+  const report = saveReport(save);
+  return [
+    `writing ${report.slot}, dev mode ${report.dev ? 'on' : 'off'}${WHY_NOT[report.writes]}`,
+    `autosave ${report.autosaveSeconds === null ? `— ${UNREADABLE_CADENCE}` : report.autosaveSeconds === 0 ? 'never' : `every ${report.autosaveSeconds}s`}`,
+    ...report.slots.map((slot) => `${slot.name.padEnd(SLOT_COLUMN)} ${slotAge(save, slot.writtenAt)}`),
+  ];
+}
+
+const NOT_ADOPTED = 'this session did not come out of that slot, so autosave will not write it: /restore to pick it up or /save to replace it';
+
+const UNREADABLE_SLOT = 'that slot holds bytes nothing here can read, so autosave leaves them alone: look at the file, or /save to replace it';
+
+const UNREADABLE_CADENCE = 'the slot the cadence lives in does not hold one, so nothing is saved on a cadence: /autosave <s> sets it again';
+
+// One sentence per answer the session gives, so the terminal renders what it
+// was told rather than working it out a second time.
+const WHY_NOT: Record<SlotWrites, string> = { yes: '', 'not-ours': ` — ${NOT_ADOPTED}`, unreadable: ` — ${UNREADABLE_SLOT}` };
+
+// Checked after a command that changed the world and on every live tick, which
+// is the whole of what makes the cadence real seconds rather than turns. Two
+// things it has to say out loud: a cadence slot nobody can read, and a slot the
+// cadence came due on that this session is not entitled to replace — silence
+// there would be a game quietly not being saved.
+function autosaved(ctx: CommandContext): ToolMessage | null {
+  if (!ctx.save) return null;
+  try {
+    const outcome = autosave(ctx.save, () => serializeSession(ctx.session));
+    if (outcome.kind === 'held') return note('warn', `autosave held: slot ${outcome.slot} — ${NOT_ADOPTED}`);
+    if (outcome.kind === 'unreadable') return note('warn', `autosave held: slot ${outcome.slot} — ${UNREADABLE_SLOT}`);
+    return null;
+  } catch (error) {
+    if (error instanceof RuntimeError) return note('error', `autosave: ${error.message}`);
+    throw error;
+  }
+}
+
+// The mirror of leaving: the session goes to whatever the dev slot holds, so it
+// is what the slot it is about to write holds and an author picks up where they
+// left off. Nothing there is the ordinary case — the session carries on and
+// takes the empty slot. Something there that will not load costs the pick-up
+// and nothing else: the mode is on, the slot is withheld, and `/save` is what
+// takes it deliberately.
+function devOn(ctx: CommandContext, save: SaveContext): CommandResult {
+  const authoring = enterDev(save, serializeSession(ctx.session));
+  if (authoring === null) return noted('ok', `Dev mode on, writing slot ${liveSlot(save)}.`);
+
+  const result = importPayload(ctx, authoring, `Dev mode on, slot ${DEV_SLOT} picked up.`, DEV_SLOT);
+  if (loaded(result)) return result;
+  return { ...result, output: [...result.output, note('warn', `Dev mode is on, but slot ${DEV_SLOT} could not be picked up, so this session is left as it is and will not be written there. /save takes it.`)] };
+}
+
+// Everything done in dev goes with the mode: the session goes back to what it
+// was when dev was entered, and back to being the game of whatever slot it was
+// then. No slot is put back, because none of them moved — nothing in dev writes
+// the player's slot, which is c10, so it still holds exactly what it held on the
+// way in and a compensating write here could only ever fail and strand somebody.
+// A snapshot this build cannot read costs the session, which stays where it is
+// and is no slot's game, so what dev built cannot reach the slot a player opens
+// next; the dev slot is an author's work and is still there to `/restore` from.
+function devOff(ctx: CommandContext, save: SaveContext): CommandResult {
+  const exit = devSnapshot(save);
+  if (exit.kind === 'no-snapshot') {
+    leaveDev(save, null);
+    return noted('ok', `Dev mode off, writing slot ${liveSlot(save)}. ${exit.why}, so this session is left as it is and will not be written to one. Slot ${DEV_SLOT} still holds what dev did.`);
+  }
+
+  const result = importPayload(ctx, exit.payload, `Dev mode off, the session before dev is back.`, exit.synced);
+  const back = loaded(result);
+  leaveDev(save, back ? exit.synced : null);
+  if (back) return result;
+  return { ...result, output: [...result.output, note('warn', `Dev mode off, but this session could not be put back to what it was before dev, so it will not be written to a slot. Slot ${DEV_SLOT} still holds what dev did.`)] };
 }
 
 // --- argument parsers -----------------------------------------------------
@@ -795,6 +952,75 @@ export const COMMANDS: readonly CommandSpec[] = [
     run: runReload,
   }),
   define({
+    name: '/export',
+    arg: 'none',
+    summary: 'print the current save as a # save body',
+    parse: nothing,
+    // The bytes `serializeSession` returns and no others: what this prints
+    // pastes into `/dsl save <id>` and comes back through `/import` unchanged,
+    // which is only true while there is one serialization to print.
+    run: (ctx) => ({ output: [{ kind: 'source', words: 'tool', lines: [serializeSession(ctx.session)] }], quit: false, recorded: [] }),
+  }),
+  define({
+    name: '/import',
+    arg: 'id',
+    argHint: '<body>',
+    summary: 'load a # save body printed by /export',
+    parse: (rest) => (rest === '' ? { problem: '/import requires a # save body' } : rest),
+    run: (ctx, body) => importPayload(ctx, body, 'Imported.', null),
+  }),
+  define({
+    name: '/save',
+    arg: 'none',
+    summary: 'write the current save to the live slot',
+    parse: nothing,
+    run: (ctx) => withSaves(ctx, (save) => noted('ok', `Saved to slot ${saveNow(save, serializeSession(ctx.session))}.`)),
+  }),
+  define({
+    name: '/restore',
+    arg: 'none',
+    summary: 'load the live slot back',
+    parse: nothing,
+    run: (ctx) =>
+      withSaves(ctx, (save) => {
+        const name = liveSlot(save);
+        const slot = save.store.read(name);
+        if (!slot) return noted('error', `slot ${name} holds nothing.`);
+        return importPayload(ctx, slot.payload, `Loaded slot ${name}.`, name);
+      }),
+  }),
+  define({
+    name: '/slots',
+    arg: 'none',
+    summary: 'report which slot is live, the cadence, and what is kept',
+    parse: nothing,
+    run: (ctx) => withSaves(ctx, (save) => ({ output: [{ kind: 'source', words: 'tool', lines: slotStanding(save) }], quit: false, recorded: [] })),
+  }),
+  define({
+    name: '/autosave',
+    arg: 'number',
+    argHint: '<s>',
+    summary: 'set the autosave cadence in seconds; 0 never',
+    parse: (rest) => {
+      const seconds = Number(rest);
+      if (rest === '' || !Number.isFinite(seconds) || seconds < 0) return { problem: `/autosave requires seconds, 0 for never, got ${JSON.stringify(rest)}` };
+      return seconds;
+    },
+    run: (ctx, seconds) =>
+      withSaves(ctx, (save) => {
+        setAutosaveSeconds(save, seconds);
+        return noted('ok', seconds === 0 ? 'Autosave off.' : `Autosave every ${seconds}s.`);
+      }),
+  }),
+  define({
+    name: '/dev',
+    arg: 'id',
+    argHint: 'on | off',
+    summary: 'author against a slot of its own, and come back to this session on the way out',
+    parse: (rest) => (rest === 'on' || rest === 'off' ? rest : { problem: '/dev requires on or off' }),
+    run: (ctx, mode) => withSaves(ctx, (save) => (mode === 'on' ? devOn(ctx, save) : devOff(ctx, save))),
+  }),
+  define({
     name: '/create-test',
     arg: 'id',
     argHint: '<id>',
@@ -902,7 +1128,11 @@ export function parseLine(ctx: CommandContext, line: string): ParsedCommand | Co
 function settle(ctx: CommandContext, result: CommandResult): CommandResult {
   ctx.recorder.history.push(...result.recorded);
   if (result.view) ctx.view = result.view;
-  return result;
+  // What a command recorded is what it changed, which is the table's own answer
+  // to "did the world move" and so the one this reads rather than a second one.
+  if (result.recorded.length === 0) return result;
+  const problem = autosaved(ctx);
+  return problem ? { ...result, output: [...result.output, problem] } : result;
 }
 
 export function runCommand(ctx: CommandContext, spec: CommandSpec, arg: ArgTypes[ArgKind]): CommandResult {
@@ -1061,6 +1291,12 @@ function driveChoice(ctx: CommandContext, index: number): CommandResult {
       if (over) return over;
       const progress = tickOnce(ctx, latest, elapsedMs, armed);
       latest = progress.view;
+      // A run is the one stretch of play no command punctuates, so the cadence
+      // is checked here too or a long fight saves nothing until it ends. A tick
+      // has nowhere to speak and nothing to carry: a run that ticked ends with
+      // a wait or a cancel to record, so `end` settles like any other command
+      // and asks again there, on a session the answer is still true of.
+      autosaved(ctx);
       if (!progress.active) over = progress;
       return progress;
     },

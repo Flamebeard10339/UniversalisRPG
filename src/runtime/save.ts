@@ -39,31 +39,76 @@ interface SaveFieldRule {
   // What the field will accept. A `# save` body is hand-written JSON that
   // nothing else checks, so this is where a `"time":"potato"` is caught.
   holds(value: unknown): boolean;
+  // The least this field can carry and still get past `holds` — for a record
+  // field, the least one of its entries can be. A nullable field names its
+  // emptiest object rather than its null, because null is the case the loader
+  // already has an answer for and this is the sample that walks the rest of it.
+  // Every field carries one so that "what the gate accepts, the loader reads"
+  // is proved over this table rather than over a list somebody maintains.
+  sparsest: unknown;
   prune: Prune;
 }
 
 const isNumber = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value);
 const isInteger = (value: unknown): boolean => isNumber(value) && Number.isInteger(value);
 const isObject = (value: unknown): boolean => typeof value === 'object' && value !== null && !Array.isArray(value);
+const isText = (value: unknown): boolean => typeof value === 'string';
 
-const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
-  location: { shape: 'scalar', holds: (value) => typeof value === 'string', prune: 'pruned by a rule of its own' },
-  inventory: { shape: 'record', holds: isNumber, prune: { of: 'item', loaded: (registry, id) => registry.items.has(id) } },
-  flags: { shape: 'record', holds: (value) => typeof value === 'boolean' || isNumber(value), prune: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) } },
-  visits: { shape: 'record', holds: isNumber, prune: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) } },
-  xp: { shape: 'record', holds: isNumber, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } },
-  resources: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
-  resourceRateRemainders: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
-  equipped: { shape: 'record', holds: (value) => typeof value === 'string', prune: 'pruned by a rule of its own' },
-  buffs: { shape: 'record', holds: isBuffList, prune: 'pruned by a rule of its own' },
-  activeAction: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
-  journey: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
-  instances: { shape: 'scalar', holds: isInstanceTable, prune: 'pruned by a rule of its own' },
-  populations: { shape: 'scalar', holds: isPopulations, prune: 'pruned by a rule of its own' },
-  time: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
-  rng: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
-  player: { shape: 'scalar', holds: isObject, prune: 'holds no registry id' },
-  modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), prune: 'pruned by a rule of its own' },
+function at(value: unknown, field: string, holds: (held: unknown) => boolean): boolean {
+  return isObject(value) && holds((value as Record<string, unknown>)[field]);
+}
+
+function everyValue(value: unknown, holds: (held: unknown) => boolean): boolean {
+  return isObject(value) && Object.values(value as Record<string, unknown>).every(holds);
+}
+
+// What the pruner and the engine under it reach into without asking first.
+// `isObject` alone let a payload past this gate and into a `TypeError` raised
+// by the destructuring below it, which is the shape c14 forbids. These say what
+// a field is worth refusing *by name* for; what makes the clause hold for a
+// field nobody here thought of is `pruned` below, not the length of this list.
+const isActor = (value: unknown): boolean => at(value, 'resources', (held) => everyValue(held, isNumber)) && at(value, 'rateRemainders', (held) => everyValue(held, isNumber));
+
+const isCadence = (value: unknown): boolean => at(value, 'progress', isNumber) && at(value, 'attemptsMade', isInteger);
+
+const isSeat = (value: unknown): boolean => at(value, 'ownerRef', isText) && at(value, 'actionSlug', isText) && at(value, 'target', isText);
+
+const optional = (value: unknown, field: string, holds: (held: unknown) => boolean): boolean => {
+  const held = (value as Record<string, unknown>)[field];
+  return held === undefined || holds(held);
+};
+
+const isActiveAction = (value: unknown): boolean =>
+  at(value, 'ownerRef', isText) &&
+  at(value, 'actionSlug', isText) &&
+  at(value, 'repeating', (held) => typeof held === 'boolean') &&
+  at(value, 'implicitTarget', isNumber) &&
+  at(value, 'cadences', (held) => everyValue(held, isCadence)) &&
+  optional(value, 'actors', (held) => everyValue(held, isActor)) &&
+  optional(value, 'roster', (held) => everyValue(held, isSeat));
+
+const isJourney = (value: unknown): boolean => at(value, 'to', isText) && at(value, 'legs', (held) => Array.isArray(held) && held.every(isText));
+
+const isPlayer = (value: unknown): boolean => at(value, 'name', isText) && at(value, 'race', isText);
+
+export const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
+  location: { shape: 'scalar', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' },
+  inventory: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'item', loaded: (registry, id) => registry.items.has(id) } },
+  flags: { shape: 'record', holds: (value) => typeof value === 'boolean' || isNumber(value), sparsest: false, prune: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) } },
+  visits: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) } },
+  xp: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } },
+  resources: { shape: 'record', holds: isInteger, sparsest: 0, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
+  resourceRateRemainders: { shape: 'record', holds: isInteger, sparsest: 0, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
+  equipped: { shape: 'record', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' },
+  buffs: { shape: 'record', holds: isBuffList, sparsest: [], prune: 'pruned by a rule of its own' },
+  activeAction: { shape: 'scalar', holds: (value) => value === null || isActiveAction(value), sparsest: { ownerRef: '', actionSlug: '', repeating: false, implicitTarget: 0, cadences: {} }, prune: 'pruned by a rule of its own' },
+  journey: { shape: 'scalar', holds: (value) => value === null || isJourney(value), sparsest: { to: '', legs: [] }, prune: 'pruned by a rule of its own' },
+  instances: { shape: 'scalar', holds: isInstanceTable, sparsest: { next: 1, byId: {} }, prune: 'pruned by a rule of its own' },
+  populations: { shape: 'scalar', holds: isPopulations, sparsest: {}, prune: 'pruned by a rule of its own' },
+  time: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
+  rng: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
+  player: { shape: 'scalar', holds: isPlayer, sparsest: { name: '', race: '' }, prune: 'holds no registry id' },
+  modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), sparsest: [], prune: 'pruned by a rule of its own' },
 };
 
 const SAVE_FIELD_NAMES = Object.keys(SAVE_FIELDS) as SaveField[];
@@ -251,6 +296,22 @@ function checkSave(saved: ParsedSave): void {
   }
 }
 
+// The gate that exists to keep a corrupt payload out of the engine may not
+// itself be the thing that crashes on one. `checkSave` refuses what it knows to
+// look for and names the field; anything it did not think to look at reaches the
+// pruner and arrives here as a raw `TypeError` from a destructuring below. It
+// leaves as a diagnostic — which is what makes c14 hold for the field `Seat`
+// gains next month as well as for the ones written above, because a gate spelled
+// out as a list of fields is a list somebody has to keep in step with a type.
+function pruned(state: GameState, registry: Registry): PruneWarning[] {
+  try {
+    return pruneStateForRegistry(state, registry);
+  } catch (error) {
+    if (error instanceof RuntimeError) throw error;
+    throw new RuntimeError(`this save cannot be loaded: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 // Mutates `state` in place: resets every field to initialState, then applies
 export function loadSave(state: GameState, saved: ParsedSave, registry: Registry): PruneWarning[] {
   checkSave(saved);
@@ -270,7 +331,7 @@ export function loadSave(state: GameState, saved: ParsedSave, registry: Registry
     else delete target[field];
   }
   state.log = base.log;
-  const warnings = pruneStateForRegistry(state, registry);
+  const warnings = pruned(state, registry);
   for (const warning of warnings) state.log.push(warning.message);
   return warnings;
 }

@@ -24,3 +24,6 @@ tsconfig.node.tsbuildinfo
 # removed on the way out; these two lines are for the write that was killed.
 *.jsonl.lock
 *.jsonl.*.tmp
+
+# One file per save slot, written by whoever is playing.
+.saves/

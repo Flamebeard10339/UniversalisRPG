@@ -333,6 +333,8 @@
         "src/runtime/said.ts",
         "src/runtime/save.test.ts",
         "src/runtime/save.ts",
+        "src/runtime/saveSlots.test.ts",
+        "src/runtime/saveSlots.ts",
         "src/runtime/sayFixture.ts",
         "src/runtime/session.test.ts",
         "src/runtime/session.ts",
@@ -344,6 +346,8 @@
         "src/runtime/state.ts",
         "src/runtime/stats.ts",
         "src/runtime/stopping.test.ts",
+        "src/runtime/store.test.ts",
+        "src/runtime/store.ts",
         "src/runtime/time.test.ts",
         "src/runtime/translationSurvival.test.ts",
         "src/runtime/tuning.ts",
@@ -608,6 +612,22 @@
             "src/runtime/skillGrants.ts"
           ],
           "note": "produced by xp-from-events: which skills a fired event trains, and what one moment is worth to each. The line itself is parsed in src/grammar/skillGrant.ts, which the DSL load path owns."
+        },
+        {
+          "name": "named slot store",
+          "paths": [
+            "src/runtime/store.ts",
+            "src/runtime/store.test.ts"
+          ],
+          "note": "produced by auto-save-export-and-load: read, write, remove and list named opaque text, stamped with when the slot was written, over a driver that supplies the bytes"
+        },
+        {
+          "name": "save slot policy",
+          "paths": [
+            "src/runtime/saveSlots.ts",
+            "src/runtime/saveSlots.test.ts"
+          ],
+          "note": "produced by auto-save-export-and-load: which slot a session writes, whether the autosave cadence has elapsed, the dev slot pair, and the report a surface renders instead of tracking its own copy"
         }
       ]
     },
@@ -1249,6 +1269,8 @@
         "scripts/lib/layers.ts",
         "scripts/lib/sessionTiming.test.ts",
         "scripts/lib/sessionTiming.ts",
+        "scripts/lib/slotFile.test.ts",
+        "scripts/lib/slotFile.ts",
         "scripts/lib/sourceFiles.ts",
         "scripts/lib/stripComments.test.ts",
         "scripts/lib/stripComments.ts",
@@ -1307,6 +1329,14 @@
             "scripts/planeView.test.ts"
           ],
           "note": "produced by cluster-plane-view: the /inventory rendering of a grown item's plane, its standings and the verb line each row invites"
+        },
+        {
+          "name": "file-backed slot driver",
+          "paths": [
+            "scripts/lib/slotFile.ts",
+            "scripts/lib/slotFile.test.ts"
+          ],
+          "note": "produced by auto-save-export-and-load: one file per slot under one directory, which is the store play-cli supplies to the command table; the slot-name guard is what its test proves"
         }
       ]
     },
