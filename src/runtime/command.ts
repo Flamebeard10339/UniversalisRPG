@@ -319,6 +319,11 @@ function formatElapsed(seconds: number): string {
 function runNamedTest(ctx: CommandContext, testId: string): CommandResult {
   try {
     const result = runSessionTest(ctx.session, testId);
+    // A `# test` replays whatever it was written with, and its first line is a
+    // `load:` whenever `/create-test` wrote it, so this session may be any game
+    // at all now. Nothing here can say which, and a standing that cannot be
+    // said is one that has to go.
+    if (ctx.save) ctx.save.synced = null;
     const next = view(ctx.session);
     const verdict = result.passed ? `Test '${testId}' PASSED` : `Test '${testId}' FAILED: ${result.failure}`;
     return shown(next, [note('plain', verdict)]);
@@ -370,9 +375,12 @@ function runDirective(ctx: CommandContext, directive: Directive): CommandResult 
 
   try {
     const outcome = applyDirective(ctx.session, directive);
-    // The other route a payload becomes this session, and the only one that is
-    // not `importPayload`: a `load:` addresses a `# save` by id, so what the
-    // session is now came out of the content and out of no slot.
+    // A payload becoming this session by any route other than `importPayload`,
+    // which is the one route that can say which slot it came from. A `load:`
+    // addresses a `# save` by id, so what the session is now came out of the
+    // content and out of no slot. `runNamedTest` above answers the same
+    // question for the same reason, and the walk in play-cli.test.ts over
+    // `COMMANDS` is what says those two are the whole of it.
     if (directive.kind === 'load' && ctx.save) ctx.save.synced = null;
     const next = view(ctx.session);
     return { ...shown(next), recorded: [recordedOutcome(directive, outcome)] };

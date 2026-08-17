@@ -684,6 +684,12 @@ haul:
 
 # save stashed
 {"version":${SAVE_VERSION},"inventory":{"gold":7},"time":42000}
+
+# save stranger
+{"version":${SAVE_VERSION},"inventory":{"gold":5},"flags":{"camp.discovered":true}}
+
+# test replay
+load: stranger
 `;
 
 const EXPORT_SOURCE = `
@@ -1430,6 +1436,38 @@ const ENTERED_HOLDING: ReadonlyArray<readonly [string, (game: Playing) => void]>
 // the same reason.
 const SHAPED_IN_DEV: Record<string, string> = { '<N>': '1', '<enter>': '', '<directive>': 'use: entity.chest.open' };
 
+// An argument each command that takes one will actually act on. A walk that
+// hands every entry the same `1` exercises the refusal and never the command:
+// `/test 1` names no test, so the route that replays a `# test` — and with it a
+// `load:` the session never named — went two audits without being walked. The
+// map is written by hand and the *check over it* is not: `ARGUMENT_PER_COMMAND`
+// below fails until every entry declaring an `argHint` has one, so a command
+// added with an argument is walked on the day it exists or the suite says so.
+const ACTS_ON: Record<string, string> = {
+  '/inventory': 'gold',
+  '/wait': '1',
+  '/speed': '2',
+  '/test': 'replay',
+  '/load': 'stranger',
+  '/expect': 'stranger',
+  '/assert': 'time >= 0',
+  '/dsl': `save staged {"version":${SAVE_VERSION}}`,
+  '/local': 'list',
+  '/create-test': 'made',
+  '/create-valid-test': 'made-valid',
+  '/import': SOMEONE_ELSES_SAVE,
+  '/autosave': '1',
+  '/dev': 'off',
+};
+
+// What each entry is driven with: the shape-named ones by their shape, and
+// everything else bare and then with an argument it acts on.
+function linesFor(spec: (typeof COMMANDS)[number]): string[] {
+  const bare = SHAPED_IN_DEV[spec.name] ?? spec.name;
+  const argument = ACTS_ON[spec.name];
+  return argument === undefined ? [bare, `${bare} 1`] : [bare, `${bare} ${argument}`];
+}
+
 // What the slot holds, read as the one number that says whose session it is.
 function goldIn(payload: string | null): number | null {
   if (payload === null) return null;
@@ -1440,14 +1478,66 @@ function goldIn(payload: string | null): number | null {
   }
 }
 
+// The same question the c9 walk asks of dev mode, asked of ordinary play: after
+// any line at all, is this session still the game the live slot holds? A line
+// that replaces the session — `/load`, `/import`, a `# test` whose first line
+// is the `load:` that `/create-test` writes — makes it a different game, and a
+// standing left standing across one of those is a stranger's save written over
+// the player's. Derived over `COMMANDS` and over the arguments each one acts
+// on, because the route that went two audits unwalked was `/test`, and it went
+// unwalked precisely because the walk handed it a `1` it could only refuse.
+describe('no line leaves this session writing a slot that is not its game (c4)', () => {
+  // How far this player's own game gets before the line under test runs. The
+  // fixture's stranger — the `# save` a `/load` names and the `# test` replays
+  // — sits well below it, so the count in the slot afterwards says whose game
+  // it is: this player's lineage can only have gone up from here.
+  const PLAYED_GOLD = 9;
+
+  it('over every line the command table takes', () => {
+    const leaked: string[] = [];
+
+    for (const spec of COMMANDS) {
+      for (const line of linesFor(spec)) {
+        const game = playing();
+        try {
+          runLine(game.ctx, '/autosave 1');
+          // A game of this player's own, in the slot and in the session.
+          for (let each = 0; each < PLAYED_GOLD; each += 1) {
+            game.pass(2_000);
+            runLine(game.ctx, 'use: entity.chest.open');
+          }
+          runLine(game.ctx, '/save');
+          const played = game.slot(PLAYER_SLOT);
+
+          runLine(game.ctx, line);
+          game.pass(2_000);
+          runLine(game.ctx, 'use: entity.chest.open');
+
+          const gold = goldIn(game.slot(PLAYER_SLOT));
+          // Either the slot still holds what it held, or it holds this
+          // player's game carried one command further. What it may never hold
+          // is a game from somewhere else, which is what a standing kept
+          // across a load writes there.
+          if (game.slot(PLAYER_SLOT) !== played && (gold === null || gold < PLAYED_GOLD + 1)) {
+            leaked.push(`${JSON.stringify(line)}: slot holds gold ${gold}, which is not this player's game`);
+          }
+        } finally {
+          rmSync(game.dir, { recursive: true, force: true });
+        }
+      }
+    }
+
+    expect(leaked).toEqual([]);
+  });
+});
+
 describe('nothing done in dev mode reaches the slot being played (c9)', () => {
   for (const [holding, enter] of ENTERED_HOLDING) {
     it(`over every line the command table takes, entering on ${holding}`, () => {
       const leaked: string[] = [];
 
       for (const spec of COMMANDS) {
-        const bare = SHAPED_IN_DEV[spec.name] ?? spec.name;
-        for (const line of [bare, `${bare} 1`]) {
+        for (const line of linesFor(spec)) {
           const game = playing();
           try {
             runLine(game.ctx, '/autosave 1');
@@ -1486,6 +1576,19 @@ describe('nothing done in dev mode reaches the slot being played (c9)', () => {
   // A walk over an empty table would report no leak either.
   it('walks the whole command table, twice per entry', () => {
     expect(COMMANDS.length).toBeGreaterThan(20);
+  });
+
+  // The half of the walk that is derived: the arguments are hand-written and
+  // this is what stops the list going stale. A command that takes an argument
+  // and is handed nothing it acts on is a command this walk only ever refuses.
+  it('hands every command that takes an argument one it acts on', () => {
+    const takesOne = COMMANDS.filter((spec) => spec.argHint !== '' && SHAPED_IN_DEV[spec.name] === undefined);
+    expect(takesOne.length).toBeGreaterThan(10);
+    expect(takesOne.filter((spec) => ACTS_ON[spec.name] === undefined).map((spec) => spec.name)).toEqual([]);
+
+    // And the walks are driven by that map rather than beside it: the map full
+    // and the lines still saying `1` is the walk that missed a HIGH twice.
+    for (const spec of takesOne) expect(linesFor(spec), spec.name).toContain(`${spec.name} ${ACTS_ON[spec.name]}`);
   });
 
   // The state left out of the table above, because a slot the store cannot read

@@ -208,6 +208,37 @@ describe('a session writes the one slot whose game it is (c4, c9)', () => {
   });
 });
 
+describe('the rule is which slot, not whether there is one', () => {
+  it('refuses a slot this session is synced to something else instead of', () => {
+    const { save } = turning();
+    saveNow(save, 'the player');
+    save.store.write(DEV_SLOT, 'somebody authoring');
+    save.dev = true;
+
+    // Synced, and to a real slot — just not the one being written. A rule that
+    // asked only whether this session is synced to anything would say yes.
+    save.synced = PLAYER_SLOT;
+    expect(liveSlot(save)).toBe(DEV_SLOT);
+    expect(saveReport(save).writes).toBe('not-ours');
+  });
+
+  it('is not in dev at all when the snapshot could not be put down', () => {
+    const { save } = turning();
+    saveNow(save, 'the player');
+    const writing = save.store.write.bind(save.store);
+    (save.store as { write: (name: string, payload: string) => unknown }).write = (name, payload) => {
+      if (name === DEV_SNAPSHOT_SLOT) throw new RuntimeError('slot dev-snapshot could not be written');
+      return writing(name, payload);
+    };
+
+    // The snapshot is what leaving comes back from, so a mode entered without
+    // one is a mode with no way out. It is not entered.
+    expect(() => enterDev(save, 'the session as it stands')).toThrow(/dev-snapshot/);
+    expect(save.dev).toBe(false);
+    expect(liveSlot(save)).toBe(PLAYER_SLOT);
+  });
+});
+
 describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', () => {
   it('snapshots the session on the way in, and no slot needs putting back on the way out', () => {
     const { save, pass } = turning();

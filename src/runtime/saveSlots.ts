@@ -1,4 +1,5 @@
 import { RuntimeError } from './runtime';
+import type { Answer } from './localized';
 import { slotStore, type Slot, type SlotDriver, type SlotStore } from './store';
 
 // The slot a session writes when nobody is authoring, and the pair that exist
@@ -37,7 +38,10 @@ export interface SaveContext {
   readonly store: SlotStore;
   readonly now: () => number;
   dev: boolean;
-  synced: string | null;
+  // An `Answer` rather than a bare string: a slot name is an id, never a word,
+  // and saying so is what keeps this handle inside the published walk instead
+  // of on the list of types it is told to skip.
+  synced: Answer | null;
 }
 
 // A new game is the empty player slot's game, and this is the one place that is

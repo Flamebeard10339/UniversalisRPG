@@ -428,6 +428,27 @@ The player's progress survives closing the game, through a store three queued br
   The context is the handle a driver keeps slots through, which is the same reason `CommandContext`
   was already listed there.
 
+- **The standing is dropped by every route a payload becomes this session, and the walk that says so
+  is derived over `COMMANDS` twice.** Pass 6 found the third route: `runSessionTest` replays a
+  `# test`'s directives through `applyDirective`, so a `load:` inside one — and `/create-test` writes
+  one as every test's first line — never reached the `load:` arm in `runDirective` where the standing
+  is dropped. `/test` on an ordinary generated test wrote a stranger's game over the player's slot
+  with no warning. Two guards now, both in `command.ts`, and the reason they are two is that
+  `runDirective` knows which directive it ran and `runNamedTest` cannot know: a replay may have been
+  any game at all, so its standing goes unconditionally. What makes two guards a rule rather than a
+  list is that the proof derives its subjects — `no line leaves this session writing a slot that is
+  not its game (c4)` walks every `COMMANDS` entry outside dev, beside the c9 walk that walks them
+  inside it, so a fourth route is walked on the day it exists.
+- **A walk that hands every command the same argument only ever exercises its refusal.** That is why
+  the route above went two passes unwalked: `/test 1` names no test. `ACTS_ON` gives each entry an
+  argument it acts on, the count of entries missing one is asserted against `COMMANDS`, and the walks
+  are asserted to be driven by that map rather than beside it — a map full while the lines still say
+  `1` is exactly the walk that missed this.
+- **`synced` is an `Answer`, so the handle stays inside the published walk.** It was a bare `string`,
+  which put `SaveContext` on `published.test.ts`'s hand-maintained skip list. `Answer` exists for
+  this and its own comment names a slot as the example, so the entry came off the list rather than
+  onto it.
+
 ## Open questions
 
 - Where the store interface lives, and whether the autosave decision — has the cadence elapsed,
