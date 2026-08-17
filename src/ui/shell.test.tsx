@@ -11,9 +11,9 @@ import { slotStore, type SlotDriver } from '../runtime/store';
 import { pageStorage } from './agent/pageStorage';
 import { App, retrying } from './App';
 import { browserSlots } from './browserStore';
-import { OPENING_CELLS } from '../runtime/openUniverseFixture';
+import { clearingReaches, OPENING_CELLS } from '../runtime/openUniverseFixture';
 import type { UniverseProblem } from '../runtime/openUniverse';
-import { createDriver, REMEDIES, remediesFor, type Driver } from './driver';
+import { createDriver, REMEDIES, type Driver } from './driver';
 import { FaultBanner } from './FaultBanner';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { wordsOf } from './words';
@@ -46,27 +46,42 @@ function openedOver(cell: { base: readonly ModuleSource[]; local: string }): Dri
 
 const problemsOf = (message: string): UniverseProblem[] => [{ modules: [LOCAL_CHANGES_MODULE_ID], words: 'tool', message }];
 
+const banner = (driver: Driver): { drawn: boolean; drivers: string[] } => {
+  const snapshot = driver.snapshot();
+  return alerting(renderToStaticMarkup(<FaultBanner problems={snapshot.problems} remedies={snapshot.remedies} words={words} onRemedy={() => undefined} />));
+};
+
 describe('a problem is never drawn as text with nothing beside it (c3, c7)', () => {
+  // What reaches the screen, against what the fixture broke. Neither side of
+  // this is the expression that decides the controls: `clearingReaches` is a
+  // fact about the module the fixture broke and the part of it clearing
+  // rewrites, and the other side is the markup. Comparing the drawn set against
+  // the function that computed it is what let the same withdrawal survive here
+  // twice.
   it('draws exactly the remedies the report has, for every state the door can leave', () => {
     expect(OPENING_CELLS.length).toBeGreaterThan(6);
+    let offered = 0;
 
     for (const cell of OPENING_CELLS) {
-      const problems = openedOver(cell).snapshot().problems;
-      const drawn = alerting(renderToStaticMarkup(<FaultBanner problems={problems} words={words} onRemedy={() => undefined} />));
+      const drawn = banner(openedOver(cell));
 
       expect(drawn.drawn, cell.where).toBe(true);
-      expect([...drawn.drivers].sort(), cell.where).toEqual([...remediesFor(problems)].sort());
-      // The clause's own sentence: something to do, always.
-      expect(drawn.drivers.length, cell.where).toBeGreaterThan(0);
+      // The clause's own sentence: something to do, always, and it is the
+      // control that asks nothing of the author.
+      expect(drawn.drivers, cell.where).toContain('reopen');
+      expect(drawn.drivers.includes('clear-local'), cell.where).toBe(clearingReaches(cell));
+      if (clearingReaches(cell)) offered += 1;
     }
+
+    // Drawn nowhere, or drawn everywhere, would satisfy every line above.
+    expect(offered).toBeGreaterThan(0);
+    expect(offered).toBeLessThan(OPENING_CELLS.length);
   });
 
   // A remedy no state draws would be a control nobody can reach; the pair of
   // checks is what holds the markup and the decision to the same set.
   it('draws every remedy there is, across the states there are', () => {
-    const drawn = new Set(
-      OPENING_CELLS.flatMap((cell) => alerting(renderToStaticMarkup(<FaultBanner problems={openedOver(cell).snapshot().problems} words={words} onRemedy={() => undefined} />)).drivers),
-    );
+    const drawn = new Set(OPENING_CELLS.flatMap((cell) => banner(openedOver(cell)).drivers));
 
     expect(drawn).toEqual(new Set(REMEDIES));
   });
@@ -75,7 +90,7 @@ describe('a problem is never drawn as text with nothing beside it (c3, c7)', () 
   // than a sentence this layer wrote about it.
   it('says what the door said, and nothing it did not', () => {
     const problems = problemsOf('the door said this');
-    const html = renderToStaticMarkup(<FaultBanner problems={problems} words={words} onRemedy={() => undefined} />);
+    const html = renderToStaticMarkup(<FaultBanner problems={problems} remedies={REMEDIES} words={words} onRemedy={() => undefined} />);
 
     expect(html).toContain('the door said this');
   });
@@ -164,10 +179,10 @@ describe('taking a remedy changes the state it was taken from (c7)', () => {
   // here. What is asserted is the wiring, and how it behaves in a browser is
   // the author's to look at — this suite mounts nothing.
   it('offers the remedy that loads the page again, which is the only thing that re-reads a shipped module', () => {
-    const driver = openedOver({ base: [{ name: 'torn', text: '# info torn\nversion: 0.0.0\npack: test\n' }], local: '' });
+    const driver = openedOver({ base: [{ name: 'torn', text: '# info torn\nversion: 0.0.0\npack: test\n\n# item\n' }], local: '' });
 
     expect(driver.snapshot().problems.flatMap((problem) => problem.modules)).toEqual(['torn']);
-    expect(remediesFor(driver.snapshot().problems)).toEqual(['reopen']);
+    expect(driver.snapshot().remedies).toEqual(['reopen']);
   });
 
   // Both answers, because only one of them is ever taken here: the suite runs

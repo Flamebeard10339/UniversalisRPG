@@ -101,3 +101,94 @@ cannot is what the world said as the action began, and nothing in the tree says 
 
 `opening-a-universe-answers-rather-than-raises`, closed. Starting before it is closed would mean
 deleting the handling for a state the engine can still reach.
+
+## Audit passes
+
+### Pass 1 — 2026-08-17
+
+- base: `7a0081a19f28d556372123f479f8d0baec702d7c`
+- head: `7051d8b0f76c7555b304bf4c9716c7d3de6e9aef`
+- proof 1: unmet — The three subjects the clause names are all true: src/ui/driver.ts:30 is `view: PlayView`,
+src/ui/agent/testHarness.ts:38 is `view: PlayView`, src/ui/App.tsx:150 `standingIn` is total, and
+`npx tsc --noEmit` passes (re-run: it did on 7051d8b). The clause fails on its own subject, which is
+the published type and not that one field of it. Two more fields of the same interface, in the same
+file, still describe states the door can no longer produce, and both were made unreachable by this
+branch's own predecessor commit cedfaf5:
+(a) src/ui/driver.ts:43 `speed: number | null`, while src/ui/driver.ts:151 sets it from
+`context.live.speed` and src/runtime/command.ts:131 types that `speed: number`. `context` is
+definitely assigned by `openOnce` before the constructor returns, so null is unreachable. The lie has
+already generated the defect the Deliverable warns about: src/ui/SettingsPane.tsx:62 reads
+`{speed === null ? null : <SpeedField ... />}`, an unreachable branch in a rendered component. Measured
+with `npm run mutate` on 2026-08-17 over the whole suite: removing that guard SURVIVED 0 failed of
+3749, and inverting it — which takes the speed control off the Settings page entirely — also SURVIVED
+0 failed of 3749. Manifest kept at
+C:\Users\yonat\AppData\Local\Temp\audit-the-shell-is-never-handed-a-missing-view-pass1-residue.json.
+So it is dead and untested at once, which the Deliverable names as the confusion that cost the
+predecessor branch its HIGH.
+(b) src/ui/driver.ts:66 `serialized(): string | null` with the comment "null when there is no session
+to save", while the body is `serializeSession(context.session)` and src/runtime/session.ts:395 returns
+`string`. At the merge base 7a0081a the body was `context ? serializeSession(context.session) : null`,
+so the null was real then and is not now. It already carries the spelling this spec exists to refuse:
+scripts/drift.test.ts:236 `JSON.parse(gui.serialized()!)`.
+The sweep was aimed at one field of the published type rather than at the type, and `npx tsc --noEmit`
+is a proof that cannot see the difference — it passed before the sweep and passes now.
+- proof 2: unmet — The scanner works for what it enumerates, and it enumerates. Eight aimed mutations, all
+KILLED by the test that names them (`npm run mutate`, 2026-08-17, manifest at
+C:\Users\yonat\AppData\Local\Temp\mutations-the-shell-is-never-handed-a-missing-view-pass1.json):
+reintroducing `view?.` in src/ui/LocationBanner.tsx, reintroducing `view!` in src/ui/App.tsx,
+reintroducing `view?.` in the test file src/ui/mapEdit.test.ts, restoring `PlayView | null` on
+`DriverSnapshot`, stopping the walk descending into tests, dropping one row from `ASKING`, dropping
+`undefined` from `NOTHING`, and dropping the chain prefix from `A_VIEW`. `vitest src/ui/surface.test.ts`
+passes 32 of 32 and the tree is clean of all eight spellings.
+What fails is the clause's operative claim — "derived ... so a site written next month is caught rather
+than a list going stale". The subjects (the files) are derived; the predicate (what counts as asking) is
+a hand-written list of eight spellings, and the test that grades it ('fires on every way of asking, and
+on none of the ways of using') checks that list against a second hand-written list of the same eight,
+which is enumeration on both axes. Seven ordinary spellings pass the whole rule. Re-runnable — paste the
+file's own `A_VIEW`, `NOTHING`, `ASKING` and `UNION` into `node -e` and test these strings:
+  `view?: PlayView`            escapes the union rule entirely — the optional-property spelling of the
+                               very union it bans, and the spelling `CommandResult.view?: PlayView` in
+                               src/runtime/command.ts:102 already uses one layer down
+  `if (view) ...`              escapes all eight — the plainest way of asking there is
+  `view == null` / `!= null`   escapes: the pattern requires `[=!]==`, three characters
+  `typeof view === 'undefined'` escapes: the quote breaks the `NOTHING` alternation
+  `Boolean(view)`              escapes
+  `const at = view\n  ? 1 : 2` escapes: the scan is line-by-line, so a formatter wrapping a long
+                               ternary defeats `branches on its truth`
+  `const v = snapshot.view; if (!v)` escapes: the rule is keyed on the identifier `view`
+The first of those is the one that matters: `view?: PlayView` is how a reader would most plausibly put
+the nullable back, and no test in this file says a word about it. This is the list-kept-in-sync shape
+CLAUDE.md names, wearing a derivation's clothes.
+- proof 3: met — `vitest src/ui/render.test.tsx` passes 27 of 27 on 7051d8b, and the sweep is behaviour
+preserving by reading: every one of the 28 sites is `?.`/`??` on an operand `openUniverse` now
+guarantees (src/runtime/openUniverse.ts returns a session on every input), or a branch whose condition
+is now constant. Aimed 22 mutations at the swept lines themselves rather than at the render tests —
+one per file the sweep touched — and 17 died on the render test that names them (`npm run mutate`,
+2026-08-17, manifest at
+C:\Users\yonat\AppData\Local\Temp\mutations-the-shell-is-never-handed-a-missing-view-pass1.json;
+25 killed, 5 survived, 0 unstable, 0 errored over the 30 entries). The four new render proofs in
+af9ce0e each kill the line they were written for: the two banners, the Local standing and the modal's
+way out. The five survivors are filed below rather than left implied; none of them is a screen drawing
+something different today, and three are decisions no static render can reach.
+One caveat on the record: the sweep was specified as "either an unreachable branch to remove or a `?.`
+to unwrap", and src/ui/driver.ts:278 is neither — `logging(result.view)` became
+`[{ kind: 'view', view: context.view, ... }]`, substituting a different expression and deleting a
+conditional. It is equivalent today only because `driveChoice` in src/runtime/command.ts:1349 is the one
+producer of `result.live` and always carries `view: opening`, which `settle` moves onto `ctx.view`.
+`CommandResult` types `view?` and `live?` independently, so nothing enforces it, and both the deletion
+of that line and its substitution for `current.view` SURVIVED the whole suite.
+- proof 4: met — Every mechanical leg passes on 7051d8b: tsc ok, npm test ok (3749 of 3749), layer-check ok,
+audit-status ok, doctor ok with 27 warnings that do not fail the leg, bytes ok, tree ok, base ok, and
+`spec the-shell-is-never-handed-a-missing-view` ok — every declared member closed. Graded on the same
+reading the worker's 2026-08-17 decision on the-shell-draws-what-the-session-answers-clause-14 used and
+recorded in docs/events.jsonl: the remaining red legs are the audit-pass accounting, which no run of the
+gate can turn green. Two things a reader of this record should know rather than re-derive.
+First, the accounting is not only self-referential: `clauses opening-a-universe-answers-rather-than-raises`
+clears when the sibling auditor files, and this spec's leg clears when this pass is filed, but
+`spec the-shell-draws-what-the-session-answers` (1 open member) and `clauses` (c4, c5, c14 outstanding
+across 2 passes) need a third audit on a spec nobody has been commissioned for. The branch cannot go
+green until that pass exists.
+Second, `npm test` FAILED on the first of three merge-ready runs and passed on the other two, and a bare
+`npm test` between them passed 3749 of 3749. That is the fourth sighting of
+npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s and not this branch's doing; a recurrence
+is written into the friction file beside this one.

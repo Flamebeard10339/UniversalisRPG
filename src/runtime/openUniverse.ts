@@ -1,16 +1,19 @@
+import { clearLocalSections, LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics, type Registry } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
 import type { Answer } from './localized';
 import { startingLocationId } from './save';
-import { type SaveContext } from './saveSlots';
+import { entitledSlot, type SaveContext } from './saveSlots';
 import { startSession, type PlaySession } from './session';
 
-// What is wrong with a universe, and which modules it is wrong of. The modules
-// are a list rather than one name because the two things that can be wrong are
-// about different numbers of modules: the loader disables a module and names
-// that module, and a requirement is a property of the merged universe, which
-// every module that loaded built. Neither is inferred from where a caller was
-// standing when it found out.
+// What is wrong with a universe, and which modules the loader named when it
+// said so. The modules are a list rather than one name because the two things
+// that can be wrong are about different numbers of modules: the loader disables
+// a module and names that module, and a requirement is a property of the merged
+// universe, which no module is answerable for on its own — so an unmet
+// requirement names none. Naming every module that loaded was the same guess
+// the exception's `try` block was, in new clothes: nothing in the value
+// disagreed and an author was told to discard work nothing was wrong with.
 export interface UniverseProblem {
   modules: readonly Answer[];
   // The tool's own English, and said so at the type: a loader diagnostic and a
@@ -94,15 +97,34 @@ export function openUniverse(sources: readonly ModuleSource[], options: { save?:
   const disabled = loaded.diagnostics.map((diagnostic): UniverseProblem => ({ modules: [diagnostic.moduleId], words: 'tool', message: formatModuleDiagnostic(diagnostic) }));
   const unmet = REQUIREMENTS.filter((requirement) => !requirement.met(loaded.registry));
 
+  // Answered at every open rather than latched at the first one: a session that
+  // recovers is the live slot's game again, and the slot question has one
+  // answer, which `saveSlots` owns.
+  if (options.save) options.save.synced = unmet.length > 0 ? null : entitledSlot(options.save);
+
   if (unmet.length === 0) {
     return { session: startSession(loaded.registry), modules: loaded.loadedModules, problems: disabled, unmet: [] };
   }
 
-  if (options.save) options.save.synced = null;
   return {
     session: startSession(loadUniverseWithDiagnostics([FALLBACK_SOURCE]).registry),
     modules: loaded.loadedModules,
-    problems: [...disabled, ...unmet.map((requirement): UniverseProblem => ({ modules: loaded.loadedModules, words: 'tool', message: requirement.unmet }))],
+    problems: [...disabled, ...unmet.map((requirement): UniverseProblem => ({ modules: [], words: 'tool', message: requirement.unmet }))],
     unmet: unmet.map((requirement) => requirement.id),
   };
+}
+
+// The one question a caller may have that the answer above does not contain:
+// what the door says over the same sources with the author's module set aside.
+// Asked rather than inferred — the door is total, so this is a call, where
+// which module a merged universe's trouble belongs to is not computable at all.
+// Cleared, not removed: `/local clear` rewrites the module's body against the
+// modules it stands on and keeps its header, so a header that will not load is
+// still there afterwards. Null where there is no module to clear, and no save
+// context, because nothing is being opened for anybody to play.
+export function openWithLocalCleared(sources: readonly ModuleSource[], dependencies: readonly Answer[]): OpenedUniverse | null {
+  const local = sources.find((source) => source.name === LOCAL_CHANGES_MODULE_ID);
+  if (local === undefined) return null;
+  const rest = sources.filter((source) => source !== local);
+  return openUniverse([...rest, { name: LOCAL_CHANGES_MODULE_ID, text: clearLocalSections(local.text, dependencies) }]);
 }

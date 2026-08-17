@@ -10,6 +10,7 @@ import { emptyTranscript } from '../transcript';
 function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
   return {
     problems: [],
+    remedies: [],
     dev: false,
     speed: 1,
     live: null,

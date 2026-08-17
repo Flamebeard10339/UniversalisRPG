@@ -290,7 +290,7 @@ export function App({
               the session wherever the player happens to be standing. */}
           <DevBanner dev={dev} words={words} />
           {snapshot.problems.length > 0 ? (
-            <FaultBanner problems={snapshot.problems} words={words} onRemedy={(remedy) => (remedy === 'clear-local' ? driver.clearLocalChanges() : tryAgain(driver))} />
+            <FaultBanner problems={snapshot.problems} remedies={snapshot.remedies} words={words} onRemedy={(remedy) => (remedy === 'clear-local' ? driver.clearLocalChanges() : tryAgain(driver))} />
           ) : null}
           <VStack
             layer={shell.where.layer}

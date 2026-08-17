@@ -24,6 +24,22 @@ describe('the door answers for every input, and what it hands back is startable 
     expect(CELLS.length).toBeGreaterThan(6);
   });
 
+  // The arithmetic above is the family counting itself: both sides of it come
+  // from the same list of placements, so dropping one moves both and the count
+  // still agrees. Where each aim was actually placed is a property of the cells
+  // and does not move with it.
+  it('places every aim in a base module and in the local one, which the count cannot tell you', () => {
+    const placed = new Map<string, string[]>();
+    for (const cell of CELLS) {
+      if (cell.broke === null) continue;
+      const aim = cell.aim.kind === 'stage' ? cell.aim.stage : cell.aim.id;
+      placed.set(aim, [...(placed.get(aim) ?? []), cell.broke === LOCAL_CHANGES_MODULE_ID ? 'local' : 'base']);
+    }
+
+    expect(placed.size).toBeGreaterThan(6);
+    for (const [aim, where] of placed) expect([...where].sort(), aim).toEqual(['base', 'local']);
+  });
+
   it('lands each fixture on the stage or the requirement it is keyed under', () => {
     for (const cell of CELLS) {
       if (cell.aim.kind === 'stage') {
@@ -55,12 +71,32 @@ describe('the door answers for every input, and what it hands back is startable 
 });
 
 describe('what is at fault is read off the loader, never inferred (c2)', () => {
-  it('names, for every cell, exactly the modules the fixture broke or the modules that built the universe', () => {
+  it('names, for every cell, exactly the modules the fixture broke and no others', () => {
     for (const cell of CELLS) {
       const answer = opened(cell);
 
       expect(reported(answer.problems), cell.where).toEqual(new Set(cell.names));
-      if (cell.broke !== null) expect(cell.names, cell.where).toContain(cell.broke);
+      // The half a list of expected names cannot state about itself: every
+      // module the door named is the module this cell broke. A cell that broke
+      // a base module and stands a clean local module beside it is where that
+      // used to come out wrong, and it is in the family now.
+      for (const name of reported(answer.problems)) expect(name, cell.where).toBe(cell.broke);
+    }
+  });
+
+  // A requirement is unmet of the universe the modules came to, and nothing in
+  // the loader's report says which of them owes it. So the door says no module
+  // — the one answer that is not a guess dressed as a fact.
+  it('names no module for a requirement nothing met, whichever module broke it', () => {
+    const cells = CELLS.filter((cell) => opened(cell).unmet.length > 0);
+    expect(cells.length).toBeGreaterThan(1);
+
+    for (const cell of cells) {
+      const answer = opened(cell);
+      const unmet = answer.problems.filter((problem) => answer.unmet.some((id) => requirement(id).unmet === problem.message));
+
+      expect(unmet.length, cell.where).toBe(answer.unmet.length);
+      for (const problem of unmet) expect(problem.modules, cell.where).toEqual([]);
     }
   });
 
@@ -144,6 +180,25 @@ describe('a session opened over the fallback is no slot\'s game (c4)', () => {
     expect(autosave(stood, () => 'bytes')).toEqual({ kind: 'held', slot: PLAYER_SLOT });
     expect(autosave(played, () => 'bytes')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
     expect(stood.store.read(PLAYER_SLOT)).toBeNull();
+  });
+
+  // Twice over one context, which is what `reopen` and clearing local changes
+  // both are: the driver builds the save context once and hands it to the door
+  // at every open. A session that recovers is the slot's game again, and an
+  // author who cleared a broken module went on playing with no autosave for the
+  // life of the page while the field stayed where the first open put it.
+  it('answers whose game this is at every open, rather than latching at the first', () => {
+    const save = context();
+
+    openUniverse([], { save });
+    expect(save.synced).toBeNull();
+
+    openUniverse([BASE], { save });
+
+    expect(save.synced).toBe(PLAYER_SLOT);
+    expect(writesLive(save)).toBe('yes');
+    setAutosaveSeconds(save, 1);
+    expect(autosave(save, () => 'bytes')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
   });
 
   it('takes the slot when it is said out loud, which is what stops this being a refusal to save at all', () => {

@@ -4,7 +4,7 @@ import { shadowed } from './authoringSurface';
 import { devRefusal } from './devMode';
 import { type AuthoringContext, createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { type Localizer } from '../runtime/localized';
-import { openUniverse, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
+import { openUniverse, openWithLocalCleared, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
 import { createSaveContext, type SaveContext } from '../runtime/saveSlots';
 import { sessionLocalizer, serializeSession, view, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
@@ -12,18 +12,29 @@ import { EDITOR_SLOT } from './editorMemory';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 import { createTransientChannel, type TransientChannel } from './transient';
 
-// What can be done about the problems a universe opened with. Every state the
-// door can leave the shell in has at least one: `reopen` needs nothing of the
-// author and stands wherever the trouble is, and `clear-local` is offered
-// exactly where the local module is one of the modules the door reports a
-// problem against. One expression over the door's report, so there is no
-// second answer here about which module is at fault.
+// What can be done about the problems a universe opened with.
 export const REMEDIES = ['clear-local', 'reopen'] as const;
 
 export type Remedy = (typeof REMEDIES)[number];
 
-export function remediesFor(problems: readonly UniverseProblem[]): readonly Remedy[] {
-  return problems.some((problem) => problem.modules.includes(LOCAL_CHANGES_MODULE_ID)) ? ['clear-local', 'reopen'] : ['reopen'];
+// The door's answer as a reader of it, which is what makes "the same report" a
+// comparison rather than a judgement.
+const asRead = (problems: readonly UniverseProblem[]): string => problems.map((problem) => `${problem.modules.join(' ')}: ${problem.message}`).join('\n');
+
+// A control stands when taking it changes the answer, and never because some
+// module was judged at fault: which module a merged universe's trouble belongs
+// to is not computable, and both attempts at it — the `try` block an exception
+// arrived in, then the list of every module that loaded — told an author to
+// discard work nothing was wrong with. `reopen` needs nothing of the author and
+// re-runs the load over the store as it stands now, which is a thing this report
+// cannot know the outcome of, so it stands wherever there is trouble and is what
+// leaves every state with something to do. `clear-local` is asked of the door
+// instead of inferred: the door is total, so what it would report over the text
+// clearing leaves behind is a question, and the answer is used as it comes.
+function remediesFor(problems: readonly UniverseProblem[], ifCleared: () => readonly UniverseProblem[] | null): readonly Remedy[] {
+  if (problems.length === 0) return [];
+  const cleared = ifCleared();
+  return cleared !== null && asRead(cleared) !== asRead(problems) ? ['clear-local', 'reopen'] : ['reopen'];
 }
 
 export interface DriverSnapshot {
@@ -36,6 +47,11 @@ export interface DriverSnapshot {
   // with nothing to say; a local module set aside leaves a problem and a
   // playable session at once, so this is not a question about the view.
   problems: readonly UniverseProblem[];
+  // What the shell can offer to do about them, decided where the door is
+  // reachable rather than in the component that draws them: whether clearing
+  // changes anything is a question for the door, and a component that opened a
+  // universe to ask it would be the thing c6 deleted.
+  remedies: readonly Remedy[];
   // Whose session this is, and how fast its live clock runs, as the session
   // answers both. Readings rather than copies: nothing in this layer writes
   // either, and both move only where a command moved them (c6, c10).
@@ -179,7 +195,8 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   const openOnce = (before: Transcript): void => {
     const local = readLocal();
     const localSource: ModuleSource = { name: LOCAL_CHANGES_MODULE_ID, text: local.text };
-    const opened = openUniverse(local.text.trim() === '' ? shipped : [...shipped, localSource], { save });
+    const sources = local.text.trim() === '' ? shipped : [...shipped, localSource];
+    const opened = openUniverse(sources, { save });
 
     const authoring: AuthoringContext = {
       baseSources: shipped,
@@ -198,7 +215,13 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     const said = [...local.complaints, ...(opened.modules.includes(LOCAL_CHANGES_MODULE_ID) ? shadowing(local.text) : [])];
     const opening = open(opened, authoring, save, said);
     context = opening.context;
-    current = settled({ view: opening.context.view, transcript: appendOutputs(before, opening.output), live: null, problems: opened.problems });
+    current = settled({
+      view: opening.context.view,
+      transcript: appendOutputs(before, opening.output),
+      live: null,
+      problems: opened.problems,
+      remedies: remediesFor(opened.problems, () => openWithLocalCleared(sources, authoring.dependencies)?.problems ?? null),
+    });
   };
 
   openOnce(emptyTranscript());

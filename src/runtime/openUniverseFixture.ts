@@ -58,6 +58,12 @@ function moduleText(id: string, breakage: Breakage): string {
 // derived family quietly becomes a smaller one.
 export type Aim = { kind: 'stage'; stage: ModuleLoadStage } | { kind: 'requirement'; id: RequirementId };
 
+// A local module with nothing wrong with it, which is what stands beside a
+// breakage in the base. Without it no cell of the family reaches the state the
+// author's work is destroyed in: a shipped module at fault, an author's module
+// loading clean, and a control offering to discard the second to fix the first.
+const HEALTHY_LOCAL = moduleText(LOCAL_CHANGES_MODULE_ID, { body: '# item lamp' });
+
 export interface OpeningCell {
   where: string;
   // The modules a driver is opened over.
@@ -67,9 +73,14 @@ export interface OpeningCell {
   // The module this cell broke, which is what every assertion about attribution
   // is made against. Never read off the door.
   broke: string | null;
+  // Where in that module it broke it. Clearing the local module rewrites its
+  // body and keeps its header, so a breakage the fixture wrote into a header is
+  // one clearing cannot reach — which is what makes this a fact about the
+  // fixture that a proof about the controls can be made against.
+  brokeInHeader: boolean;
   // Every module the door must report a problem against. A disabled module is
   // reported against itself; an unmet requirement is a property of the merged
-  // universe and is reported against every module that built it.
+  // universe and is no module's, so it names none.
   names: readonly string[];
   aim: Aim;
 }
@@ -85,13 +96,10 @@ function cellsFor(aim: Aim, breakage: Breakage): OpeningCell[] {
     return {
       where: `${aim.kind === 'stage' ? aim.stage : aim.id} in the ${at}`,
       base: at === 'local' ? [BASE] : [BASE, { name: id, text }],
-      local: at === 'local' ? text : '',
+      local: at === 'local' ? text : HEALTHY_LOCAL,
       broke: id,
-      // A stage disables the module it names and the rest of the universe
-      // stands; an unmet requirement is against everything that loaded, which
-      // here is the base and the module the fixture broke, since a module that
-      // trips no stage loads.
-      names: aim.kind === 'stage' ? [id] : [BASE_ID, id],
+      brokeInHeader: (breakage.needs ?? []).length > 0,
+      names: aim.kind === 'stage' ? [id] : [],
       aim,
     };
   });
@@ -102,12 +110,19 @@ export const OPENING_CELLS: readonly OpeningCell[] = [
   ...Object.entries(BY_REQUIREMENT).flatMap(([id, breakage]) => cellsFor({ kind: 'requirement', id: id as RequirementId }, breakage)),
   // And the set with nothing in it, which trips no stage and meets no
   // requirement because there is nothing there to meet one.
-  { where: 'nothing at all', base: [], local: '', broke: null, names: [], aim: { kind: 'requirement', id: REQUIREMENTS[0].id } },
+  { where: 'nothing at all', base: [], local: '', broke: null, brokeInHeader: false, names: [], aim: { kind: 'requirement', id: REQUIREMENTS[0].id } },
 ];
 
 // How many cells the two spines and the two placements come to, stated as the
 // arithmetic rather than as a number, so that a spine growing moves it.
 export const CELL_COUNT = (Object.keys(BY_STAGE).length + Object.keys(BY_REQUIREMENT).length) * PLACEMENTS.length + 1;
+
+// What clearing the local module could reach in this cell, stated as a fact
+// about what the fixture broke and where: only the author's own module is
+// cleared, and clearing rewrites its body, never the header the command keeps.
+// Every proof about which controls a state offers is made against this and
+// never against the expression that decides them.
+export const clearingReaches = (cell: OpeningCell): boolean => cell.broke === LOCAL_CHANGES_MODULE_ID && !cell.brokeInHeader;
 
 export const sourcesOf = (cell: { base: readonly ModuleSource[]; local: string }): readonly ModuleSource[] =>
   cell.local === '' ? cell.base : [...cell.base, { name: LOCAL_CHANGES_MODULE_ID, text: cell.local }];

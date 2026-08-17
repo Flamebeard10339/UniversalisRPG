@@ -96,6 +96,12 @@ const DISPATCHES = [
   // back a session, the modules that loaded and a list of problems; what
   // loading has stages is not something this layer is told.
   'openUniverse',
+  // And the same question with the author's module set aside, which is how the
+  // shell knows whether the control that discards it changes anything. Asked of
+  // the door rather than worked out here, because working it out means writing
+  // the module the way `/local clear` does, and that is the load-and-adopt path
+  // this layer is closed to.
+  'openWithLocalCleared',
   'runLine',
   'serializeSession',
   'sessionLocalizer',

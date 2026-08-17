@@ -226,3 +226,137 @@ Three things a planner should read out of that, because they are what this spec 
 this is closed. Its whole content is the payoff of c1: once the door guarantees a session,
 `DriverSnapshot.view` cannot be null, and 29 sites across 10 files under `src/ui` still handle a state
 that cannot occur.
+
+## Audit passes
+
+### Pass 1 — 2026-08-17
+
+- base: `7a0081a19f28d556372123f479f8d0baec702d7c`
+- head: `7051d8b0f76c7555b304bf4c9716c7d3de6e9aef`
+- proof 1: met — `npx vitest run src/runtime/openUniverse.test.ts` — 14 pass. The family is derived, not
+listed: `openUniverseFixture.ts` keys `BY_STAGE` `satisfies Record<ModuleLoadStage, Breakage>` and
+`BY_REQUIREMENT` `satisfies Record<RequirementId, Breakage>`, so a stage or a requirement added next
+month leaves the object missing a key and `tsc` (a merge-ready leg, green) refuses it. Each cell is
+checked to land on the stage it claims by asking the loader, not the door
+(`lands each fixture on the stage or the requirement it is keyed under`).
+Mutation, manifest at C:\Users\yonat\AppData\Local\Temp\audit-opening-a-universe-answers-rather-than-raises-pass1-mutations-aimed.json:
+c1a `if (unmet.length === 0)` -> `if (true)` in src/runtime/openUniverse.ts KILLED by
+`returns a session for every cell, and the session opens on a place`, re-run at its own file with the
+mutation still applied; c1b `loadUniverseWithDiagnostics([FALLBACK_SOURCE])` -> `([])` KILLED by the
+same named test. I also probed for a raise the family cannot reach — a resource whose `max` or
+`start` names an undeclared stat, over `npm run inspect` — and the loader disables the module and the
+door answers in every case, so "never raises" survived the search as well as the family.
+One reservation, filed as a finding rather than graded here: c1's own guard
+`crosses both published spines with both placements` cannot fail when a placement is dropped, because
+`CELL_COUNT` is computed from `PLACEMENTS.length` and both sides move together (mutation c1c: scope
+`"crosses both published spines…" -> src/runtime/openUniverse.test.ts`, killed by a different test).
+The clause's substance holds; the named guard for its derivation does not check what it reads as.
+- proof 2: met — `npx vitest run src/runtime/openUniverse.test.ts src/ui/surface.test.ts`. Both halves are
+derived. The per-module half: `openUniverse.ts:94` takes `modules: [diagnostic.moduleId]` straight off
+`loaded.diagnostics`, and the test compares the reported set against `cell.names`, which the fixture
+writes from what it broke — mutation c2a `modules: [diagnostic.moduleId]` -> `modules: []` KILLED by
+`names, for every cell, exactly the modules the fixture broke or the modules that built the universe`,
+re-run at its own file. The tree half: `surface.test.ts` walks every non-test module under `src/` and
+`scripts/`, brace-matches whole `try` blocks and refuses `openUniverse(` inside one — mutation c2b
+wrapped the driver's own call (`src/ui/driver.ts:182`) in `try { … } catch { throw … }` and it was
+KILLED by `puts no call to the door inside one, under src/ui or scripts`. The scanner carries its own
+vacuity guards (`reads a try block whole`, `finds the try blocks there are` > 6).
+Noted and filed against c7 rather than here: the module list on an *unmet-requirement* problem is
+`loaded.loadedModules`, which is the door's own construction rather than the loader naming a culprit.
+The fixture encodes the same rule, so the clause's proof is internally consistent; what it costs shows
+up as c7's report being wrong about which module.
+- proof 3: met — `npx vitest run src/runtime/openUniverse.test.ts src/ui/shell.test.tsx`. Announced:
+mutation c3a dropped the `...unmet.map(...)` spread from `openUniverse.ts:105` and was KILLED by
+`says which requirement was unmet, wherever a requirement is unmet`. Hermetic by construction:
+`FALLBACK_SOURCE` is a DSL string loaded through `loadUniverseWithDiagnostics([FALLBACK_SOURCE])`
+alone, so nothing of the universe it stands in for is in scope; mutation c3b removed `starting` from
+that string and was KILLED by `is hermetic by construction: it loads alone, clean, and meets every
+requirement there is`. The strongest line here is not a promise —
+`stands in the same session whatever it stood in for` compares `serializeSession` across every cell
+that stood in and asserts one distinct value, which no read of the failed universe could survive. On
+the screen half, mutation c3c replaced `{problem.message}` in `FaultBanner.tsx` with a fixed string
+and was KILLED by `says what the door said, and nothing it did not`. Unmistakable: the fallback
+carries no `# locale`, so every engine sentence draws as its own key, and
+`is not a place the universe it stood in for could have offered` checks the location id is not one
+the failed registry holds.
+- proof 4: met — `npx vitest run src/runtime/openUniverse.test.ts src/runtime/saveSlots.test.ts`.
+`openUniverse.ts:101` forces `options.save.synced = null` on the stand-in path only, and the test
+walks every cell plus a universe that opens, asserting `save.synced === null` equals
+`answer.unmet.length > 0` — the two sides are the door's answer and the save context, not one
+restated. Mutation c4a/c4b `if (options.save)` -> `if (false && options.save)` KILLED by
+`forces the live slot loose exactly where it stood in, and leaves it alone where it did not` and by
+`refuses the autosave that a session over a universe that opened would have taken`, each re-run at
+its own file. `saveNow` still takes the slot, so this is a refusal to autosave and not a refusal to
+save, which the third test holds.
+Filed as a finding and not graded here: the door never restores `synced`, so a session that recovers
+by clear-local or reopen over the same `SaveContext` never autosaves again for the life of the page.
+Measured with `npm run inspect`: open([]) then open([BASE]) over one context leaves
+`synced: null, writesLive: 'not-ours'` and `autosave` returns `{ kind: 'held' }`.
+- proof 5: met — `npx vitest run scripts/drift.test.ts scripts/play-cli.test.ts`. `openRepl`
+(`scripts/play-cli.ts`) now calls `openUniverse(withEngineLocale(sources), { save: options.save })`
+and `main`'s `try/catch` around it is gone, so the CLI takes lines from a universe it used to strand
+on; `play-cli.test.ts` walks every cell of `OPENING_CELLS` and asserts a problem and a `/look` that
+returns output for each. `drift.test.ts` compares the two drivers at the opening for the first time,
+cell by cell, on both the reported problems and `serializeSession` — the bytes, not the view.
+Mutation c5a/c5b spread `{ ...openUniverse(...), problems: [] }` over the REPL's answer: KILLED by
+`answers over content that will not load, rather than stranding on it` and by
+`reaches the same session and reports the same problems, cell by cell`, each re-run at its own file.
+Both new tests carry vacuity guards (`taken === OPENING_CELLS.length`, `reported > cells - 1`).
+- proof 6: met — `npx vitest run src/ui/surface.test.ts`. Both counts are derived by the tree walk
+`surface.test.ts` already does — `modulesUnder` over `src/` and `scripts/` — so a site written next
+month is caught and a rename does not satisfy it. Mutation c6a appended
+`// loadUniverseWithDiagnostics` to a line of `src/ui/driver.ts` and was KILLED by
+`calls the load path nowhere under src/ui`; c6b appended `// localTrouble` to a line of
+`src/runtime/openUniverse.ts` and was KILLED by `names nothing that guessed, anywhere in the tree`.
+Each re-run at its own file with the mutation still applied. `git grep` confirms the count directly:
+no `FAULT_AT`, `FaultAt`, `Fault.at`, `localTrouble` or `wordless` anywhere but the scanner's own
+list, and no load-path call in any shipped module under `src/ui`.
+One narrowing, filed as a low finding: the scan's set excludes test modules, and five test files
+under `src/ui` (authoringSurface, devMode, driver, mapEdit, render) still call
+`loadUniverseWithDiagnostics`. The clause says "under `src/ui`" without that exclusion.
+- proof 7: unmet — Two independent failures, each measured.
+(1) The named proof compares the drawn set against the function that computes it — the exact shape
+this clause's own last sentence forbids. `shell.test.tsx` asserts
+`expect([...drawn.drivers].sort()).toEqual([...remediesFor(problems)].sort())` while `FaultBanner`
+itself calls `remediesFor`, so both sides move together. Mutation c7b changed `driver.ts:26` to
+`? ['clear-local'] : ['reopen']` — which withdraws the try-again control from every state where the
+local module is at fault — and it SURVIVED: 0 failed of 3749, scope
+`src/ui/shell.test.tsx "draws exactly the remedies the report has, for every state the door can leave"
+-> src/ui/shell.test.tsx -> whole suite`. `driver.test.ts` does not catch it either: its
+`leaves every state with something to do about it` asserts only `remedies.length > 0` and that the
+union across cells equals `REMEDIES`, both of which the mutant satisfies. The half of c7 that a
+mutation does kill is the offered/withheld direction (c7a, inverting the ternary, KILLED by
+`offers clearing exactly where the fixture broke the local module`).
+(2) The report is not right about which module. `openUniverse.ts:105` attributes an unmet requirement
+to `loaded.loadedModules` — every module that loaded — so a shipped module that loads clean and
+removes the starting location, standing beside a local module that loads clean, names `local-changes`
+in the problem and `remediesFor` offers clear-local. Reproduced with `npm run inspect`:
+base + `# remove location.base.hall` in a shipped module + a local module holding `# item lamp` gives
+`problems: [{ modules: ['base','local-changes','shipped-bad'], message: 'no # location is marked
+starting…' }]`, `remedies: ['clear-local','reopen']`. Taking it discards the author's work and leaves
+the problem in place, since the fault is in the shipped module. That is the mirror of the defect this
+whole spec exists to remove, and `OPENING_CELLS` cannot see it: `cellsFor` sets `local: ''` for every
+base placement, so no cell has a breakage in the base with a healthy local module beside it.
+- proof 8: met — `git diff --stat main...HEAD -- content/ ":!content/engine-*.dsl"` prints nothing, over
+the audited range as well as against main. `npm test` is green on the whole suite
+(`npm run tasks -- merge-ready`, npm test leg ok). The content check derives its subjects:
+`src/runtime/integration.test.ts:26` builds `shippedSources()` from `readdirSync('content')` filtered
+on `.dsl`, minus the local-changes module, so a third shipped module is replayed on the commit that
+authors it — no filenames are named. Mutation c8a changed `start: 0` on `# resource rage` in
+`content/combat-expansion.dsl` and 12 shipped `# test`s failed, re-run at
+`src/runtime/integration.test.ts` with the mutation still applied, which is the derivation firing on
+the second content module rather than on the one file the check used to name.
+- proof 9: unmet — `npm run tasks -- merge-ready` exits 1. Every mechanical leg passes — tsc ok, npm test
+ok, layer-check ok, audit-status ok, doctor ok (27 warnings, which do not fail the leg), bytes ok,
+tree ok, base ok — and this spec's own legs read
+`spec opening-a-universe-answers-rather-than-raises ok`. What fails is not only the circular
+"no recorded audit pass" for this spec and its successor. Two legs fail on a different spec that this
+branch declares: `spec the-shell-draws-what-the-session-answers FAIL 1 open member(s)` and
+`clauses the-shell-draws-what-the-session-answers FAIL 3 outstanding across 2 pass(es): c4, c5, c14`.
+The spec's own `## Decisions` claims otherwise — "its `-clause-4`, `-clause-5` and `-clause-14`
+records are moved onto this spec rather than discharged in prose, so the clauses leg of `merge-ready`
+accounts for them". The records were moved and closed (they show as member tasks of this spec), and
+the leg still reports the three clauses outstanding, because it reads that spec's recorded passes and
+not its records. So the gate does not pass, and the reason is a claim the branch made about it rather
+than an artefact of this audit not being filed yet. Full output at
+C:\Users\yonat\AppData\Local\Temp\audit-opening-a-universe-answers-rather-than-raises-pass1-mergeready.txt

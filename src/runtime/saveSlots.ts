@@ -49,8 +49,18 @@ export interface SaveContext {
 // not — is whoever wrote it's until `/restore` picks it up or `/save` takes it,
 // which is what a reopened game meets.
 export function createSaveContext(driver: SlotDriver, now: () => number): SaveContext {
-  const store = slotStore(driver, now);
-  return { store, now, dev: false, synced: stateOf(store, PLAYER_SLOT).kind === 'empty' ? PLAYER_SLOT : null };
+  const save: SaveContext = { store: slotStore(driver, now), now, dev: false, synced: null };
+  save.synced = entitledSlot(save);
+  return save;
+}
+
+// Whose game a session standing here now is: the live slot's while that slot is
+// empty, and nobody's once it holds bytes somebody else wrote. One answer, so
+// that a context being built and a universe being opened over it cannot come to
+// two different ones about the same store.
+export function entitledSlot(save: SaveContext): Answer | null {
+  const slot = liveSlot(save);
+  return stateOf(save.store, slot).kind === 'empty' ? slot : null;
 }
 
 // What is in a slot, in three answers rather than two. Collapsing the last two
