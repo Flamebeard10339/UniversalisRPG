@@ -65,8 +65,9 @@ Proof:
   proof: vitest scripts/play-cli.test.ts
 - [c9] **Nothing done in dev mode survives into the player's slot.** Anything done in between —
   content edits, play, cheats, a save-breaking mistake — is gone on exit, and the player's slot is
-  byte-identical across the whole of it: the same bytes at `/dev on`, at `/dev off`, and at every
-  command afterwards. The clause states the guarantee and names no mechanism, because the mechanism
+  byte-identical across the whole of the mode: the same bytes at `/dev on` and at `/dev off`. What
+  happens to it after that is ordinary play by whichever game the session was put back to, which is
+  c4's question and not this one. The clause states the guarantee and names no mechanism, because the mechanism
   is c10 and this is its corollary — the slot receives nothing while the mode is on, so there is
   nothing to put back when the mode goes off. What is snapshotted on the way in is the *session*,
   which is the thing dev actually moves, and restoring it is how `/dev off` puts the player back

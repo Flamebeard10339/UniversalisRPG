@@ -1016,7 +1016,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: '/dev',
     arg: 'id',
     argHint: 'on | off',
-    summary: 'author against a slot of its own, and put the player\'s back on the way out',
+    summary: 'author against a slot of its own, and come back to this session on the way out',
     parse: (rest) => (rest === 'on' || rest === 'off' ? rest : { problem: '/dev requires on or off' }),
     run: (ctx, mode) => withSaves(ctx, (save) => (mode === 'on' ? devOn(ctx, save) : devOff(ctx, save))),
   }),
