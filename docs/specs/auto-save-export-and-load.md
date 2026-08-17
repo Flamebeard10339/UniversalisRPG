@@ -63,9 +63,17 @@ Proof:
   `play-cli` against a file-backed store, and this branch ships no browser adapter and no stub of
   one — `the-gui-authors-through-the-same-door` c11–c15 owns the browser adapter and requires this.
   proof: vitest scripts/play-cli.test.ts
-- [c9] **Entering dev mode snapshots the player's slot before anything is editable, and leaving
-  restores it.** Anything done in between — content edits, play, cheats, a save-breaking mistake — is
-  gone on exit and the slot is byte-identical to the snapshot.
+- [c9] **Nothing done in dev mode survives into the player's slot.** Anything done in between —
+  content edits, play, cheats, a save-breaking mistake — is gone on exit, and the player's slot is
+  byte-identical across the whole of it: the same bytes at `/dev on`, at `/dev off`, and at every
+  command afterwards. The clause states the guarantee and names no mechanism, because the mechanism
+  is c10 and this is its corollary — the slot receives nothing while the mode is on, so there is
+  nothing to put back when the mode goes off. What is snapshotted on the way in is the *session*,
+  which is the thing dev actually moves, and restoring it is how `/dev off` puts the player back
+  where they were. Knowingly not covered: repairing damage another process did to the player's slot
+  while dev was on. The author ruled that out on the measurement that a compensating write is the
+  only step on the way out that can fail, and that a failing one strands the author in the mode and
+  then destroys their work through the remedy it prints.
   proof: vitest scripts/play-cli.test.ts
 - [c10] **Autosave follows the slot.** While dev mode is on, every write goes to the dev slot and the
   player's slot receives nothing, so a session spent authoring cannot appear in the file being played.
@@ -338,6 +346,87 @@ The player's progress survives closing the game, through a store three queued br
   throwing reader, so one unreadable settings slot cost the whole report — the same shape as the
   finding closed one pass earlier, one caller further on. `cadenceOrNone` is what a report asks and
   `autosaveSeconds` is what has to act on one, and neither guesses.
+
+- **Entitlement is one slot name, and it is answered where the session or the live slot changes —
+  never at a write.** Five passes graded this rule, four of them unmet, each on a different branch of
+  itself. It was two sets of slot names in a `WeakMap` mutated by hand at eight call sites, and
+  CLAUDE.md names that shape as the repository's largest failure mode. It is now
+  `SaveContext.synced`: the one slot whose game this session is, `null` for none. A session may write
+  the live slot when `synced === liveSlot(save)` and at no other time.
+
+  Two things fall out, and between them four of the five recorded failures stop being fixable
+  because they stop being expressible. There is no negative set, so pass 5's first HIGH — an `isNot`
+  entry `/dev off` left behind that nothing on the way back in took away, which made an empty dev
+  slot permanently unadoptable — has nowhere to live. And the "an empty slot is free to take"
+  allowance moved off the write and onto the two transitions that can grant it: `createSaveContext`,
+  because a new game is the empty player slot's game, and `enterDev`, because an empty dev slot is
+  this session's scratch slot. That is the whole diagnosis of why the rule kept failing. Asked at
+  the write, one question owed two opposite answers to the same input — yes for an empty dev slot at
+  entry, no for an empty player slot on the way out of dev — and whichever it gave, a pass filed the
+  other. Asked at the transition, they are two different events and each gets its own answer.
+
+- **The proposal to derive entitlement by compare-and-swap on the store's stamp was measured and
+  refused.** It would have had `enterDev`, `leaveDev`, `devOn` and `devOff` stop touching
+  entitlement, with a session entitled when the slot's `writtenAt` is the one it last synchronised
+  with, or when the slot is empty. Applying exactly that move to the branch failed six tests,
+  including the c9 `COMMANDS` walk with 162 leaks. The stamp rescues two of the six — the ones where
+  the player's slot holds bytes whose stamp the session never synchronised with — and cannot reach
+  the other four: three are the empty-slot arm it keeps, which is pass 2 reopened, and one is a
+  restore write it does not touch. The premise is what fails: `/dev on` and `/dev off` *load
+  payloads*, so they change what game the session is, and a transition that changes the session's
+  identity cannot stop answering which slot that session is. Resuming from the live slot at startup
+  was weighed against it and refused too — it reverses "`play-cli` starts fresh every run" for what
+  the construction-time empty-slot answer already gives, and leaves the unloadable-slot case needing
+  the rule anyway. Taking dev mode out of the branch was weighed and is unnecessary: under this shape
+  the rule is the same size with dev as without, because dev contributes two transitions that each
+  answer one nullable field.
+
+- **What dev snapshots is the session, and leaving dev writes no slot at all.** This replaces the
+  pass-3 ruling that leaving rewrites the player's slot when it differs from the snapshot, and the
+  pass-4 ruling that leaving has three ways to go. The restore write was insurance against something
+  c10 forbids, and the measurement says so: with `leaveDev`'s whole restore-and-remove block deleted,
+  the c9 walk — every `COMMANDS` entry, twice, from four player-slot entry states — passes with zero
+  leaks, and the only four tests that notice its absence all manufacture the damage from outside the
+  command table, one of them saying so in its own comment. It was also the one step on the way out
+  that could fail, which is pass 5's second HIGH: a refused write kept the mode on and printed a
+  remedy that destroyed the authoring. Snapshotting the session instead is what makes the deletion
+  possible rather than merely safe — it is the thing dev really moves, it is what `/dev off` has to
+  put back, and it retires `was-empty` entirely, because "there was no player slot" stops being a
+  case that has anything to restore. `/dev off` goes from four outcomes to two. The snapshot carries
+  the pre-dev `synced` beside the bytes, so leaving restores the standing it went in with rather than
+  inventing one: a reopened game that was no slot's before `/dev on` is still no slot's after.
+
+- **Dev mode is entered from a player slot the store cannot read.** This reverses the pass-3 ruling
+  that it is not, which reasoned that there is no snapshot to take of bytes nothing can read and no
+  way to put them back. Neither is true once the snapshot is of the session: a session is readable by
+  definition, and the bytes are never written because no session is their game. Refusing entry cost
+  an author the only mode they could work in whenever a slot they were not going to touch was
+  spoiled.
+
+- **A load is required to say which slot it came out of.** `importPayload` takes it as an argument
+  with no default, and the four callers each answer — `/import` with nothing, `/restore` with the
+  live slot, `/dev on` with the dev slot, `/dev off` with what the snapshot carried — so a fifth
+  added next month does not compile until it answers too. This closes a defect no pass filed and that
+  the audits' own framing would have missed, because it is not about dev: a payload from `/import`,
+  or from a `# save` in the content by way of `load:`, inherited the standing of the session it
+  replaced, so the next cadence wrote a stranger's game over an hour of somebody's play. `load:`
+  reaches the session through `applyDirective` rather than `importPayload`, so it answers at its own
+  seam in `runDirective` — the two routes a payload becomes this session are exactly those two, and
+  both are named.
+
+- **Taking the snapshot slot away happens last, because it is tidiness.** A stale snapshot costs
+  nothing — the next `/dev on` overwrites it — so the mode goes off and the standing is set before
+  the removal is attempted. Done the other way round, a store that refuses the removal would keep
+  somebody in dev with no command that leaves, which is the same shape as the restore write this
+  branch just deleted. The ordering was the one aimed mutation of seventeen to survive; it is now
+  watched by `saveSlots.test.ts` "is out of the mode even when the store refuses to take the snapshot
+  away".
+
+- **`SaveContext` is not a published surface.** `published.test.ts` refuses a bare `string` on
+  anything a driver can hold, and `synced` is one. It is a slot name, which is a file name rather
+  than words, and no surface reads one off the context: c13 is that a surface draws `saveReport`.
+  The context is the handle a driver keeps slots through, which is the same reason `CommandContext`
+  was already listed there.
 
 ## Open questions
 
