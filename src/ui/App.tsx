@@ -7,6 +7,8 @@ import { addressable, NOWHERE, type Standing } from './authoringSurface';
 import type { Driver } from './driver';
 import { editControls } from './editControls';
 import { EditPane } from './EditPane';
+import { FaultBanner } from './FaultBanner';
+import { SettingsPane } from './SettingsPane';
 import { recorded, remembered, type Editing, type MapWhere } from './editorMemory';
 import { FloatingText } from './FloatingText';
 import { Home } from './Home';
@@ -141,6 +143,10 @@ export function App({
   const [where, setWhere] = useState(opening);
   const [editing, setEditing] = useEditing(driver, remembering);
   const view = snapshot.view;
+  // Whose session this is, asked of the driver once and read from there by
+  // every surface that is dev-only. No component below holds a second copy,
+  // exactly as none holds a copy of whether the session opened (c6).
+  const dev = snapshot.dev;
   // Read every render rather than held: `/dsl` adopts a new registry, and the
   // language being played is the session's rather than the shell's (c3).
   const localizer = driver.localizer();
@@ -217,7 +223,8 @@ export function App({
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
       if (subpage.id === 'home') return <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} />;
-      return subpage.id === 'edit' ? <EditPane held={held} onSend={driver.send} words={words} /> : null;
+      if (subpage.id === 'edit') return <EditPane held={held} dev={dev} onSend={driver.send} words={words} />;
+      return subpage.id === 'settings' ? <SettingsPane dev={dev} speed={snapshot.speed} words={words} onSend={driver.send} /> : null;
     }
     if (layer.id === 'map') {
       return (
@@ -226,7 +233,7 @@ export function App({
           arrivals={arrivals}
           generation={generation}
           words={words}
-          onChoose={driver.choose}
+          dev={dev}
           sections={sections}
           where={editing.map}
           onWhere={(map: MapWhere) => setEditing({ ...editing, map })}
@@ -257,6 +264,9 @@ export function App({
     <TransientProvider value={driver.transient}>
       <div className="flex h-[100dvh] select-none flex-col overflow-hidden bg-background text-text">
         <main className="relative flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
+          {/* Above the column rather than on a page, because the state it is
+              about is one where there may be no page worth opening. */}
+          {snapshot.fault ? <FaultBanner fault={snapshot.fault} words={words} onRemedy={(remedy) => (remedy === 'clear-local' ? driver.clearLocalChanges() : driver.reopen())} /> : null}
           <VStack
             layer={shell.where.layer}
             onLayer={(layer) => go((held) => toLayer(held, layer))}

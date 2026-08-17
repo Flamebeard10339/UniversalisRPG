@@ -179,9 +179,16 @@ describe('the two drivers cannot drift', () => {
 
     for (const spec of COMMANDS) {
       const bare = SHAPED[spec.name] ?? spec.name;
+      // A dev power is refused by the driver that is the game while the session
+      // is the player's, which is the one difference between the two by design.
+      // Compared inside the dev slot instead, so what the pair does with it is
+      // still held to being identical — and the entering and the leaving are
+      // two more lines that have to match.
+      if (spec.dev) inStep(repl, gui, '/dev on');
       for (const line of [bare, `${bare} 1`]) {
         if (!refused(inStep(repl, gui, line).result)) accepted += 1;
       }
+      if (spec.dev) inStep(repl, gui, '/dev off');
     }
 
     // A table every entry of which was refused would prove nothing about

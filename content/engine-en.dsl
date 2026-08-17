@@ -158,6 +158,10 @@ engine.shell.stage: Stage
 engine.shell.unstage: Unstage
 engine.shell.copy: Copy
 engine.shell.place: Place
+engine.shell.dev: Dev mode
+engine.shell.speed: Speed
+engine.shell.clear: Clear local changes
+engine.shell.reopen: Open again
 engine.repl.place: {location} ({id})
 engine.repl.here: Here: {entities}
 engine.repl.clock: [time: {time}s]

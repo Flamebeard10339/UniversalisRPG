@@ -77,7 +77,12 @@ function reopened(where: Editing | null): string {
   const storage = pageStorage();
   const slots = browserSlots(() => storage);
   if (where) slotStore(slots, () => 0).write(EDITOR_SLOT, recorded(where));
-  return renderToStaticMarkup(<App driver={createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined })} />);
+  const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
+  // The editing surfaces are the dev slot's, so the page this is about is only
+  // drawn from inside it — entered through the line the REPL types, because
+  // there is no other way in.
+  driver.send('/dev on');
+  return renderToStaticMarkup(<App driver={driver} />);
 }
 
 const attribute = (html: string, name: string): string[] => [...html.matchAll(new RegExp(`${name}="([^"]*)"`, 'g'))].map(([, value]) => value);

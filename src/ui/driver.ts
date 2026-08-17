@@ -1,6 +1,8 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
+import { shadowed } from './authoringSurface';
+import { devRefusal } from './devMode';
 import { type AuthoringContext, createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { BASE_LANGUAGE, localizerFor, type Localizer } from '../runtime/localized';
 import { createSaveContext, type SaveContext } from '../runtime/saveSlots';
@@ -10,13 +12,46 @@ import { EDITOR_SLOT } from './editorMemory';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 import { createTransientChannel, type TransientChannel } from './transient';
 
+// Where a failed opening came from. Two, because only one of them is the
+// author's to clear: a local module that will not load is work somebody did and
+// can discard, and a shipped file that will not load is a bug discarding it
+// would not touch (c5). Declared as the list rather than as a union of literals
+// so that everything downstream of a fault derives its cases from it.
+export const FAULT_AT = ['base', 'local'] as const;
+
+export type FaultAt = (typeof FAULT_AT)[number];
+
+export interface Fault {
+  at: FaultAt;
+  why: string;
+}
+
+// What can be done from a fault. Every fault has at least one, which is the
+// whole of c4: `reopen` is the answer that needs nothing of the author and
+// stands wherever the trouble is, and `clear-local` is offered exactly where
+// discarding the local module is what would help.
+export const REMEDIES = ['clear-local', 'reopen'] as const;
+
+export type Remedy = (typeof REMEDIES)[number];
+
+export function remediesFor(fault: Fault): readonly Remedy[] {
+  return fault.at === 'local' ? ['clear-local', 'reopen'] : ['reopen'];
+}
+
 export interface DriverSnapshot {
   view: PlayView | null;
   transcript: Transcript;
   // The run under way, as the run last reported itself; null when none is.
   live: LiveProgress | null;
-  // The message that stopped the session from opening at all, if one did.
-  fault: string | null;
+  // What the session is not what the store asked for, and where that came
+  // from. A local module set aside leaves a fault and a playable session at
+  // once (c1), so this is not the same question as whether there is a view.
+  fault: Fault | null;
+  // Whose session this is, and how fast its live clock runs, as the session
+  // answers both. Readings rather than copies: nothing in this layer writes
+  // either, and both move only where a command moved them (c6, c10).
+  dev: boolean;
+  speed: number | null;
 }
 
 export interface Driver {
@@ -57,6 +92,15 @@ export interface Driver {
   // no view of a gesture, so a drag it never heard about — one the map refused
   // before a line existed — is said here or nowhere (c8, c13).
   note(text: string): void;
+  // Open again, over the sources as they stand and the local module as the
+  // store holds it now. The action that stands whatever the fault is: a build
+  // that fixed a shipped file is a build this reaches, and a local module
+  // somebody repaired in another tab is one this picks up.
+  reopen(): void;
+  // Discard the local module and open again on what a first-ever launch finds.
+  // A fresh module is written rather than the broken one edited, so this cannot
+  // fail on text nothing can parse (c2).
+  clearLocalChanges(): void;
 }
 
 export interface DriverOptions {
@@ -100,7 +144,7 @@ const because = (error: unknown): string => (error instanceof Error ? error.mess
 // this file decides nothing.
 export function createDriver(sources: readonly ModuleSource[], options: DriverOptions = {}): Driver {
   const listeners = new Set<() => void>();
-  let current: DriverSnapshot;
+  let current!: DriverSnapshot;
   let context: CommandContext | null = null;
 
   const save = createSaveContext(options.slots ?? memoryDriver(), options.now ?? (() => Date.now()));
@@ -109,37 +153,95 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   // this session opened is the one being read.
   const stored = (): string => save.store.read(LOCAL_CHANGES_MODULE_ID)?.payload ?? '';
 
-  // What the slot held when the page opened, and a message instead when it
-  // could not be read at all. A store that refuses is never a reason for the
-  // session not to open: it opens on the shipped modules and says so (c13).
-  let held = '';
-  const complaints: CommandOutput[] = [];
-  try {
-    held = stored();
-  } catch (error) {
-    complaints.push({ kind: 'message', words: 'tool', tone: 'warn', text: `local changes could not be read: ${because(error)}` });
-  }
+  const shipped = [...sources];
+  let authoring: AuthoringContext | null = null;
 
-  const base = loadUniverseWithDiagnostics(sources);
-  const authoring: AuthoringContext = {
-    baseSources: [...sources],
-    dependencies: base.loadedModules,
-    // Empty until something is staged: the module's own header is written by
-    // the same edit that writes its first section, so nothing here mints one.
-    localSource: { name: LOCAL_CHANGES_MODULE_ID, text: held },
-    writeLocalChanges: (text) => void save.store.write(LOCAL_CHANGES_MODULE_ID, text),
-    readLocalChanges: stored,
+  const warn = (text: string, detail?: string[]): CommandOutput => (detail ? { kind: 'message', words: 'tool', tone: 'warn', text, detail } : { kind: 'message', words: 'tool', tone: 'warn', text });
+
+  // Every snapshot is made here, so what the session answers about itself is
+  // read at the one place a snapshot exists rather than copied in beside each
+  // of the six that make one.
+  const settled = (next: Omit<DriverSnapshot, 'dev' | 'speed'>): DriverSnapshot => ({ ...next, dev: save.dev, speed: context?.live.speed ?? null });
+
+  // What the slot holds, and a complaint instead when it cannot be read at all.
+  // A store that refuses is never a reason for the session not to open: it
+  // opens on the shipped modules and says so (c13).
+  const readLocal = (): { text: string; complaints: CommandOutput[] } => {
+    try {
+      return { text: stored(), complaints: [] };
+    } catch (error) {
+      return { text: '', complaints: [warn(`local changes could not be read: ${because(error)}`)] };
+    }
   };
 
-  try {
-    const loaded = held.trim() === '' ? base : loadUniverseWithDiagnostics([...sources, authoring.localSource]);
-    const opening = open(loaded, authoring, save, complaints);
+  // Which addresses the local module speaks about that a shipped module already
+  // declares, as lines. Said whether or not the merged text differs, because a
+  // local copy that matches its base is exactly the copy that makes the next
+  // edit to the shipped file invisible (c3).
+  const shadowing = (local: string): CommandOutput[] => {
+    const found = shadowed([...shipped, { name: LOCAL_CHANGES_MODULE_ID, text: local }]);
+    if (found.length === 0) return [];
+    return [warn(`${LOCAL_CHANGES_MODULE_ID} shadows ${found.length} shipped section(s), so editing the file will not change what is played`, found.map((each) => `# ${each.kind} ${each.address} — also in ${each.modules.join(', ')}`))];
+  };
+
+  const seated = (before: Transcript, opening: Opening, fault: Fault | null): void => {
     context = opening.context;
-    current = { view: opening.context.view, transcript: appendOutputs(emptyTranscript(), opening.output), live: null, fault: null };
-  } catch (error) {
-    const fault = because(error);
-    current = { view: null, transcript: appendOutputs(emptyTranscript(), [...complaints, { kind: 'message', words: 'tool', tone: 'error', text: fault }]), live: null, fault };
-  }
+    current = settled({ view: opening.context.view, transcript: appendOutputs(before, opening.output), live: null, fault });
+  };
+
+  const stranded = (before: Transcript, said: CommandOutput[], fault: Fault): void => {
+    context = null;
+    authoring = null;
+    current = settled({ view: null, transcript: appendOutputs(before, [...said, { kind: 'message', words: 'tool', tone: 'error', text: fault.why }]), live: null, fault });
+  };
+
+  // One attempt at opening, and the whole of where a fault can come from. The
+  // base modules first; then the local module over them where the store holds
+  // one. A local module that will not load is set aside and the session opens
+  // on the base alone (c1), and a base that will not load leaves no session at
+  // all — so the two are told apart by which of these paths was taken rather
+  // than by anybody reading an error message (c5).
+  const openOnce = (before: Transcript): void => {
+    const local = readLocal();
+    const said = [...local.complaints];
+
+    let base: Loaded;
+    try {
+      base = loadUniverseWithDiagnostics(shipped);
+    } catch (error) {
+      stranded(before, said, { at: 'base', why: because(error) });
+      return;
+    }
+
+    authoring = {
+      baseSources: shipped,
+      dependencies: base.loadedModules,
+      // Empty until something is staged: the module's own header is written by
+      // the same edit that writes its first section, so nothing here mints one.
+      localSource: { name: LOCAL_CHANGES_MODULE_ID, text: local.text },
+      writeLocalChanges: (text) => void save.store.write(LOCAL_CHANGES_MODULE_ID, text),
+      readLocalChanges: stored,
+    };
+
+    let setAside: string | null = null;
+    if (local.text.trim() !== '') {
+      try {
+        seated(before, open(loadUniverseWithDiagnostics([...shipped, authoring.localSource]), authoring, save, [...said, ...shadowing(local.text)]), null);
+        return;
+      } catch (error) {
+        setAside = because(error);
+        said.push(warn(`${LOCAL_CHANGES_MODULE_ID} was set aside, so this session is the shipped content alone — it is still in the store to read or clear: ${setAside}`));
+      }
+    }
+
+    try {
+      seated(before, open(base, authoring, save, said), setAside === null ? null : { at: 'local', why: setAside });
+    } catch (error) {
+      stranded(before, said, { at: 'base', why: because(error) });
+    }
+  };
+
+  openOnce(emptyTranscript());
 
   // A shell with no session still draws its own tabs, so it still needs
   // somewhere to ask for their words. A registry with no content answers every
@@ -161,7 +263,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   // counts a line it is told again rather than writing it out, so a page that
   // asks every keystroke says it once (c13).
   const complain = (text: string): void => {
-    current = { ...current, transcript: appendOutputs(current.transcript, [{ kind: 'message', words: 'tool', tone: 'warn', text }]) };
+    current = settled({ ...current, transcript: appendOutputs(current.transcript, [{ kind: 'message', words: 'tool', tone: 'warn', text }]) });
     publish();
   };
 
@@ -172,7 +274,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     stopTicking?.();
     stopTicking = null;
     const result = run.end(cancelled);
-    current = { ...current, view: context.view, live: null, transcript: appendOutputs(current.transcript, result.output) };
+    current = settled({ ...current, view: context.view, live: null, transcript: appendOutputs(current.transcript, result.output) });
     publish();
   };
 
@@ -187,12 +289,12 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     const run = running;
     if (!run) return;
     const progress = run.tick(elapsedMs);
-    current = {
+    current = settled({
       ...current,
       view: progress.view,
       live: progress.active ? progress : null,
       transcript: appendOutputs(current.transcript, logging(progress.view)),
-    };
+    });
     if (!progress.active) {
       close(false);
       return;
@@ -207,20 +309,40 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   // world the next tick was about to move.
   const send = (line: string): void => {
     if (!context) return;
+    // The one gate over every route in: a line typed at the console, a line a
+    // control spells and a line an agent hands the harness all pass here, so a
+    // dev power has one refusal and the shell has no second answer about whose
+    // session this is (c6, c11).
+    const refusal = devRefusal(line, save.dev);
+    if (refusal !== null) {
+      complain(refusal);
+      return;
+    }
     if (running) close(true);
     const result = runLine(context, line);
-    current = { ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) };
+    current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
     if (result.live) {
       running = result.live;
       // Arming reports no output of its own; whatever the world said as the
       // action began rides on the view it handed back.
-      current = { ...current, transcript: appendOutputs(current.transcript, logging(result.view)) };
+      current = settled({ ...current, transcript: appendOutputs(current.transcript, logging(result.view)) });
       stopTicking = ticker(advance);
       // Zero elapsed, so the first frame is the run's own report of itself
       // rather than a shape this layer guessed while waiting for a tick.
       advance(0);
       return;
     }
+    publish();
+  };
+
+  // The whole of what a recovery control does: open again and keep what was
+  // said. A run under way belongs to the session being replaced, so it is
+  // dropped rather than ticked into the next one.
+  const reopen = (): void => {
+    running = null;
+    stopTicking?.();
+    stopTicking = null;
+    openOnce(current.transcript);
     publish();
   };
 
@@ -247,8 +369,20 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
         return null;
       }
     },
-    baseSources: () => authoring.baseSources,
+    baseSources: () => shipped,
     note: complain,
+    reopen,
+    clearLocalChanges: () => {
+      // The command that mints a fresh module rather than editing the broken
+      // one, which is what makes it the one command that can proceed from text
+      // nothing can parse (c2). Sent rather than performed, because writing the
+      // module is the table's and this layer has no second spelling of it.
+      send(`/local clear`);
+      // And open again over what the store holds now, so what is left is the
+      // session a first-ever launch produces rather than the one that was
+      // already standing when the module was set aside.
+      reopen();
+    },
     editorMemory: {
       read: () => {
         try {

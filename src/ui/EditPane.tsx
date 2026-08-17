@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Console } from './Console';
+import { DevOnly } from './DevOnly';
 import { draftIn, kindsIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
 import { useTestSurface } from './testSurface';
 import type { Words } from './words';
@@ -13,7 +14,11 @@ import type { Words } from './words';
 // What the Global filter is set to when it is narrowing to nothing.
 const OPEN_TO_ALL = '';
 
-export function EditPane({ held, onSend, words }: { held: EditHeld; onSend: (line: string) => void; words: Words }): JSX.Element {
+// The editing surfaces are the dev slot's, and the console is not: every
+// command the shared table defines has been reachable from this page since
+// `gui-rebuild`, and taking that away would be this branch changing what a
+// player can do. What is gated is the staging above it (c6).
+export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: boolean; onSend: (line: string) => void; words: Words }): JSX.Element {
   const list = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const restored = useRef(false);
@@ -39,6 +44,7 @@ export function EditPane({ held, onSend, words }: { held: EditHeld; onSend: (lin
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <DevOnly dev={dev}>
       <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-raised px-3 py-2">
         {(['local', 'global'] as const).map((surface) => (
           <button
@@ -137,6 +143,7 @@ export function EditPane({ held, onSend, words }: { held: EditHeld; onSend: (lin
           </div>
         </div>
       ) : null}
+      </DevOnly>
 
       <Console onSend={onSend} words={words} />
     </div>

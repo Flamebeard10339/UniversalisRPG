@@ -62,7 +62,7 @@ function handTicker(): Ticker & { advance(elapsedMs: number): void; stops: numbe
 
 function shown(driver: Driver): PlayView {
   const view = driver.snapshot().view;
-  if (!view) throw new Error(driver.snapshot().fault ?? 'no view');
+  if (!view) throw new Error(driver.snapshot().fault?.why ?? 'no view');
   return view;
 }
 
@@ -240,8 +240,8 @@ describe('the GUI driver', () => {
     const driver = createDriver([{ name: 'empty', text: '# info empty\nversion: 0.0.0\npack: test\n' }]);
 
     expect(driver.snapshot().view).toBeNull();
-    expect(driver.snapshot().fault).toBe('no # location is marked starting, so a new game has nowhere to begin');
-    expect(texts(driver)).toEqual([driver.snapshot().fault]);
+    expect(driver.snapshot().fault).toEqual({ at: 'base', why: 'no # location is marked starting, so a new game has nowhere to begin' });
+    expect(texts(driver)).toEqual([driver.snapshot().fault!.why]);
   });
 });
 
@@ -299,7 +299,10 @@ describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
     reopened.send('/local list');
 
     expect(shown(reopened).discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
-    expect(sourceLines(reopened)).toEqual(sourceLines(first));
+    // And is told, as it opens, that the staged copy shadows the shipped
+    // section it was taken from — which the first driver had nothing to say
+    // about, because nothing was staged when it opened (c3).
+    expect(sourceLines(reopened)).toEqual(['# location tutorial-island.guide-house — also in tutorial-island', ...sourceLines(first)]);
     expect(reopened.localChanges()).toBe(first.localChanges());
   });
 

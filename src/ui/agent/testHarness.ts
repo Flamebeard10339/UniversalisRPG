@@ -1,6 +1,6 @@
 import { askedOption } from '../../runtime/command';
 import type { PlayChoice, PlayView } from '../../runtime/session';
-import type { Driver, DriverSnapshot } from '../driver';
+import type { Driver, DriverSnapshot, Fault } from '../driver';
 import type { TestAction, TestSurface } from '../testSurface';
 import type { Moment } from '../transient';
 import type { LogEntry } from '../transcript';
@@ -36,9 +36,11 @@ export interface TestState {
   // published, because there is no list here for anyone to forget to widen.
   view: PlayView | null;
   // What the driver holds around the view, which the view does not carry: the
-  // message that stopped a session opening, the run under way, and what has
+  // failure that stopped a session opening or set the local module aside and
+  // where it came from, whose session this is, the run under way, and what has
   // been said so far.
-  fault: string | null;
+  fault: Fault | null;
+  dev: boolean;
   live: { label: string; active: boolean; progress: number; time: number } | null;
   transcript: LogEntry[];
   // What the shell holds that the session does not: where the nav is standing,
@@ -149,6 +151,7 @@ export function testState(snapshot: DriverSnapshot, surfaces: Record<string, unk
   return {
     view,
     fault: snapshot.fault,
+    dev: snapshot.dev,
     live: snapshot.live
       ? {
           label: snapshot.live.label,
@@ -194,6 +197,11 @@ export function installTestHarness(driver: Driver, host: TestHost = globalThis a
     driver.answer(text(given.key, 'key'), text(given.value, 'value'));
   });
   actions.set('cancel', () => driver.cancel());
+  // The two ways out of a session that would not open. Named here rather than
+  // on a surface because they belong to the driver: a shell with no session
+  // has no component mounted that could offer them.
+  actions.set('reopen', () => driver.reopen());
+  actions.set('clear-local', () => driver.clearLocalChanges());
 
   const harness: BrowserTestHarness = {
     actions: () => [...actions.keys(), ...surfaces.actions()].sort(),

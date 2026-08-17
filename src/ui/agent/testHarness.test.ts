@@ -10,6 +10,8 @@ import { emptyTranscript } from '../transcript';
 function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
   return {
     fault: null,
+    dev: false,
+    speed: 1,
     live: null,
     transcript: emptyTranscript(),
     view: {
@@ -58,6 +60,8 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     baseSources: () => [],
     editorMemory: { read: () => null, write: (text) => void calls.push(`editorMemory:${text}`) },
     note: (text) => void calls.push(`note:${text}`),
+    reopen: () => void calls.push('reopen'),
+    clearLocalChanges: () => void calls.push('clearLocalChanges'),
   };
 }
 
@@ -92,7 +96,7 @@ describe('the browser test harness', () => {
     const harness = installTestHarness(driver(snapshot(), calls), host, { settle: async () => undefined });
 
     expect(host.__test).toBe(harness);
-    expect(harness.actions()).toEqual(['answer', 'cancel', 'choice', 'choose', 'send']);
+    expect(harness.actions()).toEqual(['answer', 'cancel', 'choice', 'choose', 'clear-local', 'reopen', 'send']);
 
     const results = await harness.batch([
       { target: 'choice', value: 'travel:yard' },
@@ -122,7 +126,7 @@ describe('the browser test harness', () => {
     surfaces.register('shell', () => ({ actions: { layer: (value) => void moved.push(value) }, state: () => ({ layer: 'home' }) }));
     const harness = installTestHarness(driver(snapshot()), {}, { settle: async () => undefined, surfaces });
 
-    expect(harness.actions()).toEqual(['answer', 'cancel', 'choice', 'choose', 'send', 'shell.layer']);
+    expect(harness.actions()).toEqual(['answer', 'cancel', 'choice', 'choose', 'clear-local', 'reopen', 'send', 'shell.layer']);
     const [result] = await harness.batch([{ target: 'shell.layer', value: 'map' }]);
 
     expect(result.ok).toBe(true);

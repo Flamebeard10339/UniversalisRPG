@@ -100,6 +100,10 @@ const DISPATCHES = [
   'createSaveContext',
   'memoryDriver',
   'RuntimeError',
+  // Which lines name a dev-only power, which is the table's own mark read back.
+  // A reading, not a second table: the shell refuses what the marks say and
+  // holds no list of its own for one to fall behind the other.
+  'devTokenIn',
 ];
 
 // The stylesheet the floor is set in, read as text: it is one rule over four
