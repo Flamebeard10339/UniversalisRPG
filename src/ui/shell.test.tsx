@@ -46,10 +46,10 @@ function openedOver(cell: { base: readonly ModuleSource[]; local: string }): Dri
 
 const problemsOf = (message: string): UniverseProblem[] => [{ modules: [LOCAL_CHANGES_MODULE_ID], words: 'tool', message }];
 
-const banner = (driver: Driver): { drawn: boolean; drivers: string[] } => {
-  const snapshot = driver.snapshot();
-  return alerting(renderToStaticMarkup(<FaultBanner problems={snapshot.problems} remedies={snapshot.remedies} words={words} onRemedy={() => undefined} />));
-};
+// The whole shell rather than the banner alone, so that what is asserted is
+// what a reader gets: a decision the driver made and a component wired to
+// something else reaches nobody, and the region is found the same way either way.
+const banner = (driver: Driver): { drawn: boolean; drivers: string[] } => alerting(renderToStaticMarkup(<App driver={driver} />));
 
 describe('a problem is never drawn as text with nothing beside it (c3, c7)', () => {
   // What reaches the screen, against what the fixture broke. Neither side of
