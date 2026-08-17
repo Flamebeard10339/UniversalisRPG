@@ -7,14 +7,22 @@ import { loadUniverseWithDiagnostics } from '../content/registry';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
 import { App } from './App';
+import { addressable } from './authoringSurface';
+import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { PER_UNIT } from './discovery';
 import { createDriver, type Driver } from './driver';
 import { MapPane } from './MapPane';
+import { FORGOTTEN } from './editorMemory';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { LABELS, type LabelId } from './labels';
 import { wordsOf } from './words';
 import { LAYERS, OPENING, toLayer, toSubpage } from './nav';
+
+// What the map is handed beyond the view: the one list a drag stages out of,
+// and where it is looking. Empty here — every case below is about what is drawn
+// rather than about what a drag does, which mapEdit.test.ts owns.
+const MAPPING = { sections: [], where: FORGOTTEN.map, onWhere: () => undefined, onSend: () => undefined, onNote: () => undefined };
 
 // A run that is under way and going nowhere, which is what a test about what
 // is drawn wants: no timer, and the same frame however long the test takes.
@@ -125,6 +133,15 @@ const shellWord = wordsOf(localizerFor(loadInEnglish(''), 'en'));
 const NODE = { position: 1, direction: asLocalized('ne') };
 
 const SHELL_WORDS: readonly string[] = (Object.keys(LABELS) as LabelId[]).map((id) => shellWord(id, NODE));
+
+// What the editing page draws that is neither an engine word nor one of the
+// shell's own: the heading of each section the loaded modules hold. Accounted
+// for rather than exempted — the page is held to drawing what came out of the
+// modules and nothing else, which is a stronger thing to be held to than an
+// attribute a component could write on anything. Derived from the same list the
+// page is built from, so a section added to content/ is accounted for here.
+const authored = (driver: Driver): string[] =>
+  addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }]).map((section) => `# ${section.kind} ${section.address}`);
 
 // The engine's half of what is drawn, with the shell's own words taken out by
 // what they are rather than by where they sit: excising a region left every
@@ -321,7 +338,7 @@ describe('what the shell puts on the screen', () => {
       const runs = readable(html);
       seen += runs.length;
       for (const run of runs) {
-        expect(accountedFor(run, [...engine, ...SHELL_WORDS]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
+        expect(accountedFor(run, [...engine, ...SHELL_WORDS, ...authored(driver)]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
       }
     };
 
@@ -354,7 +371,7 @@ describe('what the shell puts on the screen', () => {
     const engine = new Set<string>(published(view));
     expect(idsPublished(view).filter((id) => engine.has(id))).toEqual([]);
     for (const run of readable(renderToStaticMarkup(<App driver={driver} />))) {
-      expect(accountedFor(run, [...engine, ...SHELL_WORDS]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
+      expect(accountedFor(run, [...engine, ...SHELL_WORDS, ...authored(driver)]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
     }
   });
 
@@ -411,7 +428,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, LOOK_OUT));
     const view = driver.snapshot().view!;
 
-    const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={['surveyed.overlook']} generation={1} onChoose={() => undefined} />));
+    const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={['surveyed.overlook']} generation={1} onChoose={() => undefined} {...MAPPING} />));
 
     expect(drawn.find((entry) => entry.id === 'surveyed.overlook')!.flashing).toBe(true);
     expect(drawn.find((entry) => entry.id === 'surveyed.workshop')!.flashing).toBe(false);
@@ -425,7 +442,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, 'travel:surveyed.cove'));
     const view = driver.snapshot().view!;
 
-    const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />);
+    const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />);
 
     expect(view.journey).toEqual({ to: 'surveyed.cove', legs: ['surveyed.overlook', 'surveyed.cove'] });
     expect(places(html).map((node) => [node.id, node.walk])).toEqual([
@@ -443,7 +460,7 @@ describe('what the shell puts on the screen', () => {
     const driver = createDriver([SURVEYED]);
     driver.choose(position(driver, LOOK_OUT));
 
-    const html = renderToStaticMarkup(<MapPane words={shellWord} view={driver.snapshot().view!} arrivals={[]} generation={0} onChoose={() => undefined} />);
+    const html = renderToStaticMarkup(<MapPane words={shellWord} view={driver.snapshot().view!} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />);
 
     expect(driver.snapshot().view!.journey).toBeNull();
     expect(places(html).every((node) => node.walk === undefined)).toBe(true);
@@ -592,7 +609,7 @@ describe('what the shell puts on the screen', () => {
       const driver = createDriver([STOREYS]);
       const view = driver.snapshot().view!;
 
-      const strip = floors(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+      const strip = floors(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />));
 
       expect(view.discovered.map((place) => place.z).sort()).toEqual([0, 1]);
       expect(strip.offered.sort()).toEqual([0, 1]);
@@ -606,7 +623,7 @@ describe('what the shell puts on the screen', () => {
       const driver = createDriver([STOREYS]);
       const view = driver.snapshot().view!;
 
-      const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />);
+      const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />);
 
       expect(html).toContain('data-drive="map.recentre"');
       expect(onScreen(readable(html), shellWord('recentre'))).toBe(true);
@@ -617,7 +634,7 @@ describe('what the shell puts on the screen', () => {
       driver.choose(position(driver, LOOK_OUT));
       const view = driver.snapshot().view!;
 
-      const under = drawnAt(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+      const under = drawnAt(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />));
 
       // Nothing has been dragged, so the sheet sits centred on what it is
       // showing at a zoom of 1. Worked out from the places the engine
@@ -680,7 +697,7 @@ describe('what the shell puts on the screen', () => {
       driver.choose(position(driver, LOOK_OUT));
       const view = driver.snapshot().view!;
 
-      const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+      const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />));
 
       expect(drawn.map((node) => node.id).sort()).toEqual(view.discovered.map((place) => place.id).sort());
       // Where the player is standing is the one with no travel out to it.

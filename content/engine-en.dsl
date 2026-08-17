@@ -150,6 +150,14 @@ engine.shell.dead: Dead
 engine.shell.free: Free
 engine.shell.node.position: Position {position}
 engine.shell.node.slot: Slot {direction}
+engine.shell.local: Here
+engine.shell.global: World
+engine.shell.every-kind: Every kind
+engine.shell.section: Section
+engine.shell.stage: Stage
+engine.shell.unstage: Unstage
+engine.shell.copy: Copy
+engine.shell.place: Place
 engine.repl.place: {location} ({id})
 engine.repl.here: Here: {entities}
 engine.repl.clock: [time: {time}s]

@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { askedOption } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { dismissal } from './asking';
-import { Console } from './Console';
+import { addressable, NOWHERE, type Standing } from './authoringSurface';
 import type { Driver } from './driver';
+import { editControls } from './editControls';
+import { EditPane } from './EditPane';
+import { recorded, remembered, type Editing, type MapWhere } from './editorMemory';
 import { FloatingText } from './FloatingText';
 import { Home } from './Home';
 import { Ledger } from './Ledger';
@@ -98,9 +102,44 @@ function useCrossings(rows: PlayView['xp'], onSkills: boolean): Crossings {
   return held;
 }
 
-export function App({ driver, opening = OPENING, clock = () => Date.now() }: { driver: Driver; opening?: Where; clock?: () => number }): JSX.Element {
+// How long the shell waits before writing down where the author is. A pan
+// settles the sheet on every frame and a slot is not a thing to write sixty
+// times a second; short enough that a reload after a pause loses nothing, which
+// is what c10 asks and the whole of what it asks about the cadence. A staged
+// edit does not wait on this — it goes through the driver as it is staged.
+export const REMEMBER_AFTER_MS = 400;
+
+// What the author is looking at, kept in the store the edits are in. Read once,
+// because it is where a page opens and not a thing the store goes on deciding.
+function useEditing(driver: Driver, after: number): [Editing, (next: Editing) => void] {
+  const [editing, setEditing] = useState<Editing>(() => remembered(driver.editorMemory.read()));
+
+  useEffect(() => {
+    const timer = setTimeout(() => driver.editorMemory.write(recorded(editing)), after);
+    return () => clearTimeout(timer);
+  }, [editing]);
+
+  return [editing, setEditing];
+}
+
+// Where the player is, as the view publishes it: what the Local surface is
+// narrowed to is a fact read off the session rather than one worked out here.
+const standingIn = (view: PlayView | null): Standing => (view ? { location: view.location.id, entities: view.entities.map((entity) => entity.id) } : NOWHERE);
+
+export function App({
+  driver,
+  opening = OPENING,
+  clock = () => Date.now(),
+  remembering = REMEMBER_AFTER_MS,
+}: {
+  driver: Driver;
+  opening?: Where;
+  clock?: () => number;
+  remembering?: number;
+}): JSX.Element {
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
   const [where, setWhere] = useState(opening);
+  const [editing, setEditing] = useEditing(driver, remembering);
   const view = snapshot.view;
   // Read every render rather than held: `/dsl` adopts a new registry, and the
   // language being played is the session's rather than the shell's (c3).
@@ -142,14 +181,60 @@ export function App({ driver, opening = OPENING, clock = () => Date.now() }: { d
   const shell = { where, go };
   const crossed = useCrossings(rows, LAYERS[where.layer].subpages[subpageOf(where)].id === 'skills');
 
+  // The one list, rebuilt when the module an author is editing changes and not
+  // on every frame: splitting every shipped module into sections is the whole
+  // survey, and what makes it move is a staged edit landing.
+  // Read off the store once per snapshot rather than once per render: the store
+  // moves when the driver publishes and at no other time, and where the map is
+  // looking moves far more often than that.
+  const sections = useMemo(
+    () => addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }]),
+    [snapshot],
+  );
+  const held = {
+    sections,
+    standing: standingIn(view),
+    editing,
+    controls: editControls(
+      { sections, editing },
+      {
+        send: driver.send,
+        note: driver.note,
+        move: setEditing,
+        // The bytes the store holds, handed to the author. Offered rather than
+        // relied on: a browser that refuses the clipboard has still printed
+        // them, which is the same command and the same bytes.
+        hand: () => {
+          const text = driver.localChanges();
+          if (text !== null && typeof navigator !== 'undefined') void navigator.clipboard?.writeText(text);
+        },
+      },
+    ),
+  };
+
   useTestSurface('shell', shell);
 
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
       if (subpage.id === 'home') return <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} />;
-      return subpage.id === 'edit' ? <Console onSend={driver.send} words={words} /> : null;
+      return subpage.id === 'edit' ? <EditPane held={held} onSend={driver.send} words={words} /> : null;
     }
-    if (layer.id === 'map') return <MapPane view={view} arrivals={arrivals} generation={generation} words={words} onChoose={driver.choose} />;
+    if (layer.id === 'map') {
+      return (
+        <MapPane
+          view={view}
+          arrivals={arrivals}
+          generation={generation}
+          words={words}
+          onChoose={driver.choose}
+          sections={sections}
+          where={editing.map}
+          onWhere={(map: MapWhere) => setEditing({ ...editing, map })}
+          onSend={driver.send}
+          onNote={driver.note}
+        />
+      );
+    }
     if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? [], localizer)} />;
     if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
     // Both sides of what the player has are rows that act, because c21 puts a

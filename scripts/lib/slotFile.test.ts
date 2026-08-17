@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { RuntimeError } from '../../src/runtime/runtime';
+import { describeSlotDriver } from '../../src/runtime/storeContract';
 import { fileSlots, SLOT_SUFFIX } from './slotFile';
 
 const made: string[] = [];
@@ -17,6 +18,11 @@ afterEach(() => {
   for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
+// What it owes as a slot driver, which is not this file's to state: the same
+// cases run against every implementation, so the two cannot disagree about what
+// a slot is.
+describeSlotDriver('one file per slot', () => fileSlots(tempDir()));
+
 describe('one file per slot, under one directory', () => {
   it('makes the directory on the first write and not before', () => {
     const dir = path.join(tempDir(), 'not-yet');
@@ -30,18 +36,15 @@ describe('one file per slot, under one directory', () => {
     expect(readdirSync(dir)).toEqual([`player${SLOT_SUFFIX}`]);
   });
 
-  it('moves text without reading it, and removing what is not there is not a failure', () => {
+  // The half the contract cannot see: that the bytes it hands back are the
+  // file's own, so nothing was wrapped around them on the way down.
+  it('writes the payload into the file and nothing else', () => {
     const dir = tempDir();
     const driver = fileSlots(dir);
     const payload = '{"version":11}\nnot even one line\r\n';
 
     driver.write('player', payload);
-    expect(driver.read('player')).toBe(payload);
     expect(readFileSync(path.join(dir, `player${SLOT_SUFFIX}`), 'utf8')).toBe(payload);
-
-    driver.remove('player');
-    expect(driver.read('player')).toBeNull();
-    expect(() => driver.remove('player')).not.toThrow();
   });
 
   it('lists slots by name, and nothing in the directory that is not one', () => {

@@ -40,6 +40,11 @@ export function drawnAt(place: Place, plane: number): Point {
   return { x: place.x + climb * CLIMB_NUDGE, y: place.y - climb * CLIMB_NUDGE };
 }
 
+// Where a place is, from where it was drawn. The nudge above is a drawing and
+// not a position, so a gesture that moved the drawing has to come back through
+// it before anything says where the place now is.
+export const placedAt = (at: Point, climb: number): Point => ({ x: at.x - climb * CLIMB_NUDGE, y: at.y + climb * CLIMB_NUDGE });
+
 // What is drawn on one z-plane: everything standing on it, plus anywhere off it
 // the player could step to from where they are, plus anywhere the view is
 // offering a way out to. A staircase is a place on another floor, and a floor

@@ -1652,14 +1652,16 @@ describe('all of it is exercised before src/ui exists (c8)', () => {
     rmSync(game.dir, { recursive: true, force: true });
   });
 
-  // Derived rather than asserted: the adapter is a file under src/ui that
-  // imports the store, so the proof that none was shipped is that no file
-  // there names one. `the-gui-authors-through-the-same-door` c11-c15 is what
-  // makes this expectation change.
-  it('ships no browser adapter and no stub of one', () => {
-    const reaching = readdirSync('src/ui', { recursive: true, withFileTypes: true })
-      .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
-      .filter((entry) => /from '[^']*(store|saveSlots|slotFile)'/.test(readFileSync(path.join(entry.parentPath, entry.name), 'utf8')))
+  // The expectation `the-gui-authors-through-the-same-door` c11-c15 was written
+  // to change: src/ui now holds a browser adapter, and a rule that no file
+  // there names the store would refuse the thing that clause asked for. What
+  // stays true is the direction — the CLI keeps its own slots as files and
+  // reaches for nothing the browser built, so this half of the store is
+  // exercised whether or not a page ever opens.
+  it('reaches no browser adapter, so the CLI stands in its own store', () => {
+    const reaching = readdirSync('scripts', { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name) && !entry.name.includes('.test.'))
+      .filter((entry) => /from '[^']*\/ui\/[^']*(browserStore|pageStorage)'/.test(readFileSync(path.join(entry.parentPath, entry.name), 'utf8')))
       .map((entry) => entry.name);
 
     expect(reaching).toEqual([]);

@@ -1,10 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
-import { DragSheet, useSheetHold } from './DragSheet';
+import type { Section } from './authoringSurface';
+import { DragSheet, useSheetHold, type Grip } from './DragSheet';
 import { drawnFor, onWalk, spotOf, walkLine, type Node } from './discovery';
+import type { MapWhere } from './editorMemory';
+import { answering, droppedAt, placedInto } from './mapEdit';
 import { useTestSurface } from './testSurface';
 import { useMoment } from './transient';
-import { bounds, panOnto, tapTarget } from './viewport';
+import { bounds, panOnto, tapTarget, type Point } from './viewport';
 import type { Words } from './words';
 
 // The map draws its own working out — the box a pan is held against — for
@@ -12,6 +15,13 @@ import type { Words } from './words';
 // surface that can be reached from inside the game is a debug surface that has
 // to be designed.
 const DEBUGGING = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
+
+// A place under the finger is drawn where the finger has taken it and is not
+// there yet: the registry learns about it once, on release, through the same
+// door a typed edit takes. A live drag that wrote coordinates as it went would
+// be a second path, unvalidated for the length of the gesture, and a refused
+// edit would be a state the map was already drawn in.
+const NOT_CARRIED: Point = { x: 0, y: 0 };
 
 // One place on the sheet. Its own component because the arrival it plays is
 // asked for through the channel, and a channel is reached by a hook.
@@ -24,6 +34,8 @@ function Bubble({
   held,
   onChoose,
   dragged,
+  carried,
+  grip,
 }: {
   node: Node;
   arrived: boolean;
@@ -33,33 +45,59 @@ function Bubble({
   held: (element: HTMLButtonElement | null) => void;
   onChoose: (position: number) => void;
   dragged: () => boolean;
+  // Where the finger has carried it since it was picked up, in sheet pixels.
+  carried: Point;
+  // Null when places are not being moved, which is what makes a press a tap.
+  grip: Grip | null;
 }): JSX.Element {
   const spot = spotOf(node);
   const flash = useMoment('arrival', arrived, node.place.id);
 
+  // What the bubble looks like either way, and what is inside it. A control
+  // names on its own tag the action that drives it, and a tag cannot say
+  // "choose, unless places are being moved" — so the two behaviours are two
+  // controls over one appearance rather than one control that lies in a mode.
+  const look = {
+    ref: held,
+    'data-place': node.place.id,
+    'data-walk': walking,
+    style: { left: spot.x + carried.x, top: spot.y + carried.y },
+    className: `absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-3 py-2 text-xs ${flash} ${
+      node.here ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-panel'
+    } ${walking === 'going' ? 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong' : ''} ${
+      walking === 'crossing' ? 'border-accent text-accent' : ''
+    } ${node.climb !== 0 ? 'opacity-70' : ''} ${position === undefined && !grip ? 'text-text-subtle' : ''}`,
+  };
+
+  const inside = (
+    <>
+      {/* Inside the control, so what it covers is what the control answers, and
+          sized against the zoom the sheet is drawn at. */}
+      <span data-tap-target className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: tapTarget(scale), height: tapTarget(scale) }} />
+      <span className="block max-w-[8rem] truncate">{node.place.title}</span>
+    </>
+  );
+
+  if (grip) {
+    return (
+      <button data-drive="map.place" type="button" {...grip} {...look}>
+        {inside}
+      </button>
+    );
+  }
+
   return (
     <button
-      ref={held}
       data-drive="choose"
       type="button"
-      data-place={node.place.id}
-      data-walk={walking}
       disabled={position === undefined}
       onClick={() => {
         if (dragged() || position === undefined) return;
         onChoose(position);
       }}
-      style={{ left: spot.x, top: spot.y }}
-      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-3 py-2 text-xs ${flash} ${
-        node.here ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-panel'
-      } ${walking === 'going' ? 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong' : ''} ${
-        walking === 'crossing' ? 'border-accent text-accent' : ''
-      } ${node.climb !== 0 ? 'opacity-70' : ''} ${position === undefined ? 'text-text-subtle' : ''}`}
+      {...look}
     >
-      {/* Inside the control, so what it covers is what the control answers, and
-          sized against the zoom the sheet is drawn at. */}
-      <span data-tap-target className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: tapTarget(scale), height: tapTarget(scale) }} />
-      <span className="block max-w-[8rem] truncate">{node.place.title}</span>
+      {inside}
     </button>
   );
 }
@@ -88,21 +126,33 @@ export function MapPane({
   generation,
   words,
   onChoose,
+  sections,
+  where,
+  onWhere,
+  onSend,
+  onNote,
 }: {
   view: PlayView | null;
   arrivals: readonly string[];
   generation: number;
   words: Words;
   onChoose: (position: number) => void;
+  // The map's slice of the one list, which is what a drag stages an edit out of.
+  sections: readonly Section[];
+  where: MapWhere;
+  onWhere: (where: MapWhere) => void;
+  onSend: (line: string) => void;
+  onNote: (text: string) => void;
 }): JSX.Element {
   const bubbles = useRef<Array<HTMLElement | null>>([]);
-  const [plane, setPlane] = useState<number | null>(null);
+  const [plane, setPlane] = useState<number | null>(where.plane);
+  const [moving, setMoving] = useState(false);
 
   // A place with no way out to it is somewhere the player cannot set off for
   // now, and the map says so by not being tappable rather than by saying why.
   const { plane: at, here, sheet, travels } = drawnFor(view, plane);
   const spots = sheet.nodes.map(spotOf);
-  const hold = useSheetHold(spots, bubbles, JSON.stringify(sheet.nodes.map((node) => node.place.title)));
+  const hold = useSheetHold(spots, bubbles, JSON.stringify(sheet.nodes.map((node) => node.place.title)), where, (id, by) => letGo(id, by));
 
   // The walk under way, as the engine published it, with the place the player
   // is standing in at the head so a road on it is a pair of neighbours.
@@ -121,13 +171,29 @@ export function MapPane({
     hold.settle(standing ? panOnto(spotOf(standing), bounds(drawn.sheet.nodes.map(spotOf)), 1) : { x: 0, y: 0 }, 1);
   };
 
+  const answer = { send: onSend, note: onNote };
+
+  const place = (id: string, at: Point): void => answering(placedInto(sections, id, at), answer);
+
+  function letGo(id: string, carried: Point): void {
+    const node = sheet.nodes.find((each) => each.place.id === id);
+    if (node) answering(droppedAt(sections, node, carried), answer);
+  }
+
   // The one value the map both draws and hands over, assembled here and not
   // twice. A registration that says a floor the map is not drawing is markup
   // that says it too, so what a driving agent is told is what a player sees or
   // a render test fails.
-  const map = { plane: at, zoom: hold.zoom, pan: hold.pan, sheet, travels };
+  const map = { plane: at, zoom: hold.zoom, pan: hold.pan, sheet, travels, moving };
 
-  useTestSurface('map', { map, controls: { settle: hold.settle, plane: setPlane, recentre } });
+  // Where the map is looking, kept where the edits are so that reopening the
+  // page opens it here. Reported rather than written from inside the gesture,
+  // because the sheet comes to rest on every frame and a slot does not.
+  useEffect(() => {
+    onWhere({ pan: hold.pan, zoom: hold.zoom, plane });
+  }, [hold.pan.x, hold.pan.y, hold.zoom, plane]);
+
+  useTestSurface('map', { map, controls: { settle: hold.settle, plane: setPlane, recentre, moving: setMoving, place } });
 
   return (
     <DragSheet
@@ -148,6 +214,19 @@ export function MapPane({
             className="absolute left-3 top-3 rounded-xl border border-border bg-surface px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97] active:text-accent"
           >
             {words('recentre')}
+          </button>
+          {/* Moving places is a mode, because a drag on a place and a drag on
+              the sheet are the same gesture and only one of them can be it. */}
+          <button
+            data-drive="map.moving"
+            type="button"
+            data-moving={moving ? 'yes' : undefined}
+            onClick={() => setMoving(!moving)}
+            className={`absolute bottom-3 left-3 rounded-xl border px-3 text-xs transition-transform duration-75 active:scale-[0.97] ${
+              moving ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-surface text-text-subtle'
+            }`}
+          >
+            {words('place')}
           </button>
           {map.sheet.planes.length > 1 ? (
             // The floors, named by the number the author gave them. A word for
@@ -190,6 +269,8 @@ export function MapPane({
           held={(element) => void (bubbles.current[at] = element)}
           onChoose={onChoose}
           dragged={hold.dragged}
+          carried={hold.carried?.id === node.place.id ? hold.carried.by : NOT_CARRIED}
+          grip={moving ? hold.grip(node.place.id) : null}
         />
       ))}
     </DragSheet>

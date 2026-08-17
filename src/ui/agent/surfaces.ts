@@ -1,5 +1,7 @@
 import type { Answer } from '../../runtime/localized';
+import { SURFACES, type Standing, type SurfaceId } from '../authoringSurface';
 import type { Sheet } from '../discovery';
+import { draftIn, kindsIn, rowsIn, sectionKey, type EditHeld } from '../editControls';
 import { clampZoom, type Point } from '../viewport';
 import { clampIndex } from '../gesture';
 import type { LabelId } from '../labels';
@@ -100,6 +102,7 @@ export interface MapState {
   planes: readonly number[];
   zoom: number;
   pan: Point;
+  moving: boolean;
   places: MapPlace[];
 }
 
@@ -107,6 +110,7 @@ export interface MapView {
   plane: number;
   zoom: number;
   pan: Point;
+  moving: boolean;
   sheet: Sheet;
   travels: ReadonlyMap<string, number>;
 }
@@ -115,6 +119,11 @@ export interface MapControls {
   settle(pan: Point, zoom: number): void;
   plane(at: number): void;
   recentre(): void;
+  // Whether a drag on a place moves the place or the sheet under it.
+  moving(on: boolean): void;
+  // Where a place was let go of, in the units a location declares. The same
+  // door a finger uses: what comes out of it is a `/dsl` line and nothing else.
+  place(id: string, at: Point): void;
 }
 
 export function mapState(map: MapView): MapState {
@@ -123,6 +132,7 @@ export function mapState(map: MapView): MapState {
     planes: map.sheet.planes,
     zoom: map.zoom,
     pan: map.pan,
+    moving: map.moving,
     places: map.sheet.nodes.map((node) => ({ id: node.place.id, at: node.at, here: node.here, climb: node.climb, goes: map.travels.get(node.place.id) ?? null })),
   };
 }
@@ -138,6 +148,77 @@ export function mapSurface(map: MapView, controls: MapControls): TestSurface {
       zoom: (value) => controls.settle(map.pan, zoomFrom(value)),
       plane: (value) => controls.plane(planeFrom(value, map.sheet.planes)),
       recentre: () => controls.recentre(),
+      moving: (value) => controls.moving(value === true),
+      place: (value) => {
+        const { place, ...at } = (value ?? {}) as { place?: unknown };
+        const named = map.sheet.nodes.find((node) => node.place.id === place);
+        if (!named) throw new Error(`the map draws no place called ${String(place)}`);
+        controls.place(named.place.id, pointFrom(at));
+      },
+    },
+  };
+}
+
+// What the editing page holds that the session does not: which of the filters
+// is showing, what it is narrowed to, which section is open and what is in the
+// field. The rows are the page's own answer rather than a second reading of the
+// list, so a registration that says a row the page is not drawing is markup
+// that says it too.
+export interface EditState {
+  surface: SurfaceId;
+  surfaces: readonly SurfaceId[];
+  kind: string | null;
+  kinds: readonly string[];
+  rows: readonly string[];
+  open: string | null;
+  draft: string;
+  cursor: number;
+  scroll: number;
+  standing: Standing;
+}
+
+export function editState(held: EditHeld): EditState {
+  return {
+    surface: held.editing.surface,
+    surfaces: SURFACES,
+    kind: held.editing.kind,
+    kinds: kindsIn(held),
+    rows: rowsIn(held).map(sectionKey),
+    open: held.editing.open,
+    draft: draftIn(held.sections, held.editing),
+    cursor: held.editing.cursor,
+    scroll: held.editing.scroll,
+    standing: held.standing,
+  };
+}
+
+export function surfaceNamed(value: unknown): SurfaceId {
+  const found = SURFACES.find((each) => each === value);
+  if (!found) throw new Error(`no editing surface is named ${String(value)}`);
+  return found;
+}
+
+// A row is opened by the heading it is drawn under, because an index into a
+// filtered list is not something an agent should have to count to.
+export function rowNamed(held: EditHeld, value: unknown): string {
+  const found = rowsIn(held).map(sectionKey).find((key) => key === value);
+  if (!found) throw new Error(`the editing page is not offering ${String(value)}`);
+  return found;
+}
+
+export function editSurface(held: EditHeld): TestSurface {
+  return {
+    state: () => editState(held),
+    actions: {
+      surface: (value) => held.controls.surface(surfaceNamed(value)),
+      kind: (value) => held.controls.kind(value === null ? null : String(value)),
+      open: (value) => held.controls.open(value === null ? null : rowNamed(held, value)),
+      text: (value) => held.controls.text(String(value)),
+      cursor: (value) => held.controls.cursor(Number(value)),
+      scroll: (value) => held.controls.scroll(Number(value)),
+      stage: () => held.controls.stage(),
+      unstage: () => held.controls.unstage(),
+      copy: () => held.controls.copy(),
     },
   };
 }
@@ -212,6 +293,7 @@ export interface AgentSurfaces {
   map: { map: MapView; controls: MapControls };
   skills: { panels: readonly SkillPanel[]; opened: Answer | null; greeted: readonly Answer[]; controls: { open(id: Answer | null): void } };
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
+  edit: EditHeld;
 }
 
 export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurfaces[K]) => TestSurface } = {
@@ -219,4 +301,5 @@ export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurface
   map: ({ map, controls }) => mapSurface(map, controls),
   plane: (held) => planeSurface(held),
   skills: (held) => skillsSurface(held),
+  edit: (held) => editSurface(held),
 };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../../runtime/localizedFixture';
-import { layerNamed, mapState, mapSurface, pointFrom, shellState, shellSurface, subpageNamed, zoomFrom } from './surfaces';
+import { layerNamed, mapState, mapSurface, pointFrom, shellState, shellSurface, subpageNamed, zoomFrom, type MapControls } from './surfaces';
 import { CLIMB_NUDGE, sheetAt, type Place } from '../discovery';
 import { ZOOM_MAX, ZOOM_MIN, type Point } from '../viewport';
 import { HOME_LAYER, LAYERS, OPENING, toLayer } from '../nav';
@@ -71,10 +71,20 @@ describe('the shell as a driving agent reaches it', () => {
   });
 });
 
+// Every control the map offers, doing nothing: a case names the one it is about
+// and a control added to the map is a control this stops compiling without.
+const INERT: MapControls = {
+  settle: () => undefined,
+  plane: () => undefined,
+  recentre: () => undefined,
+  moving: () => undefined,
+  place: () => undefined,
+};
+
 describe('the map as a driving agent reaches it', () => {
   const sheet = sheetAt(HOUSE, 'hall', 0);
   const travels = new Map([['beach', 3]]);
-  const view = { plane: 0, zoom: 1, pan: { x: 0, y: 0 }, sheet, travels };
+  const view = { plane: 0, zoom: 1, pan: { x: 0, y: 0 }, moving: false, sheet, travels };
 
   it('publishes what is drawn and where, so nothing has to be read off the markup', () => {
     const state = mapState(view);
@@ -87,7 +97,7 @@ describe('the map as a driving agent reaches it', () => {
 
   it('pans and zooms through the same settling a finger goes through', () => {
     const rests: Array<{ pan: Point; zoom: number }> = [];
-    const surface = mapSurface(view, { settle: (pan, zoom) => void rests.push({ pan, zoom }), plane: () => undefined, recentre: () => undefined });
+    const surface = mapSurface(view, { ...INERT, settle: (pan, zoom) => void rests.push({ pan, zoom }) });
 
     surface.actions!.pan({ x: 20, y: -5 });
     surface.actions!.zoom(2);
@@ -114,7 +124,7 @@ describe('the map as a driving agent reaches it', () => {
 
   it('changes to a floor it is drawing, and refuses one it is not', () => {
     const floors: number[] = [];
-    const surface = mapSurface(view, { settle: () => undefined, plane: (at) => void floors.push(at), recentre: () => undefined });
+    const surface = mapSurface(view, { ...INERT, plane: (at) => void floors.push(at) });
 
     surface.actions!.plane(-1);
 

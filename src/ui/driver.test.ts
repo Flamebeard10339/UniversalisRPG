@@ -1,9 +1,14 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { engineLocale } from '../content/engineLocale';
 import { loadUniverseWithDiagnostics } from '../content/registry';
 import { newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
+import { slotStore, type SlotDriver } from '../runtime/store';
+import { browserSlots, SLOT_PREFIX, STORAGE_REFUSALS } from './browserStore';
 import { createDriver, type Driver } from './driver';
+import { noStorage, pageStorage, REFUSING as BROWSER_REFUSALS } from './agent/pageStorage';
+import { EDITOR_SLOT, FORGOTTEN, recorded } from './editorMemory';
 import { SHIPPED_SOURCES } from './shippedContent';
 
 // One spannable action and nothing else, so a test about time is not also a
@@ -238,4 +243,194 @@ describe('the GUI driver', () => {
     expect(driver.snapshot().fault).toBe('no # location is marked starting, so a new game has nowhere to begin');
     expect(texts(driver)).toEqual([driver.snapshot().fault]);
   });
+});
+
+// The store a page would have, stood up in memory. One per driver unless a
+// test hands the same one to two of them, which is what closing a tab and
+// opening it again looks like from here.
+function pageSlots(limit?: number): SlotDriver {
+  const storage = pageStorage(limit);
+  return browserSlots(() => storage);
+}
+
+const sourceLines = (driver: Driver): string[] =>
+  driver
+    .snapshot()
+    .transcript.entries.filter((entry) => entry.words === 'tool' && entry.kind === 'detail')
+    .map((entry) => entry.text);
+
+const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.filter((entry) => entry.words === 'tool').map((entry) => String(entry.text));
+
+const EDIT = '/dsl location tutorial-island.guide-house x: 7, y: 7';
+
+describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
+  // c1. The door the REPL has had all along, opened from the browser: staged,
+  // validated, adopted, and the world the session is playing has moved.
+  it('stages a section, adopts it, and the session is playing the edit', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots() });
+
+    driver.send(EDIT);
+
+    expect(said(driver)).toContain('Staged # location tutorial-island.guide-house in local-changes.');
+    expect(shown(driver).discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
+  });
+
+  // c1's other half: a section that cannot load changes nothing at all.
+  it('refuses a whole edit that does not load, and goes on playing what it had', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots() });
+    const before = shown(driver);
+
+    driver.send('/dsl location tutorial-island.guide-house adjacent: nowhere-at-all');
+
+    expect(said(driver)).toContain('local changes did not load.');
+    expect(shown(driver)).toEqual(before);
+    expect(driver.localChanges()).toBe('');
+  });
+
+  // c9. Every staged edit is in the slot as it is staged, and a driver built
+  // over that slot opens with it applied — no save command anywhere.
+  it('opens a second driver over the same store with the edit already applied', () => {
+    const slots = pageSlots();
+    const first = createDriver(SHIPPED_SOURCES, { slots });
+    first.send(EDIT);
+    first.send('/local list');
+
+    const reopened = createDriver(SHIPPED_SOURCES, { slots });
+    reopened.send('/local list');
+
+    expect(shown(reopened).discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
+    expect(sourceLines(reopened)).toEqual(sourceLines(first));
+    expect(reopened.localChanges()).toBe(first.localChanges());
+  });
+
+  // c16. One route out, and it is the bytes the store holds: the control reads
+  // what `/local show` prints, because there is no second spelling of them.
+  it('hands over the same bytes /local show prints and the slot holds', () => {
+    const slots = pageSlots();
+    const driver = createDriver(SHIPPED_SOURCES, { slots });
+    driver.send(EDIT);
+    driver.send('/local show');
+
+    const handed = driver.localChanges()!;
+    expect(handed).toContain('# location tutorial-island.guide-house');
+    expect(sourceLines(driver).join('\n')).toBe(handed.trimEnd());
+    expect(slotStore(slots, () => 0).read('local-changes')?.payload).toBe(handed);
+  });
+
+  it('offers nothing to hand over when the store cannot be read', () => {
+    expect(createDriver(SHIPPED_SOURCES, { slots: browserSlots(noStorage) }).localChanges()).toBeNull();
+  });
+});
+
+// c13. Universal over the modes the adapter can distinguish, plus the one the
+// store itself distinguishes — a slot whose shape this build does not know.
+// No message text is named: what is asserted is that the session is still
+// playable and that something was said on the tool channel.
+describe('a store that refuses leaves the session playing (c13)', () => {
+  const REFUSING: Record<string, () => SlotDriver> = {
+    ...Object.fromEntries(Object.entries(BROWSER_REFUSALS).map(([mode, induce]) => [mode, () => browserSlots(induce())])),
+    unrecognised: () => {
+      const storage = pageStorage();
+      storage.setItem(`${SLOT_PREFIX}local-changes`, 'not a slot at all');
+      return browserSlots(() => storage);
+    },
+  };
+
+  // Every moment this driver touches the store on its own account, in the
+  // order a page reaches them: it opens over what is kept, it stages an edit,
+  // and it writes down where the author is. One entry is what the driver does
+  // and one is what a store would have to do for it, so which moments a mode
+  // refuses at is asked of a store built the same way rather than named — a
+  // mode added to the adapter is placed by what it does.
+  // As much of a local module as a staging write puts in the slot, which is
+  // all the probe needs: what is asked is whether the store takes a write of
+  // about that size, not what the module says.
+  const HEADER = ['# info local-changes', 'version: 0.0.0', ''].join('\n');
+
+  const MOMENTS: Record<string, { drive(driver: Driver): void; asks(store: ReturnType<typeof slotStore>): void }> = {
+    opening: {
+      drive: () => undefined,
+      asks: (store) => void store.read('local-changes'),
+    },
+    staging: {
+      drive: (driver) => driver.send(EDIT),
+      asks: (store) => {
+        store.read('local-changes');
+        store.write('local-changes', HEADER);
+      },
+    },
+    remembering: {
+      drive: (driver) => driver.editorMemory.write(recorded(FORGOTTEN)),
+      asks: (store) => void store.write(EDITOR_SLOT, recorded(FORGOTTEN)),
+    },
+    reading: {
+      drive: (driver) => void driver.editorMemory.read(),
+      asks: (store) => void store.read(EDITOR_SLOT),
+    },
+  };
+
+// Every place the driver reaches the store on its own account, counted off the
+// module rather than listed here. A reach added there without a moment above is
+// a reach nothing asks about, which is what this clause was unmet for once.
+const STORE_REACHES = [...readFileSync('src/ui/driver.ts', 'utf8').matchAll(/save\.store\.\w+\(/g)].length;
+
+  const refusesAt = (slots: () => SlotDriver, moment: string): boolean => {
+    try {
+      MOMENTS[moment].asks(slotStore(slots(), () => 0));
+      return false;
+    } catch {
+      return true;
+    }
+  };
+
+  // What the session said at each moment, in order. Run against a store that
+  // refuses and against one that does not, so what is compared is the refusal
+  // and not the wording of it: no message text is named anywhere below.
+  const through = (slots: SlotDriver): { driver: Driver; at: Record<string, string[]> } => {
+    const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
+    const at: Record<string, string[]> = {};
+    let before: string[] = [];
+    for (const [moment, what] of Object.entries(MOMENTS)) {
+      what.drive(driver);
+      const now = said(driver);
+      at[moment] = now.slice(before.length);
+      before = now;
+    }
+    return { driver, at };
+  };
+
+  it('covers every refusal the adapter names, and the one the store itself names', () => {
+    expect(Object.keys(REFUSING)).toEqual(expect.arrayContaining([...STORAGE_REFUSALS]));
+    expect(Object.keys(REFUSING).length).toBeGreaterThan(STORAGE_REFUSALS.length);
+  });
+
+  it('asks every moment of the driver that the store could refuse at', () => {
+    expect(Object.keys(MOMENTS)).toHaveLength(STORE_REACHES);
+    // A probe that never refuses would leave every assertion below vacuous.
+    expect(Object.keys(MOMENTS).filter((moment) => refusesAt(REFUSING.unavailable, moment))).toEqual(Object.keys(MOMENTS));
+  });
+
+  for (const [mode, slots] of Object.entries(REFUSING)) {
+    it(`says so at every moment it refuses, and goes on playing, when the store is ${mode}`, () => {
+      const refused = through(slots());
+      const quiet = through(pageSlots());
+
+      // The session opened on the shipped modules whatever the store did.
+      expect(refused.driver.snapshot().fault).toBeNull();
+      expect(shown(refused.driver).location.id).toBe('tutorial-island.guide-house');
+
+      // At each moment this store refuses at, something was said that a store
+      // which did not refuse never says at that moment. Nothing is named: the
+      // comparison is the same session over a store that worked.
+      const refusing = Object.keys(MOMENTS).filter((moment) => refusesAt(slots, moment));
+      expect(refusing, `${mode} refuses nothing, so nothing below is asked`).not.toEqual([]);
+      for (const moment of refusing) {
+        expect(refused.at[moment].filter((line) => !quiet.at[moment].includes(line)), `nothing said while ${moment}`).not.toEqual([]);
+      }
+
+      // Still playable: the world still answers, with the state it already had.
+      refused.driver.send('/look');
+      expect(shown(refused.driver).location.id).toBe('tutorial-island.guide-house');
+    });
+  }
 });
