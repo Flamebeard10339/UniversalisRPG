@@ -248,6 +248,24 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
     expect(save.store.read(DEV_SLOT)?.payload).toBe(authored);
   });
 
+  it('is out of the mode even when the store refuses to take the snapshot away', () => {
+    const { save } = turning();
+    saveNow(save, 'the player');
+    enterDev(save, 'the session being played');
+    const exit = devSnapshot(save);
+
+    // Taking the snapshot away is tidiness — a stale one is overwritten by the
+    // next `/dev on` and costs nothing — so it goes last, after the mode is
+    // already off. Done first, a store that refuses it would keep somebody in
+    // dev with no command that leaves, which is the shape the restore write had.
+    (save.store as { remove: (name: string) => unknown }).remove = (name) => {
+      throw new RuntimeError(`slot ${name} cannot be removed`);
+    };
+    expect(() => leaveDev(save, exit.kind === 'restore' ? exit.synced : null)).toThrow(/cannot be removed/);
+    expect(save.dev).toBe(false);
+    expect(save.synced).toBe(PLAYER_SLOT);
+  });
+
   it('leaves the stamp alone on a slot nothing touched', () => {
     const { save, pass } = turning();
     saveNow(save, 'the player');
