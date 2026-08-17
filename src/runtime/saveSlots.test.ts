@@ -469,6 +469,25 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
     expect(autosave(save, () => 'the second authoring session')).toEqual({ kind: 'wrote', slot: DEV_SLOT });
   });
 
+  it('says a cadence it cannot read is unknown, rather than quietly meaning never', () => {
+    const { save } = turning();
+    setAutosaveSeconds(save, 30);
+    saveNow(save, 'the player');
+    // Bytes the store cannot make sense of, which is a different arm from a
+    // slot that reads and holds something that is not a number: `never` and
+    // `nobody can tell` are two answers and only one of them is silent.
+    const readable = save.store.read.bind(save.store);
+    (save.store as { read: (name: string) => unknown }).read = (name) => {
+      if (name !== AUTOSAVE_SLOT) return readable(name);
+      throw new RuntimeError('slot autosave does not parse');
+    };
+
+    expect(saveReport(save).autosaveSeconds).toBeNull();
+    expect(() => autosaveSeconds(save)).toThrow(/does not hold a cadence/);
+    // The rest of the report still stands.
+    expect(saveReport(save).writes).toBe('yes');
+  });
+
   it('picks the dev slot up on the way in, so a second visit is not a session refused', () => {
     const { save, pass } = turning();
     setAutosaveSeconds(save, 1);
