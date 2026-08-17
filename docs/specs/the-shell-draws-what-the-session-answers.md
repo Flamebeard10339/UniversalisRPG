@@ -274,3 +274,141 @@ address lives beside it in `sectionsIn`. Putting the report in the content layer
 would have meant a second copy of that rule, which is the failure mode this
 repository names first. The proof moved with it, to
 `src/ui/authoringSurface.test.ts`, and still walks `SCHEMAS`.
+
+## Audit passes
+
+### Pass 1 — 2026-08-17
+
+- base: `7a0081a19f28d556372123f479f8d0baec702d7c`
+- head: `2a93ced3bd3bda2329ab2823f5176df0b51d6389`
+- proof 1: met — vitest src/ui/driver.test.ts "a local module that will not load never costs the session (c1, c2)".
+  The proof writes the payload into the slot rather than typing a command, and walks both broken shapes
+  ("will not parse", "will not resolve"): the driver opens on SHIPPED_SOURCES alone, serialized() and the
+  whole view are identical to a driver opened with an empty slot before and after a /look, the reason rides
+  the tool channel, and localChanges() still returns the broken text. Mutation c1b
+  (src/ui/driver.ts `open(base, authoring, save, said)` -> `open(base, authoring, save, [])`) KILLED by that
+  named test, re-run at its own file. Mutation c1a (`setAside = because(error);` -> `setAside = null;`)
+  SURVIVED the whole suite: that catch is a branch no route I could build reaches (a `# remove`, a
+  `-starting`, a dangling `adjacent:` and pure garbage all arrive as diagnostics, verified by probe), so it
+  is untested defensive code rather than a hole in what c1 promises. Filed as a finding.
+- proof 2: met — vitest src/ui/driver.test.ts "clears from any state that offers it, and lands where a first-ever
+  launch lands". Clearing is taken from both broken shapes, including the one nothing can parse; afterwards
+  fault is null, serialized() equals a fresh driver's, listLocalSections of what the slot holds is empty, and
+  a second driver built over the same slots opens on the same bytes, which is the "no residue in the store"
+  half. Mutation (src/ui/driver.ts send of `/local clear` changed to `/local list`) KILLED by that named
+  test. The control writes a fresh module rather than editing the broken one because it spells /local clear,
+  which mints a header from the dependencies; src/ui holds no second spelling of it.
+- proof 3: met — vitest src/ui/authoringSurface.test.ts "a local section that shadows a base section is reported,
+  for every kind (c3)" plus src/ui/driver.test.ts "opens a second driver over the same store with the edit
+  already applied". The kind sweep derives its subjects from Object.keys(SCHEMAS) minus the header and asserts
+  the count is over ten, and the address it compares against is the one addressable() itself writes, so the
+  test does not restate the qualification rule. A copy identical to its base and a copy that differs report
+  the same thing, which is the clause's "whether or not the merged result differs". Mutations c3a
+  (src/ui/authoringSurface.ts `shipped.get(keyOf(section))` pointed at a key nothing holds) and c3b
+  (src/ui/driver.ts `...shadowing(local.text)` deleted) both KILLED by their named tests.
+  The report is implemented in src/ui/authoringSurface.ts (`shadowed`) rather than in
+  src/content/localChanges.ts as this clause's proof line forecast. Judged on the merits and accepted: the
+  information c3 wants is exactly what `addressable` discards, and the rule that turns a section into an
+  address lives beside it in `sectionsIn`, so the content-layer placement would have been a second copy of
+  that rule. The spec's proof line still names src/content/localChanges.test.ts and is now wrong.
+- proof 4: met — vitest src/ui/driver.test.ts "every state the loader can leave the app in has an action out of
+  it (c4, c5)" and src/ui/shell.test.tsx "a fault is never drawn as text with nothing beside it (c4, c5)".
+  The cases are the cross product of three base states and four local states derived as a table rather than
+  as a list of screens, the run asserts all three outcomes (opened, base, local) were actually reached, and
+  every fault is checked to carry at least one remedy. shell.test.tsx reads the drawn markup rather than the
+  props: the banner region is matched out of the rendered HTML and its data-drive buttons compared to
+  remediesFor, in both directions (every fault draws its remedies, and every remedy is drawn by some fault),
+  with a session under it and without one. Mutation (src/ui/driver.ts remediesFor's base arm made empty)
+  KILLED by that named test.
+- proof 5: met — vitest src/ui/driver.test.ts "offers clearing where the local module is at fault and nowhere
+  else". Over the same derived table: clear-local is offered exactly when fault.at is 'local', and fault.at is
+  'local' exactly when the base loads and the local module does not, asserted against the table's own labels
+  rather than against an error string, which is the clause's "told apart by which path was taken".
+  Mutation (src/ui/driver.ts the fallthrough fault relabelled from 'local' to 'base') KILLED by that test.
+- proof 6: unmet — The gating half is met and holds by construction: DevOnly.tsx is the only module in the tree that
+  writes data-dev (asserted by walking every shipped module under src/ui), so a mark that is not gated cannot
+  be written; rendering App as the player contains no data-dev and rendering it after /dev on contains more
+  than one; no module under src/ui assigns a dev flag or names DEV_SLOT, enterDev, leaveDev, devSnapshot or
+  liveSlot. Mutation (src/ui/DevOnly.tsx `return dev ? (` -> `return true ? (`) KILLED.
+  The banner half is not delivered. The clause says "and the banner reads the same one"; the Deliverable says
+  "The orange banner is a rendering of c13's answer"; c13 says the scanner still passes "over a tree with a
+  dev banner, a recovery control and a Settings body in it"; the absorbed record is named
+  gui-dev-mode-toggle-banner-and-editing-gate. grep -rni "banner" src/ui returns FaultBanner, LocationBanner
+  and StatusBanner and no dev banner, and DevOnly renders className="contents", which draws nothing of its
+  own. The only thing on any screen that says whose session this is is the checkbox on the Settings subpage.
+  Checked and fails; recorded unmet rather than deferred because the clause's other half is delivered here and
+  the missing half is this branch's, not a later branch's.
+- proof 7: met — vitest src/ui/devMode.test.tsx "the toggle is the dev slot's entry, not a second one (c7)".
+  The screen's guarantee is measured as bytes: a session is edited, serialized, taken into dev, moved with
+  /wait 30 and /save, then taken out; serialized() is back to the pre-dev bytes, DEV_SNAPSHOT_SLOT is gone,
+  DEV_SLOT holds what dev did and PLAYER_SLOT is untouched. That there is no second path is derived: every
+  shipped module under src/ui is checked to name none of the slot machinery and to assign no dev flag.
+  Mutation (src/ui/devMode.ts devLine made to spell "on" for both arms) KILLED by the byte test.
+- proof 8: met — vitest src/runtime/command.test.ts "/goto stands the player somewhere no road reaches, and
+  records a line that replays" (recorder.history is ['goto: island'] and a `# test` built from that line
+  replays to the same place) and "marks the dev-only commands, and the tokens are read off the marks";
+  vitest src/ui/devMode.test.tsx "marks at least one, and every mark is a line both drivers can run", which
+  walks COMMANDS.filter(spec => spec.dev) rather than naming /goto. "No component mutates session state
+  directly" is derived by src/ui/surface.test.ts's DISPATCHES allowlist plus MOVES_THE_WORLD, over every
+  module under src/ui; the branch's one addition to that list, devTokenIn, is a pure read of the table's own
+  marks. Mutations c8 (src/content/serialize.ts printing goto: as travel:) and c9b both KILLED.
+  Deviation, judged and accepted: the clause's sentence names "the speed multiplier" alongside teleport as
+  recorded and replayable, and /speed records nothing. Under the branch's own settled reading /speed is not a
+  dev power at all: it is unmarked on the table and only the widget is gated, so c8's universal ("every dev
+  power") has one subject and that subject is recorded. Recording /speed would emit a directive
+  applyDirective has no LiveSettings to turn, i.e. a `# test` line that replays as a no-op. Accepted; the
+  disagreement between the clause's sentence and the implementation is filed as a finding so the next reader
+  is not left to reconstruct it.
+- proof 9: met — vitest src/ui/devMode.test.tsx "tapping a place has one handler and one decision (c9)". One
+  decision point, tappedPlace(dev, place, goes), is asserted over all four cells; the dev-on path is played
+  end to end against a world whose far place has no road to it (put on the map by a discover: on a signpost,
+  and asserted unreachable before the tap), and the state after is read off the engine's own report: location
+  is the far place, it is discovered, and every road out of it is discovered. The dev-off path is compared
+  against driver.choose by serialized() bytes and by the live run, so "exactly as it does today, arrival delay
+  and all" is a byte comparison rather than a claim. Mutations c9a (src/ui/devMode.ts's dev arm made to spell
+  a choice) and c9b (src/runtime/session.ts relocateTo replaced by a bare location assignment) both KILLED.
+- proof 10: met — vitest src/ui/devMode.test.tsx "there is one time multiplier (c10)": setting from the field and
+  setting from the console both land on snapshot.speed, which is context.live.speed. The command proof
+  grep -rn "speed" src/ui --include=*.ts --include=*.tsx --exclude=*.test.* returns eleven lines, all of them
+  either the prop being passed down, the label key, or speedLine spelling /speed; no default, no clamp, no
+  second field. The sweep over every shipped src/ui module for a speed assigned a number and for a speed near
+  Math.min, Math.max or clamp derives that rather than asserting it once. Mutation (src/ui/driver.ts
+  `speed: context?.live.speed ?? null` -> `speed: 1`) KILLED.
+- proof 11: met — vitest src/ui/driver.test.ts and src/ui/devMode.test.tsx "with dev off, nothing changes (c11)":
+  a whole session with /autosave, /save, /look and /restore leaves no slot whose name starts with "dev",
+  refusing a dev power moves no bytes and creates no dev slot, the refusal is derived from the table's marks
+  rather than a list, and the CLI runs /goto with no gate at all. src/runtime/integration.test.ts is green.
+  Mutations c11a (src/ui/devMode.ts devTokenIn's answer discarded) and c11b (src/runtime/command.ts the
+  dev mark on /goto flipped off, which empties the derived set) both KILLED.
+  The clause's enumerated subjects, saving, loading, autosave, travel, the live clock, no dev slot, every dev
+  command refused and said so, and play-cli ungated, all hold. Its summary sentence ("a player who never
+  opens the toggle cannot tell this branch landed") does not: the Edit subpage's staging surfaces and the
+  map's Place button were reachable from the GUI before this branch and are now behind the gate, which
+  src/ui/editorMemory.test.tsx measures by having to send /dev on to see what it saw before. That is c6's
+  instruction rather than a defect, and it is filed as a finding because the two clauses disagree in the spec
+  and the resolution lives only in the worker's Decisions.
+- proof 12: met — vitest src/runtime/integration.test.ts green, and the whole suite green under
+  npm run tasks -- merge-ready (tsc, npm test, layer-check, audit-status, doctor, bytes all pass).
+  The command proof as written, git diff --stat HEAD -- content/, is empty on a clean tree and so answers
+  nothing; read against the diff base it is not empty. git diff 7a0081a..2a93ced --stat -- content/ is four
+  added lines in content/engine-en.dsl and nothing else. Judged on the merits and accepted: those four are
+  engine vocabulary keys for the four controls this branch adds, mirrored into ENGINE_KEYS and LABELS, which
+  is the established route for a shell word and is forced by src/ui/render.test.tsx refusing any run of text
+  on screen that is neither an engine value nor a LABELS key. No shipped game content moved:
+  tutorial-island.dsl and combat-expansion.dsl are untouched, so what c12's own sentence forbids, a recovery
+  path reachable only because content was changed, did not happen. The unrunnable command proof is filed as a
+  finding against the contract.
+- proof 13: met — vitest src/ui/surface.test.ts "names on every control the harness action that drives it, or why
+  it needs none", which reads every button, input, select and textarea out of every module under src/ui with
+  a brace-aware scanner and checks each declared name against installTestHarness's own action list rather
+  than against a table written beside the tree. The controls this branch adds, clear-local and reopen on the
+  fault banner, the dev checkbox and speed field in Settings, and map.go on every map bubble, all pass, and
+  the two driver-level actions were added to the harness. Two mutations, one per half of the rule: c13a
+  (src/ui/MapPane.tsx data-drive on the map bubble renamed away, so a control names no driver) and c13b
+  (src/ui/FaultBanner.tsx clear-local misspelt, so a control names an action the harness does not offer)
+  both KILLED by that named test.
+- proof 14: met — npm run tasks -- merge-ready on 2a93ced: tsc pass, npm test pass, layer-check pass,
+  audit-status pass, doctor pass (27 warnings, none of which fails the leg), bytes pass, tree pass (nothing
+  uncommitted), base pass (main has not moved past the merge base). The two legs that fail are the two this
+  pass exists to clear: "1 open member" and "has no recorded audit pass". Re-runnable by the next pass with
+  the same one command.
