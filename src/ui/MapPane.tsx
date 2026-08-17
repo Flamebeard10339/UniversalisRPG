@@ -133,7 +133,7 @@ export function MapPane({
   onSend,
   onNote,
 }: {
-  view: PlayView | null;
+  view: PlayView;
   arrivals: readonly string[];
   generation: number;
   words: Words;
@@ -158,7 +158,7 @@ export function MapPane({
 
   // The walk under way, as the engine published it, with the place the player
   // is standing in at the head so a road on it is a pair of neighbours.
-  const walk = walkLine(here, view?.journey ?? null);
+  const walk = walkLine(here, view.journey);
   const going = walk[walk.length - 1];
 
   // Back to where the player is standing, on the floor they are standing on, at
@@ -166,7 +166,7 @@ export function MapPane({
   // one: a player who has wandered off across three z-layers has no other way
   // back to themselves.
   const recentre = (): void => {
-    const floor = view?.discovered.find((place) => place.id === here)?.z ?? null;
+    const floor = view.discovered.find((place) => place.id === here)?.z ?? null;
     const drawn = drawnFor(view, floor);
     const standing = drawn.sheet.nodes.find((each) => each.place.id === here);
     setPlane(floor);

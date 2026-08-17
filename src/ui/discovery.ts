@@ -101,11 +101,11 @@ export interface Drawn {
 // the component, because the two halves have to agree — a place is drawn on the
 // strength of the offer that leads to it — and a composition inside a render is
 // one no test in this suite can reach.
-export function drawnFor(view: PlayView | null, asked: number | null): Drawn {
-  const discovered = view?.discovered ?? [];
-  const here = view?.location.id ?? '';
+export function drawnFor(view: PlayView, asked: number | null): Drawn {
+  const discovered = view.discovered;
+  const here = view.location.id;
   const plane = asked ?? discovered.find((place) => place.id === here)?.z ?? 0;
-  const travels = waysOut(view?.choices ?? []);
+  const travels = waysOut(view.choices);
 
   return { plane, here, sheet: sheetAt(discovered, here, plane, travels), travels };
 }

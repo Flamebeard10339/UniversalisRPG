@@ -92,8 +92,8 @@ describe('a drag is a section edit and nothing else (c8)', () => {
 
     expect(said(driver)).toContain('local changes did not load.');
     expect(driver.localChanges()).toBe('');
-    expect(driver.snapshot().view?.discovered.find((each) => each.id === section.address)).toEqual(
-      opened().snapshot().view?.discovered.find((each) => each.id === section.address),
+    expect(driver.snapshot().view.discovered.find((each) => each.id === section.address)).toEqual(
+      opened().snapshot().view.discovered.find((each) => each.id === section.address),
     );
   });
 

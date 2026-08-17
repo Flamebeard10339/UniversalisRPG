@@ -27,7 +27,7 @@ export function remediesFor(problems: readonly UniverseProblem[]): readonly Reme
 }
 
 export interface DriverSnapshot {
-  view: PlayView | null;
+  view: PlayView;
   transcript: Transcript;
   // The run under way, as the run last reported itself; null when none is.
   live: LiveProgress | null;
@@ -231,8 +231,6 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  const logging = (current: PlayView | undefined): CommandOutput[] => (current ? [{ kind: 'view', view: current, reread: false }] : []);
-
   // The run decides whether it is over; this only passes it the time that went
   // by and hands React what came back. A tick is also where the world speaks:
   // what an action's completion said rides on the view that tick returns and
@@ -246,7 +244,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       ...current,
       view: progress.view,
       live: progress.active ? progress : null,
-      transcript: appendOutputs(current.transcript, logging(progress.view)),
+      transcript: appendOutputs(current.transcript, [{ kind: 'view', view: progress.view, reread: false }]),
     });
     if (!progress.active) {
       close(false);
@@ -277,7 +275,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       running = result.live;
       // Arming reports no output of its own; whatever the world said as the
       // action began rides on the view it handed back.
-      current = settled({ ...current, transcript: appendOutputs(current.transcript, logging(result.view)) });
+      current = settled({ ...current, transcript: appendOutputs(current.transcript, [{ kind: 'view', view: context.view, reread: false }]) });
       stopTicking = ticker(advance);
       // Zero elapsed, so the first frame is the run's own report of itself
       // rather than a shape this layer guessed while waiting for a tick.

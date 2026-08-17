@@ -35,7 +35,7 @@ export interface TestState {
   // What the runtime published, whole and as it published it. Not a projection
   // of it: a field the runtime starts publishing is readable the moment it is
   // published, because there is no list here for anyone to forget to widen.
-  view: PlayView | null;
+  view: PlayView;
   // What the driver holds around the view, which the view does not carry: what
   // the door reported about the universe this session opened over, whose
   // session this is, the run under way, and what has been said so far.
@@ -138,15 +138,15 @@ function record(value: unknown, name: string): Record<string, unknown> {
 }
 
 function choicePosition(snapshot: DriverSnapshot, id: string): number {
-  const at = snapshot.view?.choices.findIndex((choice) => choice.id === id) ?? -1;
+  const at = snapshot.view.choices.findIndex((choice) => choice.id === id);
   if (at < 0) throw new Error(`choice is not visible: ${id}`);
   return at + 1;
 }
 
 export function testState(snapshot: DriverSnapshot, surfaces: Record<string, unknown> = {}): TestState {
   const view = snapshot.view;
-  const option = view ? askedOption(view.modals) : undefined;
-  const modal = view && option ? view.modals[view.modals.length - 1] : undefined;
+  const option = askedOption(view.modals);
+  const modal = option ? view.modals[view.modals.length - 1] : undefined;
 
   return {
     view,
@@ -162,7 +162,7 @@ export function testState(snapshot: DriverSnapshot, surfaces: Record<string, unk
       : null,
     transcript: snapshot.transcript.entries.slice(-20),
     surfaces,
-    choices: (view?.choices ?? []).map((choice, at) => ({ ...choice, position: at + 1 })),
+    choices: view.choices.map((choice, at) => ({ ...choice, position: at + 1 })),
     modal:
       modal && option
         ? {

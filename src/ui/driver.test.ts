@@ -62,11 +62,7 @@ function handTicker(): Ticker & { advance(elapsedMs: number): void; stops: numbe
   return ticker;
 }
 
-function shown(driver: Driver): PlayView {
-  const view = driver.snapshot().view;
-  if (!view) throw new Error(driver.snapshot().problems.map((problem) => problem.message).join('; ') || 'no view');
-  return view;
-}
+const shown = (driver: Driver): PlayView => driver.snapshot().view;
 
 function position(driver: Driver, choiceId: string): number {
   const at = shown(driver).choices.findIndex((choice) => choice.id === choiceId);

@@ -84,10 +84,10 @@ describe('the browser test harness', () => {
     ]);
     // Still readable off the view, which is the half the projection used to
     // answer and the half it kept losing.
-    expect(state.view?.resources[0].title).toBe('Energy');
-    expect(state.view?.player.name).toBe('Miri');
-    expect(state.view?.journey).toBeNull();
-    expect(state.view?.inventory).toEqual({});
+    expect(state.view.resources[0].title).toBe('Energy');
+    expect(state.view.player.name).toBe('Miri');
+    expect(state.view.journey).toBeNull();
+    expect(state.view.inventory).toEqual({});
   });
 
   it('publishes named actions and batches one result per step', async () => {
@@ -117,7 +117,7 @@ describe('the browser test harness', () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe('action is not registered: missing');
-    expect(result.state.view?.location.id).toBe('start');
+    expect(result.state.view.location.id).toBe('start');
   });
 
   it('reaches what a component registered, by the surface name joined to the action name', async () => {

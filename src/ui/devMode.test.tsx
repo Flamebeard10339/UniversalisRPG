@@ -85,7 +85,7 @@ const CUT_OFF: ModuleSource = {
 function cutOff(): Driver {
   const driver = createDriver([engineLocale(), CUT_OFF], { slots: pageSlots(), ticker: () => () => undefined });
   driver.send('use: entity.signpost.read-the-signpost');
-  const drawn = driver.snapshot().view!.discovered.map((place) => place.id);
+  const drawn = driver.snapshot().view.discovered.map((place) => place.id);
   if (!drawn.includes('isle')) throw new Error('the far place is not on the map, so there is nothing to teleport to');
   return driver;
 }
@@ -203,7 +203,7 @@ describe("the toggle is the dev slot's entry, not a second one (c7)", () => {
     expect(driver.localChanges()).toBe(staged);
     // And the session is playing them, because leaving dev restores a session
     // that was opened over the same local module.
-    expect(driver.snapshot().view!.discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
+    expect(driver.snapshot().view.discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
   });
 });
 
@@ -241,12 +241,12 @@ describe('tapping a place has one handler and one decision (c9)', () => {
     driver.send(devLine(true));
     const far = 'isle';
     // Nothing the player could tap: there is no way out to it from here.
-    expect(driver.snapshot().view!.choices.some((choice) => choice.leadsTo === far)).toBe(false);
+    expect(driver.snapshot().view.choices.some((choice) => choice.leadsTo === far)).toBe(false);
     expect(tappedPlace(false, far, null)).toBeNull();
 
     driver.send(tappedPlace(true, far, null)!);
 
-    const after = driver.snapshot().view!;
+    const after = driver.snapshot().view;
     expect(after.location.id).toBe(far);
     // Discovery is spread, which is what standing somewhere does — asked of the
     // engine's own report rather than of a flag this test knows the name of.
@@ -259,7 +259,7 @@ describe('tapping a place has one handler and one decision (c9)', () => {
   it("sets off for a place exactly as a choice does while the session is the player's", () => {
     const driver = cutOff();
     const twin = cutOff();
-    const at = driver.snapshot().view!;
+    const at = driver.snapshot().view;
     const road = at.choices.findIndex((choice) => choice.kind === 'travel');
     expect(road, 'the island offers no walk from where it opens').toBeGreaterThanOrEqual(0);
 

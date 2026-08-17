@@ -23,6 +23,6 @@ describe('the content the build carries', () => {
     const driver = createDriver(SHIPPED_SOURCES);
 
     expect(driver.snapshot().problems).toEqual([]);
-    expect(driver.snapshot().view?.location.id).toBe('tutorial-island.guide-house');
+    expect(driver.snapshot().view.location.id).toBe('tutorial-island.guide-house');
   });
 });

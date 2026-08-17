@@ -232,7 +232,7 @@ function skillPanels(html: string): Array<{ id: string; runs: string[]; ring: bo
 }
 
 function position(driver: Driver, choiceId: string): number {
-  const at = driver.snapshot().view!.choices.findIndex((choice) => choice.id === choiceId);
+  const at = driver.snapshot().view.choices.findIndex((choice) => choice.id === choiceId);
   if (at < 0) throw new Error(`no such choice: ${choiceId}`);
   return at + 1;
 }
@@ -330,7 +330,7 @@ describe('what the shell puts on the screen', () => {
     let seen = 0;
 
     const step = (): void => {
-      const at = driver.snapshot().view!;
+      const at = driver.snapshot().view;
       for (const line of published(at)) engine.add(line);
       expect(idsPublished(at).filter((id) => engine.has(id))).toEqual([]);
       const html = renderToStaticMarkup(<App driver={driver} />);
@@ -345,7 +345,7 @@ describe('what the shell puts on the screen', () => {
     step();
     driver.choose(position(driver, TALK));
     step();
-    const menu = driver.snapshot().view!.modals[0].options[0];
+    const menu = driver.snapshot().view.modals[0].options[0];
     driver.answer(menu.key, menu.values![1].value);
     step();
     driver.choose(position(driver, ROAST));
@@ -364,7 +364,7 @@ describe('what the shell puts on the screen', () => {
   // permission granted to either was answering no question (c10).
   it('renders nothing a player can read that the engine did not publish, with a row on every page', () => {
     const driver = everyPageFilled();
-    const view = driver.snapshot().view!;
+    const view = driver.snapshot().view;
 
     expect(Object.entries(pagesDrawn(view)).filter(([, rows]) => rows === 0)).toEqual([]);
 
@@ -382,13 +382,13 @@ describe('what the shell puts on the screen', () => {
 
     const runs = readable(renderToStaticMarkup(<App driver={driver} />));
 
-    for (const choice of driver.snapshot().view!.choices) expect(onScreen(runs, choice.label), choice.label).toBe(true);
+    for (const choice of driver.snapshot().view.choices) expect(onScreen(runs, choice.label), choice.label).toBe(true);
   });
 
   it('draws the discovered places where they are, with the roads between them', () => {
     const driver = createDriver([SURVEYED]);
     driver.choose(position(driver, LOOK_OUT));
-    const found = driver.snapshot().view!.discovered;
+    const found = driver.snapshot().view.discovered;
 
     const html = renderToStaticMarkup(<App driver={driver} />);
     const drawn = places(html);
@@ -411,7 +411,7 @@ describe('what the shell puts on the screen', () => {
   it('puts them as far apart as the engine put them, a unit of world at a time', () => {
     const driver = createDriver([SURVEYED]);
     driver.choose(position(driver, LOOK_OUT));
-    const found = driver.snapshot().view!.discovered;
+    const found = driver.snapshot().view.discovered;
 
     const drawn = places(renderToStaticMarkup(<App driver={driver} />));
 
@@ -426,7 +426,7 @@ describe('what the shell puts on the screen', () => {
   it('acknowledges the place that has just arrived, and leaves the known one alone', () => {
     const driver = createDriver([SURVEYED]);
     driver.choose(position(driver, LOOK_OUT));
-    const view = driver.snapshot().view!;
+    const view = driver.snapshot().view;
 
     const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={['surveyed.overlook']} generation={1} {...MAPPING} />));
 
@@ -440,7 +440,7 @@ describe('what the shell puts on the screen', () => {
     // Walked the long way round, so the route has a middle to draw and the map
     // has a road it is not taking.
     driver.choose(position(driver, 'travel:surveyed.cove'));
-    const view = driver.snapshot().view!;
+    const view = driver.snapshot().view;
 
     const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} {...MAPPING} />);
 
@@ -460,9 +460,9 @@ describe('what the shell puts on the screen', () => {
     const driver = createDriver([SURVEYED]);
     driver.choose(position(driver, LOOK_OUT));
 
-    const html = renderToStaticMarkup(<MapPane words={shellWord} view={driver.snapshot().view!} arrivals={[]} generation={0} {...MAPPING} />);
+    const html = renderToStaticMarkup(<MapPane words={shellWord} view={driver.snapshot().view} arrivals={[]} generation={0} {...MAPPING} />);
 
-    expect(driver.snapshot().view!.journey).toBeNull();
+    expect(driver.snapshot().view.journey).toBeNull();
     expect(places(html).every((node) => node.walk === undefined)).toBe(true);
     expect(html).not.toContain('data-walk="road"');
   });
@@ -477,14 +477,14 @@ describe('what the shell puts on the screen', () => {
 
     // The one the engine is offering a way to is the one that can be tapped;
     // the one the player is already standing in is not.
-    expect(driver.snapshot().view!.choices.some((choice) => choice.id === 'travel:surveyed.overlook')).toBe(true);
+    expect(driver.snapshot().view.choices.some((choice) => choice.id === 'travel:surveyed.overlook')).toBe(true);
     expect(overlook.disabled).toBe(false);
     expect(workshop.disabled).toBe(true);
   });
 
   it('draws what the player is carrying, and what they are made of, on the sheet', () => {
     const driver = everyPageFilled();
-    const view = driver.snapshot().view!;
+    const view = driver.snapshot().view;
 
     const runs = engineRuns(renderToStaticMarkup(<App driver={driver} />));
 
@@ -518,7 +518,7 @@ describe('what the shell puts on the screen', () => {
 
   it('draws the run above the choices, which it does not withdraw', () => {
     const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
-    const idle = driver.snapshot().view!.choices;
+    const idle = driver.snapshot().view.choices;
     const running = idle.find((choice) => choice.id === ROAST)!.label;
     const other = idle.find((choice) => choice.id === TALK)!.label;
 
@@ -552,7 +552,7 @@ describe('what the shell puts on the screen', () => {
 
   it('names its two glyph controls with the engine value each one acts on', () => {
     const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
-    const running = driver.snapshot().view!.choices.find((choice) => choice.id === ROAST)!.label;
+    const running = driver.snapshot().view.choices.find((choice) => choice.id === ROAST)!.label;
     driver.choose(position(driver, ROAST));
 
     expect(renderToStaticMarkup(<App driver={driver} />)).toContain(`aria-label="${running}"`);
@@ -571,7 +571,7 @@ describe('what the shell puts on the screen', () => {
   it('draws the modal the engine is asking for, and stops once it is answered', () => {
     const driver = createDriver(SHIPPED_SOURCES);
     driver.choose(position(driver, 'talk:tutorial-island.miki'));
-    const menu = driver.snapshot().view!.modals[0].options[0];
+    const menu = driver.snapshot().view.modals[0].options[0];
 
     const asked = renderToStaticMarkup(<App driver={driver} />);
     expect(asking(asked)).toBe(true);
@@ -607,7 +607,7 @@ describe('what the shell puts on the screen', () => {
   describe('draws every field it hands a driving agent', () => {
     it('says which floor it is showing, and offers the ones it found', () => {
       const driver = createDriver([STOREYS]);
-      const view = driver.snapshot().view!;
+      const view = driver.snapshot().view;
 
       const strip = floors(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} {...MAPPING} />));
 
@@ -621,7 +621,7 @@ describe('what the shell puts on the screen', () => {
 
     it('offers a way back to the player, on the floor they are standing on', () => {
       const driver = createDriver([STOREYS]);
-      const view = driver.snapshot().view!;
+      const view = driver.snapshot().view;
 
       const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} {...MAPPING} />);
 
@@ -632,7 +632,7 @@ describe('what the shell puts on the screen', () => {
     it('draws the sheet under the pan and the zoom it reports', () => {
       const driver = createDriver([SURVEYED]);
       driver.choose(position(driver, LOOK_OUT));
-      const view = driver.snapshot().view!;
+      const view = driver.snapshot().view;
 
       const under = drawnAt(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} {...MAPPING} />));
 
@@ -650,7 +650,7 @@ describe('what the shell puts on the screen', () => {
     it('draws one skill panel per row the view publishes, each with its own level in its own ring', () => {
       const driver = createDriver([SURVEYED], { ticker: noTicks });
       driver.choose(position(driver, LOOK_OUT));
-      const view = driver.snapshot().view!;
+      const view = driver.snapshot().view;
       // Where the skills page is: the character layer, on the page the nav
       // names, rather than an index this test would have to keep in step.
       const skills = LAYERS[2].subpages.findIndex((subpage) => subpage.id === 'skills');
@@ -695,7 +695,7 @@ describe('what the shell puts on the screen', () => {
     it('draws a place for every node on the sheet, and disables the ones it has no way out to', () => {
       const driver = createDriver([SURVEYED]);
       driver.choose(position(driver, LOOK_OUT));
-      const view = driver.snapshot().view!;
+      const view = driver.snapshot().view;
 
       const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} {...MAPPING} />));
 

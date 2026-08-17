@@ -41,11 +41,11 @@ function Ring({ panel, greeted }: { panel: SkillPanel; greeted: boolean }): JSX.
   );
 }
 
-export function SkillsPane({ view, first, crossed, words }: { view: PlayView | null; first: XpMark | null; crossed: Crossings; words: Words }): JSX.Element {
+export function SkillsPane({ view, first, crossed, words }: { view: PlayView; first: XpMark | null; crossed: Crossings; words: Words }): JSX.Element {
   const [opened, setOpened] = useState<Answer | null>(null);
-  const panels = skillPanels(view?.xp ?? []);
+  const panels = skillPanels(view.xp);
   const shown = panels.find((panel) => panel.id === opened) ?? null;
-  const now = { at: view?.time ?? 0, totals: Object.fromEntries((view?.xp ?? []).map((row) => [row.id, row.value])) };
+  const now = { at: view.time, totals: Object.fromEntries(view.xp.map((row) => [row.id, row.value])) };
   const rate = shown === null || first === null ? null : perHour(first, now, shown.id);
   const left = shown === null ? null : untilNext(shown, rate);
 

@@ -110,7 +110,7 @@ export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapsho
           </div>
         </div>
 
-        {live || (view && view.choices.length > 0) ? (
+        {live || view.choices.length > 0 ? (
           <>
             <Splitter
               onGrab={() => void (held.current = split)}
@@ -129,7 +129,7 @@ export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapsho
                 </div>
               ) : null}
               <div className="unbarred min-h-0 flex-1 overflow-y-auto">
-                {view && view.choices.length > 0 ? <Sheet choices={view.choices} onChoose={onChoose} /> : null}
+                {view.choices.length > 0 ? <Sheet choices={view.choices} onChoose={onChoose} /> : null}
               </div>
             </div>
           </>

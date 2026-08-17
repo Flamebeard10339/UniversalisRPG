@@ -90,7 +90,7 @@ describe('a problem is never drawn as text with nothing beside it (c3, c7)', () 
     // whether it is the game.
     expect(withGame.snapshot().view).not.toBeNull();
     expect(standingIn.snapshot().view).not.toBeNull();
-    expect(standingIn.snapshot().view!.location.id).not.toBe(withGame.snapshot().view!.location.id);
+    expect(standingIn.snapshot().view.location.id).not.toBe(withGame.snapshot().view.location.id);
     for (const driver of [withGame, standingIn]) {
       const drawn = alerting(renderToStaticMarkup(<App driver={driver} />));
       expect(drawn.drawn, driver.snapshot().problems[0]?.message).toBe(true);
@@ -149,7 +149,7 @@ describe('taking a remedy changes the state it was taken from (c7)', () => {
     driver.reopen();
 
     expect(driver.snapshot().problems).toEqual([]);
-    expect(driver.snapshot().view?.discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
+    expect(driver.snapshot().view.discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
   });
 
   // A problem no local module is named in, where clearing an author's work

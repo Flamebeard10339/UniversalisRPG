@@ -3,7 +3,7 @@ import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { askedOption } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { dismissal } from './asking';
-import { addressable, NOWHERE, type Standing } from './authoringSurface';
+import { addressable, type Standing } from './authoringSurface';
 import type { Driver } from './driver';
 import { editControls } from './editControls';
 import { EditPane } from './EditPane';
@@ -61,9 +61,9 @@ const NOTE_TICK_MS = 100;
 // what the player is carrying, never what either just got, so both are the
 // difference between two views — which is also why this is held here, above
 // every page, rather than on whichever page happens to be about one of them.
-function useXpNotes(view: PlayView | null, clock: () => number): readonly Note[] {
-  const rows = view?.xp ?? [];
-  const carried = view?.carried ?? [];
+function useXpNotes(view: PlayView, clock: () => number): readonly Note[] {
+  const rows = view.xp;
+  const carried = view.carried;
   const seen = useRef({ rows, carried });
   const [queue, setQueue] = useState(emptyQueue);
 
@@ -147,7 +147,7 @@ function tryAgain(driver: Driver): void {
 
 // Where the player is, as the view publishes it: what the Local surface is
 // narrowed to is a fact read off the session rather than one worked out here.
-const standingIn = (view: PlayView | null): Standing => (view ? { location: view.location.id, entities: view.entities.map((entity) => entity.id) } : NOWHERE);
+const standingIn = (view: PlayView): Standing => ({ location: view.location.id, entities: view.entities.map((entity) => entity.id) });
 
 export function App({
   driver,
@@ -172,27 +172,27 @@ export function App({
   // language being played is the session's rather than the shell's (c3).
   const localizer = driver.localizer();
   const words = wordsOf(localizer);
-  const asking = view ? askedOption(view.modals) : undefined;
+  const asking = askedOption(view.modals);
   // Drawn because the engine says one is in hand, never because the shell
   // recognised the screen holding it: the focus is a published field and the
   // screen's name is not a thing this layer can read. A screen with a plane in
   // hand is drawn as that plane rather than as a list of its values, so the
   // option sheet is what every other screen gets.
-  const plane = view?.focus ? (view.planes.find((each) => each.instance === view.focus?.instance) ?? null) : null;
-  const { arrivals, generation } = useArrivals(view?.discovered ?? []);
-  const rows = view?.xp ?? [];
+  const plane = view.focus ? (view.planes.find((each) => each.instance === view.focus?.instance) ?? null) : null;
+  const { arrivals, generation } = useArrivals(view.discovered);
+  const rows = view.xp;
   const notes = useXpNotes(view, clock);
   // Where the session's own reading of how fast experience arrives is measured
   // from. The engine keeps no such field: a rate is a fact about the play.
   const opened = useRef<XpMark | null>(null);
-  if (opened.current === null && view) opened.current = markOf(view);
+  if (opened.current === null) opened.current = markOf(view);
 
   // The one answer a gesture away from the open screen makes: the value that
   // screen published as the way out of itself, or nothing where it published
   // none (c19). Both gestures this shell has go through it, so a click on the
   // sheet's ground and a move to another page say the same thing and neither
   // has a way out the other has not got.
-  const leaving = view ? dismissal(view.modals) : null;
+  const leaving = dismissal(view.modals);
   const leave = leaving ? () => driver.answer(leaving.key, leaving.value) : undefined;
 
   // Assembled once and both drawn from and handed over, the way the map's is:
@@ -263,13 +263,13 @@ export function App({
         />
       );
     }
-    if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? [], localizer)} />;
+    if (subpage.id === 'stats') return <Ledger entries={counted(view.stats, localizer)} />;
     if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
     // Both sides of what the player has are rows that act, because c21 puts a
     // worn copy on this page and nowhere else and the verbs it offers are
     // reachable from nowhere else either.
-    if (subpage.id === 'equipment') return <Ledger entries={worn(view?.equipment ?? [], view?.carried ?? [], view?.planes ?? [], localizer, words('empty'))} onOpen={driver.open} />;
-    return <Ledger entries={carried(view?.carried ?? [], view?.planes ?? [], localizer)} onOpen={driver.open} />;
+    if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} onOpen={driver.open} />;
+    return <Ledger entries={carried(view.carried, view.planes, localizer)} onOpen={driver.open} />;
   };
 
   const bodies = LAYERS.map((layer, at) => (
