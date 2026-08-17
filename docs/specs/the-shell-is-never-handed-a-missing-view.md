@@ -71,6 +71,24 @@ the predecessor's c8 makes that check on the same branch. A "deletes more than i
 dropped: c2 already proves the branches left rather than being asserted away, which is the fact the
 line count was standing in for, and `main...HEAD` would have measured the predecessor's additions too.
 
+**Both open questions took the narrow answer, under the author's 2026-08-17 ruling.** `MapPane` and
+`discovery.ts` go on taking a view; `drawnFor`'s parameter loses its null and nothing else moves, and
+`walkLine` keeps its journey guard, because a view with no journey under way is a state the engine
+still produces. `NOWHERE` survives in `authoringSurface.ts` and `standingIn` stops reaching for it:
+c1 makes the state it answered for unreachable, and four test files name the value as the standing
+with no entities, so deleting it would mint that literal three times over.
+
+**c2's scanner walks `src/ui` with tests included**, one flag wider than the `SOURCES` set the file's
+other rules use. It earned the width on the first run: 39 `snapshot().view!` assertions across five
+test files, none of them in the ten files this spec counted, and the assertion is the exact spelling
+the clause says is not a fix.
+
+**Three survivors are declared rather than closed, and two are filed as findings.** `SkillsPane`'s
+rate clock and `MapPane`'s recentre floor are read only after component state a click sets, which
+CLAUDE.md's testing rule 5 leaves to the author. The driver's arming log is redundant with the tick
+that follows it for every fixture in the tree — the only thing the arming view carries that the tick
+cannot is what the world said as the action began, and nothing in the tree says anything there.
+
 ## Open questions
 
 - Whether `MapPane` and `discovery.ts` keep taking a view at all, or take the fields they draw, is the

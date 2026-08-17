@@ -1015,6 +1015,13 @@
             "src/ui/SettingsPane.tsx"
           ],
           "note": "produced by the-shell-draws-what-the-session-answers: whether a power is dev-only is a mark on the command table, and DevOnly is the one place that mark is drawn"
+        },
+        {
+          "name": "the published view is never a maybe",
+          "paths": [
+            "src/ui/surface.test.ts"
+          ],
+          "note": "produced by the-shell-is-never-handed-a-missing-view: DriverSnapshot.view is PlayView, and the rule reads every module under src/ui -- tests included -- for the eight ways of asking whether there is one, the non-null assertion among them, plus the published type standing in a union with null or undefined. The subjects are the directory's, so a module written next month is scanned the day it exists, and the file holds the word and the operators apart in its own source so it is scanned by the rule rather than exempt from it."
         }
       ]
     },
