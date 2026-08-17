@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { slotStore } from '../runtime/store';
 import { browserSlots } from './browserStore';
-import { EDITOR_SLOT, FORGOTTEN, recorded, remembered, type Where } from './editorMemory';
+import { EDITOR_SLOT, FORGOTTEN, recorded, remembered, type Editing } from './editorMemory';
 import { pageStorage } from './pageStorage';
 
 // One distinct value per thing the memory holds, exhaustive over the type: a
-// field added to `Where` stops this compiling until it has a value here, and
+// field added to `Editing` stops this compiling until it has a value here, and
 // the walk below then holds the round trip to carrying it.
-const MOVED: { [K in keyof Where]: Where[K] } = {
+const MOVED: { [K in keyof Editing]: Editing[K] } = {
   surface: 'global',
   kind: 'entity',
   open: 'location tutorial-island.beach',
@@ -17,7 +17,7 @@ const MOVED: { [K in keyof Where]: Where[K] } = {
   map: { pan: { x: -120.5, y: 88 }, zoom: 2.25, plane: -1 },
 };
 
-const KEYS = Object.keys(FORGOTTEN) as Array<keyof Where>;
+const KEYS = Object.keys(FORGOTTEN) as Array<keyof Editing>;
 
 const overStorage = (): ReturnType<typeof slotStore> => slotStore(browserSlots(((storage) => () => storage)(pageStorage())), () => 0);
 
@@ -30,7 +30,7 @@ describe('where the author was survives the tab (c10)', () => {
     expect(KEYS.length).toBeGreaterThan(5);
 
     for (const key of KEYS) {
-      const where: Where = { ...FORGOTTEN, [key]: MOVED[key] };
+      const where: Editing = { ...FORGOTTEN, [key]: MOVED[key] };
 
       expect(remembered(recorded(where)), key).toEqual(where);
       // And the field really moved, so a round trip that dropped it would show.

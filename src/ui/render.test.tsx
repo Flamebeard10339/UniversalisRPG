@@ -10,11 +10,17 @@ import { App } from './App';
 import { PER_UNIT } from './discovery';
 import { createDriver, type Driver } from './driver';
 import { MapPane } from './MapPane';
+import { FORGOTTEN } from './editorMemory';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { LABELS, type LabelId } from './labels';
 import { wordsOf } from './words';
 import { LAYERS, OPENING, toLayer, toSubpage } from './nav';
+
+// What the map is handed beyond the view: the one list a drag stages out of,
+// and where it is looking. Empty here — every case below is about what is drawn
+// rather than about what a drag does, which mapEdit.test.ts owns.
+const MAPPING = { sections: [], where: FORGOTTEN.map, onWhere: () => undefined, onSend: () => undefined, onNote: () => undefined };
 
 // A run that is under way and going nowhere, which is what a test about what
 // is drawn wants: no timer, and the same frame however long the test takes.
@@ -29,8 +35,17 @@ const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>
 // one of those runs: a control named for a screen reader is prose a player
 // reads, and leaving it out would exempt from the clause the one place a glyph
 // control is allowed to say anything at all.
+// The tool's own channel, taken out whole. Whose words a run is is the
+// discriminant `CommandOutput` already carries and the transcript already
+// holds; a component declares it on the element it draws, so a parser
+// diagnostic and a section an author is editing are not read as prose the
+// shell wrote. It is the exemption the REPL's tool lines already have, derived
+// from the markup rather than from a region of this file naming components.
+const TOOL_CHANNEL = /<(\w+)[^>]*\bdata-words="tool"[^>]*>[\s\S]*?<\/\1>/g;
+
 function readable(html: string): string[] {
   return html
+    .replace(TOOL_CHANNEL, '')
     .replace(/aria-label="([^"]*)"/g, '\n$1\n')
     .replace(/<[^>]*>/g, '\n')
     .split('\n')
@@ -411,7 +426,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, LOOK_OUT));
     const view = driver.snapshot().view!;
 
-    const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={['surveyed.overlook']} generation={1} onChoose={() => undefined} />));
+    const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={['surveyed.overlook']} generation={1} onChoose={() => undefined} {...MAPPING} />));
 
     expect(drawn.find((entry) => entry.id === 'surveyed.overlook')!.flashing).toBe(true);
     expect(drawn.find((entry) => entry.id === 'surveyed.workshop')!.flashing).toBe(false);
@@ -425,7 +440,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, 'travel:surveyed.cove'));
     const view = driver.snapshot().view!;
 
-    const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />);
+    const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />);
 
     expect(view.journey).toEqual({ to: 'surveyed.cove', legs: ['surveyed.overlook', 'surveyed.cove'] });
     expect(places(html).map((node) => [node.id, node.walk])).toEqual([
@@ -443,7 +458,7 @@ describe('what the shell puts on the screen', () => {
     const driver = createDriver([SURVEYED]);
     driver.choose(position(driver, LOOK_OUT));
 
-    const html = renderToStaticMarkup(<MapPane words={shellWord} view={driver.snapshot().view!} arrivals={[]} generation={0} onChoose={() => undefined} />);
+    const html = renderToStaticMarkup(<MapPane words={shellWord} view={driver.snapshot().view!} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />);
 
     expect(driver.snapshot().view!.journey).toBeNull();
     expect(places(html).every((node) => node.walk === undefined)).toBe(true);
@@ -592,7 +607,7 @@ describe('what the shell puts on the screen', () => {
       const driver = createDriver([STOREYS]);
       const view = driver.snapshot().view!;
 
-      const strip = floors(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+      const strip = floors(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />));
 
       expect(view.discovered.map((place) => place.z).sort()).toEqual([0, 1]);
       expect(strip.offered.sort()).toEqual([0, 1]);
@@ -606,7 +621,7 @@ describe('what the shell puts on the screen', () => {
       const driver = createDriver([STOREYS]);
       const view = driver.snapshot().view!;
 
-      const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />);
+      const html = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />);
 
       expect(html).toContain('data-drive="map.recentre"');
       expect(onScreen(readable(html), shellWord('recentre'))).toBe(true);
@@ -617,7 +632,7 @@ describe('what the shell puts on the screen', () => {
       driver.choose(position(driver, LOOK_OUT));
       const view = driver.snapshot().view!;
 
-      const under = drawnAt(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+      const under = drawnAt(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />));
 
       // Nothing has been dragged, so the sheet sits centred on what it is
       // showing at a zoom of 1. Worked out from the places the engine
@@ -680,7 +695,7 @@ describe('what the shell puts on the screen', () => {
       driver.choose(position(driver, LOOK_OUT));
       const view = driver.snapshot().view!;
 
-      const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} />));
+      const drawn = places(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} onChoose={() => undefined} {...MAPPING} />));
 
       expect(drawn.map((node) => node.id).sort()).toEqual(view.discovered.map((place) => place.id).sort());
       // Where the player is standing is the one with no travel out to it.

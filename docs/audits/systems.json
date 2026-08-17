@@ -348,6 +348,7 @@
         "src/runtime/stopping.test.ts",
         "src/runtime/store.test.ts",
         "src/runtime/store.ts",
+        "src/runtime/storeContract.ts",
         "src/runtime/time.test.ts",
         "src/runtime/translationSurvival.test.ts",
         "src/runtime/tuning.ts",
@@ -628,6 +629,13 @@
             "src/runtime/saveSlots.test.ts"
           ],
           "note": "produced by auto-save-export-and-load: which slot a session writes, whether the autosave cadence has elapsed, the dev slot pair, and the report a surface renders instead of tracking its own copy"
+        },
+        {
+          "name": "the slot driver contract",
+          "paths": [
+            "src/runtime/storeContract.ts"
+          ],
+          "note": "produced by the-gui-authors-through-the-same-door: one set of cases every SlotDriver is held to"
         }
       ]
     },
@@ -723,6 +731,7 @@
         "src/ui/App.tsx",
         "src/ui/Console.tsx",
         "src/ui/DragSheet.tsx",
+        "src/ui/EditPane.tsx",
         "src/ui/FloatingText.tsx",
         "src/ui/Home.tsx",
         "src/ui/Ledger.tsx",
@@ -745,6 +754,10 @@
         "src/ui/agent/testHarness.ts",
         "src/ui/asking.test.ts",
         "src/ui/asking.ts",
+        "src/ui/authoringSurface.test.ts",
+        "src/ui/authoringSurface.ts",
+        "src/ui/browserStore.test.ts",
+        "src/ui/browserStore.ts",
         "src/ui/bundle.test.ts",
         "src/ui/choices.test.ts",
         "src/ui/choices.ts",
@@ -755,6 +768,10 @@
         "src/ui/dragSheet.test.ts",
         "src/ui/driver.test.ts",
         "src/ui/driver.ts",
+        "src/ui/editControls.test.ts",
+        "src/ui/editControls.ts",
+        "src/ui/editorMemory.test.ts",
+        "src/ui/editorMemory.ts",
         "src/ui/format.test.ts",
         "src/ui/format.ts",
         "src/ui/gesture.test.ts",
@@ -763,9 +780,12 @@
         "src/ui/layers.test.ts",
         "src/ui/levelling.test.ts",
         "src/ui/levelling.ts",
+        "src/ui/mapEdit.test.ts",
+        "src/ui/mapEdit.ts",
         "src/ui/moments.test.ts",
         "src/ui/nav.test.ts",
         "src/ui/nav.ts",
+        "src/ui/pageStorage.ts",
         "src/ui/pageZoom.test.ts",
         "src/ui/pages.test.ts",
         "src/ui/phone.test.tsx",
@@ -942,6 +962,25 @@
             "src/ui/levelling.ts"
           ],
           "note": "produced by skills-are-a-page-and-xp-is-felt: the level inside its ring, and the lines that count up as experience and things arrive"
+        },
+        {
+          "name": "authoring surfaces",
+          "paths": [
+            "src/ui/authoringSurface.ts",
+            "src/ui/editControls.ts",
+            "src/ui/EditPane.tsx",
+            "src/ui/mapEdit.ts",
+            "src/ui/editorMemory.ts"
+          ],
+          "note": "produced by the-gui-authors-through-the-same-door"
+        },
+        {
+          "name": "localStorage persistence",
+          "paths": [
+            "src/ui/browserStore.ts",
+            "src/ui/pageStorage.ts"
+          ],
+          "note": "produced by the-gui-authors-through-the-same-door"
         }
       ]
     },

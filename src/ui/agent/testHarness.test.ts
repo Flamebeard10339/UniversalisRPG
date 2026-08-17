@@ -56,6 +56,8 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     serialized: () => null,
     localChanges: () => null,
     baseSources: () => [],
+    editorMemory: { read: () => null, write: (text) => void calls.push(`editorMemory:${text}`) },
+    note: (text) => void calls.push(`note:${text}`),
   };
 }
 

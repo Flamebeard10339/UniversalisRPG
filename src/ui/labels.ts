@@ -40,6 +40,17 @@ export const LABELS = {
   // its direction, and a language that puts the number first can say so.
   position: 'engine.shell.node.position',
   slot: 'engine.shell.node.slot',
+  // The editing surfaces and their controls. `local` and `global` name two of
+  // the three filters over the one list; the third is the map, which already
+  // has a word.
+  local: 'engine.shell.local',
+  global: 'engine.shell.global',
+  'every-kind': 'engine.shell.every-kind',
+  section: 'engine.shell.section',
+  stage: 'engine.shell.stage',
+  unstage: 'engine.shell.unstage',
+  copy: 'engine.shell.copy',
+  place: 'engine.shell.place',
 } as const satisfies Record<string, EngineKey>;
 
 export type LabelId = keyof typeof LABELS;

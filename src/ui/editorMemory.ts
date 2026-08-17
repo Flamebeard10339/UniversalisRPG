@@ -14,7 +14,7 @@ export interface MapWhere {
   plane: number | null;
 }
 
-export interface Where {
+export interface Editing {
   surface: SurfaceId;
   // What the Global list is narrowed to, and null for every kind.
   kind: string | null;
@@ -28,7 +28,7 @@ export interface Where {
   map: MapWhere;
 }
 
-export const FORGOTTEN: Where = {
+export const FORGOTTEN: Editing = {
   surface: 'local',
   kind: null,
   open: null,
@@ -60,7 +60,7 @@ function mapWhere(value: unknown): MapWhere {
 // says less than this one asks for, and forgetting where the map was looking
 // because a field it never held is missing would be the whole memory lost for
 // the newest thing in it. What it cannot make sense of, it forgets.
-export function remembered(stored: string | null): Where {
+export function remembered(stored: string | null): Editing {
   if (stored === null) return FORGOTTEN;
   let parsed: unknown;
   try {
@@ -81,4 +81,4 @@ export function remembered(stored: string | null): Where {
   };
 }
 
-export const recorded = (where: Where): string => JSON.stringify(where);
+export const recorded = (where: Editing): string => JSON.stringify(where);

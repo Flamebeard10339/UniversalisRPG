@@ -24,6 +24,25 @@ interface Pinch {
   scale: number;
 }
 
+// A thing drawn on the sheet, picked up and carried across it. The sheet owns
+// this rather than whoever drew the thing, for the two reasons the pan is
+// owned here: the arithmetic is the sheet's — a gesture is measured on the
+// screen and the sheet is drawn scaled — and a drag on a thing and a drag on
+// the ground under it are the same gesture, so only one of them can be it.
+export interface Carried {
+  id: string;
+  // How far it has come since it was picked up, in the sheet's own pixels.
+  by: Point;
+}
+
+// What a rider puts on a thing it wants carried. The sheet reports where it was
+// let go of once, on release: nothing is moved by this, only drawn moved.
+export interface Grip {
+  onPointerDown(event: React.PointerEvent<HTMLElement>): void;
+  onPointerMove(event: React.PointerEvent<HTMLElement>): void;
+  onPointerUp(event: React.PointerEvent<HTMLElement>): void;
+}
+
 // Where the sheet has got to, and everything that moves it. Built by the hook
 // and handed to the component, so the caller holding it can settle the sheet
 // from a control of its own without reaching into the gesture.
@@ -44,6 +63,15 @@ export interface SheetHold {
   // because a click arrives after the release that clears the gesture, and a
   // control asking mid-click whether it was dragged would always be told no.
   travelled: { current: boolean };
+  // What is being carried across the sheet, and null when nothing is.
+  carried: Carried | null;
+  // Whether something is under the finger right now. A ref rather than the
+  // state above, because the sheet's own press handler runs in the same
+  // gesture and a state set is not there yet when it does.
+  gripped: { current: { id: string } | null };
+  // The handlers that pick one thing up, and null where the caller is not
+  // offering to carry anything — which is what makes a press a tap.
+  grip(id: string): Grip;
 }
 
 const AT_REST: Point = { x: 0, y: 0 };
@@ -51,11 +79,29 @@ const AT_REST: Point = { x: 0, y: 0 };
 // How far a finger travels before what it is doing is a drag and not a tap.
 const DRAG_SLOP_PX = 6;
 
-export function useSheetHold(points: readonly Point[], measured: { current: Array<HTMLElement | null> }, keyed: string): SheetHold {
+// Where the sheet opens, for a caller that remembers where it was left. A
+// caller that does not passes none and opens at rest.
+export interface Opening {
+  pan: Point;
+  zoom: number;
+}
+
+export function useSheetHold(
+  points: readonly Point[],
+  measured: { current: Array<HTMLElement | null> },
+  keyed: string,
+  opening?: Opening,
+  // Where a thing was let go of, in the sheet's own pixels from where it was
+  // drawn. Reported once, on release: what the caller does about it is the
+  // caller's, and until then the thing is only drawn somewhere else.
+  onCarried?: (id: string, by: Point) => void,
+): SheetHold {
   const gesture = useRef<Grab | Pinch | null>(null);
   const travelled = useRef(false);
-  const [pan, setPan] = useState<Point>(AT_REST);
-  const [zoom, setZoom] = useState(1);
+  const grip = useRef<{ id: string; from: Point } | null>(null);
+  const [carried, setCarried] = useState<Carried | null>(null);
+  const [pan, setPan] = useState<Point>(opening?.pan ?? AT_REST);
+  const [zoom, setZoom] = useState(opening?.zoom ?? 1);
   const [node, setNode] = useState<Size>({ width: 0, height: 0 });
   const box = bounds(points);
 
@@ -95,6 +141,33 @@ export function useSheetHold(points: readonly Point[], measured: { current: Arra
     dragged: () => travelled.current,
     gesture,
     travelled,
+    carried,
+    grip: (id) => {
+      const by = (event: { clientX: number; clientY: number }): Point => {
+        const from = grip.current?.from ?? AT_REST;
+        return { x: (event.clientX - from.x) / zoom, y: (event.clientY - from.y) / zoom };
+      };
+      return {
+        onPointerDown: (event) => {
+          event.stopPropagation();
+          event.currentTarget.setPointerCapture(event.pointerId);
+          grip.current = { id, from: { x: event.clientX, y: event.clientY } };
+          setCarried({ id, by: AT_REST });
+        },
+        onPointerMove: (event) => {
+          if (grip.current?.id !== id) return;
+          setCarried({ id, by: by(event) });
+        },
+        onPointerUp: (event) => {
+          if (grip.current?.id !== id) return;
+          const rested = by(event);
+          grip.current = null;
+          setCarried(null);
+          onCarried?.(id, rested);
+        },
+      };
+    },
+    gripped: grip,
   };
 }
 
@@ -120,6 +193,7 @@ export function DragSheet({
   const release = useRef<() => void>(() => undefined);
   const gesture = hold.gesture;
   const centre = centreOf(hold.box);
+  const carrying = (): boolean => hold.gripped.current !== null;
 
   // From the middle of the window, which is what the pan is an offset from.
   const fromCentre = (x: number, y: number): Point => {
@@ -186,7 +260,9 @@ export function DragSheet({
         hold.settle({ x: panAfterZoom(hold.pan.x, focal.x, hold.zoom, zoom), y: panAfterZoom(hold.pan.y, focal.y, hold.zoom, zoom) }, zoom);
       }}
       onMouseDown={(event) => {
-        if (event.button !== 0) return;
+        // A pointerdown on a thing being carried has already happened by now,
+        // and the sheet must not also start panning under it.
+        if (event.button !== 0 || carrying()) return;
         event.stopPropagation();
         const move = (native: MouseEvent): void => movePan(fromCentre(native.clientX, native.clientY));
         window.addEventListener('mousemove', move);
@@ -198,7 +274,7 @@ export function DragSheet({
         beginPan(fromCentre(event.clientX, event.clientY));
       }}
       onTouchStart={(event) => {
-        if (event.touches.length === 0) return;
+        if (event.touches.length === 0 || carrying()) return;
         event.stopPropagation();
         const move = (native: TouchEvent): void => {
           const moved = touchPoints(native.touches);

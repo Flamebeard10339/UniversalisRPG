@@ -6,6 +6,7 @@ import { BASE_LANGUAGE, localizerFor, type Localizer } from '../runtime/localize
 import { createSaveContext, type SaveContext } from '../runtime/saveSlots';
 import { sessionLocalizer, serializeSession, startSession, view, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
+import { EDITOR_SLOT } from './editorMemory';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 import { createTransientChannel, type TransientChannel } from './transient';
 
@@ -47,6 +48,15 @@ export interface Driver {
   // surface reads a shipped section's text out of. The sources themselves, so
   // nothing here re-renders one.
   baseSources(): readonly ModuleSource[];
+  // Where the shell keeps its own place — which section is open, where the map
+  // is looking — in the same store the edits are in, so there is one thing to
+  // be lost and it is not lost (c10). Opaque here: what is in it belongs to
+  // whoever is standing in it, the way a payload belongs to a slot.
+  editorMemory: { read(): string | null; write(text: string): void };
+  // What the shell has to say on the tool's own channel. The command table has
+  // no view of a gesture, so a drag it never heard about — one the map refused
+  // before a line existed — is said here or nowhere (c8, c13).
+  note(text: string): void;
 }
 
 export interface DriverOptions {
@@ -146,6 +156,15 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     for (const listener of listeners) listener();
   };
 
+  // A store that refused something this layer asked for on its own account,
+  // said out loud on the same channel the command table refuses on. The column
+  // counts a line it is told again rather than writing it out, so a page that
+  // asks every keystroke says it once (c13).
+  const complain = (text: string): void => {
+    current = { ...current, transcript: appendOutputs(current.transcript, [{ kind: 'message', words: 'tool', tone: 'warn', text }]) };
+    publish();
+  };
+
   const close = (cancelled: boolean): void => {
     const run = running;
     if (!run || !context) return;
@@ -229,6 +248,24 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       }
     },
     baseSources: () => authoring.baseSources,
+    note: complain,
+    editorMemory: {
+      read: () => {
+        try {
+          return save.store.read(EDITOR_SLOT)?.payload ?? null;
+        } catch (error) {
+          complain(`where the editor was could not be read: ${because(error)}`);
+          return null;
+        }
+      },
+      write: (text) => {
+        try {
+          save.store.write(EDITOR_SLOT, text);
+        } catch (error) {
+          complain(`where the editor was could not be kept: ${because(error)}`);
+        }
+      },
+    },
   };
 
   if (import.meta.env.DEV && typeof window !== 'undefined') {
