@@ -428,3 +428,112 @@ repository names first. The proof moved with it, to
   uncommitted), base pass (main has not moved past the merge base). The two legs that fail are the two this
   pass exists to clear: "1 open member" and "has no recorded audit pass". Re-runnable by the next pass with
   the same one command.
+
+### Pass 2 — 2026-08-17
+
+- base: `7a0081a19f28d556372123f479f8d0baec702d7c`
+- head: `720d59698a07477502232ddfa716a7d319447cf7`
+- proof 1: met — vitest src/ui/driver.test.ts "opens on the shipped content alone, says why, and plays exactly as with no
+  local module at all" and "leaves the text in the store to read". Re-verified after the triage restructure: the
+  clause's literal subject, a local module that will not load, still opens on SHIPPED_SOURCES alone with the reason
+  on the tool channel and the broken text still in the slot. Mutation c1 (src/ui/driver.ts
+  `setAside = localTrouble(loaded);` -> `setAside = null;`, the line the triage renamed) KILLED by that named test,
+  re-run at its own file. Noted against the neighbour rather than against this sentence: a local module that does
+  load and leaves the merged universe unstartable now costs the whole session, which is graded under c4 and c5.
+- proof 2: met — vitest src/ui/driver.test.ts "clears from any state that offers it, and lands where a first-ever launch
+  lands". Unchanged by the triage. Mutation (src/ui/driver.ts the send of `/local clear` changed to `/local show`)
+  KILLED by that named test. src/ui holds no second spelling of the fresh-module write.
+- proof 3: met — vitest src/ui/authoringSurface.test.ts "reports the address and the file, for every kind a module can
+  declare". The kind sweep still derives its subjects from SCHEMAS. Mutation (src/ui/authoringSurface.ts `shadowed`'s
+  return of the shadowing row replaced by an empty list) KILLED by that named test. The spec's proof path was
+  corrected to this file in the triage and now points at the test that exists.
+- proof 4: unmet — There is a loader state with no action out of it, reached and measured. A local module that loads clean
+  and leaves the merged universe with no starting location is reported as at:base, leaves view null, and offers only
+  `reopen` — which re-runs the same load over the same store and returns the identical fault. Measured through the
+  real driver over a two-location base with the local module `# remove location.base.hall`: before driver.reopen()
+  and after it, fault is at:base why:"no # location is marked starting, so a new game has nowhere to begin", hasView
+  false, remedies ['reopen']. The same probe against the pre-triage driver (git show 2a93ced:src/ui/driver.ts,
+  restored after) returns at:local, hasView true, remedies ['clear-local','reopen'], so this is what commit 720d596
+  changed. Cause: `openOver` now runs `open(loaded, ...)` — and therefore startSession — inside the single edge catch
+  that answers base. The catch's own comment asserts that the one thing which raises is a registry no session can
+  start in, "which is the base's"; that is false, and it is false for exactly the route the Deliverable names, a
+  local module whose `# remove` moves the base out from under the session.
+  Two further reasons this clause is not carried. The derived table is not derived on the side that matters: BASES
+  carries 'has nowhere to begin' and LOCALS has no counterpart, so its four hand-written local states cannot reach
+  the case above. And the base arm's remedy has no executable evidence at all, since `tryAgain` in src/ui/App.tsx
+  splits on `typeof window === 'undefined'`, the suite runs in node and takes driver.reopen(), a browser takes
+  window.location.reload(), and the only proof of the shipped branch is a readFileSync of App.tsx checked for that
+  string — a source-text grep that cannot fail for the reason the clause is about. Mutation aimed here
+  (src/ui/driver.ts remediesFor's local arm collapsed to ['reopen']) KILLED, but by the sibling test "draws every
+  remedy there is, across the faults there are" after the clause's own named test survived it, because that named
+  test compares the drawn buttons against remediesFor's own output and so moves with the mutation.
+- proof 5: unmet — The same measurement. The state above is a fault in the local module — the base loads on its own, the
+  author's staged text is what makes the session unstartable — and it is labelled base, so `clear-local` is withheld
+  and the author is told to fix a shipped file that is not broken. That is the mirror of the sentence this clause
+  forbids, and it is unrecoverable: a reload reads the same slot, and the one control that would clear it is not
+  drawn. The clause's own test, vitest src/ui/driver.test.ts "offers clearing where the local module is at fault and
+  nowhere else", passes because its expectation is derived from the CELLS table's own labels
+  (cell.local.startsWith('will not')), so a fifth local state would be graded by the name somebody gave it rather
+  than by which module is at fault. Mutation (src/ui/driver.ts the edge catch's fault relabelled from base to local)
+  KILLED by that named test, which shows the label is watched in the cases the table reaches and not that the table
+  reaches the cases.
+- proof 6: met — vitest src/ui/devMode.test.tsx "says whose session this is from every page there is, and says nothing
+  while it is the player's", which walks LAYERS x subpages (asserted more than four) and renders App at each: no
+  strip anywhere as the player, a strip everywhere after `/dev on`. The gating half still holds by construction —
+  DevOnly.tsx is the only module in the tree that writes data-dev, asserted by walking every shipped module under
+  src/ui — and App.tsx reads `const dev = snapshot.dev` once (line 163) and hands that one value to DevBanner,
+  EditPane, SettingsPane and MapPane, so there is no second answer for the strip and the gate to disagree over.
+  Three mutations, all KILLED by the walk: the strip drawn always (App.tsx DevBanner given a literal dev), the strip
+  not drawn at all (the element deleted), and the strip drawn beside the gate rather than through it (DevBanner.tsx
+  altered). The third was killed only by a readFileSync of DevBanner.tsx checked for the gate's text, a source-text
+  assertion rather than a property; filed as a finding, not as a reason to withhold the grade, since the walk carries
+  the behavioural half on its own.
+- proof 7: met — vitest src/ui/devMode.test.tsx "takes the snapshot on the way in and puts the session back on the way
+  out", measured as bytes, plus the triage's new "leaves the staged edits where they were, because they are not a
+  game" — a `/dsl` edit staged inside the slot survives `/dev off` and the restored session is playing it, which
+  settles what pass 1 asked and is now written into the spec's Decisions rather than only into a worker's note.
+  Mutation (src/ui/devMode.ts devLine inverted, so the toggle spells the opposite direction) KILLED by the byte test.
+- proof 8: met — vitest src/runtime/command.test.ts "marks the dev-only commands, and the tokens are read off the marks",
+  and src/ui/devMode.test.tsx "marks at least one, and every mark is a line both drivers can run", which walks
+  COMMANDS.filter(spec => spec.dev). Mutation (src/runtime/command.ts devTokenIn pointed at a token nothing spells,
+  which empties the derived set) KILLED by the named command test. The clause's sentence was edited in the triage
+  from "recorded by the recorder and replayable" to "what moved the world is recorded and replayable"; judged and
+  accepted as a correction rather than a weakening, because the reasoning — a speed: directive would replay as a
+  no-op, applyDirective having no LiveSettings to turn — is written down in the spec's Decisions and was already the
+  settled reading at pass 1. The runtime seam it rides on is clean: relocateTo in src/runtime/effects.ts is one
+  statement of standing somewhere, and relocate:, a placement into an unset location and goto: all go through it
+  rather than assigning state.location.
+- proof 9: met — vitest src/ui/devMode.test.tsx "reaches a place no road reaches, and leaves the state an arrival leaves"
+  and "sets off for a place exactly as a choice does while the session is the player's". One decision point,
+  tappedPlace(dev, place, goes). Mutation (src/ui/devMode.ts the dev arm made to return null instead of the teleport
+  line) KILLED by the named test.
+- proof 10: met — vitest src/ui/devMode.test.tsx "hands over what was typed and lets the command refuse it" and "declares
+  no second multiplier in src/ui, no default and no clamp". Re-verified against the rebuilt control: SettingsPane
+  holds a typed string and sends on submit, re-keyed on speed so a line typed at the console moves the field, and
+  speedLine hands the string over unparsed — so the default and the clamp stay in /speed's own parser, which is what
+  the clause asks. Mutation (src/ui/devMode.ts speedLine made to spell a fixed multiplier regardless of what was
+  typed) KILLED by the named test.
+- proof 11: met — vitest src/ui/devMode.test.tsx "refuses every dev power and says so, over the marks rather than a
+  list", "plays a whole session with no dev slot anywhere in the store" and "leaves the CLI ungated"; whole suite
+  green. Mutation (src/ui/devMode.ts devRefusal's read of devTokenIn discarded, so the refusal is never derived)
+  KILLED by the named test. The clause's enumerated subjects all hold; its summary sentence still does not, since
+  the Edit subpage's staging surfaces and the map's Place button moved behind the gate — the triage wrote that loss
+  into the spec's Decisions by name, which is what pass 1 asked for, so it is a declared consequence of c6 rather
+  than an undiscovered one.
+- proof 12: met — vitest src/runtime/integration.test.ts green and npm test green under merge-ready.
+  git diff --stat main...HEAD -- content/ is four added lines in content/engine-en.dsl and nothing else, and the
+  clause's command proof over tutorial-island.dsl and combat-expansion.dsl is empty — the shipped game content is
+  untouched, which is what the clause's own sentence about a recovery path needing content changed is aimed at. The
+  four lines are engine vocabulary keys mirrored into ENGINE_KEYS and LABELS, forced by src/ui/render.test.tsx
+  refusing any run of text on screen that is neither an engine value nor a LABELS key; the triage added no fifth key,
+  and the dev strip reuses engine.shell.dev, which the Settings row already carries. The proof line rewritten in the
+  triage is narrower than the one it replaced and is filed as a finding rather than held against the grade.
+- proof 13: met — vitest src/ui/surface.test.ts "names on every control the harness action that drives it, or why it
+  needs none", still passing over a tree that now has the dev strip in it (the strip is a p element, not a control,
+  so it adds no obligation). Mutation (src/ui/FaultBanner.tsx the reopen control's data-drive misspelt, so it names
+  an action the harness does not offer) KILLED by that named test.
+- proof 14: unmet — npm run tasks -- merge-ready on 720d596: tsc pass, npm test pass, layer-check pass, doctor pass (27
+  warnings, none failing the leg), bytes pass, tree pass, base pass — and audit-status FAIL, exit 1: one tracked file
+  belongs to no system and is not declared unowned in docs/audits/systems.json, src/ui/DevBanner.tsx. That leg passed
+  at 2a93ced, so the triage commit broke it: commit 9aaac29 registered the six files the branch added and 720d596
+  added a seventh without extending the manifest. Re-runnable with the one command.
