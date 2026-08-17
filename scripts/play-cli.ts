@@ -2,8 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
-import { RuntimeError } from '../src/runtime/runtime';
-import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
+import { loadUniverseWithDiagnostics } from '../src/content/registry';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { type ModuleSource } from '../src/content/universe';
 import { initialLocalChangesModule } from '../src/content/localChanges';
@@ -11,7 +10,8 @@ import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './li
 import { fileSlots } from './lib/slotFile';
 import { createSaveContext, type SaveContext } from '../src/runtime/saveSlots';
 import { type Localized, type Localizer } from '../src/runtime/localized';
-import { serializeSession, sessionLocalizer, startSession, view, type PlayChoice, type PlayStatus, type PlayView } from '../src/runtime/session';
+import { openUniverse, type OpenedUniverse } from '../src/runtime/openUniverse';
+import { serializeSession, sessionLocalizer, view, type PlayChoice, type PlayStatus, type PlayView } from '../src/runtime/session';
 import {
   askedOption,
   createTicker,
@@ -560,25 +560,28 @@ export function loadModportalSources(dir: string): ModportalLoadResult {
 
 export interface Repl {
   context: CommandContext;
-  // Written to stderr by main, because a disabled module is not part of the
-  // game being played.
-  diagnostics: string[];
+  // What the door reported about the universe this session opened over, whole.
+  // Written to stderr by main, because a module the loader disabled is not part
+  // of the game being played and neither is a requirement it did not meet.
+  opened: OpenedUniverse;
   opening: readonly ReplLine[];
 }
 
-// Everything between having the sources and taking the first line: load the
-// universe, start a session, take the opening view, and build the one context
-// every line afterwards goes through. Lifted out of main so that the drift
-// proof drives the REPL rather than a second copy of it — a copy is what made
-// the previous cross-driver comparison measure only one of the two drivers.
+// Everything between having the sources and taking the first line: open the
+// universe through the one door, take the opening view, and build the one
+// context every line afterwards goes through. Lifted out of main so that the
+// drift proof drives the REPL rather than a second copy of it — a copy is what
+// made the previous cross-driver comparison measure only one of the two
+// drivers. `withEngineLocale` stays on this side of the door because it reads
+// through node:fs and the browser gets the same file through its content glob.
 export function openRepl(sources: readonly ModuleSource[], options: { authoring?: AuthoringContext; save?: SaveContext; driving?: boolean } = {}): Repl {
-  const loaded = loadUniverseWithDiagnostics(withEngineLocale(sources));
-  const session = startSession(loaded.registry);
+  const opened = openUniverse(withEngineLocale(sources), { save: options.save });
+  const { session } = opened;
   const recorder: Recorder = { history: [], startSave: serializeSession(session) };
   const opening = view(session);
   return {
     context: newContext(session, opening, { recorder, authoring: options.authoring, save: options.save, driving: options.driving }),
-    diagnostics: loaded.diagnostics.map((each) => `Disabled module: ${formatModuleDiagnostic(each)}`),
+    opened,
     opening: formatView(opening, sessionLocalizer(session)),
   };
 }
@@ -598,17 +601,8 @@ async function main(): Promise<void> {
   const authoring = fileAuthoring(baseSources, dependencies, args.localFile);
   const sources = existsSync(localPath) ? [...baseSources, authoring.localSource] : baseSources;
 
-  let repl: Repl;
-  try {
-    repl = openRepl(sources, { authoring, save: args.savesDir ? fileSaves(args.savesDir) : undefined, driving: liveMode });
-  } catch (err) {
-    if (err instanceof RuntimeError) {
-      console.error(`Error: ${err.message}`);
-      return;
-    }
-    throw err;
-  }
-  for (const each of repl.diagnostics) console.error(each);
+  const repl = openRepl(sources, { authoring, save: args.savesDir ? fileSaves(args.savesDir) : undefined, driving: liveMode });
+  for (const problem of repl.opened.problems) console.error(`Problem: ${problem.message}`);
   const ctx = repl.context;
   const localizer = (): Localizer => sessionLocalizer(ctx.session);
   print(repl.opening);

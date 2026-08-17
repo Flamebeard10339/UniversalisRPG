@@ -7,8 +7,8 @@ import { startSession, view, type PlayView } from '../runtime/session';
 import { slotStore, type SlotDriver } from '../runtime/store';
 import { browserSlots, SLOT_PREFIX, STORAGE_REFUSALS } from './browserStore';
 import { listLocalSections, LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
-import type { ModuleSource } from '../content/universe';
-import { createDriver, FAULT_AT, REMEDIES, remediesFor, type Driver } from './driver';
+import { OPENING_CELLS, type OpeningCell } from '../runtime/openUniverseFixture';
+import { createDriver, REMEDIES, remediesFor, type Driver } from './driver';
 import { noStorage, pageStorage, REFUSING as BROWSER_REFUSALS } from './agent/pageStorage';
 import { EDITOR_SLOT, FORGOTTEN, recorded } from './editorMemory';
 import { SHIPPED_SOURCES } from './shippedContent';
@@ -64,7 +64,7 @@ function handTicker(): Ticker & { advance(elapsedMs: number): void; stops: numbe
 
 function shown(driver: Driver): PlayView {
   const view = driver.snapshot().view;
-  if (!view) throw new Error(driver.snapshot().fault?.why ?? 'no view');
+  if (!view) throw new Error(driver.snapshot().problems.map((problem) => problem.message).join('; ') || 'no view');
   return view;
 }
 
@@ -82,7 +82,7 @@ describe('the GUI driver', () => {
   it('opens the shipped session and logs the place it opened in', () => {
     const driver = createDriver(SHIPPED_SOURCES);
 
-    expect(driver.snapshot().fault).toBeNull();
+    expect(driver.snapshot().problems).toEqual([]);
     const view = shown(driver);
     expect(view.location.id).toBe('tutorial-island.guide-house');
     expect(texts(driver)).toEqual([view.location.title, view.location.description]);
@@ -238,12 +238,13 @@ describe('the GUI driver', () => {
     expect(shown(driver)).toEqual(repl.view);
   });
 
-  it('carries the fault when a universe cannot open, rather than throwing at the mount', () => {
+  it('carries the problem when a universe cannot open, and stands the shell somewhere anyway', () => {
     const driver = createDriver([{ name: 'empty', text: '# info empty\nversion: 0.0.0\npack: test\n' }]);
 
-    expect(driver.snapshot().view).toBeNull();
-    expect(driver.snapshot().fault).toEqual({ at: 'base', why: 'no # location is marked starting, so a new game has nowhere to begin' });
-    expect(texts(driver)).toEqual([driver.snapshot().fault!.why]);
+    expect(driver.snapshot().problems).toEqual([{ modules: ['empty'], message: 'no # location is marked starting, so a new game has nowhere to begin' }]);
+    // A session all the same, so nothing downstream is handed a missing view.
+    const view = shown(driver);
+    expect(texts(driver)).toEqual([driver.snapshot().problems[0].message, view.location.title, view.location.description]);
   });
 });
 
@@ -421,7 +422,7 @@ const STORE_REACHES = [...readFileSync('src/ui/driver.ts', 'utf8').matchAll(/sav
       const quiet = through(pageSlots());
 
       // The session opened on the shipped modules whatever the store did.
-      expect(refused.driver.snapshot().fault).toBeNull();
+      expect(refused.driver.snapshot().problems).toEqual([]);
       expect(shown(refused.driver).location.id).toBe('tutorial-island.guide-house');
 
       // At each moment this store refuses at, something was said that a store
@@ -440,107 +441,111 @@ const STORE_REACHES = [...readFileSync('src/ui/driver.ts', 'utf8').matchAll(/sav
   }
 });
 
-// --- what a session that would not open leaves behind (c1, c2, c4, c5) ------
+// --- what the door's report leaves the shell to offer (c7) -----------------
 
-// The base a session is opened over, in every state the load path can leave it
-// in. Named by what is wrong with it rather than by a screen, because what c4
-// is about is the loader's failure modes and a screen is one layer down.
-const BASES: Record<string, readonly ModuleSource[]> = {
-  loads: SHIPPED_SOURCES,
-  'will not parse': [{ name: 'torn', text: '# info torn\nversion: 0.0.0\npack: test\n\n# location hall\nx: over there\n' }],
-  'has nowhere to begin': [{ name: 'empty', text: '# info empty\nversion: 0.0.0\npack: test\n' }],
-};
-
-// What the session itself writes when an edit is staged in the game, which is
-// where every module below starts: the route into these states is an edit made
-// in the game and then the file changed under it, so a module nobody staged
-// would be a module this branch is not about.
-const STAGED = ((): string => {
-  const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots(), ticker: () => () => undefined });
-  driver.send(EDIT);
-  const text = driver.localChanges();
-  if (text === null || text.trim() === '') throw new Error('nothing was staged, so every module below would be empty');
-  return text;
-})();
-
-// And the local module in every state, written into the slot rather than typed
-// at a command: a payload a previous session left behind is how this state is
-// actually reached, and a command would have refused it before it landed.
-const LOCALS: Record<string, string> = {
-  none: '',
-  loads: STAGED,
-  'will not parse': STAGED.replace('x: 7, y: 7', 'x: sideways'),
-  'will not resolve': STAGED.replace('x: 7, y: 7', 'x: 7, y: 7\nadjacent:\n  nowhere-at-all'),
-};
-
-function opened(base: readonly ModuleSource[], local: string): { driver: Driver; slots: SlotDriver } {
+// Every cell of the family the door's own proof is walked over, opened the way
+// a browser opens one: the base modules handed to the driver, and the local
+// module written into the slot a previous session would have left it in.
+function opened(cell: OpeningCell): { driver: Driver; slots: SlotDriver } {
   const slots = pageSlots();
-  if (local !== '') slotStore(slots, () => 0).write(LOCAL_CHANGES_MODULE_ID, local);
-  return { driver: createDriver(base, { slots, ticker: () => () => undefined }), slots };
+  if (cell.local !== '') slotStore(slots, () => 0).write(LOCAL_CHANGES_MODULE_ID, cell.local);
+  return { driver: createDriver(cell.base, { slots, ticker: () => () => undefined }), slots };
 }
 
-// Every pairing of the two, which is where the cases come from: the four ways
-// c4 names are four of these cells, and a fifth way the loader learns to fail
-// is a row somebody adds above rather than a case nobody thought to write.
-const CELLS = Object.entries(BASES).flatMap(([base, sources]) => Object.entries(LOCALS).map(([local, text]) => ({ base, local, sources, text })));
-
-describe('every state the loader can leave the app in has an action out of it (c4, c5)', () => {
-  it('opens over each pairing of a base and a local module, and none of them strands', () => {
-    expect(CELLS.length).toBeGreaterThan(8);
-    const seen: string[] = [];
-
-    for (const cell of CELLS) {
-      const where = `${cell.base} / ${cell.local}`;
-      const { driver } = opened(cell.sources, cell.text);
-      const fault = driver.snapshot().fault;
-      seen.push(fault?.at ?? 'opened');
-
-      if (fault === null) {
-        expect(driver.snapshot().view, where).not.toBeNull();
-        continue;
-      }
-      // The whole of the clause: a fault always has something to do about it,
-      // and which things are offered is asked of the fault.
-      expect(remediesFor(fault).length, where).toBeGreaterThan(0);
-      expect(remediesFor(fault).every((remedy) => REMEDIES.includes(remedy)), where).toBe(true);
-    }
-
-    // A run in which nothing failed, or in which only one kind of failure was
-    // reached, would satisfy every line above.
-    expect(new Set(seen)).toEqual(new Set(['opened', 'base', 'local']));
+describe('the controls a state offers follow from the door\'s report (c7)', () => {
+  it('walks the family the door is proved over, so a cell added there is a cell here', () => {
+    expect(OPENING_CELLS.length).toBeGreaterThan(6);
   });
 
-  // c5. The control that discards an author's work is offered exactly where
-  // discarding it would help, and the two are told apart by where the failure
-  // came from rather than by anybody reading the message.
-  it('offers clearing where the local module is at fault and nowhere else', () => {
-    for (const cell of CELLS) {
-      const fault = opened(cell.sources, cell.text).driver.snapshot().fault;
-      if (fault === null) continue;
-      const where = `${cell.base} / ${cell.local}: ${fault.why}`;
-      expect(remediesFor(fault).includes('clear-local'), where).toBe(fault.at === 'local');
-      // Which is the local module's fault exactly when the base loads and the
-      // local module does not.
-      expect(fault.at === 'local', where).toBe(cell.base === 'loads' && cell.local.startsWith('will not'));
+  // The whole of the clause's first half, asserted against what the fixture
+  // broke and never against the report the expression under test reads. A cell
+  // that broke the local module expects clearing offered; one that broke a base
+  // module expects it withheld, including the cell where the local module loads
+  // clean and the merged universe still has nowhere to begin.
+  it('offers clearing exactly where the fixture broke the local module', () => {
+    let offered = 0;
+    for (const cell of OPENING_CELLS) {
+      const problems = opened(cell).driver.snapshot().problems;
+      const wanted = cell.broke === LOCAL_CHANGES_MODULE_ID;
+
+      expect(remediesFor(problems).includes('clear-local'), `${cell.where}: ${problems.map((each) => each.message).join('; ')}`).toBe(wanted);
+      if (wanted) offered += 1;
+    }
+    // A family that offered it nowhere, or everywhere, would satisfy nothing.
+    expect(offered).toBeGreaterThan(0);
+    expect(offered).toBeLessThan(OPENING_CELLS.length);
+  });
+
+  it('names, through the driver too, exactly the modules the fixture broke', () => {
+    for (const cell of OPENING_CELLS) {
+      const problems = opened(cell).driver.snapshot().problems;
+
+      expect(new Set(problems.flatMap((problem) => problem.modules)), cell.where).toEqual(new Set(cell.names));
     }
   });
 
-  // Every remedy is drawn by some fault, so a remedy nothing offers is a
-  // control nobody can reach rather than one nobody noticed.
-  it('reaches every remedy from some fault', () => {
-    expect(new Set(FAULT_AT.flatMap((at) => remediesFor({ at, why: 'why' })))).toEqual(new Set(REMEDIES));
+  it('leaves every state with something to do about it, and every remedy reachable from some state', () => {
+    const drawn = new Set<string>();
+    for (const cell of OPENING_CELLS) {
+      const { driver } = opened(cell);
+      const remedies = remediesFor(driver.snapshot().problems);
+
+      expect(driver.snapshot().problems.length, cell.where).toBeGreaterThan(0);
+      expect(remedies.length, cell.where).toBeGreaterThan(0);
+      expect(remedies.every((remedy) => REMEDIES.includes(remedy)), cell.where).toBe(true);
+      for (const remedy of remedies) drawn.add(remedy);
+    }
+
+    expect(drawn).toEqual(new Set(REMEDIES));
+  });
+
+  // And the control goes through wherever it is offered, from every one of
+  // these states including the ones no other command can proceed from: what the
+  // store holds afterwards stages nothing.
+  it('clears, wherever clearing is offered, and leaves a module that stages nothing', () => {
+    const cells = OPENING_CELLS.filter((cell) => cell.broke === LOCAL_CHANGES_MODULE_ID);
+    expect(cells.length).toBeGreaterThan(0);
+    let recovered = 0;
+
+    for (const cell of cells) {
+      const { driver } = opened(cell);
+
+      driver.clearLocalChanges();
+
+      expect(listLocalSections(driver.localChanges() ?? ''), cell.where).toEqual([]);
+      if (driver.snapshot().problems.length === 0) recovered += 1;
+    }
+
+    // A run in which clearing was the way out of nothing would pass every line
+    // above.
+    expect(recovered).toBeGreaterThan(0);
   });
 });
 
-describe('a local module that will not load never costs the session (c1, c2)', () => {
-  const BROKEN = ['will not parse', 'will not resolve'] as const;
+describe('a local module that will not load never costs the session (c1)', () => {
+  // The route into the state a browser actually takes: an edit staged in the
+  // game, and then the file changed under it.
+  const STAGED = ((): string => {
+    const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots(), ticker: () => () => undefined });
+    driver.send(EDIT);
+    const text = driver.localChanges();
+    if (text === null || text.trim() === '') throw new Error('nothing was staged, so every module below would be empty');
+    return text;
+  })();
+
+  const BROKEN: Record<string, string> = {
+    'will not parse': STAGED.replace('x: 7, y: 7', 'x: sideways'),
+    'will not resolve': STAGED.replace('x: 7, y: 7', 'x: 7, y: 7\nadjacent:\n  nowhere-at-all'),
+  };
+
+  const over = (local: string): Driver => opened({ where: local, base: SHIPPED_SOURCES, local, broke: null, names: [], aim: OPENING_CELLS[0].aim }).driver;
 
   it('opens on the shipped content alone, says why, and plays exactly as with no local module at all', () => {
-    for (const local of BROKEN) {
-      const { driver } = opened(SHIPPED_SOURCES, LOCALS[local]);
-      const bare = opened(SHIPPED_SOURCES, '').driver;
+    for (const [local, text] of Object.entries(BROKEN)) {
+      const driver = over(text);
+      const bare = over('');
 
-      expect(driver.snapshot().fault, local).toMatchObject({ at: 'local' });
+      expect(driver.snapshot().problems.flatMap((problem) => problem.modules), local).toEqual([LOCAL_CHANGES_MODULE_ID]);
       // Playable, and the same game: the bytes are what two drivers are
       // compared on, because a view is what a driver was told.
       expect(driver.serialized(), local).toBe(bare.serialized());
@@ -549,34 +554,30 @@ describe('a local module that will not load never costs the session (c1, c2)', (
       bare.send('/look');
       expect(shown(driver), local).toEqual(shown(bare));
       // And the reason is on the tool channel rather than only in a field.
-      expect(said(driver).some((line) => line.includes('set aside')), local).toBe(true);
+      expect(said(driver).some((line) => line.includes(LOCAL_CHANGES_MODULE_ID)), local).toBe(true);
     }
   });
 
   // The text is set aside, not destroyed: an author can still read what they
   // wrote, which is what makes discarding it their decision rather than ours.
   it('leaves the text in the store to read', () => {
-    const { driver } = opened(SHIPPED_SOURCES, LOCALS['will not parse']);
-
-    expect(driver.localChanges()).toBe(LOCALS['will not parse']);
+    expect(over(BROKEN['will not parse']).localChanges()).toBe(BROKEN['will not parse']);
   });
 
-  // c2. Clearing is reachable from every state that offers it and leaves the
-  // session a first-ever launch would produce — including from text nothing
-  // can parse, which is the state no other command can proceed from.
-  it('clears from any state that offers it, and lands where a first-ever launch lands', () => {
-    for (const local of BROKEN) {
-      const { driver, slots } = opened(SHIPPED_SOURCES, LOCALS[local]);
-      const fresh = opened(SHIPPED_SOURCES, '').driver;
+  // Clearing is reachable from every state that offers it — including from text
+  // nothing can parse, which is the state no other command can proceed from.
+  it('clears from text nothing can parse, and leaves no residue for the next launch', () => {
+    for (const [local, text] of Object.entries(BROKEN)) {
+      const slots = pageSlots();
+      slotStore(slots, () => 0).write(LOCAL_CHANGES_MODULE_ID, text);
+      const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
+      const fresh = over('');
 
-      expect(remediesFor(driver.snapshot().fault!), local).toContain('clear-local');
+      expect(remediesFor(driver.snapshot().problems), local).toContain('clear-local');
       driver.clearLocalChanges();
 
-      expect(driver.snapshot().fault, local).toBeNull();
+      expect(driver.snapshot().problems, local).toEqual([]);
       expect(driver.serialized(), local).toBe(fresh.serialized());
-      expect(shown(driver), local).toEqual(shown(fresh));
-      // No residue: what the slot holds declares nothing, so what it opens is
-      // the base sources and nothing else.
       expect(listLocalSections(driver.localChanges() ?? ''), local).toEqual([]);
       expect(createDriver(SHIPPED_SOURCES, { slots }).serialized(), local).toBe(fresh.serialized());
     }

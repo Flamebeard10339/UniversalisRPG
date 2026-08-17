@@ -317,6 +317,9 @@
         "src/runtime/modals.test.ts",
         "src/runtime/modals.ts",
         "src/runtime/moments.test.ts",
+        "src/runtime/openUniverse.test.ts",
+        "src/runtime/openUniverse.ts",
+        "src/runtime/openUniverseFixture.ts",
         "src/runtime/planeReport.test.ts",
         "src/runtime/planeReport.ts",
         "src/runtime/planeScreen.test.ts",
@@ -636,6 +639,14 @@
             "src/runtime/storeContract.ts"
           ],
           "note": "produced by the-gui-authors-through-the-same-door: one set of cases every SlotDriver is held to"
+        },
+        {
+          "name": "the one door a universe is opened through",
+          "paths": [
+            "src/runtime/openUniverse.ts",
+            "src/runtime/openUniverseFixture.ts"
+          ],
+          "note": "produced by opening-a-universe-answers-rather-than-raises"
         }
       ]
     },
@@ -994,7 +1005,7 @@
           "paths": [
             "src/ui/FaultBanner.tsx"
           ],
-          "note": "produced by the-shell-draws-what-the-session-answers: a fault carries where it came from, and remediesFor turns that into the controls the banner draws"
+          "note": "The banner reads the door's report: a problem names the modules it is against and remediesFor turns that list into the controls drawn. Rewritten by opening-a-universe-answers-rather-than-raises, which retired the design this used to describe - a fault carrying where in the code it came from."
         },
         {
           "name": "the dev gate",

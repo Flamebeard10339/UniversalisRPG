@@ -1,6 +1,7 @@
 import { askedOption } from '../../runtime/command';
 import type { PlayChoice, PlayView } from '../../runtime/session';
-import type { Driver, DriverSnapshot, Fault } from '../driver';
+import type { UniverseProblem } from '../../runtime/openUniverse';
+import type { Driver, DriverSnapshot } from '../driver';
 import type { TestAction, TestSurface } from '../testSurface';
 import type { Moment } from '../transient';
 import type { LogEntry } from '../transcript';
@@ -35,11 +36,10 @@ export interface TestState {
   // of it: a field the runtime starts publishing is readable the moment it is
   // published, because there is no list here for anyone to forget to widen.
   view: PlayView | null;
-  // What the driver holds around the view, which the view does not carry: the
-  // failure that stopped a session opening or set the local module aside and
-  // where it came from, whose session this is, the run under way, and what has
-  // been said so far.
-  fault: Fault | null;
+  // What the driver holds around the view, which the view does not carry: what
+  // the door reported about the universe this session opened over, whose
+  // session this is, the run under way, and what has been said so far.
+  problems: readonly UniverseProblem[];
   dev: boolean;
   live: { label: string; active: boolean; progress: number; time: number } | null;
   transcript: LogEntry[];
@@ -150,7 +150,7 @@ export function testState(snapshot: DriverSnapshot, surfaces: Record<string, unk
 
   return {
     view,
-    fault: snapshot.fault,
+    problems: snapshot.problems,
     dev: snapshot.dev,
     live: snapshot.live
       ? {

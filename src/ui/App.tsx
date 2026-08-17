@@ -282,7 +282,9 @@ export function App({
               where there may be no page worth opening, and the other is true of
               the session wherever the player happens to be standing. */}
           <DevBanner dev={dev} words={words} />
-          {snapshot.fault ? <FaultBanner fault={snapshot.fault} words={words} onRemedy={(remedy) => (remedy === 'clear-local' ? driver.clearLocalChanges() : tryAgain(driver))} /> : null}
+          {snapshot.problems.length > 0 ? (
+            <FaultBanner problems={snapshot.problems} words={words} onRemedy={(remedy) => (remedy === 'clear-local' ? driver.clearLocalChanges() : tryAgain(driver))} />
+          ) : null}
           <VStack
             layer={shell.where.layer}
             onLayer={(layer) => go((held) => toLayer(held, layer))}

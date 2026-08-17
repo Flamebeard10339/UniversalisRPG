@@ -68,7 +68,9 @@ function reaches(source: { text: string }): string[] {
 // interface a browser adapter satisfies, and the save context built over it.
 // Neither publishes anything to draw, which is why they are a widening of this
 // list rather than an exception to it — a driver keeps slots or it does not.
-const PLAY_SURFACE = ['session', 'command', 'localized', 'store', 'saveSlots'];
+// plus the one door a universe is opened through, which is what src/ui reaches
+// instead of the load path it used to reach past this list into.
+const PLAY_SURFACE = ['session', 'command', 'localized', 'store', 'saveSlots', 'openUniverse'];
 
 // A named import off the play surface, and whether the statement brought it in
 // as a type. A type is a shape to render; a value is a thing to call.
@@ -90,10 +92,13 @@ const DISPATCHES = [
   'LIVE_TICK_MS',
   'localizerFor',
   'newContext',
+  // The one call that opens a universe. src/ui hands it sources and is handed
+  // back a session, the modules that loaded and a list of problems; what
+  // loading has stages is not something this layer is told.
+  'openUniverse',
   'runLine',
   'serializeSession',
   'sessionLocalizer',
-  'startSession',
   'view',
   // The store half: the context a driver keeps slots in, the refusal every slot
   // driver raises, and the driver a session with nowhere to write falls back on.
@@ -402,6 +407,88 @@ describe('what this suite reaches, and what it leaves to the author', () => {
     expect(CONFIG, 'vite.config.ts names a test environment, so effects may now run').not.toMatch(/\benvironment\s*:/);
     for (const runner of AN_EFFECT_RUNNER) {
       expect(MANIFEST, `${runner} is a dependency, so effects may now run`).not.toContain(`"${runner}`);
+    }
+  });
+});
+
+// Everything that ships, wherever it lives: the two rules below are about the
+// whole tree rather than about this layer, so the set they walk is not the one
+// the rules above walk. Test modules are out, because the scanner has to be
+// able to name what it is refusing.
+const TREE: Array<{ file: string; text: string }> = [
+  ...modulesUnder(resolve(here, '..'), 'src'),
+  ...modulesUnder(resolve(here, '..', '..', 'scripts'), 'scripts'),
+].map(({ file, path }) => ({ file, text: readFileSync(path, 'utf8') }));
+
+// What opening a universe used to be done with, and the apparatus that existed
+// only to guess which module was at fault. Counted off the tree rather than
+// listed against filenames, so a site written next month is caught and a rename
+// is not a way to satisfy this.
+// The two places a universe is opened from, which is where a catch around the
+// opening would have to be.
+const DRIVING = TREE.filter((source) => source.file.startsWith('src/ui/') || source.file.startsWith('scripts/'));
+
+const THE_LOAD_PATH = ['loadUniverseWithDiagnostics', 'loadUniverse'];
+
+const THE_GUESS = ['FAULT_AT', 'FaultAt', 'Fault.at', 'localTrouble', 'wordless'];
+
+// A `try` block, whole, however many braces sit inside it: the same brace-aware
+// walk the control scanner does, aimed at a keyword instead of a tag.
+function tryBlocks(text: string): string[] {
+  const found: string[] = [];
+  for (const opening of text.matchAll(/\btry\s*\{/g)) {
+    let depth = 1;
+    let at = opening.index + opening[0].length;
+    while (at < text.length && depth > 0) {
+      if (text[at] === '{') depth += 1;
+      else if (text[at] === '}') depth -= 1;
+      at += 1;
+    }
+    found.push(text.slice(opening.index, at));
+  }
+  return found;
+}
+
+describe('src/ui does not open a universe, and the apparatus that guessed is gone (c6)', () => {
+  it('walks the whole tree, so the counts below are about more than this layer', () => {
+    expect(TREE.map((source) => source.file)).toContain('scripts/play-cli.ts');
+    expect(TREE.map((source) => source.file)).toContain('src/runtime/openUniverse.ts');
+    expect(TREE.length).toBeGreaterThan(SOURCES.length);
+  });
+
+  it('calls the load path nowhere under src/ui', () => {
+    for (const source of SOURCES) {
+      for (const name of THE_LOAD_PATH) expect(source.text, `${source.file} calls ${name}`).not.toContain(name);
+    }
+  });
+
+  it('leaves it reachable where it belongs, so the rule above is about where it is called rather than about it existing', () => {
+    expect(TREE.filter((source) => source.text.includes(THE_LOAD_PATH[0])).map((source) => source.file)).toContain('src/runtime/openUniverse.ts');
+  });
+
+  it('names nothing that guessed, anywhere in the tree', () => {
+    for (const source of TREE) {
+      for (const name of THE_GUESS) expect(source.text, `${source.file} names ${name}`).not.toContain(name);
+    }
+  });
+});
+
+describe('no caller classifies a failure by where it was standing (c2)', () => {
+  it('reads a try block whole, however much sits inside it', () => {
+    expect(tryBlocks('try { if (a) { b(); } } catch {}')).toEqual(['try { if (a) { b(); } }']);
+  });
+
+  it('finds the try blocks there are, so the rule below is about something', () => {
+    const blocks = DRIVING.flatMap((source) => tryBlocks(source.text));
+
+    expect(blocks.length).toBeGreaterThan(6);
+  });
+
+  it('puts no call to the door inside one, under src/ui or scripts', () => {
+    for (const source of DRIVING) {
+      for (const block of tryBlocks(source.text)) {
+        expect(block, `${source.file} catches around a call to the door`).not.toMatch(/\bopenUniverse\s*\(/);
+      }
     }
   });
 });
