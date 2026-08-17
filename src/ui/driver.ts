@@ -1,8 +1,11 @@
+import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
-import { createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
+import { type AuthoringContext, createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { BASE_LANGUAGE, localizerFor, type Localizer } from '../runtime/localized';
+import { createSaveContext, type SaveContext } from '../runtime/saveSlots';
 import { sessionLocalizer, serializeSession, startSession, view, type PlayView } from '../runtime/session';
+import { memoryDriver, type SlotDriver } from '../runtime/store';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 import { createTransientChannel, type TransientChannel } from './transient';
 
@@ -36,11 +39,24 @@ export interface Driver {
   // to save. The bytes are the whole of what the two drivers are compared on,
   // because a view is what a driver was told and this is what it is standing in.
   serialized(): string | null;
+  // The module an author is editing, as the store holds it, and null when the
+  // store cannot say. There is no second spelling of it in this layer: these
+  // are the bytes `/local show` prints and the bytes the slot holds (c16).
+  localChanges(): string | null;
+  // Every base module this session was opened over, which is what an editing
+  // surface reads a shipped section's text out of. The sources themselves, so
+  // nothing here re-renders one.
+  baseSources(): readonly ModuleSource[];
 }
 
 export interface DriverOptions {
   transient?: TransientChannel;
   ticker?: Ticker;
+  // Where this driver keeps slots. A driver handed none still stands in a
+  // store, so `/save` and a staged edit behave the same way in a test as in a
+  // browser; what differs is whether anything survives the page.
+  slots?: SlotDriver;
+  now?: () => number;
 }
 
 interface Opening {
@@ -48,21 +64,25 @@ interface Opening {
   output: CommandOutput[];
 }
 
-function open(sources: readonly ModuleSource[]): Opening {
-  const loaded = loadUniverseWithDiagnostics(sources);
+type Loaded = ReturnType<typeof loadUniverseWithDiagnostics>;
+
+function open(loaded: Loaded, authoring: AuthoringContext, save: SaveContext, before: readonly CommandOutput[]): Opening {
   const session = startSession(loaded.registry);
   const first = view(session);
   return {
     // `driving`, because a screen can hold a run open and offer a way to stop
     // it. It is the same flag `--live` sets, so the two drivers arm the same
     // choices and resolve the rest.
-    context: newContext(session, first, { driving: true, recorder: { history: [], startSave: serializeSession(session) } }),
+    context: newContext(session, first, { driving: true, authoring, save, recorder: { history: [], startSave: serializeSession(session) } }),
     output: [
+      ...before,
       ...loaded.diagnostics.map((diagnostic): CommandOutput => ({ kind: 'message', words: 'tool', tone: 'warn', text: formatModuleDiagnostic(diagnostic) })),
       { kind: 'view', view: first, reread: false },
     ],
   };
 }
+
+const because = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 // The GUI's session container: it holds the one context every dispatch goes
 // through, and hands React a snapshot to render. Every route in spells a line
@@ -73,13 +93,42 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   let current: DriverSnapshot;
   let context: CommandContext | null = null;
 
+  const save = createSaveContext(options.slots ?? memoryDriver(), options.now ?? (() => Date.now()));
+  // Read at the moment of asking rather than remembered, which is what the
+  // command table's own re-read means: another tab that wrote the slot after
+  // this session opened is the one being read.
+  const stored = (): string => save.store.read(LOCAL_CHANGES_MODULE_ID)?.payload ?? '';
+
+  // What the slot held when the page opened, and a message instead when it
+  // could not be read at all. A store that refuses is never a reason for the
+  // session not to open: it opens on the shipped modules and says so (c13).
+  let held = '';
+  const complaints: CommandOutput[] = [];
   try {
-    const opening = open(sources);
+    held = stored();
+  } catch (error) {
+    complaints.push({ kind: 'message', words: 'tool', tone: 'warn', text: `local changes could not be read: ${because(error)}` });
+  }
+
+  const base = loadUniverseWithDiagnostics(sources);
+  const authoring: AuthoringContext = {
+    baseSources: [...sources],
+    dependencies: base.loadedModules,
+    // Empty until something is staged: the module's own header is written by
+    // the same edit that writes its first section, so nothing here mints one.
+    localSource: { name: LOCAL_CHANGES_MODULE_ID, text: held },
+    writeLocalChanges: (text) => void save.store.write(LOCAL_CHANGES_MODULE_ID, text),
+    readLocalChanges: stored,
+  };
+
+  try {
+    const loaded = held.trim() === '' ? base : loadUniverseWithDiagnostics([...sources, authoring.localSource]);
+    const opening = open(loaded, authoring, save, complaints);
     context = opening.context;
     current = { view: opening.context.view, transcript: appendOutputs(emptyTranscript(), opening.output), live: null, fault: null };
   } catch (error) {
-    const fault = error instanceof Error ? error.message : String(error);
-    current = { view: null, transcript: appendOutputs(emptyTranscript(), [{ kind: 'message', words: 'tool', tone: 'error', text: fault }]), live: null, fault };
+    const fault = because(error);
+    current = { view: null, transcript: appendOutputs(emptyTranscript(), [...complaints, { kind: 'message', words: 'tool', tone: 'error', text: fault }]), live: null, fault };
   }
 
   // A shell with no session still draws its own tabs, so it still needs
@@ -170,6 +219,16 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     localizer: () => (context ? sessionLocalizer(context.session) : wordless()),
     cancel: () => close(true),
     serialized: () => (context ? serializeSession(context.session) : null),
+    localChanges: () => {
+      try {
+        return stored();
+      } catch {
+        // A store that cannot be read has no text to hand over, and saying so
+        // is a control that offers nothing rather than one that offers a guess.
+        return null;
+      }
+    },
+    baseSources: () => authoring.baseSources,
   };
 
   if (import.meta.env.DEV && typeof window !== 'undefined') {

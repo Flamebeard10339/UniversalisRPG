@@ -5,53 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { RuntimeError, slotStore } from '../runtime/store';
 import { describeSlotDriver } from '../runtime/storeContract';
 import { browserSlots, SLOT_PREFIX, STORAGE_REFUSALS } from './browserStore';
+import { pageStorage, REFUSING } from './pageStorage';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
-
-// A `Storage` as the DOM declares one: keyed strings, an index and a length,
-// and nothing that knows what a slot is. The adapter is driven through this
-// rather than stood in for, so what these tests exercise is the code a browser
-// would run. `limit` is the whole of what makes a quota inducible — measured in
-// characters, which is what a browser's own quota is measured in.
-export function pageStorage(limit = Number.POSITIVE_INFINITY): Storage {
-  const held = new Map<string, string>();
-  const sizeOf = (key: string, value: string): number => key.length + value.length;
-  const used = (skip?: string): number => [...held].reduce((total, [key, value]) => (key === skip ? total : total + sizeOf(key, value)), 0);
-
-  return {
-    get length(): number {
-      return held.size;
-    },
-    key: (at: number) => [...held.keys()][at] ?? null,
-    getItem: (key: string) => held.get(key) ?? null,
-    setItem(key: string, value: string) {
-      if (used(key) + sizeOf(key, value) > limit) {
-        throw Object.assign(new Error('The quota has been exceeded.'), { name: 'QuotaExceededError' });
-      }
-      held.set(key, value);
-    },
-    removeItem: (key: string) => void held.delete(key),
-    clear: () => held.clear(),
-  };
-}
-
-// A browser with storage switched off, which raises on the property itself
-// rather than handing back something that refuses.
-export function noStorage(): Storage {
-  throw new Error('The operation is insecure.');
-}
-
-// One way into each refusal the adapter can tell apart, keyed by the adapter's
-// own name for it: exhaustive by construction, so a mode added to
-// `STORAGE_REFUSALS` stops this compiling until there is a way to induce it.
-// Each entry hands back a reach that goes on refusing the same way.
-export const REFUSING: Record<(typeof STORAGE_REFUSALS)[number], () => () => Storage> = {
-  unavailable: () => noStorage,
-  quota: () => {
-    const storage = pageStorage(64);
-    return () => storage;
-  },
-};
 
 // One driver over one storage, which is what a page has: `pageStorage` mints a
 // new one every call, and a reach that minted one per verb would be a driver

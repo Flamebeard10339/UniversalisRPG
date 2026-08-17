@@ -54,6 +54,8 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     localizer: () => localizerFor(loadInEnglish(''), 'en'),
     cancel: () => void calls.push('cancel'),
     serialized: () => null,
+    localChanges: () => null,
+    baseSources: () => [],
   };
 }
 

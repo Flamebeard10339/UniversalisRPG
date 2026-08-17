@@ -3,7 +3,10 @@ import { engineLocale } from '../content/engineLocale';
 import { loadUniverseWithDiagnostics } from '../content/registry';
 import { newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
+import { slotStore, type SlotDriver } from '../runtime/store';
+import { browserSlots, SLOT_PREFIX, STORAGE_REFUSALS } from './browserStore';
 import { createDriver, type Driver } from './driver';
+import { noStorage, pageStorage, REFUSING as BROWSER_REFUSALS } from './pageStorage';
 import { SHIPPED_SOURCES } from './shippedContent';
 
 // One spannable action and nothing else, so a test about time is not also a
@@ -238,4 +241,119 @@ describe('the GUI driver', () => {
     expect(driver.snapshot().fault).toBe('no # location is marked starting, so a new game has nowhere to begin');
     expect(texts(driver)).toEqual([driver.snapshot().fault]);
   });
+});
+
+// The store a page would have, stood up in memory. One per driver unless a
+// test hands the same one to two of them, which is what closing a tab and
+// opening it again looks like from here.
+function pageSlots(limit?: number): SlotDriver {
+  const storage = pageStorage(limit);
+  return browserSlots(() => storage);
+}
+
+const sourceLines = (driver: Driver): string[] =>
+  driver
+    .snapshot()
+    .transcript.entries.filter((entry) => entry.words === 'tool' && entry.kind === 'detail')
+    .map((entry) => entry.text);
+
+const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.filter((entry) => entry.words === 'tool').map((entry) => String(entry.text));
+
+const EDIT = '/dsl location tutorial-island.guide-house x: 7, y: 7';
+
+describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
+  // c1. The door the REPL has had all along, opened from the browser: staged,
+  // validated, adopted, and the world the session is playing has moved.
+  it('stages a section, adopts it, and the session is playing the edit', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots() });
+
+    driver.send(EDIT);
+
+    expect(said(driver)).toContain('Staged # location tutorial-island.guide-house in local-changes.');
+    expect(shown(driver).discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
+  });
+
+  // c1's other half: a section that cannot load changes nothing at all.
+  it('refuses a whole edit that does not load, and goes on playing what it had', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots() });
+    const before = shown(driver);
+
+    driver.send('/dsl location tutorial-island.guide-house adjacent: nowhere-at-all');
+
+    expect(said(driver)).toContain('local changes did not load.');
+    expect(shown(driver)).toEqual(before);
+    expect(driver.localChanges()).toBe('');
+  });
+
+  // c9. Every staged edit is in the slot as it is staged, and a driver built
+  // over that slot opens with it applied — no save command anywhere.
+  it('opens a second driver over the same store with the edit already applied', () => {
+    const slots = pageSlots();
+    const first = createDriver(SHIPPED_SOURCES, { slots });
+    first.send(EDIT);
+    first.send('/local list');
+
+    const reopened = createDriver(SHIPPED_SOURCES, { slots });
+    reopened.send('/local list');
+
+    expect(shown(reopened).discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
+    expect(sourceLines(reopened)).toEqual(sourceLines(first));
+    expect(reopened.localChanges()).toBe(first.localChanges());
+  });
+
+  // c16. One route out, and it is the bytes the store holds: the control reads
+  // what `/local show` prints, because there is no second spelling of them.
+  it('hands over the same bytes /local show prints and the slot holds', () => {
+    const slots = pageSlots();
+    const driver = createDriver(SHIPPED_SOURCES, { slots });
+    driver.send(EDIT);
+    driver.send('/local show');
+
+    const handed = driver.localChanges()!;
+    expect(handed).toContain('# location tutorial-island.guide-house');
+    expect(sourceLines(driver).join('\n')).toBe(handed.trimEnd());
+    expect(slotStore(slots, () => 0).read('local-changes')?.payload).toBe(handed);
+  });
+
+  it('offers nothing to hand over when the store cannot be read', () => {
+    expect(createDriver(SHIPPED_SOURCES, { slots: browserSlots(noStorage) }).localChanges()).toBeNull();
+  });
+});
+
+// c13. Universal over the modes the adapter can distinguish, plus the one the
+// store itself distinguishes — a slot whose shape this build does not know.
+// No message text is named: what is asserted is that the session is still
+// playable and that something was said on the tool channel.
+describe('a store that refuses leaves the session playing (c13)', () => {
+  const REFUSING: Record<string, () => SlotDriver> = {
+    ...Object.fromEntries(Object.entries(BROWSER_REFUSALS).map(([mode, induce]) => [mode, () => browserSlots(induce())])),
+    unrecognised: () => {
+      const storage = pageStorage();
+      storage.setItem(`${SLOT_PREFIX}local-changes`, 'not a slot at all');
+      return browserSlots(() => storage);
+    },
+  };
+
+  it('covers every refusal the adapter names, and the one the store itself names', () => {
+    expect(Object.keys(REFUSING)).toEqual(expect.arrayContaining([...STORAGE_REFUSALS]));
+    expect(Object.keys(REFUSING).length).toBeGreaterThan(STORAGE_REFUSALS.length);
+  });
+
+  for (const [mode, slots] of Object.entries(REFUSING)) {
+    it(`says so and goes on playing when the store is ${mode}`, () => {
+      const driver = createDriver(SHIPPED_SOURCES, { slots: slots() });
+
+      // The session opened on the shipped modules whatever the store did.
+      expect(driver.snapshot().fault).toBeNull();
+      const before = shown(driver);
+      expect(before.location.id).toBe('tutorial-island.guide-house');
+
+      driver.send(EDIT);
+      expect(said(driver).length).toBeGreaterThan(0);
+
+      // Still playable: the world still answers, with the state it already had.
+      driver.send('/look');
+      expect(shown(driver).location.id).toBe(before.location.id);
+    });
+  }
 });
