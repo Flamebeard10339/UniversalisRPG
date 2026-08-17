@@ -7,7 +7,10 @@ import { devTokenIn } from '../runtime/command';
 
 export const devLine = (on: boolean): string => `/dev ${on ? 'on' : 'off'}`;
 
-export const speedLine = (multiplier: number): string => `/speed ${multiplier}`;
+// Whatever was typed, handed over as written. Nothing here reads it as a
+// number: what a multiplier may be is `/speed`'s own question, and a second
+// answer to it in this layer is the thing c10 forbids.
+export const speedLine = (typed: string): string => `/speed ${typed}`;
 
 // The one decision a tap on a place makes (c9). With dev off it is the choice
 // the engine published for setting off — arrival delay and all — and with dev

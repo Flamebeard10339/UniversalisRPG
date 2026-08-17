@@ -219,11 +219,20 @@ is the resumption the absorbed spec's question was really about; carrying the
 mode across a reload would mean persisting it, and a persisted mode is a second
 copy of the answer c6 says there is only one of.
 
-**The speed control is a number field bound to the session's own dial.** The
-fourth open question. Its value is `snapshot.speed` every render and its change
-handler sends `/speed`, so there is no draft, no default and no clamp anywhere
-in `src/ui` — which is what c10 asks. A stepped set of multipliers was rejected
-for the same reason: the steps would be multipliers this layer declared.
+**The speed control is a field and a button, the shape the console already has.**
+The fourth open question. It holds what is being typed and sends `/speed` on
+submit, and it is re-keyed on the session's own value so a line typed at the
+console puts the field where it put the dial. What is typed goes over as
+written: `src/ui` does not read it as a number, so the default and the clamp
+c10 forbids stay where they already were, in `/speed`'s own parser — which is
+also what makes a refusal come back from the one place that decides.
+
+The first build bound the input straight to `snapshot.speed`, which meant every
+keystroke sent a command. That was an over-reading of c10 — a draft string in a
+form field is the field's contents, not a second multiplier — and it built a
+second thing beside `Console.tsx`, which had the pattern already. The author
+caught it. A stepped set of multipliers stays rejected: those steps would be
+multipliers this layer declared.
 
 **`/speed` is not marked dev-only; the control that turns it is.** c6 names the
 speed control as a dev-only surface and c11 says a player cannot tell this
@@ -233,10 +242,11 @@ widget is what c6 asks for. `/goto` is marked, and is the only mark.
 
 **The recorder records what moved the world, so `/speed` leaves no line.** c8
 describes both dev powers as recorded and replayable. Teleport is a directive
-and records; the multiplier changes how fast a live driver ticks and moves
-nothing a save holds, so a `speed:` directive would emit a `# test` line that
-replays as a no-op — `applyDirective` has no `LiveSettings` to turn. Recording
-it would make a `# test` lie rather than make it fuller.
+and records. The multiplier is one variable — `ctx.live.speed`, read only where
+a live tick turns real milliseconds into sim seconds — so a `speed:` directive
+would replay as a no-op, because `applyDirective` has no `LiveSettings` to turn.
+It is covered by unit tests rather than by a `# test`, which is what a variable
+with one read site wants anyway.
 
 **The editing surfaces are gated and the command console is not.** c6 names the
 editing surfaces as dev-only; the 2026-08-12 note the Decisions above honour

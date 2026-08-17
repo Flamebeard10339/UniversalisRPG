@@ -218,12 +218,27 @@ describe('there is one time multiplier (c10)', () => {
     const { driver } = playing();
     driver.send(devLine(true));
 
-    driver.send(speedLine(4));
+    driver.send(speedLine('4'));
     expect(driver.snapshot().speed).toBe(4);
     // And the console reaches the same field, so the two are indistinguishable
     // afterwards.
     driver.send('/speed 2.5');
     expect(driver.snapshot().speed).toBe(2.5);
+  });
+
+  // What a multiplier may be is the command's question and not this layer's:
+  // the field hands over what was typed, and a refusal comes back from the one
+  // place that decides — with the dial where it was.
+  it('hands over what was typed and lets the command refuse it', () => {
+    const { driver } = playing();
+    driver.send(devLine(true));
+    driver.send(speedLine('4'));
+
+    for (const typed of ['nope', '', '0', '-2']) {
+      driver.send(speedLine(typed));
+      expect(said(driver)[said(driver).length - 1], typed).toContain('/speed requires a positive number');
+      expect(driver.snapshot().speed, typed).toBe(4);
+    }
   });
 
   it('declares no second multiplier in src/ui, no default and no clamp', () => {
