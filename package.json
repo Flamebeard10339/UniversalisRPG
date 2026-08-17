@@ -22,6 +22,7 @@
     "migrate-saves": "tsx scripts/migrate-saves.ts",
     "session-timing": "tsx scripts/session-timing.ts",
     "contribution:issue": "tsx scripts/publish-local-changes.ts",
+    "contribution:consolidate": "tsx scripts/consolidate.ts",
     "contribution:squash": "tsx scripts/squash-local-changes.ts",
     "tasks": "tsx scripts/tasks.ts",
     "modportal": "tsx scripts/modportal.ts"

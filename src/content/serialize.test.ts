@@ -3,8 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import { formatModuleDiagnostic, loadModule, loadUniverse, loadUniverseWithDiagnostics } from './registry';
-import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from './roundTrip';
-import { serializeRegistryModule } from './serialize';
+import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from './serialize';
 import { ModuleSource, parseModuleSource, parseUniverse } from './universe';
 
 const FULL_MODULE = `
@@ -147,7 +146,7 @@ submit-modal: race=Elf
 expect: blank
 `;
 
-describe('serializeRegistryModule', () => {
+describe('what the serializer prints, reached through the round trip that is its only door', () => {
   function expectSemanticRoundTrip(source: ModuleSource): void {
     const parsed = parseModuleSource(source);
     const trip = roundTripModule(loadUniverse([source]), { info: parsed.info, globals: declaredGlobalIds(parsed) }, (printed) =>
@@ -183,10 +182,9 @@ describe('serializeRegistryModule', () => {
 
   it('prints readable canonical sections for the broad fixture', () => {
     const registry = loadModule(FULL_MODULE);
-    const printed = serializeRegistryModule(registry, {
-      info: { id: 'base', version: [1, 2, 3], pack: 'core' },
-      globals: ['travel-seconds-per-unit'],
-    });
+    const printed = roundTripModule(registry, { info: { id: 'base', version: [1, 2, 3], pack: 'core' }, globals: ['travel-seconds-per-unit'] }, (text) =>
+      loadUniverseWithDiagnostics([{ name: 'base', text }]),
+    ).printed;
     const roundTrip = loadModule(printed);
 
     expect(printed).toContain('# info base');

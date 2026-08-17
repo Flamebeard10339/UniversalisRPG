@@ -635,6 +635,8 @@
       "name": "Contribution system",
       "paths": [
         ".github/ISSUE_TEMPLATE/content-contribution.yml",
+        "scripts/consolidate.test.ts",
+        "scripts/consolidate.ts",
         "scripts/lib/modportalCache.ts",
         "scripts/modportal.test.ts",
         "scripts/modportal.ts",
@@ -649,9 +651,9 @@
         "src/content/localChanges.ts",
         "src/content/modportal.test.ts",
         "src/content/modportal.ts",
+        "src/content/registryDiff.test.ts",
         "src/content/registryDiff.ts",
         "src/content/roundTrip.test.ts",
-        "src/content/roundTrip.ts",
         "src/content/serialize.test.ts",
         "src/content/serialize.ts"
       ],
@@ -697,6 +699,14 @@
             ".github/ISSUE_TEMPLATE/content-contribution.yml"
           ],
           "note": "Named 'issue form' four times in docs/audits/contribution-system-*.md."
+        },
+        {
+          "name": "edit consolidation",
+          "paths": [
+            "scripts/consolidate.ts",
+            "scripts/consolidate.test.ts"
+          ],
+          "note": "produced by an-edit-goes-home-to-its-source-file"
         }
       ]
     },

@@ -45,9 +45,18 @@ function unorderedDependencies(module: ParsedModule): ReadonlySet<string> {
 // A bare heading names something inside this module; a dotted one edits something
 // that already exists. You cannot create outside your own namespace, so adding a
 // dependency can never quietly turn a module's creation into an edit of another
-// module's object.
+// module's object. Null is the second case, and is what a caller asking which
+// file declared an id has to skip — the question is asked from two places, and
+// two spellings of this rule would send an edit home to a file that never held
+// it.
+export function declaredKey(namespace: string | null, kind: string, id: string): string | null {
+  if (!isNamespaced(kind)) return id;
+  return id.includes('.') ? null : qualify(namespace, id);
+}
+
 function targetKey(module: ParsedModule, kind: string, id: string, namespace: Namespace, visible: ReadonlySet<string | null>): string {
-  if (!isNamespaced(kind) || !id.includes('.')) return isNamespaced(kind) ? qualify(module.namespace, id) : id;
+  const own = declaredKey(module.namespace, kind, id);
+  if (own !== null) return own;
   const resolved = namespace.resolve(kind, id, module.namespace, visible, `# ${kind} ${id}`);
   const owner = namespace.ownerOf(kind, resolved);
   if (owner !== null && owner !== undefined && unorderedDependencies(module).has(owner)) {

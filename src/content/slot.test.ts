@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { localeKey, missingTranslations } from './locale';
 import { loadModule, loadUniverse } from './registry';
-import { roundTripModule } from './roundTrip';
+import { roundTripModule } from './serialize';
 import { loadUniverseWithDiagnostics, type Registry } from './registry';
 import { parseModuleSource, type ModuleSource } from './universe';
-import { declaredGlobalIds } from './roundTrip';
+import { declaredGlobalIds } from './serialize';
 
 const NL = String.fromCharCode(10);
 
