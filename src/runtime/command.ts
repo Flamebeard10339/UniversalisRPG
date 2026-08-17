@@ -20,8 +20,6 @@ import { type Modal, type ModalOption } from './modals';
 import { anId, say, says, type Said } from './said';
 import {
   DEV_SLOT,
-  PLAYER_SLOT,
-  adopted,
   autosave,
   devSnapshot,
   enterDev,
@@ -30,7 +28,6 @@ import {
   saveNow,
   saveReport,
   setAutosaveSeconds,
-  withhold,
   type SaveContext,
   type SlotWrites,
 } from './saveSlots';
@@ -373,6 +370,10 @@ function runDirective(ctx: CommandContext, directive: Directive): CommandResult 
 
   try {
     const outcome = applyDirective(ctx.session, directive);
+    // The other route a payload becomes this session, and the only one that is
+    // not `importPayload`: a `load:` addresses a `# save` by id, so what the
+    // session is now came out of the content and out of no slot.
+    if (directive.kind === 'load' && ctx.save) ctx.save.synced = null;
     const next = view(ctx.session);
     return { ...shown(next), recorded: [recordedOutcome(directive, outcome)] };
   } catch (error) {
@@ -628,7 +629,14 @@ function withSaves(ctx: CommandContext, run: (save: SaveContext) => CommandResul
 // off the end of a typed line. `loadSaved` adopts nothing until the whole of it
 // stands — including that it can be drawn — so a payload refused here leaves the
 // session where it was and the view below it cannot be the one that fails.
-function importPayload(ctx: CommandContext, payload: string, done: string): CommandResult {
+//
+// `from` names the slot this payload came out of, and nothing when it came from
+// somewhere that is not a slot. Required rather than defaulted, because a load
+// is exactly the event that changes which slot's game this session is: answered
+// here once, it is what stops an imported payload inheriting the standing of the
+// session it replaced and being autosaved over a player's slot, and a caller
+// added next month cannot leave the question unanswered.
+function importPayload(ctx: CommandContext, payload: string, done: string, from: string | null): CommandResult {
   const saved = savedGameFromSerialized(payload);
   if (!saved) return noted('error', `that is not a # save body: ${JSON.stringify(payload.slice(0, 60))}`);
   try {
@@ -636,6 +644,7 @@ function importPayload(ctx: CommandContext, payload: string, done: string): Comm
   } catch (error) {
     return refused(error);
   }
+  if (ctx.save) ctx.save.synced = from;
   return shown(view(ctx.session), [note('ok', done)]);
 }
 
@@ -693,44 +702,34 @@ function autosaved(ctx: CommandContext): ToolMessage | null {
 // and nothing else: the mode is on, the slot is withheld, and `/save` is what
 // takes it deliberately.
 function devOn(ctx: CommandContext, save: SaveContext): CommandResult {
-  const authoring = enterDev(save);
+  const authoring = enterDev(save, serializeSession(ctx.session));
   if (authoring === null) return noted('ok', `Dev mode on, writing slot ${liveSlot(save)}.`);
 
-  const result = importPayload(ctx, authoring, `Dev mode on, slot ${DEV_SLOT} picked up.`);
-  if (loaded(result)) {
-    adopted(save, DEV_SLOT);
-    return result;
-  }
+  const result = importPayload(ctx, authoring, `Dev mode on, slot ${DEV_SLOT} picked up.`, DEV_SLOT);
+  if (loaded(result)) return result;
   return { ...result, output: [...result.output, note('warn', `Dev mode is on, but slot ${DEV_SLOT} could not be picked up, so this session is left as it is and will not be written there. /save takes it.`)] };
 }
 
-// Everything done in dev goes with the mode: the player's slot goes back to the
-// snapshot, and the session goes back out of the same bytes when they will load.
-// The slot goes back either way — putting bytes back where they were cannot
-// fail, and a snapshot this build can no longer read must not be a reason to
-// strand somebody in dev with no command that leaves it. What a failed restore
-// costs is the session, which stays where it is and is told so; `player` is
-// withheld, so what dev built cannot reach the slot a player would open next,
-// and the dev slot is still there to `/restore` from.
+// Everything done in dev goes with the mode: the session goes back to what it
+// was when dev was entered, and back to being the game of whatever slot it was
+// then. No slot is put back, because none of them moved — nothing in dev writes
+// the player's slot, which is c10, so it still holds exactly what it held on the
+// way in and a compensating write here could only ever fail and strand somebody.
+// A snapshot this build cannot read costs the session, which stays where it is
+// and is no slot's game, so what dev built cannot reach the slot a player opens
+// next; the dev slot is an author's work and is still there to `/restore` from.
 function devOff(ctx: CommandContext, save: SaveContext): CommandResult {
   const exit = devSnapshot(save);
-  // Said before anything else, so whatever fails below it this session cannot
-  // write the slot it is on its way out of.
-  withhold(save, DEV_SLOT);
-
-  if (exit.kind !== 'restore') {
-    leaveDev(save, exit);
-    const why = exit.kind === 'was-empty' ? `There was no ${PLAYER_SLOT} slot to come back to` : `${exit.why}, so ${PLAYER_SLOT} is left exactly as it is`;
-    return noted('ok', `Dev mode off, writing slot ${liveSlot(save)}. ${why}, so this session is left as it is and will not be written to one. Slot ${DEV_SLOT} still holds what dev did.`);
+  if (exit.kind === 'no-snapshot') {
+    leaveDev(save, null);
+    return noted('ok', `Dev mode off, writing slot ${liveSlot(save)}. ${exit.why}, so this session is left as it is and will not be written to one. Slot ${DEV_SLOT} still holds what dev did.`);
   }
 
-  const result = importPayload(ctx, exit.payload, `Dev mode off, ${PLAYER_SLOT} restored.`);
-  leaveDev(save, exit);
-  if (loaded(result)) {
-    adopted(save, PLAYER_SLOT);
-    return result;
-  }
-  return { ...result, output: [...result.output, note('warn', `Dev mode off and slot ${PLAYER_SLOT} is back as it was, but this session could not be put back with it, so it will not be written there. Slot ${DEV_SLOT} still holds what dev did.`)] };
+  const result = importPayload(ctx, exit.payload, `Dev mode off, the session before dev is back.`, exit.synced);
+  const back = loaded(result);
+  leaveDev(save, back ? exit.synced : null);
+  if (back) return result;
+  return { ...result, output: [...result.output, note('warn', `Dev mode off, but this session could not be put back to what it was before dev, so it will not be written to a slot. Slot ${DEV_SLOT} still holds what dev did.`)] };
 }
 
 // --- argument parsers -----------------------------------------------------
@@ -960,7 +959,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     argHint: '<body>',
     summary: 'load a # save body printed by /export',
     parse: (rest) => (rest === '' ? { problem: '/import requires a # save body' } : rest),
-    run: (ctx, body) => importPayload(ctx, body, 'Imported.'),
+    run: (ctx, body) => importPayload(ctx, body, 'Imported.', null),
   }),
   define({
     name: '/save',
@@ -979,11 +978,7 @@ export const COMMANDS: readonly CommandSpec[] = [
         const name = liveSlot(save);
         const slot = save.store.read(name);
         if (!slot) return noted('error', `slot ${name} holds nothing.`);
-        const result = importPayload(ctx, slot.payload, `Loaded slot ${name}.`);
-        // Only now is this session what that slot holds, and only now may
-        // autosave write it back.
-        if (loaded(result)) adopted(save, name);
-        return result;
+        return importPayload(ctx, slot.payload, `Loaded slot ${name}.`, name);
       }),
   }),
   define({

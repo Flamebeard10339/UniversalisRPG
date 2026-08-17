@@ -2,9 +2,9 @@ import { RuntimeError } from './runtime';
 import { slotStore, type Slot, type SlotDriver, type SlotStore } from './store';
 
 // The slot a session writes when nobody is authoring, and the pair that exist
-// only while somebody is. `dev-snapshot` holds what `player` said at the moment
-// dev mode was entered, so leaving restores it and a process that dies in
-// between never wrote over it in the first place.
+// only while somebody is. `dev-snapshot` holds the *session* at the moment dev
+// mode was entered, so leaving puts the session back where it came from; the
+// player's slot needs no putting back, because nothing in dev writes it.
 export const PLAYER_SLOT = 'player';
 export const DEV_SLOT = 'dev';
 export const DEV_SNAPSHOT_SLOT = 'dev-snapshot';
@@ -20,46 +20,33 @@ export const AUTOSAVE_SLOT = 'autosave';
 export const DEFAULT_AUTOSAVE_SECONDS = 0;
 
 // The save half of a driver's context: where slots are kept, the clock the
-// cadence is measured on, and which slot is live. One clock, read by the store
-// at a write and by the cadence at a check, so the two cannot disagree.
+// cadence is measured on, which slot is live, and the one slot whose game this
+// session is. One clock, read by the store at a write and by the cadence at a
+// check, so the two cannot disagree.
+//
+// `synced` is the whole of the entitlement rule. A session may write the live
+// slot exactly when it is that slot's game, so this is one slot name and not a
+// set of them, and there is no second set naming the slots it is not. Every
+// event that changes what game this session is, or which slot is live, answers
+// it: building the context, loading a payload, `/save`, autosave, and the two
+// dev transitions. Nothing answers it at the moment of a write — which is what
+// made one rule owe two different answers about an empty slot, since an empty
+// dev slot at entry is this session's to take and an empty player slot on the
+// way out of dev is not.
 export interface SaveContext {
   readonly store: SlotStore;
   readonly now: () => number;
   dev: boolean;
+  synced: string | null;
 }
 
+// A new game is the empty player slot's game, and this is the one place that is
+// decided. A slot holding anything — bytes this build reads, or bytes it does
+// not — is whoever wrote it's until `/restore` picks it up or `/save` takes it,
+// which is what a reopened game meets.
 export function createSaveContext(driver: SlotDriver, now: () => number): SaveContext {
-  return { store: slotStore(driver, now), now, dev: false };
-}
-
-// What a session knows about its own standing in each slot: the ones it *is*
-// what they hold, and the ones it is known *not* to be. Autosave writes no
-// other, which is the whole of what stops a session that never read a slot from
-// replacing what is in it — a game reopened, or one that has just left dev mode.
-// `/save` is how a session takes a slot it did not come from, and it is
-// deliberately the explicit spelling.
-//
-// Two sets rather than one, because an absent slot answers differently to each:
-// a game nobody has loaded may take an empty slot, and a session that has just
-// been told it is nobody's may not — which is the only reason `withheld` exists
-// and is the case a single set got wrong.
-//
-// Beside the context rather than on it, the way a session's internals sit
-// beside a `PlaySession`: what a driver holds is published, and this is a fact
-// about a running process that no surface renders. A context nobody built here
-// — a restart, reading the same directory back — starts knowing nothing, which
-// is exactly what a restart knows.
-interface Standing {
-  is: Set<string>;
-  isNot: Set<string>;
-}
-
-const STANDING = new WeakMap<SaveContext, Standing>();
-
-function standingOf(save: SaveContext): Standing {
-  const held = STANDING.get(save) ?? { is: new Set<string>(), isNot: new Set<string>() };
-  STANDING.set(save, held);
-  return held;
+  const store = slotStore(driver, now);
+  return { store, now, dev: false, synced: stateOf(store, PLAYER_SLOT).kind === 'empty' ? PLAYER_SLOT : null };
 }
 
 // What is in a slot, in three answers rather than two. Collapsing the last two
@@ -86,17 +73,6 @@ function datable(store: SlotStore, name: string): Slot | null {
   return state.kind === 'held' ? state.slot : null;
 }
 
-// Whether this session is entitled to write the slot without being asked twice:
-// it is what that slot holds, or the slot is empty and nothing has said this
-// session is not its. Bytes nobody can read are neither — they are somebody's
-// save that a half-finished write or a hand edit left behind, and replacing
-// them is a thing to be asked for rather than assumed.
-export function adopts(save: SaveContext, slot: string): boolean {
-  const standing = standingOf(save);
-  if (standing.is.has(slot)) return true;
-  return !standing.isNot.has(slot) && stateOf(save.store, slot).kind === 'empty';
-}
-
 export function liveSlot(save: SaveContext): string {
   return save.dev ? DEV_SLOT : PLAYER_SLOT;
 }
@@ -104,7 +80,7 @@ export function liveSlot(save: SaveContext): string {
 // The cadence, or nothing when the slot it lives in cannot be made sense of.
 // A setting is not a save: what a report owes a reader is the rest of the
 // answer, not a refusal, so the two callers ask different questions of it the
-// way `datable` and `adopts` do of a slot.
+// way `datable` and `writesLive` do of a slot.
 export function cadenceOrNone(save: SaveContext): number | null {
   const state = stateOf(save.store, AUTOSAVE_SLOT);
   if (state.kind === 'empty') return DEFAULT_AUTOSAVE_SECONDS;
@@ -154,122 +130,93 @@ export function autosave(save: SaveContext, payload: () => string): Autosaved {
   const writes = writesLive(save);
   if (writes !== 'yes') return { kind: writes === 'unreadable' ? 'unreadable' : 'held', slot };
   save.store.write(slot, payload());
-  adopted(save, slot);
   return { kind: 'wrote', slot };
 }
 
-// Said out loud, so it replaces whatever the slot holds and the session owns it
-// from here: this is the way a session takes a slot it did not come from.
+// Said out loud, so it replaces whatever the slot holds and the session is its
+// game from here: this is the way a session takes a slot it did not come from.
 export function saveNow(save: SaveContext, payload: string): string {
   const slot = liveSlot(save);
   save.store.write(slot, payload);
-  adopted(save, slot);
+  save.synced = slot;
   return slot;
 }
 
-// A session is what a slot holds once it has been loaded out of it, and not
-// before. Told to the context rather than inferred by it, because only the
-// caller that ran the load knows whether it stood.
-export function adopted(save: SaveContext, slot: string): void {
-  const standing = standingOf(save);
-  standing.is.add(slot);
-  standing.isNot.delete(slot);
+// The session as it stood when dev mode was entered, and the slot it was the
+// game of. Both, because putting the session back is only half of coming out of
+// dev: a session restored without its standing would be the player's game again
+// while the context still believed it was the dev slot's.
+interface DevSnapshot {
+  payload: string;
+  synced: string | null;
 }
 
-// The other direction, and the reason it is not merely "forget the adoption":
-// a session told it is not a slot's stays that way when the slot is empty too.
-export function withhold(save: SaveContext, slot: string): void {
-  const standing = standingOf(save);
-  standing.is.delete(slot);
-  standing.isNot.add(slot);
-}
-
-// What the player's slot held when dev mode was entered, as JSON so that "there
-// was no slot" is a value rather than an absence that a missing snapshot and a
-// snapshot of nothing would both spell.
-function encodeSnapshot(payload: string | null): string {
-  return JSON.stringify(payload);
-}
-
-function decodeSnapshot(text: string): string | null {
+function decodeSnapshot(text: string): DevSnapshot {
   const parsed: unknown = JSON.parse(text);
-  if (parsed !== null && typeof parsed !== 'string') throw new RuntimeError(`slot ${DEV_SNAPSHOT_SLOT} does not hold a snapshot`);
-  return parsed;
+  if (typeof parsed !== 'object' || parsed === null) throw new RuntimeError(`slot ${DEV_SNAPSHOT_SLOT} does not hold a snapshot`);
+  const held = parsed as Partial<DevSnapshot>;
+  if (typeof held.payload !== 'string' || (held.synced !== null && typeof held.synced !== 'string')) throw new RuntimeError(`slot ${DEV_SNAPSHOT_SLOT} does not hold a snapshot`);
+  return { payload: held.payload, synced: held.synced };
 }
 
 // What the dev slot holds, which is what a session entering dev has to be put
-// into — null when there is none, and so nothing to pick up. Symmetrical with
-// leaving: `/dev on` goes to the dev slot and `/dev off` comes back from it, so
-// the session is always what the live slot holds and autosave never has to
-// choose between refusing an author and writing over their last session.
-// Loading it is the caller's, because loading a payload is not a store's job.
-export function enterDev(save: SaveContext): string | null {
+// into — null when there is none, and so nothing to pick up. Loading it is the
+// caller's, because loading a payload is not a store's job, so the caller says
+// so afterwards by handing `DEV_SLOT` to the load.
+//
+// What is snapshotted is the session, not the player's slot. The slot needs no
+// snapshot: c10 is that nothing in dev writes it, so it is still exactly what it
+// was when the mode goes off, and a compensating write on the way out could only
+// ever put back damage this engine did not do — while being the one step on that
+// path that could fail, and strand an author when it did. The session is the
+// thing dev really does move, and this is the only copy of it.
+export function enterDev(save: SaveContext, session: string): string | null {
   if (save.dev) throw new RuntimeError('already in dev mode');
-  const player = save.store.read(PLAYER_SLOT);
   // Persisted before the mode is on, so nothing done in dev can precede it.
-  save.store.write(DEV_SNAPSHOT_SLOT, encodeSnapshot(player?.payload ?? null));
+  save.store.write(DEV_SNAPSHOT_SLOT, JSON.stringify({ payload: session, synced: save.synced } satisfies DevSnapshot));
   save.dev = true;
-  // Nothing is said about standing here: an empty dev slot is a scratch slot
-  // this session takes, the way a game nobody has loaded takes an empty player
-  // slot, and anything already in it is refused by that same rule until the
-  // caller says it picked it up. Leaving is where a session stops being the dev
-  // slot's, so entering has nothing left to withhold.
+  // An empty dev slot is this session's scratch slot and it takes it here,
+  // where the question is asked once, rather than at every write. Anything
+  // already in it is somebody's authoring until the caller loads it.
   const authoring = stateOf(save.store, DEV_SLOT);
+  save.synced = authoring.kind === 'empty' ? DEV_SLOT : null;
   return authoring.kind === 'held' ? authoring.slot.payload : null;
 }
 
-// How leaving dev will go: back to what the player's slot held, back to having
-// no slot at all, or — when the snapshot itself is gone or unreadable — out of
-// the mode without touching the player's slot. That third answer is why this is
-// a value rather than a raise: not being able to restore a slot is a reason to
-// leave it alone, never a reason to keep somebody in a mode with no way out.
-export type DevExit = { kind: 'restore'; payload: string } | { kind: 'was-empty' } | { kind: 'no-snapshot'; why: string };
+// How leaving dev will go: back to the session dev was entered from, or — when
+// the snapshot is gone, unreadable or not a snapshot — out of the mode with the
+// session left exactly where it is. A value rather than a raise, because not
+// being able to restore a session is never a reason to keep somebody in a mode
+// with no way out of it.
+export type DevExit = { kind: 'restore'; payload: string; synced: string | null } | { kind: 'no-snapshot'; why: string };
 
 export function devSnapshot(save: SaveContext): DevExit {
   if (!save.dev) throw new RuntimeError('not in dev mode');
   const state = stateOf(save.store, DEV_SNAPSHOT_SLOT);
   if (state.kind === 'empty') return { kind: 'no-snapshot', why: `slot ${DEV_SNAPSHOT_SLOT} is gone` };
   if (state.kind === 'unreadable') return { kind: 'no-snapshot', why: `slot ${DEV_SNAPSHOT_SLOT} cannot be read` };
-  let held: string | null;
   try {
-    held = decodeSnapshot(state.slot.payload);
+    const held = decodeSnapshot(state.slot.payload);
+    return { kind: 'restore', payload: held.payload, synced: held.synced };
   } catch {
     return { kind: 'no-snapshot', why: `slot ${DEV_SNAPSHOT_SLOT} does not hold a snapshot` };
   }
-  return held === null ? { kind: 'was-empty' } : { kind: 'restore', payload: held };
 }
 
-// The commit, taking back what `devSnapshot` handed out: the player's slot goes
-// back to what it held and the snapshot goes with the mode. No step here can
-// lose anything, which is why it is safe to run whether or not the caller could
-// put the *session* back — restoring that is the caller's, since loading a
-// payload is not something a store does, and a snapshot this build can no
-// longer read must not be a reason to strand somebody in dev.
+// Turning the mode off, and saying what game the session is now — which only
+// the caller knows, because only it ran the load. `becomes` is the snapshot's
+// own standing when the session went back, and nothing when it could not: a
+// session dev built is no slot's game, and there is no slot state that makes it
+// one, which is why an empty player slot cannot take it either.
 //
-// The dev slot stays. Removing it was tidiness and it is an author's work, so a
-// session that cannot be restored still has somewhere to go back to; a stale one
-// is not adopted, so nothing writes over it either.
-export function leaveDev(save: SaveContext, exit: DevExit): void {
+// This writes no game slot. The player's is already what it was, the dev slot is
+// an author's work and stays, and the snapshot goes last so that a store which
+// refuses the removal has already let the mode go off.
+export function leaveDev(save: SaveContext, becomes: string | null): void {
   if (!save.dev) throw new RuntimeError('not in dev mode');
-
-  // Rewritten only when it differs, so the stamp on a slot nothing touched is
-  // still the stamp of the write that made it. Bytes nobody can read differ
-  // from everything, including from the snapshot they were taken of.
-  const current = stateOf(save.store, PLAYER_SLOT);
-  if (exit.kind === 'was-empty') {
-    if (current.kind !== 'empty') save.store.remove(PLAYER_SLOT);
-  } else if (exit.kind === 'restore' && (current.kind !== 'held' || current.slot.payload !== exit.payload)) {
-    save.store.write(PLAYER_SLOT, exit.payload);
-  }
-
-  save.store.remove(DEV_SNAPSHOT_SLOT);
-  // The session standing here is the one dev built: it is not what the player's
-  // slot holds, and it is no longer the dev slot's either once the mode is off.
-  // Withheld rather than forgotten, because an empty slot answers those two
-  // differently and either of these may be empty.
-  withhold(save, PLAYER_SLOT);
-  withhold(save, DEV_SLOT);
   save.dev = false;
+  save.synced = becomes;
+  save.store.remove(DEV_SNAPSHOT_SLOT);
 }
 
 export interface SlotStanding {
@@ -300,7 +247,7 @@ export interface SaveReport {
 
 export function writesLive(save: SaveContext): SlotWrites {
   const slot = liveSlot(save);
-  if (adopts(save, slot)) return 'yes';
+  if (save.synced === slot) return 'yes';
   return stateOf(save.store, slot).kind === 'unreadable' ? 'unreadable' : 'not-ours';
 }
 

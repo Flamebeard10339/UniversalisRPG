@@ -6,7 +6,6 @@ import {
   DEV_SLOT,
   DEV_SNAPSHOT_SLOT,
   PLAYER_SLOT,
-  adopted,
   autosave,
   autosaveDue,
   autosaveSeconds,
@@ -21,10 +20,33 @@ import {
   type SaveContext,
 } from './saveSlots';
 
-function turning(start = 1_000): { save: SaveContext; pass: (ms: number) => void } {
+// The driver is shared and the context is not, because that is exactly what a
+// restart is: the slots outlive the process and what the session was the game of
+// does not. Built through `createSaveContext` rather than by copying the live
+// context, so a reopened game is measured rather than described.
+function turning(start = 1_000): { save: SaveContext; pass: (ms: number) => void; restarted: () => SaveContext } {
   let at = start;
-  const save = createSaveContext(memoryDriver(), () => at);
-  return { save, pass: (ms) => void (at += ms) };
+  const now = (): number => at;
+  const driver = memoryDriver();
+  return { save: createSaveContext(driver, now), pass: (ms) => void (at += ms), restarted: () => createSaveContext(driver, now) };
+}
+
+// A store that refuses every write, which is what stands between an author and
+// their work when a directory goes read-only or something is in the way.
+function refusing(save: SaveContext): void {
+  (save.store as { write: (name: string, payload: string) => unknown }).write = (name) => {
+    throw new RuntimeError(`slot ${name} cannot be written`);
+  };
+}
+
+// A slot whose bytes are there and mean nothing here, which is a hand edit or a
+// build that has moved on.
+function unreadable(save: SaveContext, name: string): void {
+  const readable = save.store.read.bind(save.store);
+  (save.store as { read: (slot: string) => unknown }).read = (slot) => {
+    if (slot !== name) return readable(slot);
+    throw new RuntimeError(`slot ${name} does not parse`);
+  };
 }
 
 describe('the cadence is a slot like any other (c4)', () => {
@@ -42,8 +64,8 @@ describe('the cadence is a slot like any other (c4)', () => {
     const { save, pass } = turning();
     setAutosaveSeconds(save, 30);
 
-    // Nothing written yet: there is no span to be inside of, and no slot to
-    // be somebody else's.
+    // A new game is the empty player slot's game, so there is a span to be
+    // inside of from the first write onward.
     expect(autosave(save, () => 'first')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
 
     pass(29_999);
@@ -82,102 +104,74 @@ describe('the cadence is a slot like any other (c4)', () => {
     save.store.write(PLAYER_SLOT, 'good');
     expect(autosaveDue(save)).toBe(false);
 
-    // Hand-edited to something the store cannot read.
-    const readable = save.store.read.bind(save.store);
-    (save.store as { read: (name: string) => unknown }).read = (name) => {
-      if (name !== PLAYER_SLOT) return readable(name);
-      throw new RuntimeError('slot player does not parse');
-    };
+    unreadable(save, PLAYER_SLOT);
     expect(autosaveDue(save)).toBe(true);
   });
 });
 
-describe('a session writes back only what it came out of (c4, c9)', () => {
-  it('will not autosave over a slot it never read, which is what a reopened game is', () => {
-    const first = turning();
-    setAutosaveSeconds(first.save, 30);
-    first.save.store.write(PLAYER_SLOT, 'an hour of play');
+describe('a session writes the one slot whose game it is (c4, c9)', () => {
+  it('is the empty player slot the moment it is built, which is what a new game is', () => {
+    const { save } = turning();
 
-    // The same directory, a session later. The cadence outlives the process and
-    // the adoption does not, which is the whole of the difference.
-    const restarted: SaveContext = { ...first.save, dev: false };
-    first.pass(3_600_000);
-
-    expect(autosaveDue(restarted)).toBe(true);
-    expect(autosave(restarted, () => 'a brand new game')).toEqual({ kind: 'held', slot: PLAYER_SLOT });
-    expect(restarted.store.read(PLAYER_SLOT)?.payload).toBe('an hour of play');
+    expect(save.synced).toBe(PLAYER_SLOT);
+    expect(saveReport(save).writes).toBe('yes');
   });
 
-  it('writes it once the session has been told it came out of it', () => {
-    const { save, pass } = turning();
+  it('is no slot"s when it is built over one that already holds a game, which is a reopened one', () => {
+    const { save, pass, restarted } = turning();
     setAutosaveSeconds(save, 30);
     save.store.write(PLAYER_SLOT, 'an hour of play');
-    const restarted: SaveContext = { ...save, dev: false };
+
+    const next = restarted();
+    expect(next.synced).toBeNull();
     pass(3_600_000);
 
-    adopted(restarted, PLAYER_SLOT);
-    expect(autosave(restarted, () => 'an hour and one command')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
-    expect(restarted.store.read(PLAYER_SLOT)?.payload).toBe('an hour and one command');
+    expect(autosaveDue(next)).toBe(true);
+    expect(autosave(next, () => 'a brand new game')).toEqual({ kind: 'held', slot: PLAYER_SLOT });
+    expect(next.store.read(PLAYER_SLOT)?.payload).toBe('an hour of play');
+  });
+
+  it('is no slot"s when it is built over bytes it cannot read, rather than free to replace them', () => {
+    const { save, restarted } = turning();
+    save.store.write(PLAYER_SLOT, 'good');
+    unreadable(save, PLAYER_SLOT);
+
+    const next = restarted();
+    unreadable(next, PLAYER_SLOT);
+    expect(next.synced).toBeNull();
+    expect(saveReport(next).writes).toBe('unreadable');
+  });
+
+  it('writes once it has been loaded out of the slot', () => {
+    const { save, pass, restarted } = turning();
+    setAutosaveSeconds(save, 30);
+    save.store.write(PLAYER_SLOT, 'an hour of play');
+    const next = restarted();
+    pass(3_600_000);
+
+    next.synced = PLAYER_SLOT;
+    expect(autosave(next, () => 'an hour and one command')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
+    expect(next.store.read(PLAYER_SLOT)?.payload).toBe('an hour and one command');
   });
 
   it('takes the slot outright when it is said out loud', () => {
-    const { save, pass } = turning();
+    const { save, pass, restarted } = turning();
     setAutosaveSeconds(save, 30);
     save.store.write(PLAYER_SLOT, 'an hour of play');
-    const restarted: SaveContext = { ...save, dev: false };
+    const next = restarted();
 
-    saveNow(restarted, 'replaced deliberately');
+    saveNow(next, 'replaced deliberately');
     pass(30_000);
-    expect(autosave(restarted, () => 'and kept from here')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
-    expect(restarted.store.read(PLAYER_SLOT)?.payload).toBe('and kept from here');
-  });
-
-  it('holds the player slot again the moment dev mode is left', () => {
-    const { save, pass } = turning();
-    setAutosaveSeconds(save, 30);
-    saveNow(save, 'the player');
-
-    enterDev(save);
-    pass(30_000);
-    autosave(save, () => 'authoring');
-    const snapshot = devSnapshot(save);
-    expect(snapshot).toEqual({ kind: 'restore', payload: 'the player' });
-    leaveDev(save, snapshot);
-
-    pass(30_000);
-    expect(autosave(save, () => 'authoring, one command later')).toEqual({ kind: 'held', slot: PLAYER_SLOT });
-    expect(save.store.read(PLAYER_SLOT)?.payload).toBe('the player');
-  });
-
-  it('will not autosave into an empty player slot after dev mode, where a fresh game would', () => {
-    const fresh = turning();
-    setAutosaveSeconds(fresh.save, 30);
-    // A game nobody has loaded may take the empty slot: that is a new game.
-    expect(autosave(fresh.save, () => 'a new game')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
-
-    const authoring = turning();
-    setAutosaveSeconds(authoring.save, 30);
-    enterDev(authoring.save);
-    authoring.pass(30_000);
-    autosave(authoring.save, () => 'authoring');
-    leaveDev(authoring.save, devSnapshot(authoring.save));
-
-    // The same empty slot, and a session that has just been told it is not its.
-    expect(authoring.save.store.read(PLAYER_SLOT)).toBeNull();
-    authoring.pass(30_000);
-    expect(autosave(authoring.save, () => 'authoring, one command later')).toEqual({ kind: 'held', slot: PLAYER_SLOT });
-    expect(authoring.save.store.read(PLAYER_SLOT)).toBeNull();
+    expect(autosave(next, () => 'and kept from here')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
+    expect(next.store.read(PLAYER_SLOT)?.payload).toBe('and kept from here');
   });
 
   it('leaves bytes nobody can read alone, and still answers every question about them', () => {
     const { save, pass } = turning();
     setAutosaveSeconds(save, 30);
     save.store.write(PLAYER_SLOT, 'good');
-    const readable = save.store.read.bind(save.store);
-    (save.store as { read: (name: string) => unknown }).read = (name) => {
-      if (name !== PLAYER_SLOT) return readable(name);
-      throw new RuntimeError('slot player does not parse');
-    };
+    unreadable(save, PLAYER_SLOT);
+    save.synced = null;
 
     // Dating it and being entitled to replace it are different questions, and
     // an unreadable slot answers them differently: the report still stands, and
@@ -197,119 +191,164 @@ describe('a session writes back only what it came out of (c4, c9)', () => {
     setAutosaveSeconds(save, 30);
     save.store.write(DEV_SLOT, 'what the last dev session was doing');
 
-    enterDev(save);
+    enterDev(save, 'the session being played');
     pass(30_000);
     expect(autosave(save, () => 'a different dev session')).toEqual({ kind: 'held', slot: DEV_SLOT });
     expect(save.store.read(DEV_SLOT)?.payload).toBe('what the last dev session was doing');
   });
 
   it('reports which it is, so a surface draws the answer rather than guessing', () => {
-    const { save } = turning();
+    const { save, restarted } = turning();
     save.store.write(PLAYER_SLOT, 'somebody else');
-    const restarted: SaveContext = { ...save, dev: false };
+    const next = restarted();
 
-    expect(saveReport(restarted).writes).toBe('not-ours');
-    adopted(restarted, PLAYER_SLOT);
-    expect(saveReport(restarted).writes).toBe('yes');
+    expect(saveReport(next).writes).toBe('not-ours');
+    next.synced = PLAYER_SLOT;
+    expect(saveReport(next).writes).toBe('yes');
   });
 });
 
 describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', () => {
-  it('persists the player slot before the mode is on, and puts it back on the way out', () => {
+  it('snapshots the session on the way in, and no slot needs putting back on the way out', () => {
     const { save, pass } = turning();
     saveNow(save, 'the player');
 
-    enterDev(save);
-    expect(save.store.read(DEV_SNAPSHOT_SLOT)?.payload).toBe(JSON.stringify('the player'));
+    enterDev(save, 'the session being played');
+    expect(save.store.read(DEV_SNAPSHOT_SLOT)?.payload).toBe(JSON.stringify({ payload: 'the session being played', synced: PLAYER_SLOT }));
 
     pass(1_000);
     saveNow(save, 'authoring');
     saveNow(save, 'more authoring');
     expect(save.store.read(DEV_SLOT)?.payload).toBe('more authoring');
+    // c10 is why there is nothing to put back: dev never reached it.
     expect(save.store.read(PLAYER_SLOT)?.payload).toBe('the player');
 
-    leaveDev(save, devSnapshot(save));
+    const exit = devSnapshot(save);
+    expect(exit).toEqual({ kind: 'restore', payload: 'the session being played', synced: PLAYER_SLOT });
+    leaveDev(save, exit.kind === 'restore' ? exit.synced : null);
     expect(save.store.read(PLAYER_SLOT)?.payload).toBe('the player');
     expect(save.store.read(DEV_SNAPSHOT_SLOT)).toBeNull();
-    // The dev slot is an author's work and stays; nothing has adopted it, so
-    // nothing writes over it either.
+    // The dev slot is an author's work and stays; the session is not its game
+    // any more, so nothing writes over it either.
     expect(save.store.read(DEV_SLOT)?.payload).toBe('more authoring');
+  });
+
+  it('writes no slot on the way out, so nothing on that path can fail and strand an author', () => {
+    const { save } = turning();
+    saveNow(save, 'the player');
+    enterDev(save, 'the session being played');
+    saveNow(save, 'authoring');
+    const authored = save.store.read(DEV_SLOT)?.payload;
+
+    const exit = devSnapshot(save);
+    refusing(save);
+    expect(() => leaveDev(save, exit.kind === 'restore' ? exit.synced : null)).not.toThrow();
+    expect(save.dev).toBe(false);
+    expect(save.synced).toBe(PLAYER_SLOT);
+    expect(save.store.read(DEV_SLOT)?.payload).toBe(authored);
   });
 
   it('leaves the stamp alone on a slot nothing touched', () => {
     const { save, pass } = turning();
-    const written = saveNow(save, 'the player') && save.store.read(PLAYER_SLOT)!.writtenAt;
+    saveNow(save, 'the player');
+    const written = save.store.read(PLAYER_SLOT)!.writtenAt;
 
-    enterDev(save);
+    enterDev(save, 'the session being played');
     pass(90_000);
     saveNow(save, 'authoring');
-    leaveDev(save, devSnapshot(save));
+    leaveDev(save, PLAYER_SLOT);
 
     expect(save.store.read(PLAYER_SLOT)?.writtenAt).toBe(written);
   });
 
-  it('restores byte-identically over a slot something did overwrite', () => {
-    const { save } = turning();
-    saveNow(save, '{"version":11,"time":5000}');
+  it('comes back out to the standing it went in with, so a session that was nobody"s stays nobody"s', () => {
+    const { save, pass, restarted } = turning();
+    setAutosaveSeconds(save, 30);
+    save.store.write(PLAYER_SLOT, 'an hour of play');
 
-    enterDev(save);
-    save.store.write(PLAYER_SLOT, 'a save-breaking mistake');
-    leaveDev(save, devSnapshot(save));
+    // A reopened game, which is no slot's until it says so. Dev must not
+    // launder that into an entitlement on the way back out.
+    const next = restarted();
+    expect(next.synced).toBeNull();
 
-    expect(save.store.read(PLAYER_SLOT)?.payload).toBe('{"version":11,"time":5000}');
+    enterDev(next, 'a brand new game');
+    const exit = devSnapshot(next);
+    expect(exit).toEqual({ kind: 'restore', payload: 'a brand new game', synced: null });
+    leaveDev(next, exit.kind === 'restore' ? exit.synced : null);
+
+    pass(3_600_000);
+    expect(autosave(next, () => 'a brand new game, one command later')).toEqual({ kind: 'held', slot: PLAYER_SLOT });
+    expect(next.store.read(PLAYER_SLOT)?.payload).toBe('an hour of play');
   });
 
-  it('snapshots the absence of a slot, and leaving takes the mode back to having none', () => {
-    const { save } = turning();
+  it('will not autosave into an empty player slot after dev mode, where a fresh game would', () => {
+    const fresh = turning();
+    setAutosaveSeconds(fresh.save, 30);
+    // A game nobody has loaded may take the empty slot: that is a new game.
+    expect(autosave(fresh.save, () => 'a new game')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
 
-    enterDev(save);
-    expect(save.store.read(DEV_SNAPSHOT_SLOT)?.payload).toBe('null');
-    saveNow(save, 'authoring');
-    save.store.write(PLAYER_SLOT, 'written by something in dev');
+    const authoring = turning();
+    setAutosaveSeconds(authoring.save, 30);
+    enterDev(authoring.save, 'the session being played');
+    authoring.pass(30_000);
+    autosave(authoring.save, () => 'authoring');
+    // The session dev built could not be put back, so it is no slot's game, and
+    // an empty slot cannot make it one — which a rule asked at the write did.
+    leaveDev(authoring.save, null);
 
-    expect(devSnapshot(save)).toEqual({ kind: 'was-empty' });
-    leaveDev(save, devSnapshot(save));
-    expect(save.store.read(PLAYER_SLOT)).toBeNull();
+    expect(authoring.save.store.read(PLAYER_SLOT)).toBeNull();
+    authoring.pass(30_000);
+    expect(autosave(authoring.save, () => 'authoring, one command later')).toEqual({ kind: 'held', slot: PLAYER_SLOT });
+    expect(authoring.save.store.read(PLAYER_SLOT)).toBeNull();
   });
 
   it('loses nothing when the process dies in dev: the snapshot and the player slot are both on disk', () => {
-    const { save } = turning();
+    const { save, restarted } = turning();
     saveNow(save, 'the player');
-    enterDev(save);
+    enterDev(save, 'the session being played');
     saveNow(save, 'authoring');
 
     // The mode lives in memory and the slots do not, so a session that never
     // reached `leaveDev` is exactly this store with a fresh context over it.
-    const restarted: SaveContext = { ...save, dev: false };
-    expect(restarted.store.read(PLAYER_SLOT)?.payload).toBe('the player');
-    expect(liveSlot(restarted)).toBe(PLAYER_SLOT);
-    expect(restarted.store.read(DEV_SNAPSHOT_SLOT)?.payload).toBe(JSON.stringify('the player'));
+    const next = restarted();
+    expect(next.store.read(PLAYER_SLOT)?.payload).toBe('the player');
+    expect(liveSlot(next)).toBe(PLAYER_SLOT);
+    expect(next.store.read(DEV_SNAPSHOT_SLOT)?.payload).toBe(JSON.stringify({ payload: 'the session being played', synced: PLAYER_SLOT }));
   });
 
-  it('refuses to leave when the snapshot is gone rather than erasing what it cannot restore', () => {
+  it('leaves when the snapshot is gone rather than keeping somebody in a mode with no way out', () => {
     const { save } = turning();
     saveNow(save, 'the player');
-    enterDev(save);
+    enterDev(save, 'the session being played');
     saveNow(save, 'authoring');
     save.store.remove(DEV_SNAPSHOT_SLOT);
 
-    // Not being able to restore a slot is a reason to leave it alone, never a
-    // reason to keep somebody in a mode with no way out of it.
     const exit = devSnapshot(save);
     expect(exit).toEqual({ kind: 'no-snapshot', why: 'slot dev-snapshot is gone' });
-    leaveDev(save, exit);
+    leaveDev(save, null);
     expect(save.dev).toBe(false);
+    // Nothing was restorable, so nothing was touched and the session is no
+    // slot's game.
+    expect(save.synced).toBeNull();
     expect(save.store.read(PLAYER_SLOT)?.payload).toBe('the player');
     expect(save.store.read(DEV_SLOT)?.payload).toBe('authoring');
+  });
+
+  it('says a snapshot it cannot make sense of is one it has not got', () => {
+    const { save } = turning();
+    enterDev(save, 'the session being played');
+    save.store.write(DEV_SNAPSHOT_SLOT, '"the shape a snapshot used to have"');
+
+    expect(devSnapshot(save)).toEqual({ kind: 'no-snapshot', why: 'slot dev-snapshot does not hold a snapshot' });
   });
 
   it('refuses to enter twice and to leave when it was never entered', () => {
     const { save } = turning();
 
     expect(() => devSnapshot(save)).toThrow(/not in dev mode/);
-    expect(() => leaveDev(save, { kind: 'was-empty' })).toThrow(/not in dev mode/);
-    enterDev(save);
-    expect(() => enterDev(save)).toThrow(/already in dev mode/);
+    expect(() => leaveDev(save, null)).toThrow(/not in dev mode/);
+    enterDev(save, 'the session being played');
+    expect(() => enterDev(save, 'again')).toThrow(/already in dev mode/);
   });
 
   it('creates no dev slot at all while the mode is off', () => {
@@ -339,7 +378,7 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
     });
 
     pass(500);
-    enterDev(save);
+    enterDev(save, 'the session being played');
     const report = saveReport(save);
     expect(report.dev).toBe(true);
     expect(report.slot).toBe(DEV_SLOT);
@@ -362,33 +401,68 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
     expect(() => autosaveSeconds(save)).toThrow(/does not hold a cadence/);
   });
 
+  it('takes an empty dev slot on every visit, not only the first', () => {
+    const { save, pass } = turning();
+    setAutosaveSeconds(save, 1);
+    saveNow(save, 'the player');
+
+    expect(enterDev(save, 'the session being played')).toBeNull();
+    pass(2_000);
+    expect(autosave(save, () => 'the first authoring session')).toEqual({ kind: 'wrote', slot: DEV_SLOT });
+    leaveDev(save, PLAYER_SLOT);
+
+    // Emptied between visits, by a hand or by an author starting over. The slot
+    // is empty and this session is the one entering it, so it is this session's
+    // — a rule that remembered being told otherwise could never take it again.
+    save.store.remove(DEV_SLOT);
+    expect(enterDev(save, 'the session being played')).toBeNull();
+    pass(2_000);
+    expect(autosave(save, () => 'the second authoring session')).toEqual({ kind: 'wrote', slot: DEV_SLOT });
+  });
+
   it('picks the dev slot up on the way in, so a second visit is not a session refused', () => {
     const { save, pass } = turning();
     setAutosaveSeconds(save, 1);
     saveNow(save, 'the player');
 
-    expect(enterDev(save)).toBeNull();
+    expect(enterDev(save, 'the session being played')).toBeNull();
     pass(2_000);
     expect(autosave(save, () => 'the first authoring session')).toEqual({ kind: 'wrote', slot: DEV_SLOT });
-    leaveDev(save, devSnapshot(save));
+    leaveDev(save, PLAYER_SLOT);
 
     // Second visit: the slot is still there, and this is what it holds.
-    expect(enterDev(save)).toBe('the first authoring session');
-    adopted(save, DEV_SLOT);
+    expect(enterDev(save, 'the session being played')).toBe('the first authoring session');
+    // Which the caller loaded, and says so.
+    save.synced = DEV_SLOT;
     pass(2_000);
     expect(autosave(save, () => 'the second')).toEqual({ kind: 'wrote', slot: DEV_SLOT });
   });
 
-  it('withholds the dev slot until the caller says it picked it up', () => {
+  it('leaves a dev slot nobody has loaded as no session"s until the caller says it picked it up', () => {
     const { save, pass } = turning();
     setAutosaveSeconds(save, 1);
     save.store.write(DEV_SLOT, 'what the last dev session was doing');
 
-    expect(enterDev(save)).toBe('what the last dev session was doing');
+    expect(enterDev(save, 'the session being played')).toBe('what the last dev session was doing');
     pass(2_000);
     // The caller has not said it loaded, so it is nobody's yet.
     expect(autosave(save, () => 'a different dev session')).toEqual({ kind: 'held', slot: DEV_SLOT });
     expect(save.store.read(DEV_SLOT)?.payload).toBe('what the last dev session was doing');
+  });
+
+  it('is entered from a player slot it cannot read, because what it snapshots is the session', () => {
+    const { save } = turning();
+    save.store.write(PLAYER_SLOT, 'good');
+    unreadable(save, PLAYER_SLOT);
+    save.synced = null;
+
+    expect(() => enterDev(save, 'the session being played')).not.toThrow();
+    expect(save.dev).toBe(true);
+    // And the bytes it cannot read are still there, untouched, on the way out.
+    const exit = devSnapshot(save);
+    expect(exit).toEqual({ kind: 'restore', payload: 'the session being played', synced: null });
+    leaveDev(save, exit.kind === 'restore' ? exit.synced : null);
+    expect(saveReport(save).writes).toBe('unreadable');
   });
 
   it('reports a slot it cannot read as one with no date rather than refusing the whole answer', () => {
