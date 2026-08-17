@@ -87,14 +87,15 @@ Proof:
   by renaming and a site written next month is caught rather than a list going stale. The driver hands
   over sources and is handed back a session, the modules that loaded, and a list of problems.
   proof: vitest src/ui/surface.test.ts
-- [c7] **The controls a state offers follow from the door's report, and the report is right about
-  which module.** Clearing local changes is offered exactly when the local module is among the modules
-  the door reports a problem against — one expression over the report, not a classification anybody
-  computes — and every state the door can leave the shell in has at least one control that changes it.
-  The proof walks c1's generated family and asserts against **what the fixture broke**, never against
-  the expression under test: a cell that broke the local module expects clear-local offered, a cell that
-  broke only a base module expects it withheld. Asserting the drawn set against the function that
-  computes it is what let the predecessor's equivalent mutation survive its own named test.
+- [c7] **A control is offered when taking it changes the answer.** Clearing local changes is offered
+  exactly where the door, asked what it would report over the text clearing leaves behind, answers
+  differently — a question put to the door rather than a judgement about which module is at fault —
+  and every state the door can leave the shell in has at least one control that changes it. The proof
+  walks c1's generated family and asserts against **what the fixture broke**, never against the
+  expression under test: the family stands a healthy local module beside every base breakage and
+  expects clearing withheld there, and the expression that decides the controls is reachable from no
+  test. Asserting the drawn set against the function that computes it is what let the predecessor's
+  equivalent mutation survive its own named test, and it is what let this one survive its own.
   proof: vitest src/ui/driver.test.ts src/ui/shell.test.tsx
 - [c8] **Nothing that loads today stops loading, and no shipped game content is edited.** Shipped
   content, every `# test` over it and the whole suite pass unchanged. The content check derives its
@@ -104,6 +105,21 @@ Proof:
   proof: command git diff --stat main...HEAD -- content/ ":!content/engine-*.dsl"
 - [c9] `npm run tasks -- merge-ready` passes before the spec is marked done.
   proof: command npm run tasks -- merge-ready
+
+**c7 was amended on 2026-08-17, after pass 1, and this is the record of it.** Its first half
+promised that clearing is offered when the local module is among the modules the door reports against.
+Pass 1 graded the clause unmet and showed why the sentence could not be kept: an unmet requirement is a
+property of the merged universe, so naming the modules it is "against" means naming every module that
+loaded, and a healthy local module standing beside broken shipped content is then offered a control
+that destroys the author's work and fixes nothing. That is the same guess the Deliverable deletes from
+control flow, surviving as a list. The replacement is the ruling of 2026-08-17: a control is offered
+when taking it changes the answer. It is a question the door can be asked, because the door is total
+and never raises, and it needs no attribution at all — which is why `modules` is now empty on a
+requirement problem rather than populated with a guess. The clause got wider, not narrower: the second
+half and the proof shape are unchanged and the first half now forbids a class of wrong answer the old
+sentence permitted. One behaviour narrowed with it — an order-stage problem in the local module no
+longer offers clearing, because `clearLocalSections` preserves the header and the control changed
+nothing there.
 
 ## Goal
 
