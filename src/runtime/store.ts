@@ -1,5 +1,11 @@
 import { RuntimeError } from './runtime';
 
+// How a driver says it could not: part of the interface rather than a thing
+// each implementation goes and finds, because the command table turns exactly
+// this into a message and lets the session carry on. A driver raising anything
+// else ends the session standing behind it.
+export { RuntimeError };
+
 // One named slot: whatever text was written into it, and when. The stamp is the
 // store's, never the payload's — a payload is opaque here, and a store that
 // looked inside one would be a save store rather than a slot store.

@@ -64,7 +64,11 @@ function reaches(source: { text: string }): string[] {
 // the module declaring what a published string may be: a driver that holds one
 // has to be able to name its type, and c3 makes every word this layer draws one
 // of them.
-const PLAY_SURFACE = ['session', 'command', 'localized'];
+// plus the two the driver now stands in rather than renders: the slot-store
+// interface a browser adapter satisfies, and the save context built over it.
+// Neither publishes anything to draw, which is why they are a widening of this
+// list rather than an exception to it — a driver keeps slots or it does not.
+const PLAY_SURFACE = ['session', 'command', 'localized', 'store', 'saveSlots'];
 
 // A named import off the play surface, and whether the statement brought it in
 // as a type. A type is a shape to render; a value is a thing to call.
@@ -79,7 +83,24 @@ function calls(source: { text: string }): string[] {
 // Everything src/ui takes off the play surface as a value: the entries a
 // driver dispatches through, the cadence both drivers tick at, and the ticker
 // that turns two clock readings into an elapsed span.
-const DISPATCHES = ['askedOption', 'BASE_LANGUAGE', 'createTicker', 'LIVE_TICK_MS', 'localizerFor', 'newContext', 'runLine', 'serializeSession', 'sessionLocalizer', 'startSession', 'view'];
+const DISPATCHES = [
+  'askedOption',
+  'BASE_LANGUAGE',
+  'createTicker',
+  'LIVE_TICK_MS',
+  'localizerFor',
+  'newContext',
+  'runLine',
+  'serializeSession',
+  'sessionLocalizer',
+  'startSession',
+  'view',
+  // The store half: the context a driver keeps slots in, the refusal every slot
+  // driver raises, and the driver a session with nowhere to write falls back on.
+  'createSaveContext',
+  'memoryDriver',
+  'RuntimeError',
+];
 
 // The stylesheet the floor is set in, read as text: it is one rule over four
 // element names, so this is the whole of what holds a control that declares
