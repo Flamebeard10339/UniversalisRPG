@@ -987,6 +987,22 @@
             "src/ui/agent/pageStorage.ts"
           ],
           "note": "produced by the-gui-authors-through-the-same-door"
+        },
+        {
+          "name": "the way out of a session that would not open",
+          "paths": [
+            "src/ui/FaultBanner.tsx"
+          ],
+          "note": "produced by the-shell-draws-what-the-session-answers: a fault carries where it came from, and remediesFor turns that into the controls the banner draws"
+        },
+        {
+          "name": "the dev gate",
+          "paths": [
+            "src/ui/devMode.ts",
+            "src/ui/DevOnly.tsx",
+            "src/ui/SettingsPane.tsx"
+          ],
+          "note": "produced by the-shell-draws-what-the-session-answers: whether a power is dev-only is a mark on the command table, and DevOnly is the one place that mark is drawn"
         }
       ]
     },
