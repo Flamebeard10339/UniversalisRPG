@@ -7,11 +7,17 @@ import { loadUniverseWithDiagnostics } from '../content/registry';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
 import { App } from './App';
-import { addressable } from './authoringSurface';
+import { addressable, offeredBy } from './authoringSurface';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { PER_UNIT } from './discovery';
 import { createDriver, type Driver } from './driver';
 import { MapPane } from './MapPane';
+import { LocationBanner } from './LocationBanner';
+import { StatusBanner } from './StatusBanner';
+import { dismissal } from './asking';
+import { sectionKey } from './editControls';
+import { formatClock } from './format';
+import { devLine } from './devMode';
 import { FORGOTTEN } from './editorMemory';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
@@ -541,6 +547,69 @@ describe('what the shell puts on the screen', () => {
   // The field itself is DOM wiring and is not driven here; what this holds is
   // that the pane carrying it is mounted and named, since a command route the
   // shell never draws is a route the player does not have.
+  // The two strips above the column, rendered on their own. Every word either
+  // of them draws is also somewhere else on the screen — the location's title
+  // sits on the transcript, the resources are named again on the sheet — so the
+  // clauses above, which ask what runs of text are anywhere, cannot fail on a
+  // banner that stopped drawing. These ask what each one draws.
+  it('names where the player is, what time it is there and who is standing with them', () => {
+    const view = createDriver(SHIPPED_SOURCES, { ticker: noTicks }).snapshot().view;
+
+    const html = renderToStaticMarkup(<LocationBanner view={view} flash={false} />);
+
+    expect(view.entities.length).toBeGreaterThan(0);
+    expect(readable(html)).toEqual([view.location.title, view.entities.map((entity) => entity.title).join(' · ')]);
+    // The clock is digits and a colon, which `readable` drops for having no
+    // letter in it, so it is asked for against the markup.
+    expect(html).toContain(`>${formatClock(view.time)}<`);
+  });
+
+  it('draws one meter per resource the view publishes, in the order it published them', () => {
+    const view = createDriver(SHIPPED_SOURCES, { ticker: noTicks }).snapshot().view;
+
+    // A meter's readout is digits and a slash, which `readable` drops, so what
+    // is left is exactly the names — one per bar and nothing else.
+    const drawn = readable(renderToStaticMarkup(<StatusBanner view={view} stirring={false} />));
+
+    expect(view.resources.length).toBeGreaterThan(0);
+    expect(drawn).toEqual(view.resources.map((resource) => resource.title));
+  });
+
+  // Where the player is standing, as the Edit pane's Local list. The standing is
+  // one value the shell assembles off the view and hands to the partition, so a
+  // shell that narrowed it to nowhere draws an empty Local list while every
+  // other page looks exactly the same. Dev, because the pane is.
+  it('narrows the Local surface to what is standing where the player is', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    driver.send(devLine(true));
+    const view = driver.snapshot().view;
+    const sections = addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }]);
+    const here = offeredBy(sections, { location: view.location.id, entities: view.entities.map((entity) => entity.id) }, 'local');
+
+    const drawn = [...renderToStaticMarkup(<App driver={driver} />).matchAll(/data-section="([^"]*)"/g)].map(([, key]) => key);
+
+    expect(here.length).toBeGreaterThan(0);
+    expect(drawn).toEqual(here.map(sectionKey));
+  });
+
+  // c19 as markup: the ground a modal sits on is answerable exactly where the
+  // screen published a way out of itself, and inert where it published none.
+  it('hands the sheet the way out the screen published, and nothing where it published none', () => {
+    const leaves = createDriver([engineLocale(), SURVEYED]);
+    leaves.choose(position(leaves, LOOK_OUT));
+    leaves.open('surveyed.awl');
+    const stays = createDriver(SHIPPED_SOURCES);
+    stays.choose(position(stays, TALK));
+
+    expect(dismissal(leaves.snapshot().view.modals)).not.toBeNull();
+    expect(renderToStaticMarkup(<App driver={leaves} />)).toContain('data-drive="dismiss"');
+
+    const held = renderToStaticMarkup(<App driver={stays} />);
+    expect(dismissal(stays.snapshot().view.modals)).toBeNull();
+    expect(asking(held)).toBe(true);
+    expect(held).not.toContain('data-drive="dismiss"');
+  });
+
   it('draws the command field on Edit, so every line the table takes has somewhere to be typed', () => {
     const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
 
