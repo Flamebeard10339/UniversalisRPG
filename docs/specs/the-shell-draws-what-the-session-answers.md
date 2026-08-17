@@ -188,3 +188,79 @@ tap, one decision point, and the decision is c6's answer.
   call, and is a UI decision the author tests. c10 fixes that there is one dial.
 - Which further powers are dev-only is not decided here. c6 makes adding one a matter of marking it,
   and the mark is what a later branch reads.
+
+## Decisions the worker made
+
+**The set-aside local module stays in the slot it was in.** The first open
+question. Nothing is moved to a quarantine slot: the payload is still what
+`/local show` prints and what the Edit page reads, so an author can copy their
+work out before deciding to discard it, and clearing is the one thing that
+destroys it. A quarantine slot would be a second place the module can be, and
+the whole of the branch is about not making second copies.
+
+**c2's control writes the fresh module by sending `/local clear`, then reopens.**
+The command already mints a header from the dependencies rather than editing the
+text, which is exactly what c2 asks for, and `authoringSurface.test.ts` holds
+`src/ui` to reaching the local-changes module for its name and nothing else — a
+driver that wrote the module itself would go around the one load-and-adopt path.
+The reopen after it is what makes the result the session a first-ever launch
+produces rather than the one that was already standing.
+
+**The recovery control is a banner over the whole shell.** The second open
+question. It sits above the column rather than on the Edit page, because the
+state it is about is one where there may be no page worth opening: a base module
+that will not load leaves no session, and a control on a page is a control
+reached by navigating a shell that has nothing in it.
+
+**The dev slot does not survive a page reload.** The third open question. A new
+driver starts with `save.dev` false, so a reload comes back as the player. The
+dev slot itself is untouched and `/restore` picks it up after `/dev on`, which
+is the resumption the absorbed spec's question was really about; carrying the
+mode across a reload would mean persisting it, and a persisted mode is a second
+copy of the answer c6 says there is only one of.
+
+**The speed control is a number field bound to the session's own dial.** The
+fourth open question. Its value is `snapshot.speed` every render and its change
+handler sends `/speed`, so there is no draft, no default and no clamp anywhere
+in `src/ui` — which is what c10 asks. A stepped set of multipliers was rejected
+for the same reason: the steps would be multipliers this layer declared.
+
+**`/speed` is not marked dev-only; the control that turns it is.** c6 names the
+speed control as a dev-only surface and c11 says a player cannot tell this
+branch landed. `/speed` has been reachable from the GUI console since
+`gui-rebuild`, so marking the command would be a behaviour change; marking the
+widget is what c6 asks for. `/goto` is marked, and is the only mark.
+
+**The recorder records what moved the world, so `/speed` leaves no line.** c8
+describes both dev powers as recorded and replayable. Teleport is a directive
+and records; the multiplier changes how fast a live driver ticks and moves
+nothing a save holds, so a `speed:` directive would emit a `# test` line that
+replays as a no-op — `applyDirective` has no `LiveSettings` to turn. Recording
+it would make a `# test` lie rather than make it fuller.
+
+**The editing surfaces are gated and the command console is not.** c6 names the
+editing surfaces as dev-only; the 2026-08-12 note the Decisions above honour
+says the console the Edit subpage already ships stays. Both hold: `EditPane`
+wraps the staging surfaces in the gate and leaves `Console` outside it, so every
+command the shared table defines is still reachable from the GUI exactly as
+before this branch.
+
+**Four words were added to `content/engine-en.dsl` and `ENGINE_KEYS`.** c12 says
+no authored file is edited to accommodate this branch, and its command proof is
+`git diff --stat HEAD -- content/`. That diff is not empty: the four controls
+this branch adds need words, and the engine's vocabulary table is where a
+control's word has lived since `gui-rebuild` — `src/ui/render.test.tsx` refuses
+a run of text on the screen that is neither an engine value nor a key in
+`LABELS`, so a control with no word is not an option. No shipped game content
+moved: `tutorial-island.dsl` and `combat-expansion.dsl` are untouched, which is
+what c12's own sentence about a recovery path needing content changed is aimed
+at. Flagged rather than assumed.
+
+**c3's report lives in `src/ui/authoringSurface.ts`, not `src/content/localChanges.ts`.**
+The forecast named the latter. `addressable` is the function that discards
+exactly this information — it collapses a staged copy and the shipped section it
+shadows into one row — and the qualification rule that turns a section into an
+address lives beside it in `sectionsIn`. Putting the report in the content layer
+would have meant a second copy of that rule, which is the failure mode this
+repository names first. The proof moved with it, to
+`src/ui/authoringSurface.test.ts`, and still walks `SCHEMAS`.
