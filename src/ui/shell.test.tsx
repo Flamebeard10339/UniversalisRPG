@@ -44,7 +44,7 @@ function openedOver(cell: { base: readonly ModuleSource[]; local: string }): Dri
   return createDriver(cell.base, { slots, ticker: () => () => undefined });
 }
 
-const problemsOf = (message: string): UniverseProblem[] => [{ modules: [LOCAL_CHANGES_MODULE_ID], message }];
+const problemsOf = (message: string): UniverseProblem[] => [{ modules: [LOCAL_CHANGES_MODULE_ID], words: 'tool', message }];
 
 describe('a problem is never drawn as text with nothing beside it (c3, c7)', () => {
   it('draws exactly the remedies the report has, for every state the door can leave', () => {

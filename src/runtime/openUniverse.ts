@@ -1,5 +1,6 @@
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics, type Registry } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
+import type { Answer } from './localized';
 import { startingLocationId } from './save';
 import { type SaveContext } from './saveSlots';
 import { startSession, type PlaySession } from './session';
@@ -11,7 +12,12 @@ import { startSession, type PlaySession } from './session';
 // every module that loaded built. Neither is inferred from where a caller was
 // standing when it found out.
 export interface UniverseProblem {
-  modules: readonly string[];
+  modules: readonly Answer[];
+  // The tool's own English, and said so at the type: a loader diagnostic and a
+  // requirement's sentence both come from below the layer that declares what a
+  // translated string is, so neither is keyed and neither is drawn as something
+  // the world said.
+  words: 'tool';
   message: string;
 }
 
@@ -68,7 +74,7 @@ export interface OpenedUniverse {
   // loader's answer about the sources rather than an answer about whichever
   // universe the session ended up in: an author editing their way out of a
   // stand-in still stages against the modules that did load.
-  modules: readonly string[];
+  modules: readonly Answer[];
   problems: readonly UniverseProblem[];
   // The requirements the universe asked for did not meet. Non-empty is exactly
   // the states the stand-in opened in.
@@ -85,7 +91,7 @@ export interface OpenedUniverse {
 // to write a stand-in over the slot a player's game is in.
 export function openUniverse(sources: readonly ModuleSource[], options: { save?: SaveContext } = {}): OpenedUniverse {
   const loaded = loadUniverseWithDiagnostics(sources);
-  const disabled = loaded.diagnostics.map((diagnostic): UniverseProblem => ({ modules: [diagnostic.moduleId], message: formatModuleDiagnostic(diagnostic) }));
+  const disabled = loaded.diagnostics.map((diagnostic): UniverseProblem => ({ modules: [diagnostic.moduleId], words: 'tool', message: formatModuleDiagnostic(diagnostic) }));
   const unmet = REQUIREMENTS.filter((requirement) => !requirement.met(loaded.registry));
 
   if (unmet.length === 0) {
@@ -96,7 +102,7 @@ export function openUniverse(sources: readonly ModuleSource[], options: { save?:
   return {
     session: startSession(loadUniverseWithDiagnostics([FALLBACK_SOURCE]).registry),
     modules: loaded.loadedModules,
-    problems: [...disabled, ...unmet.map((requirement): UniverseProblem => ({ modules: loaded.loadedModules, message: requirement.unmet }))],
+    problems: [...disabled, ...unmet.map((requirement): UniverseProblem => ({ modules: loaded.loadedModules, words: 'tool', message: requirement.unmet }))],
     unmet: unmet.map((requirement) => requirement.id),
   };
 }

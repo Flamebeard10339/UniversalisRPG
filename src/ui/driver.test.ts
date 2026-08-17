@@ -241,7 +241,7 @@ describe('the GUI driver', () => {
   it('carries the problem when a universe cannot open, and stands the shell somewhere anyway', () => {
     const driver = createDriver([{ name: 'empty', text: '# info empty\nversion: 0.0.0\npack: test\n' }]);
 
-    expect(driver.snapshot().problems).toEqual([{ modules: ['empty'], message: 'no # location is marked starting, so a new game has nowhere to begin' }]);
+    expect(driver.snapshot().problems).toEqual([{ modules: ['empty'], words: 'tool', message: 'no # location is marked starting, so a new game has nowhere to begin' }]);
     // A session all the same, so nothing downstream is handed a missing view.
     const view = shown(driver);
     expect(texts(driver)).toEqual([driver.snapshot().problems[0].message, view.location.title, view.location.description]);

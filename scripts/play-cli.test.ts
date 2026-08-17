@@ -4,7 +4,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish, withEngineLocale } from '../src/content/engineLocale';
 import { ENGINE_KEYS } from '../src/content/locale';
-import { renderLocalChangesModule } from '../src/content/localChanges';
+import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../src/content/localChanges';
+import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
 import { loadUniverseWithDiagnostics } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
 import { RuntimeError } from '../src/runtime/runtime';
@@ -107,6 +108,25 @@ describe('play-cli renders what a command result says happened', () => {
 
     expect(ENGINE_KEYS.filter((key) => opening.some((line) => line.includes(key)))).toEqual([]);
     expect(opening.length).toBeGreaterThan(5);
+  });
+
+  // c5. The REPL used to load, start a session bare and strand on exactly the
+  // input the GUI recovered from — the one line the drift proof could not
+  // compare. It opens through the door now, so it answers here too.
+  it('answers over content that will not load, rather than stranding on it', () => {
+    let taken = 0;
+
+    for (const cell of OPENING_CELLS) {
+      const sources = cell.local === '' ? cell.base : [...cell.base, { name: LOCAL_CHANGES_MODULE_ID, text: cell.local }];
+      const repl = openRepl(sources);
+
+      expect(repl.opened.problems.length, cell.where).toBeGreaterThan(0);
+      // And it goes on taking lines, which is the whole of what recovering is.
+      expect(shown(runLine(repl.context, '/look')).length, cell.where).toBeGreaterThan(0);
+      taken += 1;
+    }
+
+    expect(taken).toBe(OPENING_CELLS.length);
   });
 
   it('prints a location description on first arrival and again only when /look asks', () => {

@@ -71,7 +71,7 @@ describe('what is at fault is read off the loader, never inferred (c2)', () => {
   it('carries the text the loader wrote for a module it disabled', () => {
     const cell = CELLS.find((each) => each.aim.kind === 'stage' && each.aim.stage === 'parse' && each.broke === 'broken')!;
 
-    expect(opened(cell).problems).toEqual([{ modules: ['broken'], message: expect.stringContaining('[broken] parse:') }]);
+    expect(opened(cell).problems).toEqual([{ modules: ['broken'], words: 'tool', message: expect.stringContaining('[broken] parse:') }]);
   });
 });
 
