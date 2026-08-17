@@ -48,6 +48,14 @@ Do not bloat CLAUDE.md with over 200 lines of instructions.
   three never collapse.
 - **Red-green proves a test can fail; only mutation proves it fails for the right reason.**
   `npm run mutate -- <manifest.json>` is the tool; keep manifests in scratch, they rot.
+- **Aim the manifest while writing the proof, not after an auditor names it.** The lesson above says 
+  *whether*; this is *when*, and the gap was measured at 3.5 hours and 660k tokens on
+  `the-gui-authors-through-the-same-door`. Both clauses that came back `unmet` were proofs that could 
+  not fail — and so was the *first fix* for each, which only a further run revealed: three runs, 21 
+  mutations, 9 survivors on the first aim. The cost is wall clock, and it compounds: `mutate` rewrites 
+  source in place so nothing else can be edited while one runs, and every round after the first sits 
+  behind a serial audit. One manifest over every clause, run before the first auditor is commissioned, 
+  is the same tokens and a third of the clock.
 - **Commission one auditor whose only question is "is anything worse than before".**
   Clause-by-clause verification cannot see a regression.
 - **Read a finding list's shape before promoting it.** Density in one file is a structural
