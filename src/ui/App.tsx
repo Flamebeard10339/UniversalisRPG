@@ -7,6 +7,7 @@ import { addressable, NOWHERE, type Standing } from './authoringSurface';
 import type { Driver } from './driver';
 import { editControls } from './editControls';
 import { EditPane } from './EditPane';
+import { DevBanner } from './DevBanner';
 import { FaultBanner } from './FaultBanner';
 import { SettingsPane } from './SettingsPane';
 import { recorded, remembered, type Editing, type MapWhere } from './editorMemory';
@@ -122,6 +123,19 @@ function useEditing(driver: Driver, after: number): [Editing, (next: Editing) =>
   }, [editing]);
 
   return [editing, setEditing];
+}
+
+// What "try again" can mean, which depends on where the shell is standing. A
+// page can re-read everything, base sources included, only by loading again —
+// they are inlined at build time, so a shipped file somebody fixed is reached
+// by this and by nothing the driver can do. Where there is no page, there is
+// nothing to reload and the driver's own re-open is the whole of it.
+function tryAgain(driver: Driver): void {
+  if (typeof window === 'undefined') {
+    driver.reopen();
+    return;
+  }
+  window.location.reload();
 }
 
 // Where the player is, as the view publishes it: what the Local surface is
@@ -264,9 +278,11 @@ export function App({
     <TransientProvider value={driver.transient}>
       <div className="flex h-[100dvh] select-none flex-col overflow-hidden bg-background text-text">
         <main className="relative flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
-          {/* Above the column rather than on a page, because the state it is
-              about is one where there may be no page worth opening. */}
-          {snapshot.fault ? <FaultBanner fault={snapshot.fault} words={words} onRemedy={(remedy) => (remedy === 'clear-local' ? driver.clearLocalChanges() : driver.reopen())} /> : null}
+          {/* Both above the column rather than on a page: one is about a state
+              where there may be no page worth opening, and the other is true of
+              the session wherever the player happens to be standing. */}
+          <DevBanner dev={dev} words={words} />
+          {snapshot.fault ? <FaultBanner fault={snapshot.fault} words={words} onRemedy={(remedy) => (remedy === 'clear-local' ? driver.clearLocalChanges() : tryAgain(driver))} /> : null}
           <VStack
             layer={shell.where.layer}
             onLayer={(layer) => go((held) => toLayer(held, layer))}

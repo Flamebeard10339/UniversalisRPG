@@ -92,10 +92,11 @@ export interface Driver {
   // no view of a gesture, so a drag it never heard about — one the map refused
   // before a line existed — is said here or nowhere (c8, c13).
   note(text: string): void;
-  // Open again, over the sources as they stand and the local module as the
-  // store holds it now. The action that stands whatever the fault is: a build
-  // that fixed a shipped file is a build this reaches, and a local module
-  // somebody repaired in another tab is one this picks up.
+  // Run the load again, over the same base sources and the local module as the
+  // store holds it *now* — so a module another tab repaired is one this picks
+  // up. It does not re-read the base: those are the bundle's, inlined at build
+  // time, and the only thing that re-reads them is loading the page again,
+  // which is what the control over this says (c4).
   reopen(): void;
   // Discard the local module and open again on what a first-ever launch finds.
   // A fresh module is written rather than the broken one edited, so this cannot
@@ -138,16 +139,20 @@ function open(loaded: Loaded, authoring: AuthoringContext, save: SaveContext, be
 
 const because = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-// What is wrong with one module in a universe that loaded, and nothing when it
-// is in there whole. Both halves of the same question, because a module can be
-// dropped with something said about it and can also be absent with nothing
-// said: only "it is loaded and nobody complained" is a module the session is
-// actually playing.
-function troubleWith(name: string, loaded: Loaded): string | null {
-  const complaints = loaded.diagnostics.filter((diagnostic) => diagnostic.sourceName === name || diagnostic.moduleId === LOCAL_CHANGES_MODULE_ID);
+// What is wrong with the local module in a universe that loaded, and nothing
+// when it is in there whole. Both halves of the same question, because a module
+// can be dropped with something said about it and can also be absent with
+// nothing said: only "it is loaded and nobody complained" is a module the
+// session is actually playing.
+//
+// Named for the module it is about rather than taking one. It reads the local
+// module's id either way, so a parameter would be a signature promising a
+// second caller something the body does not do.
+function localTrouble(loaded: Loaded): string | null {
+  const complaints = loaded.diagnostics.filter((diagnostic) => diagnostic.moduleId === LOCAL_CHANGES_MODULE_ID || diagnostic.sourceName === LOCAL_CHANGES_MODULE_ID);
   if (complaints.length > 0) return complaints.map(formatModuleDiagnostic).join('; ');
-  const status = loaded.modules.find((module) => module.sourceName === name || module.moduleId === LOCAL_CHANGES_MODULE_ID);
-  return status?.loaded === true ? null : `${name} is not in the universe that loaded`;
+  const status = loaded.modules.find((module) => module.moduleId === LOCAL_CHANGES_MODULE_ID || module.sourceName === LOCAL_CHANGES_MODULE_ID);
+  return status?.loaded === true ? null : `${LOCAL_CHANGES_MODULE_ID} is not in the universe that loaded`;
 }
 
 // The GUI's session container: it holds the one context every dispatch goes
@@ -217,48 +222,49 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     const local = readLocal();
     const said = [...local.complaints];
 
-    let base: Loaded;
+    // One catch, at the edge, and it answers `base`. Everything under it either
+    // returns a reason or opens: the load path says what it could not make
+    // sense of in diagnostics rather than raising, and the one thing that does
+    // raise is a registry no session can start in — which is the base's, since
+    // seven shapes of broken local module were tried against this and every one
+    // came back as a diagnostic. So a raise here is either that, or a bug in
+    // this file, and neither may stop the shell mounting.
     try {
-      base = loadUniverseWithDiagnostics(shipped);
+      openOver(before, local.text, said);
     } catch (error) {
       stranded(before, said, { at: 'base', why: because(error) });
-      return;
     }
+  };
+
+  const openOver = (before: Transcript, held: string, said: CommandOutput[]): void => {
+    const base = loadUniverseWithDiagnostics(shipped);
 
     authoring = {
       baseSources: shipped,
       dependencies: base.loadedModules,
       // Empty until something is staged: the module's own header is written by
       // the same edit that writes its first section, so nothing here mints one.
-      localSource: { name: LOCAL_CHANGES_MODULE_ID, text: local.text },
+      localSource: { name: LOCAL_CHANGES_MODULE_ID, text: held },
       writeLocalChanges: (text) => void save.store.write(LOCAL_CHANGES_MODULE_ID, text),
       readLocalChanges: stored,
     };
 
     let setAside: string | null = null;
-    if (local.text.trim() !== '') {
-      try {
-        const loaded = loadUniverseWithDiagnostics([...shipped, authoring.localSource]);
-        // The load path drops a module it cannot make sense of and says so in a
-        // diagnostic rather than raising, so whether the local module is in the
-        // universe that came back is asked of the report and not of a catch —
-        // the same question `/reload` asks before it adopts anything.
-        setAside = troubleWith(authoring.localSource.name, loaded);
-        if (setAside === null) {
-          seated(before, open(loaded, authoring, save, [...said, ...shadowing(local.text)]), null);
-          return;
-        }
-      } catch (error) {
-        setAside = because(error);
+    if (held.trim() !== '') {
+      const loaded = loadUniverseWithDiagnostics([...shipped, authoring.localSource]);
+      // The load path drops a module it cannot make sense of and says so in a
+      // diagnostic rather than raising, so whether the local module is in the
+      // universe that came back is asked of the report — the same question
+      // `/reload` asks before it adopts anything.
+      setAside = localTrouble(loaded);
+      if (setAside === null) {
+        seated(before, open(loaded, authoring, save, [...said, ...shadowing(held)]), null);
+        return;
       }
       said.push(warn(`${LOCAL_CHANGES_MODULE_ID} was set aside, so this session is the shipped content alone — it is still in the store to read or clear: ${setAside}`));
     }
 
-    try {
-      seated(before, open(base, authoring, save, said), setAside === null ? null : { at: 'local', why: setAside });
-    } catch (error) {
-      stranded(before, said, { at: 'base', why: because(error) });
-    }
+    seated(before, open(base, authoring, save, said), setAside === null ? null : { at: 'local', why: setAside });
   };
 
   openOnce(emptyTranscript());
@@ -355,9 +361,8 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  // The whole of what a recovery control does: open again and keep what was
-  // said. A run under way belongs to the session being replaced, so it is
-  // dropped rather than ticked into the next one.
+  // Open again and keep what was said. A run under way belongs to the session
+  // being replaced, so it is dropped rather than ticked into the next one.
   const reopen = (): void => {
     running = null;
     stopTicking?.();

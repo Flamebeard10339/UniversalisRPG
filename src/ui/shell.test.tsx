@@ -114,21 +114,41 @@ describe('taking a remedy changes the state it was taken from (c4)', () => {
     expect(driver.snapshot().fault).toBeNull();
   });
 
-  // The remedy that stands wherever the trouble is. A shipped module is not
-  // this app's to repair, so what an author does about one is fix the file and
-  // come back — and this is that, in the one form the shell can offer: the
-  // sources and the store are read again rather than remembered.
-  it('opens again over the sources as they stand, so a repaired module is picked up', () => {
-    const torn: ModuleSource = { name: 'torn', text: '# info torn\nversion: 0.0.0\npack: test\n' };
-    const driver = openedOver([torn], '');
+  // What opening again actually does: read the store and run the load over it.
+  // A module somebody repaired in another tab is the case that reaches — the
+  // store is shared and the base sources are not, so this is the whole of what
+  // the shell can do about a fault without the page going away.
+  it('runs the load again over the store as it stands now', () => {
+    const slots = pageSlots();
+    const store = slotStore(slots, () => 0);
+    store.write(LOCAL_CHANGES_MODULE_ID, brokenLocal());
+    const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
+    expect(driver.snapshot().fault).toMatchObject({ at: 'local' });
 
-    expect(driver.snapshot().fault).toMatchObject({ at: 'base' });
-    expect(remediesFor(driver.snapshot().fault!)).toContain('reopen');
-
-    torn.text = '# info torn\nversion: 0.0.0\npack: test\n\n# location hall\nx: 0, y: 0\nstarting\n';
+    // Another writer over the same store, which is what a second tab is.
+    store.write(LOCAL_CHANGES_MODULE_ID, brokenLocal().replace('x: sideways', 'x: 7, y: 7'));
     driver.reopen();
 
     expect(driver.snapshot().fault).toBeNull();
-    expect(driver.snapshot().view?.location.id).toBe('torn.hall');
+    expect(driver.snapshot().view?.discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
+  });
+
+  // The base fault, where nothing the driver can do helps. `reopen` re-runs the
+  // load over the same source objects, and in a browser those are
+  // `SHIPPED_SOURCES` — `import.meta.glob` with `eager`, so their text is
+  // inlined at build time and cannot change while the page is up. A shipped
+  // module somebody repaired is therefore reached by loading the page again and
+  // by nothing else, which is what the control over a base fault does.
+  //
+  // A driver handed sources whose text later changes does pick them up; that is
+  // true of this function and false of the app, so it is not what is asserted
+  // here. What is asserted is the wiring, and how it behaves in a browser is
+  // the author's to look at — this suite mounts nothing.
+  it('offers the remedy that loads the page again, which is the only thing that re-reads a shipped module', () => {
+    const driver = openedOver([{ name: 'torn', text: '# info torn\nversion: 0.0.0\npack: test\n' }], '');
+
+    expect(driver.snapshot().fault).toMatchObject({ at: 'base' });
+    expect(remediesFor(driver.snapshot().fault!)).toEqual(['reopen']);
+    expect(readFileSync(join(here, 'App.tsx'), 'utf8')).toContain('window.location.reload()');
   });
 });

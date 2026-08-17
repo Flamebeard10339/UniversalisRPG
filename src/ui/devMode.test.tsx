@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
@@ -13,7 +16,15 @@ import { browserSlots } from './browserStore';
 import { devLine, devRefusal, speedLine, tappedPlace } from './devMode';
 import { createDriver, type Driver } from './driver';
 import { SHIPPED_SOURCES } from './shippedContent';
+import { LAYERS, OPENING, toLayer, toSubpage } from './nav';
 import { SHIPPED_UI } from './shell.test';
+
+const here = fileURLToPath(new URL('.', import.meta.url));
+
+// How the dev strip is found in the markup: the role it carries, which nothing
+// else over the column uses. An attribute would have to spell `data-dev`, and
+// the rule above is that only one module in the tree may.
+const DEV_STRIP = 'role="status"';
 
 const pageSlots = (): SlotDriver => {
   const storage = pageStorage();
@@ -99,6 +110,33 @@ describe('one answer gates every dev-only control (c6)', () => {
     expect([...asDeveloper.matchAll(/data-dev=/g)].length).toBeGreaterThan(1);
   });
 
+  // The banner half of the clause. Derived over the nav rather than rendered
+  // once at the opening page: what it promises is that somebody standing
+  // anywhere can read it, and a strip drawn on one page would satisfy a single
+  // render and nothing else.
+  it("says whose session this is from every page there is, and says nothing while it is the player's", () => {
+    const { driver } = playing();
+    const everywhere = LAYERS.flatMap((layer, at) => layer.subpages.map((_, index) => toSubpage(toLayer(OPENING, at), at, index)));
+    expect(everywhere.length).toBeGreaterThan(4);
+
+    for (const where of everywhere) {
+      expect(renderToStaticMarkup(<App driver={driver} opening={where} />), `${LAYERS[where.layer].id}`).not.toContain(DEV_STRIP);
+    }
+
+    driver.send(devLine(true));
+
+    for (const where of everywhere) {
+      expect(renderToStaticMarkup(<App driver={driver} opening={where} />), `${LAYERS[where.layer].id}`).toContain(DEV_STRIP);
+    }
+  });
+
+  // And it is a reading of the same answer, not a second one: it is drawn
+  // through the gate, so there is no way to put it on the screen without the
+  // dev-only surfaces going on the screen with it.
+  it('draws the strip through the same gate the surfaces go through', () => {
+    expect(readFileSync(join(here, 'DevBanner.tsx'), 'utf8')).toContain('<DevOnly dev={dev}>');
+  });
+
   it('reads the mode off the session rather than holding it, so both halves move together', () => {
     const { driver } = playing();
     expect(driver.snapshot().dev).toBe(false);
@@ -146,6 +184,26 @@ describe("the toggle is the dev slot's entry, not a second one (c7)", () => {
     // the REPL gets because it is the same call.
     expect(store.read(DEV_SLOT)).not.toBeNull();
     expect(store.read(PLAYER_SLOT)).toBeNull();
+  });
+
+  // What leaving takes with it, and what it does not. The dev slot holds a
+  // game, and the local module is not one: an author's edits live in a slot no
+  // dev transition touches, so the work survives the exit that discards the
+  // session it was tested in. The editing surfaces being dev-only would be a
+  // trap if this were not true.
+  it('leaves the staged edits where they were, because they are not a game', () => {
+    const { driver } = playing();
+    driver.send(devLine(true));
+    driver.send('/dsl location tutorial-island.guide-house x: 7, y: 7');
+    const staged = driver.localChanges();
+    expect(staged).toContain('x: 7, y: 7');
+
+    driver.send(devLine(false));
+
+    expect(driver.localChanges()).toBe(staged);
+    // And the session is playing them, because leaving dev restores a session
+    // that was opened over the same local module.
+    expect(driver.snapshot().view!.discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
   });
 });
 

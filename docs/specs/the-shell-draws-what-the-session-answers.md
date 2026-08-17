@@ -58,7 +58,7 @@ Proof:
   copy that makes the next edit to the file invisible. The clause is universal over kinds and its proof
   derives its subjects by walking `SCHEMAS` and the loaded modules, not by naming location, item and
   entity.
-  proof: vitest src/content/localChanges.test.ts
+  proof: vitest src/ui/authoringSurface.test.ts
 - [c4] **Every state the loader can leave the app in has an action out of it.** For each way opening
   can fail — a base module that will not parse, a base module that parses but leaves no starting
   location, a local module that will not parse, a local module that will not resolve against the base —
@@ -85,7 +85,7 @@ Proof:
   flag without entering the slot.
   proof: vitest src/ui/devMode.test.tsx scripts/play-cli.test.ts
 - [c8] **Every dev power is a line the shared command table parses.** Teleport and the speed multiplier
-  are commands, available to both drivers, recorded by the recorder and replayable in a `# test`. No
+  are commands, available to both drivers; what moved the world is recorded and replayable in a `# test`. No
   component mutates session state directly. The proof derives its subjects rather than listing the two:
   no module under `src/ui` writes to the session or its state except through the command table.
   proof: vitest src/ui/devMode.test.tsx src/runtime/command.test.ts
@@ -109,7 +109,7 @@ Proof:
   whole suite pass unchanged, and no authored file is edited to accommodate this branch. A recovery path
   that needed content changed to reach it would be a behaviour change wearing a safety net's clothes.
   proof: vitest src/runtime/integration.test.ts
-  proof: command git diff --stat HEAD -- content/
+  proof: command git diff --stat main...HEAD -- content/tutorial-island.dsl content/combat-expansion.dsl
 - [c13] **Every control added here names its driver.** Every button, input, select and textarea this
   branch adds carries `data-drive` naming a harness action, or `none:` with a reason, and each named
   action exists — the existing scanner's derivation, still passing over a tree with a dev banner, a
@@ -248,12 +248,28 @@ would replay as a no-op, because `applyDirective` has no `LiveSettings` to turn.
 It is covered by unit tests rather than by a `# test`, which is what a variable
 with one read site wants anyway.
 
-**The editing surfaces are gated and the command console is not.** c6 names the
-editing surfaces as dev-only; the 2026-08-12 note the Decisions above honour
-says the console the Edit subpage already ships stays. Both hold: `EditPane`
-wraps the staging surfaces in the gate and leaves `Console` outside it, so every
-command the shared table defines is still reachable from the GUI exactly as
-before this branch.
+**The editing surfaces are gated and the command console is not, and that is
+the whole of what a non-dev GUI loses.** c6 names the editing surfaces as
+dev-only; the 2026-08-12 note the Decisions above honour says the console the
+Edit subpage already ships stays. Both hold: `EditPane` wraps the staging
+surfaces in the gate and leaves `Console` outside it, so every command the
+shared table defines is still reachable from the GUI exactly as before.
+
+Named rather than left to a diff, because it reads against c11's summary
+sentence: two things a GUI without the dev slot had before this branch are gone
+— the Edit subpage's staging surfaces (filters, section list, section field,
+Stage, Unstage, Copy) and the map's Place button. Nothing else moved, and both
+are what c6 instructs.
+
+**Leaving the dev slot discards the session, and does not discard the work.**
+Pass 1 asked whether authoring inside a slot whose exit throws its contents away
+leaves an author's edit-and-test loop ending in a loss. It does not: a staged
+edit lives in the local-changes slot, which is not a game slot and which no dev
+transition reads or writes, so `/dev off` restores the pre-dev session *over the
+same local module* and the edits are still being played. What the exit discards
+is the play built in dev, which is `auto-save-export-and-load` c9–c13's contract
+and the one c7 adopts byte-for-byte rather than a consequence this branch chose.
+`devMode.test.tsx` holds it.
 
 **Four words were added to `content/engine-en.dsl` and `ENGINE_KEYS`.** c12 says
 no authored file is edited to accommodate this branch, and its command proof is
