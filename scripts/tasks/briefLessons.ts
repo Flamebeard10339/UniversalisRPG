@@ -44,6 +44,16 @@ export const WORKER_LESSONS: readonly Lesson[] = [
     body: 'A finding names one reproduction and the reproduction is always narrower than the property the clause promises, so a fix that satisfies the sentence and not the property is the failure mode this workflow is measurably worst at: 30% of fixes did not hold against 0.5% of certifications reversed, and every failure was aimed at a finding literally.',
   },
   {
+    id: 'worker/label-from-data',
+    title: 'A label computed from where the code was standing cannot be derived-proved, only enumerated.',
+    body: "An exception carries the control-flow position and never the subject: catch it in a different block and the same failure is attributed to something else, with nothing in any value disagreeing. Where a producer already reports the subject by name -- the load path does, per module -- read it; where none does, make one, before writing the test that would otherwise have to be a table of inputs somebody thought of.",
+  },
+  {
+    id: 'worker/absence-is-not-evidence',
+    title: 'A signal you did not get is worth what your instrument is worth. Prove the instrument first.',
+    body: "A surviving mutation says nothing is watching that line, not that nothing reaches it; read as the second, one survivor on a catch licensed a deletion that turned an untested-but-correct path into an unrecoverable one. A probe that finds no route establishes only that the routes you spelled do not reach -- seven tries at `# remove location base.camp` measured a space where the grammar takes a dot. Before concluding absence, make the probe fail for the reason you intended.",
+  },
+  {
     id: 'worker/file-findings',
     title: 'File what you notice outside your grant; do not merely mention it.',
     body: "`tasks add \"<title>\" --kind finding --fault tooling|contract|nobody --deliverable \"what fixing it would mean\"` — the fault and the deliverable are required and the command refuses without them. Reporting it in a final message is how it gets lost. Never cite an id you have not seen in your own store — describe it in prose instead.",
@@ -54,7 +64,7 @@ export const AUDITOR_LESSONS: readonly Lesson[] = [
   {
     id: 'auditor/false-proof-shape',
     title: 'Ask what would have to break for a test to fail, and whether that is what the clause promises.',
-    body: 'Watch for an assertion that cannot be false while the code is present at all — for example, a fixture that performs a second operation whose side effect produces the asserted state, an expectation derived from the structure under test, or a test written against the class the implementation is guaranteed to handle.',
+    body: 'Watch for an assertion that cannot be false while the code is present at all — for example, a fixture that performs a second operation whose side effect produces the asserted state, an expectation derived from the structure under test, or a test written against the class the implementation is guaranteed to handle. Two shapes measured since: an expectation compared against what the function under test itself returned, so both sides move together and the mutation survived its own named test; and a case table that derives one axis and enumerates the other, where the hole is in the enumerated half and an expectation keyed off that half’s own labels grades the wrong answer correct, so adding the missing row does not repair it.',
   },
   {
     id: 'auditor/next-neighbour',
@@ -92,7 +102,12 @@ export const PLANNER_LESSONS: readonly Lesson[] = [
   {
     id: 'planner/who-else-computes',
     title: 'Ask who else computes this answer.',
-    body: 'Scope a fix to everywhere the wrong answer is produced, not only to where the bug was reported.',
+    body: 'Scope a fix to everywhere the wrong answer is produced, not only to where the bug was reported — and ask it before a spec has anything re-derive an answer, because a hand-rolled copy of a report that already exists is two answers kept in sync by hand and the copy is where the defect lands.',
+  },
+  {
+    id: 'planner/proof-shape-follows-design',
+    title: 'When the only available proof of a clause is a table of cases, the design is the thing to change.',
+    body: 'A property computed from data can be checked against the data; one a caller infers can only be checked against a list of inputs somebody thought of. If a clause says *every* and the worker can offer only instances, do not accept a longer list — ask what would have to be read rather than guessed for the proof to derive its own subjects.',
   },
   {
     id: 'planner/name-delegated-decisions',

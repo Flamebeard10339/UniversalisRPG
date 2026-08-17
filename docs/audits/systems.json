@@ -730,6 +730,7 @@
         "src/main.tsx",
         "src/ui/App.tsx",
         "src/ui/Console.tsx",
+        "src/ui/DevBanner.tsx",
         "src/ui/DevOnly.tsx",
         "src/ui/DragSheet.tsx",
         "src/ui/EditPane.tsx",
