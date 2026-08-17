@@ -128,10 +128,17 @@ function useEditing(driver: Driver, after: number): [Editing, (next: Editing) =>
 // What "try again" can mean, which depends on where the shell is standing. A
 // page can re-read everything, base sources included, only by loading again —
 // they are inlined at build time, so a shipped file somebody fixed is reached
-// by this and by nothing the driver can do. Where there is no page, there is
+// by that and by nothing the driver can do. Where there is no page, there is
 // nothing to reload and the driver's own re-open is the whole of it.
+export type Retry = 'reload' | 'reopen';
+
+export const retrying = (onAPage: boolean): Retry => (onAPage ? 'reload' : 'reopen');
+
+// The decision above, wired. The `window` call is the one line here no test
+// reaches: the suite mounts nothing and runs in node, so how a page behaves
+// when it reloads is the author's to look at.
 function tryAgain(driver: Driver): void {
-  if (typeof window === 'undefined') {
+  if (retrying(typeof window !== 'undefined') === 'reopen') {
     driver.reopen();
     return;
   }

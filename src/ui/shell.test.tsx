@@ -9,7 +9,7 @@ import { localizerFor } from '../runtime/localized';
 import type { ModuleSource } from '../content/universe';
 import { slotStore, type SlotDriver } from '../runtime/store';
 import { pageStorage } from './agent/pageStorage';
-import { App } from './App';
+import { App, retrying } from './App';
 import { browserSlots } from './browserStore';
 import { OPENING_CELLS } from '../runtime/openUniverseFixture';
 import type { UniverseProblem } from '../runtime/openUniverse';
@@ -168,6 +168,13 @@ describe('taking a remedy changes the state it was taken from (c7)', () => {
 
     expect(driver.snapshot().problems.flatMap((problem) => problem.modules)).toEqual(['torn']);
     expect(remediesFor(driver.snapshot().problems)).toEqual(['reopen']);
+  });
+
+  // Both answers, because only one of them is ever taken here: the suite runs
+  // in node and would otherwise grade the shipped branch by reading App.tsx for
+  // a string, which passes with the call in a comment.
+  it("means loading the page again on a page, and the driver's own re-open where there is none", () => {
+    expect([retrying(true), retrying(false)]).toEqual(['reload', 'reopen']);
     expect(readFileSync(join(here, 'App.tsx'), 'utf8')).toContain('window.location.reload()');
   });
 });
