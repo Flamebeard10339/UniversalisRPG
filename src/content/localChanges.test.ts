@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clearLocalSections, deleteLocalSection, initialLocalChangesModule, listLocalSections, localSectionHeadings, upsertLocalSection } from './localChanges';
+import { deleteLocalSection, initialLocalChangesModule, listLocalSections, localSectionHeadings, upsertLocalSection } from './localChanges';
 
 describe('local-changes module text helpers', () => {
   it('renders a managed header with sorted dependencies', () => {
@@ -76,21 +76,21 @@ describe('local-changes module text helpers', () => {
     expect(staged.text.split('\n').slice(0, 5)).toEqual(['# info local-changes', 'version: 0.0.0', 'pack: local', 'dependencies:', '  base']);
   });
 
-  it('clears the body and keeps the header, which is what deleting the last section does', () => {
+  // A delete is an edit to a file the author is still in, so the header stands
+  // — including a declaration this caller could not have written. Clearing is
+  // not an edit and no longer lives here at all: it reads nothing, so there is
+  // no source for it to preserve anything out of.
+  it('keeps the header across a delete of the last section', () => {
     // A header the renderer would not produce, so that "kept" and "rebuilt"
     // are distinguishable at all — over a file this caller wrote, they are the
-    // same text and the comparison below holds either way.
-    const foreign = ['# info local-changes', 'version: 3.2.1', 'pack: shared', 'dependencies:', '  base', '', '# item gem', 'title: Gem', ''].join('\n');
-    const cleared = clearLocalSections(foreign, ['base']);
+    // same text and the comparison below could not tell them apart.
+    const foreign = ['# info local-changes', 'version: 3.2.1', 'pack: shared', 'dependencies:', '  base', '  gone-in-this-release', '', '# item gem', 'title: Gem', ''].join('\n');
 
-    expect(localSectionHeadings(cleared)).toEqual([]);
-    expect(cleared).toContain('version: 3.2.1');
-    expect(cleared).toBe(deleteLocalSection(foreign, ['base'], 'item', 'gem').text);
-  });
+    const deleted = deleteLocalSection(foreign, ['base'], 'item', 'gem').text;
 
-  it('clears a file nothing can parse back to a fresh header, which is the only way out of one', () => {
-    const cleared = clearLocalSections('# item\ntitle: Nameless\n', ['base']);
-    expect(cleared.split('\n').slice(0, 5)).toEqual(['# info local-changes', 'version: 0.0.0', 'pack: local', 'dependencies:', '  base']);
+    expect(localSectionHeadings(deleted)).toEqual([]);
+    expect(deleted).toContain('version: 3.2.1');
+    expect(deleted).toContain('gone-in-this-release');
   });
 
   it('preserves section text when a file starts with a UTF-8 BOM', () => {

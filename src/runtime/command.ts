@@ -2,11 +2,11 @@ import { DslError } from '../grammar/parser';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../content/registry';
 import { type ModuleSource } from '../content/universe';
 import {
-  clearLocalSections,
   deleteLocalSection,
   LOCAL_CHANGES_MODULE_ID,
   listLocalSections,
   localSectionHeadings,
+  renderLocalChangesModule,
   upsertLocalSection,
 } from '../content/localChanges';
 import { isGrowthDirective, parseDirectiveLine, type Directive } from '../content/test';
@@ -540,10 +540,12 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
       // is how a file nothing else will touch gets read.
       case 'show':
         return { output: [{ kind: 'source', words: 'tool', lines: localChangesNow(authoring).trimEnd().split('\n') }], quit: false, recorded: [] };
-      // Unparsed like `show`, and for the same reason turned around: this is
-      // the command that can proceed from a file nothing else can read.
+      // Unread, which is what makes it the way out of a file nothing else can
+      // read and the way out of a header no other command rewrites: what it
+      // writes is the module a first launch finds, so nothing of the one being
+      // cleared survives it and the state it is taken from always moves.
       case 'clear':
-        return commitLocalChanges(ctx, authoring, clearLocalSections(localChangesNow(authoring), authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
+        return commitLocalChanges(ctx, authoring, renderLocalChangesModule(authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
       case 'delete': {
         const source = localSourceNow(authoring);
         if (!source.read) return source.refusal;

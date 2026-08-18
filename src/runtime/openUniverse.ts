@@ -1,4 +1,4 @@
-import { clearLocalSections, LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
+import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../content/localChanges';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics, type Registry } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
 import type { Answer } from './localized';
@@ -118,13 +118,14 @@ export function openUniverse(sources: readonly ModuleSource[], options: { save?:
 // what the door says over the same sources with the author's module set aside.
 // Asked rather than inferred — the door is total, so this is a call, where
 // which module a merged universe's trouble belongs to is not computable at all.
-// Cleared, not removed: `/local clear` rewrites the module's body against the
-// modules it stands on and keeps its header, so a header that will not load is
-// still there afterwards. Null where there is no module to clear, and no save
-// context, because nothing is being opened for anybody to play.
+// Cleared, not removed: `/local clear` writes the module a first launch finds
+// over whatever was there, so the text asked about is a function of the modules
+// that loaded and of nothing in the file being replaced. Null where there is no
+// module to clear, and no save context, because nothing is being opened for
+// anybody to play.
 export function openWithLocalCleared(sources: readonly ModuleSource[], dependencies: readonly Answer[]): OpenedUniverse | null {
   const local = sources.find((source) => source.name === LOCAL_CHANGES_MODULE_ID);
   if (local === undefined) return null;
   const rest = sources.filter((source) => source !== local);
-  return openUniverse([...rest, { name: LOCAL_CHANGES_MODULE_ID, text: clearLocalSections(local.text, dependencies) }]);
+  return openUniverse([...rest, { name: LOCAL_CHANGES_MODULE_ID, text: renderLocalChangesModule(dependencies) }]);
 }

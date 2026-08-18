@@ -73,11 +73,6 @@ export interface OpeningCell {
   // The module this cell broke, which is what every assertion about attribution
   // is made against. Never read off the door.
   broke: string | null;
-  // Where in that module it broke it. Clearing the local module rewrites its
-  // body and keeps its header, so a breakage the fixture wrote into a header is
-  // one clearing cannot reach — which is what makes this a fact about the
-  // fixture that a proof about the controls can be made against.
-  brokeInHeader: boolean;
   // Every module the door must report a problem against. A disabled module is
   // reported against itself; an unmet requirement is a property of the merged
   // universe and is no module's, so it names none.
@@ -98,7 +93,6 @@ function cellsFor(aim: Aim, breakage: Breakage): OpeningCell[] {
       base: at === 'local' ? [BASE] : [BASE, { name: id, text }],
       local: at === 'local' ? text : HEALTHY_LOCAL,
       broke: id,
-      brokeInHeader: (breakage.needs ?? []).length > 0,
       names: aim.kind === 'stage' ? [id] : [],
       aim,
     };
@@ -110,7 +104,7 @@ export const OPENING_CELLS: readonly OpeningCell[] = [
   ...Object.entries(BY_REQUIREMENT).flatMap(([id, breakage]) => cellsFor({ kind: 'requirement', id: id as RequirementId }, breakage)),
   // And the set with nothing in it, which trips no stage and meets no
   // requirement because there is nothing there to meet one.
-  { where: 'nothing at all', base: [], local: '', broke: null, brokeInHeader: false, names: [], aim: { kind: 'requirement', id: REQUIREMENTS[0].id } },
+  { where: 'nothing at all', base: [], local: '', broke: null, names: [], aim: { kind: 'requirement', id: REQUIREMENTS[0].id } },
 ];
 
 // How many cells the two spines and the two placements come to, stated as the
@@ -118,11 +112,11 @@ export const OPENING_CELLS: readonly OpeningCell[] = [
 export const CELL_COUNT = (Object.keys(BY_STAGE).length + Object.keys(BY_REQUIREMENT).length) * PLACEMENTS.length + 1;
 
 // What clearing the local module could reach in this cell, stated as a fact
-// about what the fixture broke and where: only the author's own module is
-// cleared, and clearing rewrites its body, never the header the command keeps.
-// Every proof about which controls a state offers is made against this and
-// never against the expression that decides them.
-export const clearingReaches = (cell: OpeningCell): boolean => cell.broke === LOCAL_CHANGES_MODULE_ID && !cell.brokeInHeader;
+// about what the fixture broke: clearing writes the module a first launch
+// finds, so it reaches everything the author's own module can be broken in and
+// nothing outside it. Every proof about which controls a state offers is made
+// against this and never against the expression that decides them.
+export const clearingReaches = (cell: OpeningCell): boolean => cell.broke === LOCAL_CHANGES_MODULE_ID;
 
 export const sourcesOf = (cell: { base: readonly ModuleSource[]; local: string }): readonly ModuleSource[] =>
   cell.local === '' ? cell.base : [...cell.base, { name: LOCAL_CHANGES_MODULE_ID, text: cell.local }];

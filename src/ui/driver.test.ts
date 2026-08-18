@@ -452,6 +452,11 @@ function opened(cell: OpeningCell): { driver: Driver; slots: SlotDriver } {
 // a test can make without a second opinion about what a problem is.
 const report = (driver: Driver): string => driver.snapshot().problems.map((problem) => `${problem.modules.join(' ')}: ${problem.message}`).join('\n');
 
+// A local module a second tab wrote while this session was standing in a fault,
+// broken in a way no cell of the family is broken in, so that "the answer moved"
+// is a comparison no cell can pass by having been in that state already.
+const ELSEWHERE = ['# info local-changes', 'version: 0.0.0', 'pack: local', '', '# entity gull-from-another-tab', 'peck:', '  give: nothing-a-cell-names', ''].join('\n');
+
 describe('the controls a state offers follow from the door\'s report (c7)', () => {
   it('walks the family the door is proved over, so a cell added there is a cell here', () => {
     expect(OPENING_CELLS.length).toBeGreaterThan(6);
@@ -530,22 +535,74 @@ describe('the controls a state offers follow from the door\'s report (c7)', () =
     }
   });
 
-  it('leaves every state with something to do about it, and every remedy reachable from some state', () => {
+  // The whole of the clause's second half, taken from every state rather than
+  // counted in any of them. `reopen` is offered everywhere, and what it is worth
+  // is that it reads the store at the moment it is taken: measured here by
+  // writing the module a second tab would have written and seeing the answer
+  // move, from each of the fifteen states in turn. Asserting the control is
+  // present is what a state with nothing behind it also passes.
+  it('leaves every state a control that moves it, taken from that state and measured', () => {
     const drawn = new Set<string>();
     for (const cell of OPENING_CELLS) {
-      const { driver } = opened(cell);
+      const { driver, slots } = opened(cell);
       const { problems, remedies } = driver.snapshot();
+      const before = report(driver);
 
       expect(problems.length, cell.where).toBeGreaterThan(0);
-      // Opening again needs nothing of the author and reaches a store another
-      // writer may have repaired, so it stands wherever there is trouble — which
-      // is what makes "at least one" true of every cell rather than of most.
-      expect(remedies, cell.where).toContain('reopen');
       expect(remedies.every((remedy) => REMEDIES.includes(remedy)), cell.where).toBe(true);
+      expect(remedies, cell.where).toContain('reopen');
       for (const remedy of remedies) drawn.add(remedy);
+
+      slotStore(slots, () => 0).write(LOCAL_CHANGES_MODULE_ID, ELSEWHERE);
+      driver.reopen();
+
+      expect(report(driver), `${cell.where}: ${before}`).not.toBe(before);
     }
 
     expect(drawn).toEqual(new Set(REMEDIES));
+  });
+
+  // The dead end this clause was unmet for, asked of every state the author's
+  // own module put the shell in. Opening again reproduces the report — the door
+  // is a function of its sources and the store has not moved — so `reopen` alone
+  // would leave these states with nothing that changes them and the author's
+  // staged work permanently inert. Clearing is offered in every one of them and
+  // moves the answer, because what it writes is read off the modules that loaded
+  // and nothing of the file it replaces survives it, the header included.
+  it('moves the answer from every state the author’s own module left it in', () => {
+    const cells = OPENING_CELLS.filter((cell) => cell.broke === LOCAL_CHANGES_MODULE_ID);
+    expect(cells.length).toBeGreaterThan(5);
+
+    for (const cell of cells) {
+      const { driver } = opened(cell);
+      const before = report(driver);
+      expect(before, cell.where).not.toBe('');
+
+      driver.reopen();
+      expect(report(driver), `${cell.where} reopened`).toBe(before);
+
+      expect(driver.snapshot().remedies, cell.where).toContain('clear-local');
+      driver.clearLocalChanges();
+
+      expect(report(driver), `${cell.where}: ${before}`).not.toBe(before);
+      expect(driver.snapshot().problems.flatMap((problem) => problem.modules), cell.where).not.toContain(LOCAL_CHANGES_MODULE_ID);
+    }
+  });
+
+  // And the other end of the same rule: a universe that opened with nothing to
+  // say offers nothing, with a module staged and all. What stands behind this is
+  // not cosmetic — a state with no problem that reports a remedy is a state that
+  // asked the door a second question about the whole universe to find one.
+  it('offers nothing where the door had nothing to say, with a module staged', () => {
+    const slots = pageSlots();
+    const staging = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
+    staging.send(EDIT);
+    expect(staging.localChanges()).not.toBe('');
+
+    const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
+
+    expect(driver.snapshot().problems).toEqual([]);
+    expect(driver.snapshot().remedies).toEqual([]);
   });
 
   // And the control goes through wherever it is offered, from every one of
@@ -587,7 +644,7 @@ describe('a local module that will not load never costs the session (c1)', () =>
     'will not resolve': STAGED.replace('x: 7, y: 7', 'x: 7, y: 7\nadjacent:\n  nowhere-at-all'),
   };
 
-  const over = (local: string): Driver => opened({ where: local, base: SHIPPED_SOURCES, local, broke: null, brokeInHeader: false, names: [], aim: OPENING_CELLS[0].aim }).driver;
+  const over = (local: string): Driver => opened({ where: local, base: SHIPPED_SOURCES, local, broke: null, names: [], aim: OPENING_CELLS[0].aim }).driver;
 
   it('opens on the shipped content alone, says why, and plays exactly as with no local module at all', () => {
     for (const [local, text] of Object.entries(BROKEN)) {

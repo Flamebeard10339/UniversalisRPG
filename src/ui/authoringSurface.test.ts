@@ -197,7 +197,7 @@ const ADDRESSED_BY_NAME = 'LOCAL_CHANGES_MODULE_ID';
 
 describe('no surface goes around the one load-and-adopt path (c2)', () => {
   it('reads both trees it is a rule about', () => {
-    expect(EXPORTED).toEqual(expect.arrayContaining(['upsertLocalSection', 'deleteLocalSection', 'clearLocalSections', 'renderLocalChangesModule', ADDRESSED_BY_NAME]));
+    expect(EXPORTED).toEqual(expect.arrayContaining(['upsertLocalSection', 'deleteLocalSection', 'renderLocalChangesModule', ADDRESSED_BY_NAME]));
     expect(modulesUnder(here, 'src/ui').length).toBeGreaterThan(20);
   });
 
