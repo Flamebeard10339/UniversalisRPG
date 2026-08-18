@@ -12,6 +12,7 @@ import {
   MAPPED_KIND,
   NOWHERE,
   offeredBy,
+  shadowed,
   SHOW_LINE,
   stage,
   SURFACES,
@@ -196,7 +197,7 @@ const ADDRESSED_BY_NAME = 'LOCAL_CHANGES_MODULE_ID';
 
 describe('no surface goes around the one load-and-adopt path (c2)', () => {
   it('reads both trees it is a rule about', () => {
-    expect(EXPORTED).toEqual(expect.arrayContaining(['upsertLocalSection', 'deleteLocalSection', 'clearLocalSections', 'renderLocalChangesModule', ADDRESSED_BY_NAME]));
+    expect(EXPORTED).toEqual(expect.arrayContaining(['upsertLocalSection', 'deleteLocalSection', 'renderLocalChangesModule', ADDRESSED_BY_NAME]));
     expect(modulesUnder(here, 'src/ui').length).toBeGreaterThan(20);
   });
 
@@ -212,5 +213,67 @@ describe('no surface goes around the one load-and-adopt path (c2)', () => {
       // is the other half of going around the door.
       expect(module.text, `${module.file} adopts a registry of its own`).not.toContain('adoptRegistry');
     }
+  });
+});
+
+// --- what a staged copy hides (c3) -----------------------------------------
+
+// Every kind a module can declare a section of, minus the header, which is not
+// a section anybody addresses. Read off `SCHEMAS` rather than written down, so
+// the sweep below covers the kind added next month.
+const ADDRESSABLE_KINDS = Object.keys(SCHEMAS).filter((kind) => kind !== 'info');
+
+const asModule = (name: string, sections: readonly string[]): { name: string; text: string } => ({
+  name,
+  text: [`# info ${name}`, 'version: 1.0.0', '', ...sections].join('\n') + '\n',
+});
+
+describe('a local section that shadows a base section is reported, for every kind (c3)', () => {
+  it('reports the address and the file, for every kind a module can declare', () => {
+    expect(ADDRESSABLE_KINDS.length).toBeGreaterThan(10);
+
+    for (const kind of ADDRESSABLE_KINDS) {
+      const base = asModule('shipped', [`# ${kind} thing`]);
+      // The address a staged copy carries is the qualified one, which is what
+      // `sectionsIn` writes and what `/dsl` takes; the two are the same string
+      // by construction rather than by this test knowing the rule.
+      const address = addressable([base])[0].address;
+      const local = { name: 'local-changes', text: `# info local-changes\nversion: 0.0.0\npack: local\n\n# ${kind} ${address}\n` };
+
+      expect(shadowed([base, local]), kind).toEqual([{ kind, address, modules: ['shipped'] }]);
+    }
+  });
+
+  it('reports a copy that matches its base byte for byte, because that is the copy that hides an edit', () => {
+    const base = asModule('shipped', ['# item lamp', 'title: Lamp']);
+    const same = { name: 'local-changes', text: `# info local-changes\nversion: 0.0.0\npack: local\n\n# item shipped.lamp\ntitle: Lamp\n` };
+    const different = { name: 'local-changes', text: `# info local-changes\nversion: 0.0.0\npack: local\n\n# item shipped.lamp\ntitle: Lantern\n` };
+
+    expect(shadowed([base, same])).toEqual(shadowed([base, different]));
+    expect(shadowed([base, same])).toHaveLength(1);
+  });
+
+  it('says nothing about a staged section no shipped module declares, or about the shipped modules alone', () => {
+    const base = asModule('shipped', ['# item lamp', 'title: Lamp']);
+    const fresh = { name: 'local-changes', text: `# info local-changes\nversion: 0.0.0\npack: local\n\n# item torch\ntitle: Torch\n` };
+
+    expect(shadowed([base, fresh])).toEqual([]);
+    expect(shadowed([base])).toEqual([]);
+    // Two shipped modules declaring one address is not this report's business:
+    // what it is about is a staged copy of a file somebody is about to edit.
+    expect(shadowed([base, asModule('shipped', ['# item lamp', 'title: Lamp'])])).toEqual([]);
+  });
+
+  it('reports every staged copy that shadows one, not merely the first', () => {
+    const base = asModule('shipped', ['# item lamp', 'title: Lamp', '', '# location cave', 'x: 0, y: 0']);
+    const local = {
+      name: 'local-changes',
+      text: '# info local-changes\nversion: 0.0.0\npack: local\n\n# item shipped.lamp\ntitle: Mine\n\n# location shipped.cave\nx: 1, y: 1\n\n# item torch\ntitle: Torch\n',
+    };
+
+    expect(shadowed([base, local])).toEqual([
+      { kind: 'item', address: 'shipped.lamp', modules: ['shipped'] },
+      { kind: 'location', address: 'shipped.cave', modules: ['shipped'] },
+    ]);
   });
 });

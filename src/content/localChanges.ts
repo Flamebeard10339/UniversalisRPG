@@ -140,17 +140,3 @@ export function deleteLocalSection(source: string, dependencies: readonly string
   const kept = sections.filter((section) => section.kind !== kind || section.id !== id);
   return { text: withBody(source, dependencies, kept), deleted: kept.length !== sections.length };
 }
-
-// Emptying the body is one more edit that rewrites only sections, so the header
-// survives it the way it survives a delete of the last section — the two used
-// to disagree about the same file. The exception is a file that will not parse:
-// there is no header to read out of it, and this is the one command that can
-// still proceed from there, which is what makes it the way out.
-export function clearLocalSections(source: string, dependencies: readonly string[]): string {
-  try {
-    return withBody(source, dependencies, []);
-  } catch (error) {
-    if (error instanceof DslError) return renderLocalChangesModule(dependencies);
-    throw error;
-  }
-}

@@ -57,6 +57,10 @@ const NOT_PUBLISHED: ReadonlyArray<{ type: string; why: string }> = [
   { type: 'src/runtime/command.ts#AuthoringContext', why: 'the module sources an authoring command edits. Their text is DSL, which is `src/content`\'s and is drawn as a tool line where it is drawn at all' },
   { type: 'src/runtime/command.ts#CommandContext', why: 'the handle a driver runs a line through — a session, a recorder and two dials. Every value it publishes reaches this walk on its own: the view as `PlayView`, the answer as `CommandResult`' },
   { type: 'src/runtime/command.ts#CommandHelp', why: "the command table, whose name, aliases and summary are the tool's own English (c4): both drivers print one as a tool line, and the `help` arm that carries it says so" },
+  {
+    type: 'src/runtime/openUniverse.ts#OpenedUniverse',
+    why: 'the handle a driver opens through — a session, the module ids that loaded and what is wrong with them. Its problems reach this walk on their own, as `UniverseProblem`, which declares the tool as whose words they are; the session it holds reaches a driver as `CommandContext` does and is passed over for the same reason',
+  },
 ];
 
 const UNPUBLISHED = new Set(NOT_PUBLISHED.map((each) => each.type));

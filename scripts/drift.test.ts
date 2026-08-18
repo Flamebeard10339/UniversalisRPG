@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
+import { withEngineLocale } from '../src/content/engineLocale';
+import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
 import { loadUniverseWithDiagnostics } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
 import { COMMANDS, runLine, type AuthoringContext, type CommandResult } from '../src/runtime/command';
@@ -59,28 +61,36 @@ const withStorage = (): (() => Storage) => {
   return () => storage;
 };
 
-function bothDrivers(): { repl: Repl; gui: Driver; slots: { repl: SlotDriver; gui: SlotDriver } } {
-  const dependencies = loadUniverseWithDiagnostics(SHIPPED_SOURCES).loadedModules;
+function bothOver(base: readonly ModuleSource[], local: string): { repl: Repl; gui: Driver; slots: { repl: SlotDriver; gui: SlotDriver } } {
+  // The engine's own English on both sides: the REPL puts it there itself and
+  // the browser's glob has already, so a fixture that named neither would be
+  // two different universes compared with each other.
+  const shipped = withEngineLocale(base);
+  const localSource: ModuleSource = { name: LOCAL_CHANGES_MODULE_ID, text: local };
+  const sources = local === '' ? shipped : [...shipped, localSource];
+  const dependencies = loadUniverseWithDiagnostics(sources).loadedModules.filter((id) => id !== LOCAL_CHANGES_MODULE_ID);
   // The store each driver's own player would have: one file per slot under the
   // CLI, one prefixed key per slot under the browser. Two stores rather than
   // one, because a shared store would let one driver read what the other wrote
   // and hide exactly the drift this measures.
   const slots = { repl: fileSlots(tempDir()), gui: browserSlots(withStorage()) };
   const save = createSaveContext(slots.repl, () => STAMP);
-  const localSource: ModuleSource = { name: LOCAL_CHANGES_MODULE_ID, text: '' };
+  for (const driver of local === '' ? [] : [slots.repl, slots.gui]) slotStore(driver, () => STAMP).write(LOCAL_CHANGES_MODULE_ID, local);
   const authoring: AuthoringContext = {
-    baseSources: [...SHIPPED_SOURCES],
+    baseSources: [...shipped],
     dependencies,
     localSource,
     writeLocalChanges: (text) => void save.store.write(LOCAL_CHANGES_MODULE_ID, text),
     readLocalChanges: () => save.store.read(LOCAL_CHANGES_MODULE_ID)?.payload ?? '',
   };
   return {
-    repl: openRepl(SHIPPED_SOURCES, { authoring, save, driving: true }),
-    gui: createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined, slots: slots.gui, now: () => STAMP }),
+    repl: openRepl(sources, { authoring, save, driving: true }),
+    gui: createDriver(shipped, { ticker: () => () => undefined, slots: slots.gui, now: () => STAMP }),
     slots,
   };
 }
+
+const bothDrivers = (): { repl: Repl; gui: Driver; slots: { repl: SlotDriver; gui: SlotDriver } } => bothOver(SHIPPED_SOURCES, '');
 
 // What each store is standing in, slot by slot, as the bytes it holds. c15's
 // comparison: a view is what a driver was told and this is what it is standing
@@ -179,9 +189,16 @@ describe('the two drivers cannot drift', () => {
 
     for (const spec of COMMANDS) {
       const bare = SHAPED[spec.name] ?? spec.name;
+      // A dev power is refused by the driver that is the game while the session
+      // is the player's, which is the one difference between the two by design.
+      // Compared inside the dev slot instead, so what the pair does with it is
+      // still held to being identical — and the entering and the leaving are
+      // two more lines that have to match.
+      if (spec.dev) inStep(repl, gui, '/dev on');
       for (const line of [bare, `${bare} 1`]) {
         if (!refused(inStep(repl, gui, line).result)) accepted += 1;
       }
+      if (spec.dev) inStep(repl, gui, '/dev off');
     }
 
     // A table every entry of which was refused would prove nothing about
@@ -197,14 +214,14 @@ describe('the two drivers cannot drift', () => {
 
   it('answers a modal through the shared table, by the line the table parses', () => {
     const { repl, gui } = bothDrivers();
-    const talk = String(gui.snapshot().view!.choices.findIndex((choice) => choice.id === 'talk:tutorial-island.miki') + 1);
+    const talk = String(gui.snapshot().view.choices.findIndex((choice) => choice.id === 'talk:tutorial-island.miki') + 1);
     inStep(repl, gui, talk);
 
-    const asked = gui.snapshot().view!.modals[0].options[0];
+    const asked = gui.snapshot().view.modals[0].options[0];
     // The GUI's own route in, held to the line the REPL would have typed.
     inStep(repl, gui, `submit-modal: ${asked.key}=${asked.values![0].value}`, () => gui.answer(asked.key, asked.values![0].value));
 
-    expect(gui.snapshot().view!.modals).toEqual([]);
+    expect(gui.snapshot().view.modals).toEqual([]);
   });
 
   it('walks the crafting route through both drivers, gesture against typed line', () => {
@@ -215,11 +232,49 @@ describe('the two drivers cannot drift', () => {
     inStep(repl, gui, '/inv tutorial-island.iron-sword', () => gui.open('tutorial-island.iron-sword'));
     for (const [key, value] of CRAFTING_ROUTE) inStep(repl, gui, `submit-modal: ${key}=${value}`, () => gui.answer(key, value));
 
-    expect(gui.snapshot().view!.modals).toEqual([]);
-    const grown = JSON.parse(gui.serialized()!) as SerializedGrowth;
+    expect(gui.snapshot().view.modals).toEqual([]);
+    const grown = JSON.parse(gui.serialized()) as SerializedGrowth;
     // A route every step of which was refused would leave both drivers standing
     // in the same unmoved game, and every comparison above would pass over it.
     expect(Object.keys(grown.instances.byId['1'].payload.plane)).toEqual(['0,0', '1,0', '2,-1']);
     expect(grown.equipped).toEqual({ mainhand: '1' });
+  });
+});
+
+// c5. Opening is the one line the two drivers never took together: the GUI
+// recovered and the REPL stranded, so the comparison below could not be made at
+// all. It is the same call now, and what it answers is compared over every cell
+// of the door's own family — content that will not parse, will not resolve,
+// will not order, and content that loads and leaves nowhere to begin.
+describe('the two drivers open the same way, over content that will not load', () => {
+  it('reaches the same session and reports the same problems, cell by cell', () => {
+    expect(OPENING_CELLS.length).toBeGreaterThan(6);
+    let reported = 0;
+
+    for (const cell of OPENING_CELLS) {
+      const { repl, gui } = bothOver(cell.base, cell.local);
+
+      expect(gui.snapshot().problems, cell.where).toEqual(repl.opened.problems);
+      expect(gui.serialized(), cell.where).toBe(serializeSession(repl.context.session));
+      reported += repl.opened.problems.length;
+    }
+
+    // A family that said nothing anywhere would pass every line above.
+    expect(reported).toBeGreaterThan(OPENING_CELLS.length - 1);
+  });
+
+  // And both go on taking lines from there, which is what "recovers" means:
+  // stranding is a REPL that has no context to hand the next line to.
+  it('takes a line on either side of the door, from a universe that would not open', () => {
+    const cell = OPENING_CELLS.find((each) => each.local === '')!;
+    const { repl, gui } = bothOver(cell.base, cell.local);
+
+    inStep(repl, gui, '/look');
+    inStep(repl, gui, '/state');
+
+    // The premise, rather than that there is a session at all: the type says
+    // the second, and a cell that quietly began opening cleanly would pass
+    // every line above without this.
+    expect(gui.snapshot().problems.length).toBeGreaterThan(0);
   });
 });

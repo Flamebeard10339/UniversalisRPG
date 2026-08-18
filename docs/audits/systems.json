@@ -317,6 +317,9 @@
         "src/runtime/modals.test.ts",
         "src/runtime/modals.ts",
         "src/runtime/moments.test.ts",
+        "src/runtime/openUniverse.test.ts",
+        "src/runtime/openUniverse.ts",
+        "src/runtime/openUniverseFixture.ts",
         "src/runtime/planeReport.test.ts",
         "src/runtime/planeReport.ts",
         "src/runtime/planeScreen.test.ts",
@@ -636,6 +639,14 @@
             "src/runtime/storeContract.ts"
           ],
           "note": "produced by the-gui-authors-through-the-same-door: one set of cases every SlotDriver is held to"
+        },
+        {
+          "name": "the one door a universe is opened through",
+          "paths": [
+            "src/runtime/openUniverse.ts",
+            "src/runtime/openUniverseFixture.ts"
+          ],
+          "note": "produced by opening-a-universe-answers-rather-than-raises"
         }
       ]
     },
@@ -730,8 +741,11 @@
         "src/main.tsx",
         "src/ui/App.tsx",
         "src/ui/Console.tsx",
+        "src/ui/DevBanner.tsx",
+        "src/ui/DevOnly.tsx",
         "src/ui/DragSheet.tsx",
         "src/ui/EditPane.tsx",
+        "src/ui/FaultBanner.tsx",
         "src/ui/FloatingText.tsx",
         "src/ui/Home.tsx",
         "src/ui/Ledger.tsx",
@@ -742,6 +756,7 @@
         "src/ui/ModalSheet.tsx",
         "src/ui/Pager.tsx",
         "src/ui/PlaneModal.tsx",
+        "src/ui/SettingsPane.tsx",
         "src/ui/SkillsPane.tsx",
         "src/ui/Splitter.tsx",
         "src/ui/StatusBanner.tsx",
@@ -764,6 +779,8 @@
         "src/ui/choices.ts",
         "src/ui/consoleLine.test.ts",
         "src/ui/consoleLine.ts",
+        "src/ui/devMode.test.tsx",
+        "src/ui/devMode.ts",
         "src/ui/discovery.test.ts",
         "src/ui/discovery.ts",
         "src/ui/dragSheet.test.ts",
@@ -793,9 +810,11 @@
         "src/ui/planeGraph.ts",
         "src/ui/planeModal.test.tsx",
         "src/ui/planePanel.ts",
+        "src/ui/published.test.ts",
         "src/ui/render.test.tsx",
         "src/ui/sheet.test.ts",
         "src/ui/sheet.ts",
+        "src/ui/shell.test.tsx",
         "src/ui/shippedContent.test.ts",
         "src/ui/shippedContent.ts",
         "src/ui/skillPanels.test.ts",
@@ -981,6 +1000,29 @@
             "src/ui/agent/pageStorage.ts"
           ],
           "note": "produced by the-gui-authors-through-the-same-door"
+        },
+        {
+          "name": "the way out of a session that would not open",
+          "paths": [
+            "src/ui/FaultBanner.tsx"
+          ],
+          "note": "The banner reads the door's report: a problem names the modules it is against and remediesFor turns that list into the controls drawn. Rewritten by opening-a-universe-answers-rather-than-raises, which retired the design this used to describe - a fault carrying where in the code it came from."
+        },
+        {
+          "name": "the dev gate",
+          "paths": [
+            "src/ui/devMode.ts",
+            "src/ui/DevOnly.tsx",
+            "src/ui/SettingsPane.tsx"
+          ],
+          "note": "produced by the-shell-draws-what-the-session-answers: whether a power is dev-only is a mark on the command table, and DevOnly is the one place that mark is drawn"
+        },
+        {
+          "name": "the published view is never a maybe",
+          "paths": [
+            "src/ui/published.test.ts"
+          ],
+          "note": "produced by the-shell-is-never-handed-a-missing-view and re-cut after each of its two audits: what the driver publishes admits no absence, and nothing that drives it asks whether a view is there. The type half is a derivation and is closed. It folds '| null', '| undefined' and '?:' into one question over DriverSnapshot's, Driver's and TestState's own keys, looks through a method to what it yields, carries a positive control so a derivation that quietly stopped naming anything reddens the tsc already in CI, and names the fields that may honestly be absent in a pair of checks that cannot go stale in either direction. The scan half asks the type checker what a subject can hold and the grammar what counts as asking, over src/ui and scripts, so a renamed binding, a formatter-wrapped ternary and 'view?: PlayView' all fail where eight regexes over text let them through -- but it is a NAMED GRAMMAR AND NOT A CLOSED SET, and pass 2 measured twelve ordinary spellings outside it. Three shapes escape: a position where presence decides something that the grammar does not name (switch/case, '??=', a destructuring default, a default parameter, Object.is); the nothing put back where the walk does not descend (inside a type argument, a type-parameter constraint or a cast); and a runtime assertion such as expect(<it>).not.toBeNull(), whose subject is an argument to a library call. The edge is stated in full in src/ui/published.test.ts, where the scan half is introduced. Asking the checker about every condition position is the closed answer to the first shape and not to the third, and is deferred to its own spec. What keeps this a boundary rather than a hole is the type half: a nullable cannot be published at all, so what escapes is a reader writing a check that cannot be false, never a type that lies."
         }
       ]
     },

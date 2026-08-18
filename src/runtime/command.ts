@@ -2,11 +2,11 @@ import { DslError } from '../grammar/parser';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../content/registry';
 import { type ModuleSource } from '../content/universe';
 import {
-  clearLocalSections,
   deleteLocalSection,
   LOCAL_CHANGES_MODULE_ID,
   listLocalSections,
   localSectionHeadings,
+  renderLocalChangesModule,
   upsertLocalSection,
 } from '../content/localChanges';
 import { isGrowthDirective, parseDirectiveLine, type Directive } from '../content/test';
@@ -214,6 +214,11 @@ export interface CommandSpec<K extends ArgKind = ArgKind> {
   readonly arg: K;
   readonly argHint: string;
   readonly summary: string;
+  // Whether this is a power only a developer's session may reach. The table
+  // does not act on it — the CLI is not the game and has every command
+  // unconditionally — so this is the mark a driver that *is* the game reads to
+  // know what to refuse, and adding the next dev power is marking it.
+  readonly dev: boolean;
   parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
   run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
 }
@@ -225,10 +230,11 @@ function define<K extends ArgKind>(spec: {
   arg: K;
   argHint?: string;
   summary: string;
+  dev?: boolean;
   parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
   run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
 }): CommandSpec {
-  return { aliases: [], match: 'name', argHint: '', ...spec };
+  return { aliases: [], match: 'name', argHint: '', dev: false, ...spec };
 }
 
 function isProblem(value: unknown): value is CommandProblem {
@@ -534,10 +540,12 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
       // is how a file nothing else will touch gets read.
       case 'show':
         return { output: [{ kind: 'source', words: 'tool', lines: localChangesNow(authoring).trimEnd().split('\n') }], quit: false, recorded: [] };
-      // Unparsed like `show`, and for the same reason turned around: this is
-      // the command that can proceed from a file nothing else can read.
+      // Unread, which is what makes it the way out of a file nothing else can
+      // read and the way out of a header no other command rewrites: what it
+      // writes is the module a first launch finds, so nothing of the one being
+      // cleared survives it and the state it is taken from always moves.
       case 'clear':
-        return commitLocalChanges(ctx, authoring, clearLocalSections(localChangesNow(authoring), authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
+        return commitLocalChanges(ctx, authoring, renderLocalChangesModule(authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
       case 'delete': {
         const source = localSourceNow(authoring);
         if (!source.read) return source.refusal;
@@ -855,6 +863,15 @@ export const COMMANDS: readonly CommandSpec[] = [
     run: runDirective,
   }),
   define({
+    name: '/goto',
+    arg: 'directive',
+    argHint: '<location>',
+    dev: true,
+    summary: 'stand in a location at once, whether or not a road reaches it',
+    parse: directiveFrom('/goto', (rest) => `goto: ${rest}`),
+    run: runDirective,
+  }),
+  define({
     name: '/speed',
     arg: 'number',
     argHint: '<n>',
@@ -1056,6 +1073,19 @@ export const COMMANDS: readonly CommandSpec[] = [
 const BY_TOKEN = new Map<string, CommandSpec>(
   COMMANDS.filter((spec) => spec.match === 'name').flatMap((spec) => [spec.name, ...spec.aliases].map((token) => [token, spec] as const)),
 );
+
+// Every token that names a dev-only power, aliases included, read off the table
+// rather than written down: a driver that is the game refuses these while the
+// session is the player's, and the set it refuses cannot fall behind the marks.
+export const DEV_TOKENS: readonly string[] = [...BY_TOKEN].filter(([, spec]) => spec.dev).map(([token]) => token);
+
+// Which dev-only command a line names, and nothing when it names none. The
+// leading token, which is how the parser recognises a named command, so a line
+// this answers for is a line that would have reached that command.
+export function devTokenIn(line: string): string | undefined {
+  const token = line.trim().split(/[ \t]+/)[0];
+  return DEV_TOKENS.includes(token) ? token : undefined;
+}
 
 function byMatch(match: CommandMatch): CommandSpec {
   const spec = COMMANDS.find((each) => each.match === match);

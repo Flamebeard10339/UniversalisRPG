@@ -9,7 +9,10 @@ import { emptyTranscript } from '../transcript';
 
 function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
   return {
-    fault: null,
+    problems: [],
+    remedies: [],
+    dev: false,
+    speed: 1,
     live: null,
     transcript: emptyTranscript(),
     view: {
@@ -53,11 +56,13 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     open: (item) => void calls.push(`open:${item}`),
     localizer: () => localizerFor(loadInEnglish(''), 'en'),
     cancel: () => void calls.push('cancel'),
-    serialized: () => null,
+    serialized: () => '',
     localChanges: () => null,
     baseSources: () => [],
     editorMemory: { read: () => null, write: (text) => void calls.push(`editorMemory:${text}`) },
     note: (text) => void calls.push(`note:${text}`),
+    reopen: () => void calls.push('reopen'),
+    clearLocalChanges: () => void calls.push('clearLocalChanges'),
   };
 }
 
@@ -80,10 +85,10 @@ describe('the browser test harness', () => {
     ]);
     // Still readable off the view, which is the half the projection used to
     // answer and the half it kept losing.
-    expect(state.view?.resources[0].title).toBe('Energy');
-    expect(state.view?.player.name).toBe('Miri');
-    expect(state.view?.journey).toBeNull();
-    expect(state.view?.inventory).toEqual({});
+    expect(state.view.resources[0].title).toBe('Energy');
+    expect(state.view.player.name).toBe('Miri');
+    expect(state.view.journey).toBeNull();
+    expect(state.view.inventory).toEqual({});
   });
 
   it('publishes named actions and batches one result per step', async () => {
@@ -92,7 +97,7 @@ describe('the browser test harness', () => {
     const harness = installTestHarness(driver(snapshot(), calls), host, { settle: async () => undefined });
 
     expect(host.__test).toBe(harness);
-    expect(harness.actions()).toEqual(['answer', 'cancel', 'choice', 'choose', 'send']);
+    expect(harness.actions()).toEqual(['answer', 'cancel', 'choice', 'choose', 'clear-local', 'reopen', 'send']);
 
     const results = await harness.batch([
       { target: 'choice', value: 'travel:yard' },
@@ -113,7 +118,7 @@ describe('the browser test harness', () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe('action is not registered: missing');
-    expect(result.state.view?.location.id).toBe('start');
+    expect(result.state.view.location.id).toBe('start');
   });
 
   it('reaches what a component registered, by the surface name joined to the action name', async () => {
@@ -122,7 +127,7 @@ describe('the browser test harness', () => {
     surfaces.register('shell', () => ({ actions: { layer: (value) => void moved.push(value) }, state: () => ({ layer: 'home' }) }));
     const harness = installTestHarness(driver(snapshot()), {}, { settle: async () => undefined, surfaces });
 
-    expect(harness.actions()).toEqual(['answer', 'cancel', 'choice', 'choose', 'send', 'shell.layer']);
+    expect(harness.actions()).toEqual(['answer', 'cancel', 'choice', 'choose', 'clear-local', 'reopen', 'send', 'shell.layer']);
     const [result] = await harness.batch([{ target: 'shell.layer', value: 'map' }]);
 
     expect(result.ok).toBe(true);

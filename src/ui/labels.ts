@@ -51,6 +51,12 @@ export const LABELS = {
   unstage: 'engine.shell.unstage',
   copy: 'engine.shell.copy',
   place: 'engine.shell.place',
+  // The dev slot's own surfaces, and the two ways out of a session that would
+  // not open.
+  dev: 'engine.shell.dev',
+  speed: 'engine.shell.speed',
+  clear: 'engine.shell.clear',
+  reopen: 'engine.shell.reopen',
 } as const satisfies Record<string, EngineKey>;
 
 export type LabelId = keyof typeof LABELS;

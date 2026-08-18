@@ -59,7 +59,7 @@ const A_HEXAGON = /-?\d+\s*,\s*-?\d+/;
 
 describe('the plane a player drags', () => {
   it('opens on a plane, so nothing below is a rule about an empty screen', () => {
-    const view = opened().snapshot().view!;
+    const view = opened().snapshot().view;
 
     expect(view.focus).not.toBeNull();
     expect(planeOf(view).clusters.length).toBeGreaterThan(0);
@@ -78,7 +78,7 @@ describe('the plane a player drags', () => {
   });
 
   it('says what the copy is worth while nothing on it is pressed', () => {
-    const view = opened().snapshot().view!;
+    const view = opened().snapshot().view;
     const runs = readable(renderToStaticMarkup(<App driver={opened()} />));
     const plane = planeOf(view);
 
@@ -89,7 +89,7 @@ describe('the plane a player drags', () => {
 
 describe('what the panel says about the node that was pressed', () => {
   it('says nothing about a node until one is pressed, and offers the way out', () => {
-    const view = opened().snapshot().view!;
+    const view = opened().snapshot().view;
     const panel = panelFor(planeGraph(planeOf(view)), null, choicesOf(view));
 
     expect(panel.node).toBeNull();
@@ -99,7 +99,7 @@ describe('what the panel says about the node that was pressed', () => {
   });
 
   it('offers the allocate the engine published for the node, and nothing for any other node', () => {
-    const view = opened().snapshot().view!;
+    const view = opened().snapshot().view;
     const graph = planeGraph(planeOf(view));
     const ready = graph.nodes.find((node) => node.standing === 'available')!;
     const locked = graph.nodes.find((node) => node.standing === 'unreached');
@@ -109,7 +109,7 @@ describe('what the panel says about the node that was pressed', () => {
   });
 
   it('names the standing of whatever was pressed, so a node out of reach says so', () => {
-    const view = opened().snapshot().view!;
+    const view = opened().snapshot().view;
     const graph = planeGraph(planeOf(view));
 
     for (const node of graph.nodes) {
@@ -121,7 +121,7 @@ describe('what the panel says about the node that was pressed', () => {
   });
 
   it('carries what every position pays straight off the report, without adding anything up', () => {
-    const view = grown().snapshot().view!;
+    const view = grown().snapshot().view;
     const plane = planeOf(view);
     const graph = planeGraph(plane);
     const positions = plane.clusters.flatMap((cluster) => cluster.positions);
@@ -138,7 +138,7 @@ describe('what the panel says about the node that was pressed', () => {
 describe('a socket with nothing through it', () => {
   it('offers the jewels the engine published for it, each named by the copy it brings', () => {
     const driver = opened('submit-modal: plane=allocate: slot e');
-    const view = driver.snapshot().view!;
+    const view = driver.snapshot().view;
     const graph = planeGraph(planeOf(view));
     const socket = graph.nodes.find((node) => node.socket && node.standing === 'allocated' && node.holds === null)!;
     const panel = panelFor(graph, socket.key, choicesOf(view));
@@ -152,7 +152,7 @@ describe('a socket with nothing through it', () => {
 
   it('offers no jewels once one has gone through it, and says what it holds instead', () => {
     const driver = opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with tutorial-island.crossroads-jewel');
-    const view = driver.snapshot().view!;
+    const view = driver.snapshot().view;
     const graph = planeGraph(planeOf(view));
     const filled = graph.nodes.find((node) => node.socket && node.holds !== null)!;
 
@@ -161,7 +161,7 @@ describe('a socket with nothing through it', () => {
   });
 
   it('offers no jewels on a socket no point has been spent on', () => {
-    const view = opened().snapshot().view!;
+    const view = opened().snapshot().view;
     const graph = planeGraph(planeOf(view));
     const unspent = graph.nodes.find((node) => node.socket && node.standing !== 'allocated');
 
@@ -172,7 +172,7 @@ describe('a socket with nothing through it', () => {
 describe('a node of a cluster the screen is not standing on', () => {
   it('is walked to by a published move, so one press reaches any node the graph draws', () => {
     const driver = opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with tutorial-island.crossroads-jewel');
-    const view = driver.snapshot().view!;
+    const view = driver.snapshot().view;
     const graph = planeGraph(planeOf(view));
     const elsewhere = graph.nodes.filter((node) => node.hex !== view.focus!.hex);
 
@@ -181,7 +181,7 @@ describe('a node of a cluster the screen is not standing on', () => {
   });
 
   it('needs no walk for a node of the cluster the screen is already on', () => {
-    const view = opened().snapshot().view!;
+    const view = opened().snapshot().view;
     const graph = planeGraph(planeOf(view));
     const here = graph.nodes.filter((node) => node.hex === view.focus!.hex);
 

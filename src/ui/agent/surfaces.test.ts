@@ -78,6 +78,7 @@ const INERT: MapControls = {
   plane: () => undefined,
   recentre: () => undefined,
   moving: () => undefined,
+  go: () => undefined,
   place: () => undefined,
 };
 

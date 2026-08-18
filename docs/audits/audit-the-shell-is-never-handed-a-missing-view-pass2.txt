@@ -1,0 +1,242 @@
+# Pass 2 on the-shell-is-never-handed-a-missing-view. Fill in every value, then run:
+#   npm run tasks -- audit the-shell-is-never-handed-a-missing-view --args-from <this file>
+# One flag per line. A line that does not open with -- continues the value above it,
+# which is how a clause's evidence can be a paragraph. `#` at column zero is a comment.
+
+# met | unmet | unknown | deferred. `met` needs evidence the next pass can re-run and is
+# refused without one; `unmet` means you checked and it fails; `unknown` means nobody looked;
+# `deferred` means you checked, it fails, and the goal this brief printed still holds without
+# it — refused with no reason, and converts the clause into a tracked undelivered record.
+
+# [c1] **The published type says what is true.** `DriverSnapshot.view` is `PlayView`. The harness publishe…
+--proof 1=met
+--evidence 1=Repaired, and repaired at the subject pass 1 said it missed: the type rather than one field
+of it. On c7992617 the three named subjects still hold (src/ui/driver.ts:40 `view: PlayView`,
+src/ui/agent/testHarness.ts:38 `view: PlayView`, src/ui/App.tsx:150 `standingIn` total) and both
+lies pass 1 measured are gone — src/ui/driver.ts:59 is `speed: number`, :82 is `serialized(): string`
+with the "null when there is no session to save" comment deleted, the dead `speed === null` guard is
+out of src/ui/SettingsPane.tsx, and the `!` is off scripts/drift.test.ts:236. `npx tsc --noEmit` passes.
+What makes this met rather than a third sweep of one field is that the question is now asked of the
+type. Re-run with the red-green script kept at
+C:\Users\yonat\AppData\Local\Temp\audit-the-shell-is-never-handed-a-missing-view-pass2-typeprobe.mjs
+(`node <it> <worktree>`): 17 probes, each editing one file, running `npx tsc --noEmit`, and recording
+whether src/ui/published.test.ts is named among the errors. 12 are named and are the ones that should
+be — a field added to DriverSnapshot as `| null`, as `?:`, as `| undefined`, through an alias
+resolving to a union and through a generic resolving to one; a property and a one-call method added to
+Driver; a field added to TestState; an exemption gone stale in both directions (`live` on the snapshot,
+`modal` on the harness); and three weakenings of the derivation itself, each of which reddens the
+positive control at published.test.ts:51. Two are correctly silent: an array of nullables is not an
+absent member, and `void` is not an absence. Two escape and are filed as findings rather than counted
+here: an absence yielded through two calls, and one yielded from an inline object type literal, which
+is the shape `editorMemory` at src/ui/driver.ts:95 already has in the tree.
+Pass 1's three SettingsPane survivors are dead. `npm run mutate` on 2026-08-18, manifest at
+C:\Users\yonat\AppData\Local\Temp\mutations-the-shell-is-never-handed-a-missing-view-pass2.json:
+taking the speed control off the page KILLED, drawing a constant in place of the session's dial
+KILLED, and inverting the dev gate around it KILLED — each by src/ui/render.test.tsx "draws the speed
+dial on Settings, carrying the multiplier the session holds", each re-measured with the mutation still
+applied. Pass 1 measured the first two as SURVIVED 0 failed of 3749.
+
+# [c2] **Nothing under `src/ui` asks whether there is a view, and nothing this layer publishes may quietly…
+--proof 2=unmet
+--evidence 2=Graded against the sentence as amended on 2026-08-18. The type half is met and the
+mechanism of the other half is right; what fails is the headline, and it fails on an instance in the
+tree rather than on a hypothetical.
+src/ui/shell.test.tsx:106 and :107 are `expect(withGame.snapshot().view).not.toBeNull()` and
+`expect(standingIn.snapshot().view).not.toBeNull()` — two assertions under src/ui that ask whether
+there is a view, on a type that can no longer be one, with a comment above them presenting them as the
+point of the case. Commit f85c80b unwrapped the `!` on :108 and left the two lines above it untouched.
+The worker deleted the identical spelling from scripts/drift.test.ts:275 on this branch and recorded
+why in docs/events.jsonl ("vacuous once the type is total"); the two under the directory the clause
+actually names were not. This is the Deliverable's own sentence — a test written against the
+impossible state that can never fail — surviving in the file the clause is about.
+The rule cannot see them, and its stated reason for not needing to is false. published.test.ts:225
+says "The list is the grammar's and closed by it — there is no other syntax for asking"; the spec's
+amendment paragraph and the concept note in docs/audits/systems.json both say "both are closed sets,
+so neither half can be missing a row". Twelve ordinary spellings escape, measured by appending them to
+the rule's own SPELLINGS fixture and asking the rule — re-run with
+C:\Users\yonat\AppData\Local\Temp\audit-the-shell-is-never-handed-a-missing-view-pass2-escapes.mjs,
+which restores the file from bytes afterwards and carries two controls that are correctly caught:
+  `renamed === void 0`                        the canonical spelling of `=== undefined`
+  `renamed ??= x` and `renamed &&= x`         the assignment forms of two operators the list has
+  `const { view = null } = s`                 a destructuring default, and `const { problems, remedies }
+                                              = driver.snapshot()` at src/ui/driver.test.ts:537 is the
+                                              house style this is one keystroke from
+  `switch (renamed) { case null: }`           a question form the grammar has and the list has not
+  `Object.is(renamed, null)`
+  `if (s.view as Published | null)`           a cast straight into the condition
+  `<T extends Published | null>`              the union put back on a type parameter
+  `Array<Published | null>` and `Record<string, Published | undefined>`  the nothing put back inside a
+                                              container, which the declaration half does not look into
+  `const nothing = undefined; renamed === nothing`
+  a default parameter standing in for it
+All five of the ones worth writing typecheck under this repo's own `npx tsc --noEmit` — verified by
+adding them to a scratch module under src/ui and running the gate, which reported nothing.
+What the branch did build is a large, real improvement and should be said so. Every one of the seven
+spellings pass 1 named now fails, including `view?: PlayView`, and so do a renamed binding and a
+formatter-wrapped ternary that no line-by-line text rule can reach. Eleven aimed mutations, all
+KILLED first aim (manifest above, 2026-08-18): a question put back under src/ui, one put back under
+scripts, `PlayView | null` put back on the published type, one question form dropped from the grammar,
+the declaration half dropped, the flow type read instead of what a binding was declared to hold, the
+over-strictness guard removed so an honest question one layer down is called a violation, the walk not
+descending, scripts dropped from the scanned set, the union no longer walked, and `spellingAt`
+answering wrong so the fixture could not tell which spelling it caught. `vitest
+src/ui/published.test.ts` passes 4 of 4, and the type half's 17-probe red-green is under c1 above.
+The remedy this points at is a boundary or a derivation, not a longer list of node kinds — the
+predicate is still enumerated, only in a much better alphabet.
+
+# [c3] **Every screen draws exactly what it drew before.** The full render sweep passes unchanged. This is…
+--proof 3=met
+--evidence 3=Pass 1's evidence re-run and it still holds: `vitest src/ui/render.test.tsx` passes 28 of
+28 on c7992617, where pass 1 recorded 27 of 27 on 7051d8b. The one added case is 9bac4d2's speed-dial
+proof, which is a pass-1 finding against this same file being closed rather than a screen changing.
+Not re-derived — pass 2 was scoped to c1 and c2 by the commissioning brief, and the three mutations
+aimed at src/ui/SettingsPane.tsx under c1 above are the part of c3's surface these repairs touched.
+The caveat pass 1 recorded on src/ui/driver.ts:278 is unchanged by these commits and stands as filed.
+
+# [c4] `npm run tasks -- merge-ready` passes before the spec is marked done. **c2 was amended on 2026-08-1…
+--proof 4=met
+--evidence 4=Graded on the same reading pass 1 used and recorded in docs/events.jsonl: the audit-pass
+accounting cannot be turned green by any run of the gate. On c7992617: tsc ok, layer-check ok,
+audit-status ok, doctor ok with 27 warnings that do not fail the leg, bytes ok, tree ok, base ok. The
+six red legs are the accounting — two specs with open members and two clause tallies on
+opening-a-universe-answers-rather-than-raises and the-shell-draws-what-the-session-answers, plus this
+spec's own two, which clear as their passes are filed.
+One thing changed since pass 1 and a reader should have it rather than re-derive it: `npm test` FAILED
+on both of two runs here, not one of three. The failure is
+`scripts/tasks/auditPrompt.test.ts > tasks CLI > audit-prompt prints a ready-to-use auditor prompt for
+a spec`, "Test timed out in 5000ms", 3753 of 3754 passing both times. That file is untouched by this
+branch — `git log 7a0081a..HEAD -- scripts/tasks/auditPrompt.test.ts` is empty — and it passes 69 of
+69 in isolation in 35s. It is the fifth sighting of
+npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s, under a second auditor sharing this
+machine; a recurrence is written beside this file rather than a second record. The suite is 53s wall,
+well inside the five-minute rule, and the file this branch adds costs 4.4s of it.
+
+# The regression question, since no clause carries it: nothing is worse than before this branch.
+# The only source changes in the repair range are type-only, or deletions of branches the types made
+# unreachable — src/ui/driver.ts loses two nullables and a stale comment, src/ui/SettingsPane.tsx
+# loses a guard on a value that cannot be null, and the two test fixtures that fed those nulls
+# (src/ui/agent/testHarness.test.ts `serialized: () => null`, four `view!` in scripts/drift.test.ts)
+# move with them. `settled` at src/ui/driver.ts:167 reads `context.live.speed`, typed `number` at
+# src/runtime/command.ts:131, with `context` definitely assigned before the constructor returns, so
+# no path produced the null either type described. Coverage is a strict superset: src/ui/surface.test.ts
+# loses 94 lines of text rule, and every one of its eight forms is in the replacement's grammar and in
+# its fixture, which additionally covers scripts/, renamed bindings and wrapped ternaries. The one
+# spelling both rules miss — the nothing inside a container — was checked against the retired regex
+# directly rather than assumed, and it missed it too, so that is a gap carried forward and not one
+# opened here. `modulesUnder`'s `tests` flag goes with its only caller and `SHIPPED` still has three.
+# The one assertion the branch replaced rather than deleted, scripts/drift.test.ts:275, went from
+# `expect(view).not.toBeNull()` to `expect(problems.length).toBeGreaterThan(0)`, which is a stronger
+# statement of that fixture's premise, not a weaker one.
+
+# One block per finding, uncommented. A finding needs both halves: what is broken
+# (--evidence) and what fixing it would mean (--deliverable), and it names what is
+# at fault: the tooling, the contract that briefed the work, or nobody — nobody being
+# a real answer, for a question no one could have answered when the work was briefed.
+
+--finding Two assertions under src/ui still ask whether there is a view, on the lines above the one the sweep unwrapped
+--severity high
+--system User interface
+--fault nobody
+--file src/ui/shell.test.tsx
+--deliverable Delete both lines. The case's third assertion —
+`expect(standingIn.snapshot().view.location.id).not.toBe(withGame.snapshot().view.location.id)` —
+already says the thing the comment above them claims, that both have a session and what differs is
+whether it is the game, and it says it in a way that can fail. Then make the rule able to see the
+class rather than this instance: a runtime assertion whose subject is a published type that admits
+nothing is a question in exactly the sense c2 means, so `questions()` should reach an `expect(<it>)`
+chain ending in a nothing-matcher, or published.test.ts should say in one place that runtime
+assertions are outside its reach. Without one of those, the next `not.toBeNull()` lands the same way.
+--evidence 2026-08-18, on c7992617. src/ui/shell.test.tsx:106 `expect(withGame.snapshot().view)
+.not.toBeNull()` and :107 `expect(standingIn.snapshot().view).not.toBeNull()`, on `DriverSnapshot.view`
+typed `PlayView` at src/ui/driver.ts:40. Neither can fail. Commit f85c80b changed :108 from
+`view!.location.id` to `view.location.id` and left :106 and :107 as they were —
+`git log -L 100,112:src/ui/shell.test.tsx` shows the sweep passing over them. The same spelling was
+deleted from scripts/drift.test.ts:275 on this branch and the reason recorded in docs/events.jsonl
+("a fifth line asserting the view was not null -- vacuous once the type is total"), so the judgement
+was made and applied to the other directory only. `vitest src/ui/published.test.ts` passes 4 of 4 with
+both lines present: `questions()` has no form for a call, so the rule reports nothing.
+
+--finding c2's grammar half is stated as a closed set in three places and is not one; twelve ordinary spellings escape it
+--severity high
+--system User interface
+--fault nobody
+--file src/ui/published.test.ts
+--deliverable Either derive the condition positions instead of listing the node kinds, or write the
+boundary down in all three places that currently claim closure. The derivation exists off the shelf —
+`@typescript-eslint/no-unnecessary-condition` asks the checker whether a condition's type makes it
+always truthy or never nullish, which is the same question over every condition position the grammar
+has rather than over twenty the file names, and it takes `??=`, `&&=`, `switch`, a destructuring
+default and `void 0` with it because it never enumerated them. Pair it with a declaration half that
+looks into type arguments and constraints (see the sibling finding) and the file's SPELLINGS array
+becomes a regression fixture rather than the definition. If instead the boundary is the answer, then
+published.test.ts:225, the amendment paragraph in
+docs/specs/the-shell-is-never-handed-a-missing-view.md and the concept note in docs/audits/systems.json
+all have to stop saying the set is closed and say what it does not reach — a stated boundary is a
+better result than a longer list, but three copies of a false claim is the worse one.
+--evidence 2026-08-18, on c7992617. Re-run with
+C:\Users\yonat\AppData\Local\Temp\audit-the-shell-is-never-handed-a-missing-view-pass2-escapes.mjs,
+which appends candidates to the rule's own SPELLINGS fixture, runs `vitest src/ui/published.test.ts`,
+and restores the file from bytes. Two controls are caught (an inferred nullable return, a typed `let`
+putting the union back); twelve escape: `renamed === void 0`, `renamed ??= x`, `renamed &&= x`,
+`const { view = null } = s`, `switch (renamed) { case null: }`, `Object.is(renamed, null)`,
+`if (s.view as Published | null)`, `<T extends Published | null>`, `Array<Published | null>`,
+`Record<string, Published | undefined>`, comparison against a binding that holds undefined, and a
+default parameter. Five of them were put in a scratch module under src/ui and `npx tsc --noEmit`
+reported nothing, so they are code this repository's own gate accepts. The destructuring default is
+the one that matters: `const { problems, remedies } = driver.snapshot()` at src/ui/driver.test.ts:537
+is the house style, and `= fallback` is one keystroke from it. The file says at :225 "The list is the
+grammar's and closed by it — there is no other syntax for asking".
+
+--finding The type half stops one level short of a shape already in the interface it guards
+--severity medium
+--system User interface
+--fault nobody
+--file src/ui/driver.ts
+--deliverable Fold through an inline object type literal as well as through a call, so
+`editorMemory: { read(): string | null; ... }` is asked the same question as
+`localChanges(): string | null` and either fails or is exempted by name where a reader can see the
+decision. The file's stated reason for stopping at one level — "a method returning a localizer
+publishes a localizer and what the localizer then returns is that module's promise" — is a good
+reason and does not cover this case: an anonymous object type declared inside `Driver` is nobody
+else's promise, it is this interface's.
+--evidence 2026-08-18, on c7992617. Probe P11 of
+C:\Users\yonat\AppData\Local\Temp\audit-the-shell-is-never-handed-a-missing-view-pass2-typeprobe.mjs:
+adding `probe(): string | null` inside the inline type at src/ui/driver.ts:95 leaves
+src/ui/published.test.ts unnamed by `npx tsc --noEmit`, where the same member added to `Driver`
+directly (P9) is named at published.test.ts:69. `editorMemory.read(): string | null` is in the tree
+today and is honest, so nothing is wrong now — what is missing is that the rule never asked. P10 is
+the neighbour: a member yielding an absence through two calls, `probeTwice(): () => string | null`,
+also escapes, and is outside the clause's sentence, which says "through a call".
+
+--finding Neither the rule nor the one it replaced can see the nothing put back inside a container
+--severity medium
+--system User interface
+--fault nobody
+--file src/ui/published.test.ts
+--deliverable `isPublished` and `admitsNothing` walk only the top-level union members of a type, so
+`Array<PlayView | null>`, `Record<string, PlayView | undefined>` and `<T extends PlayView | null>`
+read as "not the published type at all" rather than as the published type in a union with nothing.
+Walking type arguments and type-parameter constraints closes all three with the machinery already
+there, and is the same change the sibling finding's declaration half needs. Explicitly not a
+regression: the eight regexes this replaced missed all three too, so it is a gap carried forward
+rather than one opened here — which is why it is filed separately from the closed-set finding and at a
+lower severity.
+--evidence 2026-08-18, on c7992617. The three spellings escape the new rule, measured by the escapes
+script above. The old rule was checked directly rather than assumed: pasting `UNION` out of
+7051d8b's src/ui/surface.test.ts into `node -e` and running it over the same three strings yields
+`[["PlayView"]]` each time, with no `null` or `undefined` member, so the retired text rule reported
+nothing on them either.
+
+--finding `tasks where` reports two exports that exist only inside a template literal
+--severity low
+--system Task system
+--fault tooling
+--file src/ui/published.test.ts
+--deliverable The export scan reads module text rather than the program, so an `export function`
+written inside a string is reported as a module export. Fixing it means the scan asks the compiler for
+a module's exports, which this repository now has an instrument for one directory away in
+src/ui/published.test.ts. Until then a reader of `tasks where` cannot tell a real export from a
+fixture string, and this file is the first place in the tree where the two differ.
+--evidence 2026-08-18, on c7992617. `npm run tasks -- where src/ui/published.test.ts` prints nine
+exports; `reads` and `readsOneThatMayBeMissing` are src/ui/published.test.ts:130 and :134, both inside
+the `USES` template literal that starts at :129. The file's real exports are the seven type aliases.

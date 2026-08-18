@@ -117,6 +117,9 @@ export interface MapView {
 
 export interface MapControls {
   settle(pan: Point, zoom: number): void;
+  // Tapping a place, which is one handler and one decision: setting off for it,
+  // or standing in it at once. Whichever it is, what comes out is a line.
+  go(id: string): void;
   plane(at: number): void;
   recentre(): void;
   // Whether a drag on a place moves the place or the sheet under it.
@@ -149,6 +152,11 @@ export function mapSurface(map: MapView, controls: MapControls): TestSurface {
       plane: (value) => controls.plane(planeFrom(value, map.sheet.planes)),
       recentre: () => controls.recentre(),
       moving: (value) => controls.moving(value === true),
+      go: (value) => {
+        const named = map.sheet.nodes.find((node) => node.place.id === value);
+        if (!named) throw new Error(`the map draws no place called ${String(value)}`);
+        controls.go(named.place.id);
+      },
       place: (value) => {
         const { place, ...at } = (value ?? {}) as { place?: unknown };
         const named = map.sheet.nodes.find((node) => node.place.id === place);

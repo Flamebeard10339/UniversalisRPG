@@ -3,10 +3,13 @@ import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { askedOption } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { dismissal } from './asking';
-import { addressable, NOWHERE, type Standing } from './authoringSurface';
+import { addressable, type Standing } from './authoringSurface';
 import type { Driver } from './driver';
 import { editControls } from './editControls';
 import { EditPane } from './EditPane';
+import { DevBanner } from './DevBanner';
+import { FaultBanner } from './FaultBanner';
+import { SettingsPane } from './SettingsPane';
 import { recorded, remembered, type Editing, type MapWhere } from './editorMemory';
 import { FloatingText } from './FloatingText';
 import { Home } from './Home';
@@ -58,9 +61,9 @@ const NOTE_TICK_MS = 100;
 // what the player is carrying, never what either just got, so both are the
 // difference between two views — which is also why this is held here, above
 // every page, rather than on whichever page happens to be about one of them.
-function useXpNotes(view: PlayView | null, clock: () => number): readonly Note[] {
-  const rows = view?.xp ?? [];
-  const carried = view?.carried ?? [];
+function useXpNotes(view: PlayView, clock: () => number): readonly Note[] {
+  const rows = view.xp;
+  const carried = view.carried;
   const seen = useRef({ rows, carried });
   const [queue, setQueue] = useState(emptyQueue);
 
@@ -122,9 +125,29 @@ function useEditing(driver: Driver, after: number): [Editing, (next: Editing) =>
   return [editing, setEditing];
 }
 
+// What "try again" can mean, which depends on where the shell is standing. A
+// page can re-read everything, base sources included, only by loading again —
+// they are inlined at build time, so a shipped file somebody fixed is reached
+// by that and by nothing the driver can do. Where there is no page, there is
+// nothing to reload and the driver's own re-open is the whole of it.
+export type Retry = 'reload' | 'reopen';
+
+export const retrying = (onAPage: boolean): Retry => (onAPage ? 'reload' : 'reopen');
+
+// The decision above, wired. The `window` call is the one line here no test
+// reaches: the suite mounts nothing and runs in node, so how a page behaves
+// when it reloads is the author's to look at.
+function tryAgain(driver: Driver): void {
+  if (retrying(typeof window !== 'undefined') === 'reopen') {
+    driver.reopen();
+    return;
+  }
+  window.location.reload();
+}
+
 // Where the player is, as the view publishes it: what the Local surface is
 // narrowed to is a fact read off the session rather than one worked out here.
-const standingIn = (view: PlayView | null): Standing => (view ? { location: view.location.id, entities: view.entities.map((entity) => entity.id) } : NOWHERE);
+const standingIn = (view: PlayView): Standing => ({ location: view.location.id, entities: view.entities.map((entity) => entity.id) });
 
 export function App({
   driver,
@@ -141,31 +164,35 @@ export function App({
   const [where, setWhere] = useState(opening);
   const [editing, setEditing] = useEditing(driver, remembering);
   const view = snapshot.view;
+  // Whose session this is, asked of the driver once and read from there by
+  // every surface that is dev-only. No component below holds a second copy,
+  // exactly as none holds a copy of whether the session opened (c6).
+  const dev = snapshot.dev;
   // Read every render rather than held: `/dsl` adopts a new registry, and the
   // language being played is the session's rather than the shell's (c3).
   const localizer = driver.localizer();
   const words = wordsOf(localizer);
-  const asking = view ? askedOption(view.modals) : undefined;
+  const asking = askedOption(view.modals);
   // Drawn because the engine says one is in hand, never because the shell
   // recognised the screen holding it: the focus is a published field and the
   // screen's name is not a thing this layer can read. A screen with a plane in
   // hand is drawn as that plane rather than as a list of its values, so the
   // option sheet is what every other screen gets.
-  const plane = view?.focus ? (view.planes.find((each) => each.instance === view.focus?.instance) ?? null) : null;
-  const { arrivals, generation } = useArrivals(view?.discovered ?? []);
-  const rows = view?.xp ?? [];
+  const plane = view.focus ? (view.planes.find((each) => each.instance === view.focus?.instance) ?? null) : null;
+  const { arrivals, generation } = useArrivals(view.discovered);
+  const rows = view.xp;
   const notes = useXpNotes(view, clock);
   // Where the session's own reading of how fast experience arrives is measured
   // from. The engine keeps no such field: a rate is a fact about the play.
   const opened = useRef<XpMark | null>(null);
-  if (opened.current === null && view) opened.current = markOf(view);
+  if (opened.current === null) opened.current = markOf(view);
 
   // The one answer a gesture away from the open screen makes: the value that
   // screen published as the way out of itself, or nothing where it published
   // none (c19). Both gestures this shell has go through it, so a click on the
   // sheet's ground and a move to another page say the same thing and neither
   // has a way out the other has not got.
-  const leaving = view ? dismissal(view.modals) : null;
+  const leaving = dismissal(view.modals);
   const leave = leaving ? () => driver.answer(leaving.key, leaving.value) : undefined;
 
   // Assembled once and both drawn from and handed over, the way the map's is:
@@ -217,7 +244,8 @@ export function App({
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
       if (subpage.id === 'home') return <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} />;
-      return subpage.id === 'edit' ? <EditPane held={held} onSend={driver.send} words={words} /> : null;
+      if (subpage.id === 'edit') return <EditPane held={held} dev={dev} onSend={driver.send} words={words} />;
+      return subpage.id === 'settings' ? <SettingsPane dev={dev} speed={snapshot.speed} words={words} onSend={driver.send} /> : null;
     }
     if (layer.id === 'map') {
       return (
@@ -226,7 +254,7 @@ export function App({
           arrivals={arrivals}
           generation={generation}
           words={words}
-          onChoose={driver.choose}
+          dev={dev}
           sections={sections}
           where={editing.map}
           onWhere={(map: MapWhere) => setEditing({ ...editing, map })}
@@ -235,13 +263,13 @@ export function App({
         />
       );
     }
-    if (subpage.id === 'stats') return <Ledger entries={counted(view?.stats ?? [], localizer)} />;
+    if (subpage.id === 'stats') return <Ledger entries={counted(view.stats, localizer)} />;
     if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
     // Both sides of what the player has are rows that act, because c21 puts a
     // worn copy on this page and nowhere else and the verbs it offers are
     // reachable from nowhere else either.
-    if (subpage.id === 'equipment') return <Ledger entries={worn(view?.equipment ?? [], view?.carried ?? [], view?.planes ?? [], localizer, words('empty'))} onOpen={driver.open} />;
-    return <Ledger entries={carried(view?.carried ?? [], view?.planes ?? [], localizer)} onOpen={driver.open} />;
+    if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} onOpen={driver.open} />;
+    return <Ledger entries={carried(view.carried, view.planes, localizer)} onOpen={driver.open} />;
   };
 
   const bodies = LAYERS.map((layer, at) => (
@@ -257,6 +285,13 @@ export function App({
     <TransientProvider value={driver.transient}>
       <div className="flex h-[100dvh] select-none flex-col overflow-hidden bg-background text-text">
         <main className="relative flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
+          {/* Both above the column rather than on a page: one is about a state
+              where there may be no page worth opening, and the other is true of
+              the session wherever the player happens to be standing. */}
+          <DevBanner dev={dev} words={words} />
+          {snapshot.problems.length > 0 ? (
+            <FaultBanner problems={snapshot.problems} remedies={snapshot.remedies} words={words} onRemedy={(remedy) => (remedy === 'clear-local' ? driver.clearLocalChanges() : tryAgain(driver))} />
+          ) : null}
           <VStack
             layer={shell.where.layer}
             onLayer={(layer) => go((held) => toLayer(held, layer))}

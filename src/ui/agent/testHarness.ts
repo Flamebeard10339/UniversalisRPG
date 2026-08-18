@@ -1,5 +1,6 @@
 import { askedOption } from '../../runtime/command';
 import type { PlayChoice, PlayView } from '../../runtime/session';
+import type { UniverseProblem } from '../../runtime/openUniverse';
 import type { Driver, DriverSnapshot } from '../driver';
 import type { TestAction, TestSurface } from '../testSurface';
 import type { Moment } from '../transient';
@@ -34,11 +35,12 @@ export interface TestState {
   // What the runtime published, whole and as it published it. Not a projection
   // of it: a field the runtime starts publishing is readable the moment it is
   // published, because there is no list here for anyone to forget to widen.
-  view: PlayView | null;
-  // What the driver holds around the view, which the view does not carry: the
-  // message that stopped a session opening, the run under way, and what has
-  // been said so far.
-  fault: string | null;
+  view: PlayView;
+  // What the driver holds around the view, which the view does not carry: what
+  // the door reported about the universe this session opened over, whose
+  // session this is, the run under way, and what has been said so far.
+  problems: readonly UniverseProblem[];
+  dev: boolean;
   live: { label: string; active: boolean; progress: number; time: number } | null;
   transcript: LogEntry[];
   // What the shell holds that the session does not: where the nav is standing,
@@ -136,19 +138,20 @@ function record(value: unknown, name: string): Record<string, unknown> {
 }
 
 function choicePosition(snapshot: DriverSnapshot, id: string): number {
-  const at = snapshot.view?.choices.findIndex((choice) => choice.id === id) ?? -1;
+  const at = snapshot.view.choices.findIndex((choice) => choice.id === id);
   if (at < 0) throw new Error(`choice is not visible: ${id}`);
   return at + 1;
 }
 
 export function testState(snapshot: DriverSnapshot, surfaces: Record<string, unknown> = {}): TestState {
   const view = snapshot.view;
-  const option = view ? askedOption(view.modals) : undefined;
-  const modal = view && option ? view.modals[view.modals.length - 1] : undefined;
+  const option = askedOption(view.modals);
+  const modal = option ? view.modals[view.modals.length - 1] : undefined;
 
   return {
     view,
-    fault: snapshot.fault,
+    problems: snapshot.problems,
+    dev: snapshot.dev,
     live: snapshot.live
       ? {
           label: snapshot.live.label,
@@ -159,7 +162,7 @@ export function testState(snapshot: DriverSnapshot, surfaces: Record<string, unk
       : null,
     transcript: snapshot.transcript.entries.slice(-20),
     surfaces,
-    choices: (view?.choices ?? []).map((choice, at) => ({ ...choice, position: at + 1 })),
+    choices: view.choices.map((choice, at) => ({ ...choice, position: at + 1 })),
     modal:
       modal && option
         ? {
@@ -194,6 +197,11 @@ export function installTestHarness(driver: Driver, host: TestHost = globalThis a
     driver.answer(text(given.key, 'key'), text(given.value, 'value'));
   });
   actions.set('cancel', () => driver.cancel());
+  // The two ways out of a session that would not open. Named here rather than
+  // on a surface because they belong to the driver: a shell with no session
+  // has no component mounted that could offer them.
+  actions.set('reopen', () => driver.reopen());
+  actions.set('clear-local', () => driver.clearLocalChanges());
 
   const harness: BrowserTestHarness = {
     actions: () => [...actions.keys(), ...surfaces.actions()].sort(),

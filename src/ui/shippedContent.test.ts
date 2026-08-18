@@ -22,7 +22,7 @@ describe('the content the build carries', () => {
   it('opens a session out of what it bundled', () => {
     const driver = createDriver(SHIPPED_SOURCES);
 
-    expect(driver.snapshot().fault).toBeNull();
-    expect(driver.snapshot().view?.location.id).toBe('tutorial-island.guide-house');
+    expect(driver.snapshot().problems).toEqual([]);
+    expect(driver.snapshot().view.location.id).toBe('tutorial-island.guide-house');
   });
 });

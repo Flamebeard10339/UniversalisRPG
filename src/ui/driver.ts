@@ -1,22 +1,62 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
-import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
+import { shadowed } from './authoringSurface';
+import { devRefusal } from './devMode';
 import { type AuthoringContext, createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
-import { BASE_LANGUAGE, localizerFor, type Localizer } from '../runtime/localized';
+import { type Localizer } from '../runtime/localized';
+import { openUniverse, openWithLocalCleared, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
 import { createSaveContext, type SaveContext } from '../runtime/saveSlots';
-import { sessionLocalizer, serializeSession, startSession, view, type PlayView } from '../runtime/session';
+import { sessionLocalizer, serializeSession, view, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
 import { EDITOR_SLOT } from './editorMemory';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 import { createTransientChannel, type TransientChannel } from './transient';
 
+// What can be done about the problems a universe opened with.
+export const REMEDIES = ['clear-local', 'reopen'] as const;
+
+export type Remedy = (typeof REMEDIES)[number];
+
+// The door's answer as a reader of it, which is what makes "the same report" a
+// comparison rather than a judgement.
+const asRead = (problems: readonly UniverseProblem[]): string => problems.map((problem) => `${problem.modules.join(' ')}: ${problem.message}`).join('\n');
+
+// A control stands when taking it changes the answer, and never because some
+// module was judged at fault: which module a merged universe's trouble belongs
+// to is not computable, and both attempts at it — the `try` block an exception
+// arrived in, then the list of every module that loaded — told an author to
+// discard work nothing was wrong with. `reopen` needs nothing of the author and
+// re-runs the load over the store as it stands now, which is a thing this report
+// cannot know the outcome of, so it stands wherever there is trouble and is what
+// leaves every state with something to do. `clear-local` is asked of the door
+// instead of inferred: the door is total, so what it would report over the text
+// clearing leaves behind is a question, and the answer is used as it comes.
+function remediesFor(problems: readonly UniverseProblem[], ifCleared: () => readonly UniverseProblem[] | null): readonly Remedy[] {
+  if (problems.length === 0) return [];
+  const cleared = ifCleared();
+  return cleared !== null && asRead(cleared) !== asRead(problems) ? ['clear-local', 'reopen'] : ['reopen'];
+}
+
 export interface DriverSnapshot {
-  view: PlayView | null;
+  view: PlayView;
   transcript: Transcript;
   // The run under way, as the run last reported itself; null when none is.
   live: LiveProgress | null;
-  // The message that stopped the session from opening at all, if one did.
-  fault: string | null;
+  // What the door reported about the universe this session opened over, each
+  // problem naming the modules it is against. Empty is a universe that opened
+  // with nothing to say; a local module set aside leaves a problem and a
+  // playable session at once, so this is not a question about the view.
+  problems: readonly UniverseProblem[];
+  // What the shell can offer to do about them, decided where the door is
+  // reachable rather than in the component that draws them: whether clearing
+  // changes anything is a question for the door, and a component that opened a
+  // universe to ask it would be the thing c6 deleted.
+  remedies: readonly Remedy[];
+  // Whose session this is, and how fast its live clock runs, as the session
+  // answers both. Readings rather than copies: nothing in this layer writes
+  // either, and both move only where a command moved them (c6, c10).
+  dev: boolean;
+  speed: number;
 }
 
 export interface Driver {
@@ -36,10 +76,10 @@ export interface Driver {
   // because `/dsl` adopts a new registry and the language being played is the
   // session's rather than the shell's.
   localizer(): Localizer;
-  // What a save of this session would write, and null when there is no session
-  // to save. The bytes are the whole of what the two drivers are compared on,
-  // because a view is what a driver was told and this is what it is standing in.
-  serialized(): string | null;
+  // What a save of this session would write. The bytes are the whole of what
+  // the two drivers are compared on, because a view is what a driver was told
+  // and this is what it is standing in.
+  serialized(): string;
   // The module an author is editing, as the store holds it, and null when the
   // store cannot say. There is no second spelling of it in this layer: these
   // are the bytes `/local show` prints and the bytes the slot holds (c16).
@@ -57,6 +97,16 @@ export interface Driver {
   // no view of a gesture, so a drag it never heard about — one the map refused
   // before a line existed — is said here or nowhere (c8, c13).
   note(text: string): void;
+  // Run the load again, over the same base sources and the local module as the
+  // store holds it *now* — so a module another tab repaired is one this picks
+  // up. It does not re-read the base: those are the bundle's, inlined at build
+  // time, and the only thing that re-reads them is loading the page again,
+  // which is what the control over this says (c4).
+  reopen(): void;
+  // Discard the local module and open again on what a first-ever launch finds.
+  // A fresh module is written rather than the broken one edited, so this cannot
+  // fail on text nothing can parse (c2).
+  clearLocalChanges(): void;
 }
 
 export interface DriverOptions {
@@ -74,10 +124,8 @@ interface Opening {
   output: CommandOutput[];
 }
 
-type Loaded = ReturnType<typeof loadUniverseWithDiagnostics>;
-
-function open(loaded: Loaded, authoring: AuthoringContext, save: SaveContext, before: readonly CommandOutput[]): Opening {
-  const session = startSession(loaded.registry);
+function open(opened: OpenedUniverse, authoring: AuthoringContext, save: SaveContext, before: readonly CommandOutput[]): Opening {
+  const { session } = opened;
   const first = view(session);
   return {
     // `driving`, because a screen can hold a run open and offer a way to stop
@@ -86,7 +134,7 @@ function open(loaded: Loaded, authoring: AuthoringContext, save: SaveContext, be
     context: newContext(session, first, { driving: true, authoring, save, recorder: { history: [], startSave: serializeSession(session) } }),
     output: [
       ...before,
-      ...loaded.diagnostics.map((diagnostic): CommandOutput => ({ kind: 'message', words: 'tool', tone: 'warn', text: formatModuleDiagnostic(diagnostic) })),
+      ...opened.problems.map((problem): CommandOutput => ({ kind: 'message', words: 'tool', tone: 'warn', text: problem.message })),
       { kind: 'view', view: first, reread: false },
     ],
   };
@@ -100,8 +148,8 @@ const because = (error: unknown): string => (error instanceof Error ? error.mess
 // this file decides nothing.
 export function createDriver(sources: readonly ModuleSource[], options: DriverOptions = {}): Driver {
   const listeners = new Set<() => void>();
-  let current: DriverSnapshot;
-  let context: CommandContext | null = null;
+  let current!: DriverSnapshot;
+  let context!: CommandContext;
 
   const save = createSaveContext(options.slots ?? memoryDriver(), options.now ?? (() => Date.now()));
   // Read at the moment of asking rather than remembered, which is what the
@@ -109,44 +157,74 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   // this session opened is the one being read.
   const stored = (): string => save.store.read(LOCAL_CHANGES_MODULE_ID)?.payload ?? '';
 
-  // What the slot held when the page opened, and a message instead when it
-  // could not be read at all. A store that refuses is never a reason for the
-  // session not to open: it opens on the shipped modules and says so (c13).
-  let held = '';
-  const complaints: CommandOutput[] = [];
-  try {
-    held = stored();
-  } catch (error) {
-    complaints.push({ kind: 'message', words: 'tool', tone: 'warn', text: `local changes could not be read: ${because(error)}` });
-  }
+  const shipped = [...sources];
 
-  const base = loadUniverseWithDiagnostics(sources);
-  const authoring: AuthoringContext = {
-    baseSources: [...sources],
-    dependencies: base.loadedModules,
-    // Empty until something is staged: the module's own header is written by
-    // the same edit that writes its first section, so nothing here mints one.
-    localSource: { name: LOCAL_CHANGES_MODULE_ID, text: held },
-    writeLocalChanges: (text) => void save.store.write(LOCAL_CHANGES_MODULE_ID, text),
-    readLocalChanges: stored,
+  const warn = (text: string, detail?: string[]): CommandOutput => (detail ? { kind: 'message', words: 'tool', tone: 'warn', text, detail } : { kind: 'message', words: 'tool', tone: 'warn', text });
+
+  // Every snapshot is made here, so what the session answers about itself is
+  // read at the one place a snapshot exists rather than copied in beside each
+  // of the six that make one.
+  const settled = (next: Omit<DriverSnapshot, 'dev' | 'speed'>): DriverSnapshot => ({ ...next, dev: save.dev, speed: context.live.speed });
+
+  // What the slot holds, and a complaint instead when it cannot be read at all.
+  // A store that refuses is never a reason for the session not to open: it
+  // opens on the shipped modules and says so (c13).
+  const readLocal = (): { text: string; complaints: CommandOutput[] } => {
+    try {
+      return { text: stored(), complaints: [] };
+    } catch (error) {
+      return { text: '', complaints: [warn(`local changes could not be read: ${because(error)}`)] };
+    }
   };
 
-  try {
-    const loaded = held.trim() === '' ? base : loadUniverseWithDiagnostics([...sources, authoring.localSource]);
-    const opening = open(loaded, authoring, save, complaints);
-    context = opening.context;
-    current = { view: opening.context.view, transcript: appendOutputs(emptyTranscript(), opening.output), live: null, fault: null };
-  } catch (error) {
-    const fault = because(error);
-    current = { view: null, transcript: appendOutputs(emptyTranscript(), [...complaints, { kind: 'message', words: 'tool', tone: 'error', text: fault }]), live: null, fault };
-  }
+  // Which addresses the local module speaks about that a shipped module already
+  // declares, as lines. Said whether or not the merged text differs, because a
+  // local copy that matches its base is exactly the copy that makes the next
+  // edit to the shipped file invisible (c3).
+  const shadowing = (local: string): CommandOutput[] => {
+    const found = shadowed([...shipped, { name: LOCAL_CHANGES_MODULE_ID, text: local }]);
+    if (found.length === 0) return [];
+    return [warn(`${LOCAL_CHANGES_MODULE_ID} shadows ${found.length} shipped section(s), so editing the file will not change what is played`, found.map((each) => `# ${each.kind} ${each.address} — also in ${each.modules.join(', ')}`))];
+  };
 
-  // A shell with no session still draws its own tabs, so it still needs
-  // somewhere to ask for their words. A registry with no content answers every
-  // key with the key, which is what the localizer already does for a language
-  // nothing translated — unmistakable on a screen that has just failed to open
-  // a world, and one door rather than two.
-  const wordless = (): Localizer => localizerFor(loadUniverseWithDiagnostics([]).registry, BASE_LANGUAGE);
+  // One load and one answer. The door is handed the sources — the shipped
+  // modules, and the local module over them where the store holds one — and
+  // hands back a session, the modules that loaded and what is wrong with them.
+  // Nothing here decides which module is at fault and nothing here catches:
+  // both were this file's guesses about facts the loader states.
+  const openOnce = (before: Transcript): void => {
+    const local = readLocal();
+    const localSource: ModuleSource = { name: LOCAL_CHANGES_MODULE_ID, text: local.text };
+    const sources = local.text.trim() === '' ? shipped : [...shipped, localSource];
+    const opened = openUniverse(sources, { save });
+
+    const authoring: AuthoringContext = {
+      baseSources: shipped,
+      // What a staged edit stands on, as the door reported it. The module being
+      // authored is not one of them.
+      dependencies: opened.modules.filter((id) => id !== LOCAL_CHANGES_MODULE_ID),
+      // Empty until something is staged: the module's own header is written by
+      // the same edit that writes its first section, so nothing here mints one.
+      localSource,
+      writeLocalChanges: (text) => void save.store.write(LOCAL_CHANGES_MODULE_ID, text),
+      readLocalChanges: stored,
+    };
+
+    // Asked of the report rather than of the text: a module the door did not
+    // load has no addresses in the universe to be shadowing anything in.
+    const said = [...local.complaints, ...(opened.modules.includes(LOCAL_CHANGES_MODULE_ID) ? shadowing(local.text) : [])];
+    const opening = open(opened, authoring, save, said);
+    context = opening.context;
+    current = settled({
+      view: opening.context.view,
+      transcript: appendOutputs(before, opening.output),
+      live: null,
+      problems: opened.problems,
+      remedies: remediesFor(opened.problems, () => openWithLocalCleared(sources, authoring.dependencies)?.problems ?? null),
+    });
+  };
+
+  openOnce(emptyTranscript());
 
   const ticker = options.ticker ?? createTicker();
   let running: LiveRun | null = null;
@@ -161,22 +239,20 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   // counts a line it is told again rather than writing it out, so a page that
   // asks every keystroke says it once (c13).
   const complain = (text: string): void => {
-    current = { ...current, transcript: appendOutputs(current.transcript, [{ kind: 'message', words: 'tool', tone: 'warn', text }]) };
+    current = settled({ ...current, transcript: appendOutputs(current.transcript, [{ kind: 'message', words: 'tool', tone: 'warn', text }]) });
     publish();
   };
 
   const close = (cancelled: boolean): void => {
     const run = running;
-    if (!run || !context) return;
+    if (!run) return;
     running = null;
     stopTicking?.();
     stopTicking = null;
     const result = run.end(cancelled);
-    current = { ...current, view: context.view, live: null, transcript: appendOutputs(current.transcript, result.output) };
+    current = settled({ ...current, view: context.view, live: null, transcript: appendOutputs(current.transcript, result.output) });
     publish();
   };
-
-  const logging = (current: PlayView | undefined): CommandOutput[] => (current ? [{ kind: 'view', view: current, reread: false }] : []);
 
   // The run decides whether it is over; this only passes it the time that went
   // by and hands React what came back. A tick is also where the world speaks:
@@ -187,12 +263,12 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     const run = running;
     if (!run) return;
     const progress = run.tick(elapsedMs);
-    current = {
+    current = settled({
       ...current,
       view: progress.view,
       live: progress.active ? progress : null,
-      transcript: appendOutputs(current.transcript, logging(progress.view)),
-    };
+      transcript: appendOutputs(current.transcript, [{ kind: 'view', view: progress.view, reread: false }]),
+    });
     if (!progress.active) {
       close(false);
       return;
@@ -206,21 +282,39 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   // and stopping first is what keeps the next line from resolving against a
   // world the next tick was about to move.
   const send = (line: string): void => {
-    if (!context) return;
+    // The one gate over every route in: a line typed at the console, a line a
+    // control spells and a line an agent hands the harness all pass here, so a
+    // dev power has one refusal and the shell has no second answer about whose
+    // session this is (c6, c11).
+    const refusal = devRefusal(line, save.dev);
+    if (refusal !== null) {
+      complain(refusal);
+      return;
+    }
     if (running) close(true);
     const result = runLine(context, line);
-    current = { ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) };
+    current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
     if (result.live) {
       running = result.live;
       // Arming reports no output of its own; whatever the world said as the
       // action began rides on the view it handed back.
-      current = { ...current, transcript: appendOutputs(current.transcript, logging(result.view)) };
+      current = settled({ ...current, transcript: appendOutputs(current.transcript, [{ kind: 'view', view: context.view, reread: false }]) });
       stopTicking = ticker(advance);
       // Zero elapsed, so the first frame is the run's own report of itself
       // rather than a shape this layer guessed while waiting for a tick.
       advance(0);
       return;
     }
+    publish();
+  };
+
+  // Open again and keep what was said. A run under way belongs to the session
+  // being replaced, so it is dropped rather than ticked into the next one.
+  const reopen = (): void => {
+    running = null;
+    stopTicking?.();
+    stopTicking = null;
+    openOnce(current.transcript);
     publish();
   };
 
@@ -235,9 +329,9 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     choose: (position) => send(String(position)),
     answer: (key, value) => send(`submit-modal: ${key}=${value}`),
     open: (item) => send(`/inv ${item}`),
-    localizer: () => (context ? sessionLocalizer(context.session) : wordless()),
+    localizer: () => sessionLocalizer(context.session),
     cancel: () => close(true),
-    serialized: () => (context ? serializeSession(context.session) : null),
+    serialized: () => serializeSession(context.session),
     localChanges: () => {
       try {
         return stored();
@@ -247,8 +341,20 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
         return null;
       }
     },
-    baseSources: () => authoring.baseSources,
+    baseSources: () => shipped,
     note: complain,
+    reopen,
+    clearLocalChanges: () => {
+      // The command that mints a fresh module rather than editing the broken
+      // one, which is what makes it the one command that can proceed from text
+      // nothing can parse (c2). Sent rather than performed, because writing the
+      // module is the table's and this layer has no second spelling of it.
+      send(`/local clear`);
+      // And open again over what the store holds now, so what is left is the
+      // session a first-ever launch produces rather than the one that was
+      // already standing when the module was set aside.
+      reopen();
+    },
     editorMemory: {
       read: () => {
         try {

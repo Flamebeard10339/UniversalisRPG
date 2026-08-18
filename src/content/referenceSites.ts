@@ -228,6 +228,9 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'travel':
       put(value, 'location', 'location', `${where} travel:`, visit);
       return;
+    case 'goto':
+      put(value, 'location', 'location', `${where} goto:`, visit);
+      return;
     case 'craft':
       put(value, 'recipe', 'recipe', `${where} craft:`, visit);
       return;

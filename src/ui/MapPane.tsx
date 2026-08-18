@@ -3,10 +3,12 @@ import type { PlayView } from '../runtime/session';
 import type { Section } from './authoringSurface';
 import { DragSheet, useSheetHold, type Grip } from './DragSheet';
 import { drawnFor, onWalk, spotOf, walkLine, type Node } from './discovery';
+import { DevOnly } from './DevOnly';
 import type { MapWhere } from './editorMemory';
 import { answering, droppedAt, placedInto } from './mapEdit';
 import { useTestSurface } from './testSurface';
 import { useMoment } from './transient';
+import { tappedPlace } from './devMode';
 import { bounds, panOnto, tapTarget, type Point } from './viewport';
 import type { Words } from './words';
 
@@ -29,10 +31,9 @@ function Bubble({
   node,
   arrived,
   walking,
-  position,
   scale,
   held,
-  onChoose,
+  go,
   dragged,
   carried,
   grip,
@@ -40,10 +41,10 @@ function Bubble({
   node: Node;
   arrived: boolean;
   walking: 'going' | 'crossing' | undefined;
-  position: number | undefined;
   scale: number;
   held: (element: HTMLButtonElement | null) => void;
-  onChoose: (position: number) => void;
+  // What tapping this place does, and nothing when tapping it does nothing.
+  go: (() => void) | null;
   dragged: () => boolean;
   // Where the finger has carried it since it was picked up, in sheet pixels.
   carried: Point;
@@ -66,7 +67,7 @@ function Bubble({
       node.here ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-panel'
     } ${walking === 'going' ? 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong' : ''} ${
       walking === 'crossing' ? 'border-accent text-accent' : ''
-    } ${node.climb !== 0 ? 'opacity-70' : ''} ${position === undefined && !grip ? 'text-text-subtle' : ''}`,
+    } ${node.climb !== 0 ? 'opacity-70' : ''} ${go === null && !grip ? 'text-text-subtle' : ''}`,
   };
 
   const inside = (
@@ -88,12 +89,12 @@ function Bubble({
 
   return (
     <button
-      data-drive="choose"
+      data-drive="map.go"
       type="button"
-      disabled={position === undefined}
+      disabled={go === null}
       onClick={() => {
-        if (dragged() || position === undefined) return;
-        onChoose(position);
+        if (dragged() || go === null) return;
+        go();
       }}
       {...look}
     >
@@ -125,18 +126,19 @@ export function MapPane({
   arrivals,
   generation,
   words,
-  onChoose,
+  dev,
   sections,
   where,
   onWhere,
   onSend,
   onNote,
 }: {
-  view: PlayView | null;
+  view: PlayView;
   arrivals: readonly string[];
   generation: number;
   words: Words;
-  onChoose: (position: number) => void;
+  // Whose session this is, which is the whole of what the tap below decides on.
+  dev: boolean;
   // The map's slice of the one list, which is what a drag stages an edit out of.
   sections: readonly Section[];
   where: MapWhere;
@@ -156,7 +158,7 @@ export function MapPane({
 
   // The walk under way, as the engine published it, with the place the player
   // is standing in at the head so a road on it is a pair of neighbours.
-  const walk = walkLine(here, view?.journey ?? null);
+  const walk = walkLine(here, view.journey);
   const going = walk[walk.length - 1];
 
   // Back to where the player is standing, on the floor they are standing on, at
@@ -164,11 +166,21 @@ export function MapPane({
   // one: a player who has wandered off across three z-layers has no other way
   // back to themselves.
   const recentre = (): void => {
-    const floor = view?.discovered.find((place) => place.id === here)?.z ?? null;
+    const floor = view.discovered.find((place) => place.id === here)?.z ?? null;
     const drawn = drawnFor(view, floor);
     const standing = drawn.sheet.nodes.find((each) => each.place.id === here);
     setPlane(floor);
     hold.settle(standing ? panOnto(spotOf(standing), bounds(drawn.sheet.nodes.map(spotOf)), 1) : { x: 0, y: 0 }, 1);
+  };
+
+  // The one handler a tap on a place goes through, whichever of the two things
+  // it turns out to do. Both spell a line, so there is one route into the
+  // session from this page and the decision is made once (c9).
+  const lineFor = (id: string): string | null => tappedPlace(dev, id, travels.get(id) ?? null);
+
+  const go = (id: string): void => {
+    const line = lineFor(id);
+    if (line !== null) onSend(line);
   };
 
   const answer = { send: onSend, note: onNote };
@@ -193,7 +205,7 @@ export function MapPane({
     onWhere({ pan: hold.pan, zoom: hold.zoom, plane });
   }, [hold.pan.x, hold.pan.y, hold.zoom, plane]);
 
-  useTestSurface('map', { map, controls: { settle: hold.settle, plane: setPlane, recentre, moving: setMoving, place } });
+  useTestSurface('map', { map, controls: { settle: hold.settle, plane: setPlane, recentre, moving: setMoving, place, go } });
 
   return (
     <DragSheet
@@ -217,6 +229,7 @@ export function MapPane({
           </button>
           {/* Moving places is a mode, because a drag on a place and a drag on
               the sheet are the same gesture and only one of them can be it. */}
+          <DevOnly dev={dev}>
           <button
             data-drive="map.moving"
             type="button"
@@ -228,6 +241,7 @@ export function MapPane({
           >
             {words('place')}
           </button>
+          </DevOnly>
           {map.sheet.planes.length > 1 ? (
             // The floors, named by the number the author gave them. A word for
             // up or down would be this layer writing prose; the number is the
@@ -264,10 +278,9 @@ export function MapPane({
           arrived={arrivals.includes(node.place.id)}
           // Where the walk ends, somewhere it still has to cross, or neither.
           walking={node.place.id === going ? 'going' : walk.includes(node.place.id) && !node.here ? 'crossing' : undefined}
-          position={map.travels.get(node.place.id)}
+          go={lineFor(node.place.id) === null ? null : () => go(node.place.id)}
           scale={map.zoom}
           held={(element) => void (bubbles.current[at] = element)}
-          onChoose={onChoose}
           dragged={hold.dragged}
           carried={hold.carried?.id === node.place.id ? hold.carried.by : NOT_CARRIED}
           grip={moving ? hold.grip(node.place.id) : null}

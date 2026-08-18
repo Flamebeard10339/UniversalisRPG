@@ -8,7 +8,7 @@ import { grow } from './growth';
 import { planeReports, type PlaneFocus, type PlaneReport } from './planeReport';
 import { actionAddress } from '../content/action';
 import { parseOwnerRef, TRAVEL_PAIR } from './actions';
-import { spreadDiscovery } from './effects';
+import { relocateTo, spreadDiscovery } from './effects';
 import { reachable, type Journey } from './journey';
 import { armedAction, hasPool, playerCadence } from './encounter';
 import { PLAYER } from './state';
@@ -708,6 +708,16 @@ function performDirective(session: PlaySession, directive: Directive): { failure
     case 'travel': {
       const refused = walkTo(directive.location, registry, state);
       return refused ? { failure: refused } : {};
+    }
+    // Arriving with the walk taken out. The route is not consulted, which is
+    // the whole difference from `travel:` — and the walk that was under way is
+    // ended rather than resumed, because a queue of legs off a road the player
+    // is no longer standing on describes a world that is gone.
+    case 'goto': {
+      if (!registry.locations.has(directive.location)) throw new RuntimeError(`unknown location: ${directive.location}`);
+      endJourney(state);
+      relocateTo(state, registry, directive.location);
+      return {};
     }
     case 'craft':
       craft(directive.recipe, registry, state);

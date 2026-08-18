@@ -89,6 +89,36 @@ export function addressable(sources: readonly ModuleSource[]): Section[] {
   return [...held.values()];
 }
 
+export interface Shadowed {
+  kind: string;
+  address: string;
+  // Which shipped modules also declare it, so what is reported is the file to
+  // go to and not merely that there is one.
+  modules: string[];
+}
+
+// What the line above throws away in the act of collapsing two rows into one:
+// which addresses the staged module speaks about that a shipped module already
+// declares. Nothing is compared — a staged copy that matches its base byte for
+// byte is exactly the copy that makes the next edit to the shipped file
+// invisible, so the redeclaration is the report and the difference is not (c3).
+// Universal over kinds by construction: it walks what the modules declare, and
+// a kind added to the load path arrives here the day a module writes one.
+export function shadowed(sources: readonly ModuleSource[]): Shadowed[] {
+  const shipped = new Map<string, string[]>();
+  const staged: Section[] = [];
+  for (const source of sources) {
+    for (const section of sectionsIn(source)) {
+      if (section.staged) staged.push(section);
+      else shipped.set(keyOf(section), [...(shipped.get(keyOf(section)) ?? []), section.module]);
+    }
+  }
+  return staged.flatMap((section) => {
+    const modules = shipped.get(keyOf(section));
+    return modules ? [{ kind: section.kind, address: section.address, modules }] : [];
+  });
+}
+
 // Where the player is, as the view publishes it. The ids are the engine's own,
 // which is what makes "what this location owns" a fact read off the session
 // rather than one this layer works out from the content.
