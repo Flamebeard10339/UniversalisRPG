@@ -50,19 +50,20 @@ prints to the same bytes at the end of this branch as at its start, and c7 is th
 
 Proof:
 
-- [c1] **Every consumer of a discriminated union in the shipped tree is total.** For each union the
-  grammar declares with a `kind` discriminator, every function that switches on it either returns a
-  type with no `undefined` member, or ends in a `default` branch that assigns the scrutinee to `never`.
-  No consumer carries a `default` that absorbs an unmatched member into a fallback. The proof derives
-  its subjects twice over — the union set from the grammar's exported types, the consumer set from
-  `shippedModules()` (`scripts/lib/layers.ts:83`), the same enumeration `layer-check` sweeps — so a
-  union declared next month and a consumer written next month are both covered without an edit here.
-  proof: vitest src/grammar/exhaustive.test.ts
-- [c2] **A member added to a union does not build until every consumer answers it.** The proof adds a
-  member to each union in turn against a type-level fixture and asserts the compile fails, so the
-  guarantee is the compiler's rather than a test's reading of source text. c1 says the shape is in
-  place; this says the shape bites.
-  proof: command npx tsc --noEmit -p tsconfig.exhaustive.json
+- [c1] **Every switch over a discriminated union in the shipped tree ends in a `never` assignment.**
+  For each union any shipped module switches on, the switch handles every member and its `default`
+  assigns the scrutinee to `never`. The proof derives its subjects three ways over — the file set from
+  `shippedModules()` (`scripts/lib/layers.ts:83`), the same enumeration `layer-check` sweeps; the union
+  set by asking the type checker which switched-on types are discriminated, so a union declared next
+  month is a subject with no edit here; and each union's members from the checker rather than from a
+  list. Measured at commissioning: 20 such switches, 0 guarded, 4 already missing a member.
+  proof: vitest scripts/exhaustive.test.ts
+- [c2] **The guard bites.** A synthesised union with one member left unhandled is compiled through the
+  type checker and the compile is asserted to fail, naming `never`; the same fixture with every member
+  handled is asserted to compile clean. c1 says the shape is present at every consumer and reads
+  source text to say it; this says the shape rejects what it must reject, and is the reason c1 cannot
+  pass by finding a `never` that does nothing.
+  proof: vitest scripts/exhaustive.test.ts
 - [c3] **A section prints under the spellings its schema declares.** `serializeRegistryModule` and
   every printer below it read field names and `keyword:` spellings from `SCHEMAS`
   (`src/content/module.ts:32`) rather than restating them, and no authored spelling of a
@@ -89,7 +90,7 @@ Proof:
   only constructor is its minter, so a second site that builds one by template literal fails to
   compile. This is c5's rule read from the writing end, and it is what stops the sixth assembly of
   `${ownerRef}.${actionSlug}` being written after this branch closes.
-  proof: command npx tsc --noEmit -p tsconfig.exhaustive.json
+  proof: command npx tsc --noEmit
 - [c7] **Nothing that loads today loads differently, and nothing that prints today prints
   differently.** Every module under `content/` parses to a registry deep-equal to the one it parsed to
   at this branch's base, and prints to byte-identical text. The proof reads the base bytes from a
@@ -166,6 +167,24 @@ records: walking `src` alone once let a whole engine sentence survive in `script
 **`result` (`src/content/serialize.ts:80`) is the model and is not changed.** It is already total, and
 its totality is why it is the one consumer of `ActionResult` that has never silently dropped a member.
 c1 makes the other four look like it rather than inventing a new discipline.
+
+**The guard is required at every consumer, not only where a return type does not already give it.**
+A function returning `string` is protected by `strict` alone: a switch that falls through fails to
+compile because the return type does not admit `undefined`. Reading the rule that way would make it
+two rules — carry a `never` default, *or* be inside a function whose return type happens to exclude
+`undefined` — and the second half moves a switch in and out of protection whenever a signature
+changes, with nobody reading the switch. `applyOne` (`src/runtime/effects.ts:232`) is the case that
+settled it: nineteen arms, no `default`, returning `number | undefined`, complete today and complete
+only until a twenty-first member is added, at which point it silently returns `undefined` for it. One
+rule, no exceptions to remember, three lines per site. The survey at commissioning found 20 switches
+and 0 guards, so the uniform rule costs 20 edits rather than the 4 the narrower reading would have
+asked for — and the 16 it adds are exactly the ones that are correct by luck.
+
+**c1's proof lives in `scripts/`, not beside the grammar.** `sweptFiles` (`scripts/lib/layers.ts:74`)
+includes test files, so a test under `src/grammar` importing `shippedModules` would be an upward
+import and `layer-check` would refuse it. `scripts/printedWords.test.ts:18` is the precedent: a rule
+about the whole tree lives above the whole tree, and its header records that walking `src` alone let
+an engine sentence survive in `scripts`.
 
 **c1 is generalising a mechanism this repository has already measured working.** The survey turned up
 `decision 2026-08-09T00:52:04Z (first-class-modals)`: widening the `Directive` union made

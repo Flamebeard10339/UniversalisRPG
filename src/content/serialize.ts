@@ -64,6 +64,10 @@ function condition(value: Condition): string {
     case 'and':
     case 'or':
       return value.conditions.map(condition).join(` ${value.kind} `);
+    default: {
+      const unreached: never = value;
+      return unreached;
+    }
   }
 }
 
@@ -128,6 +132,10 @@ function result(value: ActionResult): string {
     case 'credit':
     case 'one-of':
       throw new Error(`a ${value.kind} result spans lines and cannot be inlined`);
+    default: {
+      const unreached: never = value;
+      return unreached;
+    }
   }
 }
 
@@ -334,6 +342,10 @@ export function printDirective(value: Directive): string {
       return `open-modal: ${value.modal}`;
     case 'submit-modal':
       return `submit-modal: ${value.key}=${value.value}`;
+    default: {
+      const unreached: never = value;
+      return unreached;
+    }
   }
 }
 

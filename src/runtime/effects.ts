@@ -327,6 +327,10 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     case 'roll':
       applyResults(segment, requireDropTable(registry, result.table).results, actor, count);
       return undefined;
+    default: {
+      const unreached: never = result;
+      return unreached;
+    }
   }
 }
 

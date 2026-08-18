@@ -553,6 +553,10 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
         if (!next.deleted) return noted('error', `no local # ${op.kind} ${op.id} is staged.`);
         return commitLocalChanges(ctx, authoring, next.text, `Deleted local # ${op.kind} ${op.id}.`);
       }
+      default: {
+        const unreached: never = op;
+        return unreached;
+      }
     }
   } catch (error) {
     if (error instanceof DslError) return noted('error', error.message);

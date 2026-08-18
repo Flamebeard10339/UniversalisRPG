@@ -23,6 +23,10 @@ export function boundarySourceName(source: BoundarySource): string {
       return `action ${source.ownerRef}.${source.actionSlug}`;
     case 'resource':
       return `resource ${source.resourceId}`;
+    default: {
+      const unreached: never = source;
+      return unreached;
+    }
   }
 }
 

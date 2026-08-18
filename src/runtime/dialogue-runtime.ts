@@ -67,6 +67,10 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, st
         return enterNode(dialogue, findNode(dialogue, step.target), registry, state);
       case 'menu':
         return { dialogue: dialogue.id, node: node.name, resumeIndex: i + 1, replay };
+      default: {
+        const unreached: never = step;
+        void unreached;
+      }
     }
   }
   return null;

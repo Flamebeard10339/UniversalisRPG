@@ -183,6 +183,10 @@ export function describeResolution(resolution: Exclude<TargetResolution, { state
       return `${resolution.file} declares no tests — name a file that has at least one \`it(...)\`, or drop it from the target`;
     case 'unparseable':
       return 'does not match a form this brief can resolve — write `vitest <file> "<test name>"` to name one test, or `vitest <file> [<file> ...]` (optionally wrapped in one pair of backticks) to name every test in one or more files';
+    default: {
+      const unreached: never = resolution;
+      return unreached;
+    }
   }
 }
 
