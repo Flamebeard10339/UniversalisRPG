@@ -28,19 +28,36 @@ Proof:
   publishes a view rather than a maybe-view, and `standingIn` answers where the player is rather than
   whether there is one.
   proof: command npx tsc --noEmit
-- [c2] **Nothing under `src/ui` asks whether there is a view.** The count of the spellings that test
-  for one is zero — derived by the same scanner `surface.test.ts` already reads the tree with, so a
-  site written next month is caught rather than a list going stale. The branches are deleted rather
-  than left unreachable behind a `!`, which is what makes this a clause and not a restatement of c1:
-  a non-null assertion satisfies the compiler and leaves the reader exactly the question this spec
-  removes.
-  proof: vitest src/ui/surface.test.ts
+- [c2] **Nothing under `src/ui` asks whether there is a view, and nothing this layer publishes may
+  quietly admit one.** The guarantee is derived over the published interfaces' own keys and put to the
+  type checker: `| null`, `| undefined` and `?:` are one question over every member, including the
+  members written next month and the ones that yield an absence through a call, and a name exempted
+  from it fails as loudly when it stops admitting absence as a field does when it starts. The other
+  half, which no type can state about itself, is put to the same compiler over the two directories a
+  driver is driven from: every spelling of the question is a source fixture compiled by the program
+  that reads the tree, so what holds the tree is what the fixtures prove rather than a second list
+  checked against the first. The branches are deleted rather than left unreachable behind a `!`, which
+  is what makes this a clause and not a restatement of c1: a non-null assertion satisfies the compiler
+  and leaves the reader exactly the question this spec removes.
+  proof: vitest src/ui/published.test.ts
 - [c3] **Every screen draws exactly what it drew before.** The full render sweep passes unchanged. This
   is the clause that carries the whole risk of the sweep, because 29 mechanical deletions across ten
   files is a shape that fails silently or not at all.
   proof: vitest src/ui/render.test.tsx
 - [c4] `npm run tasks -- merge-ready` passes before the spec is marked done.
   proof: command npm run tasks -- merge-ready
+
+**c2 was amended on 2026-08-18, after pass 1, and this is the record of it.** It promised a count of
+spellings, scanned over text by `surface.test.ts`. Pass 1 graded it unmet and named seven ordinary
+spellings that escaped all eight of those regexes — `view?: PlayView` first, which is the standard
+TypeScript spelling of the very union the rule bans and is already the house spelling one layer down in
+`CommandResult`. A rule that derives its files and enumerates its spellings is the manual-sync shape
+this repository names most loudly, wearing a derivation's clothes. The replacement, ruled the same day,
+asks the type checker what a member can hold and the compiler what counts as asking; both are closed
+sets, so neither half can be missing a row. The clause is wider than it was and the proof moved with
+it, from `surface.test.ts` to `src/ui/published.test.ts`, which is why the `proof:` line changed too.
+c1 was amended by nothing: it always said the published type says what is true, and what pass 1 showed
+is that the sweep answered it for one field rather than for the type.
 
 ## Goal
 
