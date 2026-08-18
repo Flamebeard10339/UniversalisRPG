@@ -122,9 +122,17 @@ const SPELLINGS: readonly string[] = [
 // The other side of the same fixture: reading a field off what was published
 // is not asking whether it is there, and a rule that cannot tell the two apart
 // refuses every use of the thing it is protecting.
-const USES = `export function reads(s: Snapshot): unknown {
+// One layer down the same type genuinely may be missing — a command result
+// carries a view only where the command produced one — so a question about one
+// of those is a question worth asking, and a rule that cannot tell it from a
+// dead one refuses honest code.
+const USES = `import type { CommandResult } from '../runtime/command';
+export function reads(s: Snapshot): unknown {
   const renamed = s.view;
   return [renamed.said, renamed.choices[0], renamed.modals.length > 0 ? 1 : 0, renamed.location.title, s.live?.label];
+}
+export function readsOneThatMayBeMissing(result: CommandResult): unknown {
+  return result.view === undefined ? null : [result.view.said, result.view!.time];
 }`;
 
 const PREAMBLE = `import type { DriverSnapshot } from './driver';\ntype Snapshot = DriverSnapshot;\ntype Published = DriverSnapshot['view'];\n`;
