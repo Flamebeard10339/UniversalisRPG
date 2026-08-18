@@ -810,6 +810,7 @@
         "src/ui/planeGraph.ts",
         "src/ui/planeModal.test.tsx",
         "src/ui/planePanel.ts",
+        "src/ui/published.test.ts",
         "src/ui/render.test.tsx",
         "src/ui/sheet.test.ts",
         "src/ui/sheet.ts",
@@ -1019,9 +1020,9 @@
         {
           "name": "the published view is never a maybe",
           "paths": [
-            "src/ui/surface.test.ts"
+            "src/ui/published.test.ts"
           ],
-          "note": "produced by the-shell-is-never-handed-a-missing-view: DriverSnapshot.view is PlayView, and the rule reads every module under src/ui -- tests included -- for the eight ways of asking whether there is one, the non-null assertion among them, plus the published type standing in a union with null or undefined. The subjects are the directory's, so a module written next month is scanned the day it exists, and the file holds the word and the operators apart in its own source so it is scanned by the rule rather than exempt from it."
+          "note": "produced by the-shell-is-never-handed-a-missing-view and re-cut after its first audit: what the driver publishes admits no absence, and nothing that drives it asks whether a view is there. Both halves derive rather than enumerate. The type half folds '| null', '| undefined' and '?:' into one question over DriverSnapshot's, Driver's and TestState's own keys, looks through a method to what it yields, carries a positive control so a derivation that quietly stopped naming anything reddens the tsc already in CI, and names the fields that may honestly be absent in a pair of checks that cannot go stale in either direction. The scan half asks the type checker what a subject can hold and the grammar what counts as asking -- both closed sets -- over src/ui and scripts, so a renamed binding, a formatter-wrapped ternary and 'view?: PlayView' all fail where eight regexes over text let them through."
         }
       ]
     },
