@@ -54,7 +54,10 @@ Proof:
   somebody thought of.
   proof: vitest src/runtime/openUniverse.test.ts
 - [c2] **What is at fault is read off the loader, never inferred.** Every problem the door reports
-  names the module it came from, and that name comes from the loader's own per-module report. The proof
+  names the module it came from **where a producer names one**, and that name comes from the loader's
+  own per-module report; a problem no producer attributes names nothing, rather than being handed a
+  guess. A loader diagnostic is the first kind and an unmet requirement is the second — it is a
+  property of the merged universe and no module owns it. The proof
   is what makes this different from the branch it replaces: for each cell of c1's family it checks the
   reported module against **the module the fixture actually broke**, so a reproduction cannot be graded
   by the path it took through the code, and no assertion is keyed off a label the test itself wrote.
@@ -105,6 +108,14 @@ Proof:
   proof: command git diff --stat main...HEAD -- content/ ":!content/engine-*.dsl"
 - [c9] `npm run tasks -- merge-ready` passes before the spec is marked done.
   proof: command npm run tasks -- merge-ready
+
+**c2 was amended on 2026-08-18, after pass 2, and this is the record of it.** It said every problem
+names the module it came from. Under the 2026-08-17 ruling a requirement problem names no module at
+all, because attributing a property of the merged universe to a module is the guess this spec deletes
+and the honest answer is silence. The clause is stricter for the amendment, not looser: it now forbids
+the thing that actually went wrong at pass 1, which was a problem naming every module that loaded
+because the sentence demanded a name and no true one existed. Empty is now the required answer there
+rather than a tolerated one.
 
 **c7 was amended on 2026-08-17, after pass 1, and this is the record of it.** Its first half
 promised that clearing is offered when the local module is among the modules the door reports against.
@@ -376,3 +387,151 @@ the leg still reports the three clauses outstanding, because it reads that spec'
 not its records. So the gate does not pass, and the reason is a claim the branch made about it rather
 than an artefact of this audit not being filed yet. Full output at
 C:\Users\yonat\AppData\Local\Temp\audit-opening-a-universe-answers-rather-than-raises-pass1-mergeready.txt
+
+### Pass 2 — 2026-08-18
+
+- base: `7a0081a19f28d556372123f479f8d0baec702d7c`
+- head: `c7992617a69477f418b11cbd67167e2178395169`
+- proof 1: met — Pass 1's evidence re-run and still holding, on a family that has grown rather than
+shrunk. `npx vitest run src/runtime/openUniverse.test.ts` is 17 pass, where pass 1 saw 14 -- the
+three added since are the c1 placement guard the pass-1 finding asked for
+(`places every aim in a base module and in the local one, which the count cannot tell you`) and
+c4's per-open slot answer. The derivation is unchanged and still typed: `openUniverseFixture.ts`
+keys BY_STAGE `satisfies Record<ModuleLoadStage, Breakage>` and BY_REQUIREMENT
+`satisfies Record<RequirementId, Breakage>`, and tsc is a merge-ready leg and green.
+`lands each fixture on the stage or the requirement it is keyed under` still asks the loader
+rather than the door. The family got wider at c45a755: every base-placement cell now stands
+HEALTHY_LOCAL beside the breakage instead of `local: ''`, which is the pass-1 HIGH's repair and
+adds no cell the type spine did not already require. No fresh mutation aimed, per the brief;
+pass 1's c1a and c1b remain the re-runnable record.
+- proof 2: met — `npx vitest run src/runtime/openUniverse.test.ts src/ui/surface.test.ts` -- 87 pass
+across the four files run together. Both halves still derived. Per-module half: the door still
+takes `modules: [diagnostic.moduleId]` straight off `loaded.diagnostics` and the test still
+compares the reported set against `cell.names`, which the fixture writes from what it broke;
+`names, through the driver too, exactly the modules the fixture broke` now asks the same question
+through the driver as well. Tree half: `surface.test.ts` still brace-matches whole try blocks and
+refuses `openUniverse(` inside one; the scanner's vacuity guards are intact, and `git grep`
+confirms no try block under src/ui or scripts wraps the door. One thing moved and it moved toward
+the clause, not away: at c45a755 a requirement problem stopped naming `loaded.loadedModules` and
+now names nothing at all, so the door no longer reports a module for a fault no module is
+answerable for. Filed as a finding rather than graded here: the clause's first sentence -- every
+problem names the module it came from -- is now false of a requirement problem, and that is
+recorded only inside c7's amendment note.
+- proof 3: met — `npx vitest run src/runtime/openUniverse.test.ts src/ui/shell.test.tsx` -- pass. Every
+line pass 1 named is still there and still asserting: `says which requirement was unmet, wherever
+a requirement is unmet`, `is hermetic by construction: it loads alone, clean, and meets every
+requirement there is`, `stands in the same session whatever it stood in for` (one distinct
+`serializeSession` across every cell that stood in), `is not a place the universe it stood in for
+could have offered`. FALLBACK_SOURCE is unchanged in this range --
+`git diff 3e28dcc..HEAD -- src/runtime/openUniverse.ts` touches only the problem attribution, the
+slot answer and the new `openWithLocalCleared`. On the screen half, `says what the door said, and
+nothing it did not` still renders through FaultBanner; FaultBanner changed at c45a755 to take
+`remedies` as a prop instead of computing them, and still draws only `problem.message`.
+- proof 4: met — `npx vitest run src/runtime/openUniverse.test.ts src/runtime/saveSlots.test.ts` --
+pass. The repair to the pass-1 finding landed here and improved the clause rather than weakening
+it: `openUniverse` no longer forces `synced` null only on the stand-in path and leaves it alone
+otherwise, it answers the question at every open --
+`options.save.synced = unmet.length > 0 ? null : entitledSlot(options.save)` -- and `entitledSlot`
+is now the single place saveSlots decides it, called both by `createSaveContext` and by the door.
+`answers whose game this is at every open, rather than latching at the first` is the new test and
+is what closes the pass-1 finding. The pre-existing behaviour is preserved: `entitledSlot` reduces
+to the same empty-player-slot rule `createSaveContext` used to spell inline, with `liveSlot` giving
+PLAYER_SLOT at `dev: false`.
+- proof 5: met — `npx vitest run scripts/drift.test.ts scripts/play-cli.test.ts` -- pass, inside a
+128-pass run with driver.test.ts. `openRepl` still calls the door and `main`'s try/catch is still
+gone. One assertion in `drift.test.ts` changed in this range and it got stronger, not weaker:
+`the two drivers open the same way, over content that will not load` replaced
+`expect(gui.snapshot().view).not.toBeNull()` -- which the successor spec's type change had made
+vacuous -- with `expect(gui.snapshot().problems.length).toBeGreaterThan(0)`, which is the premise
+the cell-by-cell comparison rests on. The vacuity guards pass 1 named
+(`taken === OPENING_CELLS.length`, `reported > cells - 1`) are intact.
+- proof 6: met — `npx vitest run src/ui/surface.test.ts` -- pass. Both counts are still derived by
+`modulesUnder` over src/ and scripts/ rather than listed.
+`git grep -n "FAULT_AT\|FaultAt\|Fault.at\|localTrouble\|wordless" -- src scripts content` returns
+exactly one line, `src/ui/surface.test.ts:439`, which is the scanner's own list. No shipped module
+under src/ui calls the load path; the six files that do are all `.test.` files, which is unchanged
+from pass 1 and is the low finding pass 1 already filed. `surface.test.ts` lost 91 lines in this
+range and none of them were c6's: the deletion is the successor spec's
+`the shell is never handed a missing one` regex block, retired by the 2026-08-17T23:13 ruling and
+replaced by `src/ui/published.test.ts`. `DISPATCHES` gained `openWithLocalCleared` beside
+`openUniverse`, so the PLAY_SURFACE trade the spec's Decisions describe as one-for-one is now
+two-for-one, both entries on the same door module.
+- proof 7: unmet — Graded against the amended sentence. The first half is delivered and now genuinely
+proved; the second half fails, measured, on a cell of the door's own family.
+FIRST HALF -- met. `npx vitest run src/ui/driver.test.ts src/ui/shell.test.tsx` passes, and the
+proof no longer compares the drawn set against the function that computes it: `clearingReaches`
+reads `cell.broke` and `cell.brokeInHeader`, both written by the fixture, and `remediesFor` is no
+longer exported at all. Five mutations aimed at driver.ts:37 and openUniverse.ts:129, manifest at
+C:\Users\yonat\AppData\Local\Temp\mutations-opening-a-universe-answers-rather-than-raises-pass2.json:
+c7b (invert the ternary) KILLED by `offers clearing exactly where clearing could reach what the
+fixture broke`; c7c (drop `asRead(cleared) !== asRead(problems)`, so clearing is offered wherever
+there is a module to clear) KILLED by `offers it where taking it changes the answer, and withholds
+it where taking it would not`, and the same mutant KILLED again by the fixture-side test as c7c2
+and by the drawn markup as c7c3; c7d (ask the door over text `clearLocalSections` did not rewrite)
+KILLED by the fixture-side test. Each re-run at its own file with the mutation still applied.
+Pass 1's survivor is confirmed dead and confirmed to have applied: c7a
+(`? ['clear-local', 'reopen'] : ['reopen']` to `? ['clear-local'] : ['reopen']`, byte-identical to
+the pass-1 mutation) KILLED at scope 33 tests by `leaves every state with something to do about it,
+and every remedy reachable from some state`, and KILLED again as c7a2 at scope 9 by the markup
+test -- two independent named tests, where pass 1 had 0 of 3749. Independently of the suite,
+`npm run inspect` over the whole family agrees with the fixture's rule on all 15 cells:
+`clearingReaches(cell)` equals `asRead(openWithLocalCleared(...)) !== asRead(openUniverse(...))`
+with no exception, which answers the standing worry that `clearingReaches` is a copy of a fact
+`clearLocalSections` owns. It is a stated fact, but it is held by an executable comparison in both
+directions -- c7d is the mutation for the direction where `clearLocalSections` stops clearing -- so
+it fails loudly rather than drifting.
+SECOND HALF -- unmet. `every state the door can leave the shell in has at least one control that
+changes it` is false of the cell `order in the local`, and the failure is user-facing rather than a
+proof-shape quibble. In that state the door reports the local module disabled at the order stage,
+`clear-local` is withheld (correctly, under the ruling), and `reopen` is the only control offered.
+Taking `reopen` reproduces a byte-identical report: `openUniverse` is a pure function of its
+sources, `reopen` re-reads the same store and hands the same sources back, and the probe over all
+15 cells prints `reopenSameReport=true` for every one of them
+(C:\Users\yonat\AppData\Local\Temp\audit-opening-a-universe-answers-rather-than-raises-pass2-probe2.ts,
+run with `npm run inspect -- -`). The state is reachable in the shipped app: the app itself writes
+the local module's `dependencies:` from the modules that loaded, and `headerFor`
+(src/content/localChanges.ts:113) keeps every declared dependency forever, so a release that drops
+or renames a shipped module an author staged against leaves a header naming a module that is not
+loaded. Probe 3 walks that route end to end -- a module the app itself would have written,
+depending on `base` and a since-removed `extra`: the door reports
+`order: dependencies names a module that is not loaded: extra`, taking `/local clear` deletes the
+author's body and leaves the identical report, and reopening leaves the identical report.
+`clearLocalSections` only mints a fresh header when the text will not parse, and a stale dependency
+parses, so no control in the app -- banner or console -- can repair it. The author's staged work is
+inert with no way out. The root of it is already on record as
+`clearing-local-changes-keeps-a-broken-info-header-so-a-stale` (finding/unreviewed, DSL load path);
+the 2026-08-17T23:13 ruling declared that record retired, on the ground that `a control that
+changes nothing is by this rule not offered`. Withholding the control is right for the first half
+and is exactly what makes the second half false: it removes the only control from a state instead of
+giving that state a way out. The proof cannot see this because it counts rather than measures:
+`leaves every state with something to do about it` asserts `toContain('reopen')` for all 15 cells,
+and the only test that measures a remedy changing a state -- `runs the load again over the store as
+it stands now` -- covers the one case where a second writer repaired the local module, which is also
+the case that already has `clear-local`. Mutation c7g (make `reopen` stop re-running the load) is
+KILLED by that one test, so the control is not inert in general; nothing proves it changes any of
+the nine states where it is the only control offered.
+- proof 8: met — `git diff --stat main...HEAD -- content/ ":!content/engine-*.dsl"` prints nothing, and
+`npx vitest run src/runtime/integration.test.ts` is 28 pass. The content check still derives its
+subjects from `readdirSync('content')` rather than naming files. `git diff 3e28dcc..HEAD -- content`
+is empty, so nothing in the repair range touched shipped content at all. The whole-suite half of the
+clause is where this is qualified rather than clean: `npm test` fails once under full-suite
+contention (see c9), and the failure is `scripts/tasks/auditPrompt.test.ts`, which is tooling and
+not content or the load path -- the file passes 69 of 69 when run alone in 35s.
+- proof 9: unmet — `npm run tasks -- merge-ready` exits 1, on more legs than pass 1 saw. tsc ok,
+layer-check ok, audit-status ok, doctor ok (27 warnings, which do not fail the leg), bytes ok,
+tree ok, base ok. Two kinds of failure. (1) `npm test FAIL exit=1`, which pass 1 recorded as ok:
+`scripts/tasks/auditPrompt.test.ts > audit-prompt prints a ready-to-use auditor prompt for a spec`
+times out at 5000ms under full-suite load (1 failed of 3754) and passes 69 of 69 when the file is
+run alone. Not a defect this branch introduced -- it is the fourth file to join a failure mode the
+store already holds twice as unreviewed HIGHs
+(`npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s`,
+`modportal-test-ts-times-out-under-suite-load-paying-real-sub`), and neither record names this file.
+Recorded as a recurrence rather than a new finding. (2) The clause and spec legs:
+`spec opening-a-universe-answers-rather-than-raises FAIL 3 open member(s)` (clause-7, clause-9 and
+the pass-1 merge-ready finding) plus `1 unreviewed finding(s)`;
+`clauses opening-a-universe-answers-rather-than-raises FAIL 3 outstanding across 1 pass(es):
+c7, c9, c14` -- note c14, a clause number this nine-clause spec does not have, arriving from the
+predecessor's moved record; and both legs still failing on `the-shell-draws-what-the-session-answers`
+and now on `the-shell-is-never-handed-a-missing-view` as well. That is the same composition mismatch
+pass 1 filed as `opening-a-universe-answers-rather-than-raises-pass1-merge-re`, which is still open,
+so nothing here is new information about it. c7 unmet keeps this unmet regardless.
