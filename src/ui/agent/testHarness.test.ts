@@ -56,7 +56,7 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     open: (item) => void calls.push(`open:${item}`),
     localizer: () => localizerFor(loadInEnglish(''), 'en'),
     cancel: () => void calls.push('cancel'),
-    serialized: () => null,
+    serialized: () => '',
     localChanges: () => null,
     baseSources: () => [],
     editorMemory: { read: () => null, write: (text) => void calls.push(`editorMemory:${text}`) },

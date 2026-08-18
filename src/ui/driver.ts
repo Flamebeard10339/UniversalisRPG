@@ -56,7 +56,7 @@ export interface DriverSnapshot {
   // answers both. Readings rather than copies: nothing in this layer writes
   // either, and both move only where a command moved them (c6, c10).
   dev: boolean;
-  speed: number | null;
+  speed: number;
 }
 
 export interface Driver {
@@ -76,10 +76,10 @@ export interface Driver {
   // because `/dsl` adopts a new registry and the language being played is the
   // session's rather than the shell's.
   localizer(): Localizer;
-  // What a save of this session would write, and null when there is no session
-  // to save. The bytes are the whole of what the two drivers are compared on,
-  // because a view is what a driver was told and this is what it is standing in.
-  serialized(): string | null;
+  // What a save of this session would write. The bytes are the whole of what
+  // the two drivers are compared on, because a view is what a driver was told
+  // and this is what it is standing in.
+  serialized(): string;
   // The module an author is editing, as the store holds it, and null when the
   // store cannot say. There is no second spelling of it in this layer: these
   // are the bytes `/local show` prints and the bytes the slot holds (c16).

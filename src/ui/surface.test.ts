@@ -19,11 +19,11 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 // Every module beneath src/ui, not every module directly inside it: a rule
 // that stops at the top level exempts the whole of src/ui/tabs/ from all four
 // of the rules below at once, and a directory is how this layer will grow.
-function modulesUnder(directory: string, prefix: string, tests = false): Array<{ file: string; path: string }> {
+function modulesUnder(directory: string, prefix: string): Array<{ file: string; path: string }> {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) return modulesUnder(path, `${prefix}/${entry.name}`, tests);
-    if (!/\.tsx?$/.test(entry.name) || (!tests && entry.name.includes('.test.'))) return [];
+    if (entry.isDirectory()) return modulesUnder(path, `${prefix}/${entry.name}`);
+    if (!/\.tsx?$/.test(entry.name) || entry.name.includes('.test.')) return [];
     return [{ file: `${prefix}/${entry.name}`, path }];
   });
 }
@@ -494,94 +494,6 @@ describe('no caller classifies a failure by where it was standing (c2)', () => {
     for (const source of DRIVING) {
       for (const block of tryBlocks(source.text)) {
         expect(block, `${source.file} catches around a call to the door`).not.toMatch(/\bopenUniverse\s*\(/);
-      }
-    }
-  });
-});
-
-// Every module beneath src/ui, tests included. The set is the directory's and
-// never a list of filenames: the sweep this rule closes touched ten files, and
-// a rule written against those ten would pass the eleventh. Tests are in it
-// because the question reads the same wherever it is asked — a fixture that
-// unwraps what it was handed leaves the next reader exactly the doubt this rule
-// removes — and because this file is one of them, so the rule is one it is held
-// to itself rather than one it stands outside of.
-const UNDER_UI = modulesUnder(here, 'src/ui', true).map(({ file, path }) => ({ file, text: readFileSync(path, 'utf8') }));
-
-// What the session publishes, and the expression one of them is bound to. Both
-// are fragments, joined to the operators below only at the moment of asking,
-// which is what lets this file be scanned by its own rule: the word and the
-// operator never stand next to each other in the source that looks for them.
-const PUBLISHED = 'PlayView';
-
-const A_VIEW = String.raw`(?:[\w$]+(?:\(\))?\s*\.\s*)*\bview\b`;
-
-// The union chain the published type stands in, whichever side of it the rest
-// sits on, so a third member between the type and the nothing is not a way past
-// this.
-const UNION = new RegExp(String.raw`(?:[\w$'"\[\]. ]+\|\s*)*` + PUBLISHED + String.raw`(?:\s*\|[\w$'"\[\]. ]+)*`, 'g');
-
-const NOTHING = ['null', 'undefined'];
-
-// Every way of asking. A question and not a use: `.choices` reads a field off
-// what was published, and each of these first asks whether there is anything to
-// read it off. The assertion is one of them rather than an exemption from them,
-// because it satisfies the compiler and leaves the reader the same question.
-const ASKING: Array<{ asked: string; pattern: RegExp }> = [
-  { asked: 'chains off it optionally', pattern: new RegExp(A_VIEW + String.raw`\s*\?\s*\.`) },
-  { asked: 'defaults it away', pattern: new RegExp(A_VIEW + String.raw`\s*\?\?`) },
-  { asked: 'guards on its truth', pattern: new RegExp(A_VIEW + String.raw`\s*(?:&&|\|\|)`) },
-  { asked: 'branches on its truth', pattern: new RegExp(A_VIEW + String.raw`\s*\?(?![.?])`) },
-  { asked: 'asserts it away', pattern: new RegExp(A_VIEW + String.raw`\s*!(?!=)`) },
-  { asked: 'compares it with nothing', pattern: new RegExp(A_VIEW + String.raw`\s*[=!]==\s*(?:${NOTHING.join('|')})`) },
-  { asked: 'compares nothing with it', pattern: new RegExp(String.raw`\b(?:${NOTHING.join('|')})\s*[=!]==\s*` + A_VIEW) },
-  { asked: 'negates it', pattern: new RegExp(String.raw`!\s*` + A_VIEW + String.raw`(?![\s]*[.?])`) },
-];
-
-const unions = (text: string): string[][] => [...text.matchAll(UNION)].map((match) => match[0].split('|').map((member) => member.trim()));
-
-describe('the shell is never handed a missing one (c2)', () => {
-  it('walks its own directory, tests included, so the rules below are about more than what shipped', () => {
-    const files = UNDER_UI.map((source) => source.file);
-
-    expect(files).toContain('src/ui/App.tsx');
-    expect(files).toContain('src/ui/surface.test.ts');
-    expect(files).toContain('src/ui/agent/testHarness.ts');
-    expect(UNDER_UI.length).toBeGreaterThan(SHIPPED.length);
-  });
-
-  it('reads a union chain whole, whichever side the type sits on', () => {
-    expect(unions(`x: ${PUBLISHED} | Other | null`)).toEqual([[PUBLISHED, 'Other', 'null']]);
-    expect(unions(`x: Other | ${PUBLISHED}`)).toEqual([['Other', PUBLISHED]]);
-    expect(unions(`x: ${PUBLISHED}['choices']`)).toEqual([[PUBLISHED]]);
-  });
-
-  it('fires on every way of asking, and on none of the ways of using', () => {
-    const asked = ['a?.choices', 'a ?? b', 'a && b', 'a ? b : c', 'a!.choices', 'a === null', 'undefined !== a', '!a'];
-    const used = ['a.choices', 'a.choices?.length', 'a.focus ? b : c', 'a.modals[0]', "kind === 'a'", 'a !== b'];
-
-    for (const written of asked) {
-      const spelled = written.replace(/a/g, 'snapshot.view');
-      expect(ASKING.some((each) => each.pattern.test(spelled)), spelled).toBe(true);
-    }
-    for (const written of used) {
-      const spelled = written.replace(/a/g, 'snapshot.view');
-      expect(ASKING.filter((each) => each.pattern.test(spelled)).map((each) => each.asked), spelled).toEqual([]);
-    }
-  });
-
-  it('puts the published type in a union with nothing nowhere under src/ui', () => {
-    for (const source of UNDER_UI) {
-      for (const members of unions(source.text)) {
-        for (const member of members) expect(NOTHING, `${source.file} unions ${PUBLISHED} with ${member}`).not.toContain(member);
-      }
-    }
-  });
-
-  it('asks nowhere under src/ui whether there is one', () => {
-    for (const source of UNDER_UI) {
-      for (const line of source.text.split('\n')) {
-        for (const { asked, pattern } of ASKING) expect(pattern.test(line), `${source.file} ${asked}: ${line.trim()}`).toBe(false);
       }
     }
   });

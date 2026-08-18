@@ -214,14 +214,14 @@ describe('the two drivers cannot drift', () => {
 
   it('answers a modal through the shared table, by the line the table parses', () => {
     const { repl, gui } = bothDrivers();
-    const talk = String(gui.snapshot().view!.choices.findIndex((choice) => choice.id === 'talk:tutorial-island.miki') + 1);
+    const talk = String(gui.snapshot().view.choices.findIndex((choice) => choice.id === 'talk:tutorial-island.miki') + 1);
     inStep(repl, gui, talk);
 
-    const asked = gui.snapshot().view!.modals[0].options[0];
+    const asked = gui.snapshot().view.modals[0].options[0];
     // The GUI's own route in, held to the line the REPL would have typed.
     inStep(repl, gui, `submit-modal: ${asked.key}=${asked.values![0].value}`, () => gui.answer(asked.key, asked.values![0].value));
 
-    expect(gui.snapshot().view!.modals).toEqual([]);
+    expect(gui.snapshot().view.modals).toEqual([]);
   });
 
   it('walks the crafting route through both drivers, gesture against typed line', () => {
@@ -232,8 +232,8 @@ describe('the two drivers cannot drift', () => {
     inStep(repl, gui, '/inv tutorial-island.iron-sword', () => gui.open('tutorial-island.iron-sword'));
     for (const [key, value] of CRAFTING_ROUTE) inStep(repl, gui, `submit-modal: ${key}=${value}`, () => gui.answer(key, value));
 
-    expect(gui.snapshot().view!.modals).toEqual([]);
-    const grown = JSON.parse(gui.serialized()!) as SerializedGrowth;
+    expect(gui.snapshot().view.modals).toEqual([]);
+    const grown = JSON.parse(gui.serialized()) as SerializedGrowth;
     // A route every step of which was refused would leave both drivers standing
     // in the same unmoved game, and every comparison above would pass over it.
     expect(Object.keys(grown.instances.byId['1'].payload.plane)).toEqual(['0,0', '1,0', '2,-1']);
@@ -272,6 +272,9 @@ describe('the two drivers open the same way, over content that will not load', (
     inStep(repl, gui, '/look');
     inStep(repl, gui, '/state');
 
-    expect(gui.snapshot().view).not.toBeNull();
+    // The premise, rather than that there is a session at all: the type says
+    // the second, and a cell that quietly began opening cleanly would pass
+    // every line above without this.
+    expect(gui.snapshot().problems.length).toBeGreaterThan(0);
   });
 });

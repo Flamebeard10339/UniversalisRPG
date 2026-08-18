@@ -48,7 +48,7 @@ function SpeedField({ speed, words, onSend }: { speed: number; words: Words; onS
 // session every render rather than kept here, so setting it from this field and
 // setting it from the console are indistinguishable afterwards, and there is no
 // second default and no second clamp for the two to disagree about (c10).
-export function SettingsPane({ dev, speed, words, onSend }: { dev: boolean; speed: number | null; words: Words; onSend: (line: string) => void }): JSX.Element {
+export function SettingsPane({ dev, speed, words, onSend }: { dev: boolean; speed: number; words: Words; onSend: (line: string) => void }): JSX.Element {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
       <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-panel px-3 py-2 text-sm text-text">
@@ -59,7 +59,7 @@ export function SettingsPane({ dev, speed, words, onSend }: { dev: boolean; spee
       <DevOnly dev={dev}>
         {/* Re-keyed on the dial, so a `/speed` typed at the console puts this
             field where it put the dial and no effect here has to notice. */}
-        {speed === null ? null : <SpeedField key={speed} speed={speed} words={words} onSend={onSend} />}
+        <SpeedField key={speed} speed={speed} words={words} onSend={onSend} />
       </DevOnly>
     </div>
   );
