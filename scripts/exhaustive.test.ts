@@ -87,13 +87,13 @@ function delegates(checker: ts.TypeChecker, clause: ts.DefaultClause, subject: t
   return found;
 }
 
-function consumersIn(program: ts.Program): Consumer[] {
+function consumersIn(program: ts.Program, include: (relative: string) => boolean = (relative) => /^(src|scripts)\//.test(relative)): Consumer[] {
   const checker = program.getTypeChecker();
   const found: Consumer[] = [];
   for (const file of program.getSourceFiles()) {
     if (file.isDeclarationFile) continue;
     const relative = file.fileName.replace(`${root}/`, '');
-    if (!/^(src|scripts)\//.test(relative)) continue;
+    if (!include(relative)) continue;
     const visit = (node: ts.Node): void => {
       if (ts.isSwitchStatement(node)) {
         const consumer = consumerAt(checker, file, node, relative);
@@ -200,5 +200,68 @@ describe('the guard bites', () => {
     const errors = errorsIn(fixture(['a', 'b']));
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.join(' ')).toContain('never');
+  });
+});
+
+describe('the delegation exemption discriminates', () => {
+  // The exemption is the one place this rule can be made vacuous: every switch
+  // in the tree now carries a default, so an exemption that fired on all of
+  // them would pass c1 while proving nothing. Mutation found exactly that —
+  // forcing `delegates` to return true survived the whole suite — so the
+  // exemption is held to the same red-green standard as the guard itself,
+  // against a fixture where the right answer is known both ways.
+  const FIXTURE = [
+    `type M = { kind: 'a'; a: number } | { kind: 'b'; b: number } | { kind: 'c'; c: number };`,
+    `function total(value: M): number {`,
+    `  switch (value.kind) {`,
+    `    case 'a': return value.a;`,
+    `    case 'b': return value.b;`,
+    `    case 'c': return value.c;`,
+    `    default: { const unreached: never = value; return unreached; }`,
+    `  }`,
+    `}`,
+    `export function dispatching(value: M): number {`,
+    `  switch (value.kind) {`,
+    `    case 'a': return value.a;`,
+    `    default: return total(value);`,
+    `  }`,
+    `}`,
+    `export function absorbing(value: M): number {`,
+    `  switch (value.kind) {`,
+    `    case 'a': return value.a;`,
+    `    default: return 0;`,
+    `  }`,
+    `}`,
+  ].join('\n');
+
+  const name = `${root}/delegation-fixture.ts`;
+
+  function analysed(): Consumer[] {
+    const host = ts.createCompilerHost({ strict: true });
+    const original = host.getSourceFile.bind(host);
+    host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) =>
+      fileName === name ? ts.createSourceFile(fileName, FIXTURE, languageVersion, true) : original(fileName, languageVersion, onError, shouldCreate);
+    host.fileExists = (fileName) => fileName === name || ts.sys.fileExists(fileName);
+    host.readFile = (fileName) => (fileName === name ? FIXTURE : ts.sys.readFile(fileName));
+    const built = ts.createProgram([name], { strict: true, noEmit: true, skipLibCheck: true }, host);
+    return consumersIn(built, (relative) => relative === 'delegation-fixture.ts');
+  }
+
+  // In source order: the total consumer, the one that dispatches to it, the
+  // one that answers for itself.
+  it('finds all three switches the fixture declares', () => {
+    expect(analysed().map((consumer) => consumer.handled)).toEqual([3, 1, 1]);
+  });
+
+  it('reads a default that hands the scrutinee on as dispatching', () => {
+    const [, dispatching] = analysed();
+    expect(dispatching.delegating).toBe(true);
+    expect(dispatching.guarded).toBe(true);
+  });
+
+  it('reads a default that answers for itself as absorbing', () => {
+    const [, , absorbing] = analysed();
+    expect(absorbing.delegating).toBe(false);
+    expect(absorbing.guarded).toBe(false);
   });
 });
