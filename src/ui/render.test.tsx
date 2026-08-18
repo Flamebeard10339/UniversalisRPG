@@ -17,13 +17,13 @@ import { StatusBanner } from './StatusBanner';
 import { dismissal } from './asking';
 import { sectionKey } from './editControls';
 import { formatClock } from './format';
-import { devLine } from './devMode';
+import { devLine, speedLine } from './devMode';
 import { FORGOTTEN } from './editorMemory';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { LABELS, type LabelId } from './labels';
 import { wordsOf } from './words';
-import { LAYERS, OPENING, toLayer, toSubpage } from './nav';
+import { HOME_LAYER, LAYERS, OPENING, toLayer, toSubpage } from './nav';
 
 // What the map is handed beyond the view: the one list a drag stages out of,
 // and where it is looking. Empty here — every case below is about what is drawn
@@ -617,6 +617,24 @@ describe('what the shell puts on the screen', () => {
 
     expect(html).toContain(`aria-label="${shellWord('command')}"`);
     expect(onScreen(readable(html), shellWord('run'))).toBe(true);
+  });
+
+  // The dial `/speed` turns, on the page it is drawn on. Every other proof of
+  // the multiplier reads it off the snapshot, so the whole control could be
+  // deleted from the markup and each of them would go on passing; this one
+  // reads the session's own value back out of the page.
+  it('draws the speed dial on Settings, carrying the multiplier the session holds', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    driver.send(devLine(true));
+    driver.send(speedLine('3'));
+    const settings = LAYERS[HOME_LAYER].subpages.findIndex((subpage) => subpage.id === 'settings');
+    const label = `aria-label="${shellWord('speed')}"`;
+
+    const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, settings)} />);
+
+    expect(driver.snapshot().speed).toBe(3);
+    expect(html, 'the Settings page draws no field named for the dial').toContain(label);
+    expect(html.slice(html.indexOf(label), html.indexOf('>', html.indexOf(label)))).toContain(`value="${driver.snapshot().speed}"`);
   });
 
   it('names its two glyph controls with the engine value each one acts on', () => {
