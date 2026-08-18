@@ -481,3 +481,26 @@ The counter-evidence is that auditing was where the value sat, not implementatio
 All four implementation rounds needed correction and all four audit rounds found
 something real, so budgeting one audit pass — as this branch was asked to — would
 have merged three separate defects.
+
+---
+
+## 2026-08-18 — Four read-only research agents over the inference/duplication question
+
+Planning session, no code written. Four Explore agents in parallel over the main
+checkout: branch-failure diagnosis, DSL vocabulary duplication census, inference
+census, existing derivation spines. ~760k subagent tokens, ~10 min wall for the
+slowest, against a planning session that would otherwise have read the same files
+serially into one context and been unable to hold all four answers at once.
+
+Verdict: paid off decisively, and for a reason the earlier rows do not name. The
+value was not parallelism — it was that four *independent* readings of one
+question disagreed with the premise in the same direction. The branch-failure
+agent contradicted the session's stated premise (no HIGH was backlogged; every
+door HIGH is `done`), and the other three independently ranked proof-design above
+inference and duplication as a cost driver. A single agent asked the same
+question would have been graded against the premise it was handed.
+
+Cost note: every one of the four reports had to be spot-checked before use, and
+one headline claim was understated rather than wrong (zero exhaustiveness guards
+tree-wide, not merely absent from two files). Budget verification time per agent;
+the reports are leads, not evidence.
