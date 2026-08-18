@@ -64,19 +64,21 @@ Proof:
   source text to say it; this says the shape rejects what it must reject, and is the reason c1 cannot
   pass by finding a `never` that does nothing.
   proof: vitest scripts/exhaustive.test.ts
-- [c3] **A section prints under the spellings its schema declares.** `serializeRegistryModule` and
-  every printer below it read field names and `keyword:` spellings from `SCHEMAS`
-  (`src/content/module.ts:32`) rather than restating them, and no authored spelling of a
-  schema-declared field appears as a string literal anywhere in `src/content/serialize.ts`. The seven
-  `BESPOKE` kinds (`module.ts:59`) keep their own printers and are exempt by construction rather than
-  by a list.
-  proof: vitest src/content/serialize.test.ts
-- [c4] **Round-tripping is proved over generated content, not only over shipped content.** The proof
-  walks `SCHEMAS`, synthesises for every kind a section exercising every field that kind declares —
-  including the fields no module in `content/` authors — prints it, reparses it and compares the
-  registries. A field added to a schema next month is round-tripped by this test with no edit to it,
-  which is the property the shipped-corpus round trip cannot have.
-  proof: vitest src/content/roundTrip.test.ts
+- [c3] **A parser owns everything about what it reads.** `Parser<T>` is a codec: it parses, it prints,
+  and it carries the authored spellings it accepts. Nothing outside a parser states how the thing it
+  reads is written — no field spelling, no separator, no unit suffix appears as a literal anywhere in
+  `src/content/serialize.ts`, whose per-kind printers are replaced by one walk over the collected
+  grammar. A parser added next month brings its own writing with it, because there is nowhere else to
+  put it.
+  proof: vitest src/grammar/codec.test.ts src/content/serialize.test.ts
+- [c4] **A parser proves its own round trip, and the collection proves it did.** Each parser's
+  examples are parsed and printed back inside that parser's own test, so a round trip cannot be
+  satisfied by what some other module happens to author; the collected walk then asserts that every
+  parser in the grammar has examples and that each one survives parse-then-print unchanged. The
+  subjects are the collection, not a list, so a parser with no examples fails rather than passing
+  silently — which is the property the shipped-corpus round trip cannot have, because it protects a
+  field exactly as far as `content/*.dsl` happens to use it.
+  proof: vitest src/grammar/codec.test.ts src/content/roundTrip.test.ts
 - [c5] **An address is taken apart once, where it is read, and is carried as its parts thereafter.**
   No module under `src/runtime` recovers structure from an id by splitting, slicing or matching it:
   an action's owner arrives as `{ kind, id }`, a journey as `{ origin, dest }`, an actor as
@@ -167,6 +169,30 @@ records: walking `src` alone once let a whole engine sentence survive in `script
 **`result` (`src/content/serialize.ts:80`) is the model and is not changed.** It is already total, and
 its totality is why it is the one consumer of `ActionResult` that has never silently dropped a member.
 c1 makes the other four look like it rather than inventing a new discipline.
+
+**A kind is owned by its parser, and the grammar is what collecting them produces.** Ruled by the
+author on 2026-08-18, and it replaces the two options this spec was written against — a `print` on
+`Field`, or a separate print table keyed by field name. Both keep the writing half somewhere other
+than the reading half, which is the same enumeration in a new place; the second is the manual-sync
+system outright. The shape is instead: everything of or related to a kind lives inside its parser,
+one step collects the parsers into the grammar, and the round trip runs inside the parser rather than
+across the tree. Complexity stops mattering at the point where it cannot leak — a parser that reads,
+writes and proves itself is a unit that adding does not cost anything elsewhere, where today adding a
+kind costs an edit in `NAMESPACED_KINDS`, `CONTENT_SECTION_MAPS`, `applySection`, `visitSection` and
+nineteen loops in `serializeRegistryModule`, none of which fails when it is skipped.
+
+This is why `Parser<T>` (`src/grammar/parser.ts:2`) is the seam rather than `SectionSchema`. It is one
+method today, `parse(cursor)`, and there are about 25 implementations — 19 under `src/grammar` and the
+rest inline in `src/content` schemas. `serialize.ts` already holds their writing halves as orphans:
+`range()`, `bonusAmount()`, `duration()` and `n()` are the print sides of parsers they no longer sit
+beside. The conversion moves them home rather than writing them.
+
+**Stage 2 is one worker's whole context and was not started inside this one.** Making `print` required
+on `Parser<T>` breaks all 25 implementations in a single edit — that is the point of it, since an
+optional `print` is a hole of exactly the shape mutation found in c1's delegation exemption — and a
+half-converted parser table is worse than an unconverted one. Recorded here rather than begun, with
+the seam, the population and the orphaned print halves named so the next worker does not re-derive
+them. `SECTION_KINDS` is already `Object.keys(PARSERS)` and is the model for what collection means.
 
 **The guard is required at every consumer, not only where a return type does not already give it.**
 A function returning `string` is protected by `strict` alone: a switch that falls through fails to
