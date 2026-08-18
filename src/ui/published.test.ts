@@ -8,8 +8,8 @@ import type { Driver, DriverSnapshot } from './driver';
 // What this layer publishes, held to saying what is true — asked of the type
 // rather than of one field at a time, so `| null`, `| undefined` and `?:` are
 // one question over every key including the ones written next month, and asked
-// of the shape rather than of the text, so a spelling nobody thought of is
-// caught by the same sentence as the ones that were.
+// of the shape rather than of the text, so neither a rename nor a line break
+// defeats it.
 
 // What a member yields when it is called, and the member itself when it is not:
 // `serialized(): string | null` publishes a nothing exactly as `speed: number |
@@ -80,6 +80,24 @@ export type NoStaleExemptionOnTheHarness = Nothing<Exclude<HonestlyAbsentOnTheHa
 // question the type removed, so the compiler is asked the question instead of
 // being taken as the answer.
 
+// This half is a named grammar and not a closed set, and this is the one place
+// its edge is written down. What it reaches is the forms in which the language
+// itself marks a value's presence as the thing being decided, over the
+// top-level union members of what a declaration says it holds. Three shapes
+// are outside it. A position where presence decides something that the grammar
+// does not name — `switch`/`case`, `??=`, a destructuring default, a default
+// parameter, `Object.is`. The nothing put back where the walk does not
+// descend — inside a type argument, a type-parameter constraint or a cast. And
+// a runtime assertion, `expect(<it>).not.toBeNull()`, whose subject is an
+// argument to a library call and is marked as questioned by nothing in the
+// syntax. The first shape closes by asking the checker whether a condition's
+// type leaves it always true rather than by listing node kinds, which is a new
+// dependency and a new gate and so is a spec of its own; the third is outside
+// that answer too, because an argument is not a condition position.
+// What makes this a boundary and not a hole is the half above: a nullable
+// cannot be published at all, so a spelling that escapes here is a reader
+// writing a check that cannot be false, never a type that lies.
+
 const here = fileURLToPath(new URL('.', import.meta.url));
 
 const root = resolve(here, '..', '..');
@@ -92,10 +110,12 @@ const slashed = (path: string): string => path.replace(/\\/g, '/');
 // the next reader the same doubt a component would.
 const DRIVEN_FROM = [`${slashed(root)}/src/ui/`, `${slashed(root)}/scripts/`];
 
-// Every spelling of the question, one entry each, written as the source a
-// reader would write. They are compiled by the same program that reads the
-// tree and are read by the same walk, so what holds the tree is what these
-// prove — rather than a second list of patterns checked against the first.
+// One entry for each form the grammar names, written as the source a reader
+// would write. They are compiled by the same program that reads the tree and
+// are read by the same walk, so what holds the tree is what these prove —
+// rather than a second list of patterns checked against the first. This is a
+// regression fixture for the forms below and never the definition of asking;
+// what the grammar does not reach is stated with the half it belongs to.
 const SPELLINGS: readonly string[] = [
   `export interface PutItBack { view?: Published }`,
   `export interface OrNull { view: Published | null }`,
@@ -220,9 +240,10 @@ function held(subject: ts.Expression): ts.Type {
 
 const isNothingLiteral = (node: ts.Expression): boolean => node.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(node) && node.text === 'undefined');
 
-// Every question the language has about whether something is there. The list
-// is the grammar's and closed by it — there is no other syntax for asking —
-// where a list of spellings is open and defeated by a rename or a line break.
+// The forms in which the language marks a value's presence as the thing being
+// decided. Reading the grammar rather than the text is what survives a rename
+// or a line break; what it is not is every position where presence decides
+// something, which is the edge stated where this half is introduced.
 function questions(node: ts.Node): Array<{ asked: string; subject: ts.Expression }> {
   if (ts.isNonNullExpression(node)) return [{ asked: 'asserts it away', subject: node.expression }];
   if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node) || ts.isCallExpression(node)) && node.questionDotToken !== undefined) {
@@ -306,7 +327,7 @@ describe('the shell is never handed a missing one (c2)', () => {
     expect(files.length).toBeGreaterThan(20);
   });
 
-  it('catches every spelling of the question, including the ones no text rule reaches', () => {
+  it('catches every form its grammar names, including the ones no text rule reaches', () => {
     const caught = new Set(IN_THE_FIXTURE.filter((one) => one.line < USES_FROM).map((one) => spellingAt(one.line)));
 
     expect(SPELLINGS.filter((_, at) => !caught.has(at))).toEqual([]);
@@ -316,7 +337,7 @@ describe('the shell is never handed a missing one (c2)', () => {
     expect(IN_THE_FIXTURE.filter((one) => one.line >= USES_FROM)).toEqual([]);
   });
 
-  it('asks nowhere the driver is driven from whether there is one', () => {
+  it('finds no such question anywhere the driver is driven from', () => {
     expect(IN_THE_TREE).toEqual([]);
   });
 });

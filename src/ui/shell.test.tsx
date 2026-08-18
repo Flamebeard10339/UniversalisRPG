@@ -101,10 +101,8 @@ describe('a problem is never drawn as text with nothing beside it (c3, c7)', () 
     const withGame = openedOver({ base: SHIPPED_SOURCES, local: brokenLocal() });
     const standingIn = openedOver({ base: [{ name: 'empty', text: '# info empty\nversion: 0.0.0\npack: test\n' }], local: '' });
 
-    // Both have a session now, which is the point of the door; what differs is
-    // whether it is the game.
-    expect(withGame.snapshot().view).not.toBeNull();
-    expect(standingIn.snapshot().view).not.toBeNull();
+    // Both have a session, which is the point of the door; what differs is
+    // whether it is the game, and where the player stands is what says so.
     expect(standingIn.snapshot().view.location.id).not.toBe(withGame.snapshot().view.location.id);
     for (const driver of [withGame, standingIn]) {
       const drawn = alerting(renderToStaticMarkup(<App driver={driver} />));
