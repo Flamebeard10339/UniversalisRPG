@@ -36,7 +36,11 @@ Proof:
   half, which no type can state about itself, is put to the same compiler over the two directories a
   driver is driven from: every spelling of the question is a source fixture compiled by the program
   that reads the tree, so what holds the tree is what the fixtures prove rather than a second list
-  checked against the first. The branches are deleted rather than left unreachable behind a `!`, which
+  checked against the first. That second half is a **named grammar and not a closed set**, and the
+  file, this clause and the concept note each say so and say what is outside it — asking the checker
+  about every condition position is the closed answer and is a spec of its own. It is a boundary the
+  first half makes small: a nullable cannot be published, so a spelling that escapes is a reader
+  writing a pointless check rather than a type that lies. The branches are deleted rather than left unreachable behind a `!`, which
   is what makes this a clause and not a restatement of c1: a non-null assertion satisfies the compiler
   and leaves the reader exactly the question this spec removes.
   proof: vitest src/ui/published.test.ts
@@ -46,6 +50,17 @@ Proof:
   proof: vitest src/ui/render.test.tsx
 - [c4] `npm run tasks -- merge-ready` passes before the spec is marked done.
   proof: command npm run tasks -- merge-ready
+
+**c2 was amended a second time on 2026-08-18, after pass 2, and this is the record of it.** The first
+amendment replaced eight regexes with a compiler walk and called both of its halves closed sets. The
+type half is one. The grammar half is not: pass 2 measured twelve ordinary spellings escaping it,
+`const { view = null } = s` among them, which is this repository's own house style. A thirteenth entry
+would move the number and not the shape, so the claim is retired rather than extended and what the rule
+does not reach is written down in all three places that claimed closure. The derivation that would
+close it — asking the type checker about every condition position rather than about a listed grammar —
+is real, is named in the store, and is a new dependency and a new gate, so it is deferred to its own
+spec under this branch's standing scope ruling. What makes that honest is c1, graded met at the same
+pass: the published type admits no absence at all, so the residue is a pointless check and never a lie.
 
 **c2 was amended on 2026-08-18, after pass 1, and this is the record of it.** It promised a count of
 spellings, scanned over text by `surface.test.ts`. Pass 1 graded it unmet and named seven ordinary
@@ -209,3 +224,99 @@ Second, `npm test` FAILED on the first of three merge-ready runs and passed on t
 `npm test` between them passed 3749 of 3749. That is the fourth sighting of
 npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s and not this branch's doing; a recurrence
 is written into the friction file beside this one.
+
+### Pass 2 — 2026-08-18
+
+- base: `7a0081a19f28d556372123f479f8d0baec702d7c`
+- head: `304b3090757088b8c4bce8ecda8aadd04548c098`
+- proof 1: met — Repaired, and repaired at the subject pass 1 said it missed: the type rather than one field
+of it. On c7992617 the three named subjects still hold (src/ui/driver.ts:40 `view: PlayView`,
+src/ui/agent/testHarness.ts:38 `view: PlayView`, src/ui/App.tsx:150 `standingIn` total) and both
+lies pass 1 measured are gone — src/ui/driver.ts:59 is `speed: number`, :82 is `serialized(): string`
+with the "null when there is no session to save" comment deleted, the dead `speed === null` guard is
+out of src/ui/SettingsPane.tsx, and the `!` is off scripts/drift.test.ts:236. `npx tsc --noEmit` passes.
+What makes this met rather than a third sweep of one field is that the question is now asked of the
+type. Re-run with the red-green script kept at
+C:\Users\yonat\AppData\Local\Temp\audit-the-shell-is-never-handed-a-missing-view-pass2-typeprobe.mjs
+(`node <it> <worktree>`): 17 probes, each editing one file, running `npx tsc --noEmit`, and recording
+whether src/ui/published.test.ts is named among the errors. 12 are named and are the ones that should
+be — a field added to DriverSnapshot as `| null`, as `?:`, as `| undefined`, through an alias
+resolving to a union and through a generic resolving to one; a property and a one-call method added to
+Driver; a field added to TestState; an exemption gone stale in both directions (`live` on the snapshot,
+`modal` on the harness); and three weakenings of the derivation itself, each of which reddens the
+positive control at published.test.ts:51. Two are correctly silent: an array of nullables is not an
+absent member, and `void` is not an absence. Two escape and are filed as findings rather than counted
+here: an absence yielded through two calls, and one yielded from an inline object type literal, which
+is the shape `editorMemory` at src/ui/driver.ts:95 already has in the tree.
+Pass 1's three SettingsPane survivors are dead. `npm run mutate` on 2026-08-18, manifest at
+C:\Users\yonat\AppData\Local\Temp\mutations-the-shell-is-never-handed-a-missing-view-pass2.json:
+taking the speed control off the page KILLED, drawing a constant in place of the session's dial
+KILLED, and inverting the dev gate around it KILLED — each by src/ui/render.test.tsx "draws the speed
+dial on Settings, carrying the multiplier the session holds", each re-measured with the mutation still
+applied. Pass 1 measured the first two as SURVIVED 0 failed of 3749.
+- proof 2: unmet — Graded against the sentence as amended on 2026-08-18. The type half is met and the
+mechanism of the other half is right; what fails is the headline, and it fails on an instance in the
+tree rather than on a hypothetical.
+src/ui/shell.test.tsx:106 and :107 are `expect(withGame.snapshot().view).not.toBeNull()` and
+`expect(standingIn.snapshot().view).not.toBeNull()` — two assertions under src/ui that ask whether
+there is a view, on a type that can no longer be one, with a comment above them presenting them as the
+point of the case. Commit f85c80b unwrapped the `!` on :108 and left the two lines above it untouched.
+The worker deleted the identical spelling from scripts/drift.test.ts:275 on this branch and recorded
+why in docs/events.jsonl ("vacuous once the type is total"); the two under the directory the clause
+actually names were not. This is the Deliverable's own sentence — a test written against the
+impossible state that can never fail — surviving in the file the clause is about.
+The rule cannot see them, and its stated reason for not needing to is false. published.test.ts:225
+says "The list is the grammar's and closed by it — there is no other syntax for asking"; the spec's
+amendment paragraph and the concept note in docs/audits/systems.json both say "both are closed sets,
+so neither half can be missing a row". Twelve ordinary spellings escape, measured by appending them to
+the rule's own SPELLINGS fixture and asking the rule — re-run with
+C:\Users\yonat\AppData\Local\Temp\audit-the-shell-is-never-handed-a-missing-view-pass2-escapes.mjs,
+which restores the file from bytes afterwards and carries two controls that are correctly caught:
+  `renamed === void 0`                        the canonical spelling of `=== undefined`
+  `renamed ??= x` and `renamed &&= x`         the assignment forms of two operators the list has
+  `const { view = null } = s`                 a destructuring default, and `const { problems, remedies }
+                                              = driver.snapshot()` at src/ui/driver.test.ts:537 is the
+                                              house style this is one keystroke from
+  `switch (renamed) { case null: }`           a question form the grammar has and the list has not
+  `Object.is(renamed, null)`
+  `if (s.view as Published | null)`           a cast straight into the condition
+  `<T extends Published | null>`              the union put back on a type parameter
+  `Array<Published | null>` and `Record<string, Published | undefined>`  the nothing put back inside a
+                                              container, which the declaration half does not look into
+  `const nothing = undefined; renamed === nothing`
+  a default parameter standing in for it
+All five of the ones worth writing typecheck under this repo's own `npx tsc --noEmit` — verified by
+adding them to a scratch module under src/ui and running the gate, which reported nothing.
+What the branch did build is a large, real improvement and should be said so. Every one of the seven
+spellings pass 1 named now fails, including `view?: PlayView`, and so do a renamed binding and a
+formatter-wrapped ternary that no line-by-line text rule can reach. Eleven aimed mutations, all
+KILLED first aim (manifest above, 2026-08-18): a question put back under src/ui, one put back under
+scripts, `PlayView | null` put back on the published type, one question form dropped from the grammar,
+the declaration half dropped, the flow type read instead of what a binding was declared to hold, the
+over-strictness guard removed so an honest question one layer down is called a violation, the walk not
+descending, scripts dropped from the scanned set, the union no longer walked, and `spellingAt`
+answering wrong so the fixture could not tell which spelling it caught. `vitest
+src/ui/published.test.ts` passes 4 of 4, and the type half's 17-probe red-green is under c1 above.
+The remedy this points at is a boundary or a derivation, not a longer list of node kinds — the
+predicate is still enumerated, only in a much better alphabet.
+- proof 3: met — Pass 1's evidence re-run and it still holds: `vitest src/ui/render.test.tsx` passes 28 of
+28 on c7992617, where pass 1 recorded 27 of 27 on 7051d8b. The one added case is 9bac4d2's speed-dial
+proof, which is a pass-1 finding against this same file being closed rather than a screen changing.
+Not re-derived — pass 2 was scoped to c1 and c2 by the commissioning brief, and the three mutations
+aimed at src/ui/SettingsPane.tsx under c1 above are the part of c3's surface these repairs touched.
+The caveat pass 1 recorded on src/ui/driver.ts:278 is unchanged by these commits and stands as filed.
+- proof 4: met — Graded on the same reading pass 1 used and recorded in docs/events.jsonl: the audit-pass
+accounting cannot be turned green by any run of the gate. On c7992617: tsc ok, layer-check ok,
+audit-status ok, doctor ok with 27 warnings that do not fail the leg, bytes ok, tree ok, base ok. The
+six red legs are the accounting — two specs with open members and two clause tallies on
+opening-a-universe-answers-rather-than-raises and the-shell-draws-what-the-session-answers, plus this
+spec's own two, which clear as their passes are filed.
+One thing changed since pass 1 and a reader should have it rather than re-derive it: `npm test` FAILED
+on both of two runs here, not one of three. The failure is
+`scripts/tasks/auditPrompt.test.ts > tasks CLI > audit-prompt prints a ready-to-use auditor prompt for
+a spec`, "Test timed out in 5000ms", 3753 of 3754 passing both times. That file is untouched by this
+branch — `git log 7a0081a..HEAD -- scripts/tasks/auditPrompt.test.ts` is empty — and it passes 69 of
+69 in isolation in 35s. It is the fifth sighting of
+npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s, under a second auditor sharing this
+machine; a recurrence is written beside this file rather than a second record. The suite is 53s wall,
+well inside the five-minute rule, and the file this branch adds costs 4.4s of it.
