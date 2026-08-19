@@ -2,232 +2,233 @@
 
 ## Deliverable
 
-This repository has no measurement of its own resistance to change, and every remedy it has attempted
-has therefore been aimed at a symptom. The finding census that motivated the last three branches —
-duplication ~30%, inference ~17%, proofs-that-cannot-fail ~28%, layering/missing-seam ~16% — reads as
-four problems and is not. Duplication is a consumer that rebuilt an answer, inference is a consumer
-that rebuilt an answer from a lossy carrier, and a missing seam is the absence of the answer that
-would have been asked for. Those three are 63% of the census and they are one act: **a consumer
-deriving an answer from a shape, because nothing exposes the answer.** They were remediated
-separately, three times, which is why each remediation found its own surfaces and none of them
-reached the sentence.
+A first version of this spec proposed measuring resistance to change by classifying import edges as
+shapes or answers and ranking modules by how many others must know their shape. It was graded by two
+independent adversarial readers before dispatch and refuted, and the refutation is why this document
+looks nothing like it. The record is kept rather than tidied away: the earlier text is at `7b8463a`
+and the grading is row 85 of `docs/dsl-rewrite/delegation-experiments.md`.
 
-The act is measurable and is measured here for the first time. Classifying every internal import edge
-in the shipped tree by what the importer consumes — a **shape** (a type, an interface, a const table:
-the importer must know the internals) or an **answer** (a function: the importer knows only the
-contract) — gives 2342 edges, of which 1056, or 45%, are structural. Ranked by how many modules must
-know a module's shape:
+It failed on measurement, not on taste. Ranked against the sixty merges on `main`, shape-in-degree
+correlated with how often a file actually changes at Spearman 0.195, against 0.505 for its own dual.
+`src/content/serialize.ts` is the most-changed file in the repository — **20 of 60 merged features
+touch it** — and shape-in scored it 0, one hundred and sixty-third of two hundred and thirty-four,
+which the worker would have read as "safe". The one validation the spec offered was that
+`src/grammar/parser.ts` was the sole answer-dominant row and was the module the preceding branch had
+just converted to a codec. Re-run at the merge base, before that conversion, `parser.ts` was already
+answer-dominant on identical imported names — `Cursor DslError Parser Span parseWhole requireEnd` at
+both ends. The instrument did not detect the fix it was said to agree with.
 
-    shape-in  answer-in  module
-          39         13  src/content/registry.ts
-          37         15  src/runtime/localized.ts
-          26          6  src/grammar/section.ts
-          23         15  src/runtime/state.ts
-          23          4  src/runtime/session.ts
-          21         37  src/grammar/parser.ts
+The lesson that survives is not about import graphs. It is that a proxy was chosen over a direct
+measurement that was available the whole time, and was then never checked against it. The question
+asked was *how many unique files are required to implement a given feature*. Every merge on `main` is
+a feature whose file list git already holds, and `docs/audits/systems.json` is already a partition of
+every tracked file, gated by `audit-status` on exactly that property. So the question is answerable
+by reading, and here is the answer:
 
-`Registry` is imported as a type by 37 modules; `loadUniverseWithDiagnostics` is called by 10. The
-registry is a data structure thirty-seven consumers walk and is not an oracle any of them asks. That
-is the whole of the namespace-autocomplete report: the editor received `Registry` and had to build the
-namespace, because the registry has never been asked to produce one — and "do module-level variables
-belong in the list" became a decision the *feature* made because the registry never made it, so all
-thirty-seven consumers make it again, independently. Five implementations of one capability is not a
-surprise at thirty-seven shape-consumers; it is the predicted number.
+    unit                          n    files (median)   systems (median)   <= 2 systems
+    src+scripts .ts, no tests    88          7                 2            52/88  (59%)
+    src+scripts .ts, with tests  88         13                 2            51/88  (58%)
+    every tracked file          139         10                 1           101/139 (73%)
 
-The last row is the calibration. `src/grammar/parser.ts` is the only module in that ranking where
-answers exceed shapes, and it is the one the branch immediately preceding this one converted into a
-codec. The metric was derived with no knowledge of that branch and independently agrees with the one
-fix that has worked, which is the reason to trust it as an instrument rather than as an opinion.
+    systems per feature, non-test code:  1sys=32  2sys=17  3sys=17  4sys=13  5sys=4  6sys=2
+    files per feature, non-test code:    median 7, max 83
+    97% of the files those merges touched are still owned by today's manifest
 
-Counting the files a feature touches, which is the intuition this began as, is not the instrument.
-It is post-hoc, so a worker cannot reach for it before writing; it is satisfied perfectly by one god
-file; and it condemns exactly the wide invariant sweeps `CLAUDE.md` protects, where one rule across
-forty files is one task. Shape-in-degree is the same intuition made available before the work and
-not gameable: a module's shape-in is literally the number of files that must be read and possibly
-changed if that module's internals move.
+The file count moves with the unit and is therefore not a number anything should gate on — 7, 13 and
+10 are the same repository counted three ways. **Systems per feature is median 2 under all three
+units.** That is the measurement this spec is built on, and its robustness to the unit choice is the
+property the previous version lacked: its headline of "2342 edges, 45% structural" turned out to be a
+count of imported names under an abstain rule the clause text did not state, and neither grader could
+reproduce it.
 
-Two properties are load-bearing and are what make this a measurement rather than a second model of
-the code. The classification derives its subjects from the tree, so a module written next month is
-counted with no edit here. And the comparison against the branch's base is computed by running the
-same pure function over a `SourceTree` read from git at the merge base — `architecture.ts` already
-takes `files` and `read` as data — so **no census number is stored anywhere and there is nothing to
-keep in sync.** A stored baseline would be the failure mode this repository names as its largest and
-most frequent, installed inside the tool built to detect it.
+Which makes the author's own sentence checkable rather than aspirational. *"Any individual feature
+should touch a single system or the interface between two systems."* Fifty-nine percent of merged
+features already do. The remaining thirty-six are the whole of the problem, they are enumerable, and
+nothing today notices when a branch joins them. Grant drift is the mechanism and it is already
+measured: `decision 2026-08-08T14:04:52Z` records that **all seven** dispatches of one push needed
+their write grant corrected, three caught before dispatch and four disclosed mid-task, and that
+`tasks plan` graded that set "no overlap, no unstated dependency" immediately before two of its
+branches collided in five shared files. A forecast that is never compared to the outcome is not a
+forecast.
 
-The gate is soft by ruling. Nothing here changes an exit code, refuses a diff or reddens a check. The
-number is reported where decisions are made — to the worker before it writes, to the auditor before
-it grades, and to whoever reads `audit-status` — because the measured failure is not that people
-ignored a gate, it is that nobody had the number. Across 1582 store records this repository holds
-1188 findings and **2 questions**: the channel by which an agent says "this design is wrong, stop"
-exists in `taskStore.ts` and has been used twice in the project's life. An agent that sees the disease
-today has nowhere to put it except a finding, which by the standing rule cannot create work and is
-therefore triaged as a symptom. c6 is the clause that gives that observation somewhere to go.
+So the gate is on the comparison, and it is hard, by the author's ruling of 2026-08-19. The reason it
+can be hard is the measurement above: a ceiling of two systems fails 41% of historical features, which
+is a gate that bites without being a stop-work order, and every instrument in this repository with a
+clean record is one that exits non-zero. `layer-check` is the only gate never routed around, and the
+one rule that changed planner behaviour did so by deleting the decompose step rather than reporting on
+it. Reporting-only instruments here have a uniform record: `tasks produces` fires on one of a hundred
+and sixty related pairs, `--breaches` has five uses in 1583 records, and workers have written
+event-log notes explaining a grant-drift number away rather than acting on it.
 
-No application code changes on this branch, and c8 is what makes that checkable rather than promised.
-`src/content/registry.ts` is the first thing this measurement will indict and it is deliberately not
-touched: the instrument is built and calibrated before it is acted on, so that the change to the
-registry can be shown to have moved the number rather than asserted to have helped.
+None of this detects duplication, and saying so plainly is a correction of the previous version's
+worst habit. Five independent implementations of one capability have no import edge between them and
+touch no common system; neither the refuted metric nor this one can see them. That is the author's
+first-named complaint and it is deferred, named, to the next spec — `## Decisions` says what it will
+need and why it is not folded in here.
 
 Proof:
 
-- [c1] **Every internal import edge in the shipped tree is classified, and the subject set derives
-  itself.** Each edge is `shape`, `answer` or `unclassified`, decided from the *exporting* module's
-  own declaration — `export function`/`export class` and a `const` whose initializer is callable are
-  answers; `export interface`/`export type`/`export enum` and a `const` bound to data are shapes.
-  The file set comes from `repoSourceTree()`, the enumeration `tasks system` and `tasks where` already
-  walk, so a module added next month is a subject with no edit. Nothing is guessed: an export whose
-  form does not decide the question is counted `unclassified` and that count is reported, rather than
-  assigned to whichever bucket looks likelier.
-  proof: vitest scripts/lib/architecture.test.ts
-- [c2] **The cheap classifier is calibrated against the type checker, and the disagreement is
-  reported rather than assumed small.** A test builds a `ts.Program` over the same subjects, classifies
-  each edge from the resolved symbol's flags and call signatures, and compares. Every edge the two
-  disagree on is asserted to be one the text classifier called `unclassified` — so the cheap answer
-  is allowed to abstain and is not allowed to be wrong — and the run prints both totals beside each
-  other. The reference measurement at commissioning is 2342 edges, 1056 shapes, 45% structural.
-  proof: vitest scripts/census.test.ts
-- [c3] **The comparison against the base stores nothing.** The census is computed twice through one
-  pure function: once over the working tree and once over a `SourceTree` whose `files` and `read` are
-  served from git at the merge base. No count, threshold or ranking is written to any tracked file,
-  and the proof asserts the base-side reader never touches the working directory — so a branch cannot
-  drift from its baseline, because it does not have one to drift from.
-  proof: vitest scripts/lib/architecture.test.ts
-- [c4] **The report names every shape hub and says what may not be done to it.** A module whose
-  shape-in is at least twice its answer-in is a hub; the rule is a ratio and not a tuned threshold,
-  which is why it names `registry.ts` (39:13), `localized.ts` (37:15), `section.ts` (26:6) and
-  `session.ts` (23:4) and correctly does not name `parser.ts` (21:37) or `state.ts` (23:15). The
-  report ranks them, prints both numbers, prints the delta against the merge base, and states the
-  prohibition: do not add a consumer of a hub's shape. `audit-status` exits on exactly the condition
-  it exits on today and on no condition added here.
-  proof: vitest scripts/audit-status.test.ts
-- [c5] **A worker is given the number before it writes.** `work-prompt` prints, for every path in the
-  member's `writes` grant, that module's shape-in and answer-in and whether it is a hub, and prints
-  the instruction that a grant crossing a hub is a reason to file a question rather than to proceed.
-  The subjects are the grant the record actually carries, so a grant widened after dispatch is
-  reported without an edit here.
+- [c1] **What every merged feature cost is derived from git and stored nowhere.** For every merge
+  commit on `main`, the feature's file set is the diff between its two parents, and its system set is
+  those files resolved through `owningSystem`. The subjects are the merges git holds, so a feature
+  merged next month is in the series with no edit. The report prints the distribution under all three
+  units above and never a bare median, because the file count is unit-dependent and a number quoted
+  without its unit is how the previous version of this spec became unreproducible.
+  proof: vitest scripts/lib/featureCost.test.ts
+- [c2] **A spec's system declaration is derived from its grant and is never typed.** The systems a
+  spec may touch are `ownerOf` resolved over the member's `writes`, so there is no second list to
+  keep in agreement with the first, and widening the declaration is possible only by widening the
+  grant — which is a recorded store event carrying who, when, branch and head.
+  proof: vitest scripts/lib/featureCost.test.ts
+- [c3] **`merge-ready` exits non-zero when the diff touches a system the declaration does not name.**
+  A new leg, hard, beside the existing ones. Ownership is resolved against the manifest **as it stands
+  at the merge base**, so a diff cannot legalise itself by editing `systems.json` in the same change;
+  that is the one gaming move this gate has, and resolving from the base is what closes it. The proof
+  drives the real leg over a fixture repository whose diff crosses an undeclared system and asserts
+  the exit code, not the message.
+  proof: vitest scripts/tasks/mergeReady.test.ts
+- [c4] **`merge-ready` exits non-zero when a declaration names more than two systems and no author
+  ruling is recorded against that spec.** Two is the author's stated ceiling and the escape is a
+  `tasks decision` against the spec, not a flag — a flag is a thing a worker can add, and a decision
+  is a thing the store remembers. Measured against history: this leg would have failed 36 of the 88
+  merged features that carry code.
+  proof: vitest scripts/tasks/mergeReady.test.ts
+- [c5] **A worker is given the number before it writes.** `work-prompt` prints the member's derived
+  system declaration, the historical distribution from c1, and — when the declaration already exceeds
+  two — the instruction that this needs an author ruling before code rather than an explanation at
+  merge. The subjects are the record's own grant, so a grant widened after dispatch is reported with
+  no edit here.
   proof: vitest scripts/tasks/workPrompt.test.ts
-- [c6] **Every auditor's brief carries the question an auditor currently cannot ask.** The generated
-  brief contains, as a graded item beside the clauses, "what is the smallest change that would make
-  this class of defect impossible, and was it made?" — and names "this spec is the wrong shape, stop"
-  as a permitted answer, with `tasks question` as where it goes. The proof asserts this over every
-  brief the generator can produce rather than over one sample, so a second brief shape added later
-  carries it too.
-  proof: vitest scripts/tasks/auditPrompt.test.ts
-- [c7] **A spec says what it is aiming at before it says how.** `spec new`'s scaffold carries an
-  `## End state` section, and `tasks spec show` reports whether that section is present and non-empty
-  for the spec it is shown. It reports; it refuses nothing and fails nothing, and specs written before
-  this branch are reported as lacking it rather than retrofitted.
-  proof: vitest scripts/tasks/specCmds.test.ts
-- [c8] **This branch changes no application behaviour.** No file under `src/` and no file under
-  `content/` is modified. The measurement is built and calibrated before anything it indicts is
-  touched, so that the change to `registry.ts` can be shown against a number that existed before it.
+- [c6] **Closing a spec records what it actually cost, so a cadence can be derived rather than
+  guessed.** `tasks done` writes the closing diff's file count and system count onto the event it
+  already emits. It is derived once at close from git and never recomputed, so nothing drifts. This is
+  the series that decides whether c4's ceiling of two is right: if the rate of rulings does not fall
+  across the next twenty specs, either the ceiling is wrong or the partition is, and both are then
+  answerable from data instead of from argument.
+  proof: vitest scripts/tasks/records.test.ts
+- [c7] **The gate holds on the branch that builds it.** The implementation branch is cut from `main`
+  and its diff against `main` names no file outside this member's `writes` grant. This is c3 applied
+  to itself, and it replaces the previous version's c8, which asserted "no file under `src/`" and was
+  false at the commit that introduced it because that commit sat on a branch already carrying another
+  spec's work.
   proof: command git diff --name-only main...HEAD
-- [c9] `npm run tasks -- merge-ready` passes before the spec is marked done.
+- [c8] `npm run tasks -- merge-ready` passes before the spec is marked done.
   proof: command npm run tasks -- merge-ready
 
 ## Goal
 
-Give the repository a number for its own resistance to change — derived, not stored — and put it in
-front of the worker before it writes and the auditor before it grades, so that a design that will
-cost seventeen files is visible in minute one instead of hour three.
+Make a change unable to cost more than it declared, and make two systems the declared ceiling, so
+that a feature which is going to touch six systems is refused at declaration time instead of
+discovered at hour three.
 
 ## End state
 
-    census(tree) = for each import edge, does the importer consume a shape or an answer
-    hubs         = modules where shape-in >= 2 x answer-in
-    report       = census(worktree) vs census(tree at merge-base), ranked, delta, hubs named
-    work-prompt  = report restricted to this member's writes grant
-    audit-prompt = + "what smallest change makes this impossible, and was it made?"
+    cost(merge)   = files and systems in the diff between its two parents        -- from git
+    declared(spec)= ownerOf over the member's writes grant                       -- from the store
+    gate          = FAIL if diff touches a system not in declared(spec)
+                    FAIL if |declared(spec)| > 2 and no author ruling is recorded
+    work-prompt   = declared(spec) + the historical distribution, before code
+    tasks done    = record cost(this merge), so the series accumulates
 
 Five lines. Anything in the implementation that is not one of them is scope this spec did not ask
-for, and this section exists so that is decidable by reading rather than by an audit.
+for, and this section is here so that is decidable by reading rather than by an audit. c1 and c6 are
+the first and last lines; c2 the second; c3, c4 and c7 the gate; c5 the fourth.
 
 ## Stages
 
-1. **The census** — c1, c2. `scripts/lib/architecture.ts` and `scripts/census.test.ts`. First because
-   every other stage consumes it, and because the calibration is what decides whether the cheap
-   classifier is honest enough to build on. If c2's disagreement set contains an edge the text
-   classifier called `shape` or `answer` wrongly, stop and file a question: the remaining stages are
-   worthless on an instrument that lies.
-2. **The report** — c3, c4. `scripts/audit-status.ts`. The git-side `SourceTree` is the whole of c3
-   and is small because `architecture.ts` was already written to take its reads as data.
-3. **The consumers** — c5, c6, c7. `scripts/tasks/workPrompt.ts`, `auditPrompt.ts`, `specCmds.ts`.
-   Independent of each other; each is a few lines over a number stage 1 already computes.
+1. **The measurement** — c1, c2. New `scripts/lib/featureCost.ts`, pure over `{ merges, diff, read }`
+   passed in as data, the same seam `architecture.ts` uses and for the same reason: no temp repo per
+   case, and the five-minute rule survives. Goes first because c3 and c4 are meaningless if the
+   distribution they are calibrated against cannot be reproduced.
+2. **The gate** — c3, c4. `scripts/tasks/mergeReady.ts`. Two legs, both hard. The merge-base manifest
+   read is the whole of c3's anti-gaming and is three lines given `git.fileAt`.
+3. **The consumers** — c5, c6. `scripts/tasks/workPrompt.ts`, `scripts/tasks/records.ts`. Independent
+   of each other.
 
-c8 and c9 hold across all three and are not a stage.
+c7 and c8 hold across all three and are not a stage.
 
 ## Decisions
 
-**The capability is extended, not added.** The survey found `derived architecture view` registered to
-Task system over `scripts/lib/architecture.ts`, which already exposes `ImportEdge` and
-`exportedNames`. The census is a field on an edge that module already computes, not a second walk of
-the import graph beside it. A separate tool would be two derivations of one graph kept in agreement by
-hand, which is the thing this spec is about.
+**Why the import-edge census is abandoned rather than repaired.** Both graders killed it
+independently and on different evidence. Its columns were overlapping sets rather than the partition
+c1 claimed — 39 + 13 against 45 distinct importers of `registry.ts` — and the hub list flips depending
+on which rule resolves the 26.5% of edges that carry both a shape and an answer, which in turn decides
+whether `state.ts` is a hub, which is what the old Decisions rested its central argument on. Its
+answer column was dominated by `export class`: `DslError` at 42 importers is thrown and not asked, and
+`Cursor` is the most shape-like object in the grammar layer, so reclassifying one keyword made
+`parser.ts` the worst module in the tree instead of the best. And it was defeatable in one line by a
+barrel re-export, of which `src/runtime/runtime.ts:71` is already an instance. A metric with three
+undecided definitions, each of which reverses its output, is not an instrument that needs tuning.
 
-**The classifier is textual and the checker is the auditor of it, not the implementation.**
-`architecture.ts` is pure over `{ files, read }` and is why `tasks where` needs no temp repo and
-answers in milliseconds; a `ts.Program` inside it would take that away from every caller to serve one.
-So the classification reads the exporting declaration's syntax, consistent with `exportedNames`, and
-c2 is a separate checker-based test that holds it honest. This is the same division
-`scripts/exhaustive.test.ts` already uses — a rule about the whole tree proved from above the tree —
-and its cost is paid once per suite run rather than once per query. `export const x: Fn = ...` is the
-known ambiguous form and is what `unclassified` is for.
+**Shape-out-degree is the good half and is deliberately not in this spec.** The dual of the refuted
+metric — how many other modules' internals *this* module must know — correlates at 0.505 against the
+same historical record and ranks `serialize.ts` second rather than one hundred and sixty-third, which
+is the enumerator diagnosis stated as a number. It is worth having. It is not here because it is a
+diagnostic and this spec is a gate, and because folding a second measurement into a branch that is
+installing two hard legs into `merge-ready` is how the previous version reached nine clauses across
+five production files, one of whose proof targets did not exist. It is the next spec and it now has a
+validation set: any successor metric must be scored against c1's series before a line of it is
+written.
 
-**The gate is soft, by the author's ruling on 2026-08-19.** Nothing here fails a check. The reason is
-in the store rather than in intuition: 1188 findings against 2 questions says the problem is not that
-warnings were ignored, it is that the number did not exist and the channel for objecting was unused.
-A hard ratchet on a measurement nobody has seen yet would be a gate earning its place by sounding
-rigorous, which `CLAUDE.md` names directly. Whether it hardens is a decision for after there is a
-history of the number moving.
+**Duplication is not addressed here and this is the second time it has to be said out loud.** Five
+implementations of one capability share no import edge and need not share a system, so neither the
+refuted metric nor this one detects them. The author named it first and the previous version implied
+it was covered by a causal story about shape-consumers, which is a story and not a detector. What
+would detect it is the co-change matrix c1 already computes — file pairs that change together across
+many features with no import path between them — plus the concept registry, whose failure was in its
+key rather than its question: 78 of 149 distinct `produces` names in the store were never registered,
+because a capability name is authored prose and two authors do not choose the same words. That is one
+spec, it is next after shape-out, and it does not belong in a branch about gates.
 
-**`src/content/registry.ts` is not touched, by the author's ruling on 2026-08-19, and the tool is
-required to be loud about it.** It is the worst module by this measurement and the root of the
-autocomplete report, and it is left alone until the instrument exists, so that the fix is graded
-against a number captured before it. c4 makes the warning a clause rather than a courtesy and c8 makes
-the abstention checkable. Turning `Registry` from a shape thirty-seven modules walk into an oracle
-they ask is the next spec and is not this one.
+**The gate is hard by the author's ruling of 2026-08-19, which reverses their soft ruling of the same
+day.** The evidence that changed it was gathered after the first ruling and is in the graders' reports:
+every reporting-only instrument in this repository has been routed around, with counts, and the two
+mechanisms that ever changed behaviour both removed a path rather than annotating one. A hard gate is
+affordable here only because the measurement says so — 59% of merged features already satisfy the
+ceiling — and that is the difference between a gate and a stop-work order.
 
-**This spec runs beside `nothing-downstream-rebuilds-what-the-load-path-decided`, whose grant is
-`scripts/` whole.** That is a declared collision and it is why this grant names five files rather than
-a directory — `tool-friction-backlog` was declined for exactly the mistake of granting
-`scripts/tasks/` and `scripts/lib/` wholesale. The two specs are disjoint in fact: that branch's
-remaining stages are `src/content` and `src/runtime`, and c8 forbids this one from entering either.
-`tasks plan` is run before dispatch regardless.
+**c4's escape is a recorded decision and not a flag, and the ruling rate is the thing to watch.**
+Forty-one percent of historical features would have needed one, which is a real risk of the escape
+becoming furniture. It is accepted with the risk named rather than designed around, because the
+alternative — a ceiling nobody must justify crossing — is the current state. c6 exists so the question
+"is the rate falling" is answerable in twenty specs from the store rather than from anyone's
+impression, and if it is not falling then the ceiling or the partition is wrong and this Decisions
+entry is where that gets re-opened.
 
-**The pseudocode requirement is one clause and not a system.** c7 reports; it does not refuse a spec
-without an `## End state`, and it does not retrofit the eighty specs already written. The requirement
-that a worker write the ideal shape before implementing is worth having because the failure it
-addresses was measured at three hours against four lines, but a gate over spec prose would be a check
-on writing rather than on code, and the cheapest version that could have prevented that failure is a
-section in the scaffold and a line in `spec show`.
+**Ownership is resolved at the merge base and this is the whole anti-gaming surface.** The one way to
+satisfy c3 dishonestly is to move a file into the declared system by editing `systems.json` in the
+same diff. Reading the manifest at the base closes it, costs three lines given `git.fileAt`, and needs
+no new rule for anyone to remember. `audit-status` already fails on the partition being incomplete,
+so "every tracked file is owned by exactly one system" is a property this gate may assume rather than
+re-establish.
 
-**Why 63% of the finding census is one disease, and why proofs-that-cannot-fail is not part of it.**
-Duplication, inference and missing-seam are three readings of one act and are fixed by one change:
-expose the answer. Proofs-that-cannot-fail is not an architectural category at all — it is the audit
-protocol failing to notice an assertion that cannot fail, it is already addressed by
-`npm run mutate` and by the standing lesson about aiming the manifest before the first auditor, and
-filing it alongside the other three is the category error that has been costing passes. Nothing in
-this spec addresses it and nothing in this spec should.
+**The declaration is derived from the grant, so there is nothing to keep in sync.** `CLAUDE.md` names
+manually-synced systems as the repository's single largest and most frequent failure mode, and a
+`systems:` field beside `writes:` would be one. Resolving `writes` through `ownerOf` means the
+declaration cannot disagree with the grant, and widening it is already a store event.
 
-**`state.ts` and `parser.ts` are the two rows that prove the ratio rule is not a proxy for size.**
-`state.ts` has a high shape-in (23) and is not a hub because 15 modules also call it; `parser.ts` has
-21 and is emphatically not one. A rule keyed on shape-in alone would have named both and would have
-told the last branch to undo the codec conversion. The ratio is what distinguishes a module many
-things depend on from a module many things must understand.
+**The measurement is answerable over history, and the 3% that is not is stated rather than hidden.**
+`System.paths` holds exact files, so a file renamed or deleted since a merge resolves to no owner
+today. Ninety-seven percent of the files those 88 merges touched are still owned, which is why the
+series is worth computing; the report names the unresolved count per merge rather than silently
+dropping it, because a feature whose files have all since been renamed would otherwise appear to have
+touched zero systems. Three of the 139 merges already show that shape.
+
+**This spec must be implemented on its own branch cut from `main`.** c7 is false on any branch
+carrying another spec's work, which is exactly how the previous version's equivalent clause was false
+at birth. The commit of this document is not the implementation and does not need to satisfy c7.
 
 ## Open questions
 
-- Whether the hub ratio is 2:1 or something else is the worker's call once the full distribution is
-  in front of it. The clause fixes that the rule is a ratio between the two numbers and derives its
-  own subjects; it does not fix the constant. A constant chosen to make today's list come out right
-  is worth saying so in the pass file.
-- Whether `work-prompt`'s hub report is printed for every grant or only when a grant crosses a hub is
-  the worker's call. The clause requires the number be present before writing; a brief that prints
-  four zeroes on every task is noise that will teach people to skip the section.
-- Whether the base-side `SourceTree` reads through `git show` per file or one `git archive` is an
-  implementation choice with a wall-clock consequence, and the five-minute rule is what decides it.
-  `systemView` recomputing the whole edge graph per system was measured at 210ms over 260 files and
-  declined as a non-problem; a second whole-tree walk against the merge base is the first thing on
-  this branch that could change that, and the measurement belongs in the pass file.
-- Whether `unclassified` edges should be reported per-module or only in the total is open. If the
-  count is large the buckets are not trustworthy and c2 will say so before this matters.
+- Whether the co-change matrix is computed here or in the duplication spec is the worker's call. c1
+  needs the per-merge file sets and the matrix is one pass over them; building it now costs almost
+  nothing and using it here is out of scope. Producing it and leaving it unused is acceptable; using
+  it is not.
+- Whether c3's leg reports every offending file or the first is the worker's call. The gate's value is
+  the exit code; the message is ergonomics.
+- Whether `tasks done`'s recorded cost in c6 counts test files is open, and the honest answer is
+  probably both, since c1 shows the median moves from 7 to 13 on that choice alone and a series that
+  does not say which it counted will be misread within a month.
+- Whether 88 merges is enough to calibrate a ceiling is a fair challenge to c4 and is not settled
+  here. The distribution is bimodal enough that the answer is probably yes, but the worker should say
+  what it saw rather than repeat this sentence.
