@@ -504,3 +504,32 @@ Cost note: every one of the four reports had to be spot-checked before use, and
 one headline claim was understated rather than wrong (zero exhaustiveness guards
 tree-wide, not merely absent from two files). Budget verification time per agent;
 the reports are leads, not evidence.
+
+---
+
+## 2026-08-18 — One coding agent over stages 2 and 3 of a live spec
+
+Dispatched per `docs/workflow.md` step 5 — one instruction pointing at
+`work-prompt` — plus only the facts the record could not carry: a tsc-verified
+worklist (30 sites / 15 files), the 2026-08-16 ruling it must not reverse, and
+three environment traps measured in the dispatching session (CRLF working
+copies breaking exact-match edits and mutate manifests; `inspect` rejecting TS
+syntax; heredocs mangling regex escapes in manifests). ~270k tokens, 30 min.
+
+Paid off, and the reason is worth separating from the output. The agent landed
+two clauses met and mutation-verified on the first aim, 12 killed 0 survived —
+but the load-bearing result was that its derived proof found a real defect no
+test could have: `skillGrant` consumed to end of line while its schema declares
+`grants` as a comma-separated clause list, so a second grant on one line was
+refused. No shipped `.dsl` authored one, which is exactly why the corpus round
+trip could never have reached it. That is the case for derivation over
+enumeration, produced rather than argued.
+
+It also stopped where it was told to stop rather than half-landing c3's walk,
+and filed six concrete reasons a field-derived printer disagrees with today's
+bytes. The dispatching session had failed at the same task for the opposite
+reason — context exhaustion mid-conversion — so the cost that mattered was not
+capability but a fresh context over a fully specified job.
+
+Carry forward: passing measured environment traps in the prompt is cheap and
+removed the exact failure that ended the previous attempt.
