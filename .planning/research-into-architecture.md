@@ -2122,3 +2122,544 @@ Agent 3 left them.
 - **§8 is speculation.** It has one supporting data point (#12) and no measurement.
 - **My §1 rests on abstracts and site self-description.** I did not read the RIG paper's methodology,
   so the 6.6% single-language figure is quoted, not audited. If someone builds on it, read §V.
+
+---
+
+# Agent 5 — the experiments, run
+
+Agent 4 asked for four things before anything else is believed: the closure-vs-transcription time
+series (§2), the probe at HEAD (§4), the closed-set census (§3), and the data-vs-behaviour count that
+bounds transposition (§5). I ran all four, plus an audit of Agent 3's numbers that nobody had done,
+plus a retrospective on §6. Everything below reproduces from `git` and the tree; no stored state, per
+#20. Scripts were scratch and are gone, per Agent 3's precedent — the method is in the text.
+
+**Two of the page's load-bearing claims do not survive, and they are Agent 4's, not Agent 3's.** The
+probe is worth building and is better than specified. §2 is refuted by its own criterion, and by a
+margin that is not close.
+
+---
+
+## 1. Audit of Agent 3's numbers — discharging the duty Agent 4 discharged for the papers
+
+Agent 4 checked the citations and left the measurements unchecked. Agent 3's §4 is the strongest
+result on the page and four proposals die on it, so it is the one to re-run.
+
+| claim | Agent 3 | re-run | verdict |
+|---|---|---|---|
+| base rate: merges touching non-test `src` | 51/139 = 37% | 53/139 = **38%** | reproduces |
+| `systems.json` edited alongside `src` | 40/63 = 63% | 44/69 = **64%** | reproduces |
+| every `scripts/*.ts` gate, edited alongside `src` | **0 of 10** | **1 of 10 = 10%** | one merge off |
+
+Counting every merge rather than only feature merges, the gate row is 4 of 14 — but three of those
+four are back-merges (`Merge main into …`), where the `src` files arrive from main rather than from
+the branch. Excluding them lands on Agent 3's own denominator, one merge apart. The same confound
+applies to `systems.json`:
+
+| | co-edit rate | base rate |
+|---|---|---|
+| all merges | `systems.json` 64%, gates 29% | 38% |
+| back-merges excluded | `systems.json` **60%**, gates **1 of 10 = 10%** | **33%** |
+
+**The law holds.** `systems.json` is co-edited at 1.8× base rate and the gates at 0.3×. The one
+exception is `a0080863` (`reimplement-localization`), which edited `scripts/lib/layers.ts` alongside
+76 `src` files — a branch that moved a layer root, which is the one case where a gate genuinely has
+to move with the code. So the honest statement is *1 of 10, and the one has a reason*, rather than
+0 of 10. The "~0.9% coincidence" p-value was computed on the zero and should be recomputed before it
+is quoted again; the finding itself is unaffected.
+
+I also re-derived Agent 3's §5 blast-radius table, which reproduces closely (`+slot` → 11 rather
+than 9, `+entitytype` → 11 exact, `+event,+faction` → 28 rather than 27; I count `scripts/` too).
+
+**Agent 3's "286 literals across 41 modules" does not survive contact with a parser.** It is a grep
+over kind names, and `'test'`, `'event'`, `'item'`, `'save'`, `'action'` are ordinary words — 16 of
+the hits are in `scripts/tasks/records.test.ts`, which has never heard of a section kind. Parsed
+rather than grepped, the `SCHEMAS` literal groups are **16 sites in 12 files, 9 of them non-test**.
+The mechanism Agent 3 named is real. The number attached to it is about 3× too big, and §4's
+"today (b) is on the order of 41 files" inherits the error.
+
+---
+
+## 2. The probe (§4), built as an instrument rather than run by hand
+
+Agent 4's probe is the best idea on the page, and the specified form is too slow to become a habit:
+one `tsc --noEmit` on this tree is **33 seconds**, so a census-sized sweep is twenty minutes of
+serial compiles with a `sed` and a backup file around each one.
+
+It does not need to be. Drive `ts.createLanguageService` over the real `tsconfig`, hold the mutated
+source as an in-memory override keyed by a bumped script version, and ask every root file for its
+semantic diagnostics. The lib and `node_modules` parse is paid once. **38 probes, each a full-program
+re-check, in 200 seconds total — 8 seconds for the baseline and about 5 for each subsequent set.**
+Nothing is written to disk, so it cannot leave a mutated tree behind the way the `sed`-and-restore
+form can, and it composes with `npm run inspect`'s existing "evaluate against the repo's own module
+resolution and leave no file behind" contract.
+
+That is the difference between an acceptance test somebody runs once to close a spec and one that
+runs on every branch. I record it because the same lesson has already been paid for once here:
+`npm run mutate` works and costs 8–20 minutes, and #11 notes that the cost is why it gets skipped.
+
+---
+
+## 3. What the probe found: these sets are load-bearing in one direction only
+
+Widen every one of the 38 closed sets by one synthetic member and count the files that stop
+compiling:
+
+| files that fail when one member is added | sets |
+|---|---|
+| **0 — nothing in the tree notices** | **15 of 38** |
+| 1, and it is the set's own defining file | 13 of 38 |
+| 2 or more, reaching another module | 10 of 38 |
+
+The maximum anywhere in the tree is **4** (`Standing`, `src/runtime/planeReport.ts`). And the two
+sets this page is about:
+
+```
+add a kind to SCHEMAS   ->  1 file fails   (src/content/locale.ts, TEXT_FIELDS)
+add a kind to BESPOKE   ->  0 files fail
+```
+
+A whole new section kind — its own grammar, its own parser, a thing an author can write at the top
+of a module — can be added to `content/module.ts` and **nothing in the repository fails to compile.**
+`SECTION_KINDS` is declared `readonly string[]`, so no type is derived from the set the tree actually
+uses. `ReferenceKind`, the 19-member union at the centre of #14's co-change pair, is the same: widen
+it and the build is green.
+
+Now run the probe backwards. **Remove** a member instead:
+
+| | add a member | remove a member |
+|---|---|---|
+| `SCHEMAS` | 1 file | 2 files |
+| `ReferenceKind` | **0 files** | 2 files |
+
+That asymmetry is the whole diagnosis, and it is sharper than "the copies are hand-written":
+
+> **Every closed set in this tree is consumed contravariantly and almost none covariantly.** The set
+> appears as an *argument* type — "you may only pass one of these" — which checks call sites and is
+> satisfied by a narrower set. Almost nothing consumes it as a *domain* — "you must handle all of
+> these" — which is the only direction in which adding a member is an error. Narrowing is checked.
+> Widening is free. The blast radius an author feels is entirely in the direction the compiler is not
+> watching.
+
+This is why Agent 3's structural instruments were blind to it, and it is a more precise statement of
+why than "transcription has no import edge". `referenceSites.ts` *does* import from `content`. The
+edge is there. What is missing is a total mapping.
+
+---
+
+## 4. |b|, measured over history instead of estimated
+
+Agent 4 defines (b) as "files that hold a hand-written literal of the set and did not fail", estimates
+it at ~41, and sets `|b| → 0` as the acceptance test. Estimating it needs a heuristic for "holds a
+literal", which is exactly where the 286 went wrong. It does not need one — history has the answer.
+
+Method: walk every revision of each set's defining file, parse the set at each, and record the commits
+where it grew. That is **43 member-addition events across 13 sets**. For each, take the commit's
+changed files and keep those whose *added lines* mention the new member by name. That is the set of
+files that demonstrably had to learn about it. Then ask which of those the compiler would have named.
+
+```
+(file, event) pairs where a file had to learn a new member:   145
+   named by the compiler, or the defining file itself:         37   (25.5%)
+   silent — Agent 4's |b|:                                    108   (74.5%)
+```
+
+**The compiler sees a quarter of the blast radius.** Per set:
+
+| set | defined in | silent | seen | coverage |
+|---|---|---|---|---|
+| `ENGINE_KEYS` | `src/content/locale.ts` | 41 | 17 | 29% |
+| **`SCHEMAS`** | `src/content/module.ts` | **26** | **1** | **4%** |
+| `EVENT_OPS` | `scripts/lib/eventLog.ts` | 13 | 4 | 24% |
+| `PREPOSITION` | `src/grammar/actionResult.ts` | 8 | 2 | 20% |
+| `SURFACE_BUILDERS` | `src/ui/agent/surfaces.ts` | 6 | 1 | 14% |
+| 8 others | | 14 | 12 | 46% |
+
+**So §4 does not die, and §4's own falsification bar was set in the wrong units.** "Under five files"
+is not the test; the answer is a rate, and it is 74.5%. But the probe as specified would have
+reported 1 for `SCHEMAS` and called that the leak. The leak is 26.
+
+One correction I owe against my own number. Split the silent files by how many distinct
+member-additions dragged each one in:
+
+```
+SCHEMAS, silent files by number of kind-additions that touched them
+  5  src/content/namespace.ts        1  src/content/event.ts, faction.ts, flag.ts, slot.ts,
+  5  src/content/registry.ts            passive.ts, clusterJewel.ts, item.ts, entityType.ts,
+  4  src/content/referenceSites.ts      resolve.ts, modportal.ts, serialize.ts, slot.test.ts
+```
+
+The twelve singletons are mostly **the new kind's own new module**. Adding `# faction` creates
+`faction.ts`; that is the feature, not a tax. **The recurring tax is three files, every single time**
+— and all three are the ones that hold a near-copy of the kind list. The same filter over
+`ENGINE_KEYS` leaves nine, led by `src/ui/labels.ts` at seven; but `LABELS` maps a UI name *to* a key,
+so a new key never forces an existing row to change. Which is a distinction the page does not have:
+
+> **A closed set is a *domain* if something must be total over it, and a *vocabulary* if not.** Adding
+> to a vocabulary costs only the new member's own use site. Adding to a domain costs every table.
+> `SCHEMAS` is a domain. `ENGINE_KEYS` is a vocabulary with 186 members and the largest raw count on
+> the page. Ranking closed sets by `sites × members`, as §3 proposes, puts the vocabulary first.
+
+---
+
+## 5. The census (§3) — and the census that should have been asked for
+
+38 closed sets in the tree, taking "closed set" to be decidable rather than judged: an exported
+`enum`, an exported string-union alias of ≥3 members, an exported `as const`, or any `const` the tree
+derives a type from with `keyof typeof X` or `typeof X[number]`.
+
+**§3's stated falsification does not fire, but barely.** There is a second instance with meaningful
+transcription — `ENGINE_KEYS` — and 13 sets have actually grown at least once. The operation
+generalises. It generalises *weakly*: ranked by recurring silent files, `SCHEMAS` has 3, `ENGINE_KEYS`
+9 (as a vocabulary, so they are not a tax), `EVENT_OPS` 3, and everything else has 0 or 1.
+
+The more useful output is the third item of §3, which Agent 4 lists last and which is the one that
+explains the 74.5%. Every table in the tree keyed by a closed set defined in another file:
+
+```
+live tables keyed by a closed set defined elsewhere:    20
+  TOTAL — the compiler enforces coverage:               11
+  PARTIAL<Record<K,…>> — explicitly opted out:           0
+  HOLE — Record<string,…>, readonly string[], inferred:  9
+```
+
+And the split is not random:
+
+| | total | hole |
+|---|---|---|
+| keyed by a **string-union / enum** (`Standing`, `MessageTone`, `LogKind`, `SlotWrites`, `Direction`, `State`) | **10** | 1 |
+| keyed by **`SCHEMAS`** | **1** (`TEXT_FIELDS`) | **6** |
+
+Three of the six holes are in one file:
+
+```
+src/content/namespace.ts:15  ACTION_OWNER_KINDS    (inferred)          3 of 15 kinds
+src/content/namespace.ts:24  GLOBAL_SECTION_KINDS  readonly string[]   2 of 15
+src/content/namespace.ts:26  NAMESPACED_KINDS      readonly string[]  12 of 15
+```
+
+**Nobody opted out.** Zero `Partial<Record<K,…>>` in the tree — there is no deliberate escape
+anywhere. The nine holes are all places where the annotation was simply never written, and TypeScript
+infers `string[]` from `['variable', 'slot']` by default. **The failure mode is not that somebody
+copied a list. It is that the shape which checks nothing is the shape you get for free, and there is
+no signal at the moment of writing that a different one was available.** That is a design fact about
+the language, not about this repository, and it is why the same defect recurs in nine independent
+places with no shared cause.
+
+### The finding that breaks §5's plan
+
+§5 assumes the copies are *copies*, so that deriving them is available. Parsed, they are not:
+
+```
+SECTION_KINDS     22 : info item stat skill slot location entity event faction flag recipe
+                       resource variable passive cluster-jewel action dialogue droptable test
+                       save remove locale
+ReferenceKind     19 : … + capability, node, action-slug   − info, slot, variable, dialogue,
+                                                             remove, locale
+NAMESPACED_KINDS  19 : … + node, action-slug               − info, slot, variable, remove, locale
+```
+
+Union 25, present in all three **16**. Each pair differs by two to six members. These are not
+transcriptions of one set; they are **three overlapping sets that share a core**, and *no derivation
+from `SCHEMAS` exists* — `ReferenceKind` has members `SCHEMAS` does not have and lacks members it
+does. Totalisation cannot apply, because there is no key type to be total over. Transposition cannot
+apply, because the fold target would have to be the union of 25 rather than `SCHEMAS`'s 15.
+
+This is worse than the page's diagnosis and it is also the repair. The differences are *principled*:
+`info`, `remove` and `locale` are not referenceable objects, and `slot` and `variable` are global —
+which the tree already knows, because `GLOBAL_SECTION_KINDS = ['variable', 'slot']` sits three lines
+above `NAMESPACED_KINDS` in the same file. The predicates exist. They are just not attached to the
+kinds. Fold `referenceable` and `namespaced` into the row and all three lists derive.
+
+**So §5's transposition is not merely the larger win — for near-miss sets it is the only thing that
+makes derivation possible at all.** §5 sells it as "1 edit instead of 6". Its real job is to give the
+per-kind facts a home so that the sets which are *nearly* `SECTION_KINDS` stop being hand-maintained.
+
+### §5's prediction, answered
+
+§5 asks for a count: of the enumerators keyed by kind, how many payloads are data at or below
+`content` and so may fold, per `layer-check`'s order?
+
+| enumerator | payload | verdict |
+|---|---|---|
+| `TEXT_FIELDS` (`locale.ts`) | `readonly string[]` | **fold** — already total, and pure data |
+| `GLOBAL_SECTION_KINDS` | boolean per kind | **fold** |
+| `NAMESPACED_KINDS` | boolean per kind | **fold** |
+| `ACTION_OWNER_KINDS` | boolean per kind | **fold** |
+| `applySection` switch (`registry.ts`) | behaviour | **totalise in place** |
+| `visitSection` switch (`referenceSites.ts`) | behaviour | **totalise in place** |
+| `ReferenceKind` union | *a different set* | neither — needs the fold above first |
+
+**Four fold, two totalise, one is the near-miss case §5 does not have.** The prediction that most
+payloads are data holds. Blast radius for a new kind should go from 5 files to roughly 1 + 2.
+
+---
+
+## 6. §2 is refuted, by its own criterion, and not narrowly
+
+§2's test: walk the merges, plot median transitive closure against transcription count, and
+"§2 dies if median closure has been growing roughly linearly while literal count has not."
+
+I ran it over the 105 first-parent merges, reconstructing each tree with `git ls-tree` piped into a
+single `git cat-file --batch` so that 105 revisions cost minutes rather than 28,000 subprocess calls.
+The first merge (2026-07-07, 82 modules) is a different lineage — the next first-parent merge is
+2026-08-03 with 54 modules — so it is dropped. That leaves **31 distinct tree states over 15 days**,
+82 → 152 modules.
+
+| quantity | first | last | growth | R² vs merge index | R² vs ln(index) |
+|---|---|---|---|---|---|
+| modules | 82 | 152 | 1.85× | 0.813 | 0.536 |
+| median closure | 8 | 81 | 10.1× | 0.820 | 0.579 |
+| **mean closure** | **11.7** | **54.0** | **4.62×** | **0.940** | 0.768 |
+| **p90 closure** | **23** | **91** | **3.96×** | **0.955** | 0.885 |
+| **total closure** (Σ over modules) | **962** | **8204** | **8.53×** | 0.894 | 0.648 |
+| fraction of modules with closure ≥ 40 | 0.05 | 0.64 | 13.0× | 0.948 | 0.839 |
+| **hole tables** | **7** | **7** | **1.00×** | **0.135** | 0.014 |
+| enumeration members | 78 | 309 | 3.96× | 0.738 | 0.463 |
+| closed sets | 15 | 26 | 1.73× | 0.755 | 0.452 |
+
+**Closure is the linear one and transcription is the flat one. Exactly backwards from the
+prediction.** Seven hole-tables at the first measured state, seven at the last, R² = 0.135 — the
+transcription surface has not grown at all in fifteen days while the tree doubled. Closure fits a
+line better than a log at every percentile. And it grows **2.5× faster than the module count**
+(4.62× against 1.85×): mean closure per module went 0.14 → 0.36, so the average module now reaches
+better than a third of the repository, against a seventh two weeks ago.
+
+I use the mean and p90 rather than the median, which is the statistic everyone has been quoting.
+Agent 3's own §0 says the population is bimodal — `grammar`/`content` at 3/12 against `runtime`/`ui`
+at 82/86. **The median of a bimodal population is a threshold indicator, not a growth curve**: it
+sits in the low mode until just over half the modules cross into the high one and then it jumps,
+which is exactly the 15 → 31 and 51 → 81 steps in the series. The mean and p90 are smooth and both
+fit at R² > 0.94. Agent 3 found the bimodality and the page then kept quoting the median through it.
+
+The 4× rise in enumeration members is almost entirely one step — 110 → 257 at state 22, when
+`reimplement-localization` landed 186 `ENGINE_KEYS`. A vocabulary, per §4 above.
+
+---
+
+## 7. Agent 3's floor is not a floor
+
+§2's argument is "a quantity with a floor cannot be the thing growing linearly", resting on Agent 3's
+finding that two unrelated surgeries both stop at 42–49. The inference needs the floor to be a
+property of the tree. It is a property of *one snapshot* of the tree, and it moves.
+
+Recompute Agent 3's physically-impossible bound — every intra-SCC edge deleted — across the window:
+
+| modules | biggest SCC | intra-SCC edges | mean closure | **mean closure at Agent 3's floor** |
+|---|---|---|---|---|
+| 56 | 6 | 15 | 18.6 | **16.0** |
+| 82 | 14 | 51 | 25.5 | **20.0** |
+| 126 | 28 | 140 | 48.2 | **32.9** |
+| 152 | 28 | 143 | 54.0 | **37.5** |
+
+**The floor grew 2.3× over the same fifteen days.** Deleting every cycle in the tree today leaves you
+where the *actual* tree stood two weeks ago. Agent 3 measured the prize correctly and read a snapshot
+as a bound; §2 then built an inference on the bound.
+
+The gap between actual and floor — the part cycle-breaking would actually buy — went from 2.6 modules
+(14%) to 16.5 (31%). **Cycles are becoming a larger share of the problem, not a constant one.**
+Agent 3's "banning cycles buys a constant factor on an unbounded quantity" is right that the quantity
+is unbounded and wrong that the factor is constant.
+
+---
+
+## 8. The null model — 80% of the closure number is arithmetic
+
+Before anyone optimises closure, it is worth asking how much of it is a fact about *this* codebase.
+Rewire the graph at random, preserving only three things: the module count, each module's out-degree,
+and the layer rule. 30 trials, deterministic seed.
+
+| revision | modules | observed mean closure | random, layer rule respected | observed / random |
+|---|---|---|---|---|
+| `b9ea66f9` | 57 | 18.3 | 32.2 | 0.57 |
+| `c59b0a0d` | 83 | 25.2 | 37.2 | 0.68 |
+| `a0080863` | 127 | 47.8 | 58.9 | 0.81 |
+| **HEAD** | **154** | **53.3** | **66.4** | **0.80** |
+
+**Four fifths of the closure number at HEAD is reproduced by a graph wired by a random number
+generator.** And the ratio is rising — the tree started at 0.57 of random and is at 0.80. All the
+design decisions inside the four layers, every module boundary anyone has argued about, account for
+the remaining 20%.
+
+That is the real explanation for Agent 3's floor, and it is not about game runtimes. Both surgeries
+preserved the module count and roughly the out-degree, so both landed near the null value. **A graph
+with 154 nodes and 817 edges has a large closure whatever you do with it**, unless you delete nodes,
+delete edges, or add a constraint that forbids whole classes of edge.
+
+Which names the one lever the null model leaves. Drop the layer rule from the same simulation:
+
+```
+random, out-degree preserved only            mean closure 137.4
+random, out-degree + the 5-layer rule        mean closure  66.4
+```
+
+**`layer-check`'s five-element total order is worth 2.6× on the quantity that grows.** It is the
+largest single determinant of the closure number in the tree, it is the only gate never routed
+around, and it is 8 lines with no knob. Everything else on this page — every partition, every grant
+file, every digest — is arguing over the 20%.
+
+---
+
+## 9. What is left after all that: one unit of 28
+
+If closure is mostly arithmetic and the transcription surface is flat, what is the thing?
+
+Reading cost is not "how many modules does this reach". It is "how many can I read **one at a time**,
+in dependency order, holding only interfaces". For a DAG that is one module at a time, always. For a
+strongly connected component of size *k* it is *k* at once, because no member can be understood
+before the others. So the honest quantity is the size of the largest indivisible unit in a module's
+reading list.
+
+| quantity, over 152 non-test `src` modules | median | mean | p90 | max |
+|---|---|---|---|---|
+| modules in the closure | 81 | 53.1 | 91 | 138 |
+| **units** in the closure (SCCs collapsed) | 49 | 36.1 | 59 | 105 |
+| **largest unit in the closure** | **28** | 15.2 | 28 | 28 |
+
+Four cycles in the tree. One of them is 28 modules with 131 internal edges, and **78 of 152 modules —
+51% — have it in their reading list.** The others are small and interesting: a 4-module cycle
+(`registryDiff` `serialize` `references` `registry`) and a 3-module one (`module` `locale` `action`),
+which is to say #14's co-change cluster and the `SCHEMAS`/`TEXT_FIELDS` pair are both *also* cycles.
+
+And the rest of the tree is already stratified:
+
+| layer | modules | cycles | biggest SCC | natural strata, SCCs collapsed |
+|---|---|---|---|---|
+| `src/grammar` | 14 | 0 | — | **7** |
+| `src/content` | 42 | 2 | 4 | **9** |
+| `src/ui` | 54 | 1 | 2 | **6** |
+| **`src/runtime`** | **42** | **1** | **28** | 6 |
+
+`grammar`, `content` and `ui` are near-acyclic and already 6–9 layers deep by their own import
+structure. **`src/runtime` is the only place in the tree where "what does this sit on top of" has no
+answer**, and it is two thirds of that directory.
+
+This reframes #24. Agent 3 priced banning cycles at "40% of the median closure for 32 edges, worth
+doing for inexemptibility but not the intervention", and sequenced it last on that basis. The pricing
+used the wrong prize twice: the closure delta is against a floor that moves (§7), and closure is
+mostly arithmetic anyway (§8). The right prize is that **acyclicity is the precondition for the only
+mechanism measured to move the number — the layer rule.** You cannot give `src/runtime` an internal
+order while 28 of its 42 modules are one unit. A DAG always has a natural stratification and a cyclic
+graph does not.
+
+---
+
+## 10. A negative result I want on the record
+
+The obvious next claim is that touching the 28-blob is what makes features expensive, and it looked
+true:
+
+```
+feature merges with >=2 src files: 33
+  touching a unit >= 10 modules  (n=15):  median 16 src files, mean 21.3
+  not                            (n=18):  median 10 src files, mean  9.9
+  difference 11.4 files, one-sided permutation p = 0.0043 over 20,000 shuffles
+```
+
+It is not true. A bigger feature touches more files and is therefore more likely to include a blob
+module by chance. Draw the same number of files uniformly at random from the tree at each merge:
+
+```
+features touching a unit >= 10 modules:  observed 15,  expected by feature size alone 18.9
+```
+
+**Features touch the blob slightly *less* than chance.** The size difference is the confound, not the
+finding. I cannot claim that breaking the blob makes features smaller, and neither should anyone else
+without running this control — the uncontrolled version passes a significance test at p = 0.004 and
+is wrong.
+
+The argument in §9 is structural — half the tree cannot be read in order — and it has to stand on
+that, not on a feature-size effect.
+
+---
+
+## 11. §6's transform, priced
+
+Agent 4 proposes evaluating the governing artifact at the merge base and predicts the co-edit rate
+goes to zero by construction, with the residual that a pipeline lands two branches. The residual is
+the cost, and it is measurable retrospectively: of the merges that edited `systems.json` alongside
+`src`, how many of those edits covered a file the same branch created?
+
+```
+merges editing systems.json alongside src:                                44
+  where the edit covered a path holding a file that branch created:       41   (93%)
+```
+
+**41 of 44.** Merge-base evaluation would have forced a separate preceding branch on essentially
+every one of them — about one in three of all merges in the repository. That is not "raises the cost
+from one line to a round trip" as an occasional event; it is a round trip on a third of all work, and
+it is the same tax #12 was celebrated for *removing* when it deleted the decompose step.
+
+The transform is sound and the mechanism is right. I would not spend it on `systems.json`, whose only
+job is a partition that Agent 3's §4 and v2's refutation both say should not exist. If it is run at
+all, run it on something whose grant is rare.
+
+---
+
+## 12. What I would do
+
+Against Agent 4's eight-point admission test, which is the best artifact on this page and which I am
+using rather than restating.
+
+**First, and it is a day: totalise the nine holes.** Nine tables in the tree are keyed by a closed set
+and typed so that nothing checks them; zero are `Partial<Record<…>>`, so nobody opted out. Six are
+keyed by `SCHEMAS` and three of those are in `namespace.ts`. This is #23 at its true size — much
+smaller than the page believes, because the 286 was a grep — and it retires 26 of the 108 silent
+pairs. Knob: none, the key type is `keyof typeof SCHEMAS`. Duplication: copying a table makes it
+worse. Relabel: no partition. Baseline: none. Population: per set. Artifact: compile errors a worker
+must answer.
+
+**Second, fold the per-kind predicates into the rows (§5), because otherwise `ReferenceKind` and
+`NAMESPACED_KINDS` cannot be derived at all.** They are not copies of `SCHEMAS`; they are
+`SECTION_KINDS ± a handful`, and the handful is `referenceable` and `namespaced` — predicates the
+tree already half-knows, since `GLOBAL_SECTION_KINDS` is sitting three lines away. Hold §5's line:
+data folds in, behaviour totalises in place. The fold target is the 22 of `SECTION_KINDS`, not the 15
+of `SCHEMAS`.
+
+**Third, make the probe a command, not a one-off.** `npm run probe` already "asks the load path a
+question without building a runner for it". The type-level twin is the same idea: widen every closed
+set by one member, report which ones nothing notices. Zero is the target and zero is not arbitrary —
+it is the same shape as `layer-check`'s zero violations and `exhaustive.test.ts`'s zero uncovered
+switches, both of which are on the survivors list. It runs in 200 seconds for the whole tree and it
+is a *report*, not a gate, so it does not add a fourth number to argue about. It is also the derived
+proof CLAUDE.md asks for: it walks the sets and covers the one added next month.
+
+**Fourth, break the 28-module unit — and price it as what it is.** Not 40% off a median that is a
+threshold indicator, against a floor that moves. It is the precondition for giving `src/runtime` an
+internal order, and the layer rule is the only thing in fifteen days of history measured to move the
+quantity that actually grows, by 2.6×. Agent 3's 32-edge estimate is the honest cost and I did not
+find a cheaper one.
+
+**What I am not able to recommend, and will not pretend otherwise.** I did not show that adding
+layers *inside* `runtime` reduces closure in this tree — only that the existing five-element order is
+worth 2.6× in the null model, and that `runtime` is the one place a finer order is currently
+impossible. Nor do I have a mechanism for enforcing a finer order without a hand-maintained list: a
+stratification derived from the imports is vacuous, since it is recomputed from whatever the code
+just did, and a declared one is `systems.json` with better manners. **That is the open problem, and
+it is the one worth a branch of thinking before a branch of code.** The shape that would work is a
+rule with no per-case knob, the way the five-layer order has none — and I do not have it.
+
+---
+
+## 13. What would falsify this
+
+- **§3 (probe directionality) dies** if some set widens and breaks more than the 4 files `Standing`
+  breaks. Re-run the battery; it is 200 seconds.
+- **§4's 74.5% is inflated** by counting the new kind's own new module as a file that "had to learn".
+  Filtered to files dragged in by ≥2 distinct additions, the recurring tax is 3 files for `SCHEMAS`,
+  and I believe that number more than the rate. Both are reported.
+- **§6 (the time series) dies** if 31 distinct states over 15 days are not enough, which is a fair
+  objection: the R² of 0.94–0.955 is over a short window with one project restart excluded. Re-run at
+  ~80 states. It will not reverse from arithmetic alone — the null model says closure rises with n —
+  but the *rate* is what is being claimed.
+- **§8 (the null model) dies** if my rewiring is unfair. It preserves out-degree and the layer rule
+  and nothing else; a fairer null would also preserve the directory structure, and that would raise
+  the null value and shrink the 20% further, not widen it. Anyone who wants to defend closure as a
+  target should build that null and show observed ≪ random.
+- **§9 dies** if the 28-module SCC is broken and closure does not fall, or if `src/runtime` proves
+  unstratifiable for reasons other than the cycle.
+- **§12's first item is cheap enough to just do**, and if totalising the nine holes does not reduce
+  the next kind-addition below 5 files, §4 and §5 are both wrong about the mechanism.
+- **The thing I could not test** is #23's own falsification: whether `referenceSites.ts` and
+  `registry.ts` stop co-changing once their literals are derived. That needs the change to land. My
+  §5 finding predicts they will not fully stop, because `registry.ts` is in a 4-module cycle with
+  `serialize.ts` and `references.ts` for reasons unrelated to the kind list.
