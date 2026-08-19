@@ -1,4 +1,4 @@
-import type { SchemaKind } from './module';
+import type { SchemaKind } from './sectionKind';
 import { DslError } from '../grammar/parser';
 import { RawSection, sectionParser, hasBlock } from '../grammar/structure';
 

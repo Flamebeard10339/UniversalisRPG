@@ -9,6 +9,7 @@ import { flagSchema } from './flag';
 import { infoSchema } from './info';
 import { itemSchema } from './item';
 import { parseLocaleSection } from './locale';
+import type { SchemaKind } from './sectionKind';
 import { locationSchema } from './location';
 import { passiveSchema } from './passive';
 import { DslError } from '../grammar/parser';
@@ -25,10 +26,8 @@ import { parseTest } from './test';
 import { variableSchema } from './variable';
 
 // Every kind whose grammar is key/value, beside the schema that reads it. The
-// literal keys are kept rather than widened to `string`, because `TEXT_FIELDS`
-// is exhaustive over them: a kind added here and nowhere else is a kind whose
-// words nobody decided about, and that is a compile error rather than a title
-// that quietly has no key.
+// Total over `SCHEMA_KINDS` rather than keyed by `string`, so a kind named
+// there and given no schema here does not compile.
 export const SCHEMAS = {
   info: infoSchema,
   item: itemSchema,
@@ -45,9 +44,9 @@ export const SCHEMAS = {
   variable: variableSchema,
   passive: passiveSchema,
   'cluster-jewel': clusterJewelSchema,
-} satisfies Record<string, AnySchema>;
+} satisfies Record<SchemaKind, AnySchema>;
 
-export type SchemaKind = keyof typeof SCHEMAS;
+export type { SchemaKind };
 
 // The runtime lookup, where a kind is whatever a module wrote and may be
 // bespoke or nothing at all. The union above is for the exhaustiveness checks

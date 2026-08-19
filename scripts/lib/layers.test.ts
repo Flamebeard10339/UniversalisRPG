@@ -118,6 +118,9 @@ describe('checkLayers', () => {
       read: 2,
       edges: 2,
       violations: [{ from: 'src/grammar/a.ts', to: 'src/content/registry' }],
+      // The same pair, read the other way: these two import each other, so
+      // they are also the one shape that has no order between them.
+      cycles: [{ members: ['src/content/registry.ts', 'src/grammar/a.ts'], closedBy: [{ from: 'src/grammar/a.ts', to: 'src/content/registry.ts' }] }],
       unlayered: ['src/stray.ts'],
     });
   });
