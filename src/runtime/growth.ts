@@ -1,8 +1,9 @@
+import { RuntimeError } from './error';
 import { Registry } from '../content/registry';
 import { GrowthDirective, isGrowthDirective, parseDirectiveLine } from '../content/test';
 import { applyClusterEffect } from './clusterEffect';
 import { allocate, feedItem, Growth, slotJewel } from './itemInstance';
-import { GameState, RuntimeError } from './state';
+import { GameState } from './state';
 
 // Every rule and every refusal is inside these four; what is here is which one
 // the verb names and what it is handed, and a check appearing beside it would

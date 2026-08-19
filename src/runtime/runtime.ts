@@ -1,3 +1,4 @@
+import { RuntimeError } from './error';
 import {
   actionStillValid,
   actionVisible,
@@ -64,11 +65,12 @@ import { BASE_LANGUAGE, Localized, localizerFor, localizerOf } from './localized
 import { nextRandom } from './rng';
 import { roadsFrom, routeTo } from './journey';
 import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs';
-import { advanceTime, endAction, FIGHT_SCOPED, GameState, isFightScoped, PLAYER, RuntimeError } from './state';
+import { advanceTime, endAction, FIGHT_SCOPED, GameState, isFightScoped, PLAYER } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { msUntilEmpty, toMilliUnits, fromMilliUnits } from './units';
 
-export { advanceTime, createGameState, endAction, endJourney, PLAYER, RuntimeError } from './state';
+export { advanceTime, createGameState, endAction, endJourney, PLAYER } from './state';
+export { RuntimeError } from './error';
 export type { GameState } from './state';
 export { buffsOf, grantBuff, stackCount } from './buffs';
 export type { BuffInstance, BuffTable } from './buffs';

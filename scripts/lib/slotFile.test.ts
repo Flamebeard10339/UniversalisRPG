@@ -1,8 +1,8 @@
+import { RuntimeError } from '../../src/runtime/error';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { RuntimeError } from '../../src/runtime/runtime';
 import { describeSlotDriver } from '../../src/runtime/storeContract';
 import { fileSlots, SLOT_SUFFIX } from './slotFile';
 

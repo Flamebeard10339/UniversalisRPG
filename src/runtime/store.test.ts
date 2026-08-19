@@ -1,6 +1,6 @@
+import { RuntimeError } from './error';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { RuntimeError } from './runtime';
 import { memoryDriver, slotStore, type SlotDriver } from './store';
 
 const SOURCE = readFileSync('src/runtime/store.ts', 'utf8');
@@ -54,7 +54,12 @@ describe('the slot store keeps named text and nothing else (c1)', () => {
   it('reaches neither a save nor the filesystem, so a driver is the only thing that touches either', () => {
     const imports = [...SOURCE.matchAll(/from '([^']+)'/g)].map(([, from]) => from);
 
-    expect(imports).toEqual(['./runtime']);
+    // The claim, not the list. Naming the one import this file happened to have
+    // proved nothing about reaching a save and went stale the first time an
+    // unrelated declaration moved; what is asserted is that nothing it reaches
+    // is a save module or a host API, which is the sentence above.
+    expect(imports.filter((from) => /save|slotFile|session/i.test(from))).toEqual([]);
+    expect(imports.filter((from) => from.startsWith('node:') || !from.startsWith('.'))).toEqual([]);
   });
 
   it('never parses a payload: what the store holds is the driver text it was handed', () => {

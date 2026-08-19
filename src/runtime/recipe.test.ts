@@ -1,5 +1,6 @@
+import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
-import { craft, createGameState, RuntimeError, recipeCraftable, resolve } from './runtime';
+import { craft, createGameState, recipeCraftable, resolve } from './runtime';
 import { CRAFT_ADDRESS, loadModule, Registry } from '../content/registry';
 import { applyDirective, startSession, view } from './session';
 import { SAVE_VERSION } from './save';

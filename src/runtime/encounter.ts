@@ -1,3 +1,4 @@
+import { RuntimeError } from './error';
 import { Action, isTwoSided, Sided } from '../grammar/action';
 import { attemptDuration, statValue } from './stats';
 import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
@@ -5,7 +6,7 @@ import { actionAddress } from '../content/action';
 import { declaredId, Entity } from '../content/entity';
 import { hostile, Registry } from '../content/registry';
 import { actionVisible, findActiveAction, findActionOwner, requiresMet } from './actions';
-import { GameState, PLAYER, RuntimeError, templateOf } from './state';
+import { GameState, PLAYER, templateOf } from './state';
 import { Answer, Localized, localizerOf, Params } from './localized';
 import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
 

@@ -1,3 +1,4 @@
+import { RuntimeError } from './error';
 import { ActionResult } from '../grammar/actionResult';
 import { evaluateCondition } from './conditions';
 import { Action } from '../content/entity';
@@ -8,7 +9,7 @@ import { Registry } from '../content/registry';
 import type { ActiveAction } from './encounter';
 import { copiesOf } from './itemInstance';
 import { BASE_LANGUAGE, localizerFor, type Localized, type Localizer } from './localized';
-import { GameState, RuntimeError } from './state';
+import { GameState } from './state';
 import { travelSecondsPerUnit } from './tuning';
 
 export function findActionOwner(obj: string, objId: string, registry: Registry): unknown {

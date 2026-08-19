@@ -1,9 +1,10 @@
+import { RuntimeError } from './error';
 import { choose, cursorProblem, DialogueCursor, menuChoices } from './dialogue-runtime';
 import { carriedFrame, carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
 import { type PlaneFocus } from './planeReport';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
-import { GameState, RuntimeError } from './state';
+import { GameState } from './state';
 import { Registry } from '../content/registry';
 import type { EngineKey } from '../content/locale';
 import type { Said } from './said';

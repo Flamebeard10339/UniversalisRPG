@@ -1,7 +1,9 @@
+import { RuntimeError } from './error';
 import { Action } from '../content/entity';
 import { actionAddress } from '../content/action';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
-import { createGameState, endAction, GameState, initResources, RuntimeError } from './runtime';
+import { createGameState, endAction, GameState } from './state';
+import { initResources } from './effects';
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
 import { findActionOwner, parseOwnerRef, travelEndProblem, TRAVEL_PAIR } from './actions';

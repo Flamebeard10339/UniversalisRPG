@@ -1,9 +1,10 @@
+import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
 import { loadUniverse, Registry } from '../content/registry';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, dialogueFrame, isModalFrame, Modal, ModalChoice, ModalFrame, MODAL_NAMES, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
 import { SAVE_VERSION } from './save';
-import { choose, createGameState, DialogueCursor, GameState, RuntimeError, talk } from './runtime';
+import { choose, createGameState, DialogueCursor, GameState, talk } from './runtime';
 import { applyResultsNow } from './effects';
 import { apply, applyDirective, PlaySession, PlayStatus, startSession, submitModal, view } from './session';
 

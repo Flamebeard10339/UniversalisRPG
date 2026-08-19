@@ -1,9 +1,10 @@
+import { RuntimeError } from './error';
 import { evaluateCondition, renderSegments } from './conditions';
 import { Choice, Dialogue, DialogueNode, Spoken } from '../content/dialogue';
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';
-import { GameState, RuntimeError } from './state';
+import { GameState } from './state';
 
 // A resumable cursor, not a loop: a menu hands control back to the driver.
 // Named, not held: every field is an id or a number, so the cursor survives a

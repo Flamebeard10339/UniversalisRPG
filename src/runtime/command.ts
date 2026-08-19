@@ -1,3 +1,4 @@
+import { RuntimeError } from './error';
 import { DslError } from '../grammar/parser';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../content/registry';
 import { type ModuleSource } from '../content/universe';
@@ -13,7 +14,7 @@ import { isGrowthDirective, parseDirectiveLine, type Directive } from '../conten
 import { printDirective } from '../content/serialize';
 import { resolveCarried, resolveDirective } from '../content/typed';
 import { type ParsedSave } from '../content/saveSection';
-import { describeCondition, RuntimeError } from './runtime';
+import { describeCondition } from './runtime';
 import { wornCopySlot } from './itemInstance';
 import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal, type ModalOption } from './modals';

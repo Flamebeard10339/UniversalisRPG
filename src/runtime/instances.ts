@@ -1,9 +1,10 @@
+import { RuntimeError } from './error';
 import { mayBeInstanceId } from '../content/instanceId';
 import type { Registry } from '../content/registry';
 import { Localized, localizerOf } from './localized';
 import { say, type Said } from './said';
 import type { PruneWarning } from './save';
-import { GameState, RuntimeError } from './state';
+import { GameState } from './state';
 
 // One table for everything that carries state about a single copy of a
 // template: an item that stopped being interchangeable with the rest of its

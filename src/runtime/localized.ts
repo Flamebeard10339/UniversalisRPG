@@ -1,10 +1,10 @@
+import { RuntimeError } from './error';
 import { Action } from '../grammar/action';
 import { actionTextKey, actionTextOwner } from '../content/action';
 import { EngineKey, localeKey, Locales } from '../content/locale';
 import { parseSegments, TextSegment } from '../content/dialogue';
 import { Registry } from '../content/registry';
 import { articleEn } from '../grammar/values';
-import { GameState, RuntimeError } from './state';
 
 declare const LOCALIZED: unique symbol;
 
@@ -134,7 +134,11 @@ export function localizerFor(registry: Registry, language: string): Localizer {
   return self;
 }
 
-export const localizerOf = (registry: Registry, state: GameState): Localizer => localizerFor(registry, state.language);
+// Asks for the language, not for the whole state that carries one. Every
+// caller still passes a `GameState` and none of them changed; what went away is
+// this module having to import the state shape in order to read one field of
+// it, which is what put the localizer inside the runtime cycle.
+export const localizerOf = (registry: Registry, playing: { language: string }): Localizer => localizerFor(registry, playing.language);
 
 // The sentence an item with no `examine:` of its own gets. English supplies the
 // article from the title it is about to precede; no other language is asked to,

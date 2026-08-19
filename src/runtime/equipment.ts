@@ -1,4 +1,5 @@
-import { GameState, RuntimeError } from './state';
+import { RuntimeError } from './error';
+import { GameState } from './state';
 import { Registry } from '../content/registry';
 import { carriesItem, isGrownCopy, itemTemplate, stockItem } from './itemInstance';
 

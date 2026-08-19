@@ -1,3 +1,4 @@
+import { RuntimeError } from './error';
 import { Action } from '../content/entity';
 import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
@@ -9,7 +10,7 @@ import { itemInstance, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
 import { skillLevel } from './skills';
 import { BuffInstance, buffsOf, stackCount } from './buffs';
-import { GameState, PLAYER, RuntimeError } from './state';
+import { GameState, PLAYER } from './state';
 import { contestSpread, defaultActionDuration, minDamage } from './tuning';
 import { fromMilliUnits, MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
 import { BonusAmount, TagClause } from '../grammar/tagClause';

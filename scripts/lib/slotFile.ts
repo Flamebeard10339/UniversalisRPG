@@ -1,6 +1,6 @@
+import { RuntimeError } from '../../src/runtime/error';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { RuntimeError } from '../../src/runtime/runtime';
 import type { SlotDriver } from '../../src/runtime/store';
 
 export const SLOT_SUFFIX = '.slot';

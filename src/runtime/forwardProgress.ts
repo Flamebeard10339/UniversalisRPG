@@ -1,4 +1,4 @@
-import { RuntimeError } from './state';
+import { RuntimeError } from './error';
 
 export type BoundarySource =
   | { kind: 'requested' }

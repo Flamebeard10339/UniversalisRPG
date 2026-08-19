@@ -1,3 +1,4 @@
+import { RuntimeError } from '../src/runtime/error';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,7 +9,6 @@ import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../src/conten
 import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
 import { loadUniverseWithDiagnostics } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
-import { RuntimeError } from '../src/runtime/runtime';
 import { localizerFor } from '../src/runtime/localized';
 import { asLocalized } from '../src/runtime/localizedFixture';
 import { SAVE_VERSION } from '../src/runtime/save';

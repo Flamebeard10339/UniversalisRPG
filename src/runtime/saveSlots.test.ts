@@ -1,5 +1,5 @@
+import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
-import { RuntimeError } from './runtime';
 import { memoryDriver } from './store';
 import {
   AUTOSAVE_SLOT,

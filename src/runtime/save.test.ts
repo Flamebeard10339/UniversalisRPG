@@ -1,6 +1,7 @@
+import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { armAction, armCraft, armFightAction, armTravel, buffsOf, createGameState, grantBuff, PLAYER, RuntimeError, statValue } from './runtime';
+import { armAction, armCraft, armFightAction, armTravel, buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, ModalFrame, openModalNamed } from './modals';

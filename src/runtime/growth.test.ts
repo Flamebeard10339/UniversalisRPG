@@ -1,3 +1,4 @@
+import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
 import { DslError } from '../grammar/parser';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
@@ -6,7 +7,7 @@ import { grow, growLine } from './growth';
 import { itemInstance, type Growth } from './itemInstance';
 import { planeReport } from './planeReport';
 import { initialState } from './save';
-import { GameState, RuntimeError } from './state';
+import { GameState } from './state';
 import { localizerFor } from './localized';
 import { say } from './said';
 import { inEnglish } from './sayFixture';

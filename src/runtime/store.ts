@@ -1,4 +1,4 @@
-import { RuntimeError } from './runtime';
+import { RuntimeError } from './error';
 
 // How a driver says it could not: part of the interface rather than a thing
 // each implementation goes and finds, because the command table turns exactly

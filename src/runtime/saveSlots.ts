@@ -1,4 +1,4 @@
-import { RuntimeError } from './runtime';
+import { RuntimeError } from './error';
 import type { Answer } from './localized';
 import { slotStore, type Slot, type SlotDriver, type SlotStore } from './store';
 

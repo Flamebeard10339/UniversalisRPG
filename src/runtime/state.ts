@@ -1,3 +1,4 @@
+import { RuntimeError } from './error';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import type { Localized } from './localized';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
@@ -7,8 +8,6 @@ import type { Populations } from './population';
 import type { Journey } from './journey';
 import type { ModalFrame } from './modals';
 import { type BuffTable, clearBuffs } from './buffs';
-
-export class RuntimeError extends Error {}
 
 // Readonly because effects.ts owns every write, and with it rollover and on-empty.
 export type PoolLevels = { readonly [resourceId: string]: number };
