@@ -278,6 +278,7 @@
         "src/runtime/carriedItem.test.ts",
         "src/runtime/carriedName.test.ts",
         "src/runtime/carriedName.ts",
+        "src/runtime/carried.ts",
         "src/runtime/carriedScreen.test.ts",
         "src/runtime/carriedScreen.ts",
         "src/runtime/clusterEffect.test.ts",

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
-import { carriedEntries, carriedOptions, carriedSubmit, CONFIRMED, LEAVE } from './carriedScreen';
+import { carriedOptions, carriedSubmit, CONFIRMED, LEAVE } from './carriedScreen';
+import { carriedEntries } from './carried';
 import { equip } from './equipment';
 import { carriedCount, feedItem } from './itemInstance';
 import { planeFrame } from './planeScreen';

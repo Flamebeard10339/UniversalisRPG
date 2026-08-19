@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseDirectiveLine } from '../content/test';
 import { loadUniverse } from '../content/load';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
-import { carriedFrame } from './carriedScreen';
+import { carriedFrame } from './carried';
 import { equip } from './equipment';
 import { growLine } from './growth';
 import { grownItems, wornCopy } from './itemInstance';

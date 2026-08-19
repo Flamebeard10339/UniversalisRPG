@@ -20,7 +20,7 @@ import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
 import { answerModal, dialogueFrame, Modal, modalFocus, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
-import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carriedScreen';
+import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carried';
 import { Registry } from '../content/registry';
 import { type ParsedSave } from '../content/saveSection';
 import { DEFAULT_LANGUAGE } from '../grammar/section';

@@ -4,7 +4,7 @@ import { Item } from '../content/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
-import { carriedEntries, carriedFrame } from './carriedScreen';
+import { carriedEntries, carriedFrame } from './carried';
 import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
 import { isSaid, say, type Said } from './said';
