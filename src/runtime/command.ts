@@ -1,3 +1,4 @@
+import type { ModalOption } from './modalOption';
 import { RuntimeError } from './error';
 import { DslError } from '../grammar/parser';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../content/registry';
@@ -17,7 +18,7 @@ import { type ParsedSave } from '../content/saveSection';
 import { describeCondition } from './runtime';
 import { wornCopySlot } from './itemInstance';
 import { type Answer, type Localized, type Localizer } from './localized';
-import { type Modal, type ModalOption } from './modals';
+import { type Modal } from './modals';
 import { anId, say, says, type Said } from './said';
 import {
   DEV_SLOT,

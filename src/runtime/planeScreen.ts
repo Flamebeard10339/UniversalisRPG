@@ -1,3 +1,4 @@
+import type { ModalChoice, ModalOption } from './modalOption';
 import { hexKey } from '../content/hex';
 import { Item } from '../content/item';
 import { Registry } from '../content/registry';
@@ -8,7 +9,6 @@ import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
 import { isSaid, say, type Said } from './said';
 import { itemCopies, wornCopySlot } from './itemInstance';
-import { type ModalChoice, type ModalOption } from './modals';
 import { ClusterReport, PlaneFocus, PlaneReport, planeReport } from './planeReport';
 import { GameState, type ModalFrame } from './state';
 

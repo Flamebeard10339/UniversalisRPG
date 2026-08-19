@@ -1,9 +1,10 @@
+import type { ModalChoice, ModalOption } from './modalOption';
 import { type ModalFrame } from './state';
 import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
 import { loadUniverse, Registry } from '../content/registry';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
-import { answerModal, dialogueFrame, isModalFrame, Modal, ModalChoice, MODAL_NAMES, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
+import { answerModal, dialogueFrame, isModalFrame, Modal, MODAL_NAMES, openModal, openModalNamed, pruneModals, publishModal, topModal } from './modals';
 import { SAVE_VERSION } from './save';
 import { choose, createGameState, DialogueCursor, GameState, talk } from './runtime';
 import { applyResultsNow } from './effects';
@@ -201,7 +202,6 @@ function talking(registry: Registry): GameState {
   return state;
 }
 
-import type { ModalOption } from './modals';
 
 // What a screen offers, as the answers alone: the words beside each are asserted
 // where the language they are in is the point, and everywhere else they are

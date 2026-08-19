@@ -1,3 +1,4 @@
+import type { ModalChoice, ModalOption } from './modalOption';
 import { isBase, Item } from '../content/item';
 import type { EngineKey } from '../content/locale';
 import { Registry } from '../content/registry';
@@ -5,7 +6,6 @@ import { carriedName } from './carriedName';
 import { equip, unequip } from './equipment';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { itemCopies, destroyItem, grownItems, isGrownCopy, itemTemplate, wornCopy, wornIn } from './itemInstance';
-import { type ModalChoice, type ModalOption } from './modals';
 import { planeFrame } from './planeScreen';
 import { GameState, type ModalAnswers, type ModalFrame } from './state';
 

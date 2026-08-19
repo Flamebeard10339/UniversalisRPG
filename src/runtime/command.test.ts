@@ -1,3 +1,4 @@
+import type { ModalOption } from './modalOption';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState } from './runtime';
@@ -8,7 +9,6 @@ import { BASE_LANGUAGE, localizerFor } from './localized';
 import { initialLocalChangesModule, renderLocalChangesModule } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 import { SAVE_VERSION } from './save';
-import type { ModalOption } from './modals';
 import { runTest, serializeSession, sessionStatus, startSession, view, type PlaySession } from './session';
 import {
   COMMANDS,

@@ -66,7 +66,8 @@ export { equip, unequip } from './equipment';
 export type { EncounterFoe, EncounterView } from './encounter';
 export { choose, talk } from './dialogue-runtime';
 export { answerModal, openModal, publishModal, topModal } from './modals';
-export type { Modal, ModalOption } from './modals';
+export type { Modal } from './modals';
+export type { ModalOption } from './modalOption';
 
 
 // A pool a result drained must settle at the instant it ran out, the same way a

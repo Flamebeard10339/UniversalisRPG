@@ -1,3 +1,4 @@
+import type { ModalOption } from './modalOption';
 import { RuntimeError } from './error';
 import { choose, cursorProblem, menuChoices } from './dialogue-runtime';
 import { carriedFrame, carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
@@ -17,26 +18,6 @@ import type { EngineKey } from '../content/locale';
 // than as two lists, because the whole reason c3 kept reopening is that a value
 // is both — read on the screen and replayed by a `submit-modal:` — and no
 // branding of one field can hold while the other carries the same text.
-export interface ModalChoice {
-  readonly value: Answer;
-  readonly shown: Localized;
-  // What the choice acts on, where the screen has a subject it also publishes
-  // and a driver may be drawing that subject rather than this list. Absent on
-  // every screen whose choices are only ever pressed as a list.
-  readonly on?: Answer;
-  // What the choice brings to that node, named the one way every screen names a
-  // carried thing. `shown` is the whole sentence a list needs; this is the half
-  // of it a driver drawing the node itself has room for.
-  readonly subject?: Localized;
-}
-
-export interface ModalOption {
-  key: Answer;
-  label: Localized;
-  // What this option will accept, or null where it takes free text.
-  values: readonly ModalChoice[] | null;
-}
-
 // The whole of what leaves src/runtime: a name, the options still to be
 // answered, and the value that answering any of them with takes the screen
 // down. A driver can render a modal it has never heard of from this alone, and

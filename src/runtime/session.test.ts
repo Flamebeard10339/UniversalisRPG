@@ -1,3 +1,4 @@
+import type { ModalChoice } from './modalOption';
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
@@ -6,7 +7,6 @@ import { Registry } from '../content/registry';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { loadUniverse } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
-import type { ModalChoice } from './modals';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, startSession, submitModal, view, wait } from './session';
