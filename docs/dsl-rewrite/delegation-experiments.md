@@ -504,3 +504,28 @@ Cost note: every one of the four reports had to be spot-checked before use, and
 one headline claim was understated rather than wrong (zero exhaustiveness guards
 tree-wide, not merely absent from two files). Budget verification time per agent;
 the reports are leads, not evidence.
+
+## 2026-08-19 — two read-only measurement agents beside a refactor
+
+Both were dispatched to *measure* while the main session refactored, on the rule
+that only one worker writes to a checkout. Neither touched a tracked file and
+neither collided with the live edits.
+
+Both corrected the numbers they were sent to verify, which is the whole return.
+The census found 43 closed sets and 11 hole-tables against the research page's
+38 and 9, and killed the page's claim that `SCHEMAS` has six holes — two of the
+six are near-miss sets with members `SCHEMAS` does not have, so deriving them
+from it would have been wrong. The probe found 46 sets and a 25/16/5 histogram
+against a claimed 15/13/10, and named the likely cause of the gap: inserting a
+*type-correct* member measures whether anything downstream notices, while
+inserting a placeholder makes every object set error at its own definition site
+and lands the whole distribution rightward. That is a measurement artifact and
+it would have been baked into a repo command.
+
+What made both worth it: each was given the prior numbers and asked to verify or
+correct, rather than asked the open question. A disagreement is cheap to check
+and an agreement is cheap to accept; an unanchored survey is neither.
+
+The probe agent also reported the checkout switching branches underneath it and
+declined to "restore" what it found, snapshotting the SHA it was asked about
+instead. That is the correct call and it is worth knowing an agent will make it.
