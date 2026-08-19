@@ -1,7 +1,7 @@
+import { clearBuffs } from './buffs';
 import { readdirSync, readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { buffsOf, createGameState, GameState, grantBuff, PLAYER, resolve, statValue, useAction, useFight } from './runtime';
-import { clearBuffs } from './buffs';
 import { restorePools } from './effects';
 import { Registry } from '../content/registry';
 import { engineLocale, withEngineLocale } from '../content/engineLocale';

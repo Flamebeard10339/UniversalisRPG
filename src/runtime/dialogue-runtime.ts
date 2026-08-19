@@ -4,19 +4,11 @@ import { Choice, Dialogue, DialogueNode, Spoken } from '../content/dialogue';
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';
-import { GameState } from './state';
+import { type DialogueCursor, GameState } from './state';
 
 // A resumable cursor, not a loop: a menu hands control back to the driver.
 // Named, not held: every field is an id or a number, so the cursor survives a
 // save and a driver never holds a registry object it would have to re-resolve.
-
-export interface DialogueCursor {
-  dialogue: string;
-  node: string;
-  // The step after the menu, so the menu itself is at resumeIndex - 1.
-  resumeIndex: number;
-  replay: boolean;
-}
 
 // A line the dialogue speaks, at the address the load path stamped on it. A
 // line without one was built in code rather than loaded, and there is no

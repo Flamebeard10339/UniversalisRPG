@@ -357,7 +357,7 @@ describe('every published string says which of the two it is (c1)', () => {
     const named = new Set(roots.map((root) => `${root.file}#${root.type}`));
 
     expect([...named].filter((root) => UNPUBLISHED.has(root)).sort()).toEqual([...UNPUBLISHED].sort());
-    for (const reached of ['src/runtime/session.ts#PlayView', 'src/runtime/save.ts#PruneWarning', 'src/ui/sheet.ts#Entry', 'scripts/planeView.ts#PlaneLines']) {
+    for (const reached of ['src/runtime/session.ts#PlayView', 'src/runtime/pruning.ts#PruneWarning', 'src/ui/sheet.ts#Entry', 'scripts/planeView.ts#PlaneLines']) {
       expect(named, `${reached} is published and the derivation missed it`).toContain(reached);
     }
   });

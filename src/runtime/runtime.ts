@@ -1,3 +1,4 @@
+import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
 import {
   actionStillValid,
@@ -29,27 +30,7 @@ import {
   relocateTo,
   settlePools,
 } from './effects';
-import {
-  ActiveAction,
-  actorEntity,
-  armedAction,
-  damageTarget,
-  enterEncounter,
-  IMPLICIT_TARGET_FULL,
-  logSwing,
-  newCadence,
-  hasPool,
-  opposes,
-  Participant,
-  participants,
-  leaveFight,
-  playerCadence,
-  poolLevel,
-  retaliation,
-  seatOf,
-  sideOf,
-  targetLevel,
-} from './encounter';
+import { actorEntity, armedAction, damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, hasPool, opposes, Participant, participants, leaveFight, playerCadence, poolLevel, retaliation, seatOf, sideOf, targetLevel } from './encounter';
 import { applyRespawns, downOne, isStanding, nextRespawn, standing } from './population';
 import { actionAddress } from '../content/action';
 import { Action, declaredId } from '../content/entity';
@@ -64,16 +45,17 @@ import { Registry } from '../content/registry';
 import { BASE_LANGUAGE, Localized, localizerFor, localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { roadsFrom, routeTo } from './journey';
-import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs';
-import { advanceTime, endAction, FIGHT_SCOPED, GameState, isFightScoped, PLAYER } from './state';
+import { applyDeclared, expireBuffs, nextBuffExpiry } from './buffs';
+import { type ActiveAction, advanceTime, FIGHT_SCOPED, GameState, isFightScoped, PLAYER } from './state';
+import { clearBuffs } from './buffs';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { msUntilEmpty, toMilliUnits, fromMilliUnits } from './units';
 
-export { advanceTime, createGameState, endAction, endJourney, PLAYER } from './state';
+export { advanceTime, createGameState, PLAYER } from './state';
+export { endAction, endJourney } from './actionEnd';
 export { RuntimeError } from './error';
-export type { GameState } from './state';
+export type { ActiveAction, ActorState, BuffInstance, BuffTable, Cadence, DialogueCursor, GameState, ModalFrame } from './state';
 export { buffsOf, grantBuff, stackCount } from './buffs';
-export type { BuffInstance, BuffTable } from './buffs';
 export { contestSpread, minDamage, travelSecondsPerUnit } from './tuning';
 export { describeCondition, evaluateCondition, renderSegments } from './conditions';
 export { actionVisible, requiresMet } from './actions';
@@ -81,11 +63,10 @@ export { hitChance, hitDamage, sampleStat, statRange, statValue } from './stats'
 export { applyResultsNow, initResources } from './effects';
 export { encounterView } from './encounter';
 export { equip, unequip } from './equipment';
-export type { ActiveAction, ActorState, Cadence, EncounterFoe, EncounterView } from './encounter';
+export type { EncounterFoe, EncounterView } from './encounter';
 export { choose, talk } from './dialogue-runtime';
-export type { DialogueCursor } from './dialogue-runtime';
 export { answerModal, openModal, publishModal, topModal } from './modals';
-export type { Modal, ModalFrame, ModalOption } from './modals';
+export type { Modal, ModalOption } from './modals';
 
 
 // A pool a result drained must settle at the instant it ran out, the same way a

@@ -4,14 +4,14 @@ import { restorePools } from './effects';
 import { armAction, armCraft, armFightAction, armTravel, buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
-import { answerModal, ModalFrame, openModalNamed } from './modals';
+import { answerModal, openModalNamed } from './modals';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
 import { travelAction, TRAVEL_ADDRESS } from './actions';
 import { actionAddress } from '../content/action';
 import { CRAFT_ADDRESS, loadUniverse, type Registry } from '../content/registry';
-import { GameState } from './state';
+import { GameState, type ModalFrame } from './state';
 import { toMilliUnits } from './units';
 
 const MODULE = `

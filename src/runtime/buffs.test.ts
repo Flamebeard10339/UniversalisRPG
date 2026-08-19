@@ -1,10 +1,12 @@
+import { endAction, endJourney } from './actionEnd';
+import { clearBuffs } from './buffs';
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
-import { buffsOf, clearBuffs, expireBuffs, grantBuff, nextBuffExpiry, pruneBuffs, stackCount } from './buffs';
+import { buffsOf, expireBuffs, grantBuff, nextBuffExpiry, pruneBuffs, stackCount } from './buffs';
 import { Item } from '../content/item';
-import { createGameState, endAction, endJourney, equip, GameState, initResources, PLAYER, resolve, statRange, statValue, useFight } from './runtime';
+import { createGameState, equip, GameState, initResources, PLAYER, resolve, statRange, statValue, useFight } from './runtime';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 

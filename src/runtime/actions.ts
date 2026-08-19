@@ -6,10 +6,9 @@ import { actionAddress, ActionDeclaration } from '../content/action';
 import { humanizeEn } from '../grammar/values';
 import { Location } from '../content/location';
 import { Registry } from '../content/registry';
-import type { ActiveAction } from './encounter';
 import { copiesOf } from './itemInstance';
 import { BASE_LANGUAGE, localizerFor, type Localized, type Localizer } from './localized';
-import { GameState } from './state';
+import { type ActiveAction, GameState } from './state';
 import { travelSecondsPerUnit } from './tuning';
 
 export function findActionOwner(obj: string, objId: string, registry: Registry): unknown {

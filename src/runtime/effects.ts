@@ -1,3 +1,4 @@
+import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
 import { ActionResult, DropRow, nestedResults, Party } from '../grammar/actionResult';
 import { DISCOVERED } from '../content/location';
@@ -14,7 +15,7 @@ import { localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
-import { endAction, GameState, PLAYER } from './state';
+import { GameState, PLAYER } from './state';
 import { hitChance, statValue } from './stats';
 import { divideRateRemainder, toMilliUnits } from './units';
 import { applyDeclared } from './buffs';

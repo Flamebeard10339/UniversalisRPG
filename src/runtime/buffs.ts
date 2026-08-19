@@ -1,25 +1,14 @@
 import type { Registry } from '../content/registry';
 import type { Item } from '../content/item';
-import { isTagClause, TagClause } from '../grammar/tagClause';
+import { isTagClause, type TagClause } from '../grammar/tagClause';
 import { localizerOf } from './localized';
-import type { PruneWarning } from './save';
-import type { GameState } from './state';
+import type { PruneWarning } from './pruning';
+import { type BuffInstance, type GameState } from './state';
 import { secondsToMs } from './units';
 
 // One application of one source to one character, holding the tag-clause list
 // that source carries. Nothing is scaled by how many instances are held, and
 // nothing distinguishes a penalty from a bonus.
-export interface BuffInstance {
-  readonly source: string;
-  readonly tags: readonly TagClause[];
-  readonly expiresAt: number;
-}
-
-// Who holds what. Readonly because this module owns every write, and with it
-// granting, stacking, expiry, and how a buff's identity is spelled — no reader
-// takes a source id apart, because none of them assembled it.
-export type BuffTable = { readonly [actorId: string]: readonly BuffInstance[] };
-
 // An `# item` is the only thing that can grant one, because a source id has to
 // still resolve after a save is reloaded and an item id is what `pruneBuffs`
 // can ask the registry about. A grantor of any other shape is a second question
@@ -40,6 +29,10 @@ function set(state: GameState, actorId: string, held: readonly BuffInstance[]): 
   // walked for the next expiry both see the same nothing.
   if (held.length === 0) delete table[actorId];
   else table[actorId] = held;
+}
+
+export function clearBuffs(state: GameState, actorIds: readonly string[]): void {
+  for (const actorId of actorIds) set(state, actorId, []);
 }
 
 export function buffsOf(state: GameState, actorId: string): readonly BuffInstance[] {
@@ -71,10 +64,6 @@ export function grantBuff(state: GameState, actorId: string, source: BuffSource,
   const stacks = source.tags.some((tag) => tag.kind === 'keyword' && tag.value === STACKS);
   const held = stacks ? buffsOf(state, actorId) : buffsOf(state, actorId).filter((buff) => buff.source !== source.id);
   set(state, actorId, [...held, { source: source.id, tags: source.tags, expiresAt }]);
-}
-
-export function clearBuffs(state: GameState, actorIds: readonly string[]): void {
-  for (const actorId of actorIds) set(state, actorId, []);
 }
 
 // The earliest instant any instance ends. Each instance runs on its own clock,

@@ -3,21 +3,8 @@ import { Registry } from '../content/registry';
 import { templateOf } from './state';
 import { evaluateCondition } from './conditions';
 import { Localized, localizerOf } from './localized';
-import { GameState } from './state';
+import { type Deficit, GameState } from './state';
 import { secondsToMs } from './units';
-
-// How many of a type are down at a place, and when each of those is due back.
-// A copy with no `respawn after:` is down and never due, which is why the two
-// numbers are kept apart rather than encoded into one list of instants.
-export interface Deficit {
-  down: number;
-  due: number[];
-}
-
-// State about the LOCATION, because how many of its five rats are standing is
-// the place's fact. It is not an entry in the instance table: no copy is
-// addressable, so there is nothing to keep a record of.
-export type Populations = Record<string, Record<string, Deficit>>;
 
 const isDeficit = (value: unknown): boolean => {
   if (typeof value !== 'object' || value === null) return false;

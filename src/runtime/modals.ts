@@ -1,13 +1,12 @@
 import { RuntimeError } from './error';
-import { choose, cursorProblem, DialogueCursor, menuChoices } from './dialogue-runtime';
+import { choose, cursorProblem, menuChoices } from './dialogue-runtime';
 import { carriedFrame, carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
 import { type PlaneFocus } from './planeReport';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
-import { GameState } from './state';
+import { type DialogueCursor, GameState, type ModalAnswers, type ModalFrame } from './state';
 import { Registry } from '../content/registry';
 import type { EngineKey } from '../content/locale';
-import type { Said } from './said';
 
 // A modal is a named screen that presents options, sits atop whatever is
 // beneath it, and is cleared once every option has an answer. Nothing here
@@ -49,14 +48,6 @@ export interface Modal {
   // that publishes none, which is a screen no gesture can take down either.
   leaving: Answer | null;
 }
-
-export type ModalAnswers = Readonly<Record<Answer, Answer>>;
-
-export type ModalFrame =
-  | { readonly name: 'character-creation'; readonly answers: ModalAnswers }
-  | { readonly name: 'carried-items'; readonly answers: ModalAnswers }
-  | { readonly name: 'item-plane'; readonly answers: ModalAnswers; readonly target: string; readonly hex: string; readonly said?: Said }
-  | { readonly name: 'dialogue'; readonly answers: ModalAnswers; readonly cursor: DialogueCursor };
 
 export type ModalName = ModalFrame['name'];
 

@@ -5,9 +5,9 @@ import { carriedName } from './carriedName';
 import { equip, unequip } from './equipment';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { itemCopies, destroyItem, grownItems, isGrownCopy, itemTemplate, wornCopy, wornIn } from './itemInstance';
-import { type ModalAnswers, type ModalChoice, type ModalFrame, type ModalOption } from './modals';
+import { type ModalChoice, type ModalOption } from './modals';
 import { planeFrame } from './planeScreen';
-import { GameState } from './state';
+import { GameState, type ModalAnswers, type ModalFrame } from './state';
 
 // What the player carries, as a list of entries and the verbs each of them
 // takes. It asks one thing at a time — which item, then which verb, then whether

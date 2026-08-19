@@ -3,8 +3,8 @@ import { mayBeInstanceId } from '../content/instanceId';
 import type { Registry } from '../content/registry';
 import { Localized, localizerOf } from './localized';
 import { say, type Said } from './said';
-import type { PruneWarning } from './save';
-import { GameState } from './state';
+import type { PruneWarning } from './pruning';
+import { GameState, type Instance, type InstanceTable } from './state';
 
 // One table for everything that carries state about a single copy of a
 // template: an item that stopped being interchangeable with the rest of its
@@ -12,23 +12,6 @@ import { GameState } from './state';
 // here — this module knows which kind owns it and hands it back to that kind,
 // and never reads inside — which is what lets those two share one table, one
 // prune rule and one save field.
-
-// Readonly because this module owns every write, and with it minting, pruning
-// and the payload's opacity: a template a consumer could repoint is a template
-// reference that stops meaning what c2 says it means.
-export interface Instance {
-  readonly kind: string;
-  readonly template: string;
-  readonly payload: unknown;
-}
-
-// The counter lives inside the table rather than beside it, so `GameState`
-// gains one field. It never rewinds, so an id names one instance for that
-// instance's whole life and a reference cannot be answered by a later one.
-export interface InstanceTable {
-  readonly next: number;
-  readonly byId: Readonly<Record<string, Instance>>;
-}
 
 // The one cast that opens the table for writing, so every write above is in
 // this file and a consumer holding a table cannot reach past its kind.
@@ -69,10 +52,6 @@ export function defineInstanceKind<P>(name: string, kind: InstanceKind<P>): void
 
 function kindOf(name: string): InstanceKind<never> | undefined {
   return KINDS.get(name);
-}
-
-export function createInstanceTable(): InstanceTable {
-  return { next: 1, byId: {} };
 }
 
 // Minting draws no randomness and touches no clock, so a session that makes an

@@ -1,16 +1,7 @@
 import { DISCOVERED } from '../content/location';
 import type { Registry } from '../content/registry';
 import { evaluateCondition, truthy } from './conditions';
-import type { Answer } from './localized';
 import type { GameState } from './state';
-
-// A walk under way, held on the state because it outlives the leg it is on and
-// has to survive a save. The place the player is standing in is never in
-// `legs`: a leg is crossed by arriving, and arriving takes it off the front.
-export interface Journey {
-  to: Answer;
-  legs: Answer[];
-}
 
 const discovered = (state: GameState, id: string): boolean => truthy(state.flags[`${id}.${DISCOVERED}`]);
 

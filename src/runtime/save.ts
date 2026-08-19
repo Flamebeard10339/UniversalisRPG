@@ -1,8 +1,10 @@
+import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
 import { Action } from '../content/entity';
 import { actionAddress } from '../content/action';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
-import { createGameState, endAction, GameState } from './state';
+import { createGameState, GameState } from './state';
+import type { PruneWarning } from './pruning';
 import { initResources } from './effects';
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
@@ -12,7 +14,7 @@ import { isInstanceTable, pruneInstances } from './instances';
 import { itemTemplate } from './itemInstance';
 import { isPopulations, prunePopulations } from './population';
 import { isModalFrame, pruneModals } from './modals';
-import { Answer, Localized, Localizer, localizerOf } from './localized';
+import { Localized, Localizer, localizerOf } from './localized';
 import { PLAYER, templateOf } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
@@ -145,12 +147,6 @@ export function initialState(registry: Registry, language: string = DEFAULT_LANG
   if (starting) state.location = starting;
   initResources(state, registry);
   return state;
-}
-
-export interface PruneWarning {
-  path: Answer;
-  id: Answer;
-  message: Localized;
 }
 
 function addWarning(warnings: PruneWarning[], path: string, id: string, message: Localized): void {

@@ -6,44 +6,12 @@ import { actionAddress } from '../content/action';
 import { declaredId, Entity } from '../content/entity';
 import { hostile, Registry } from '../content/registry';
 import { actionVisible, findActiveAction, findActionOwner, requiresMet } from './actions';
-import { GameState, PLAYER, templateOf } from './state';
+import { type ActiveAction, type ActorState, type Cadence, GameState, PLAYER, type Seat, templateOf } from './state';
 import { Answer, Localized, localizerOf, Params } from './localized';
 import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
 
-// Where one participant's swing comes from and who it lands on. Every
-// participant has one, the player included, so nothing reads a side off an
-// identity.
-export interface Seat {
-  ownerRef: string;
-  actionSlug: string;
-  target: string;
-}
-
-export interface ActiveAction {
-  ownerRef: string; // "<obj>.<objId>", e.g. "entity.oven" or "action.melee-combat"
-  // What addresses the action under that owner, never the label it is shown as.
-  actionSlug: string;
-  repeating: boolean;
-  implicitTarget: number;
-  // Insertion order breaks ties between clocks due at the same instant.
-  cadences: Record<string, Cadence>;
-  // Scoped to the fight and vanish with it, where the player's pools persist.
-  actors?: Record<string, ActorState>;
-  roster?: Record<string, Seat>;
-}
-
-export interface Cadence {
-  progress: number;
-  attemptsMade: number;
-}
-
 export function newCadence(): Cadence {
   return { progress: 0, attemptsMade: 0 };
-}
-
-export interface ActorState {
-  resources: Record<string, number>;
-  rateRemainders: Record<string, number>;
 }
 
 // Installed rather than defaulted, because callers write attemptsMade and

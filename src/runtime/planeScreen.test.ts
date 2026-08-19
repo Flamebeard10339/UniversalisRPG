@@ -6,11 +6,10 @@ import { carriedFrame } from './carriedScreen';
 import { equip } from './equipment';
 import { growLine } from './growth';
 import { grownItems, wornCopy } from './itemInstance';
-import { ModalFrame } from './modals';
 import { planeReport } from './planeReport';
 import { BACK, PLANE, PlaneFrame, planeFocus, planeFrame, planeOptions, planeStale, planeSubmit } from './planeScreen';
 import { initialState } from './save';
-import { GameState } from './state';
+import { GameState, type ModalFrame } from './state';
 import { inEnglish } from './sayFixture';
 import { aCount, anId, says } from './said';
 

@@ -8,9 +8,9 @@ import { ORIGIN } from './clusterPlane';
 import { growLine } from './growth';
 import { isSaid, say, type Said } from './said';
 import { itemCopies, wornCopySlot } from './itemInstance';
-import { type ModalChoice, type ModalFrame, type ModalOption } from './modals';
+import { type ModalChoice, type ModalOption } from './modals';
 import { ClusterReport, PlaneFocus, PlaneReport, planeReport } from './planeReport';
-import { GameState } from './state';
+import { GameState, type ModalFrame } from './state';
 
 // One item's plane, with one hexagon of it in hand. The screen asks a single
 // question and every answer to it either moves the focus or grows the plane;

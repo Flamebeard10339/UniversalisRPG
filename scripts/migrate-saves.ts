@@ -1,3 +1,4 @@
+import type { PruneWarning } from '../src/runtime/pruning';
 import { globSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { qualify } from '../src/content/namespace';
@@ -7,7 +8,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { splitSections } from '../src/grammar/structure';
 import type { Span } from '../src/grammar/parser';
 import { createGameState } from '../src/runtime/runtime';
-import { SAVE_VERSION, loadSave, type PruneWarning } from '../src/runtime/save';
+import { SAVE_VERSION, loadSave } from '../src/runtime/save';
 
 export interface ContentFile {
   path: string;
