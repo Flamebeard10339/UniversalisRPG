@@ -12,7 +12,9 @@ export interface SkillGrant {
   event: string;
 }
 
-// The whole line, because every part of it is fixed: only the coefficient, the
+// A clause rather than a line: `grants` is a clause list, so a grant stops at
+// the comma that separates it from the next one for the same reason a tag
+// clause does. Every other part of it is fixed: only the coefficient, the
 // presence of `amount` and the event name vary, and a grant missing both halves
 // of the expression is refused by the alternation rather than by a check.
 const GRANT = new RegExp(String.raw`^gain[ \t]+(?:(?<coefficient>\d+(?:\.\d+)?)(?:[ \t]*\*[ \t]*(?<scaled>amount))?|(?<bare>amount))[ \t]+experience[ \t]+on[ \t]+(?<event>${REFERENCE.source})[ \t]*$`);
@@ -20,7 +22,7 @@ const GRANT = new RegExp(String.raw`^gain[ \t]+(?:(?<coefficient>\d+(?:\.\d+)?)(
 export const skillGrant: Parser<SkillGrant> = {
   parse(cursor) {
     const start = cursor.pos;
-    const raw = cursor.take(/[^\n]*/) ?? '';
+    const raw = cursor.take(/[^,\n]*/) ?? '';
     const groups = GRANT.exec(raw.trim())?.groups;
     if (!groups) {
       throw new DslError(`expected a grant like \`gain 4 * amount experience on rat-bitten\`, with a coefficient, an amount, or both, got ${JSON.stringify(raw)}`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });

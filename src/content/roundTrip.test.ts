@@ -2,6 +2,53 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { loadModule, loadUniverseWithDiagnostics, type ModuleDiagnostic, type UniverseLoadResult } from './registry';
 import { canSerialize, declaredGlobalIds, republishModule, roundTripModule, roundTripUniverse } from './serialize';
 import { parseUniverse, type ModuleSource } from './universe';
+import { collectionFailures, exportedCodecs, isCodec, reachableCodecs } from '../grammar/codec';
+import { AnySchema } from '../grammar/section';
+import { SCHEMAS } from './module';
+
+// The content layer's own modules, read from the directory. Together with the
+// walk in `src/grammar/codec.test.ts` this is every codec the tree holds: the
+// two layers are where a `Parser` can be written, and `layer-check` is what
+// keeps that true.
+const MODULES = import.meta.glob(['./*.ts', '!./*.test.ts'], { eager: true }) as Record<string, object>;
+
+// The other route to the same population, and the one the load path itself
+// takes: every field of every collected schema, and a list parser's element
+// under it. A kind added to `SCHEMAS` brings its parsers into this set with no
+// edit here, which a list of parsers could not do.
+const fromSchemas = () =>
+  reachableCodecs(
+    Object.entries(SCHEMAS).flatMap(([kind, schema]) => Object.entries((schema as AnySchema).fields).map(([field, spec]) => [`${kind}.${field}`, spec.parser] as const)),
+  );
+
+describe('every parser in the grammar is a codec that survives its own examples', () => {
+  it('reaches the content layer parsers and finds each one round-tripping', () => {
+    const codecs = exportedCodecs(MODULES);
+    expect(codecs.size).toBeGreaterThanOrEqual(8);
+    expect(collectionFailures(codecs)).toEqual([]);
+  });
+
+  // Two kinds keep their value parsers unexported, so the export walk above
+  // cannot see them and the schema walk is what does. Asserting the schema set
+  // is not a subset of the export set is what stops that from silently
+  // becoming untrue.
+  it('reaches the parsers only a schema names, and finds each one round-tripping', () => {
+    const codecs = fromSchemas();
+    expect(codecs.size).toBeGreaterThanOrEqual(20);
+    expect(collectionFailures(codecs)).toEqual([]);
+    const exported = exportedCodecs(MODULES);
+    expect([...codecs.keys()].some((parser) => !exported.has(parser as never))).toBe(true);
+  });
+
+  // Every field of every kind, asked directly rather than through the walk
+  // above, whose object-identity dedupe means a shared parser is named only
+  // after the first kind that reached it.
+  it('finds a codec behind every field of every collected kind', () => {
+    const fields = Object.entries(SCHEMAS).flatMap(([kind, schema]) => Object.entries((schema as AnySchema).fields).map(([field, spec]) => [`${kind}.${field}`, spec.parser] as const));
+    expect(fields.length).toBeGreaterThan(40);
+    expect(fields.filter(([, parser]) => !isCodec(parser)).map(([name]) => name)).toEqual([]);
+  });
+});
 
 const BASE = ['# info base', 'version: 1.0.0', '', '# item bread', 'title: Bread', '', '# location camp', 'x: 0, y: 0', 'starting'].join('\n');
 
