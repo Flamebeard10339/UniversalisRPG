@@ -2663,3 +2663,29 @@ rule with no per-case knob, the way the five-layer order has none — and I do n
   `registry.ts` stop co-changing once their literals are derived. That needs the change to land. My
   §5 finding predicts they will not fully stop, because `registry.ts` is in a 4-module cycle with
   `serialize.ts` and `references.ts` for reasons unrelated to the kind list.
+
+---
+
+# Final
+
+Agent 5 refuted my §2 and mispriced-out my §6, and both refutations look right to me. §2 died by exactly the test I wrote for it, and not narrowly: mean closure 11.7 → 54.0 at R² 0.94, hole tables 7 → 7 at R² 0.135. I had the slope and the constant backwards. §6 is sound as a mechanism and 41-of-44 is a fatal price on `systems.json`. What survived is the probe and the transposition finding, both of which came back better than I specified them.
+
+So here's where the page has actually landed, and I think it has landed hard enough to stop.
+
+**The diagnosis, in one line:** the median module's reading list contains a 28-module lump that cannot be read one module at a time, 51% of the tree has that lump in its list, and `src/runtime` is the only directory in the repository with no internal order. That's Agent 5's §9, and it's the cleanest statement of your symptom anyone has produced. Everything else — the 286 that was 16, the co-change pair, the closure percentiles — is downstream of it or is arithmetic.
+
+**Agent 5's open problem is already solved by its own table.** It asks for a rule that gives `runtime` a finer order with no per-case knob, rejects derived stratification as vacuous and declared stratification as `systems.json` with manners. But it conflated the readout with the rule. Nobody declared `grammar`'s 7 strata, `content`'s 9, or `ui`'s 6 — those directories are 6–9 layers deep *because they are acyclic*, and the depth is a consequence, not a configuration. Acyclicity is a property with literally zero configuration; the stratification is what falls out. `runtime` is the only directory without an internal order and the only structural difference is the cycle. You don't need a finer layer rule. You need #24, and the order arrives free.
+
+That also rehabilitates my §6 in the one place it fits. Agent 5's own criterion — "run it on something whose grant is rare" — describes cycles exactly: 4 today, against `systems.json`'s one-in-three merges. Deriving the permitted cycle set from the merge base gives you a ratchet with no stored baseline (#20) and no grandfather list (#21), which is the thing that has always blocked turning #24 on. And note this is *not* v3: that was undirected biconnected blocks, threshold 30, floor 47. This is directed SCCs, target 1, and 1 is achieved in three of your four directories today.
+
+**Order the work by decay rate, not by cost.** This is the sequencing correction I'd make to Agent 5's §12. Totalising the nine holes is a day and it will still be a day in a month. The blob is 32 edges now, and Agent 5's §7 shows the floor it sits on grew 2.3× in fifteen days while the tree doubled. The expensive item is the one getting more expensive. Do the day of work this week because it's a day and it's a real correctness defect — 74.5% of blast radius invisible to the compiler is bad regardless of whether it's the growth — but don't let it be a reason the blob branch starts in September.
+
+**Two corrections to the plan as written:**
+
+Don't ship the probe as a report. #13 records that *every* reporting-only instrument here was routed around, without exception. The probe's output is a set of filenames whose target is ∅, which is gate-shaped, not number-shaped — same family as `layer-check`'s zero and `exhaustive.test.ts`'s zero. Run it as a report for exactly as long as it takes to close the nine holes, then turn it into a gate at "no new hole tables." A permanent report is a place to put the finding, not a mechanism.
+
+And surface what Agent 5's §8 shows but doesn't say. The observed/random ratio went 0.57 → 0.80 over fifteen days. The framing was "everything else is arguing over the 20%," but the other reading is that the design content of your import graph fell from 43% to 20% in two weeks. That is the strongest evidence in the whole document that your felt problem is real and accelerating, and it's an argument for spending the branch now rather than after another doubling.
+
+**What I would not do is commission Agent 6.** Five rounds have refuted three built attempts, four literature proposals, two of my claims, and one of Agent 5's own. The remaining questions — does breaking the 28-blob actually reduce closure, do `referenceSites` and `registry` stop co-changing — are not answerable from `git` and the tree. They need the change to land. The page has converged on the only thing a page can converge on, which is an experiment.
+
+Concretely: totalise the nine holes and fold the two predicates this week, with the probe as the acceptance test and |b| measured the way Agent 5 measured it rather than the way I specified it. Then the `runtime` SCC, with merge-base-derived acyclicity as the ratchet that lets it land incrementally. Then re-run §6's time series at ~80 states, which is the one thing that tells you whether any of it worked.
