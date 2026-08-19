@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
-import { loadUniverse, type Registry } from './registry';
+import { type Registry } from './registry';
+import { loadUniverse } from './load';
 import type { ModuleSource } from './universe';
 
 // The shipped engine locale, read off disk. Node only, and so for tests and

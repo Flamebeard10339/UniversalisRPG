@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
-import { loadUniverseWithDiagnostics } from '../content/registry';
+import { loadUniverseWithDiagnostics } from '../content/load';
 import type { ModuleSource } from '../content/universe';
 import { COMMANDS, newContext, runLine, type CommandSpec } from '../runtime/command';
 import { DEV_SLOT, DEV_SNAPSHOT_SLOT, PLAYER_SLOT } from '../runtime/saveSlots';

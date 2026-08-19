@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { armFightAction, createGameState, GameState, initResources, resolve } from './runtime';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadModule } from '../content/load';
 import { secondsToMs } from './units';
 
 // No `accuracy:`, and every stat is a point, so nothing here draws from the rng:

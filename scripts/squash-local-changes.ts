@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
+import { formatModuleDiagnostic } from '../src/content/registry';
+import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { ModuleSource, parseModuleSource, ParsedModule } from '../src/content/universe';
 import { declaredGlobalIds, roundTripModule } from '../src/content/serialize';
 

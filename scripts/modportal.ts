@@ -4,7 +4,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { LISTABLE_MOD_LABELS, materializeApprovedModIssue, planModportalSync } from '../src/content/modportal';
 import type { ApprovedModIssue, MaterializedMod, ModportalEntry, ModportalManifest, ModTier } from '../src/content/modportal';
-import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
+import { formatModuleDiagnostic } from '../src/content/registry';
+import { loadUniverseWithDiagnostics } from '../src/content/load';
 import type { ModuleSource } from '../src/content/universe';
 import { DEFAULT_MODPORTAL_CACHE, MODPORTAL_MANIFEST_FILE, modportalEntryPath, orphanEntryFiles, readEntryText, readModportalCache } from './lib/modportalCache';
 

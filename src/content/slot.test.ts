@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { localeKey, missingTranslations } from './locale';
-import { loadModule, loadUniverse } from './registry';
+import { loadModule, loadUniverse } from './load';
 import { roundTripModule } from './serialize';
-import { loadUniverseWithDiagnostics, type Registry } from './registry';
+import { type Registry } from './registry';
+import { loadUniverseWithDiagnostics } from './load';
 import { parseModuleSource, type ModuleSource } from './universe';
 import { declaredGlobalIds } from './serialize';
 

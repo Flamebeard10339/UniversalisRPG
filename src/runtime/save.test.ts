@@ -10,7 +10,8 @@ import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
 import { travelAction, TRAVEL_ADDRESS } from './actions';
 import { actionAddress } from '../content/action';
-import { CRAFT_ADDRESS, loadUniverse, type Registry } from '../content/registry';
+import { CRAFT_ADDRESS, type Registry } from '../content/registry';
+import { loadUniverse } from '../content/load';
 import { GameState, type ModalFrame } from './state';
 import { toMilliUnits } from './units';
 

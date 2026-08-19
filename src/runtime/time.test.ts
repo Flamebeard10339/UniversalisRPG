@@ -1,7 +1,7 @@
 import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
 import { advanceTime, createGameState, evaluateCondition, renderSegments, useAction } from './runtime';
-import { loadModule } from '../content/registry';
+import { loadModule } from '../content/load';
 import { runTest, sessionStatus, startSession, view, wait } from './session';
 import { secondsToMs } from './units';
 

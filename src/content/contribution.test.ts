@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildContributionIssueBody, contributionBase, extractContributionDsl, localModuleLoaded } from './contribution';
-import { loadUniverseWithDiagnostics } from './registry';
+import { loadUniverseWithDiagnostics } from './load';
 
 const BASE = `
 # info base

@@ -7,7 +7,7 @@ import { Registry } from '../content/registry';
 import { engineLocale, withEngineLocale } from '../content/engineLocale';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { NAMESPACED_KINDS } from '../content/namespace';
-import { loadUniverse } from '../content/registry';
+import { loadUniverse } from '../content/load';
 import { runTest } from './session';
 import { initialState } from './save';
 import { secondsToMs, toMilliUnits } from './units';

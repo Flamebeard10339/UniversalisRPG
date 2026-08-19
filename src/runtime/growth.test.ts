@@ -2,7 +2,7 @@ import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
 import { DslError } from '../grammar/parser';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
-import { loadUniverse } from '../content/registry';
+import { loadUniverse } from '../content/load';
 import { grow, growLine } from './growth';
 import { itemInstance, type Growth } from './itemInstance';
 import { planeReport } from './planeReport';

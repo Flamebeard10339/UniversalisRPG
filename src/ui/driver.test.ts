@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { engineLocale } from '../content/engineLocale';
-import { loadUniverseWithDiagnostics } from '../content/registry';
+import { loadUniverseWithDiagnostics } from '../content/load';
 import { newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
 import { slotStore, type SlotDriver } from '../runtime/store';

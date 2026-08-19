@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
-import { loadModule } from '../content/registry';
+import { loadModule } from '../content/load';
 import { SAVE_VERSION } from '../runtime/save';
 import { applyDirective, startSession, submitModal, view, type PlaySession, type PlayView } from '../runtime/session';
 import { dismissal } from './asking';

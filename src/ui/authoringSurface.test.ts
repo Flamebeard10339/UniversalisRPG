@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { SCHEMAS, SECTION_KINDS } from '../content/module';
-import { CONTENT_SECTION_MAPS, loadUniverseWithDiagnostics } from '../content/registry';
+import { CONTENT_SECTION_MAPS } from '../content/registry';
+import { loadUniverseWithDiagnostics } from '../content/load';
 import { COMMANDS } from '../runtime/command';
 import {
   addressable,

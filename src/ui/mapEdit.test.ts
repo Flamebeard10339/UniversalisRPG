@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Location } from '../content/location';
-import { loadUniverseWithDiagnostics } from '../content/registry';
+import { loadUniverseWithDiagnostics } from '../content/load';
 import { addressable, MAPPED_KIND, NOWHERE, offeredBy, type Section } from './authoringSurface';
 import { drawnAt, PER_UNIT, placedAt, type Node } from './discovery';
 import { createDriver, type Driver } from './driver';

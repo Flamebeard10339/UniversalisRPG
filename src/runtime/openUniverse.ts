@@ -1,5 +1,6 @@
 import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../content/localChanges';
-import { formatModuleDiagnostic, loadUniverseWithDiagnostics, type Registry } from '../content/registry';
+import { formatModuleDiagnostic, type Registry } from '../content/registry';
+import { loadUniverseWithDiagnostics } from '../content/load';
 import type { ModuleSource } from '../content/universe';
 import type { Answer } from './localized';
 import { startingLocationId } from './save';

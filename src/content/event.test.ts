@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EVENT_TRIGGERS, EventTrigger, TRIGGER_NAMES, watchesAPool } from './event';
-import { loadModule } from './registry';
+import { loadModule } from './load';
 
 const PRELUDE = `
 # stat max-health

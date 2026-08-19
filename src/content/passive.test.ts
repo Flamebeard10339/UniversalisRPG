@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from './registry';
+import { loadModule } from './load';
 import { passiveRangeProblem } from './passive';
 
 // c1: # passive is a section kind, its body the same tag-clause list # item

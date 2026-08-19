@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { characterHooks } from './hooks';
-import { loadModule } from '../content/registry';
+import { loadModule } from '../content/load';
 import { midpoint } from '../grammar/range';
 import { applyClusterEffect } from './clusterEffect';
 import { ORIGIN } from './clusterPlane';

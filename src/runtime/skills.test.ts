@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadModule } from '../content/load';
 import { applyResultsNow, createGameState, GameState, initResources, PLAYER, statRange, statValue } from './runtime';
 import { point } from '../grammar/range';
 import { skillLevel, xpForLevel } from './skills';

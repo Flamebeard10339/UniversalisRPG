@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseDirectiveLine } from '../content/test';
-import { loadUniverse } from '../content/registry';
+import { loadUniverse } from '../content/load';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { carriedFrame } from './carriedScreen';
 import { equip } from './equipment';

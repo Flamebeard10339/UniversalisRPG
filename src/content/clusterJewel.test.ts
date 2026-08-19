@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { clusterJewelProblem, DEFAULT_MOD_SLOTS } from './clusterJewel';
-import { loadModule } from './registry';
+import { loadModule } from './load';
 import { getShape } from './shapes';
 
 const PASSIVES = '# stat max-health\n# passive hale\n# passive mending';

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { loadModule, loadUniverseWithDiagnostics, type ModuleDiagnostic, type UniverseLoadResult } from './registry';
+import { type ModuleDiagnostic, type UniverseLoadResult } from './registry';
+import { loadModule, loadUniverseWithDiagnostics } from './load';
 import { canSerialize, declaredGlobalIds, republishModule, roundTripModule, roundTripUniverse } from './serialize';
 import { parseUniverse, type ModuleSource } from './universe';
 

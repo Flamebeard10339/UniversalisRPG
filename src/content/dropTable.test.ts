@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ActionResult } from '../grammar/actionResult';
-import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './registry';
+import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './load';
 import { roundTripModule } from './serialize';
 
 const load = (...lines: string[]) => () => loadModule(lines.join('\n'));

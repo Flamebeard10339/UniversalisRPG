@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DIRECTIONS } from '../src/content/hex';
 import { loadInEnglish } from '../src/content/engineLocale';
-import { loadUniverse } from '../src/content/registry';
+import { loadUniverse } from '../src/content/load';
 import { hasWords, translationOf, TRANSLATED_LANGUAGE } from '../src/content/translation';
 import { BASE_LANGUAGE, localizerFor } from '../src/runtime/localized';
 import { COMMANDS, newContext, runLine, type CommandContext } from '../src/runtime/command';

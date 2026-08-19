@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
-import { formatModuleDiagnostic, loadModule, loadUniverse, loadUniverseWithDiagnostics } from './registry';
+import { formatModuleDiagnostic } from './registry';
+import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './load';
 import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from './serialize';
 import { ModuleSource, parseModuleSource, parseUniverse } from './universe';
 

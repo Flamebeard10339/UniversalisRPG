@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadUniverseWithDiagnostics } from '../content/registry';
+import { loadUniverseWithDiagnostics } from '../content/load';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 import { FALLBACK_SOURCE, openUniverse, REQUIREMENTS, type RequirementId } from './openUniverse';

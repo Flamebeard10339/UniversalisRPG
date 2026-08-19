@@ -4,7 +4,8 @@ import { ActiveAction, armAction, buffsOf, craft, createGameState, GameState, gr
 import { actionAddress } from '../content/action';
 import { Boundary, BoundarySource, boundarySourceName, requireBoundaryNotPast, requireForwardProgress, STALL_BOUND } from './forwardProgress';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadModule } from '../content/load';
 import { secondsToMs, toMilliUnits } from './units';
 
 // Fixtures: campfire-cook (no in:, so an infinite input limit), smokehouse-cook

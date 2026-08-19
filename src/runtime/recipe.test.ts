@@ -1,7 +1,8 @@
 import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
 import { craft, createGameState, recipeCraftable, resolve } from './runtime';
-import { CRAFT_ADDRESS, loadModule, Registry } from '../content/registry';
+import { CRAFT_ADDRESS, Registry } from '../content/registry';
+import { loadModule } from '../content/load';
 import { applyDirective, startSession, view } from './session';
 import { SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { engineLocale } from '../content/engineLocale';
-import { loadUniverse } from '../content/registry';
+import { loadUniverse } from '../content/load';
 import { carriedName } from './carriedName';
 import { localizerFor } from './localized';
 

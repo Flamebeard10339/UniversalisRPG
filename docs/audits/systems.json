@@ -39,6 +39,7 @@
         "src/content/instanceId.ts",
         "src/content/item.test.ts",
         "src/content/item.ts",
+        "src/content/load.ts",
         "src/content/locale.test.ts",
         "src/content/locale.ts",
         "src/content/location.ts",
@@ -132,9 +133,10 @@
           "name": "the registry",
           "paths": [
             "src/content/registry.ts",
+            "src/content/load.ts",
             "src/content/universe.ts"
           ],
-          "note": "CLAUDE.md defines this system's second half as syntax to registry, including load-time reference resolution."
+          "note": "CLAUDE.md defines this system's second half as syntax to registry, including load-time reference resolution. runtime-has-an-order-because-it-has-no-cycles split the two: registry.ts declares what a registry is and what can be asked of one, load.ts builds one from sources."
         },
         {
           "name": "droptable system",

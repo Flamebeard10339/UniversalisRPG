@@ -4,7 +4,8 @@ import { point, range } from '../grammar/range';
 import { ActiveAction, createGameState, equip, GameState, grantBuff, hitDamage, initResources, minDamage, PLAYER, sampleStat, statRange, statValue } from './runtime';
 import { restorePools } from './effects';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadModule } from '../content/load';
 import { tagClause } from '../grammar/tagClause';
 import { toMilliUnits } from './units';
 

@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { engineLocale } from '../content/engineLocale';
-import { loadUniverse } from '../content/registry';
+import { loadUniverse } from '../content/load';
 import { englishOf, everyKey, hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/translation';
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { createGameState } from './runtime';

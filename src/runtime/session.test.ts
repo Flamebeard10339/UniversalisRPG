@@ -5,7 +5,7 @@ import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
 import { feedItem, itemInstance } from './itemInstance';
 import { Registry } from '../content/registry';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
-import { loadUniverse } from '../content/registry';
+import { loadUniverse } from '../content/load';
 import type { ModuleSource } from '../content/universe';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';

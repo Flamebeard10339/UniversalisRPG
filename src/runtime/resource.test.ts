@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
 import { eventsFor, restorePools } from './effects';
 import { applyResultsNow, createGameState, initResources } from './runtime';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadModule } from '../content/load';
 import { initialState } from './save';
 import { toMilliUnits } from './units';
 

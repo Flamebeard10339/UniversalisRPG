@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Direction, Location, locationSchema, recursivelyResolveRelativeCoordinates } from '../content/location';
 import { Authored, hydrateSection } from '../grammar/section';
-import { loadModule } from '../content/registry';
+import { loadModule } from '../content/load';
 import { apply, startSession, view } from './session';
 
 function loc(id: string, over: Partial<Location> = {}): Location {

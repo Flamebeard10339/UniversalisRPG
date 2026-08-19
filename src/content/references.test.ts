@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DslError } from '../grammar/parser';
-import { loadModule } from './registry';
+import { loadModule } from './load';
 
 const VALID = `
 # stat attack

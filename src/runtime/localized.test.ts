@@ -6,7 +6,7 @@ import { declaredId } from '../content/entity';
 import { everyActionTable } from '../content/registry';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { ENGINE_KEYS } from '../content/locale';
-import { loadUniverse } from '../content/registry';
+import { loadUniverse } from '../content/load';
 import { itemExamine, localizerFor, type Localized } from './localized';
 import { initialState, pruneStateForRegistry } from './save';
 

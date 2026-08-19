@@ -1,7 +1,8 @@
 import type { ModalOption } from './modalOption';
 import { RuntimeError } from './error';
 import { DslError } from '../grammar/parser';
-import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../content/registry';
+import { formatModuleDiagnostic } from '../content/registry';
+import { loadUniverseWithDiagnostics } from '../content/load';
 import { type ModuleSource } from '../content/universe';
 import {
   deleteLocalSection,

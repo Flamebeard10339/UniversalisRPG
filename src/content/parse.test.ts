@@ -3,7 +3,7 @@ import { condition } from '../grammar/condition';
 import { Action, entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
-import { loadModule, loadUniverse } from './registry';
+import { loadModule, loadUniverse } from './load';
 import { SCHEMAS, SECTION_KINDS, parseModule, schemaFor } from './module';
 import { Cursor, DslError, Parser, parseWhole } from '../grammar/parser';
 import { ListParser } from '../grammar/list';

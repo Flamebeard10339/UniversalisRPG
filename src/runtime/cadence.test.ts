@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
 import { armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve } from './runtime';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadModule } from '../content/load';
 import { startSession, view } from './session';
 import { attemptDuration } from './stats';
 import { secondsToMs, toMilliUnits } from './units';

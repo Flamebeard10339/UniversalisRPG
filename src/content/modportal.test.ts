@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildContributionIssueBody } from './contribution';
-import { loadUniverse, loadUniverseWithDiagnostics } from './registry';
+import { loadUniverse, loadUniverseWithDiagnostics } from './load';
 import { emptyModportalManifest, issueTier, materializeApprovedModIssue, planModportalSync } from './modportal';
 import { registryDiff } from './registryDiff';
 import type { MaterializedMod, ModportalManifest, ModTier } from './modportal';

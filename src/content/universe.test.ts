@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatModuleDiagnostic, loadUniverse, loadUniverseWithDiagnostics } from './registry';
+import { formatModuleDiagnostic } from './registry';
+import { loadUniverse, loadUniverseWithDiagnostics } from './load';
 import { ModuleSource, orderModules, parseModuleSource, parseUniverse } from './universe';
 
 const module = (name: string, ...lines: string[]): ModuleSource => ({ name, text: lines.join('\n') });

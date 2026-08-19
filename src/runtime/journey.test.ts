@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DISCOVERED } from '../content/location';
 import { engineLocale } from '../content/engineLocale';
-import { loadUniverseWithDiagnostics, type Registry } from '../content/registry';
+import { type Registry } from '../content/registry';
+import { loadUniverseWithDiagnostics } from '../content/load';
 import { parseSaveSection } from '../content/saveSection';
 import { reachable, roadsFrom, routeTo } from './journey';
 import { loadSave } from './save';

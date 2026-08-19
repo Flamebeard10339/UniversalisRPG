@@ -6,7 +6,8 @@ import { consolidate, contentFiles, parseArgs, run, writable } from './consolida
 import { openRepl } from './play-cli';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { initialLocalChangesModule, localSectionHeadings, LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
-import { loadUniverse, loadUniverseWithDiagnostics, type Registry } from '../src/content/registry';
+import { type Registry } from '../src/content/registry';
+import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import { registryDiff } from '../src/content/registryDiff';
 import type { ModuleSource } from '../src/content/universe';
 import { runLine, type AuthoringContext } from '../src/runtime/command';

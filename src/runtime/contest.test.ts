@@ -3,7 +3,8 @@ import { DslError } from '../grammar/parser';
 import { nextRandom } from './rng';
 import { armAction, armFightAction, createGameState, GameState, grantBuff, hitChance, initResources, PLAYER, resolve } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
-import { loadModule, Registry } from '../content/registry';
+import { Registry } from '../content/registry';
+import { loadModule } from '../content/load';
 import { secondsToMs, toMilliUnits } from './units';
 
 // Three entities differing only in what they oppose the player with: `dummy`

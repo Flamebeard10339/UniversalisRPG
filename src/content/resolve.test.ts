@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ACTION_MEMBER } from './namespace';
-import { loadModule, loadUniverse } from './registry';
+import { loadModule, loadUniverse } from './load';
 import { ModuleSource } from './universe';
 
 const module = (id: string, ...lines: string[]): ModuleSource => ({ name: id, text: [`# info ${id}`, ...lines].join('\n') });

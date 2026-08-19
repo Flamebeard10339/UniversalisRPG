@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
-import { loadUniverseWithDiagnostics } from '../src/content/registry';
+import { loadUniverseWithDiagnostics } from '../src/content/load';
 import type { ModuleSource } from '../src/content/universe';
 import { COMMANDS, runLine, type AuthoringContext, type CommandResult } from '../src/runtime/command';
 import { createSaveContext } from '../src/runtime/saveSlots';

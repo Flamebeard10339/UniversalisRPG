@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatVersion } from '../src/grammar/dependency';
-import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, loadUniverseWithDiagnostics, type Registry } from '../src/content/registry';
+import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, type Registry } from '../src/content/registry';
+import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { registryDiffMaps } from '../src/content/registryDiff';
 import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from '../src/content/serialize';
 import { type ModuleSource, type ParsedModule } from '../src/content/universe';
