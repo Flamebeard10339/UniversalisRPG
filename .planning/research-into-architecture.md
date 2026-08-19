@@ -1502,4 +1502,265 @@ If you want to take this further, the most valuable next step would be to design
 [9]: https://aipatternbook.com/codebase-map/?utm_source=chatgpt.com "Codebase Map - Encyclopedia of Agentic Coding Patterns"
 [10]: https://arxiv.org/abs/2601.10112?utm_source=chatgpt.com "Repository Intelligence Graph: Deterministic Architectural Map for LLM Code Assistants"
 
-# Agent 3's thinking
+---
+
+# Agent 3's research — the same questions, run against the tree
+
+Agents 1 and 2 agree, and I think they are both wrong in the same place. Neither ran a number.
+Everything above this line is argument from the literature plus your own prior measurements; the
+proposals themselves (ban cycles first, place boundaries by co-change, default-deny visibility with
+grants, committed API digests, module charters) arrive un-priced and un-refuted. This repository's
+own discipline is that a proposal is refuted *before* dispatch — v1, v2 and v3 all died that way.
+So I priced them.
+
+Four of the recommendations do not survive. What survives is not on either agent's list, and it is
+already sitting in your #23 marked *never tried*.
+
+**Method.** Feature unit = merge commit; a branch's files are `diff(merge-base(p1,p2) .. p2)`. 139
+merges, 51 touching non-test `src`, 46 usable (≥2 live modules). Import graph is 154 non-test
+modules under `src` (your 211 counts tests), 817 edges, resolved through the same extensions the
+bundler uses. Everything below reproduces from `git` and the tree alone — no stored state, per #20.
+Scripts were scratch and are gone by design; the method is the artifact.
+
+Calibration against your existing numbers, to show the harness is the same instrument: files per
+`src`-touching branch median 9 / p90 32 (yours: 10 / 32, before excluding tests); four cycles with
+28 modules in `src/runtime` (#16, exact); ~2 systems per feature (#17) reappears as 2.65 directories.
+
+## 0. The closure is not repo-wide. It is two directories.
+
+Median transitive import closure, per module, by directory:
+
+| directory | modules | median closure | max |
+|---|---|---|---|
+| `src/grammar` | 14 | **3** | 10 |
+| `src/content` | 42 | **12** | 51 |
+| `src/runtime` | 42 | **82** | 87 |
+| `src/ui` | 54 | **86** | 138 |
+
+Repo-wide median 82 of 154. This is the quantity Agent 1 defined ("the transitive closure of what M
+reaches") and it is the thing that grows. But it is *bimodal*, not linear-everywhere: `grammar` and
+`content` are already bounded, and every repo-wide instrument you built averaged those two into the
+score and reported a middling number that named nothing. The failure of #1/#2/#3 is over-determined
+— they were not just repo-wide, they were repo-wide over a population that is two populations.
+
+## 1. Refuted: "ban cycles, it's cheap, do it first"
+
+Both agents make this priority #1 on the strength of your "4 violations". Four is the count of
+strongly connected components, not the count of work. The `src/runtime` SCC has 28 modules and
+**131 internal edges**. Greedy minimum-feedback-arc-set says making `src` acyclic requires cutting
+or inverting **32 import edges**, 11 of them pointing at `runtime/state.ts`, spread over ~15 files
+in the most entangled part of the codebase. That is not a day.
+
+The prize is worse than the price. Counterfactual, holding everything else fixed:
+
+| graph | median closure |
+|---|---|
+| today | 82 |
+| after the 32-edge MFAS cut | 48 |
+| **if all 131 intra-SCC edges vanished** (physically impossible upper bound) | **49** |
+
+Even deleting every edge inside the blob — which would mean those 28 modules do not reference each
+other at all — leaves the median module reaching 49 of 154. Banning cycles buys a constant factor
+on an unbounded quantity. It is worth doing for the reason `layer-check` is worth having (it is
+inexemptible, see §4), but it is not the intervention, and sequencing it first spends the branch's
+budget on a 40% dent.
+
+## 2. Refuted: "separate data from behaviour" pays 82 → 8
+
+Your #32. I found it independently and it looked spectacular. Greedily severing the *outgoing* edges
+of modules — making each a leaf, i.e. pure data — takes median closure 82 → 49 → 42 → 21 → 13 → **8**
+after five modules (`runtime/command.ts`, `content/registry.ts`, `content/module.ts`,
+`runtime/localized.ts`, `runtime/session.ts`).
+
+That number is an artifact and I am reporting it only so nobody else finds it and believes it.
+Severing outgoing edges is only realizable for consumers that import the module *as types*. Everyone
+else calls the functions and still pulls the implementation closure. Actual consumer split:
+
+| hub | consumers | type-only | value |
+|---|---|---|---|
+| `runtime/session.ts` | 22 | **19** | 3 |
+| `runtime/localized.ts` | 37 | 20 | 17 |
+| `content/registry.ts` | 38 | 9 | **29** |
+| `runtime/state.ts` | 24 | 3 | **21** |
+| `runtime/runtime.ts` | 5 | 0 | **5** |
+
+Modelling the split honestly — `X.types.ts` as a new leaf, type-only consumers repointed, value
+consumers unchanged — gives median 82 → **42**, and it **saturates after two hubs**. Splitting hubs
+3 through 8 moves the median by zero. And p90 closure *rises* 91 → 98, because the split adds
+modules. Same ceiling as cycle-breaking, from an unrelated direction.
+
+Two independent structural interventions both stop at ~42–49. That is not a coincidence about the
+interventions; it is a floor. The value-dependency structure of a game runtime is not going to let
+the combat code stop transitively reaching the state representation, and no amount of graph surgery
+changes that. **Transitive closure size is not the quantity to bound.** Agent 1 wrote the correct
+version and then dropped it: each hop costs *the interface*, not the implementation. A closure of 82
+through honest interfaces is free; a closure of 12 through leaky ones is not. Both agents then spent
+the rest of their analysis optimizing |closure|.
+
+## 3. Refuted, and this is the decisive one: co-change does not transfer
+
+This is the load-bearing recommendation on both lists — Agent 1's "place boundaries by co-change,
+not by directory", Agent 2's priority #6 — and it is your #14, the measurement you say scores both
+worked examples correctly and have quoted three times.
+
+Cluster the co-change graph, evaluate the partition by how many parts a feature touches. The trap
+nobody applied: **train on the first half of history, test on the second.** Evaluated on held-out
+features only:
+
+| partition | mean parts touched | features fully contained |
+|---|---|---|
+| co-change, trained on **all** history (circular) | 2.17 | 43% |
+| **directory (the 5 you already have)** | **2.65** | **17%** |
+| random partition, sizes matched to directories | 3.64 | 3% |
+| **co-change, trained on first half, tested on second** | **7.91** | **9%** |
+| trivial 1-part partition (the relabel attack) | 1.00 | 100% |
+
+Trained and tested on the same history it looks like a decisive win — 2.17 and 43%, beating
+directories on both. Trained honestly it is **worse than random**. Swept across k = 3…30 it never
+recovers. The 43% is memorization of the refactors it was fitted to.
+
+Why, mechanically: co-change here is not stationary.
+
+- Spearman between first-half and second-half pair weights, on the 226 pairs present in both: **0.166**. Your v1 import census was refuted at **0.195**. The signal you kept is a weaker predictor of *itself* than the metric you already threw away is of change frequency.
+- Top-50 strongest pairs: 24% overlap between halves. Top-100: 18%.
+- 3 of 46 features contribute **29%** of all pair observations. The graph is mostly a picture of three big refactors.
+
+The directional form is better and still not enough. "A never changes without B" (confidence 1.0,
+support ≥4) yields 119 rules over all history, 65 with no import edge. Learn them on the first half,
+test on the second: **14–19% hold**, against a **5.5%** random-pair baseline. Three to four times
+chance, and 80%+ false.
+
+Your headline pair is real and survives every cut: `referenceSites.ts → serialize.ts`, support 19,
+8 in the first half and 11 in the second, and `referenceSites.ts` has **never** changed without
+`serialize.ts` in either. So #14 is sound *as a statement about that pair* and unsound as a ranking,
+a clustering input, or a placement rule. That is the same shape as everything else that has worked
+here — a specific local fact, not a gradient. The honest reading is that this history is too short
+(46 features, 18 days) and its features too large for evolutionary coupling to locate boundaries,
+and that will still be true in three months because the code will have moved.
+
+## 4. The governance-artifact law — why all four remaining proposals die
+
+v2 died on one sentence: *the escape is worker-issuable*. That is treated above as a fact about v2.
+It is a law, and it is measurable. For each artifact that governs `src`, how often was it edited in
+the same branch as `src` itself? (Base rate: 51 of 139 merges touch non-test `src`, so 37%.)
+
+| governance artifact | merges editing it | also editing `src` | |
+|---|---|---|---|
+| `docs/audits/systems.json` — the v2 partition | 63 | **40** | **63%** |
+| `docs/workflow.md` | 18 | 7 | 39% |
+| `CLAUDE.md` / `AGENTS.md` | 18 | 6 | 33% |
+| `scripts/layer-check.ts` | 2 | **0** | **0%** |
+| every `scripts/*.ts` gate | 10 | **0** | **0%** |
+| `exhaustive.test.ts` | 0 | 0 | — |
+
+The partition a worker can edit to make its own diff compliant is edited alongside code at nearly
+twice the base rate. The gates are never touched alongside code — 0 of 10, which at the 37% base
+rate is a ~0.9% coincidence.
+
+This is not "declarative loses to code". `layer-check` is 8 lines and has **no knob at all**: the
+layer order is a 5-element total order, and no feature can want it different. `systems.json` has one
+knob per file, and adding your new file to it is how you go green. The discriminator is whether
+editing the artifact *helps you land your diff*.
+
+Which prices the rest of the list, because every one of them is a knob-per-case artifact that a
+worker edits to proceed:
+
+- **Default-deny visibility with per-edge grants.** The grant file is `systems.json` with better manners. A worker that needs `inventory/internal/SlotAllocator` adds the grant, truthfully, in the same commit. Expect 63%. Bazel and Google's OWNERS work because the approver is *a different party with different incentives* — that is the load-bearing part, and Agent 1's citations all have it. You do not have one at grant time; your reviewer is the same agent that wants the grant. Nothing in the mechanism survives removing the human.
+- **Committed API digests / golden files.** Same law, plus a direct collision with #20: a golden file *is* a stored baseline, and metalava's baseline-regeneration workflow — which Agent 1 cites approvingly — is the mechanism by which it gets rubber-stamped. Derive the digest at the merge base and diff, or don't build it.
+- **Module charters with `owns` / `does not own` (Agent 2 §22).** Hand-authored prose, manually synced — the failure mode CLAUDE.md names twice in one paragraph, and your #19, already rejected. You have also already built it: `tasks produces` is the concept registry, and #10 records what happened — 78 of 149 names never registered, fires ~1 in 160.
+- **Bounded contexts as the primary partition.** §3 says the data cannot place them, and v2 says a partition you can relabel is a partition that gets relabelled. Merging two systems moved compliance 67%→78% with zero code change; that property is intrinsic to any containment score, including every one in my §3 table.
+
+Feasibility note if visibility is pursued anyway: `tsconfig.json` sets `moduleResolution: "Node"`,
+which ignores `package.json` `exports` entirely. Real enforcement needs `bundler` or `node16` first.
+An ESLint/dependency-cruiser rule instead is a knob-per-case artifact and lands back in this section.
+
+## 5. What the measurements actually point at
+
+Three files carry the answer. `content/referenceSites.ts`, `content/registry.ts` and
+`content/serialize.ts` are the top co-change cluster in your #14 — and they are also the top three
+holders of **hand-written members of a closed set that is defined somewhere else**:
+
+```
+286 literal section-kind names, across 41 of 154 modules
+     80  src/content/referenceSites.ts        9  src/content/serialize.ts
+     72  src/content/registry.ts              9  src/ui/xpNotes.ts
+     23  src/runtime/session.ts               7  src/content/resolve.ts
+     17  src/content/namespace.ts             7  src/runtime/planeReport.ts
+```
+
+The set is `SCHEMAS` at `content/module.ts:32`, and `SchemaKind = keyof typeof SCHEMAS` is already
+exported on line 50. `referenceSites.ts` and `serialize.ts` co-change 19/19 with no import edge
+because **they do not need one**: each holds its own hand-copied transcription of the same
+enumeration. That is Ousterhout's information leakage in its most literal form, it is the mechanism
+behind the one co-change finding that survives §3, and it is invisible to every structural metric by
+construction — which is exactly why #1, #2 and #3 could not see it.
+
+It predicts change frequency better than anything else measured here, *conditionally*:
+
+| signal | Spearman vs change frequency (n=154) |
+|---|---|
+| lines of code | 0.563 |
+| out-degree | 0.529 |
+| kind-literal count | 0.360 |
+
+As a global ranking it loses to counting lines — which is precisely how v1 died, and I am not going
+to hand you a fourth repo-wide number. Controlled for size it inverts:
+
+| stratum | enumerator modules | mean features touching | non-enumerators |
+|---|---|---|---|
+| LOC 2–36 | 0 | — | 1.41 |
+| LOC 37–87 | 0 | — | 2.56 |
+| LOC 88–171 | 5 | 4.20 | 2.53 |
+| LOC 172–1408 | 9 | **14.67** | 5.29 |
+| **≥300 LOC** | 6 | **19.17** | 6.46 |
+
+Spearman within `≥300 LOC` rises to **0.695**. Among the modules where work actually happens,
+whether a file transcribes the kind list is a 3× discriminator on how often it gets dragged into
+somebody else's feature. Zero enumerators exist below 88 LOC, which suggests the transcription is
+not merely correlated with size but substantially *is* the size.
+
+And the blast radius is directly observable. Commits that added a kind to `SCHEMAS`:
+
+```
+0674b299  +slot                    ->   9 src modules touched
+5c7a9cff  +passive, +cluster-jewel ->   7
+d76154bd  +entitytype              ->  11
+ae08d1bc  +event, +faction         ->  27
+```
+
+Against a median feature of 9 files. Adding one member to one table is a median-to-p90 feature.
+*That* is the growth you are feeling, and it is not the import closure.
+
+## 6. Recommendation
+
+Do #23, at full scope, and do it before anything else on this page.
+
+Generalise the `exhaustive.test.ts` proof from discriminated-union switches to **any closed set
+derived from `SCHEMAS`**, and drive the 286 literals out of the 41 files by deriving them. It is the
+only candidate that satisfies every constraint the repository has established:
+
+- **It is #5 and #6 again**, the two mechanisms that worked, applied to the next closed set. `SCHEMAS` is already used this way in four test files ("read off `SCHEMAS` rather than written down"); the pattern is proven in-tree.
+- **It is inexemptible (§4).** After the change there is no knob: a kind added to `SCHEMAS` either compiles everywhere or fails. Nothing to edit alongside your diff to go green — the property that separates `layer-check` (0%) from `systems.json` (63%).
+- **It is a derived proof, not an enumeration** — CLAUDE.md's own rule. The proof walks `SCHEMAS` and covers the kind added next month.
+- **It is not a repo-wide number, a threshold, a stored baseline, a partition, or a co-editable governance file** — the five shapes that have failed here six times between them.
+- **It retires the strongest surviving finding in #14** by removing its cause rather than reporting it, and it does so without needing co-change to be stationary.
+
+Sequence, and the reason: aim one `npm run mutate` manifest over the whole thing before the first
+auditor is commissioned (the `the-gui-authors-through-the-same-door` lesson — 3.5 hours and 660k
+tokens to relearn). Then `content/referenceSites.ts` and `content/registry.ts` first: 152 of the 286
+literals, and they are the co-change pair, so the leak either closes or is proven not to be the
+cause. That is a falsifiable prediction and it is cheap: if those two stop co-changing, the model
+is right; if they keep co-changing, the leak is elsewhere and this page is wrong.
+
+Then ban cycles (#24) — 32 edges, worth it for inexemptibility, not for the 40%. Split
+`runtime/session.ts` (19 of 22 consumers are type-only, so it is nearly free) and stop, because §2
+says hub 3 onward pays nothing. Leave visibility, digests, charters and bounded contexts alone until
+there is a second party to approve a grant.
+
+## 7. What would falsify this
+
+- If `referenceSites.ts` and `registry.ts` still co-change after their literals are derived, §5 is wrong and the leak is elsewhere.
+- If adding a kind after the change still touches >4 modules, the closed set was not the binding constraint.
+- §3 rests on 46 features over 18 days. It is enough to refute "co-change locates boundaries *here, now*" and not enough to refute the technique in general; re-run the held-out split at ~150 features before reconsidering. Note that it will not become stationary by waiting — the code moves too.
+- §4's 0-of-10 is a small sample. It is significant at the 37% base rate (~0.9%), and `systems.json`'s 40-of-63 is the stronger half of the claim.
+- I did not verify agents 1's and 2's citations. Agent 2's arXiv:2601.10112 "Repository Intelligence Graph" carries a specific effect size (+12.2%, −53.9%) that nothing here depends on; check it before it is quoted again.
