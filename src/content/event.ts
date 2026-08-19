@@ -54,6 +54,8 @@ const triggerValue: Parser<EventTrigger> = {
     }
     return normalized as EventTrigger;
   },
+  print: (value) => value,
+  examples: [...TRIGGER_NAMES],
 };
 
 export const eventSchema: SectionSchema<GameEvent> = {

@@ -1,5 +1,6 @@
 import { DslError, Parser, Span } from './parser';
 import { isRange, Range } from './range';
+import { duration } from './values';
 
 // How much a bonus is worth and which channel it lands in. A percent bonus never
 // takes a range, so the two are separate members.
@@ -90,12 +91,37 @@ function parseClause(raw: string, span: Span): TagClause {
   throw new DslError(`unrecognized tag clause: ${JSON.stringify(raw)}`, span);
 }
 
+function printAmount(value: BonusAmount): string {
+  if (value.percent) return `${value.amount < 0 ? '-' : '+'}${Math.abs(value.amount)}%`;
+  const sign = value.amount.min < 0 || value.amount.max < 0 ? '-' : '+';
+  const lo = Math.min(Math.abs(value.amount.min), Math.abs(value.amount.max));
+  const hi = Math.max(Math.abs(value.amount.min), Math.abs(value.amount.max));
+  return lo === hi ? `${sign}${lo}` : `${sign}${lo}-${hi}`;
+}
+
+const printCounter = (value: Counter): string => (value.kind === 'stack' ? `stack of ${value.id}` : value.id);
+
 export const tagClause: Parser<TagClause> = {
   parse(cursor) {
     const start = cursor.pos;
     const raw = (cursor.take(/[^,\n]+/) ?? '').trim();
     return parseClause(raw, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
   },
+  print(value) {
+    switch (value.kind) {
+      case 'keyword':
+        return value.value;
+      case 'duration':
+        return duration.print(value.seconds);
+      case 'stat-bonus':
+        return `${printAmount(value)} ${value.statId}${value.per === undefined ? '' : ` per ${printCounter(value.per)}`}`;
+      default: {
+        const unreached: never = value;
+        return unreached;
+      }
+    }
+  },
+  examples: ['sharp', '30s', '2m', '1m30s', '+4-7 attack', '-2 defence', '+25% max-health', '-10% max-health', '+1 attack per mana', '+2 attack per stack of fervour'],
 };
 
 // The same magnitude without the stat, for a field that names its stat itself.
@@ -108,4 +134,6 @@ export const bonusAmount: Parser<BonusAmount> = {
     if (!groups) throw new DslError(`expected a bonus like +1 or +1%, got ${JSON.stringify(raw)}`, span);
     return parseAmount(groups, raw, span);
   },
+  print: printAmount,
+  examples: ['+1', '-3', '+25%', '-10%', '+4-7', '-3-6'],
 };

@@ -26,12 +26,14 @@ export interface ClusterJewel {
 
 // `<position> <passive>`, the way src/content/entity.ts's `statAssignment`
 // reads `<stat> <range>` for `stats:`.
-const positionAssignment: Parser<[number, string]> = {
+export const positionValue: Parser<[number, string]> = {
   parse(cursor: Cursor) {
     const position = number.parse(cursor);
     cursor.take(/[ \t]+/);
     return [position, id.parse(cursor)];
   },
+  print: ([position, passive]) => `${number.print(position)} ${id.print(passive)}`,
+  examples: ['0 keen-eye', '3 tough-hide'],
 };
 
 // Unlike `# entity stats:`, which lets a later assignment to the same key win,
@@ -54,7 +56,7 @@ export const clusterJewelSchema: SectionSchema<ClusterJewel> = {
     examine: { parser: text },
     shape: { parser: id },
     openConnections: { parser: list(id), default: () => [], keyword: 'open-connections' },
-    positions: { parser: list(positionAssignment), hydrate: hydratePositions, default: () => ({}), keyword: 'passives' },
+    positions: { parser: list(positionValue), hydrate: hydratePositions, default: () => ({}), keyword: 'passives' },
     modSlots: { parser: number, default: () => DEFAULT_MOD_SLOTS, keyword: 'mod-slots' },
   },
 };

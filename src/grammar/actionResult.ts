@@ -1,8 +1,8 @@
 import { Condition, condition } from './condition';
 import { ListParser } from './list';
 import { Cursor, DslError, Parser, Span, requireEnd } from './parser';
-import { Range, scaleRange } from './range';
-import { RawLine, hasBlock, requireNoBlock, takeBlock } from './structure';
+import { range, Range, scaleRange } from './range';
+import { RawLine, hasBlock, indentLines, requireNoBlock, takeBlock } from './structure';
 import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantified, refuseRange, REFERENCE } from './values';
 
 // Whose pool an amount moves between. `me` is the character the result is read
@@ -356,14 +356,134 @@ export const resultBlock = (lines: readonly RawLine[]): ActionResult[] => lines.
 
 const readResultBlock = (lines: readonly RawLine[]): ActionResult[] => lines.flatMap(readResultLine);
 
+// A side of a contest: a flat number, or the id of the stat holding one.
+const printSide = (value: number | string): string => numberOrStat.print(value);
+
+// The one-line form. A wrapper is never one line, so it has no spelling here;
+// `resultLines` owns those and the throwing arms are what stops a caller
+// reaching past it.
+export function printResult(value: ActionResult): string {
+  switch (value.kind) {
+    case 'say':
+      return `say: ${value.text}`;
+    case 'set':
+      return `set: ${value.variable}`;
+    case 'unset':
+      return `unset: ${value.variable}`;
+    case 'add':
+      return `add: ${value.variable} ${value.amount}`;
+    case 'give':
+      return `give: ${produced.print(value)}`;
+    case 'take':
+      return `take: ${quantified.print({ item: value.item, amount: value.amount })}`;
+    case 'xp':
+      return `xp: ${value.skill} ${range.print(value.amount)}`;
+    case 'relocate':
+      return `relocate: ${value.location}`;
+    case 'discover':
+      return `discover: ${value.location}`;
+    case 'open-modal':
+      return `open modal: ${value.modal}`;
+    case 'pool': {
+      // The exact inverse of what `parsePool` did: it scaled the written
+      // magnitude by the verb's sign, so undoing it is the same scale again.
+      // Taking abs of each bound instead inverted a restore's range — a
+      // symmetric operation on a point, which is why nothing saw it.
+      const magnitude = value.delta.max < 0 ? scaleRange(value.delta, -1) : value.delta;
+      const verb = value.delta.max < 0 ? 'drain' : 'restore';
+      // The preposition follows the verb, so it is re-derived from the sign
+      // rather than held: two fields agreeing by convention can disagree.
+      const party = value.party === undefined ? '' : ` ${PREPOSITION[verb]} ${value.party}`;
+      return `${verb}: ${range.print(magnitude)} ${value.resource}${party}`;
+    }
+    case 'inflict': {
+      const party = value.party === undefined ? '' : ` ${PREPOSITION.inflict} ${value.party}`;
+      return `inflict: ${value.buff}${party}`;
+    }
+    case 'roll':
+      return `roll: ${value.table}`;
+    case 'stop':
+      return 'stop';
+    case 'chance':
+    case 'contest':
+    case 'gate':
+    case 'credit':
+    case 'one-of':
+      throw new DslError(`a ${value.kind} result spans lines and cannot be inlined`);
+    default: {
+      const unreached: never = value;
+      return unreached;
+    }
+  }
+}
+
+function rowLines(row: DropRow): string[] {
+  const gate = row.requires ? ` if ${condition.print(row.requires)}` : '';
+  const label = `${typeof row.weight === 'string' ? row.weight : `${row.weight}x`}${gate}:`;
+  if (row.results.length === 0) return [`${label} nothing`];
+  return [label, ...indentLines(row.results.flatMap(resultLines))];
+}
+
+// A wrapper prints as its selector over an indented body, which is the one form
+// that reloads: the inline form cannot carry a nested block.
+export function resultLines(value: ActionResult): string[] {
+  switch (value.kind) {
+    case 'chance':
+      return [`${value.numerator} in ${value.denominator}:`, ...indentLines(value.results.flatMap(resultLines))];
+    case 'contest':
+      return [`${printSide(value.left)} vs ${printSide(value.right)}:`, ...indentLines(value.results.flatMap(resultLines))];
+    case 'gate':
+      return [`if ${condition.print(value.condition)}:`, ...indentLines(value.results.flatMap(resultLines))];
+    case 'credit':
+      return ['credit:', ...indentLines(value.results.flatMap(resultLines))];
+    case 'one-of':
+      return ['one of:', ...indentLines(value.rows.flatMap(rowLines))];
+    default:
+      return [printResult(value)];
+  }
+}
+
+// Whether any of these needs the block form above.
+export const spansLines = (values: readonly ActionResult[] | undefined): boolean => (values ?? []).some((value) => nestedResults(value).length > 0);
+
+const printResults = (values: readonly ActionResult[]): string => values.map(printResult).join(', ');
+
+const LEAF_EXAMPLES: readonly string[] = [
+  'say: the door is stuck',
+  'set: found-key',
+  'unset: found-key',
+  'add: gold 5',
+  'add: gold -3',
+  'give: 5-10 arrow',
+  'give: plank',
+  'take: 3 plank',
+  'xp: mining 4-7',
+  'relocate: camp',
+  'discover: camp',
+  'open modal: name-yourself',
+  'drain: 5 health',
+  'restore: 1-2 health',
+  'inflict: dazzled',
+  'roll: common-drops',
+  'stop',
+];
+
 export const actionResult: Parser<ActionResult> = {
   parse: parseResult,
+  print: printResult,
+  examples: LEAF_EXAMPLES,
 };
 
 // A list field's shape, so a `# resource`'s `on empty:` and an action's result
 // groups read blocks through the child-aware reader rather than line by line.
+// Two list shapes over the same element, so both print the same way: the
+// comma form, which is what a field's inline value is.
+const RESULT_LIST_EXAMPLES: readonly string[] = [...LEAF_EXAMPLES, 'set: found-key, add: gold 5'];
+
 export const resultList: ListParser<ActionResult> = {
   element: actionResult,
+  print: printResults,
+  examples: RESULT_LIST_EXAMPLES,
   parse: (cursor) => {
     const start = cursor.pos;
     return refuseParty(parseResults(cursor, null), { start: cursor.abs(start), end: cursor.abs(cursor.src.length) });
@@ -375,6 +495,8 @@ export const resultList: ListParser<ActionResult> = {
 // rule about where rather than a rule about which verb.
 export const hookResultList: ListParser<ActionResult> = {
   element: actionResult,
+  print: printResults,
+  examples: RESULT_LIST_EXAMPLES,
   parse: (cursor) => parseResults(cursor, null),
   parseBlock: readResultBlock,
 };

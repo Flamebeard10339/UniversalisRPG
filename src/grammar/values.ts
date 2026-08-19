@@ -1,5 +1,5 @@
 import { Cursor, DslError, Parser, Span } from './parser';
-import { Range } from './range';
+import { range, Range } from './range';
 
 // A range where only a count belongs reads as an id that will not parse, which
 // says nothing about why. Each site that refuses one says which it is.
@@ -12,6 +12,8 @@ export function refuseRange(cursor: Cursor, complaint: string): void {
 
 export const text: Parser<string> = {
   parse: (cursor) => cursor.take(/[^\n]*/) ?? '',
+  print: (value) => value,
+  examples: ['Rusty Sword', 'a line that runs to the end'],
 };
 
 // Every remaining caller reads a THRESHOLD — `has 5`, a comparison's right side,
@@ -25,6 +27,8 @@ export const number: Parser<number> = {
     refuseRange(cursor, 'this number is a threshold, not a quantity, so it takes one value rather than a range');
     return Number(raw);
   },
+  print: (value) => String(value),
+  examples: ['0', '5', '-3'],
 };
 
 export const DECIMAL = /-?\d+(?:\.\d+)?/;
@@ -36,6 +40,8 @@ export const decimal: Parser<number> = {
     if (raw === null) throw new DslError('expected a number', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
     return Number(raw);
   },
+  print: (value) => String(value),
+  examples: ['0', '5', '1.5', '-2.25'],
 };
 
 // A flat number, or the id of the stat holding one. What a field takes when the
@@ -45,6 +51,8 @@ export const numberOrStat: Parser<number | string> = {
     const raw = cursor.take(DECIMAL);
     return raw === null ? id.parse(cursor) : Number(raw);
   },
+  print: (value) => (typeof value === 'string' ? value : String(value)),
+  examples: ['3', '1.5', 'attack-speed'],
 };
 
 const SECONDS_PER_MINUTE = 60;
@@ -62,6 +70,17 @@ export const duration: Parser<number> = {
     if (total <= 0) throw new DslError('expected a duration, as in 30s, 2m or 1m30s', { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
     return total;
   },
+  // Whole minutes lose their `0s`, so `90s` and `1m30s` are the same span
+  // written two ways and only one of them is what comes back. That is the
+  // reason `examples` exists: it is the set this parser writes as well as
+  // reads, and `90s` is deliberately not in it.
+  print(seconds) {
+    if (seconds % SECONDS_PER_MINUTE === 0) return `${seconds / SECONDS_PER_MINUTE}m`;
+    const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
+    const left = seconds - minutes * SECONDS_PER_MINUTE;
+    return minutes > 0 ? `${minutes}m${left}s` : `${left}s`;
+  },
+  examples: ['30s', '2m', '1m30s'],
 };
 
 export const REFERENCE = /[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*/;
@@ -74,6 +93,8 @@ export const id: Parser<string> = {
     if (raw === null) throw new DslError('expected an id', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
     return raw;
   },
+  print: (value) => value,
+  examples: ['rusty-sword', 'forest.clearing'],
 };
 
 // The name off the end of the path: a title says "Miki", never the namespace
@@ -158,6 +179,8 @@ export const quantified: Parser<Quantified> = {
     if (Number(raw) === 0) throw new DslError(`a count of 0 does nothing: ${item}`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
     return { item, amount: Number(raw) };
   },
+  print: (value) => (value.amount === undefined ? value.item : `${number.print(value.amount)} ${id.print(value.item)}`),
+  examples: ['plank', '3 plank'],
 };
 
 export const produced: Parser<Produced> = {
@@ -170,4 +193,6 @@ export const produced: Parser<Produced> = {
     const item = id.parse(cursor);
     return { item, amount: refuseZero(range, span, `a count of 0 does nothing: ${item}`) };
   },
+  print: (value) => (value.amount === undefined ? value.item : `${range.print(value.amount)} ${id.print(value.item)}`),
+  examples: ['arrow', '5 arrow', '5-10 arrow'],
 };

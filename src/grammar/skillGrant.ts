@@ -31,6 +31,10 @@ export const skillGrant: Parser<SkillGrant> = {
       event: groups.event!,
     };
   },
+  // Every part of the line but the coefficient, the `amount` and the event name
+  // is fixed, so the printer is the alternation above read backwards.
+  print: (grant) => `gain ${grant.coefficient === 1 && grant.amount ? '' : String(grant.coefficient)}${grant.coefficient !== 1 && grant.amount ? ' * ' : ''}${grant.amount ? 'amount' : ''} experience on ${grant.event}`,
+  examples: ['gain amount experience on rat-bitten', 'gain 4 * amount experience on rat-bitten', 'gain 4 experience on rat-bitten', 'gain 1 experience on rat-bitten'],
 };
 
 // What one moment of `amount` is worth, before it is rounded to whole xp.

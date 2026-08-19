@@ -1,5 +1,10 @@
 import { DslError, Span } from './parser';
 
+// One level of the block structure this module reads, written. Here because
+// indentation is what a block IS in this language, and every printer that
+// nests one asks the same module that took it apart.
+export const indentLines = (lines: readonly string[], spaces = 2): string[] => lines.map((line) => `${' '.repeat(spaces)}${line}`);
+
 export interface RawLine {
   text: string;
   span: Span;

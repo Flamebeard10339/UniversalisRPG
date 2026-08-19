@@ -74,15 +74,17 @@ export interface Entity extends AuthoredEntity {
 }
 
 // An assignment, not the `+4-7 attack` shift a bonus tag clause carries.
-const statAssignment: Parser<[string, Range]> = {
+export const statAssignmentValue: Parser<[string, Range]> = {
   parse(cursor) {
     const statId = id.parse(cursor);
     cursor.take(/[ \t]+/);
     return [statId, range.parse(cursor)];
   },
+  print: ([statId, value]) => `${id.print(statId)} ${range.print(value)}`,
+  examples: ['attack 4', 'attack 4-7'],
 };
 
-const ally: Parser<Ally> = {
+export const allyValue: Parser<Ally> = {
   parse(cursor) {
     const count = cursor.take(/\d+(?![\w-])/);
     if (count === null) return { entity: id.parse(cursor) };
@@ -90,6 +92,8 @@ const ally: Parser<Ally> = {
     cursor.take(/[ \t]+/);
     return { count: Number(count), entity: id.parse(cursor) };
   },
+  print: (value) => (value.count === undefined ? value.entity : `${value.count} ${id.print(value.entity)}`),
+  examples: ['bandit', '2 bandit'],
 };
 
 // `on <event>:` is the one label shape whose body is results rather than an
@@ -120,7 +124,7 @@ export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'>
     examine: { parser: text },
     capabilities: { parser: list(id), keyword: 'stations', default: () => [] },
     stats: {
-      parser: list(statAssignment),
+      parser: list(statAssignmentValue),
       hydrate: (parsed) => Object.fromEntries(parsed as [string, Range][]),
       default: () => ({}),
     },
@@ -130,7 +134,7 @@ export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'>
     flags: { parser: list(id), default: () => [] },
     uses: { parser: list(id), default: () => [] },
     faction: { parser: list(id), default: () => [] },
-    allies: { parser: list(ally), default: () => [] },
+    allies: { parser: list(allyValue), default: () => [] },
     respawnAfter: { parser: duration, keyword: 'respawn after' },
     hiddenIf: { parser: condition, keyword: 'hidden if' },
     // Claimed as fields, so `on hit:` is a hook before the label dispatch below

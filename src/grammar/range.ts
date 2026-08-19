@@ -52,4 +52,6 @@ export const range: Parser<Range> = {
     if (max < min) throw new DslError(`range upper bound must be at least its lower bound, got ${match[0]}`, span);
     return { min, max };
   },
+  print: (value) => (isPoint(value) ? String(value.min) : `${value.min}-${value.max}`),
+  examples: ['5', '4-7', '-3', '1.5', '0.5-2', '-3--1'],
 };
