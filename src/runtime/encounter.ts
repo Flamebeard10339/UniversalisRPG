@@ -1,12 +1,12 @@
 import { RuntimeError } from './error';
-import { Action, isTwoSided, Sided } from '../grammar/action';
-import { attemptDuration, statValue } from './stats';
+import { Action, isTwoSided, sideOf } from '../grammar/action';
+import { attemptDuration, hasPool, statValue } from './stats';
+import { actorEntity, participants, performable, seatOf } from './roster';
 import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
-import { actionAddress } from '../content/action';
-import { declaredId, Entity } from '../content/entity';
+import { declaredId } from '../content/entity';
 import { hostile, Registry } from '../content/registry';
-import { actionVisible, findActiveAction, findActionOwner, requiresMet } from './actions';
-import { type ActiveAction, type ActorState, type Cadence, GameState, PLAYER, type Seat, templateOf } from './state';
+import { findActiveAction } from './actions';
+import { type ActiveAction, type ActorState, type Cadence, GameState, PLAYER } from './state';
 import { Answer, Localized, localizerOf, Params } from './localized';
 import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
 
@@ -24,23 +24,6 @@ export function playerCadence(active: ActiveAction): Cadence {
 
 export const IMPLICIT_TARGET_FULL = MILLI_UNITS;
 
-// The sheet an actor is measured by. `player` is a well-known id rather than a
-// privileged one: what it names declares its stats the way a rat does.
-export function actorEntity(registry: Registry, actorId: string): Entity | undefined {
-  return actorId === PLAYER ? registry.player : registry.entities.get(templateOf(actorId));
-}
-
-// Which participant a marked name is read off. The marker is written down, so
-// this is a lookup rather than a rule about who is swinging.
-export const sideOf = (field: Sided, self: string, other: string): string => (field.side === 'their' ? other : self);
-
-// Whether an actor carries the pool at all, which is what makes it a valid
-// target: there is no list of permitted types anywhere.
-export function hasPool(state: GameState, registry: Registry, actorId: string, resourceId: string): boolean {
-  const resource = registry.resources.get(resourceId);
-  return resource !== undefined && statValue(resource.max, state, registry, actorId) > 0;
-}
-
 // Unconditional and unauthored: the first two-sided action in the entity's
 // `uses:` whose `depletes:` names a pool its attacker has. `uses:` order is the
 // one place an entity says which attack it prefers.
@@ -54,13 +37,6 @@ export function retaliation(state: GameState, registry: Registry, actorId: strin
   }
   return undefined;
 }
-
-// An overload governs its entity's own performance of the action, so the gates
-// it writes have to be read where that entity swings — not only where the
-// player is offered a choice.
-export const performable = (action: Action, state: GameState): boolean => requiresMet(action, state) && actionVisible(action, state);
-
-export const seatOf = (id: string, action: Action, target: string): Seat => ({ ownerRef: `action.${id}`, actionSlug: actionAddress(action), target });
 
 // The actor's own max, not initResources' `start`, a player-lifecycle concept.
 export function enterEncounter(active: ActiveAction, actorId: string, state: GameState, registry: Registry, attackerId: string): void {
@@ -89,51 +65,6 @@ export function actorInEncounter(state: GameState, actorId: string): ActorState 
   const actor = state.activeAction?.actors?.[actorId];
   if (!actor) throw new RuntimeError(`actor is not in the encounter: ${actorId}`);
   return actor;
-}
-
-// One shape for every participant: the side it reads `my` off, the side it reads
-// `their` off, the action it brought, and its own clock.
-export interface Participant {
-  self: string;
-  other: string;
-  action: Action;
-  cadence: Cadence;
-}
-
-// The performer's own copy first: an overload governs that entity's
-// performance of the action, so reading the top-level declaration back would
-// discard everything the overload said but its label.
-function seatedAction(seat: Seat, registry: Registry, actorId: string): Action | undefined {
-  const dot = seat.ownerRef.indexOf('.');
-  const obj = seat.ownerRef.slice(0, dot);
-  const objId = seat.ownerRef.slice(dot + 1);
-  if (obj === 'action') {
-    const own = actorEntity(registry, actorId)?.actions.find((each) => declaredId(each) === objId);
-    if (own) return own;
-  }
-  const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-  return owner?.actions?.find((each) => actionAddress(each) === seat.actionSlug);
-}
-
-// What the performer of the armed action actually brings: its own copy, with
-// its overload applied. `findActiveAction` answers what the ownerRef names,
-// which is the declaration an overload overlays rather than the overlay.
-export function armedAction(state: GameState, registry: Registry): Action {
-  const active = state.activeAction!;
-  const seat = active.roster?.[PLAYER];
-  return (seat && seatedAction(seat, registry, PLAYER)) ?? findActiveAction(active, registry);
-}
-
-export function participants(state: GameState, registry: Registry): Participant[] {
-  const active = state.activeAction!;
-  const list: Participant[] = [];
-  for (const [actorId, cadence] of Object.entries<Cadence>(active.cadences)) {
-    const seat = active.roster?.[actorId];
-    if (!seat) continue;
-    const action = seatedAction(seat, registry, actorId);
-    if (action && performable(action, state)) list.push({ self: actorId, other: seat.target, action, cadence });
-  }
-  return list;
 }
 
 // The name a swing says. An actor whose entity is no longer loaded has no

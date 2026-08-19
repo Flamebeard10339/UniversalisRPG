@@ -2,7 +2,8 @@ import { RuntimeError } from './error';
 import { Action } from '../content/entity';
 import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
-import { actorEntity, participants, sideOf } from './encounter';
+import { actorEntity, participants } from './roster';
+import { sideOf } from '../grammar/action';
 import { Registry } from '../content/registry';
 import { carriedPassives, CounterLevel, itemContribution, scaledAmount, StatContribution } from './itemContribution';
 import { Item } from '../content/item';
@@ -138,6 +139,13 @@ function foldSkillLevels(registry: Registry, actorId: string, statId: string, xp
 function performing(state: GameState, registry: Registry, actorId: string): Action | undefined {
   if (!state.activeAction) return undefined;
   return participants(state, registry).find((each) => each.self === actorId)?.action;
+}
+
+// Whether an actor carries the pool at all, which is what makes it a valid
+// target: there is no list of permitted types anywhere.
+export function hasPool(state: GameState, registry: Registry, actorId: string, resourceId: string): boolean {
+  const resource = registry.resources.get(resourceId);
+  return resource !== undefined && statValue(resource.max, state, registry, actorId) > 0;
 }
 
 export function statRange(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): Range {

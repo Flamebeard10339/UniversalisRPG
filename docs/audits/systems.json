@@ -331,6 +331,7 @@
         "src/runtime/recipe.test.ts",
         "src/runtime/resolve.test.ts",
         "src/runtime/resource.test.ts",
+        "src/runtime/roster.ts",
         "src/runtime/rng.test.ts",
         "src/runtime/rng.ts",
         "src/runtime/runtime.test.ts",

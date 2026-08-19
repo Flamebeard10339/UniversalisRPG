@@ -30,7 +30,10 @@ import {
   relocateTo,
   settlePools,
 } from './effects';
-import { actorEntity, armedAction, damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, hasPool, opposes, Participant, participants, leaveFight, playerCadence, poolLevel, retaliation, seatOf, sideOf, targetLevel } from './encounter';
+import { damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, opposes, leaveFight, playerCadence, poolLevel, retaliation, targetLevel } from './encounter';
+import { actorEntity, armedAction, Participant, participants, seatOf } from './roster';
+import { hasPool } from './stats';
+import { sideOf } from '../grammar/action';
 import { applyRespawns, downOne, isStanding, nextRespawn, standing } from './population';
 import { actionAddress } from '../content/action';
 import { Action, declaredId } from '../content/entity';

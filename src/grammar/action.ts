@@ -244,6 +244,10 @@ export function sidedFields(action: Action): { written: string; value: Sided }[]
 // Side vocabulary in the body is the whole declaration of kind: an action that
 // writes one is brought by a performer and applied to a target, and one that
 // writes none belongs to the object declaring it.
+// Which participant a marked name is read off. The marker is written down, so
+// this is a lookup rather than a rule about who is swinging.
+export const sideOf = (field: Sided, self: string, other: string): string => (field.side === 'their' ? other : self);
+
 export const isTwoSided = (action: Action): boolean => sidedFields(action).some((field) => field.value.side !== undefined);
 
 // The whole table, as one predicate over a finished action: a kind says what
