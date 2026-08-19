@@ -168,6 +168,19 @@ describe('layerCheckOutput', () => {
     expect(exitCode).toBe(1);
     expect(err).toContain('  src/grammar/a.ts -> src/runtime/b');
   });
+
+  it('fails the run on a cycle, and names every module on it as well as the imports that close it', () => {
+    const { err, exitCode } = layerCheckOutput(['a.ts'], {
+      ...clean,
+      cycles: [{ members: ['src/runtime/a.ts', 'src/runtime/b.ts', 'src/runtime/c.ts'], closedBy: [{ from: 'src/runtime/c.ts', to: 'src/runtime/a.ts' }] }],
+    });
+    expect(exitCode).toBe(1);
+    expect(err.join('\n')).toContain('1 import cycle(s), holding 3 module(s)');
+    expect(err).toContain('    src/runtime/a.ts');
+    expect(err).toContain('    src/runtime/b.ts');
+    expect(err).toContain('    src/runtime/c.ts');
+    expect(err).toContain('    src/runtime/c.ts -> src/runtime/a.ts');
+  });
 });
 
 describe('runLayerCheck', () => {
@@ -186,6 +199,23 @@ describe('runLayerCheck', () => {
   it('fails when the enumeration it is handed comes back empty, rather than reporting a clean tree', () => {
     const { exitCode } = runLayerCheck({ tracked: () => [], exists: () => true, read: () => '' });
     expect(exitCode).toBe(1);
+  });
+
+  // The two modules import each other and nothing else does, so the exit code
+  // and both halves of the message are read off a tree that exists only here:
+  // the gate is a gate on any tree it is handed, not on the one in this
+  // checkout, which is already clean and would say nothing either way.
+  it('carries a cycle all the way to the exit code, naming the modules on it and the import that closes it', () => {
+    const cyclic: Record<string, string> = {
+      'src/runtime/a.ts': "import { b } from './b';",
+      'src/runtime/b.ts': "import { a } from './a';",
+      'src/grammar/g.ts': 'export const g = 1;',
+    };
+    const { exitCode, err } = runLayerCheck({ tracked: () => Object.keys(cyclic), exists: () => true, read: (file) => cyclic[file] });
+    expect(exitCode).toBe(1);
+    expect(err).toContain('    src/runtime/a.ts');
+    expect(err).toContain('    src/runtime/b.ts');
+    expect(err).toContain('    src/runtime/b.ts -> src/runtime/a.ts');
   });
 
   it('carries an upward import all the way to the exit code', () => {

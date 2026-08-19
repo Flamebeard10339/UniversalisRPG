@@ -1,9 +1,38 @@
 import { RuntimeError } from './error';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { posix } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { memoryDriver, slotStore, type SlotDriver } from './store';
 
-const SOURCE = readFileSync('src/runtime/store.ts', 'utf8');
+const SPECIFIER = /\b(?:from|import|require)\s*\(?\s*(['"`])([^'"`]+)\1/g;
+
+// Resolved the way the loader would. A specifier that names no module raises
+// here rather than dropping out of the walk, so a closure cannot come back
+// short and read as clean.
+function moduleAt(specifier: string): string {
+  const found = ['.ts', '.tsx', '/index.ts'].map((ending) => `${specifier}${ending}`).find((candidate) => existsSync(candidate));
+  if (found === undefined) throw new Error(`${specifier} resolves to no module`);
+  return found;
+}
+
+// Everything a module reaches, at any depth, and every specifier in that
+// closure that is not a file of this repository's.
+function reachedFrom(entry: string): { modules: string[]; outside: string[] } {
+  const modules = new Set<string>();
+  const outside = new Set<string>();
+  const queue = [entry];
+  while (queue.length > 0) {
+    const file = queue.pop() as string;
+    if (modules.has(file)) continue;
+    modules.add(file);
+    const directory = posix.dirname(file);
+    for (const [, , specifier] of readFileSync(file, 'utf8').matchAll(SPECIFIER)) {
+      if (specifier.startsWith('.')) queue.push(moduleAt(posix.join(directory, specifier)));
+      else outside.add(specifier);
+    }
+  }
+  return { modules: [...modules].sort(), outside: [...outside].sort() };
+}
 
 // A clock the test turns, so a stamp is a fact this file decided rather than
 // one it read off the machine it happens to be running on.
@@ -52,14 +81,11 @@ describe('the slot store keeps named text and nothing else (c1)', () => {
   // save modules cannot be shaped by them, and a module that imports nothing
   // from node cannot be doing its own I/O whatever its functions say.
   it('reaches neither a save nor the filesystem, so a driver is the only thing that touches either', () => {
-    const imports = [...SOURCE.matchAll(/from '([^']+)'/g)].map(([, from]) => from);
-
-    // The claim, not the list. Naming the one import this file happened to have
-    // proved nothing about reaching a save and went stale the first time an
-    // unrelated declaration moved; what is asserted is that nothing it reaches
-    // is a save module or a host API, which is the sentence above.
-    expect(imports.filter((from) => /save|slotFile|session/i.test(from))).toEqual([]);
-    expect(imports.filter((from) => from.startsWith('node:') || !from.startsWith('.'))).toEqual([]);
+    // The whole closure rather than the first hop, and closed rather than
+    // filtered: an import added under this file at any depth lands here and is
+    // read, where a blocklist of names passes anything that avoided the words
+    // in it.
+    expect(reachedFrom('src/runtime/store.ts')).toEqual({ modules: ['src/runtime/error.ts', 'src/runtime/store.ts'], outside: [] });
   });
 
   it('never parses a payload: what the store holds is the driver text it was handed', () => {

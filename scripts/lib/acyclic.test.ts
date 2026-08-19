@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findCycles } from './acyclic';
-import { checkLayers, sweptFiles } from './layers';
+import { checkLayers, importedPaths, resolveModule, shippedModules, sweptFiles } from './layers';
 import { trackedFiles } from './sourceFiles';
 import { readFileSync } from 'node:fs';
 
@@ -59,5 +59,25 @@ describe('the shipped tree', () => {
 
   it('sweeps enough of the tree for that to mean something', () => {
     expect(files.length).toBeGreaterThan(100);
+  });
+
+  // The subjects of the clause above, counted the way `checkLayers` builds
+  // them: an empty cycle list is a statement about this repository only while
+  // the graph it came out of still holds this repository's modules and the
+  // imports between them. Emptying either leaves "no module imports its way
+  // back to itself" true of nothing.
+  describe('the graph that answer was read off', () => {
+    const shipped = shippedModules(files, () => true);
+    const inShipped = new Set(shipped);
+    const swept = new Set(files);
+    const edges = shipped.flatMap((file) => importedPaths(file, readFileSync(file, 'utf8')).map((target) => resolveModule(target, swept))).filter((target) => target !== null && inShipped.has(target));
+
+    it('holds the modules this repository ships', () => {
+      expect(shipped.length).toBeGreaterThan(100);
+    });
+
+    it('holds the imports between them, resolved to modules', () => {
+      expect(edges.length).toBeGreaterThan(500);
+    });
   });
 });
