@@ -80,56 +80,72 @@ None.
 
 ## Where it stands
 
-The gate is in and its proof derives its subjects (c2). c1 is **not met**: three cycles remain,
-closed by nine imports. What has landed is measured below, against the tree at the merge base.
+**c1 is met.** `src` holds no import cycle, `layer-check` exits 0 and says so, and the whole
+suite is green at 3764 tests. All four cycles are retired; `merge-ready` passes every mechanical
+gate and is left only wanting an audit.
 
-| | base | now |
-|---|---|---|
-| import cycles | 4 | 3 |
-| largest indivisible unit | **28** | **8** |
-| modules carrying it | 79 of 153 (52%) | 51 of 158 (32%) |
-| `src/runtime` units, over its modules | 15 of 42 | **39 of 46** |
-| `src/runtime` stratification depth | 6 | **15** |
-| median transitive closure | 82 | 50 |
-| mean closure | 53.9 | 47.5 |
-| p90 closure | 91 | 96 |
-| median largest unit *in* a closure | 28 | **4** |
-| mean largest unit in a closure | 15.3 | 4.0 |
+| | base | at c1 open | now |
+|---|---|---|---|
+| import cycles | 4 | 3 | **0** |
+| largest indivisible unit | 28 | 8 | **1** |
+| modules carrying it | 79 of 153 (52%) | 51 of 158 (32%) | **none: there is no unit to carry** |
+| `src/runtime` units, over its modules | 15 of 42 | 39 of 46 | **49 of 49** |
+| `src/runtime` stratification depth | 6 | 15 | **21** |
+| median transitive closure | 82 | 50 | 44 |
+| mean closure | 53.9 | 47.5 | 46.0 |
+| p90 closure | 91 | 96 | 99 |
+| median largest unit *in* a closure | 28 | 4 | **1** |
+| mean largest unit in a closure | 15.3 | 4.0 | **1** |
 
-The result the branch was opened to test is the `runtime` row. Nobody declared a depth of 15, and
-no manifest holds it: `grammar` is 7 deep and `content` 9 because they are acyclic, and `runtime`
-was 6 because two thirds of it was one unit. Removing the cycle is what produced the order, and
-the order is derived from the imports rather than configured anywhere — which is the whole of the
-claim that acyclicity is the precondition, and that no finer layer rule is needed to get it.
+The `now` column was taken by re-measuring, and the same script reproduces every row of the
+`at c1 open` column exactly except the two closure averages, which come out 0.5 higher. A
+closure-row difference of 1 or less between columns is therefore not a reading.
 
-p90 closure rose, as predicted for any repair that adds modules. Five were added — `error.ts`,
-`sectionKind.ts`, `pruning.ts`, `actionEnd.ts`, `modalOption.ts` — and each exists because two
-modules needed one declaration and it was living above one of them.
+The result the branch was opened to test is the `runtime` row, and it held all the way down.
+Nobody declared a depth of 21, and no manifest holds it: `grammar` is 7 deep and `content` 9
+because they are acyclic, and `runtime` was 6 because two thirds of it was one unit. Every unit
+count and every depth here is derived from the imports and configured nowhere, which is the whole
+of the claim that acyclicity is the precondition and that no finer layer rule is needed to get it.
 
-Two secondary results worth keeping:
+p90 closure rose from 91 to 99, as predicted for any repair that adds modules. Ten were added
+over the branch — `error.ts`, `sectionKind.ts`, `pruning.ts`, `actionEnd.ts`, `modalOption.ts`,
+then `useTestSurface.ts`, `load.ts`, `roster.ts`, `carried.ts` and `modalStack.ts` — and each
+exists because two modules needed one thing and it was living above one of them. The median fell
+from 82 to 44 over the same period, which is the trade taken knowingly: the typical module reads
+half of what it used to, and the widest one reads eight more.
 
-- **Ten of the original twenty-three closing imports were type-only**, and every one of those was
-  a declaration sitting above something that needed it. The repair for all ten was the same move,
-  and none of them changed behaviour. The value edges are the expensive ones and are what is left.
+### How the twenty-three closing imports actually went
+
+Ten were type-only and every one was a declaration sitting above something that needed it; the
+repair for all ten was the same move and none changed behaviour. Of the thirteen value edges,
+the split at the end was:
+
+- **Six were a declaration in the wrong file after all**, once the question was asked precisely.
+  `sideOf` reads a `Sided` and two strings and went to `grammar/action.ts`, where `Sided` is
+  declared — no module added. `hasPool` was a `statValue` predicate wearing an encounter's name.
+  `Registry` was declared in the file that builds one rather than in one beneath it.
+- **Four were a module that was two modules.** `testSurface.ts` was a declaration and a hook;
+  `registry.ts` was a shape and a load path; `carriedScreen.ts` was a list and the screen that
+  asks about it; `modals.ts` was a stack and a table of screens. In three of the four the seam
+  was already visible in a caller — `session.ts` imported the carried rows and none of the
+  screen, and 42 files import `Registry` and never a loader.
+- **Three closed by subtraction.** Once `actorEntity` and `hasPool` moved, `effects.ts` wanted
+  nothing else from `encounter.ts` and the edge went away rather than inverting.
+- **One was a side effect in the wrong place.** `createDriver` hung `window.__test` off a global
+  from inside a factory that had to ask `typeof window !== 'undefined'` because it did not know
+  it was in a browser. The entry point does know. Deleting the edge deleted the guard.
+
+Three results worth keeping:
+
 - **`clearBuffs` is the counter-example to the move being mechanical.** It looked structural, and
-  "an actor holding nothing is spelled as absent" turned out to be buffs.ts's rule. Four tests
+  "an actor holding nothing is spelled as absent" turned out to be `buffs.ts`'s rule. Four tests
   caught it. A declaration can move down; a decision cannot, and telling them apart is the work.
-
-### The nine imports still closing a cycle
-
-```
-src/content/registry.ts  -> src/content/references.ts       Registry is declared above its validators
-src/content/registry.ts  -> src/content/serialize.ts        printSegments, which takes no Registry
-src/runtime/carriedScreen.ts -> src/runtime/planeScreen.ts  planeFrame
-src/runtime/effects.ts   -> src/runtime/modals.ts
-src/runtime/encounter.ts -> src/runtime/effects.ts          the pool deltas
-src/runtime/stats.ts     -> src/runtime/encounter.ts        actorEntity, participants, sideOf
-src/ui/driver.ts         -> src/ui/agent/testHarness.ts     installTestHarness, in a dead branch
-src/ui/testSurface.ts    -> src/ui/agent/surfaces.ts
-src/ui/testSurface.ts    -> src/ui/agent/testHarness.ts
-```
-
-Nine calls, not nine declarations: each is a decision about where behaviour belongs. `printSegments`
-is the nearest one — it takes no `Registry`, so it does not belong in the module that needs one, but
-it carries two grammar-value printers with it and those belong in `src/grammar` beside the parsers
-they invert, which is a second question and probably a second spec.
+- **Where a query lands is not cosmetic.** `encounter.ts` imports `hostile` and no loader, and
+  `contribution.ts` imports `formatModuleDiagnostic` and no loader. Sending either up with the
+  behaviour it sits beside would have bought an edge back by putting a whole load path in their
+  closure. A pure query over a shape belongs with the shape, and the closure numbers are how
+  that gets checked rather than argued.
+- **Two mapped tables over one key set are not two lists to keep in sync.** Splitting the modal
+  definitions left `{ [K in ModalName]: ... }` in two files, and adding a member to `ModalFrame`
+  fails both at the compiler. That is the distinction between a derived proof and an enumeration,
+  applied to a table rather than a test.
