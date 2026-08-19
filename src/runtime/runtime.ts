@@ -48,9 +48,8 @@ import { Registry } from '../content/registry';
 import { BASE_LANGUAGE, Localized, localizerFor, localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { roadsFrom, routeTo } from './journey';
-import { applyDeclared, expireBuffs, nextBuffExpiry } from './buffs';
+import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs';
 import { type ActiveAction, advanceTime, FIGHT_SCOPED, GameState, isFightScoped, PLAYER } from './state';
-import { clearBuffs } from './buffs';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { msUntilEmpty, toMilliUnits, fromMilliUnits } from './units';
 

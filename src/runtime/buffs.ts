@@ -6,9 +6,6 @@ import type { PruneWarning } from './pruning';
 import { type BuffInstance, type GameState } from './state';
 import { secondsToMs } from './units';
 
-// One application of one source to one character, holding the tag-clause list
-// that source carries. Nothing is scaled by how many instances are held, and
-// nothing distinguishes a penalty from a bonus.
 // An `# item` is the only thing that can grant one, because a source id has to
 // still resolve after a save is reloaded and an item id is what `pruneBuffs`
 // can ask the registry about. A grantor of any other shape is a second question

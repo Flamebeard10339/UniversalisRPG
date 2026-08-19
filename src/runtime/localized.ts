@@ -134,11 +134,14 @@ export function localizerFor(registry: Registry, language: string): Localizer {
   return self;
 }
 
-// Asks for the language, not for the whole state that carries one. Every
-// caller still passes a `GameState` and none of them changed; what went away is
-// this module having to import the state shape in order to read one field of
-// it, which is what put the localizer inside the runtime cycle.
-export const localizerOf = (registry: Registry, playing: { language: string }): Localizer => localizerFor(registry, playing.language);
+// The one field of a playing state a localizer reads. Declared here rather
+// than imported, because reaching the state shape for one string is what put
+// this module on the runtime cycle.
+export interface LanguageChoice {
+  readonly language: string;
+}
+
+export const localizerOf = (registry: Registry, playing: LanguageChoice): Localizer => localizerFor(registry, playing.language);
 
 // The sentence an item with no `examine:` of its own gets. English supplies the
 // article from the title it is about to precede; no other language is asked to,

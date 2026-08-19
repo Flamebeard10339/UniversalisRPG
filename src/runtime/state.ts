@@ -72,6 +72,9 @@ export interface Journey {
   legs: Answer[];
 }
 
+// One application of one source to one character, holding the tag-clause list
+// that source carries. Nothing is scaled by how many instances are held, and
+// nothing distinguishes a penalty from a bonus.
 export interface BuffInstance {
   readonly source: string;
   readonly tags: readonly TagClause[];

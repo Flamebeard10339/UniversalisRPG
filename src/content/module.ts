@@ -25,7 +25,7 @@ import { RawSection, sectionParser, splitSections } from '../grammar/structure';
 import { parseTest } from './test';
 import { variableSchema } from './variable';
 
-// Every kind whose grammar is key/value, beside the schema that reads it. The
+// Every kind whose grammar is key/value, beside the schema that reads it.
 // Total over `SCHEMA_KINDS` rather than keyed by `string`, so a kind named
 // there and given no schema here does not compile.
 export const SCHEMAS = {

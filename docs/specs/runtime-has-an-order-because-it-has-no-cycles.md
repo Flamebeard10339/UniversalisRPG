@@ -60,6 +60,16 @@ reused rather than reimplemented.
 
 **Retires** nothing. **Takes over** nothing.
 
+`localizerOf` is the one edge cut by narrowing a parameter rather than by moving
+a declaration, and it is a decision rather than a move, so it is recorded here.
+It took a `GameState` and read one field of it; it now takes a `LanguageChoice`,
+declared in `localized.ts` as the single `language` field it actually reads.
+Every caller still passes a `GameState` and none of them changed, and no
+behaviour differs — what went away is `localized.ts` importing the state shape,
+which was the last edge holding it inside the runtime cycle. The alternative
+was to move `GameState` beneath the localizer, which is the wrong direction: the
+state is what the localizer is asked about, not what it sits on.
+
 Cycle repair is by moving declarations down, never by adding an indirection layer or a
 `.types.ts` per module. Ten of the twenty-three back-edges are already type-only, so they carry
 no implementation and the move is mechanical; the rest are behaviour that sits on the wrong side
@@ -81,7 +91,7 @@ None.
 ## Where it stands
 
 **c1 is met.** `src` holds no import cycle, `layer-check` exits 0 and says so, and the whole
-suite is green at 3764 tests. All four cycles are retired; `merge-ready` passes every mechanical
+suite is green at 3768 tests. All four cycles are retired; `merge-ready` passes every mechanical
 gate and is left only wanting an audit.
 
 | | base | at c1 open | now |
@@ -131,6 +141,9 @@ the split at the end was:
   screen, and 42 files import `Registry` and never a loader.
 - **Three closed by subtraction.** Once `actorEntity` and `hasPool` moved, `effects.ts` wanted
   nothing else from `encounter.ts` and the edge went away rather than inverting.
+- **One narrowed what it asks for.** `localizerOf` took a `GameState` and read one field; it now
+  takes the field. It is the one edge none of the headings above describes, because nothing moved
+  and nothing split — the reasoning is under `## Decisions`.
 - **One was a side effect in the wrong place.** `createDriver` hung `window.__test` off a global
   from inside a factory that had to ask `typeof window !== 'undefined'` because it did not know
   it was in a browser. The entry point does know. Deleting the edge deleted the guard.

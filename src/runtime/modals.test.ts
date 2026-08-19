@@ -204,7 +204,6 @@ function talking(registry: Registry): GameState {
   return state;
 }
 
-
 // What a screen offers, as the answers alone: the words beside each are asserted
 // where the language they are in is the point, and everywhere else they are
 // noise between an option and the answers it takes.

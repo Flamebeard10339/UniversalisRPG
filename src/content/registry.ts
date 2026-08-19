@@ -125,9 +125,6 @@ export function formatModuleDiagnostic(value: ModuleDiagnostic): string {
   return `${at} [${value.moduleId}] ${value.stage}: ${value.message}`;
 }
 
-// A recipe is absent: its craft is shown through `engine.craft.label` over the
-// recipe's own title key, so keying the compiled label as well would be one
-// visible string with two keys that a translator has to fill in twice.
 // Every table of actions a player can be offered one from, each beside the id
 // that owns it — which is what lets a refusal name the module to blame.
 export function everyActionTable(registry: Registry): Array<[string, string, readonly Action[]]> {
