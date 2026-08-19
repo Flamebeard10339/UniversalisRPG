@@ -22,7 +22,7 @@ Proof:
   names the modules on it and the imports that close it. It has no exemption list, no threshold
   and no baseline file — the target is one member per component and one is not an adjustable
   number.
-  proof: `vitest scripts/lib/acyclic.test.ts`
+  proof: `vitest scripts/lib/layers.test.ts`
 - [c3] **`state.ts` declares the state shape and calls nothing that reads it.** The module that
   declares `GameState` imports no module that imports it back. Its seven back-edges today are
   the shape of a `GameState` field asked for from the module that also owns that field's
