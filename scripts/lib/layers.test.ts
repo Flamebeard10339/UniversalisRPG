@@ -137,18 +137,18 @@ describe('checkLayers', () => {
 });
 
 describe('layerCheckOutput', () => {
-  const clean = { read: 2, edges: 7, violations: [], unlayered: [] };
+  const clean = { read: 2, edges: 7, violations: [], cycles: [], unlayered: [] };
 
   it('passes a clean report, and counts what it read apart from what it swept', () => {
     const { out, err, exitCode } = layerCheckOutput(['a.ts', 'b.ts', 'src/vite-env.d.ts'], clean);
     expect(exitCode).toBe(0);
     expect(err).toEqual([]);
     expect(out[0]).toContain('3 module(s) swept under src and scripts, 2 read; 7 cross-file imports');
-    expect(out[out.length - 1]).toBe('Every module belongs to a layer, and every import points downward.');
+    expect(out[out.length - 1]).toBe('Every module belongs to a layer, every import points downward, and no module imports its way back to itself.');
   });
 
   it('fails a sweep that found nothing, which is a broken enumeration rather than a clean tree', () => {
-    const { err, exitCode } = layerCheckOutput([], { read: 0, edges: 0, violations: [], unlayered: [] });
+    const { err, exitCode } = layerCheckOutput([], { read: 0, edges: 0, violations: [], cycles: [], unlayered: [] });
     expect(exitCode).toBe(1);
     expect(err.join('\n')).toContain('no modules at all');
   });

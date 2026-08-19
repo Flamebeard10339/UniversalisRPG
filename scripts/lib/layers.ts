@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { findCycles, type Cycle } from './acyclic';
 import { posix, trackedFiles } from './sourceFiles';
 import { stripComments } from './stripComments';
 import { covers } from './systems';
@@ -84,6 +85,16 @@ export function shippedModules(tracked: readonly string[] = trackedFiles(), exis
   return sweptFiles(tracked, exists).filter((file) => !/\.test\.[cm]?[jt]sx?$/.test(file));
 }
 
+// A specifier names a module, not a file. Resolved against what was swept so
+// that the graph holds only edges the loader would take — the same list the
+// rule above walks, so the two cannot disagree about what an import points at.
+export function resolveModule(specifier: string, swept: ReadonlySet<string>): string | null {
+  for (const candidate of [specifier, ...MODULE_EXTENSIONS.map((extension) => `${specifier}${extension}`), ...MODULE_EXTENSIONS.map((extension) => `${specifier}/index${extension}`)]) {
+    if (swept.has(candidate)) return candidate;
+  }
+  return null;
+}
+
 export function unlayeredFiles(files: readonly string[], outside: Readonly<Record<string, string>> = OUTSIDE_STACK): string[] {
   return files.map(posix).filter((file) => layerOf(file) === null && outside[file] === undefined);
 }
@@ -94,6 +105,11 @@ export interface Violation {
 }
 
 export interface LayerReport {
+  // Groups of modules that import each other around, which is the one shape
+  // that has no reading order: a component of two or more can only be
+  // understood whole. Empty is the only passing value, and it is not a
+  // threshold — it is the size at which "read this first" has an answer.
+  cycles: Cycle[];
   // Files opened, which is fewer than were swept whenever one belongs to no
   // layer — a count of the sweep would report coverage the run did not have.
   read: number;
@@ -108,18 +124,28 @@ export function checkLayers(files: readonly string[], read: (file: string) => st
   const violations: Violation[] = [];
   let edges = 0;
   let opened = 0;
+  const swept = new Set(files.map(posix));
+  // The cycle rule answers over what the repository ships. A test importing
+  // its subject cannot produce the initialisation-order defect this exists to
+  // stop, because nothing ships that graph.
+  const shipped = shippedModules(files, () => true);
+  const out = new Map<string, string[]>();
   for (const file of files) {
     const layer = layerOf(file);
     if (layer === null) continue;
     opened++;
-    for (const target of importedPaths(file, read(file))) {
+    const targets = importedPaths(file, read(file));
+    out.set(posix(file), [...new Set(targets.map((target) => resolveModule(target, swept)).filter((target): target is string => target !== null))]);
+    for (const target of targets) {
       const targetLayer = layerOf(target);
       if (targetLayer === null) continue;
       edges++;
       if (pointsUpward(layer, targetLayer)) violations.push({ from: posix(file), to: target });
     }
   }
-  return { read: opened, edges, violations, unlayered: unlayeredFiles(files, outside) };
+  const inShipped = new Set(shipped);
+  const cycles = findCycles(shipped, (node) => (out.get(node) ?? []).filter((target) => inShipped.has(target)));
+  return { read: opened, edges, violations, cycles, unlayered: unlayeredFiles(files, outside) };
 }
 
 export interface LayerCheckOutput {
@@ -142,6 +168,19 @@ export function layerCheckOutput(files: readonly string[], report: LayerReport):
     err.push('Fix the import, or move the code: a file that needs something from above usually holds two layers’ work.');
   }
 
+  if (report.cycles.length > 0) {
+    const onCycles = report.cycles.reduce((total, cycle) => total + cycle.members.length, 0);
+    err.push(`
+${report.cycles.length} import cycle(s), holding ${onCycles} module(s). A cycle has no reading order: every module on one has to be understood with all the others, and none of them can be initialised first.`);
+    for (const cycle of report.cycles) {
+      err.push(`  ${cycle.members.length} modules:`);
+      for (const member of cycle.members) err.push(`    ${member}`);
+      err.push(`  closed by ${cycle.closedBy.length} import(s) — invert or move these and the rest becomes an order:`);
+      for (const edge of cycle.closedBy) err.push(`    ${edge.from} -> ${edge.to}`);
+    }
+    err.push('Move the declaration down rather than adding an indirection: where two modules both need a shape, the shape belongs beneath both.');
+  }
+
   if (report.unlayered.length > 0) {
     err.push(`\n${report.unlayered.length} module(s) belong to no declared root, so no import of theirs is read in either direction:`);
     for (const file of report.unlayered) err.push(`  ${file}`);
@@ -149,7 +188,7 @@ export function layerCheckOutput(files: readonly string[], report: LayerReport):
   }
 
   if (err.length > 0) return { out, err, exitCode: 1 };
-  return { out: [...out, 'Every module belongs to a layer, and every import points downward.'], err, exitCode: 0 };
+  return { out: [...out, 'Every module belongs to a layer, every import points downward, and no module imports its way back to itself.'], err, exitCode: 0 };
 }
 
 export interface LayerCheckEffects {
