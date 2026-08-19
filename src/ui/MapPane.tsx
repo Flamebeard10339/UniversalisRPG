@@ -6,7 +6,7 @@ import { drawnFor, onWalk, spotOf, walkLine, type Node } from './discovery';
 import { DevOnly } from './DevOnly';
 import type { MapWhere } from './editorMemory';
 import { answering, droppedAt, placedInto } from './mapEdit';
-import { useTestSurface } from './testSurface';
+import { useTestSurface } from './useTestSurface';
 import { useMoment } from './transient';
 import { tappedPlace } from './devMode';
 import { bounds, panOnto, tapTarget, type Point } from './viewport';

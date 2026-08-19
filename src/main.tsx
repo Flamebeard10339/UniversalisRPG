@@ -29,6 +29,14 @@ holdThePageStill();
 // whatever store it is handed.
 const driver = createDriver(SHIPPED_SOURCES, { slots: browserSlots() });
 
+// Hung off the window here for the same reason the store is built here: the
+// harness is a property of the page, and the driver it drives is handed one
+// rather than reaching for one. Inside the branch a production build folds
+// away, so the whole agent directory goes with it.
+if (import.meta.env.DEV) {
+  void import('./ui/agent/testHarness').then(({ installTestHarness }) => installTestHarness(driver));
+}
+
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <App driver={driver} />

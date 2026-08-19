@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Console } from './Console';
 import { DevOnly } from './DevOnly';
 import { draftIn, kindsIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
-import { useTestSurface } from './testSurface';
+import { useTestSurface } from './useTestSurface';
 import type { Words } from './words';
 
 // Two of the three filters over the one list — the third is the map, drawn

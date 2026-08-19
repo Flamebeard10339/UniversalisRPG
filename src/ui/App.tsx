@@ -29,7 +29,7 @@ import { PlaneModal } from './PlaneModal';
 import { carried, counted, worn } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
-import { useTestSurface } from './testSurface';
+import { useTestSurface } from './useTestSurface';
 import { wordsOf } from './words';
 import { TransientProvider } from './transient';
 import { VStack } from './VStack';

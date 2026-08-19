@@ -5,7 +5,7 @@ import { DragSheet, useSheetHold } from './DragSheet';
 import { signed, tidy } from './format';
 import { arrivalDelay, newlyDrawn, NODE_SIZE, planeGraph, type GraphEdge, type GraphNode, type Plane, type PlaneGraph, type Standing } from './planeGraph';
 import { nameOf, panelFor } from './planePanel';
-import { useTestSurface } from './testSurface';
+import { useTestSurface } from './useTestSurface';
 import { playedAfter, useMoment } from './transient';
 import { panOnto, tapTarget } from './viewport';
 import type { Words } from './words';

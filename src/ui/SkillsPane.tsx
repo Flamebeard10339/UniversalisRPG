@@ -3,7 +3,7 @@ import type { Answer, Localized } from '../runtime/localized';
 import type { PlayView } from '../runtime/session';
 import { formatClock, tidy } from './format';
 import { filled, perHour, skillPanels, untilNext, type SkillPanel, type XpMark } from './skillPanels';
-import { useTestSurface } from './testSurface';
+import { useTestSurface } from './useTestSurface';
 import { useMoment } from './transient';
 import type { Crossings } from './levelling';
 import type { Words } from './words';

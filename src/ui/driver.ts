@@ -374,9 +374,5 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     },
   };
 
-  if (import.meta.env.DEV && typeof window !== 'undefined') {
-    void import('./agent/testHarness').then(({ installTestHarness }) => installTestHarness(driver));
-  }
-
   return driver;
 }
