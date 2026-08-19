@@ -77,3 +77,59 @@ the repair chosen then is the repair generalised now.
 ## Open questions
 
 None.
+
+## Where it stands
+
+The gate is in and its proof derives its subjects (c2). c1 is **not met**: three cycles remain,
+closed by nine imports. What has landed is measured below, against the tree at the merge base.
+
+| | base | now |
+|---|---|---|
+| import cycles | 4 | 3 |
+| largest indivisible unit | **28** | **8** |
+| modules carrying it | 79 of 153 (52%) | 51 of 158 (32%) |
+| `src/runtime` units, over its modules | 15 of 42 | **39 of 46** |
+| `src/runtime` stratification depth | 6 | **15** |
+| median transitive closure | 82 | 50 |
+| mean closure | 53.9 | 47.5 |
+| p90 closure | 91 | 96 |
+| median largest unit *in* a closure | 28 | **4** |
+| mean largest unit in a closure | 15.3 | 4.0 |
+
+The result the branch was opened to test is the `runtime` row. Nobody declared a depth of 15, and
+no manifest holds it: `grammar` is 7 deep and `content` 9 because they are acyclic, and `runtime`
+was 6 because two thirds of it was one unit. Removing the cycle is what produced the order, and
+the order is derived from the imports rather than configured anywhere — which is the whole of the
+claim that acyclicity is the precondition, and that no finer layer rule is needed to get it.
+
+p90 closure rose, as predicted for any repair that adds modules. Five were added — `error.ts`,
+`sectionKind.ts`, `pruning.ts`, `actionEnd.ts`, `modalOption.ts` — and each exists because two
+modules needed one declaration and it was living above one of them.
+
+Two secondary results worth keeping:
+
+- **Ten of the original twenty-three closing imports were type-only**, and every one of those was
+  a declaration sitting above something that needed it. The repair for all ten was the same move,
+  and none of them changed behaviour. The value edges are the expensive ones and are what is left.
+- **`clearBuffs` is the counter-example to the move being mechanical.** It looked structural, and
+  "an actor holding nothing is spelled as absent" turned out to be buffs.ts's rule. Four tests
+  caught it. A declaration can move down; a decision cannot, and telling them apart is the work.
+
+### The nine imports still closing a cycle
+
+```
+src/content/registry.ts  -> src/content/references.ts       Registry is declared above its validators
+src/content/registry.ts  -> src/content/serialize.ts        printSegments, which takes no Registry
+src/runtime/carriedScreen.ts -> src/runtime/planeScreen.ts  planeFrame
+src/runtime/effects.ts   -> src/runtime/modals.ts
+src/runtime/encounter.ts -> src/runtime/effects.ts          the pool deltas
+src/runtime/stats.ts     -> src/runtime/encounter.ts        actorEntity, participants, sideOf
+src/ui/driver.ts         -> src/ui/agent/testHarness.ts     installTestHarness, in a dead branch
+src/ui/testSurface.ts    -> src/ui/agent/surfaces.ts
+src/ui/testSurface.ts    -> src/ui/agent/testHarness.ts
+```
+
+Nine calls, not nine declarations: each is a decision about where behaviour belongs. `printSegments`
+is the nearest one — it takes no `Registry`, so it does not belong in the module that needs one, but
+it carries two grammar-value printers with it and those belong in `src/grammar` beside the parsers
+they invert, which is a second question and probably a second spec.
