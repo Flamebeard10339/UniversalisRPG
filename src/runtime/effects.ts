@@ -11,7 +11,7 @@ import { evaluateCondition } from './conditions';
 import { actorEntity } from './roster';
 import { hasPool } from './stats';
 import { stockItem } from './itemInstance';
-import { openModalNamed } from './modals';
+import { openModalNamed } from './modalStack';
 import { localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { experienceFor } from './skillGrants';

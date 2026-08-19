@@ -1,12 +1,12 @@
 import type { ModalOption } from './modalOption';
 import { RuntimeError } from './error';
+import { dialogueFrame, keepModals, type ModalName, openModal, popModal, topModal } from './modalStack';
 import { choose, cursorProblem, menuChoices } from './dialogue-runtime';
 import { carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
-import { carriedFrame } from './carried';
-import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit, samePlane } from './planeScreen';
+import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit } from './planeScreen';
 import { type PlaneFocus } from './planeReport';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
-import { type DialogueCursor, GameState, type ModalAnswers, type ModalFrame } from './state';
+import { GameState, type ModalAnswers, type ModalFrame } from './state';
 import { Registry } from '../content/registry';
 import type { EngineKey } from '../content/locale';
 
@@ -31,8 +31,6 @@ export interface Modal {
   leaving: Answer | null;
 }
 
-export type ModalName = ModalFrame['name'];
-
 // Everything a member of the union knows about itself. The optional ones are
 // what a frame carrying more than answers costs: what its body must hold to be
 // one, why the world it points at can no longer hold it up, when two of them are
@@ -40,15 +38,11 @@ export type ModalName = ModalFrame['name'];
 // declares none is a screen its name alone identifies, whose body is its
 // answers, which nothing can stale and which is drawn from its options alone.
 interface ModalDefinition<F extends ModalFrame> {
-  // The frame a bare `open modal: <name>` makes, or null for a modal that
-  // carries a payload no result line can spell.
-  open(): F | null;
   options(frame: F, state: GameState, registry: Registry): readonly ModalOption[];
   // What replaces this frame once every option is answered, or null to close.
   submit(frame: F, state: GameState, registry: Registry): ModalFrame | null;
   holds?(value: Record<string, unknown>): boolean;
   stale?(frame: F, state: GameState, registry: Registry): Localized | null;
-  same?(a: F, b: F): boolean;
   // Which published plane this screen has in hand, for a member whose subject is
   // one. A member that declares none is a screen with nothing beside its options,
   // which is what keeps a driver from having to know which member is which.
@@ -68,13 +62,8 @@ const RACES: ReadonlyArray<{ value: Answer; shown: EngineKey }> = [
   { value: 'orc', shown: 'engine.race.orc' },
 ];
 
-export function dialogueFrame(cursor: DialogueCursor): ModalFrame {
-  return { name: 'dialogue', answers: {}, cursor };
-}
-
 const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { name: K }>> } = {
   'character-creation': {
-    open: () => ({ name: 'character-creation', answers: {} }),
     options: (_frame, state, registry) => [
       { key: 'name', label: localizerOf(registry, state).engine('engine.modal.name'), values: null },
       { key: 'race', label: localizerOf(registry, state).engine('engine.modal.race'), values: RACES.map((race) => ({ value: race.value, shown: localizerOf(registry, state).engine(race.shown) })) },
@@ -85,23 +74,19 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     },
   },
   'carried-items': {
-    open: () => carriedFrame(),
     options: (frame, state, registry) => carriedOptions(frame.answers, state, registry),
     submit: (frame, state, registry) => carriedSubmit(frame.answers, state, registry),
     leaves: LEAVE,
   },
   'item-plane': {
-    open: () => null,
     options: planeOptions,
     submit: planeSubmit,
     holds: isPlaneFrameBody,
     stale: planeStale,
-    same: samePlane,
     focus: planeFocus,
     leaves: BACK,
   },
   dialogue: {
-    open: () => null,
     options: (frame, state, registry) => [
       { key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuChoices(frame.cursor, registry, state).map((choice) => ({ value: String(choice.index), shown: choice.display })) },
     ],
@@ -111,7 +96,6 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     },
     holds: (value) => isCursor(value.cursor),
     stale: (frame, state, registry) => cursorProblem(localizerOf(registry, state), frame.cursor, registry),
-    same: (a, b) => a.cursor.dialogue === b.cursor.dialogue && a.cursor.node === b.cursor.node && a.cursor.resumeIndex === b.cursor.resumeIndex,
   },
 };
 
@@ -119,13 +103,8 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
 // is read off the definitions rather than off a copy of their names.
 export const MODAL_NAMES: readonly ModalName[] = Object.keys(DEFINITIONS) as ModalName[];
 
-// The one cast that opens the modal stack for writing, and the one that opens a
-// frame's answers: everything outside this module holds both as readonly, which
-// is what leaves open and close with a single implementation each.
-function stack(state: GameState): ModalFrame[] {
-  return state.modals as ModalFrame[];
-}
-
+// The one cast that opens a frame's answers for writing. The stack itself is
+// modalStack.ts's; what an answer lands on is this module's.
 function answersOf(frame: ModalFrame): Record<string, string> {
   return frame.answers as Record<string, string>;
 }
@@ -138,32 +117,6 @@ function definitionFor<F extends ModalFrame>(frame: F): ModalDefinition<F> {
 // and closing it is pruneModals's job rather than every reader's.
 function declaredFor(name: string): ModalDefinition<ModalFrame> | undefined {
   return DEFINITIONS[name as ModalName] as ModalDefinition<ModalFrame> | undefined;
-}
-
-// Two frames are the same screen when they differ only in how much of them has
-// been answered. Reopening what is already up is a no-op, which is what makes
-// the count of `open modal:` applications — batched, scaled or reached once per
-// repetition from inside a wrapper — not the count of screens raised.
-function sameScreen(a: ModalFrame, b: ModalFrame): boolean {
-  if (a.name !== b.name) return false;
-  return declaredFor(a.name)?.same?.(a, b) ?? true;
-}
-
-export function openModal(state: GameState, frame: ModalFrame): void {
-  if (state.modals.some((open) => sameScreen(open, frame))) return;
-  stack(state).push(frame);
-}
-
-export function openModalNamed(state: GameState, name: string): void {
-  const definition = DEFINITIONS[name as ModalName] as ModalDefinition<ModalFrame> | undefined;
-  if (!definition) throw new RuntimeError(`unknown modal: ${name}`);
-  const frame = definition.open();
-  if (!frame) throw new RuntimeError(`modal ${name} is not opened by name`);
-  openModal(state, frame);
-}
-
-export function topModal(state: GameState): ModalFrame | null {
-  return state.modals.length > 0 ? state.modals[state.modals.length - 1] : null;
 }
 
 // What the screen being answered has in hand, and null where it has nothing or
@@ -212,7 +165,7 @@ export function answerModal(state: GameState, registry: Registry, answers: Modal
   if (allOptions(frame, state, registry).some((option) => !(option.key in frame.answers))) return;
   // Popped before the modal acts, so anything its answer opens stacks on what
   // is left rather than on a frame that is already spent.
-  stack(state).pop();
+  popModal(state);
   let next: ModalFrame | null;
   try {
     next = definitionFor(frame).submit(frame, state, registry);
@@ -294,6 +247,6 @@ export function pruneModals(state: GameState, registry: Registry): Array<{ name:
     if (problem) dropped.push({ name: frame.name, reason: problem });
     else kept.push(frame);
   }
-  if (dropped.length > 0) stack(state).splice(0, state.modals.length, ...kept);
+  if (dropped.length > 0) keepModals(state, kept);
   return dropped;
 }

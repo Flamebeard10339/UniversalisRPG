@@ -68,7 +68,8 @@ export { encounterView } from './encounter';
 export { equip, unequip } from './equipment';
 export type { EncounterFoe, EncounterView } from './encounter';
 export { choose, talk } from './dialogue-runtime';
-export { answerModal, openModal, publishModal, topModal } from './modals';
+export { answerModal, publishModal } from './modals';
+export { openModal, topModal } from './modalStack';
 export type { Modal } from './modals';
 export type { ModalOption } from './modalOption';
 
