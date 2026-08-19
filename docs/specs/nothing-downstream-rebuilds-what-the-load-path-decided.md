@@ -181,18 +181,66 @@ writes and proves itself is a unit that adding does not cost anything elsewhere,
 kind costs an edit in `NAMESPACED_KINDS`, `CONTENT_SECTION_MAPS`, `applySection`, `visitSection` and
 nineteen loops in `serializeRegistryModule`, none of which fails when it is skipped.
 
-This is why `Parser<T>` (`src/grammar/parser.ts:2`) is the seam rather than `SectionSchema`. It is one
-method today, `parse(cursor)`, and there are about 25 implementations — 19 under `src/grammar` and the
-rest inline in `src/content` schemas. `serialize.ts` already holds their writing halves as orphans:
-`range()`, `bonusAmount()`, `duration()` and `n()` are the print sides of parsers they no longer sit
-beside. The conversion moves them home rather than writing them.
+This is why `Parser<T>` (`src/grammar/parser.ts:2`) is the seam rather than `SectionSchema`. It was one
+method, `parse(cursor)`, and is now three. `serialize.ts` held their writing halves as orphans —
+`range()`, `bonusAmount()`, `duration()`, `n()`, `ref()`, `side()`, `tag()`, `counter()`,
+`condition()`, `quantified()`, `producedQuantity()`, `result()`, `resultLines()`, `rowLines()` and
+`grantLine()` — and the conversion moved them home rather than writing them.
 
-**Stage 2 is one worker's whole context and was not started inside this one.** Making `print` required
-on `Parser<T>` breaks all 25 implementations in a single edit — that is the point of it, since an
-optional `print` is a hole of exactly the shape mutation found in c1's delegation exemption — and a
-half-converted parser table is worse than an unconverted one. Recorded here rather than begun, with
-the seam, the population and the orphaned print halves named so the next worker does not re-derive
-them. `SECTION_KINDS` is already `Object.keys(PARSERS)` and is the model for what collection means.
+**`examples` earned its place on the first run.** `list()` derives its examples from its element's,
+which is what makes a new element example a new list example with no edit; that derivation
+immediately reported that `skillGrant` consumed to end of line while `skillSchema` declares `grants`
+as a **clause** list, whose separator is the comma. A second grant on one authored line was read as
+part of the first and refused. Fixed by making the grant stop at the comma, as `tagClause` already
+did. Nothing in `content/` authored one, which is exactly why the shipped-corpus round trip could
+never have found it.
+
+**Stage 2 is one worker's whole context, and it was.** Making `print` required on `Parser<T>` breaks
+every implementation in a single edit — that is the point of it, since an optional `print` is a hole
+of exactly the shape mutation found in c1's delegation exemption — and a half-converted parser table
+is worse than an unconverted one. The population is now measured rather than estimated: `tsc` named
+**30 sites across 15 files**, not "about 25", and the split is 18 codecs reachable from the grammar
+layer's exports against 10 written inline in `src/content` schemas. `SECTION_KINDS` is already
+`Object.keys(PARSERS)` and is the model for what collection means.
+
+**c4 and c7 landed; c3 did not, and the reason is recorded rather than the clause weakened.** The
+codec conversion, the collected round trip and the byte fixture are done and mutation-verified 12/12
+on the first aim. What remains of c3 is its second sentence — `serialize.ts`'s per-kind printers
+"replaced by one walk over the collected grammar". It was surveyed and deliberately not begun with a
+third of a context left, because the survey turned up six places where a walk derived from a schema's
+fields and today's bytes disagree, and each needs a decision rather than a keystroke:
+
+- **Default suppression is not uniform today.** `stat.base` prints at its default and
+  `item.maxLevel` does not. No rule over `Field.default` reproduces both, so the field has to say
+  which it is.
+- **A list is inline for some fields and a block for others** — `entity.stats` inline,
+  `entity.flags` and `recipe.in` as blocks — and that is a property of the field, not of the parser.
+- **A hook's block form is not its element's print.** `resultLines` handles wrappers and
+  `printResult` throws on them, so a `ListParser` needs a block printer beside its inline one.
+- **A keyword flag's printed position is between two fields** (`aggressive` between `examine` and
+  `hiddenIf`), and `keywords` is a list beside `fields` with no position in it. The fix is to make a
+  flag a field — which also retires a list that must be kept in sync with `fields`.
+- **A `MappedField` has no inverse.** `entity.stats` and `clusterJewel.positions` hydrate a list into
+  a map, and printing needs the way back, in the kind's own module.
+- **Section order across kinds is the serializer's, not `SCHEMAS`'.** `CONTENT_SECTION_MAPS`
+  (`src/content/registry.ts:99`) is the kind-to-registry-map table the walk needs and already exists;
+  it covers 15 of the 22 printed kinds and is ordered differently again.
+
+The cheaper intermediate — moving each per-kind printer into the module that owns its kind and
+collecting them onto `SectionSchema.print`, required so a schema without one does not compile — is
+byte-identical by construction and is what the next worker should land first. It satisfies the
+author's rule that everything of a kind lives inside its parser and empties `serialize.ts` of
+spellings; deriving the body from the fields is then a second, separately gradeable step.
+
+**Stage 3 was not begun, and one fact about it is worth having before it is.** c5 says an action's
+owner arrives as `{ kind, id }`. `ActiveAction.ownerRef` is a **saved** field, and four `# save`
+sections in `content/combat-expansion.dsl` hold `"activeAction":{"ownerRef":"action.…"}`. c7 and this
+spec's own "no `.dsl` file in `content/` is edited by this branch" therefore forbid changing the wire
+form. c5 already anticipates this — "the wire forms a save records are reachable only through the one
+function that mints each" — so the shape change is in memory and `save.ts` gains a codec at the
+boundary that packs and unpacks. That is a seam stage 3 has to build and not a rename. The sites are
+`actions.ts:31,79`, `encounter.ts:138-140`, `save.ts:179-181,254`, `session.ts:349,558`,
+`runtime.ts:616,670,675`, `state.ts:24` and `forwardProgress.ts:23`.
 
 **The guard is required at every consumer, not only where a return type does not already give it.**
 A function returning `string` is protected by `strict` alone: a switch that falls through fails to
