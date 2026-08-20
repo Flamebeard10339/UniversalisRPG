@@ -4,8 +4,6 @@ import { trackedFiles } from './sourceFiles';
 
 const from = (source: string): string[] => importedPaths('src/content/registry.ts', source);
 
-// One git call for the whole file: every case that asks about the tree as it
-// stands asks it of this list.
 const swept = sweptFiles(trackedFiles());
 
 describe('importedPaths', () => {
@@ -117,8 +115,6 @@ describe('checkLayers', () => {
       read: 2,
       edges: 2,
       violations: [{ from: 'src/grammar/a.ts', to: 'src/content/registry' }],
-      // The same pair, read the other way: these two import each other, so
-      // they are also the one shape that has no order between them.
       cycles: [{ members: ['src/content/registry.ts', 'src/grammar/a.ts'], closedBy: [{ from: 'src/grammar/a.ts', to: 'src/content/registry.ts' }] }],
       unlayered: ['src/stray.ts'],
     });
@@ -200,10 +196,6 @@ describe('runLayerCheck', () => {
     expect(exitCode).toBe(1);
   });
 
-  // The two modules import each other and nothing else does, so the exit code
-  // and both halves of the message are read off a tree that exists only here:
-  // the gate is a gate on any tree it is handed, not on the one in this
-  // checkout, which is already clean and would say nothing either way.
   it('carries a cycle all the way to the exit code, naming the modules on it and the import that closes it', () => {
     const cyclic: Record<string, string> = {
       'src/runtime/a.ts': "import { b } from './b';",
@@ -223,8 +215,6 @@ describe('runLayerCheck', () => {
     expect(err).toContain('  src/grammar/a.ts -> scripts/c');
   });
 
-  // Called with no argument, which every case above replaces: the effects it
-  // reaches for on its own are the ones the gate actually runs on.
   it('reaches this repository through its own effects, and finds the tree there', () => {
     const { out, exitCode } = runLayerCheck();
     const [, sweptCount, readCount, edgeCount] = /^(\d+) module\(s\) swept under src and scripts, (\d+) read; (\d+) cross-file/.exec(out[0]) ?? [];

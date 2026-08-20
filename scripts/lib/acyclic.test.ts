@@ -45,10 +45,6 @@ describe('findCycles', () => {
   });
 });
 
-// The proof derives its subjects from the tree rather than naming files, so a
-// cycle introduced in a module written next month fails this without anybody
-// adding a case. This is the whole clause: not "these four are gone" but "there
-// are none", which is a sentence about the tree and not about a list.
 describe('the shipped tree', () => {
   const files = sweptFiles(trackedFiles());
   const report = checkLayers(files, (file) => readFileSync(file, 'utf8'));
@@ -61,11 +57,6 @@ describe('the shipped tree', () => {
     expect(files.length).toBeGreaterThan(100);
   });
 
-  // The subjects of the clause above, counted the way `checkLayers` builds
-  // them: an empty cycle list is a statement about this repository only while
-  // the graph it came out of still holds this repository's modules and the
-  // imports between them. Emptying either leaves "no module imports its way
-  // back to itself" true of nothing.
   describe('the graph that answer was read off', () => {
     const shipped = shippedModules(files, () => true);
     const inShipped = new Set(shipped);

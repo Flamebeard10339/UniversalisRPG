@@ -5,8 +5,6 @@ import type { SlotDriver } from '../../src/runtime/store';
 
 export const SLOT_SUFFIX = '.slot';
 
-// A slot name is a file name here, so it is held to being one: nothing that
-// could climb out of the directory it is written under reaches the filesystem.
 const SLOT_NAME = /^[a-z][a-z0-9-]*$/;
 
 function fileFor(dir: string, name: string): string {
@@ -14,21 +12,10 @@ function fileFor(dir: string, name: string): string {
   return path.join(dir, `${name}${SLOT_SUFFIX}`);
 }
 
-// Whatever is at the staging path, gone: the path is this write's own, and a
-// failure that left something there must not be reported as that something.
 function clear(staging: string): void {
   rmSync(staging, { force: true, recursive: true });
 }
 
-// Staged beside the slot and renamed over it, because `writeFileSync` truncates
-// and then streams: a process that dies inside that window leaves a prefix, and
-// the save it was replacing is already gone. A rename is atomic, so a slot holds
-// either the bytes that were there or the bytes going in, and a write that never
-// finished costs nothing at all.
-//
-// Deliberately without a retry loop around the rename: a save slot is written
-// by the one game playing it, so a rename that loses says so and the next
-// autosave comes back in a cadence.
 function replace(staging: string, file: string, name: string): void {
   try {
     renameSync(staging, file);
@@ -38,10 +25,6 @@ function replace(staging: string, file: string, name: string): void {
   }
 }
 
-// What the filesystem says, in this driver's own words. Every verb goes through
-// it: a directory where a slot should be, a permission, a handle another
-// process is holding — those reach the command table as a message it can print
-// rather than as an exception that ends the session standing behind it.
 function attempting<T>(what: string, act: () => T): T {
   try {
     return act();
@@ -51,8 +34,6 @@ function attempting<T>(what: string, act: () => T): T {
   }
 }
 
-// One file per slot under one directory, created on the first write. Nothing
-// here reads the text it moves: what a slot means is decided above this.
 export function fileSlots(dir: string): SlotDriver {
   return {
     read(name) {

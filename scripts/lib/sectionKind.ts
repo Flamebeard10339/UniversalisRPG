@@ -2,9 +2,6 @@ import ts from 'typescript';
 import { sectionKinds } from '../../src/content/sections';
 import { programOverShippedModules, relativeTo, repoRoot } from './shippedProgram';
 
-// A declaration that answers a question about section kinds. Its subjects are
-// derived from the spine rather than named here, so a per-kind list written
-// next month is one of these without an edit.
 export interface KindTable {
   where: string;
   name: string;
@@ -13,17 +10,12 @@ export interface KindTable {
   why: string;
 }
 
-// More than one kind is what makes a declaration a table rather than a mention
-// of one: `['entity', 'location', 'item']` answers a question about kinds and
-// `['location']` names a location.
 const TABLE = 2;
 
 function stringsUnder(node: ts.ArrayLiteralExpression): string[] {
   const found: string[] = [];
   for (const element of node.elements) {
     if (ts.isStringLiteral(element)) found.push(element.text);
-    // A list of pairs answers a question about its first column, which is
-    // where `contentSectionMaps()` keeps its kinds.
     else if (ts.isArrayLiteralExpression(element)) for (const inner of element.elements) if (ts.isStringLiteral(inner)) found.push(inner.text);
   }
   return found;
@@ -37,20 +29,10 @@ function keysOf(node: ts.ObjectLiteralExpression): string[] {
   });
 }
 
-// A table whose type carries a string index signature answers for whichever
-// keys somebody wrote, which is the shape a kind can be added behind. One keyed
-// by a union of kinds stops compiling until the new kind has an answer, and
-// that is the whole difference the rule is about.
 const keyedByAnyString = (checker: ts.TypeChecker, node: ts.Node): boolean => checker.getIndexInfoOfType(checker.getTypeAtLocation(node), ts.IndexKind.String) !== undefined;
 
-// `as const` and `satisfies` wrap the literal without changing what it holds,
-// and a rule that read only the bare form would miss whichever declarations
-// happen to carry one.
 const literal = (node: ts.Expression): ts.Expression => (ts.isAsExpression(node) || ts.isSatisfiesExpression(node) ? literal(node.expression) : node);
 
-// `examined` is how many declarations the walk actually opened. A rule whose
-// answer is "nothing to report" is worth what its instrument is worth, and a
-// walk that stopped reaching the tree gives the same answer as a clean one.
 export interface KindTableReport {
   examined: number;
   tables: KindTable[];

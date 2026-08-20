@@ -3,18 +3,6 @@ import { relativeTo, repoRoot } from './shippedProgram';
 
 const root = repoRoot;
 
-// A union is discriminated at a property when every constituent declares a
-// string literal there. That is the checker's own test for narrowing a switch,
-// and it is deliberately weaker than requiring the literals to differ:
-// `CommandOutput` spells `kind: 'message'` twice, TypeScript narrows it anyway,
-// and a rule that asked for distinctness reported clean over both switches on
-// it. Asking the checker rather than reading the source is what makes a union
-// declared next month a subject of this rule without an edit.
-//
-// `named` is the property the switch actually reads, when it reads one. The
-// checker narrows on the property switched, so that is the property to ask
-// about; searching for some other one can only find a discriminant nobody
-// dispatched on.
 function discriminantOf(checker: ts.TypeChecker, type: ts.Type, named: string | null): string | null {
   if (!type.isUnion() || type.types.length < 2) return null;
   const candidates = named === null ? checker.getPropertiesOfType(type.types[0]).map((property) => property.name) : [named];
@@ -47,18 +35,8 @@ export interface Consumer {
   delegating: boolean;
 }
 
-// `default:` that assigns the scrutinee to `never`. The assignment is the
-// whole mechanism: it is the one form that cannot be written so as to pass
-// while being false, which a hand-written assertion can.
 const NEVER_GUARD = /:\s*never\b|<\s*never\s*>|satisfies\s+never/;
 
-// A default that hands the scrutinee to another consumer of the same union is
-// not absorbing it — it is dispatching, and the consumer it dispatches to is
-// held to this same rule, so the chain terminates at a guard. `resultLines`
-// prints five wrappers and hands every leaf to `result`, which is total; a
-// twenty-first member reaches `result` and fails to compile there. Requiring a
-// guard here as well would ask an author to name every leaf in a function
-// about wrappers, which is the enumeration this rule exists to remove.
 function delegates(checker: ts.TypeChecker, clause: ts.DefaultClause, subject: ts.Expression, union: ts.Type): boolean {
   let found = false;
   const scrutinee = ts.isIdentifier(subject) ? checker.getSymbolAtLocation(subject) : undefined;
@@ -66,10 +44,6 @@ function delegates(checker: ts.TypeChecker, clause: ts.DefaultClause, subject: t
     if (!found && ts.isCallExpression(node)) {
       const signature = checker.getResolvedSignature(node);
       node.arguments.forEach((argument, at) => {
-        // The scrutinee is narrowed to the unhandled members by the time it
-        // reaches the default, so the union is read off the callee's parameter
-        // rather than off the argument: what matters is that the thing being
-        // handed the value declares it can answer for the whole union.
         const parameter = signature?.parameters[at];
         const declared = parameter?.valueDeclaration === undefined ? undefined : checker.getTypeOfSymbolAtLocation(parameter, parameter.valueDeclaration);
         const passed = ts.isIdentifier(argument) ? checker.getSymbolAtLocation(argument) : undefined;

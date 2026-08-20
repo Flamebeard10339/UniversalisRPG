@@ -2,16 +2,10 @@ import path from 'node:path';
 import ts from 'typescript';
 import { shippedModules } from './layers';
 
-// The subject set is the same enumeration the layer rule sweeps, tests taken
-// out. A rule about the code this repository ships that walks a tree of its
-// own reaches whichever driver that tree happens to hold and no other.
 export const repoRoot = process.cwd().replace(/\\/g, '/');
 
 export const relativeTo = (root: string, fileName: string): string => fileName.replace(`${root}/`, '');
 
-// One source compiled alone, so a rule about what the checker sees can be
-// asked a case whose right answer is known. Nothing is written anywhere: the
-// file exists only in the host's answers.
 export function programOverSource(name: string, source: string): ts.Program {
   const host = ts.createCompilerHost({ strict: true });
   const original = host.getSourceFile.bind(host);
@@ -22,10 +16,6 @@ export function programOverSource(name: string, source: string): ts.Program {
   return ts.createProgram([name], { strict: true, noEmit: true, skipLibCheck: true }, host);
 }
 
-// `overrides` replaces the text of a tracked file for one compilation, keyed by
-// repository-relative path and written nowhere. It is what lets a rule about
-// what the compiler refuses be asked the question directly — add a kind, ask
-// which files stop compiling — instead of asserting that it would.
 export function programOverShippedModules(overrides: Readonly<Record<string, string>> = {}, root: string = repoRoot): ts.Program {
   const configPath = ts.findConfigFile(root, ts.sys.fileExists, 'tsconfig.json');
   if (configPath === undefined) throw new Error('no tsconfig.json at the repository root');
@@ -46,7 +36,6 @@ export function programOverShippedModules(overrides: Readonly<Record<string, str
   return ts.createProgram(files, options, host);
 }
 
-// Every semantic error the program reports, as `<relative path>: <message>`.
 export function semanticErrors(program: ts.Program, root: string = repoRoot): string[] {
   return program
     .getSemanticDiagnostics()

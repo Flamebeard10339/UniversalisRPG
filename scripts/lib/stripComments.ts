@@ -8,8 +8,6 @@ const REGEX_PRECEDING_KEYWORDS = new Set([
 
 const IDENTIFIER_CHARACTER = /[A-Za-z0-9_$]/;
 
-// Directives compile, lint or bundle differently if removed, so they are code
-// wearing comment syntax and both callers must keep them.
 const SEMANTIC_DIRECTIVE = [
   /^\/\/\/\s*<reference\s/,
   /^\/\/\s*(@ts-|@vitest-|eslint-|prettier-ignore|[vc]8 ignore)/,
@@ -24,8 +22,6 @@ function startsRegexLiteral(previousToken: string): boolean {
   return previousToken === '' || REGEX_PRECEDING_PUNCTUATION.has(previousToken) || REGEX_PRECEDING_KEYWORDS.has(previousToken);
 }
 
-// Comments are blanked to spaces rather than deleted so line and column numbers
-// survive the strip and callers can report positions against the original.
 export function stripComments(source: string): string[] {
   const lines: string[] = [];
   let line = '';

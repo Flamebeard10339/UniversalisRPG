@@ -6,9 +6,6 @@ import type { ModportalEntry, ModportalManifest, ModTier } from '../../src/conte
 export const DEFAULT_MODPORTAL_CACHE = 'content/modportal.local';
 export const MODPORTAL_MANIFEST_FILE = 'manifest.json';
 
-// Every filename `sync` writes: an issue number, the module id, `.dsl`. Pruning
-// is scoped to this shape so a cache directory that also holds hand-placed
-// content loses none of it.
 const ENTRY_FILE = /^\d+-[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*\.dsl$/;
 
 export interface ModportalCache {
@@ -21,8 +18,6 @@ export interface EntryText {
   warning?: string;
 }
 
-// A path out of the manifest is data, not a location this tool chose: `..` in
-// one would read outside the cache the entry claims to live in.
 function insideCache(root: string, file: string): boolean {
   const relative = path.relative(root, path.resolve(root, file));
   return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
@@ -44,9 +39,6 @@ function intentFrom(value: unknown): Record<string, boolean> {
 
 export const modportalEntryPath = (root: string, entry: ModportalEntry): string => path.resolve(root, entry.file);
 
-// The other half of the tolerance below: an entry may name a file that is not
-// there, because the manifest and the files it points at are written separately.
-// Owned here so no caller has to remember it.
 export function readEntryText(root: string, entry: ModportalEntry): EntryText {
   const file = modportalEntryPath(root, entry);
   if (!existsSync(file)) return { warning: `Modportal skipped ${entry.moduleId}: missing ${entry.file}` };
@@ -58,10 +50,6 @@ export function orphanEntryFiles(root: string, entries: readonly ModportalEntry[
   return readdirSync(root).filter((file) => ENTRY_FILE.test(file) && !kept.has(file));
 }
 
-// Everything reads this file: the game at launch and the tool that repairs the
-// cache. A truncated write or an interrupted sync must take down neither, so a
-// manifest that will not parse reads as an empty one carrying a warning rather
-// than throwing past the tolerant loader.
 export function readModportalCache(root: string): ModportalCache {
   const file = path.join(root, MODPORTAL_MANIFEST_FILE);
   const ignored = (reason: string): ModportalCache => ({ manifest: emptyModportalManifest(), warnings: [`Modportal ignored ${MODPORTAL_MANIFEST_FILE}: ${reason}`] });
@@ -89,9 +77,6 @@ export function readModportalCache(root: string): ModportalCache {
       warnings.push(`Modportal skipped ${entry.moduleId}: file escapes cache directory`);
       continue;
     }
-    // A manifest predating tiers records enablement and nothing about how it was
-    // reached, so its flags read as user intent: the entries themselves are a
-    // build artifact the next sync rewrites, but that choice is not recoverable.
     if (olderThanTiers) {
       intent[String(entry.issue)] ??= entry.enabled;
       continue;

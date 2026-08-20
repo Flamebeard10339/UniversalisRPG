@@ -18,9 +18,6 @@ afterEach(() => {
   for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-// What it owes as a slot driver, which is not this file's to state: the same
-// cases run against every implementation, so the two cannot disagree about what
-// a slot is.
 describeSlotDriver('one file per slot', () => fileSlots(tempDir()));
 
 describe('one file per slot, under one directory', () => {
@@ -36,8 +33,6 @@ describe('one file per slot, under one directory', () => {
     expect(readdirSync(dir)).toEqual([`player${SLOT_SUFFIX}`]);
   });
 
-  // The half the contract cannot see: that the bytes it hands back are the
-  // file's own, so nothing was wrapped around them on the way down.
   it('writes the payload into the file and nothing else', () => {
     const dir = tempDir();
     const driver = fileSlots(dir);
@@ -57,11 +52,6 @@ describe('one file per slot, under one directory', () => {
     expect(driver.names().sort()).toEqual(['dev-snapshot', 'player']);
   });
 
-  // The reason the write is staged: `writeFileSync` truncates and then streams,
-  // so a process that dies inside that window leaves a prefix where a save was.
-  // A rename cannot half-happen, which is the filesystem's guarantee rather than
-  // this file's — what is testable here is the other half of it, that a write
-  // which does not complete leaves the slot holding exactly what it held.
   describe('a write that does not finish costs nothing', () => {
     const staging = (dir: string, name: string): string => path.join(dir, `${name}${SLOT_SUFFIX}.${process.pid}.tmp`);
 
@@ -79,7 +69,6 @@ describe('one file per slot, under one directory', () => {
       const dir = tempDir();
       const driver = fileSlots(dir);
       driver.write('player', 'an hour of play');
-      // Something already standing where the staged bytes would go.
       mkdirSync(staging(dir, 'player'));
 
       expect(() => driver.write('player', 'a brand new game')).toThrow(/slot player could not be written/);
@@ -90,8 +79,6 @@ describe('one file per slot, under one directory', () => {
     it('keeps the old bytes when the staged write cannot be moved into place', () => {
       const dir = tempDir();
       const driver = fileSlots(dir);
-      // A slot that is a directory: the staging write lands, and the rename
-      // onto it cannot.
       const file = path.join(dir, `player${SLOT_SUFFIX}`);
       mkdirSync(file);
       writeFileSync(path.join(file, 'in the way'), 'x', 'utf8');
@@ -110,9 +97,6 @@ describe('one file per slot, under one directory', () => {
     });
   });
 
-  // The guard is the whole of what stops a slot name reaching the filesystem as
-  // a path. Nothing hands it a name from a person today; the branch that adds a
-  // save-slot picker is the one that will, and this is what it will find.
   const REFUSED = ['..', '../escape', 'a/b', 'a\\b', '/absolute', 'C:name', '.hidden', 'Upper', '', ' '];
 
   for (const name of REFUSED) {
@@ -132,7 +116,6 @@ describe('one file per slot, under one directory', () => {
       try {
         driver.write(name, 'x');
       } catch {
-        // The point of the loop is that none of them landed.
       }
     }
 

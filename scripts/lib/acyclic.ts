@@ -1,20 +1,8 @@
-// Pure graph, no reads and no repository knowledge: `layers.ts` owns which
-// files are swept and how an import resolves, and hands the result here as
-// data. Nothing is imported, which is also what keeps this module out of the
-// cycle it exists to find — `architecture.ts` already imports `layers.ts`.
-
 export interface Cycle {
-  // Every module on the cycle, path-sorted. A strongly connected component is
-  // read as one unit or not at all, so the whole membership is the finding.
   members: string[];
-  // The imports that close it: remove these and the component becomes an
-  // order. Derived rather than listed, so what a reader is told to invert is
-  // the smallest set this ordering could find, not every edge inside.
   closedBy: Array<{ from: string; to: string }>;
 }
 
-// Tarjan, iterative. The graph that broke `instances.ts` was 28 modules deep
-// and a recursive walk of the whole swept tree is a stack this need not risk.
 function components(nodes: readonly string[], out: (node: string) => readonly string[]): string[][] {
   const index = new Map<string, number>();
   const low = new Map<string, number>();
@@ -68,10 +56,6 @@ function components(nodes: readonly string[], out: (node: string) => readonly st
   return found;
 }
 
-// Eades, Lin & Smyth: peel sources and sinks, break ties by out-degree minus
-// in-degree, and every edge pointing backward in what is left closes a cycle.
-// A minimum feedback arc set is NP-hard and a reader does not need the minimum
-// — they need a set small enough to act on, and this one is.
 function closingEdges(members: readonly string[], out: (node: string) => readonly string[]): Array<{ from: string; to: string }> {
   const inside = new Set(members);
   const live = new Set(members);
@@ -124,11 +108,6 @@ function closingEdges(members: readonly string[], out: (node: string) => readonl
   return backward.sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
 }
 
-// Every group of modules that can only be read together. A component of one is
-// a module, not a cycle, so what comes back is empty for a tree that has an
-// order — which is the value this rule targets, and it is not a threshold: one
-// member per component is the only size at which "read this before that" has
-// an answer for every pair.
 export function findCycles(nodes: readonly string[], out: (node: string) => readonly string[]): Cycle[] {
   return components(nodes, out)
     .filter((component) => component.length > 1)
