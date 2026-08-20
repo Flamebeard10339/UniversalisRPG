@@ -1,16 +1,36 @@
-import { LocaleSection, parseLocaleSection } from "../locale";
-import { section } from "./define";
+import { DslError } from '../../grammar/parser';
+import { hasBlock, RawSection, sectionParser } from '../../grammar/structure';
+import { section } from './define';
 
-// The words themselves live in `../locale`, which every other kind's text is
-// read through; what is here is only the section that carries them in. The key
-// it hangs under is the language tag, so the heading is printed from the
-// context rather than from the value, exactly as a `# save` is.
+export interface LocaleSection {
+  // The language tag the section heads, which is the section's id.
+  id: string;
+  entries: Array<{ key: string; value: string }>;
+}
+
+const KEY = /^(?<key>[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)*):[ \t]?(?<value>.*)$/;
+
+export const parseLocaleSection = sectionParser((section: RawSection): LocaleSection => {
+  if (!section.id) throw new DslError('# locale requires a language, as in `# locale en`', section.span);
+  const entries: Array<{ key: string; value: string }> = [];
+  const seen = new Set<string>();
+  for (const line of section.body) {
+    if (hasBlock(line)) throw new DslError(`# locale ${section.id}: a translation is one line`, line.span);
+    const groups = KEY.exec(line.text)?.groups;
+    if (!groups) throw new DslError(`# locale ${section.id}: expected \`<key>: <text>\`, got ${JSON.stringify(line.text)}`, line.span);
+    if (seen.has(groups.key)) throw new DslError(`# locale ${section.id}: ${groups.key} is translated more than once`, line.span);
+    seen.add(groups.key);
+    entries.push({ key: groups.key, value: groups.value });
+  }
+  return { id: section.id, entries };
+});
+
+// The words themselves live in `../locale`, the store every kind's text is read
+// through; what is here is the section that carries them in. Its key is the
+// language tag, so the heading is printed from the context and not the value.
 export const locale = section<LocaleSection>()({
-  kind: "locale",
-  ids: "none",
+  kind: 'locale',
+  ids: 'none',
   parse: parseLocaleSection,
-  print: (declared, { id }) => [
-    `# locale ${id}`,
-    ...declared.entries.map((entry) => `${entry.key}: ${entry.value}`),
-  ],
+  print: (declared, { id }) => [`# locale ${id}`, ...declared.entries.map((entry) => `${entry.key}: ${entry.value}`)],
 });

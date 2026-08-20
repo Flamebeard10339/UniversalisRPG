@@ -1,12 +1,13 @@
-import { DslError } from "../grammar/parser";
-import { Recipe } from "./sections/recipe";
-import { Registry } from "./registry";
-import { Dialogue } from "./sections/dialogue";
-import { Directive, Test } from "./sections/test";
-import { NAMESPACED_KINDS } from "./namespace";
-import { isActionOwnerKind, sectionOf, type ModuleSection } from "./sections";
-import { INFLICT_SITE, Visit } from "./refs";
-import { visitSection } from "./sections";
+import { DslError } from '../grammar/parser';
+import { Recipe } from './sections/recipe';
+import { Registry } from './registry';
+import { Dialogue } from './sections/dialogue';
+import { Directive, Test } from './sections/test';
+import { } from './namespace';
+import { isNamespacedKind } from './sections';
+import { isActionOwnerKind, sectionOf, type ModuleSection } from './sections';
+import { INFLICT_SITE, Visit } from './refs';
+import { visitSection } from './sections';
 
 // Resolution qualifies a name; it cannot prove the name still points at
 // something. Both `# remove` and a `-field:` edit decide what survives at merge,
@@ -17,27 +18,15 @@ import { visitSection } from "./sections";
 //
 // The namespace answers rather than the registry maps, because it is the one
 // place that already knows a member goes away with the object that owned it.
-export function validateSectionReferences(
-  section: ModuleSection,
-  id: string,
-  registry: Registry,
-): void {
+export function validateSectionReferences(section: ModuleSection, id: string, registry: Registry): void {
   const visit: Visit = (referenced, target, where) => {
-    if (
-      NAMESPACED_KINDS.includes(referenced) &&
-      !registry.namespace.has(referenced, target)
-    ) {
+    if (isNamespacedKind(referenced) && !registry.namespace.has(referenced, target)) {
       throw new DslError(`${where} names an unknown ${referenced}: ${target}`);
     }
-    if (where.endsWith(INFLICT_SITE))
-      refuseUntimedPayload(target, where, registry);
+    if (where.endsWith(INFLICT_SITE)) refuseUntimedPayload(target, where, registry);
     return target;
   };
-  visitSection(
-    sectionOf(section.kind, { ...section.value }),
-    `# ${section.kind} ${id}`,
-    visit,
-  );
+  visitSection(sectionOf(section.kind, { ...section.value }), `# ${section.kind} ${id}`, visit);
 }
 
 // An `inflict:` grants one instance of a declaration for as long as that
@@ -45,16 +34,10 @@ export function validateSectionReferences(
 // at all — granted at an instant already past, gone at the next boundary, with
 // nothing said anywhere. Refused here because this is the one moment both halves
 // are loaded: the result naming the source, and the source's own clauses.
-function refuseUntimedPayload(
-  itemId: string,
-  where: string,
-  registry: Registry,
-): void {
+function refuseUntimedPayload(itemId: string, where: string, registry: Registry): void {
   const source = registry.items.get(itemId);
-  if (source && !source.tags.some((tag) => tag.kind === "duration")) {
-    throw new DslError(
-      `${where} names ${itemId}, which declares no duration, so an instance of it would be over before anything could read it`,
-    );
+  if (source && !source.tags.some((tag) => tag.kind === 'duration')) {
+    throw new DslError(`${where} names ${itemId}, which declares no duration, so an instance of it would be over before anything could read it`);
   }
 }
 
@@ -63,8 +46,7 @@ function refuseUntimedPayload(
 // dialogue, an action's own label.
 export function registryCapabilities(registry: Registry): Set<string> {
   const capabilities = new Set<string>();
-  for (const entity of registry.entities.values())
-    for (const capability of entity.capabilities) capabilities.add(capability);
+  for (const entity of registry.entities.values()) for (const capability of entity.capabilities) capabilities.add(capability);
   return capabilities;
 }
 
@@ -75,8 +57,7 @@ export function registryCapabilities(registry: Registry): Set<string> {
 // vocabulary read off `slot:` alone quietly gives a rat a head.
 function declaredSlots(registry: Registry): Set<string> {
   const declared = new Set<string>();
-  for (const entity of registry.entities.values())
-    for (const slot of entity.equipmentSlots) declared.add(slot);
+  for (const entity of registry.entities.values()) for (const slot of entity.equipmentSlots) declared.add(slot);
   return declared;
 }
 
@@ -84,8 +65,7 @@ export function registrySlots(registry: Registry): Set<string> {
   const declared = declaredSlots(registry);
   if (declared.size > 0) return declared;
   const slots = new Set<string>();
-  for (const item of registry.items.values())
-    if (item.slot !== undefined) slots.add(item.slot);
+  for (const item of registry.items.values()) if (item.slot !== undefined) slots.add(item.slot);
   return slots;
 }
 
@@ -96,41 +76,27 @@ export function validateItemSlots(registry: Registry): void {
   if (declared.size === 0) return;
   for (const item of registry.items.values()) {
     if (item.slot !== undefined && !declared.has(item.slot)) {
-      throw new DslError(
-        `# item ${item.id} slot: names ${item.slot}, which no # entity declares among its equipment-slots:`,
-      );
+      throw new DslError(`# item ${item.id} slot: names ${item.slot}, which no # entity declares among its equipment-slots:`);
     }
   }
 }
 
-export function validateRecipeReferences(
-  recipe: Recipe,
-  capabilities: ReadonlySet<string>,
-): void {
-  if (
-    recipe.requiresCapability !== undefined &&
-    !capabilities.has(recipe.requiresCapability)
-  ) {
-    throw new DslError(
-      `# recipe ${recipe.id} station: names an unknown capability: ${recipe.requiresCapability}`,
-    );
+export function validateRecipeReferences(recipe: Recipe, capabilities: ReadonlySet<string>): void {
+  if (recipe.requiresCapability !== undefined && !capabilities.has(recipe.requiresCapability)) {
+    throw new DslError(`# recipe ${recipe.id} station: names an unknown capability: ${recipe.requiresCapability}`);
   }
 }
 
 export function validateDialogueReferences(dialogue: Dialogue): void {
   const names = new Set(dialogue.nodes.map((node) => node.name));
   const goto = (target: string | undefined, where: string): void => {
-    if (target !== undefined && !names.has(target))
-      throw new DslError(
-        `${where} goto names an unknown node in # dialogue ${dialogue.id}: ${target}`,
-      );
+    if (target !== undefined && !names.has(target)) throw new DslError(`${where} goto names an unknown node in # dialogue ${dialogue.id}: ${target}`);
   };
   for (const node of dialogue.nodes) {
     const where = `# dialogue ${dialogue.id} node ${node.name}`;
     for (const step of node.steps) {
-      if (step.kind === "goto") goto(step.target, where);
-      if (step.kind === "menu")
-        for (const choice of step.choices) goto(choice.goto, `${where} choice`);
+      if (step.kind === 'goto') goto(step.target, where);
+      if (step.kind === 'menu') for (const choice of step.choices) goto(choice.goto, `${where} choice`);
     }
   }
 }
@@ -138,31 +104,23 @@ export function validateDialogueReferences(dialogue: Dialogue): void {
 export function validateTestReferences(test: Test, registry: Registry): void {
   const slots = registrySlots(registry);
   const directive = (value: Directive, where: string): void => {
-    if (value.kind === "begin")
-      return directive(value.inner, `${where} begin:`);
-    if (value.kind === "unequip") {
-      if (!slots.has(value.slot))
-        throw new DslError(
-          `${where} unequip: names an unknown slot: ${value.slot}`,
-        );
+    if (value.kind === 'begin') return directive(value.inner, `${where} begin:`);
+    if (value.kind === 'unequip') {
+      if (!slots.has(value.slot)) throw new DslError(`${where} unequip: names an unknown slot: ${value.slot}`);
       return;
     }
     // A two-sided action is reached by id and its target by pool, both of which
     // the reference check already proved; what is left is that the performer can
     // bring it, and the player is the performer of everything a test drives.
-    if (value.kind === "use-on") {
-      if (!registry.player?.uses.some((used) => used === value.action))
-        throw new DslError(
-          `${where} use: names an action the player does not use:: ${value.action}`,
-        );
+    if (value.kind === 'use-on') {
+      if (!registry.player?.uses.some((used) => used === value.action)) throw new DslError(`${where} use: names an action the player does not use:: ${value.action}`);
       return;
     }
     // What is left of `use:` here is the kind it leads with. Both halves after
     // it are namespaced — the object, and the action hanging under it — so an
     // action nothing declares is an unknown member, caught by the walk above
     // rather than by a second comparison against the built table.
-    if (value.kind === "use" && !isActionOwnerKind(value.obj))
-      throw new DslError(`${where} use: names an unknown kind: ${value.obj}`);
+    if (value.kind === 'use' && !isActionOwnerKind(value.obj)) throw new DslError(`${where} use: names an unknown kind: ${value.obj}`);
   };
   for (const each of test.directives) directive(each, `# test ${test.id}`);
 }

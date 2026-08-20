@@ -1,35 +1,21 @@
-import { Action, actionBody } from "../../grammar/action";
-import {
-  ActionResult,
-  resultBlock,
-  resultList,
-} from "../../grammar/actionResult";
-import { Condition, condition } from "../../grammar/condition";
-import { HOOK_FIELDS, HookCarrier } from "../../grammar/hook";
-import { list } from "../../grammar/list";
-import { DslError, Parser } from "../../grammar/parser";
-import { Range, range } from "../../grammar/range";
-import { EntryBody, listMembers } from "../../grammar/section";
-import { duration, id, text } from "../../grammar/values";
-import {
-  condition as visitCondition,
-  hooks,
-  put,
-  results,
-  strings,
-  visitAction,
-  type Loose,
-  type Visit,
-} from "../refs";
-import { section } from "./define";
-import { TITLE_FIELD } from "./info";
+import { Action, actionBody } from '../../grammar/action';
+import { ActionResult, resultBlock, resultList } from '../../grammar/actionResult';
+import { Condition, condition } from '../../grammar/condition';
+import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
+import { list } from '../../grammar/list';
+import { DslError, Parser } from '../../grammar/parser';
+import { Range, range } from '../../grammar/range';
+import { EntryBody, listMembers } from '../../grammar/section';
+import { duration, id, text } from '../../grammar/values';
+import { condition as visitCondition, hooks, put, results, strings, visitAction, type Loose, type Visit } from '../refs';
+import { section } from './define';
+import { TITLE_FIELD } from './info';
 
-export type { Action } from "../../grammar/action";
+export type { Action } from '../../grammar/action';
 
 // The id an action was declared under, present on the ones an entity performs
 // through `uses:` and absent on the one-offs it writes inline.
-export const declaredId = (action: Action): string | undefined =>
-  (action as { id?: string }).id;
+export const declaredId = (action: Action): string | undefined => (action as { id?: string }).id;
 
 // A roster line names a type and how many of it. A count is what spawns, so
 // `2 bandit` mints two fight-scoped bandits and a bare name is the one that
@@ -94,7 +80,7 @@ export const statAssignmentValue: Parser<[string, Range]> = {
     return [statId, range.parse(cursor)];
   },
   print: ([statId, value]) => `${id.print(statId)} ${range.print(value)}`,
-  examples: ["attack 4", "attack 4-7"],
+  examples: ['attack 4', 'attack 4-7'],
 };
 
 export const allyValue: Parser<Ally> = {
@@ -102,70 +88,56 @@ export const allyValue: Parser<Ally> = {
     const count = cursor.take(/\d+(?![\w-])/);
     if (count === null) return { entity: id.parse(cursor) };
     if (Number(count) === 0)
-      throw new DslError("a roster of 0 brings nobody, so leave the line out", {
+      throw new DslError('a roster of 0 brings nobody, so leave the line out', {
         start: cursor.abs(cursor.pos),
         end: cursor.abs(cursor.pos),
       });
     cursor.take(/[ \t]+/);
     return { count: Number(count), entity: id.parse(cursor) };
   },
-  print: (value) =>
-    value.count === undefined
-      ? value.entity
-      : `${value.count} ${id.print(value.entity)}`,
-  examples: ["bandit", "2 bandit"],
+  print: (value) => (value.count === undefined ? value.entity : `${value.count} ${id.print(value.entity)}`),
+  examples: ['bandit', '2 bandit'],
 };
 
 // `on <event>:` is the one label shape whose body is results rather than an
 // action, because a handler is what happens rather than something to perform.
-const HANDLER_LABEL =
-  /^on[ \t]+(?<event>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
+const HANDLER_LABEL = /^on[ \t]+(?<event>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
 
-export const handlerEvent = (label: string): string | undefined =>
-  HANDLER_LABEL.exec(label)?.groups?.event;
+export const handlerEvent = (label: string): string | undefined => HANDLER_LABEL.exec(label)?.groups?.event;
 
-export const isHandlerBlock = (block: EntityBlock): block is HandlerBlock =>
-  "event" in block;
+export const isHandlerBlock = (block: EntityBlock): block is HandlerBlock => 'event' in block;
 
 // One body reader for both, chosen by the label, because the label is the only
 // thing that says which of the two a block is.
 const entityBlock: EntryBody = {
   parse(cursor, label) {
     const event = handlerEvent(label);
-    return event === undefined
-      ? actionBody.parse(cursor, label)
-      : { event, results: resultList.parse(cursor) };
+    return event === undefined ? actionBody.parse(cursor, label) : { event, results: resultList.parse(cursor) };
   },
   parseBlock(lines, label) {
     const event = handlerEvent(label);
-    return event === undefined
-      ? actionBody.parseBlock(lines, label)
-      : { event, results: resultBlock(lines) };
+    return event === undefined ? actionBody.parseBlock(lines, label) : { event, results: resultBlock(lines) };
   },
 };
 
-export const entity = section<AuthoredEntity, "aggressive", "blocks">()({
-  kind: "entity",
-  ids: "owned",
+export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
+  kind: 'entity',
+  ids: 'owned',
   // `actions` and `handlers` are what `blocks` becomes once `uses:` can be read
   // against the actions it names, which is after every section is in.
   maps: {
-    entities: (
-      value: AuthoredEntity,
-    ): readonly (readonly [string, Entity])[] => [
-      [value.id, { ...value, actions: [], handlers: [] }],
-    ],
+    entities: (value: AuthoredEntity): readonly (readonly [string, Entity])[] => [[value.id, { ...value, actions: [], handlers: [] }]],
   },
   nestsActions: true,
-  text: ["title", "examine"],
+  text: ['title', 'examine'],
   fields: {
     title: TITLE_FIELD,
     examine: { parser: text },
-    hiddenIf: { parser: condition, keyword: "hidden if" },
-    respawnAfter: { parser: duration, keyword: "respawn after" },
+    hiddenIf: { parser: condition, keyword: 'hidden if' },
+    respawnAfter: { parser: duration, keyword: 'respawn after' },
     capabilities: {
       parser: list(id),
-      keyword: "stations",
+      keyword: 'stations',
       default: () => [],
       block: true,
     },
@@ -183,7 +155,7 @@ export const entity = section<AuthoredEntity, "aggressive", "blocks">()({
     passives: { parser: list(id), default: () => [] },
     equipmentSlots: {
       parser: list(id),
-      keyword: "equipment-slots",
+      keyword: 'equipment-slots',
       default: () => [],
     },
     uses: { parser: list(id), default: () => [] },
@@ -194,26 +166,20 @@ export const entity = section<AuthoredEntity, "aggressive", "blocks">()({
     // can read it as an `on <event>:` handler.
     ...HOOK_FIELDS,
   },
-  keywords: ["aggressive"],
-  keywordsAfter: "examine",
-  entries: { into: "blocks", body: entityBlock },
+  keywords: ['aggressive'],
+  keywordsAfter: 'examine',
+  entries: { into: 'blocks', body: entityBlock },
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
     // A stat sheet is authored as a list of assignments; the stat id leading
     // each one is the reference.
-    for (const assignment of listMembers<[string, unknown]>(held.stats))
-      assignment[0] = visit("stat", assignment[0], `${where} stats:`);
-    strings(held, "uses", "action", `${where} uses:`, visit);
-    strings(held, "faction", "faction", `${where} faction:`, visit);
-    strings(held, "skills", "skill", `${where} skills:`, visit);
-    strings(held, "passives", "passive", `${where} passives:`, visit);
-    for (const entry of listMembers<Ally>(held.allies))
-      put(entry, "entity", "entity", `${where} allies:`, visit);
-    visitCondition(
-      held.hiddenIf as Condition | undefined,
-      `${where} hidden if:`,
-      visit,
-    );
+    for (const assignment of listMembers<[string, unknown]>(held.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
+    strings(held, 'uses', 'action', `${where} uses:`, visit);
+    strings(held, 'faction', 'faction', `${where} faction:`, visit);
+    strings(held, 'skills', 'skill', `${where} skills:`, visit);
+    strings(held, 'passives', 'passive', `${where} passives:`, visit);
+    for (const entry of listMembers<Ally>(held.allies)) put(entry, 'entity', 'entity', `${where} allies:`, visit);
+    visitCondition(held.hiddenIf as Condition | undefined, `${where} hidden if:`, visit);
     blocks(held.blocks, where, visit);
     hooks(held, where, visit);
   },
@@ -225,15 +191,11 @@ export const entity = section<AuthoredEntity, "aggressive", "blocks">()({
 function blocks(list: unknown, where: string, visit: Visit): void {
   for (const block of listMembers<EntityBlock>(list)) {
     if (!isHandlerBlock(block)) {
-      visitAction(
-        block,
-        `${where} action ${JSON.stringify(block.label)}`,
-        visit,
-      );
+      visitAction(block, `${where} action ${JSON.stringify(block.label)}`, visit);
       continue;
     }
     const at = `${where} ${block.label}:`;
-    put(block, "event", "event", at, visit);
+    put(block, 'event', 'event', at, visit);
     results(block.results, at, visit);
   }
 }

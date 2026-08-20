@@ -1,13 +1,8 @@
-import {
-  Dependency,
-  dependency,
-  Version,
-  version,
-} from "../../grammar/dependency";
-import { list } from "../../grammar/list";
-import { DEFAULT_LANGUAGE, HydrateContext } from "../../grammar/section";
-import { humanizeEn, id, lastSegment, text } from "../../grammar/values";
-import { section } from "./define";
+import { Dependency, dependency, Version, version } from '../../grammar/dependency';
+import { list } from '../../grammar/list';
+import { DEFAULT_LANGUAGE, HydrateContext } from '../../grammar/section';
+import { humanizeEn, id, lastSegment, text } from '../../grammar/values';
+import { section } from './define';
 
 export interface ModuleInfo {
   id: string;
@@ -21,8 +16,8 @@ export interface ModuleInfo {
 }
 
 export const info = section<ModuleInfo>()({
-  kind: "info",
-  ids: "none",
+  kind: 'info',
+  ids: 'none',
   fields: {
     version: { parser: version, default: () => [0, 0, 0] },
     dependencies: { parser: list(dependency), default: () => [] },
@@ -35,11 +30,7 @@ export const info = section<ModuleInfo>()({
 // supplies one only where the module says it is writing English; anywhere else
 // the bare id stands in and no locale entry is recorded for it, which is what
 // puts the key on screen instead of a machine-made English phrase.
-export const defaultTitle = (
-  self: { id: string },
-  { language }: HydrateContext,
-): string =>
-  language === DEFAULT_LANGUAGE ? humanizeEn(self.id) : lastSegment(self.id);
+export const defaultTitle = (self: { id: string }, { language }: HydrateContext): string => (language === DEFAULT_LANGUAGE ? humanizeEn(self.id) : lastSegment(self.id));
 
 // The title field, whole: how it reads, what the engine mints when nobody wrote
 // one, and the fact that it mints one — which is what a printer has to know to

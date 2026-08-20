@@ -1,5 +1,5 @@
-import { decimal } from "../../grammar/values";
-import { section } from "./define";
+import { decimal } from '../../grammar/values';
+import { section } from './define';
 
 export interface Variable {
   id: string;
@@ -7,9 +7,9 @@ export interface Variable {
 }
 
 export const variable = section<Variable>()({
-  kind: "variable",
-  ids: "global",
-  map: "variables",
+  kind: 'variable',
+  ids: 'global',
+  map: 'variables',
   fields: {
     value: { parser: decimal },
   },

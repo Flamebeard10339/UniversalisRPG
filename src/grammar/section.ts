@@ -1,14 +1,7 @@
 // Generic engine: field value-types are erased internally via the AnyFields casts; the rejected alternative was a hand-written parser per section kind.
-import { Cursor, DslError, Parser, Span } from "./parser";
-import { ListParser } from "./list";
-import {
-  RawLine,
-  RawSection,
-  hasBlock,
-  indentLines,
-  sectionParser,
-  takeBlock,
-} from "./structure";
+import { Cursor, DslError, Parser, Span } from './parser';
+import { ListParser } from './list';
+import { RawLine, RawSection, hasBlock, indentLines, sectionParser, takeBlock } from './structure';
 
 // What a default may know beyond the section it is filling in. A field-level
 // default cannot see the module its section came from, and c5 turns on that
@@ -17,7 +10,7 @@ export interface HydrateContext {
   language: string;
 }
 
-export const DEFAULT_LANGUAGE = "en";
+export const DEFAULT_LANGUAGE = 'en';
 export const DEFAULT_CONTEXT: HydrateContext = { language: DEFAULT_LANGUAGE };
 
 // When a field is written back out. Most are written when they hold something
@@ -25,7 +18,7 @@ export const DEFAULT_CONTEXT: HydrateContext = { language: DEFAULT_LANGUAGE };
 // spells even at its default, and `unless-default` is one it spells only when
 // the author moved it off the default, which is the difference between
 // `display:` and `max-level:`.
-export type PrintWhen = "when-set" | "always" | "unless-default";
+export type PrintWhen = 'when-set' | 'always' | 'unless-default';
 
 // What a printer needs beyond the parser, said once beside the parser. Every
 // one of these was a decision a hand-written printer made per call site, where
@@ -70,30 +63,23 @@ export interface EntryBody {
   parseBlock(lines: RawLine[], label: string): object;
 }
 
-export interface SectionSchema<
-  H extends { id: string },
-  Flags extends keyof H = never,
-  Entries extends keyof H = never,
-> {
+export interface SectionSchema<H extends { id: string }, Flags extends keyof H = never, Entries extends keyof H = never> {
   kind: string;
   fields: {
-    [K in Exclude<keyof H, "id" | Flags | Entries>]:
-      Field<H[K], H> | MappedField<H[K], H>;
+    [K in Exclude<keyof H, 'id' | Flags | Entries>]: Field<H[K], H> | MappedField<H[K], H>;
   };
-  clauses?: Exclude<keyof H, "id" | Flags | Entries>;
-  bare?: Exclude<keyof H, "id" | Flags | Entries>;
+  clauses?: Exclude<keyof H, 'id' | Flags | Entries>;
+  bare?: Exclude<keyof H, 'id' | Flags | Entries>;
   keywords?: readonly Flags[];
   // The field the keyword flags are written after. They are bare words with no
   // label, so nothing about them says where in a printed section they belong,
   // and a printer walking the fields in order has to be told.
-  keywordsAfter?: Exclude<keyof H, "id" | Flags | Entries>;
+  keywordsAfter?: Exclude<keyof H, 'id' | Flags | Entries>;
   entries?: { into: Entries; body: EntryBody };
-  exclusive?: readonly (readonly Exclude<keyof H, "id" | Flags | Entries>[])[];
+  exclusive?: readonly (readonly Exclude<keyof H, 'id' | Flags | Entries>[])[];
 }
 
-export type Authored<H extends { id: string }> = { id: string } & Partial<
-  Omit<H, "id">
->;
+export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H, 'id'>>;
 
 // A schema's generics describe one kind's authoring type, so a table holding
 // every kind sees them through this shape instead. It carries exactly what a
@@ -116,29 +102,23 @@ export interface AnySchema {
   entries?: { into: string };
 }
 
-const isListParser = (parser: unknown): boolean =>
-  typeof parser === "object" && parser !== null && "element" in parser;
+const isListParser = (parser: unknown): boolean => typeof parser === 'object' && parser !== null && 'element' in parser;
 
-export const isListField = (schema: AnySchema, name: string): boolean =>
-  isListParser(schema.fields[name]?.parser);
+export const isListField = (schema: AnySchema, name: string): boolean => isListParser(schema.fields[name]?.parser);
 
 // A field the section reaches by a line's position — as its clause list or as
 // its bare value — rather than by a `name:` label. Asked by the line reader
 // below and by anything walking the schemas, so the two cannot disagree about
 // which fields have no keyword form.
-export const isPositionalField = (
-  schema: Pick<AnySchema, "clauses" | "bare">,
-  name: string,
-): boolean => name === schema.clauses || name === schema.bare;
+export const isPositionalField = (schema: Pick<AnySchema, 'clauses' | 'bare'>, name: string): boolean => name === schema.clauses || name === schema.bare;
 
 // What a `+key:`/`-key:` line contributes, kept apart from a bare assignment so
 // that merging can tell "add these" from "this is now the whole list".
 export interface FieldEdits {
-  ops: { op: "+" | "-"; values: unknown[] }[];
+  ops: { op: '+' | '-'; values: unknown[] }[];
 }
 
-export const isFieldEdits = (value: unknown): value is FieldEdits =>
-  typeof value === "object" && value !== null && "ops" in value;
+export const isFieldEdits = (value: unknown): value is FieldEdits => typeof value === 'object' && value !== null && 'ops' in value;
 
 // A list field holds either its members or the `+`/`-` operations that will
 // produce them, and a caller reading what it names wants both.
@@ -154,15 +134,9 @@ export interface EntryRemoval {
   removed: true;
 }
 
-export const isEntryRemoval = (entry: {
-  label: string;
-}): entry is EntryRemoval => (entry as EntryRemoval).removed === true;
+export const isEntryRemoval = (entry: { label: string }): entry is EntryRemoval => (entry as EntryRemoval).removed === true;
 
-export const parseAnySection = (
-  section: RawSection,
-  schema: AnySchema,
-): { id: string } =>
-  parseSection(section, schema as unknown as SectionSchema<{ id: string }>);
+export const parseAnySection = (section: RawSection, schema: AnySchema): { id: string } => parseSection(section, schema as unknown as SectionSchema<{ id: string }>);
 
 type AnyFields = Record<
   string,
@@ -178,73 +152,34 @@ type EntryConfig = { into: string; body: EntryBody };
 const KEY = /(?<op>[+-][ \t]*)?(?<key>[a-z][a-z0-9 -]*?):/;
 const WORD = /[a-z][a-z0-9-]*/;
 
-function parseBlock(
-  parser: Parser<unknown>,
-  children: RawLine[],
-  span: Span,
-): unknown {
-  if (!("parseBlock" in parser))
-    throw new DslError("this field cannot be written as a block", span);
+function parseBlock(parser: Parser<unknown>, children: RawLine[], span: Span): unknown {
+  if (!('parseBlock' in parser)) throw new DslError('this field cannot be written as a block', span);
   return (parser as ListParser<unknown>).parseBlock(children);
 }
 
-export function parseSection<
-  H extends { id: string },
-  F extends keyof H = never,
-  E extends keyof H = never,
->(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
-  return sectionParser((read: RawSection) => readSection(read, schema))(
-    section,
-  );
+export function parseSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
+  return sectionParser((read: RawSection) => readSection(read, schema))(section);
 }
 
-function readSection<
-  H extends { id: string },
-  F extends keyof H = never,
-  E extends keyof H = never,
->(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
-  if (section.kind !== schema.kind)
-    throw new DslError(
-      `expected # ${schema.kind}, got # ${section.kind}`,
-      section.span,
-    );
-  if (!section.id)
-    throw new DslError(`# ${schema.kind} requires an id`, section.span);
+function readSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
+  if (section.kind !== schema.kind) throw new DslError(`expected # ${schema.kind}, got # ${section.kind}`, section.span);
+  if (!section.id) throw new DslError(`# ${schema.kind} requires an id`, section.span);
 
   const fields = schema.fields as unknown as AnyFields;
   const byKeyword: Record<string, string> = {};
-  for (const name of Object.keys(fields))
-    byKeyword[fields[name].keyword ?? name] = name;
+  for (const name of Object.keys(fields)) byKeyword[fields[name].keyword ?? name] = name;
   const keywords = (schema.keywords ?? []) as readonly string[];
   const clauses = schema.clauses as string | undefined;
   const bare = schema.bare as string | undefined;
   const entries = schema.entries as EntryConfig | undefined;
   const authored: Record<string, unknown> = { id: section.id };
-  for (const line of section.body)
-    parseLine(
-      line,
-      fields,
-      byKeyword,
-      keywords,
-      clauses,
-      bare,
-      entries,
-      schema.kind,
-      authored,
-    );
+  for (const line of section.body) parseLine(line, fields, byKeyword, keywords, clauses, bare, entries, schema.kind, authored);
 
   if (schema.exclusive) {
-    const active = schema.exclusive.filter((group) =>
-      (group as readonly string[]).some((key) => authored[key] !== undefined),
-    );
+    const active = schema.exclusive.filter((group) => (group as readonly string[]).some((key) => authored[key] !== undefined));
     if (active.length > 1) {
-      const names = active
-        .flat()
-        .filter((key) => authored[key as string] !== undefined);
-      throw new DslError(
-        `# ${schema.kind} ${section.id}: ${names.join(" and ")} cannot both be set`,
-        section.span,
-      );
+      const names = active.flat().filter((key) => authored[key as string] !== undefined);
+      throw new DslError(`# ${schema.kind} ${section.id}: ${names.join(' and ')} cannot both be set`, section.span);
     }
   }
   return authored as Authored<H>;
@@ -277,20 +212,9 @@ function typoOf(key: string, known: readonly string[]): string | undefined {
 // is the only one that could take it — and a key that read its value inline
 // would drop it without a word. Asked after the value is read, because what
 // remains on the line is what says whether another key follows.
-const claimsTheBlock = (cursor: Cursor, line: RawLine): boolean =>
-  hasBlock(line) && cursor.rest().replace(/[ \t,]+$/, "") === "";
+const claimsTheBlock = (cursor: Cursor, line: RawLine): boolean => hasBlock(line) && cursor.rest().replace(/[ \t,]+$/, '') === '';
 
-function parseLine(
-  line: RawLine,
-  fields: AnyFields,
-  byKeyword: Record<string, string>,
-  keywords: readonly string[],
-  clauses: string | undefined,
-  bare: string | undefined,
-  entries: EntryConfig | undefined,
-  kind: string,
-  authored: Record<string, unknown>,
-): void {
+function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, keywords: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
 
   while (!cursor.done) {
@@ -299,52 +223,27 @@ function parseLine(
 
     const heading = cursor.peek(KEY)?.groups;
     const key = heading?.key;
-    const op = heading?.op?.trim() as "+" | "-" | undefined;
+    const op = heading?.op?.trim() as '+' | '-' | undefined;
     const name = key !== undefined ? byKeyword[key] : undefined;
-    const labelsBareField =
-      name !== undefined && isPositionalField({ clauses, bare }, name);
-    if (
-      key !== undefined &&
-      !labelsBareField &&
-      (name !== undefined || entries !== undefined)
-    ) {
+    const labelsBareField = name !== undefined && isPositionalField({ clauses, bare }, name);
+    if (key !== undefined && !labelsBareField && (name !== undefined || entries !== undefined)) {
       const keySpan = {
         start: cursor.abs(cursor.pos),
         end: cursor.abs(cursor.pos + (heading!.op?.length ?? 0) + key.length),
       };
-      const meantField =
-        name !== undefined
-          ? undefined
-          : typoOf(key, [...Object.keys(byKeyword), ...keywords]);
+      const meantField = name !== undefined ? undefined : typoOf(key, [...Object.keys(byKeyword), ...keywords]);
       cursor.take(KEY);
       cursor.take(/[ \t]*/);
       if (name !== undefined) {
         const held = authored[name];
         if (held !== undefined && (op === undefined || !isFieldEdits(held))) {
-          throw new DslError(
-            op === undefined && !isFieldEdits(held)
-              ? `${kind} field ${key} is defined more than once`
-              : `${kind} field ${key} cannot be both replaced and modified in one section`,
-            keySpan,
-          );
+          throw new DslError(op === undefined && !isFieldEdits(held) ? `${kind} field ${key} is defined more than once` : `${kind} field ${key} cannot be both replaced and modified in one section`, keySpan);
         }
-        if (op !== undefined && !isListParser(fields[name].parser))
-          throw new DslError(
-            `${kind} field ${key} is not a list, so it cannot take ${op}`,
-            keySpan,
-          );
+        if (op !== undefined && !isListParser(fields[name].parser)) throw new DslError(`${kind} field ${key} is not a list, so it cannot take ${op}`, keySpan);
 
         const inline = !cursor.done;
-        const value = inline
-          ? fields[name].parser.parse(cursor)
-          : hasBlock(line)
-            ? parseBlock(fields[name].parser, takeBlock(line), line.span)
-            : undefined;
-        if (inline && claimsTheBlock(cursor, line))
-          throw new DslError(
-            `${kind} field ${key} is written inline and as a block; give it one`,
-            keySpan,
-          );
+        const value = inline ? fields[name].parser.parse(cursor) : hasBlock(line) ? parseBlock(fields[name].parser, takeBlock(line), line.span) : undefined;
+        if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} field ${key} is written inline and as a block; give it one`, keySpan);
         // an empty value with no block is unspecified: leave the field absent
         if (value === undefined) continue;
         if (op === undefined) authored[name] = value;
@@ -354,43 +253,28 @@ function parseLine(
             values: value as unknown[],
           });
       } else if (meantField !== undefined) {
-        throw new DslError(
-          `unknown ${kind} field: ${key}, one letter from ${meantField}`,
-          keySpan,
-        );
-      } else if (op === "+") {
-        throw new DslError(
-          `a bare ${key}: already adds ${key} when it is not there, so + means nothing here`,
-          keySpan,
-        );
-      } else if (op === "-") {
+        throw new DslError(`unknown ${kind} field: ${key}, one letter from ${meantField}`, keySpan);
+      } else if (op === '+') {
+        throw new DslError(`a bare ${key}: already adds ${key} when it is not there, so + means nothing here`, keySpan);
+      } else if (op === '-') {
         ((authored[entries!.into] ??= []) as object[]).push({
           label: key,
           removed: true,
         });
       } else {
         const inline = !cursor.done;
-        const body = inline
-          ? entries!.body.parse(cursor, key)
-          : entries!.body.parseBlock(takeBlock(line), key);
-        if (inline && claimsTheBlock(cursor, line))
-          throw new DslError(
-            `${kind} ${key}: is written inline and as a block; give it one`,
-            keySpan,
-          );
+        const body = inline ? entries!.body.parse(cursor, key) : entries!.body.parseBlock(takeBlock(line), key);
+        if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} ${key}: is written inline and as a block; give it one`, keySpan);
         ((authored[entries!.into] ??= []) as object[]).push({
           label: key,
           ...body,
         });
       }
     } else if (labelsBareField) {
-      throw new DslError(
-        `${kind} field ${key} must be written bare, without a '${key}:' label`,
-        {
-          start: cursor.abs(cursor.pos),
-          end: cursor.abs(cursor.pos + key!.length),
-        },
-      );
+      throw new DslError(`${kind} field ${key} must be written bare, without a '${key}:' label`, {
+        start: cursor.abs(cursor.pos),
+        end: cursor.abs(cursor.pos + key!.length),
+      });
     } else if (key !== undefined) {
       throw new DslError(`unknown ${kind} field: ${key}`, {
         start: cursor.abs(cursor.pos),
@@ -412,10 +296,7 @@ function parseLine(
           });
         authored[bare] = fields[bare].parser.parse(cursor);
       } else {
-        throw new DslError(
-          `unexpected content: ${JSON.stringify(cursor.rest())}`,
-          { start: cursor.abs(cursor.pos), end: cursor.abs(line.text.length) },
-        );
+        throw new DslError(`unexpected content: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(line.text.length) });
       }
     }
 
@@ -423,40 +304,24 @@ function parseLine(
   }
 }
 
-export function hydrateSection<
-  H extends { id: string },
-  F extends keyof H = never,
-  E extends keyof H = never,
->(
-  authored: Authored<H>,
-  schema: SectionSchema<H, F, E>,
-  context: HydrateContext = DEFAULT_CONTEXT,
-): H {
+export function hydrateSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(authored: Authored<H>, schema: SectionSchema<H, F, E>, context: HydrateContext = DEFAULT_CONTEXT): H {
   const fields = schema.fields as unknown as AnyFields;
   const read = authored as Record<string, unknown>;
   const view = { id: authored.id } as H;
 
   for (const key of Object.keys(fields)) {
     let cached: unknown;
-    let state: "unresolved" | "resolving" | "resolved" = "unresolved";
+    let state: 'unresolved' | 'resolving' | 'resolved' = 'unresolved';
     Object.defineProperty(view, key, {
       enumerable: true,
       get() {
-        if (state === "resolving")
-          throw new DslError(
-            `circular default among ${schema.kind} fields, reached via ${key}`,
-          );
-        if (state === "unresolved") {
-          state = "resolving";
+        if (state === 'resolving') throw new DslError(`circular default among ${schema.kind} fields, reached via ${key}`);
+        if (state === 'unresolved') {
+          state = 'resolving';
           const authoredValue = read[key];
           const hydrate = fields[key].hydrate;
-          cached =
-            authoredValue === undefined
-              ? fields[key].default?.(view, context)
-              : hydrate
-                ? hydrate(authoredValue)
-                : authoredValue;
-          state = "resolved";
+          cached = authoredValue === undefined ? fields[key].default?.(view, context) : hydrate ? hydrate(authoredValue) : authoredValue;
+          state = 'resolved';
         }
         return cached;
       },
@@ -491,80 +356,48 @@ export interface PrintContext {
   authored(field: string): boolean;
 }
 
-const keywordOf = (name: string, spec: AnyField): string =>
-  spec.keyword ?? name;
+const keywordOf = (name: string, spec: AnyField): string => spec.keyword ?? name;
 
-export const moduleLocalId = (moduleId: string, id: string): string =>
-  id.startsWith(`${moduleId}.`) ? id.slice(moduleId.length + 1) : id;
+export const moduleLocalId = (moduleId: string, id: string): string => (id.startsWith(`${moduleId}.`) ? id.slice(moduleId.length + 1) : id);
 
 // One field, printed from what it declares. Every branch here was a decision a
 // hand-written printer made at its call site, where nothing could check it
 // against the field it was printing.
-function fieldLines(
-  schema: AnySchema,
-  name: string,
-  spec: AnyField,
-  held: Record<string, unknown>,
-  context: PrintContext,
-): string[] {
+function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Record<string, unknown>, context: PrintContext): string[] {
   const value = held[name];
   if (value === undefined) return [];
   if (spec.generated && !context.authored(name)) return [];
 
   const parser = spec.parser as Parser<unknown> & Partial<ListParser<unknown>>;
   const positional = isPositionalField(schema, name);
-  const label = (text: string): string[] =>
-    positional ? [text] : [`${keywordOf(name, spec)}: ${text}`];
+  const label = (text: string): string[] => (positional ? [text] : [`${keywordOf(name, spec)}: ${text}`]);
 
-  const members = Array.isArray(value)
-    ? value
-    : (spec.dehydrate as ((held: unknown) => unknown[]) | undefined)?.(value);
+  const members = Array.isArray(value) ? value : (spec.dehydrate as ((held: unknown) => unknown[]) | undefined)?.(value);
   if (members !== undefined) {
-    if (members.length === 0 && spec.printed !== "always") return [];
+    if (members.length === 0 && spec.printed !== 'always') return [];
     const lines = parser.printBlock!(members);
     // A positional field has no label to hang a block off, so its block form is
     // one member to a line — which is how `# skill` writes what trains it.
-    if (spec.block)
-      return positional
-        ? lines
-        : [`${keywordOf(name, spec)}:`, ...indentLines(lines)];
-    return label(lines.join(", "));
+    if (spec.block) return positional ? lines : [`${keywordOf(name, spec)}:`, ...indentLines(lines)];
+    return label(lines.join(', '));
   }
 
   const printed = parser.print(value);
-  if (
-    spec.printed === "unless-default" &&
-    spec.default !== undefined &&
-    parser.print(spec.default(held as never, DEFAULT_CONTEXT)) === printed
-  )
-    return [];
+  if (spec.printed === 'unless-default' && spec.default !== undefined && parser.print(spec.default(held as never, DEFAULT_CONTEXT)) === printed) return [];
   return label(printed);
 }
 
 // A whole section, printed by walking what its schema declares, so a field
 // added to a schema is printed by the walk rather than by a loop somebody
 // remembered to add.
-export function printSection(
-  value: object,
-  schema: AnySchema,
-  context: PrintContext,
-  entryLines: (entry: never) => string[],
-): string[] {
+export function printSection(value: object, schema: AnySchema, context: PrintContext, entryLines: (entry: never) => string[]): string[] {
   const held = value as Record<string, unknown>;
-  const lines = [
-    `# ${schema.kind} ${moduleLocalId(context.moduleId, context.id)}`,
-  ];
+  const lines = [`# ${schema.kind} ${moduleLocalId(context.moduleId, context.id)}`];
   for (const [name, spec] of Object.entries(schema.fields)) {
     lines.push(...fieldLines(schema, name, spec, held, context));
-    if (name === schema.keywordsAfter)
-      lines.push(
-        ...(schema.keywords ?? []).filter((word) => held[word] === true),
-      );
+    if (name === schema.keywordsAfter) lines.push(...(schema.keywords ?? []).filter((word) => held[word] === true));
   }
-  const entries =
-    schema.entries === undefined
-      ? []
-      : ((held[schema.entries.into] as never[] | undefined) ?? []);
+  const entries = schema.entries === undefined ? [] : ((held[schema.entries.into] as never[] | undefined) ?? []);
   for (const entry of entries) lines.push(...entryLines(entry));
   return lines;
 }

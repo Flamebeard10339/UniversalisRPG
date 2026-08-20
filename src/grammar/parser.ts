@@ -21,7 +21,7 @@ export class DslError extends Error {
     readonly span?: Span,
   ) {
     super(message);
-    this.name = "DslError";
+    this.name = 'DslError';
   }
 }
 
@@ -45,7 +45,7 @@ export class Cursor {
   }
 
   peek(re: RegExp): RegExpExecArray | null {
-    const anchored = new RegExp(re.source, re.flags.replace(/[yg]/g, "") + "y");
+    const anchored = new RegExp(re.source, re.flags.replace(/[yg]/g, '') + 'y');
     anchored.lastIndex = this.pos;
     return anchored.exec(this.src);
   }
@@ -64,21 +64,13 @@ export function requireEnd(cursor: Cursor, what: string): void {
   cursor.take(/[ \t]*/);
   if (cursor.done) return;
   const leftover = cursor.rest();
-  throw new DslError(
-    `unexpected content after ${what}: ${JSON.stringify(leftover)}`,
-    {
-      start: cursor.abs(cursor.pos),
-      end: cursor.abs(cursor.pos + leftover.length),
-    },
-  );
+  throw new DslError(`unexpected content after ${what}: ${JSON.stringify(leftover)}`, {
+    start: cursor.abs(cursor.pos),
+    end: cursor.abs(cursor.pos + leftover.length),
+  });
 }
 
-export function parseWhole<T>(
-  parser: Parser<T>,
-  text: string,
-  base: number,
-  what: string,
-): T {
+export function parseWhole<T>(parser: Parser<T>, text: string, base: number, what: string): T {
   const cursor = new Cursor(text, 0, base);
   const value = parser.parse(cursor);
   requireEnd(cursor, what);

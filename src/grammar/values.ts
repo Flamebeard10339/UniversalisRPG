@@ -1,5 +1,5 @@
-import { Cursor, DslError, Parser, Span } from "./parser";
-import { range, Range } from "./range";
+import { Cursor, DslError, Parser, Span } from './parser';
+import { range, Range } from './range';
 
 // A range where only a count belongs reads as an id that will not parse, which
 // says nothing about why. Each site that refuses one says which it is.
@@ -14,9 +14,9 @@ export function refuseRange(cursor: Cursor, complaint: string): void {
 }
 
 export const text: Parser<string> = {
-  parse: (cursor) => cursor.take(/[^\n]*/) ?? "",
+  parse: (cursor) => cursor.take(/[^\n]*/) ?? '',
   print: (value) => value,
-  examples: ["Rusty Sword", "a line that runs to the end"],
+  examples: ['Rusty Sword', 'a line that runs to the end'],
 };
 
 // Every remaining caller reads a THRESHOLD — `has 5`, a comparison's right side,
@@ -27,18 +27,15 @@ export const number: Parser<number> = {
   parse: (cursor) => {
     const raw = cursor.take(/-?\d+/);
     if (raw === null)
-      throw new DslError("expected a number", {
+      throw new DslError('expected a number', {
         start: cursor.abs(cursor.pos),
         end: cursor.abs(cursor.pos),
       });
-    refuseRange(
-      cursor,
-      "this number is a threshold, not a quantity, so it takes one value rather than a range",
-    );
+    refuseRange(cursor, 'this number is a threshold, not a quantity, so it takes one value rather than a range');
     return Number(raw);
   },
   print: (value) => String(value),
-  examples: ["0", "5", "-3"],
+  examples: ['0', '5', '-3'],
 };
 
 export const DECIMAL = /-?\d+(?:\.\d+)?/;
@@ -48,14 +45,14 @@ export const decimal: Parser<number> = {
   parse: (cursor) => {
     const raw = cursor.take(DECIMAL);
     if (raw === null)
-      throw new DslError("expected a number", {
+      throw new DslError('expected a number', {
         start: cursor.abs(cursor.pos),
         end: cursor.abs(cursor.pos),
       });
     return Number(raw);
   },
   print: (value) => String(value),
-  examples: ["0", "5", "1.5", "-2.25"],
+  examples: ['0', '5', '1.5', '-2.25'],
 };
 
 // A flat number, or the id of the stat holding one. What a field takes when the
@@ -65,8 +62,8 @@ export const numberOrStat: Parser<number | string> = {
     const raw = cursor.take(DECIMAL);
     return raw === null ? id.parse(cursor) : Number(raw);
   },
-  print: (value) => (typeof value === "string" ? value : String(value)),
-  examples: ["3", "1.5", "attack-speed"],
+  print: (value) => (typeof value === 'string' ? value : String(value)),
+  examples: ['3', '1.5', 'attack-speed'],
 };
 
 const SECONDS_PER_MINUTE = 60;
@@ -80,11 +77,9 @@ export const duration: Parser<number> = {
     const start = cursor.pos;
     const raw = cursor.take(DURATION);
     const groups = raw === null ? undefined : DURATION.exec(raw)?.groups;
-    const total =
-      Number(groups?.minutes ?? 0) * SECONDS_PER_MINUTE +
-      Number(groups?.seconds ?? 0);
+    const total = Number(groups?.minutes ?? 0) * SECONDS_PER_MINUTE + Number(groups?.seconds ?? 0);
     if (total <= 0)
-      throw new DslError("expected a duration, as in 30s, 2m or 1m30s", {
+      throw new DslError('expected a duration, as in 30s, 2m or 1m30s', {
         start: cursor.abs(start),
         end: cursor.abs(cursor.pos),
       });
@@ -95,13 +90,12 @@ export const duration: Parser<number> = {
   // reason `examples` exists: it is the set this parser writes as well as
   // reads, and `90s` is deliberately not in it.
   print(seconds) {
-    if (seconds % SECONDS_PER_MINUTE === 0)
-      return `${seconds / SECONDS_PER_MINUTE}m`;
+    if (seconds % SECONDS_PER_MINUTE === 0) return `${seconds / SECONDS_PER_MINUTE}m`;
     const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
     const left = seconds - minutes * SECONDS_PER_MINUTE;
     return minutes > 0 ? `${minutes}m${left}s` : `${left}s`;
   },
-  examples: ["30s", "2m", "1m30s"],
+  examples: ['30s', '2m', '1m30s'],
 };
 
 export const REFERENCE = /[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*/;
@@ -112,32 +106,31 @@ export const id: Parser<string> = {
   parse: (cursor) => {
     const raw = cursor.take(REFERENCE);
     if (raw === null)
-      throw new DslError("expected an id", {
+      throw new DslError('expected an id', {
         start: cursor.abs(cursor.pos),
         end: cursor.abs(cursor.pos),
       });
     return raw;
   },
   print: (value) => value,
-  examples: ["rusty-sword", "forest.clearing"],
+  examples: ['rusty-sword', 'forest.clearing'],
 };
 
 // The name off the end of the path: a title says "Miki", never the namespace
 // that keeps two Mikis apart.
-export const lastSegment = (id: string): string => id.split(".").pop() ?? id;
+export const lastSegment = (id: string): string => id.split('.').pop() ?? id;
 
 // English in the name because it is English in the rule: every-word title case,
 // and a capitalisation that owes Turkish its dotted I.
 export const humanizeEn = (id: string): string =>
   lastSegment(id)
-    .split("-")
+    .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+    .join(' ');
 
 // Approximate: the written vowel, not the spoken one, so "a unicorn" comes out
 // wrong and "an Hay" — which is what a blanket "an" produced — does not.
-export const articleEn = (word: string): string =>
-  /^[aeiou]/i.test(word) ? "an" : "a";
+export const articleEn = (word: string): string => (/^[aeiou]/i.test(word) ? 'an' : 'a');
 
 // A quantity that is CONSUMED. One number, because `inputLimit` has to answer
 // how many completions an inventory affords, and a range has no answer.
@@ -161,20 +154,12 @@ export const DECIMAL_RANGE = /\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?/;
 // Unsigned throughout: a produced amount is never negative, and admitting a sign
 // would make `-3--1` unreadable against the hyphen that separates the bounds.
 // That is why `add:`, the one signed count, keeps a plain integer.
-function bounds(
-  cursor: Cursor,
-  pattern: RegExp,
-  what: string,
-): { range: Range; span: Span } {
+function bounds(cursor: Cursor, pattern: RegExp, what: string): { range: Range; span: Span } {
   const start = cursor.pos;
   const raw = cursor.take(pattern);
   const span = { start: cursor.abs(start), end: cursor.abs(cursor.pos) };
-  if (raw === null)
-    throw new DslError(
-      `expected ${what}, as an amount or a range like 4-7`,
-      span,
-    );
-  const [lo, hi] = raw.split("-");
+  if (raw === null) throw new DslError(`expected ${what}, as an amount or a range like 4-7`, span);
+  const [lo, hi] = raw.split('-');
   const min = Number(lo);
   const max = hi === undefined ? min : Number(hi);
   if (max < min) throw new DslError(`a range must ascend, got ${raw}`, span);
@@ -205,11 +190,7 @@ export const quantified: Parser<Quantified> = {
   parse(cursor) {
     const start = cursor.pos;
     const raw = cursor.take(COUNT);
-    if (raw !== null)
-      refuseRange(
-        cursor,
-        "this count is consumed, so it takes one number rather than a range — a craft has to know how many completions an inventory affords",
-      );
+    if (raw !== null) refuseRange(cursor, 'this count is consumed, so it takes one number rather than a range — a craft has to know how many completions an inventory affords');
     if (raw !== null) cursor.take(/[ \t]+/);
     const item = id.parse(cursor);
     if (raw === null) return { item };
@@ -221,17 +202,14 @@ export const quantified: Parser<Quantified> = {
       });
     return { item, amount: Number(raw) };
   },
-  print: (value) =>
-    value.amount === undefined
-      ? value.item
-      : `${number.print(value.amount)} ${id.print(value.item)}`,
-  examples: ["plank", "3 plank"],
+  print: (value) => (value.amount === undefined ? value.item : `${number.print(value.amount)} ${id.print(value.item)}`),
+  examples: ['plank', '3 plank'],
 };
 
 export const produced: Parser<Produced> = {
   parse(cursor) {
     if (cursor.peek(COUNT_RANGE) === null) return { item: id.parse(cursor) };
-    const { range, span } = bounds(cursor, COUNT_RANGE, "a count");
+    const { range, span } = bounds(cursor, COUNT_RANGE, 'a count');
     cursor.take(/[ \t]+/);
     // The item is read first so the complaint can name it, which is what makes
     // a zero findable in a block of twenty grants.
@@ -241,9 +219,6 @@ export const produced: Parser<Produced> = {
       amount: refuseZero(range, span, `a count of 0 does nothing: ${item}`),
     };
   },
-  print: (value) =>
-    value.amount === undefined
-      ? value.item
-      : `${range.print(value.amount)} ${id.print(value.item)}`,
-  examples: ["arrow", "5 arrow", "5-10 arrow"],
+  print: (value) => (value.amount === undefined ? value.item : `${range.print(value.amount)} ${id.print(value.item)}`),
+  examples: ['arrow', '5 arrow', '5-10 arrow'],
 };

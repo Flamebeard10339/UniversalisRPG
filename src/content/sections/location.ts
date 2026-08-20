@@ -1,24 +1,18 @@
-import { Action, actionBody, actionLines } from "../../grammar/action";
-import { Condition, condition } from "../../grammar/condition";
-import { list } from "../../grammar/list";
-import { DslError, Parser } from "../../grammar/parser";
-import {
-  AnySchema,
-  PrintContext,
-  SectionSchema,
-  listMembers,
-  printSection,
-} from "../../grammar/section";
-import { id, number, text } from "../../grammar/values";
-import { actions, condition as visitCondition, put, type Loose } from "../refs";
-import { section } from "./define";
-import { TITLE_FIELD } from "./info";
+import { Action, actionBody, actionLines } from '../../grammar/action';
+import { Condition, condition } from '../../grammar/condition';
+import { list } from '../../grammar/list';
+import { DslError, Parser } from '../../grammar/parser';
+import { AnySchema, PrintContext, SectionSchema, listMembers, printSection } from '../../grammar/section';
+import { id, number, text } from '../../grammar/values';
+import { actions, condition as visitCondition, put, type Loose } from '../refs';
+import { section } from './define';
+import { TITLE_FIELD } from './info';
 
 // The one flag every location owns without declaring it, because the engine
 // sets it the first time the player arrives.
-export const DISCOVERED = "discovered";
+export const DISCOVERED = 'discovered';
 
-export type Direction = "north" | "south" | "east" | "west" | "up" | "down";
+export type Direction = 'north' | 'south' | 'east' | 'west' | 'up' | 'down';
 
 export interface Relative {
   direction: Direction;
@@ -60,19 +54,12 @@ export const populationValue: Parser<Population> = {
     const start = cursor.pos;
     const count = cursor.take(/\d+(?![\w-])/);
     if (count === null) return { entity: id.parse(cursor) };
-    if (Number(count) === 0)
-      throw new DslError(
-        "a count of 0 puts nothing here, so leave the entry out",
-        { start: cursor.abs(start), end: cursor.abs(cursor.pos) },
-      );
+    if (Number(count) === 0) throw new DslError('a count of 0 puts nothing here, so leave the entry out', { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
     cursor.take(/[ \t]+/);
     return { count: Number(count), entity: id.parse(cursor) };
   },
-  print: (value) =>
-    value.count === undefined
-      ? value.entity
-      : `${value.count} ${id.print(value.entity)}`,
-  examples: ["rat", "3 rat"],
+  print: (value) => (value.count === undefined ? value.entity : `${value.count} ${id.print(value.entity)}`),
+  examples: ['rat', '3 rat'],
 };
 
 export const edgeValue: Parser<Edge> = {
@@ -83,11 +70,8 @@ export const edgeValue: Parser<Edge> = {
     }
     return { target };
   },
-  print: (value) =>
-    value.condition === undefined
-      ? value.target
-      : `${value.target} while ${condition.print(value.condition)}`,
-  examples: ["clearing", "clearing while has-key"],
+  print: (value) => (value.condition === undefined ? value.target : `${value.target} while ${condition.print(value.condition)}`),
+  examples: ['clearing', 'clearing while has-key'],
 };
 
 const DIRECTION = /north|south|east|west|up|down/;
@@ -96,7 +80,7 @@ export const relativeValue: Parser<Relative> = {
   parse(cursor) {
     const direction = cursor.take(DIRECTION);
     if (direction === null)
-      throw new DslError("expected a direction", {
+      throw new DslError('expected a direction', {
         start: cursor.abs(cursor.pos),
         end: cursor.abs(cursor.pos),
       });
@@ -108,7 +92,7 @@ export const relativeValue: Parser<Relative> = {
     return { direction: direction as Direction, of: id.parse(cursor) };
   },
   print: (value) => `${value.direction} of ${id.print(value.of)}`,
-  examples: ["north of clearing", "down of shaft"],
+  examples: ['north of clearing', 'down of shaft'],
 };
 
 const DIRECTION_VECTORS: Record<Direction, [number, number, number]> = {
@@ -120,9 +104,7 @@ const DIRECTION_VECTORS: Record<Direction, [number, number, number]> = {
   down: [0, 0, -1],
 };
 
-export function recursivelyResolveRelativeCoordinates(
-  locations: Map<string, Location>,
-): void {
+export function recursivelyResolveRelativeCoordinates(locations: Map<string, Location>): void {
   const placing = new Set<string>();
   const coords = new Map<string, [number, number, number]>();
 
@@ -130,25 +112,15 @@ export function recursivelyResolveRelativeCoordinates(
     const cached = coords.get(location.id);
     if (cached) return cached;
     if (!location.relative) {
-      const absolute: [number, number, number] = [
-        location.x,
-        location.y,
-        location.z,
-      ];
+      const absolute: [number, number, number] = [location.x, location.y, location.z];
       coords.set(location.id, absolute);
       return absolute;
     }
-    if (placing.has(location.id))
-      throw new DslError(
-        `location coordinates form a cycle at '${location.id}'`,
-      );
+    if (placing.has(location.id)) throw new DslError(`location coordinates form a cycle at '${location.id}'`);
     placing.add(location.id);
 
     const origin = locations.get(location.relative.of);
-    if (!origin)
-      throw new DslError(
-        `location '${location.id}' is placed relative to unknown location '${location.relative.of}'`,
-      );
+    if (!origin) throw new DslError(`location '${location.id}' is placed relative to unknown location '${location.relative.of}'`);
     const [ox, oy, oz] = place(origin);
     const [dx, dy, dz] = DIRECTION_VECTORS[location.relative.direction];
     const stepped: [number, number, number] = [ox + dx, oy + dy, oz + dz];
@@ -166,8 +138,8 @@ export function recursivelyResolveRelativeCoordinates(
   }
 }
 
-const SCHEMA: SectionSchema<Location, "starting", "actions"> = {
-  kind: "location",
+const SCHEMA: SectionSchema<Location, 'starting', 'actions'> = {
+  kind: 'location',
   fields: {
     relative: { parser: relativeValue },
     x: { parser: number, default: () => 0 },
@@ -179,11 +151,11 @@ const SCHEMA: SectionSchema<Location, "starting", "actions"> = {
     adjacent: { parser: list(edgeValue), default: () => [], block: true },
     flags: { parser: list(id), default: () => [], block: true },
   },
-  keywords: ["starting"],
-  keywordsAfter: "examine",
-  bare: "relative",
-  exclusive: [["x", "y", "z"], ["relative"]],
-  entries: { into: "actions", body: actionBody },
+  keywords: ['starting'],
+  keywordsAfter: 'examine',
+  bare: 'relative',
+  exclusive: [['x', 'y', 'z'], ['relative']],
+  entries: { into: 'actions', body: actionBody },
 };
 
 // No entry can be labelled `x:`, `y:` or `z:`, because all three are claimed as
@@ -194,52 +166,28 @@ const COORDINATE = /^[xyz]: /;
 // walk that gives each field a line of its own cannot say that. A `relative:`
 // placement writes that line instead and never beside it — the two are
 // exclusive, so a section carrying both would not parse back.
-const printLocation = (
-  value: Location,
-  context: PrintContext,
-): readonly string[] => {
-  const lines = printSection(
-    value,
-    SCHEMA as unknown as AnySchema,
-    context,
-    actionLines,
-  );
+const printLocation = (value: Location, context: PrintContext): readonly string[] => {
+  const lines = printSection(value, SCHEMA as unknown as AnySchema, context, actionLines);
   const [heading, ...rest] = lines.filter((line) => !COORDINATE.test(line));
   if (value.relative) return [heading!, ...rest];
-  return [
-    heading!,
-    lines.filter((line) => COORDINATE.test(line)).join(", "),
-    ...rest,
-  ];
+  return [heading!, lines.filter((line) => COORDINATE.test(line)).join(', '), ...rest];
 };
 
-export const location = section<Location, "starting", "actions">()({
+export const location = section<Location, 'starting', 'actions'>()({
   ...SCHEMA,
-  ids: "owned",
-  map: "locations",
+  ids: 'owned',
+  map: 'locations',
   nestsActions: true,
-  text: ["title", "examine"],
+  text: ['title', 'examine'],
   print: printLocation,
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
-    for (const entry of listMembers<Population>(held.entities))
-      put(entry, "entity", "entity", `${where} entities:`, visit);
+    for (const entry of listMembers<Population>(held.entities)) put(entry, 'entity', 'entity', `${where} entities:`, visit);
     for (const edge of listMembers<Edge>(held.adjacent)) {
-      put(edge, "target", "location", `${where} adjacent:`, visit);
-      visitCondition(
-        edge.condition,
-        `${where} adjacent: ${edge.target} while`,
-        visit,
-      );
+      put(edge, 'target', 'location', `${where} adjacent:`, visit);
+      visitCondition(edge.condition, `${where} adjacent: ${edge.target} while`, visit);
     }
-    if (held.relative)
-      put(
-        held.relative as Relative,
-        "of",
-        "location",
-        `${where} relative`,
-        visit,
-      );
+    if (held.relative) put(held.relative as Relative, 'of', 'location', `${where} relative`, visit);
     actions(held.actions, where, visit);
   },
 });

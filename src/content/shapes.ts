@@ -1,5 +1,5 @@
-import { DslError } from "../grammar/parser";
-import { Direction } from "./hex";
+import { DslError } from '../grammar/parser';
+import { Direction } from './hex';
 
 // A shape's positions are numbered 1..positionCount, and rotation never
 // renumbers them — only `edges` moves. `adjacency` is undirected: each pair
@@ -37,8 +37,7 @@ const RING_EDGES: Readonly<Record<Direction, number>> = {
 
 function cycle(count: number, offset = 0): [number, number][] {
   const pairs: [number, number][] = [];
-  for (let i = 0; i < count; i++)
-    pairs.push([offset + i + 1, offset + ((i + 1) % count) + 1]);
+  for (let i = 0; i < count; i++) pairs.push([offset + i + 1, offset + ((i + 1) % count) + 1]);
   return pairs;
 }
 
@@ -51,7 +50,7 @@ function spokes(count: number, offset: number): [number, number][] {
 // The degenerate case and the pure junction: one node, every edge touches
 // it, up to five ways out.
 const point: Shape = {
-  name: "point",
+  name: 'point',
   positionCount: 1,
   adjacency: [],
   edges: allEdgesTouch(1),
@@ -60,7 +59,7 @@ const point: Shape = {
 // Three in a line: w/nw/sw touch 1, e/ne/se touch 3, and the middle position
 // touches no edge at all.
 const spindle: Shape = {
-  name: "spindle",
+  name: 'spindle',
   positionCount: 3,
   adjacency: [
     [1, 2],
@@ -72,7 +71,7 @@ const spindle: Shape = {
 // Six in a cycle, one per edge. A legitimate shape here: edges are
 // undirected adjacency and nothing travels along one.
 const ring: Shape = {
-  name: "ring",
+  name: 'ring',
   positionCount: 6,
   adjacency: cycle(6),
   edges: RING_EDGES,
@@ -81,19 +80,16 @@ const ring: Shape = {
 // The ring plus a hub adjacent to all six — the cheap crossing, two points
 // from any edge to any other.
 const wheel: Shape = {
-  name: "wheel",
+  name: 'wheel',
   positionCount: 7,
-  adjacency: [
-    ...cycle(6),
-    ...spokes(6, 6).map(([p]): [number, number] => [p, 7]),
-  ],
+  adjacency: [...cycle(6), ...spokes(6, 6).map(([p]): [number, number] => [p, 7])],
   edges: RING_EDGES,
 };
 
 // An outer ring on the edges, an inner ring, and six spokes joining them —
 // twelve positions, the large cluster.
 const doubleRing: Shape = {
-  name: "double-ring",
+  name: 'double-ring',
   positionCount: 12,
   adjacency: [...cycle(6), ...cycle(6, 6), ...spokes(6, 6)],
   edges: RING_EDGES,
@@ -104,7 +100,7 @@ const CATALOGUE: Readonly<Record<string, Shape>> = {
   spindle,
   ring,
   wheel,
-  "double-ring": doubleRing,
+  'double-ring': doubleRing,
 };
 
 export const SHAPES: readonly Shape[] = Object.values(CATALOGUE);
@@ -114,9 +110,7 @@ export const SHAPES: readonly Shape[] = Object.values(CATALOGUE);
 export function getShape(name: string): Shape {
   const shape = CATALOGUE[name];
   if (!shape) {
-    throw new DslError(
-      `shape must be one of ${Object.keys(CATALOGUE).join(", ")}, got ${JSON.stringify(name)}`,
-    );
+    throw new DslError(`shape must be one of ${Object.keys(CATALOGUE).join(', ')}, got ${JSON.stringify(name)}`);
   }
   return shape;
 }

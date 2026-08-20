@@ -1,10 +1,9 @@
-import { DslError, Span } from "./parser";
+import { DslError, Span } from './parser';
 
 // One level of the block structure this module reads, written. Here because
 // indentation is what a block IS in this language, and every printer that
 // nests one asks the same module that took it apart.
-export const indentLines = (lines: readonly string[], spaces = 2): string[] =>
-  lines.map((line) => `${" ".repeat(spaces)}${line}`);
+export const indentLines = (lines: readonly string[], spaces = 2): string[] => lines.map((line) => `${' '.repeat(spaces)}${line}`);
 
 export interface RawLine {
   text: string;
@@ -19,8 +18,7 @@ export interface RawSection {
   span: Span;
 }
 
-const HEADING =
-  /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?[ \t]*$/;
+const HEADING = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?[ \t]*$/;
 
 // Whether a line has an indented block. The question, asked without answering
 // it: a reader deciding what to do is not a reader that consumed one.
@@ -47,10 +45,7 @@ export function takeBlock(line: RawLine): RawLine[] {
 // have.
 export function requireNoBlock(line: RawLine): void {
   if (!hasBlock(line)) return;
-  throw new DslError(
-    `${JSON.stringify(line.text)} takes no indented block`,
-    line.span,
-  );
+  throw new DslError(`${JSON.stringify(line.text)} takes no indented block`, line.span);
 }
 
 // The same demand made of a whole section once its parser has run, over every
@@ -68,9 +63,7 @@ export function requireBlocksRead(lines: readonly RawLine[]): void {
 // rather than where they are tabulated, so there is no unwrapped one for a
 // caller to reach past the table for — a migration script reading `# save`
 // fixtures did exactly that.
-export function sectionParser<S extends RawSection, T>(
-  parse: (section: S) => T,
-): (section: S) => T {
+export function sectionParser<S extends RawSection, T>(parse: (section: S) => T): (section: S) => T {
   const answering = (section: S): T => {
     const value = parse(section);
     requireBlocksRead(section.body);
@@ -86,9 +79,7 @@ const ANSWERING = new WeakSet<(section: never) => unknown>();
 // kind the loader can parse, so that "each parser carries the demand" is
 // derived from the table rather than from eight people remembering to wrap
 // theirs — which is the failure this repository names first.
-export const answersForItsBlocks = (
-  parse: (section: never) => unknown,
-): boolean => ANSWERING.has(parse);
+export const answersForItsBlocks = (parse: (section: never) => unknown): boolean => ANSWERING.has(parse);
 
 export function splitSections(source: string): RawSection[] {
   const sections: RawSection[] = [];
@@ -96,14 +87,12 @@ export function splitSections(source: string): RawSection[] {
   let stack: { indent: number; line: RawLine }[] = [];
   let offset = 0;
 
-  for (const raw of source.split("\n")) {
+  for (const raw of source.split('\n')) {
     const lineStart = offset;
     offset += raw.length + 1;
-    const withoutCarriageReturn = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
-    const bom =
-      lineStart === 0 && withoutCarriageReturn.startsWith("\uFEFF") ? 1 : 0;
-    const textLine =
-      bom === 0 ? withoutCarriageReturn : withoutCarriageReturn.slice(bom);
+    const withoutCarriageReturn = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+    const bom = lineStart === 0 && withoutCarriageReturn.startsWith('\uFEFF') ? 1 : 0;
+    const textLine = bom === 0 ? withoutCarriageReturn : withoutCarriageReturn.slice(bom);
     const textLineStart = lineStart + bom;
 
     const heading = HEADING.exec(textLine)?.groups;
@@ -118,7 +107,7 @@ export function splitSections(source: string): RawSection[] {
       stack = [];
       continue;
     }
-    if (textLine.trim() === "" || textLine.trim().startsWith("//")) continue;
+    if (textLine.trim() === '' || textLine.trim().startsWith('//')) continue;
     if (!current)
       throw new DslError(`content before first section: ${textLine}`, {
         start: textLineStart,
@@ -134,12 +123,8 @@ export function splitSections(source: string): RawSection[] {
       children: [],
     };
 
-    while (stack.length > 0 && stack[stack.length - 1].indent >= indent)
-      stack.pop();
-    (stack.length > 0
-      ? stack[stack.length - 1].line.children
-      : current.body
-    ).push(line);
+    while (stack.length > 0 && stack[stack.length - 1].indent >= indent) stack.pop();
+    (stack.length > 0 ? stack[stack.length - 1].line.children : current.body).push(line);
     stack.push({ indent, line });
     current.span.end = line.span.end;
   }

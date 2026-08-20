@@ -1,112 +1,28 @@
-import { ActionResult, nestedResults } from "../grammar/actionResult";
-import {
-  Action,
-  actionProblem,
-  assembledActionProblem,
-  isTwoSided,
-  sidedFields,
-} from "../grammar/action";
-import { Condition } from "../grammar/condition";
-import { Dialogue, parseSegments, Spoken } from "./sections/dialogue";
-import {
-  actionAddress,
-  actionTextKey,
-  actionTextOwner,
-} from "./sections/action";
-import {
-  Entity,
-  EntityBlock,
-  Handler,
-  isHandlerBlock,
-} from "./sections/entity";
-import { WORLD_FACTION } from "./sections/faction";
-import {
-  actionSlugProblem,
-  addLocaleSection,
-  BaseEntry,
-  dialogueAgainField,
-  dialogueChoiceField,
-  dialogueLineField,
-  dialogueSayField,
-  emptyLocales,
-  GENERATED_FIELD,
-  localeKey,
-  Locales,
-  LocaleSection,
-  ProseShape,
-  sayField,
-  textFieldsOf,
-  unsuppliedParameters,
-} from "./locale";
-import { recursivelyResolveRelativeCoordinates } from "./sections/location";
-import {
-  type Maps,
-  buildSection,
-  sectionFor,
-  CONTENT_SECTION_MAPS,
-  isActionOwnerKind,
-  isSectionKind,
-  mergeSection,
-  ModuleSection,
-  sectionOf,
-  SectionKind,
-  visitSection,
-} from "./sections";
-import {
-  ModuleSource,
-  ParsedModule,
-  moduleOrderProblems,
-  orderModules,
-  parseModuleSource,
-  parseUniverse,
-} from "./universe";
-import { DslError, Span } from "../grammar/parser";
-import {
-  ACTION_MEMBER,
-  memberKey,
-  Namespace,
-  NAMESPACED_KINDS,
-} from "./namespace";
-import {
-  emptyMaps,
-  mapOf,
-  everyActionTable,
-  ModuleDiagnostic,
-  ModuleLoadStage,
-  ModuleStatus,
-  PLAYER_ENTITY,
-  Registry,
-  UniverseLoadResult,
-  WORLD_BIT,
-} from "./registry";
-import {
-  registryCapabilities,
-  registrySlots,
-  validateDialogueReferences,
-  validateItemSlots,
-  validateRecipeReferences,
-  validateSectionReferences,
-  validateTestReferences,
-} from "./references";
-import {
-  ReferenceKind,
-  Visit,
-  visitAction,
-  visitResults,
-  visitTags,
-} from "./refs";
-import { Removal } from "./sections/remove";
-import { printSegments } from "./serialize";
-import {
-  actionAddresses,
-  declareMembers,
-  Member,
-  MemberOwner,
-  RESOLUTION_PASSES,
-} from "./resolve";
-import { DEFAULT_LANGUAGE } from "../grammar/section";
-import { validateTuningVariable } from "./tuningVariables";
-import { humanizeEn } from "../grammar/values";
+import type { LocaleSection } from './sections/locale';
+import { ActionResult, nestedResults } from '../grammar/actionResult';
+import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields } from '../grammar/action';
+import { Condition } from '../grammar/condition';
+import { Dialogue, parseSegments, Spoken } from './sections/dialogue';
+import { actionAddress, actionTextKey, actionTextOwner } from './sections/action';
+import { Entity, EntityBlock, Handler, isHandlerBlock } from './sections/entity';
+import { WORLD_FACTION } from './sections/faction';
+import { actionSlugProblem, addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
+import { textFieldsOf } from './sections';
+import { recursivelyResolveRelativeCoordinates } from './sections/location';
+import { type Maps, buildSection, sectionFor, contentSectionMaps, isActionOwnerKind, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind, visitSection } from './sections';
+import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
+import { DslError, Span } from '../grammar/parser';
+import { ACTION_MEMBER, memberKey, Namespace, } from './namespace';
+import { isNamespacedKind } from './sections';
+import { emptyMaps, mapOf, everyActionTable, ModuleDiagnostic, ModuleLoadStage, ModuleStatus, PLAYER_ENTITY, Registry, UniverseLoadResult, WORLD_BIT } from './registry';
+import { registryCapabilities, registrySlots, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
+import { ReferenceKind, Visit, visitAction, visitResults, visitTags } from './refs';
+import { Removal } from './sections/remove';
+import { printSegments } from './serialize';
+import { actionAddresses, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
+import { DEFAULT_LANGUAGE } from '../grammar/section';
+import { validateTuningVariable } from './tuningVariables';
+import { humanizeEn } from '../grammar/values';
 
 function emptyRegistry(): Registry {
   return {
@@ -117,16 +33,13 @@ function emptyRegistry(): Registry {
   };
 }
 
-function lineColumn(
-  source: string,
-  span: Span | undefined,
-): { line: number; column: number } | undefined {
+function lineColumn(source: string, span: Span | undefined): { line: number; column: number } | undefined {
   if (!span) return undefined;
   let line = 1;
   let column = 1;
   for (let i = 0; i < span.start; i++) {
-    if (i === 0 && source[i] === "\uFEFF") continue;
-    if (source[i] === "\n") {
+    if (i === 0 && source[i] === '\uFEFF') continue;
+    if (source[i] === '\n') {
       line++;
       column = 1;
     } else {
@@ -136,12 +49,7 @@ function lineColumn(
   return { line, column };
 }
 
-function diagnostic(
-  source: ModuleSource,
-  moduleId: string,
-  stage: ModuleLoadStage,
-  error: DslError,
-): ModuleDiagnostic {
+function diagnostic(source: ModuleSource, moduleId: string, stage: ModuleLoadStage, error: DslError): ModuleDiagnostic {
   const position = lineColumn(source.text, error.span);
   return {
     sourceName: source.name,
@@ -153,15 +61,9 @@ function diagnostic(
   };
 }
 
-const sourceEnabled = (source: ModuleSource): boolean =>
-  source.enabled !== false;
+const sourceEnabled = (source: ModuleSource): boolean => source.enabled !== false;
 
-function moduleStatus(
-  source: ModuleSource,
-  moduleId: string,
-  pack: string | undefined,
-  loaded: boolean,
-): ModuleStatus {
+function moduleStatus(source: ModuleSource, moduleId: string, pack: string | undefined, loaded: boolean): ModuleStatus {
   return {
     sourceName: source.name,
     moduleId,
@@ -171,17 +73,12 @@ function moduleStatus(
   };
 }
 
-function parsedModuleStatus(
-  module: ParsedModule,
-  loaded: boolean,
-): ModuleStatus {
+function parsedModuleStatus(module: ParsedModule, loaded: boolean): ModuleStatus {
   return moduleStatus(module.source, module.info.id, module.info.pack, loaded);
 }
 
 function summarizeDisabled(statuses: readonly ModuleStatus[]): string[] {
-  return statuses
-    .filter((module) => !module.loaded)
-    .map((module) => module.moduleId);
+  return statuses.filter((module) => !module.loaded).map((module) => module.moduleId);
 }
 
 // The base entries one section contributes: what it authored, plus the title
@@ -194,10 +91,7 @@ function summarizeDisabled(statuses: readonly ModuleStatus[]): string[] {
 // for a content key every parameter it names is one nothing supplies.
 function recordBase(registry: Registry, key: string, entry: BaseEntry): void {
   const unsupplied = unsuppliedParameters(registry.locales, key, entry.text);
-  if (unsupplied.length > 0)
-    throw new DslError(
-      `${key} names ${unsupplied.map((name) => `{${name}}`).join(", ")}, which nothing supplies`,
-    );
+  if (unsupplied.length > 0) throw new DslError(`${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
   registry.locales.base.set(key, entry);
 }
 
@@ -205,13 +99,7 @@ function recordBase(registry: Registry, key: string, entry: BaseEntry): void {
 // words are in. They are the same module for anything a module owns, and are
 // not for a global id: a `# slot` is keyed under nobody and written in whatever
 // its declarer speaks, so the caller says which is which.
-function recordBaseText(
-  registry: Registry,
-  kind: string,
-  authored: Record<string, unknown>,
-  namespace: string | null,
-  language: string,
-): void {
+function recordBaseText(registry: Registry, kind: string, authored: Record<string, unknown>, namespace: string | null, language: string): void {
   const fields = textFieldsOf(kind);
   if (!fields) return;
   const id = authored.id as string;
@@ -221,10 +109,8 @@ function recordBaseText(
     // A title is asked for whatever anybody authored, so its key is addressable
     // even where no module has text for it; an unauthored `examine:` is nothing
     // the engine ever renders and so is not a gap in any language.
-    if (field === GENERATED_FIELD || typeof authoredValue === "string")
-      registry.locales.addressable.add(key);
-    if (typeof authoredValue === "string")
-      recordBase(registry, key, { text: authoredValue, language });
+    if (field === GENERATED_FIELD || typeof authoredValue === 'string') registry.locales.addressable.add(key);
+    if (typeof authoredValue === 'string') recordBase(registry, key, { text: authoredValue, language });
     else if (field === GENERATED_FIELD && language === DEFAULT_LANGUAGE)
       recordBase(registry, key, {
         text: humanizeEn(id),
@@ -241,13 +127,7 @@ function recordBaseText(
 // actions are assembled after its section is, so a used declaration is reached
 // once here and again from its own row — writing one key twice from one label
 // rather than needing an order between the two.
-function recordActionText(
-  registry: Registry,
-  languages: ReadonlyMap<string | null, string>,
-  kind: string,
-  id: string,
-  actions: readonly Action[],
-): void {
+function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly Action[]): void {
   const taken = new Set<string>();
   for (const action of actions) {
     const slug = actionAddress(action);
@@ -279,12 +159,7 @@ interface ProseOwner {
   language: string;
 }
 
-function proseOwner(
-  registry: Registry,
-  languages: ReadonlyMap<string | null, string>,
-  kind: string,
-  id: string,
-): ProseOwner {
+function proseOwner(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string): ProseOwner {
   const namespace = registry.namespace.ownerOf(kind, id) ?? null;
   return {
     namespace,
@@ -294,13 +169,7 @@ function proseOwner(
   };
 }
 
-function recordProse(
-  registry: Registry,
-  owner: ProseOwner,
-  field: string,
-  text: string,
-  shape: ProseShape,
-): string {
+function recordProse(registry: Registry, owner: ProseOwner, field: string, text: string, shape: ProseShape): string {
   const key = localeKey(owner.namespace, owner.kind, owner.id, field);
   registry.locales.addressable.add(key);
   registry.locales.prose.set(key, shape);
@@ -308,76 +177,37 @@ function recordProse(
   return key;
 }
 
-const actionResultLists = (action: Action): ActionResult[][] =>
-  [
-    action.results,
-    action.onSuccess,
-    action.onFailure,
-    action.onUnfinished,
-  ].filter((list): list is ActionResult[] => list !== undefined);
+const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onFailure, action.onUnfinished].filter((list): list is ActionResult[] => list !== undefined);
 
 // Every result list a section AUTHORED, which is not every list a player can be
 // offered one from: an action an entity `uses:` was written once, under its own
 // declaration, and is keyed there however many entities perform it. An entity's
 // overload of one is written in that entity's block and is keyed under the
 // entity, which is where a translator will look for the words it changed.
-function authoredResults(
-  registry: Registry,
-): Array<[string, string, ActionResult[][]]> {
+function authoredResults(registry: Registry): Array<[string, string, ActionResult[][]]> {
   const owners: Array<[string, string, ActionResult[][]]> = [];
-  for (const [id, action] of registry.actions)
-    owners.push(["action", id, actionResultLists(action)]);
+  for (const [id, action] of registry.actions) owners.push(['action', id, actionResultLists(action)]);
   for (const entity of registry.entities.values()) {
-    const blocks = entity.blocks.flatMap((block) =>
-      isHandlerBlock(block) ? [block.results] : actionResultLists(block),
-    );
-    owners.push([
-      "entity",
-      entity.id,
-      [...blocks, entity.onHit, entity.whenHit],
-    ]);
+    const blocks = entity.blocks.flatMap((block) => (isHandlerBlock(block) ? [block.results] : actionResultLists(block)));
+    owners.push(['entity', entity.id, [...blocks, entity.onHit, entity.whenHit]]);
   }
-  for (const location of registry.locations.values())
-    owners.push([
-      "location",
-      location.id,
-      location.actions.flatMap(actionResultLists),
-    ]);
-  for (const item of registry.items.values())
-    owners.push([
-      "item",
-      item.id,
-      [...item.actions.flatMap(actionResultLists), item.onHit, item.whenHit],
-    ]);
-  for (const [id, table] of registry.dropTables)
-    owners.push(["droptable", id, [table.results]]);
+  for (const location of registry.locations.values()) owners.push(['location', location.id, location.actions.flatMap(actionResultLists)]);
+  for (const item of registry.items.values()) owners.push(['item', item.id, [...item.actions.flatMap(actionResultLists), item.onHit, item.whenHit]]);
+  for (const [id, table] of registry.dropTables) owners.push(['droptable', id, [table.results]]);
   // Under the recipe rather than the compiled action, because the recipe's
   // `say:` is what an author wrote and the action is what the loader made of it.
-  for (const [id, action] of registry.recipeActions)
-    owners.push(["recipe", id, actionResultLists(action)]);
+  for (const [id, action] of registry.recipeActions) owners.push(['recipe', id, actionResultLists(action)]);
   return owners;
 }
 
 // One counter over one owner's lists, in the order they were authored: a
 // wrapper is the last thing on its line, so the lines inside its body come
 // after every leaf the same list already spoke.
-function stampSays(
-  registry: Registry,
-  owner: ProseOwner,
-  lists: readonly (readonly ActionResult[])[],
-  field: (index: number) => string,
-): void {
+function stampSays(registry: Registry, owner: ProseOwner, lists: readonly (readonly ActionResult[])[], field: (index: number) => string): void {
   let index = 0;
   const walk = (list: readonly ActionResult[]): void => {
     for (const result of list) {
-      if (result.kind === "say")
-        result.key = recordProse(
-          registry,
-          owner,
-          field(index++),
-          result.text,
-          "verbatim",
-        );
+      if (result.kind === 'say') result.key = recordProse(registry, owner, field(index++), result.text, 'verbatim');
       for (const nested of nestedResults(result)) walk(nested);
     }
   };
@@ -387,65 +217,43 @@ function stampSays(
 // A node is the owner of every line spoken under it, and its `say:` results are
 // keyed beside them under the same node rather than under the dialogue: a
 // reader looking for the words of one node reads one prefix.
-function stampDialogue(
-  registry: Registry,
-  languages: ReadonlyMap<string | null, string>,
-  dialogue: Dialogue,
-): void {
-  const owner = proseOwner(registry, languages, "dialogue", dialogue.id);
+function stampDialogue(registry: Registry, languages: ReadonlyMap<string | null, string>, dialogue: Dialogue): void {
+  const owner = proseOwner(registry, languages, 'dialogue', dialogue.id);
   for (const node of dialogue.nodes) {
     const spoken = (line: Spoken, field: string): void => {
-      line.key = recordProse(
-        registry,
-        owner,
-        field,
-        printSegments(line.segments),
-        "segments",
-      );
+      line.key = recordProse(registry, owner, field, printSegments(line.segments), 'segments');
     };
     if (node.again) spoken(node.again, dialogueAgainField(node.name));
     const results: ActionResult[][] = [];
     let lines = 0;
     let choices = 0;
     for (const step of node.steps) {
-      if (step.kind === "say")
-        spoken(step, dialogueLineField(node.name, lines++));
-      else if (step.kind === "effect") results.push([step.result]);
-      else if (step.kind === "menu") {
+      if (step.kind === 'say') spoken(step, dialogueLineField(node.name, lines++));
+      else if (step.kind === 'effect') results.push([step.result]);
+      else if (step.kind === 'menu') {
         for (const choice of step.choices) {
           spoken(choice, dialogueChoiceField(node.name, choices++));
           results.push(choice.effects);
         }
       }
     }
-    stampSays(registry, owner, results, (index) =>
-      dialogueSayField(node.name, index),
-    );
+    stampSays(registry, owner, results, (index) => dialogueSayField(node.name, index));
   }
 }
 
-function localeValueProblem(
-  locales: Locales,
-  language: string,
-  key: string,
-  value: string,
-): DslError | undefined {
-  if (locales.prose.get(key) === "segments") {
+function localeValueProblem(locales: Locales, language: string, key: string, value: string): DslError | undefined {
+  if (locales.prose.get(key) === 'segments') {
     try {
       parseSegments(value, 0);
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
-      return new DslError(
-        `# locale ${language}: ${key} is a spoken line, and ${error.message}`,
-      );
+      return new DslError(`# locale ${language}: ${key} is a spoken line, and ${error.message}`);
     }
     return undefined;
   }
   const unsupplied = unsuppliedParameters(locales, key, value);
   if (unsupplied.length === 0) return undefined;
-  return new DslError(
-    `# locale ${language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(", ")}, which nothing supplies`,
-  );
+  return new DslError(`# locale ${language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
 }
 
 // A parsed section and the module the merge attributed it to. It is a
@@ -463,49 +271,27 @@ class DanglingReference extends Error {}
 
 const ownerKey = (kind: string, id: string): string => `${kind}\0${id}`;
 
-function sectionOwner(
-  owners: ReadonlyMap<string, ParsedModule>,
-  kind: string,
-  id: string,
-): ParsedModule | undefined {
+function sectionOwner(owners: ReadonlyMap<string, ParsedModule>, kind: string, id: string): ParsedModule | undefined {
   return owners.get(ownerKey(kind, id));
 }
 
 function locationIdFromMessage(message: string): string | undefined {
-  return (
-    /^location '([^']+)'/.exec(message)?.[1] ??
-    /^location coordinates form a cycle at '([^']+)'/.exec(message)?.[1]
-  );
+  return /^location '([^']+)'/.exec(message)?.[1] ?? /^location coordinates form a cycle at '([^']+)'/.exec(message)?.[1];
 }
 
-function namesDanglingRoot(
-  kind: ReferenceKind,
-  id: string,
-  danglingRoots: ReadonlySet<string>,
-): boolean {
-  const segments = id.split(".");
+function namesDanglingRoot(kind: ReferenceKind, id: string, danglingRoots: ReadonlySet<string>): boolean {
+  const segments = id.split('.');
   if (segments[0] === kind && segments.length > 1) segments.shift();
   return segments.length > 1 && danglingRoots.has(segments[0]);
 }
 
-function referencePruned(
-  kind: ReferenceKind,
-  id: string,
-  pruned: ReadonlySet<string>,
-): boolean {
+function referencePruned(kind: ReferenceKind, id: string, pruned: ReadonlySet<string>): boolean {
   return pruned.has(ownerKey(kind, id));
 }
 
-function danglingVisit(
-  danglingRoots: ReadonlySet<string>,
-  pruned: ReadonlySet<string>,
-): Visit {
+function danglingVisit(danglingRoots: ReadonlySet<string>, pruned: ReadonlySet<string>): Visit {
   return (kind, id) => {
-    if (
-      namesDanglingRoot(kind, id, danglingRoots) ||
-      referencePruned(kind, id, pruned)
-    )
-      throw new DanglingReference();
+    if (namesDanglingRoot(kind, id, danglingRoots) || referencePruned(kind, id, pruned)) throw new DanglingReference();
     return id;
   };
 }
@@ -529,84 +315,39 @@ interface ActionOwner {
 // ASSEMBLED — patched across modules, overloaded by an entity, or compiled from
 // a recipe — and none of those went through the grammar. Same rule, applied
 // where the section that owns the action can name itself.
-function validateActionTable(
-  kind: string,
-  id: string,
-  owner: ActionOwner,
-): void {
+function validateActionTable(kind: string, id: string, owner: ActionOwner): void {
   for (const action of owner.actions ?? []) {
     const problem = assembledActionProblem(action);
-    if (problem)
-      throw new DslError(
-        `# ${kind} ${id} ${actionProblem(action.label, problem)}`,
-      );
+    if (problem) throw new DslError(`# ${kind} ${id} ${actionProblem(action.label, problem)}`);
   }
 }
 
-function pruneActions(
-  actions: Action[],
-  where: string,
-  visit: Visit,
-): Action[] {
-  return actions.filter((action) =>
-    referencesLoaded(() =>
-      visitAction(
-        action,
-        `${where} action ${JSON.stringify(action.label)}`,
-        visit,
-      ),
-    ),
-  );
+function pruneActions(actions: Action[], where: string, visit: Visit): Action[] {
+  return actions.filter((action) => referencesLoaded(() => visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit)));
 }
 
 // A hook is a result list rather than a labelled block, so a dangling reference
 // inside one costs the whole hook — the verdict pruneBlocks reaches per block.
-function pruneHook(
-  hook: ActionResult[],
-  where: string,
-  visit: Visit,
-): ActionResult[] {
+function pruneHook(hook: ActionResult[], where: string, visit: Visit): ActionResult[] {
   return referencesLoaded(() => visitResults(hook, where, visit)) ? hook : [];
 }
 
 // A handler's event name is a reference the label carries, so a block survives
 // only if what it names survives — the same rule its results already follow.
-function pruneBlocks(
-  blocks: EntityBlock[],
-  where: string,
-  visit: Visit,
-): EntityBlock[] {
-  return blocks.filter((block) =>
-    referencesLoaded(() =>
-      isHandlerBlock(block)
-        ? visit("event", block.event, `${where} ${block.label}:`)
-        : visitAction(
-            block,
-            `${where} action ${JSON.stringify(block.label)}`,
-            visit,
-          ),
-    ),
-  );
+function pruneBlocks(blocks: EntityBlock[], where: string, visit: Visit): EntityBlock[] {
+  return blocks.filter((block) => referencesLoaded(() => (isHandlerBlock(block) ? visit('event', block.event, `${where} ${block.label}:`) : visitAction(block, `${where} action ${JSON.stringify(block.label)}`, visit))));
 }
 
 // The registry and the namespace must describe the same surviving universe:
 // drop one without the other and a save is pruned against content that is
 // present, or a reference resolves to content that is gone.
-function dropContent(
-  registry: Registry,
-  kind: string,
-  id: string,
-  pruned: Set<string>,
-  maps: readonly { delete(id: string): boolean }[],
-): void {
+function dropContent(registry: Registry, kind: string, id: string, pruned: Set<string>, maps: readonly { delete(id: string): boolean }[]): void {
   for (const map of maps) map.delete(id);
   registry.namespace.undeclare(kind, id);
   pruned.add(ownerKey(kind, id));
 }
 
-const ACTION_OWNER_MAPS = CONTENT_SECTION_MAPS.filter(([kind]) =>
-  isActionOwnerKind(kind),
-);
+const ACTION_OWNER_MAPS = contentSectionMaps().filter(([kind]) => isActionOwnerKind(kind));
 
 // Pruning an object's actions is done by rebuilding the object, so no site that
 // drops one is in a position to take its member with it — and a member left
@@ -614,17 +355,11 @@ const ACTION_OWNER_MAPS = CONTENT_SECTION_MAPS.filter(([kind]) =>
 // of the whole universe rather than of the object being rebuilt, because a
 // member key carries no owner kind: an entity and an item sharing an id share
 // their members' keys, and one's loss is not the other's.
-function pruneStrandedActionMembers(
-  registry: Registry,
-  pruned: Set<string>,
-): boolean {
+function pruneStrandedActionMembers(registry: Registry, pruned: Set<string>): boolean {
   const surviving = new Set<string>();
   for (const [kind, map] of ACTION_OWNER_MAPS) {
-    for (const owner of (
-      mapOf(registry, map) as ReadonlyMap<string, MemberOwner>
-    ).values()) {
-      for (const address of actionAddresses(kind, owner))
-        surviving.add(memberKey(ACTION_MEMBER, kind, owner.id, address));
+    for (const owner of (mapOf(registry, map) as ReadonlyMap<string, MemberOwner>).values()) {
+      for (const address of actionAddresses(kind, owner)) surviving.add(memberKey(ACTION_MEMBER, kind, owner.id, address));
     }
   }
   let dropped = false;
@@ -636,73 +371,34 @@ function pruneStrandedActionMembers(
   return dropped;
 }
 
-function pruneRegistryDanglingReferences(
-  registry: Registry,
-  danglingRoots: ReadonlySet<string>,
-): void {
+function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: ReadonlySet<string>): void {
   const pruned = new Set<string>();
   for (;;) {
     let changed = false;
     const visit = danglingVisit(danglingRoots, pruned);
 
     for (const [id, action] of registry.actions) {
-      if (referencesLoaded(() => visitAction(action, `# action ${id}`, visit)))
-        continue;
-      dropContent(registry, "action", id, pruned, [registry.actions]);
+      if (referencesLoaded(() => visitAction(action, `# action ${id}`, visit))) continue;
+      dropContent(registry, 'action', id, pruned, [registry.actions]);
       changed = true;
     }
 
     for (const [id, event] of registry.events) {
-      if (
-        referencesLoaded(() =>
-          visitSection(
-            { kind: "event", value: { ...event } },
-            `# event ${id}`,
-            visit,
-          ),
-        )
-      )
-        continue;
-      dropContent(registry, "event", id, pruned, [registry.events]);
+      if (referencesLoaded(() => visitSection({ kind: 'event', value: { ...event } }, `# event ${id}`, visit))) continue;
+      dropContent(registry, 'event', id, pruned, [registry.events]);
       changed = true;
     }
 
     for (const [id, entity] of registry.entities) {
-      const stats = Object.fromEntries(
-        Object.entries(entity.stats).filter(([statId]) =>
-          referencesLoaded(() =>
-            visit("stat", statId, `# entity ${id} stats:`),
-          ),
-        ),
-      );
+      const stats = Object.fromEntries(Object.entries(entity.stats).filter(([statId]) => referencesLoaded(() => visit('stat', statId, `# entity ${id} stats:`))));
       const blocks = pruneBlocks(entity.blocks, `# entity ${id}`, visit);
-      const uses = entity.uses.filter((used) =>
-        referencesLoaded(() => visit("action", used, `# entity ${id} uses:`)),
-      );
-      const faction = entity.faction.filter((named) =>
-        referencesLoaded(() =>
-          visit("faction", named, `# entity ${id} faction:`),
-        ),
-      );
-      const allies = entity.allies.filter((entry) =>
-        referencesLoaded(() =>
-          visit("entity", entry.entity, `# entity ${id} allies:`),
-        ),
-      );
-      const passives = entity.passives.filter((named) =>
-        referencesLoaded(() =>
-          visit("passive", named, `# entity ${id} passives:`),
-        ),
-      );
-      const skills = entity.skills.filter((named) =>
-        referencesLoaded(() => visit("skill", named, `# entity ${id} skills:`)),
-      );
+      const uses = entity.uses.filter((used) => referencesLoaded(() => visit('action', used, `# entity ${id} uses:`)));
+      const faction = entity.faction.filter((named) => referencesLoaded(() => visit('faction', named, `# entity ${id} faction:`)));
+      const allies = entity.allies.filter((entry) => referencesLoaded(() => visit('entity', entry.entity, `# entity ${id} allies:`)));
+      const passives = entity.passives.filter((named) => referencesLoaded(() => visit('passive', named, `# entity ${id} passives:`)));
+      const skills = entity.skills.filter((named) => referencesLoaded(() => visit('skill', named, `# entity ${id} skills:`)));
       const onHit = pruneHook(entity.onHit, `# entity ${id} on hit:`, visit);
-      const whenHit = pruneHook(
-        entity.whenHit,
-        `# entity ${id} when hit:`,
-        visit,
-      );
+      const whenHit = pruneHook(entity.whenHit, `# entity ${id} when hit:`, visit);
       if (
         Object.keys(stats).length !== Object.keys(entity.stats).length ||
         blocks.length !== entity.blocks.length ||
@@ -734,20 +430,13 @@ function pruneRegistryDanglingReferences(
     // where the stat it raises did: `per-level:` needs a `stat-id:` to raise,
     // so a skill that outlived its stat is one the build would refuse anyway.
     for (const [id, skill] of registry.skills) {
-      const statId = skill["stat-id"];
-      if (
-        statId !== undefined &&
-        !referencesLoaded(() => visit("stat", statId, `# skill ${id} stat-id:`))
-      ) {
-        dropContent(registry, "skill", id, pruned, [registry.skills]);
+      const statId = skill['stat-id'];
+      if (statId !== undefined && !referencesLoaded(() => visit('stat', statId, `# skill ${id} stat-id:`))) {
+        dropContent(registry, 'skill', id, pruned, [registry.skills]);
         changed = true;
         continue;
       }
-      const grants = skill.grants.filter((grant) =>
-        referencesLoaded(() =>
-          visit("event", grant.event, `# skill ${id} gain`),
-        ),
-      );
+      const grants = skill.grants.filter((grant) => referencesLoaded(() => visit('event', grant.event, `# skill ${id} gain`)));
       if (grants.length !== skill.grants.length) {
         registry.skills.set(id, { ...skill, grants });
         changed = true;
@@ -757,20 +446,10 @@ function pruneRegistryDanglingReferences(
     // A passive is a carrier like an item is, so it is rebuilt rather than
     // dropped: what a jewel placed it for survives a payload whose stat went.
     for (const [id, passive] of registry.passives) {
-      const tags = passive.tags.filter((tag) =>
-        referencesLoaded(() => visitTags([tag], `# passive ${id}`, visit)),
-      );
+      const tags = passive.tags.filter((tag) => referencesLoaded(() => visitTags([tag], `# passive ${id}`, visit)));
       const onHit = pruneHook(passive.onHit, `# passive ${id} on hit:`, visit);
-      const whenHit = pruneHook(
-        passive.whenHit,
-        `# passive ${id} when hit:`,
-        visit,
-      );
-      if (
-        tags.length !== passive.tags.length ||
-        onHit !== passive.onHit ||
-        whenHit !== passive.whenHit
-      ) {
+      const whenHit = pruneHook(passive.whenHit, `# passive ${id} when hit:`, visit);
+      if (tags.length !== passive.tags.length || onHit !== passive.onHit || whenHit !== passive.whenHit) {
         registry.passives.set(id, { ...passive, tags, onHit, whenHit });
         changed = true;
       }
@@ -779,20 +458,11 @@ function pruneRegistryDanglingReferences(
     // A cluster jewel names passives by position, and a position whose passive
     // is gone is an empty position rather than a broken jewel.
     for (const [id, jewel] of registry.clusterJewels) {
-      const entries = Object.entries(jewel.positions).filter(([, passiveId]) =>
-        referencesLoaded(() =>
-          visit("passive", passiveId, `# cluster-jewel ${id} passives:`),
-        ),
-      );
+      const entries = Object.entries(jewel.positions).filter(([, passiveId]) => referencesLoaded(() => visit('passive', passiveId, `# cluster-jewel ${id} passives:`)));
       if (entries.length !== Object.keys(jewel.positions).length) {
         registry.clusterJewels.set(id, {
           ...jewel,
-          positions: Object.fromEntries(
-            entries.map(([position, passiveId]) => [
-              Number(position),
-              passiveId,
-            ]),
-          ),
+          positions: Object.fromEntries(entries.map(([position, passiveId]) => [Number(position), passiveId])),
         });
         changed = true;
       }
@@ -801,46 +471,31 @@ function pruneRegistryDanglingReferences(
     for (const [id, item] of registry.items) {
       // Through the shared walk, so a clause that grows a second reference —
       // `per` did — is pruned by the rule that resolves it rather than by a copy.
-      const tags = item.tags.filter((tag) =>
-        referencesLoaded(() => visitTags([tag], `# item ${id}`, visit)),
-      );
+      const tags = item.tags.filter((tag) => referencesLoaded(() => visitTags([tag], `# item ${id}`, visit)));
       const actions = pruneActions(item.actions, `# item ${id}`, visit);
       const onHit = pruneHook(item.onHit, `# item ${id} on hit:`, visit);
       const whenHit = pruneHook(item.whenHit, `# item ${id} when hit:`, visit);
-      if (
-        tags.length !== item.tags.length ||
-        actions.length !== item.actions.length ||
-        onHit !== item.onHit ||
-        whenHit !== item.whenHit
-      ) {
+      if (tags.length !== item.tags.length || actions.length !== item.actions.length || onHit !== item.onHit || whenHit !== item.whenHit) {
         registry.items.set(id, { ...item, tags, actions, onHit, whenHit });
         changed = true;
       }
     }
 
     for (const [id, location] of registry.locations) {
-      if (
-        location.relative &&
-        (namesDanglingRoot("location", location.relative.of, danglingRoots) ||
-          referencePruned("location", location.relative.of, pruned))
-      ) {
-        dropContent(registry, "location", id, pruned, [registry.locations]);
+      if (location.relative && (namesDanglingRoot('location', location.relative.of, danglingRoots) || referencePruned('location', location.relative.of, pruned))) {
+        dropContent(registry, 'location', id, pruned, [registry.locations]);
         changed = true;
         continue;
       }
-      const entities = location.entities.filter(
-        (entry) =>
-          !namesDanglingRoot("entity", entry.entity, danglingRoots) &&
-          !referencePruned("entity", entry.entity, pruned),
-      );
+      const entities = location.entities.filter((entry) => !namesDanglingRoot('entity', entry.entity, danglingRoots) && !referencePruned('entity', entry.entity, pruned));
       const adjacent = location.adjacent.filter(
         (edge) =>
-          !namesDanglingRoot("location", edge.target, danglingRoots) &&
-          !referencePruned("location", edge.target, pruned) &&
+          !namesDanglingRoot('location', edge.target, danglingRoots) &&
+          !referencePruned('location', edge.target, pruned) &&
           referencesLoaded(() =>
             visitSection(
               {
-                kind: "location",
+                kind: 'location',
                 value: {
                   ...location,
                   entities: [],
@@ -855,11 +510,7 @@ function pruneRegistryDanglingReferences(
           ),
       );
       const actions = pruneActions(location.actions, `# location ${id}`, visit);
-      if (
-        entities.length !== location.entities.length ||
-        adjacent.length !== location.adjacent.length ||
-        actions.length !== location.actions.length
-      ) {
+      if (entities.length !== location.entities.length || adjacent.length !== location.adjacent.length || actions.length !== location.actions.length) {
         registry.locations.set(id, {
           ...location,
           entities,
@@ -871,50 +522,20 @@ function pruneRegistryDanglingReferences(
     }
 
     for (const [id, recipe] of registry.recipes) {
-      if (
-        referencesLoaded(() =>
-          visitSection(
-            { kind: "recipe", value: { ...recipe } },
-            `# recipe ${id}`,
-            visit,
-          ),
-        )
-      )
-        continue;
-      dropContent(registry, "recipe", id, pruned, [
-        registry.recipes,
-        registry.recipeActions,
-      ]);
+      if (referencesLoaded(() => visitSection({ kind: 'recipe', value: { ...recipe } }, `# recipe ${id}`, visit))) continue;
+      dropContent(registry, 'recipe', id, pruned, [registry.recipes, registry.recipeActions]);
       changed = true;
     }
 
     for (const [id, resource] of registry.resources) {
-      if (
-        referencesLoaded(() =>
-          visitSection(
-            { kind: "resource", value: { ...resource } },
-            `# resource ${id}`,
-            visit,
-          ),
-        )
-      )
-        continue;
-      dropContent(registry, "resource", id, pruned, [registry.resources]);
+      if (referencesLoaded(() => visitSection({ kind: 'resource', value: { ...resource } }, `# resource ${id}`, visit))) continue;
+      dropContent(registry, 'resource', id, pruned, [registry.resources]);
       changed = true;
     }
 
     for (const [id, table] of registry.dropTables) {
-      if (
-        referencesLoaded(() =>
-          visitSection(
-            { kind: "droptable", value: { ...table } },
-            `# droptable ${id}`,
-            visit,
-          ),
-        )
-      )
-        continue;
-      dropContent(registry, "droptable", id, pruned, [registry.dropTables]);
+      if (referencesLoaded(() => visitSection({ kind: 'droptable', value: { ...table } }, `# droptable ${id}`, visit))) continue;
+      dropContent(registry, 'droptable', id, pruned, [registry.dropTables]);
       changed = true;
     }
 
@@ -923,7 +544,7 @@ function pruneRegistryDanglingReferences(
         referencesLoaded(() =>
           visitSection(
             {
-              kind: "dialogue",
+              kind: 'dialogue',
               value: {
                 ...dialogue,
                 nodes: dialogue.nodes.map((node) => ({ ...node })),
@@ -935,22 +556,13 @@ function pruneRegistryDanglingReferences(
         )
       )
         continue;
-      dropContent(registry, "dialogue", id, pruned, [registry.dialogues]);
+      dropContent(registry, 'dialogue', id, pruned, [registry.dialogues]);
       changed = true;
     }
 
     for (const [id, test] of registry.tests) {
-      if (
-        referencesLoaded(() =>
-          visitSection(
-            { kind: "test", value: { ...test } },
-            `# test ${id}`,
-            visit,
-          ),
-        )
-      )
-        continue;
-      dropContent(registry, "test", id, pruned, [registry.tests]);
+      if (referencesLoaded(() => visitSection({ kind: 'test', value: { ...test } }, `# test ${id}`, visit))) continue;
+      dropContent(registry, 'test', id, pruned, [registry.tests]);
       changed = true;
     }
 
@@ -958,9 +570,7 @@ function pruneRegistryDanglingReferences(
 
     if (!changed) {
       registry.dialoguesByOwner.clear();
-      for (const dialogue of registry.dialogues.values())
-        if (dialogue.owner)
-          registry.dialoguesByOwner.set(dialogue.owner, dialogue);
+      for (const dialogue of registry.dialogues.values()) if (dialogue.owner) registry.dialoguesByOwner.set(dialogue.owner, dialogue);
       return;
     }
   }
@@ -973,7 +583,7 @@ function dropTableCycle(registry: Registry): string[] | null {
   const rolls = new Map<string, string[]>();
   const collect = (results: readonly ActionResult[], into: string[]): void => {
     for (const result of results) {
-      if (result.kind === "roll") into.push(result.table);
+      if (result.kind === 'roll') into.push(result.table);
       for (const nested of nestedResults(result)) collect(nested, into);
     }
   };
@@ -1013,24 +623,17 @@ function compileFactionBits(registry: Registry): void {
   registry.factionBits.clear();
   let next = 0;
   for (const id of registry.factions.keys()) {
-    registry.factionBits.set(
-      id,
-      namesSame(id, WORLD_FACTION) ? WORLD_BIT : 1 << ++next,
-    );
+    registry.factionBits.set(id, namesSame(id, WORLD_FACTION) ? WORLD_BIT : 1 << ++next);
   }
 }
 
 // A shortened id names the same object as the whole path, which is the rule the
 // namespace already resolves references by; an entity's overload block reaches
 // its action the same way rather than through a second spelling.
-const namesSame = (id: string, written: string): boolean =>
-  id === written || id.endsWith(`.${written}`);
+const namesSame = (id: string, written: string): boolean => id === written || id.endsWith(`.${written}`);
 
-function appendCondition(
-  base: Condition | undefined,
-  added: Condition,
-): Condition {
-  return base ? { kind: "and", conditions: [base, added] } : added;
+function appendCondition(base: Condition | undefined, added: Condition): Condition {
+  return base ? { kind: 'and', conditions: [base, added] } : added;
 }
 
 // A bare overload line replaces the inherited value; a `+` line adds to it.
@@ -1038,19 +641,11 @@ function overlayAction(base: Action, over: Action): Action {
   const appended = new Set(over.appended ?? []);
   const merged = { ...base } as Record<string, unknown>;
   for (const [key, value] of Object.entries(over)) {
-    if (key === "label" || key === "appended" || value === undefined) continue;
+    if (key === 'label' || key === 'appended' || value === undefined) continue;
     if (Array.isArray(value) && value.length === 0) continue;
     if (!appended.has(key)) merged[key] = value;
-    else if (key === "requires" || key === "hiddenIf")
-      merged[key] = appendCondition(
-        base[key as "requires" | "hiddenIf"],
-        value as Condition,
-      );
-    else
-      merged[key] = [
-        ...((base as unknown as Record<string, unknown[]>)[key] ?? []),
-        ...(value as unknown[]),
-      ];
+    else if (key === 'requires' || key === 'hiddenIf') merged[key] = appendCondition(base[key as 'requires' | 'hiddenIf'], value as Condition);
+    else merged[key] = [...((base as unknown as Record<string, unknown[]>)[key] ?? []), ...(value as unknown[])];
   }
   return merged as unknown as Action;
 }
@@ -1070,27 +665,18 @@ function linkEntity(entity: Entity, registry: Registry): Entity {
     }
     const used = entity.uses.find((id) => namesSame(id, block.label));
     if (used !== undefined) {
-      if (overloads.has(used))
-        throw new DslError(
-          `${JSON.stringify(block.label)} overloads ${used} more than once`,
-        );
+      if (overloads.has(used)) throw new DslError(`${JSON.stringify(block.label)} overloads ${used} more than once`);
       overloads.set(used, block);
       continue;
     }
-    const declared = [...registry.actions.keys()].find((id) =>
-      namesSame(id, block.label),
-    );
-    if (declared !== undefined)
-      throw new DslError(
-        `${JSON.stringify(block.label)} overloads # action ${declared}, which this entity does not use:`,
-      );
+    const declared = [...registry.actions.keys()].find((id) => namesSame(id, block.label));
+    if (declared !== undefined) throw new DslError(`${JSON.stringify(block.label)} overloads # action ${declared}, which this entity does not use:`);
     own.push(block);
   }
 
   const performed = entity.uses.map((id) => {
     const declaration = registry.actions.get(id);
-    if (!declaration)
-      throw new DslError(`uses: names an unknown action: ${id}`);
+    if (!declaration) throw new DslError(`uses: names an unknown action: ${id}`);
     const overload = overloads.get(id);
     return overload ? overlayAction(declaration, overload) : declaration;
   });
@@ -1101,22 +687,12 @@ function linkEntity(entity: Entity, registry: Registry): Entity {
 // The performer's side of the bargain: an entity performing a two-sided action
 // declares every stat that action reads off it, because falling through to the
 // global `# stat` bases would measure the rat by the player's sheet.
-function performerStatProblem(
-  entity: Entity,
-  action: Action,
-  registry: Registry,
-): string | undefined {
+function performerStatProblem(entity: Entity, action: Action, registry: Registry): string | undefined {
   for (const field of sidedFields(action)) {
-    if (field.value.side !== "my") continue;
-    const needed =
-      field.written === "depletes"
-        ? registry.resources.get(field.value.id)?.max
-        : field.value.id;
+    if (field.value.side !== 'my') continue;
+    const needed = field.written === 'depletes' ? registry.resources.get(field.value.id)?.max : field.value.id;
     if (needed === undefined || entity.stats[needed] !== undefined) continue;
-    const because =
-      field.written === "depletes"
-        ? `${field.value.id} is measured by ${needed}, which`
-        : `${field.written}: reads ${needed}, which`;
+    const because = field.written === 'depletes' ? `${field.value.id} is measured by ${needed}, which` : `${field.written}: reads ${needed}, which`;
     return `${actionProblem(action.label, because)} stats: does not set`;
   }
   return undefined;
@@ -1126,14 +702,11 @@ function entityProblem(entity: Entity, registry: Registry): string | undefined {
   for (const ally of entity.allies) {
     // A side is you and your allies, so naming yourself makes you your own
     // ally, and naming the player puts the player on both sides of the fight.
-    if (namesSame(entity.id, ally.entity))
-      return `allies: names this entity itself: ${ally.entity}`;
-    if (namesSame(ally.entity, PLAYER_ENTITY))
-      return `allies: names the player, who is a side rather than a member of one: ${ally.entity}`;
+    if (namesSame(entity.id, ally.entity)) return `allies: names this entity itself: ${ally.entity}`;
+    if (namesSame(ally.entity, PLAYER_ENTITY)) return `allies: names the player, who is a side rather than a member of one: ${ally.entity}`;
   }
   for (const handler of entity.handlers) {
-    if (!registry.events.has(handler.event))
-      return `on ${handler.event}: names an unknown event: ${handler.event}`;
+    if (!registry.events.has(handler.event)) return `on ${handler.event}: names an unknown event: ${handler.event}`;
   }
   for (const action of entity.actions) {
     if (!isTwoSided(action)) continue;
@@ -1143,10 +716,7 @@ function entityProblem(entity: Entity, registry: Registry): string | undefined {
   return undefined;
 }
 
-function linkRegistry(
-  registry: Registry,
-  owners: ReadonlyMap<string, ParsedModule>,
-): BuildFailure | null {
+function linkRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModule>): BuildFailure | null {
   compileFactionBits(registry);
 
   const players: Entity[] = [];
@@ -1162,18 +732,16 @@ function linkRegistry(
       // Prefixed here, so every message an entity's own linking raises names the
       // entity without each throw site repeating it.
       const error = new DslError(`# entity ${id}: ${raw.message}`, raw.span);
-      const module = sectionOwner(owners, "entity", id);
+      const module = sectionOwner(owners, 'entity', id);
       if (!module) throw error;
-      return { module, stage: "validate", error };
+      return { module, stage: 'validate', error };
     }
   }
   if (players.length > 1) {
-    const module = sectionOwner(owners, "entity", players[1].id);
-    const error = new DslError(
-      `# entity ${players[1].id} and # entity ${players[0].id} are both the player, and a game is played as one entity`,
-    );
+    const module = sectionOwner(owners, 'entity', players[1].id);
+    const error = new DslError(`# entity ${players[1].id} and # entity ${players[0].id} are both the player, and a game is played as one entity`);
     if (!module) throw error;
-    return { module, stage: "validate", error };
+    return { module, stage: 'validate', error };
   }
   registry.player = players[0];
   return null;
@@ -1183,26 +751,15 @@ function linkRegistry(
 // toss an author cannot see. Zero is not checked here — a module set is allowed
 // to hold locations without holding the one a new game begins in, and the
 // session says so when a game is actually started.
-function startingLocationFailure(
-  registry: Registry,
-  owners: ReadonlyMap<string, ParsedModule>,
-): BuildFailure | null {
-  const starting = [...registry.locations.values()].filter(
-    (location) => location.starting,
-  );
+function startingLocationFailure(registry: Registry, owners: ReadonlyMap<string, ParsedModule>): BuildFailure | null {
+  const starting = [...registry.locations.values()].filter((location) => location.starting);
   if (starting.length < 2) return null;
-  const module = sectionOwner(owners, "location", starting[1].id);
-  const error = new DslError(
-    `# location ${starting[1].id} is marked starting, and so is ${starting[0].id}; a new game begins in exactly one place`,
-  );
-  return module ? { module, stage: "validate", error } : null;
+  const module = sectionOwner(owners, 'location', starting[1].id);
+  const error = new DslError(`# location ${starting[1].id} is marked starting, and so is ${starting[0].id}; a new game begins in exactly one place`);
+  return module ? { module, stage: 'validate', error } : null;
 }
 
-function validateBuiltRegistry(
-  registry: Registry,
-  owners: ReadonlyMap<string, ParsedModule>,
-  danglingRoots: ReadonlySet<string>,
-): BuildFailure | null {
+function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModule>, danglingRoots: ReadonlySet<string>): BuildFailure | null {
   pruneRegistryDanglingReferences(registry, danglingRoots);
 
   const linked = linkRegistry(registry, owners);
@@ -1213,12 +770,10 @@ function validateBuiltRegistry(
 
   const cycle = dropTableCycle(registry);
   if (cycle) {
-    const module = sectionOwner(owners, "droptable", cycle[0]);
-    const error = new DslError(
-      `# droptable ${cycle[0]} rolls itself: ${cycle.join(" -> ")}`,
-    );
+    const module = sectionOwner(owners, 'droptable', cycle[0]);
+    const error = new DslError(`# droptable ${cycle[0]} rolls itself: ${cycle.join(' -> ')}`);
     if (!module) throw error;
-    return { module, stage: "validate", error };
+    return { module, stage: 'validate', error };
   }
 
   try {
@@ -1226,9 +781,9 @@ function validateBuiltRegistry(
   } catch (error) {
     if (!(error instanceof DslError)) throw error;
     const id = locationIdFromMessage(error.message);
-    const module = id ? sectionOwner(owners, "location", id) : undefined;
+    const module = id ? sectionOwner(owners, 'location', id) : undefined;
     if (!module) throw error;
-    return { module, stage: "validate", error };
+    return { module, stage: 'validate', error };
   }
 
   for (const variable of registry.variables.values()) {
@@ -1237,18 +792,15 @@ function validateBuiltRegistry(
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       return {
-        module: sectionOwner(owners, "variable", variable.id)!,
-        stage: "validate",
+        module: sectionOwner(owners, 'variable', variable.id)!,
+        stage: 'validate',
         error,
       };
     }
   }
 
-  for (const [kind, map] of CONTENT_SECTION_MAPS) {
-    for (const [id, value] of mapOf(registry, map) as ReadonlyMap<
-      string,
-      object
-    >) {
+  for (const [kind, map] of contentSectionMaps()) {
+    for (const [id, value] of mapOf(registry, map) as ReadonlyMap<string, object>) {
       try {
         validateActionTable(kind, id, value as ActionOwner);
         validateSectionReferences(sectionOf(kind, value), id, registry);
@@ -1256,7 +808,7 @@ function validateBuiltRegistry(
         if (!(error instanceof DslError)) throw error;
         return {
           module: sectionOwner(owners, kind, id)!,
-          stage: "validate",
+          stage: 'validate',
           error,
         };
       }
@@ -1265,12 +817,12 @@ function validateBuiltRegistry(
 
   for (const [id, action] of registry.recipeActions) {
     try {
-      validateActionTable("recipe", id, { actions: [action] });
+      validateActionTable('recipe', id, { actions: [action] });
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       return {
-        module: sectionOwner(owners, "recipe", id)!,
-        stage: "validate",
+        module: sectionOwner(owners, 'recipe', id)!,
+        stage: 'validate',
         error,
       };
     }
@@ -1281,9 +833,9 @@ function validateBuiltRegistry(
   } catch (error) {
     if (!(error instanceof DslError)) throw error;
     const id = /^# item (\S+)/.exec(error.message)?.[1];
-    const module = id ? sectionOwner(owners, "item", id) : undefined;
+    const module = id ? sectionOwner(owners, 'item', id) : undefined;
     if (!module) throw error;
-    return { module, stage: "validate", error };
+    return { module, stage: 'validate', error };
   }
 
   const capabilities = registryCapabilities(registry);
@@ -1293,8 +845,8 @@ function validateBuiltRegistry(
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       return {
-        module: sectionOwner(owners, "recipe", recipe.id)!,
-        stage: "validate",
+        module: sectionOwner(owners, 'recipe', recipe.id)!,
+        stage: 'validate',
         error,
       };
     }
@@ -1305,8 +857,8 @@ function validateBuiltRegistry(
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       return {
-        module: sectionOwner(owners, "dialogue", dialogue.id)!,
-        stage: "validate",
+        module: sectionOwner(owners, 'dialogue', dialogue.id)!,
+        stage: 'validate',
         error,
       };
     }
@@ -1317,8 +869,8 @@ function validateBuiltRegistry(
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       return {
-        module: sectionOwner(owners, "test", test.id)!,
-        stage: "validate",
+        module: sectionOwner(owners, 'test', test.id)!,
+        stage: 'validate',
         error,
       };
     }
@@ -1326,37 +878,27 @@ function validateBuiltRegistry(
   return null;
 }
 
-const wouldDeclare = (kind: string, value: MemberOwner): Member[] =>
-  declareMembers(new Namespace(), kind, value);
+const wouldDeclare = (kind: string, value: MemberOwner): Member[] => declareMembers(new Namespace(), kind, value);
 
-const memberIdentity = (member: Member): string =>
-  `${member.kind}\0${member.key}`;
+const memberIdentity = (member: Member): string => `${member.kind}\0${member.key}`;
 
-function reconcileMembers(
-  namespace: Namespace,
-  merged: Map<SectionKind, Map<string, OwnedSection>>,
-  declared: ReadonlyMap<string, Member[]>,
-): void {
+function reconcileMembers(namespace: Namespace, merged: Map<SectionKind, Map<string, OwnedSection>>, declared: ReadonlyMap<string, Member[]>): void {
   const survivingAcrossEveryKind = new Set<string>();
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
-      for (const member of wouldDeclare(kind, section.value as MemberOwner))
-        survivingAcrossEveryKind.add(memberIdentity(member));
+      for (const member of wouldDeclare(kind, section.value as MemberOwner)) survivingAcrossEveryKind.add(memberIdentity(member));
     }
   }
   for (const [kind, byId] of merged) {
     for (const id of byId.keys()) {
       for (const member of declared.get(ownerKey(kind, id)) ?? []) {
-        if (!survivingAcrossEveryKind.has(memberIdentity(member)))
-          namespace.undeclare(member.kind, member.key);
+        if (!survivingAcrossEveryKind.has(memberIdentity(member))) namespace.undeclare(member.kind, member.key);
       }
     }
   }
 }
 
-function compileModules(
-  modules: readonly ParsedModule[],
-): { registry: Registry } | { failure: BuildFailure } {
+function compileModules(modules: readonly ParsedModule[]): { registry: Registry } | { failure: BuildFailure } {
   const registry = emptyRegistry();
 
   // Two phases, because merging must happen on the authored form: a hydrated
@@ -1370,12 +912,7 @@ function compileModules(
   const danglingRoots = new Set<string>();
   for (const module of modules) {
     for (const dependency of module.info.dependencies) {
-      if (
-        (dependency.prefix === "optional" ||
-          dependency.prefix === "recommended") &&
-        !loaded.has(dependency.module)
-      )
-        danglingRoots.add(dependency.module);
+      if ((dependency.prefix === 'optional' || dependency.prefix === 'recommended') && !loaded.has(dependency.module)) danglingRoots.add(dependency.module);
     }
   }
   namespace.declareModules(loaded);
@@ -1388,7 +925,7 @@ function compileModules(
         pass(module, namespace, loaded);
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
-        return { failure: { module, stage: "resolve", error } };
+        return { failure: { module, stage: 'resolve', error } };
       }
     }
   }
@@ -1398,11 +935,10 @@ function compileModules(
         for (const section of module.sections) {
           // Removal is applied where it stands, so a later module can name the id
           // again and get a fresh one rather than a hole.
-          if (section.kind === "remove") {
+          if (section.kind === 'remove') {
             const { kind, target, id } = section.value as Removal;
             if (!owns(kind)) continue;
-            if (!isSectionKind(kind) || !merged.get(kind)?.delete(target))
-              throw new DslError(`# remove ${id} names nothing that is loaded`);
+            if (!isSectionKind(kind) || !merged.get(kind)?.delete(target)) throw new DslError(`# remove ${id} names nothing that is loaded`);
             owners.delete(ownerKey(kind, target));
             // Undeclared here rather than during resolution, so that what a name
             // resolves to stays independent of load order while the namespace and
@@ -1417,30 +953,22 @@ function compileModules(
           // from being added, patched or removed by it (c6).
           if (sectionFor(section.kind)!.map === null) continue;
           if (!owns(section.kind)) continue;
-          const byId =
-            merged.get(section.kind) ?? new Map<string, OwnedSection>();
+          const byId = merged.get(section.kind) ?? new Map<string, OwnedSection>();
           const id = (section.value as { id: string }).id;
           byId.set(id, {
             kind: section.kind,
-            value: mergeSection(
-              section.kind,
-              byId.get(id)?.value,
-              section.value,
-            ),
+            value: mergeSection(section.kind, byId.get(id)?.value, section.value),
             module,
           });
           owners.set(ownerKey(section.kind, id), module);
           merged.set(section.kind, byId);
-          const declared =
-            declaredMembers.get(ownerKey(section.kind, id)) ?? [];
-          declared.push(
-            ...wouldDeclare(section.kind, section.value as MemberOwner),
-          );
+          const declared = declaredMembers.get(ownerKey(section.kind, id)) ?? [];
+          declared.push(...wouldDeclare(section.kind, section.value as MemberOwner));
           declaredMembers.set(ownerKey(section.kind, id), declared);
         }
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
-        return { module, stage: "merge", error };
+        return { module, stage: 'merge', error };
       }
     }
     return null;
@@ -1449,46 +977,29 @@ function compileModules(
   const mergeFailure = mergePass(() => true);
   if (mergeFailure) return { failure: mergeFailure };
   reconcileMembers(namespace, merged, declaredMembers);
-  const languages = new Map<string | null, string>(
-    modules.map((module) => [module.namespace, module.info.language]),
-  );
+  const languages = new Map<string | null, string>(modules.map((module) => [module.namespace, module.info.language]));
   // Only the modules that declare content: a locale-only module writing English
   // beside a Spanish island says nothing about what language its prose is in,
   // and counting it would shut the prose door for every player of every
   // language, since the shipped engine locale declares `en`.
   for (const module of modules) {
     for (const section of module.sections) {
-      if (section.kind === "locale")
-        addLocaleSection(
-          registry.locales,
-          module.namespace,
-          section.value as LocaleSection,
-        );
+      if (section.kind === 'locale') addLocaleSection(registry.locales, module.namespace, section.value as LocaleSection);
     }
   }
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
       try {
         buildSection(section, registry as unknown as Maps, {
-          language:
-            languages.get(
-              registry.namespace.ownerOf(
-                kind,
-                (section.value as { id: string }).id,
-              ) ?? null,
-            ) ?? DEFAULT_LANGUAGE,
+          language: languages.get(registry.namespace.ownerOf(kind, (section.value as { id: string }).id) ?? null) ?? DEFAULT_LANGUAGE,
         });
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
-        return { failure: { module: section.module, stage: "build", error } };
+        return { failure: { module: section.module, stage: 'build', error } };
       }
     }
   }
-  const validationFailure = validateBuiltRegistry(
-    registry,
-    owners,
-    danglingRoots,
-  );
+  const validationFailure = validateBuiltRegistry(registry, owners, danglingRoots);
   if (validationFailure) return { failure: validationFailure };
   // Both passes run after validation, so that content dropped for a dangling
   // reference leaves no key behind for a translator to answer — and so that the
@@ -1499,23 +1010,14 @@ function compileModules(
       // A global id is in no namespace to have been dropped from one: the guard
       // is about content that went with a dangling reference, and the key such
       // an id is written under is nobody's.
-      const owned = NAMESPACED_KINDS.includes(kind);
+      const owned = isNamespacedKind(kind);
       if (owned && !registry.namespace.has(kind, id)) continue;
-      const namespace = owned
-        ? (registry.namespace.ownerOf(kind, id) ?? null)
-        : null;
+      const namespace = owned ? (registry.namespace.ownerOf(kind, id) ?? null) : null;
       try {
-        recordBaseText(
-          registry,
-          kind,
-          section.value as Record<string, unknown>,
-          namespace,
-          languages.get(owned ? namespace : section.module.namespace) ??
-            DEFAULT_LANGUAGE,
-        );
+        recordBaseText(registry, kind, section.value as Record<string, unknown>, namespace, languages.get(owned ? namespace : section.module.namespace) ?? DEFAULT_LANGUAGE);
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
-        return { failure: { module: section.module, stage: "build", error } };
+        return { failure: { module: section.module, stage: 'build', error } };
       }
     }
   }
@@ -1524,8 +1026,7 @@ function compileModules(
   // vocabulary and `humanizeEn` fills it — `defaultTitle`'s rule, applied where
   // there is no section to hang a default on.
   for (const id of registrySlots(registry)) {
-    if (!registry.slots.has(id))
-      recordBaseText(registry, "slot", { id }, null, DEFAULT_LANGUAGE);
+    if (!registry.slots.has(id)) recordBaseText(registry, 'slot', { id }, null, DEFAULT_LANGUAGE);
   }
   for (const [kind, id, actions] of everyActionTable(registry)) {
     try {
@@ -1535,42 +1036,28 @@ function compileModules(
       return {
         failure: {
           module: sectionOwner(owners, kind, id) ?? modules[0],
-          stage: "build",
+          stage: 'build',
           error,
         },
       };
     }
   }
-  for (const [kind, id, lists] of authoredResults(registry))
-    stampSays(
-      registry,
-      proseOwner(registry, languages, kind, id),
-      lists,
-      sayField,
-    );
-  for (const dialogue of registry.dialogues.values())
-    stampDialogue(registry, languages, dialogue);
+  for (const [kind, id, lists] of authoredResults(registry)) stampSays(registry, proseOwner(registry, languages, kind, id), lists, sayField);
+  for (const dialogue of registry.dialogues.values()) stampDialogue(registry, languages, dialogue);
   // Last, because it reads both halves: what a locale said and what the English
   // it is translating names. A parameter nothing supplies throws at the moment
   // the screen is drawn, so it is refused where the value is assembled instead,
   // and a translated line the segment grammar cannot read is refused beside it
   // for the same reason: it would otherwise throw out of the dialogue.
-  const byNamespace = new Map(
-    modules.map((module) => [module.namespace, module]),
-  );
+  const byNamespace = new Map(modules.map((module) => [module.namespace, module]));
   for (const declared of registry.locales.sections) {
     for (const { key, value } of declared.entries) {
-      const error = localeValueProblem(
-        registry.locales,
-        declared.language,
-        key,
-        value,
-      );
+      const error = localeValueProblem(registry.locales, declared.language, key, value);
       if (error)
         return {
           failure: {
             module: byNamespace.get(declared.module) ?? modules[0],
-            stage: "build",
+            stage: 'build',
             error,
           },
         };
@@ -1581,16 +1068,11 @@ function compileModules(
 
 export function loadUniverse(sources: readonly ModuleSource[]): Registry {
   const compiled = compileModules(parseUniverse(sources.filter(sourceEnabled)));
-  if ("failure" in compiled) throw compiled.failure.error;
+  if ('failure' in compiled) throw compiled.failure.error;
   return compiled.registry;
 }
 
-function parseActiveSources(
-  sources: readonly ModuleSource[],
-  diagnostics: ModuleDiagnostic[],
-  disabled: Set<ModuleSource>,
-  statuses: Map<ModuleSource, ModuleStatus>,
-): ParsedModule[] | null {
+function parseActiveSources(sources: readonly ModuleSource[], diagnostics: ModuleDiagnostic[], disabled: Set<ModuleSource>, statuses: Map<ModuleSource, ModuleStatus>): ParsedModule[] | null {
   const modules: ParsedModule[] = [];
   let failed = false;
   for (const source of sources) {
@@ -1598,7 +1080,7 @@ function parseActiveSources(
       modules.push(parseModuleSource(source));
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
-      diagnostics.push(diagnostic(source, source.name, "parse", error));
+      diagnostics.push(diagnostic(source, source.name, 'parse', error));
       disabled.add(source);
       statuses.set(source, moduleStatus(source, source.name, undefined, false));
       failed = true;
@@ -1607,9 +1089,7 @@ function parseActiveSources(
   return failed ? null : modules;
 }
 
-export function loadUniverseWithDiagnostics(
-  sources: readonly ModuleSource[],
-): UniverseLoadResult {
+export function loadUniverseWithDiagnostics(sources: readonly ModuleSource[]): UniverseLoadResult {
   const diagnostics: ModuleDiagnostic[] = [];
   const disabled = new Set<ModuleSource>();
   const statuses = new Map<ModuleSource, ModuleStatus>();
@@ -1619,10 +1099,7 @@ export function loadUniverseWithDiagnostics(
   // switching a broken module off is an exit from its problems, not a rename.
   for (const source of sources.filter((source) => !sourceEnabled(source))) {
     try {
-      statuses.set(
-        source,
-        parsedModuleStatus(parseModuleSource(source), false),
-      );
+      statuses.set(source, parsedModuleStatus(parseModuleSource(source), false));
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       statuses.set(source, moduleStatus(source, source.name, undefined, false));
@@ -1640,11 +1117,7 @@ export function loadUniverseWithDiagnostics(
     }
 
     if (modules.length === 0) {
-      const modules = sources.map(
-        (source) =>
-          statuses.get(source) ??
-          moduleStatus(source, source.name, undefined, false),
-      );
+      const modules = sources.map((source) => statuses.get(source) ?? moduleStatus(source, source.name, undefined, false));
       return {
         registry: emptyRegistry(),
         diagnostics,
@@ -1658,19 +1131,9 @@ export function loadUniverseWithDiagnostics(
     const orderProblems = moduleOrderProblems(modules);
     if (orderProblems.length > 0) {
       for (const problem of orderProblems) {
-        diagnostics.push(
-          diagnostic(
-            problem.module.source,
-            problem.module.info.id,
-            "order",
-            problem.error,
-          ),
-        );
+        diagnostics.push(diagnostic(problem.module.source, problem.module.info.id, 'order', problem.error));
         disabled.add(problem.module.source);
-        statuses.set(
-          problem.module.source,
-          parsedModuleStatus(problem.module, false),
-        );
+        statuses.set(problem.module.source, parsedModuleStatus(problem.module, false));
       }
       active = active.filter((source) => !disabled.has(source));
       continue;
@@ -1678,14 +1141,9 @@ export function loadUniverseWithDiagnostics(
 
     const ordered = orderModules(modules);
     const compiled = compileModules(ordered);
-    if (!("failure" in compiled)) {
-      for (const module of ordered)
-        statuses.set(module.source, parsedModuleStatus(module, true));
-      const modules = sources.map(
-        (source) =>
-          statuses.get(source) ??
-          moduleStatus(source, source.name, undefined, false),
-      );
+    if (!('failure' in compiled)) {
+      for (const module of ordered) statuses.set(module.source, parsedModuleStatus(module, true));
+      const modules = sources.map((source) => statuses.get(source) ?? moduleStatus(source, source.name, undefined, false));
       return {
         registry: compiled.registry,
         diagnostics,
@@ -1696,22 +1154,11 @@ export function loadUniverseWithDiagnostics(
       };
     }
 
-    diagnostics.push(
-      diagnostic(
-        compiled.failure.module.source,
-        compiled.failure.module.info.id,
-        compiled.failure.stage,
-        compiled.failure.error,
-      ),
-    );
+    diagnostics.push(diagnostic(compiled.failure.module.source, compiled.failure.module.info.id, compiled.failure.stage, compiled.failure.error));
     disabled.add(compiled.failure.module.source);
-    statuses.set(
-      compiled.failure.module.source,
-      parsedModuleStatus(compiled.failure.module, false),
-    );
+    statuses.set(compiled.failure.module.source, parsedModuleStatus(compiled.failure.module, false));
     active = active.filter((source) => !disabled.has(source));
   }
 }
 
-export const loadModule = (source: string): Registry =>
-  loadUniverse([{ name: "anonymous", text: source }]);
+export const loadModule = (source: string): Registry => loadUniverse([{ name: 'anonymous', text: source }]);

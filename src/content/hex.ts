@@ -2,7 +2,7 @@
 // directions carry constant neighbour deltas, so the plane needs no
 // odd/even row case. The order below is the cycle rotation walks around:
 // index i and i+3 (mod 6) are always opposite.
-export const DIRECTIONS = ["e", "ne", "nw", "w", "sw", "se"] as const;
+export const DIRECTIONS = ['e', 'ne', 'nw', 'w', 'sw', 'se'] as const;
 export type Direction = (typeof DIRECTIONS)[number];
 
 // A place on the plane, and — the same pair read as a vector — the step from
@@ -45,9 +45,7 @@ export function rotationOnto(from: Direction, to: Direction): number {
 // The two things a point may be spent on, and the two things adjacency runs
 // between: a numbered position of the cluster standing in a hex, or a jewel
 // slot on one of that hex's edges.
-export type PlaneNode =
-  | { readonly hex: Hex; readonly kind: "position"; readonly position: number }
-  | { readonly hex: Hex; readonly kind: "slot"; readonly direction: Direction };
+export type PlaneNode = { readonly hex: Hex; readonly kind: 'position'; readonly position: number } | { readonly hex: Hex; readonly kind: 'slot'; readonly direction: Direction };
 
 export const hexKey = (hex: Hex): string => `${hex.q},${hex.r}`;
 

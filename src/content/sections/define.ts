@@ -1,18 +1,9 @@
-import { actionLines } from "../../grammar/action";
-import { DslError } from "../../grammar/parser";
-import { RawSection, sectionParser } from "../../grammar/structure";
-import {
-  AnySchema,
-  Authored,
-  HydrateContext,
-  PrintContext,
-  SectionSchema,
-  hydrateSection,
-  parseAnySection,
-  printSection,
-} from "../../grammar/section";
-import { Visit } from "../refs";
-import { mergeFields } from "../merge";
+import { actionLines } from '../../grammar/action';
+import { DslError } from '../../grammar/parser';
+import { RawSection, sectionParser } from '../../grammar/structure';
+import { AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, parseAnySection, printSection } from '../../grammar/section';
+import { Visit } from '../refs';
+import { mergeFields } from '../merge';
 
 export type { PrintContext };
 
@@ -20,7 +11,7 @@ export type { PrintContext };
 // with the declaring module's namespace, `global` means the name means the same
 // thing in every module that says it, `none` means the section declares nothing
 // anyone else can name.
-export type Ids = "owned" | "global" | "none";
+export type Ids = 'owned' | 'global' | 'none';
 
 // The registry as a writer sees it. Readers get `Registry`, whose every map is
 // derived from the kinds that fill it.
@@ -37,10 +28,7 @@ export type Lands<V, M extends Record<string, unknown>> = {
 // Everything anyone asks about a section kind, in one shape. Every field is
 // filled in — `section()` supplies the schema-driven answer for any the kind
 // did not write — so no consumer branches on which kind it is holding.
-export interface Section<
-  V extends { id: string } = { id: string },
-  M extends Record<string, unknown> = Record<string, unknown>,
-> {
+export interface Section<V extends { id: string } = { id: string }, M extends Record<string, unknown> = Record<string, unknown>> {
   kind: string;
   ids: Ids;
   // The map a printed section is read back out of, and the one a reference to
@@ -73,11 +61,7 @@ interface Common<V extends { id: string }> {
 
 // A kind the key/value engine reads: it declares its fields and gets its
 // parser, its printer and its merge from them.
-type Schematic<
-  V extends { id: string },
-  F extends keyof V,
-  E extends keyof V,
-> = Common<V> & Omit<SectionSchema<V, F, E>, "kind">;
+type Schematic<V extends { id: string }, F extends keyof V, E extends keyof V> = Common<V> & Omit<SectionSchema<V, F, E>, 'kind'>;
 
 // A kind whose grammar is too far from key/value to fit the engine. It brings
 // the two halves the engine would have supplied, and nothing else differs.
@@ -92,50 +76,31 @@ interface Bespoke<V extends { id: string }> extends Common<V> {
 // and the answer is the kind's own `nestsActions`, recorded as it declares it.
 const ACTION_OWNERS = new Set<string>();
 
-export const isActionOwnerKind = (kind: string): boolean =>
-  ACTION_OWNERS.has(kind);
+export const isActionOwnerKind = (kind: string): boolean => ACTION_OWNERS.has(kind);
 
 const notContent = (kind: string): never => {
-  throw new DslError(
-    `a # ${kind} is not content and cannot be built into the registry`,
-  );
+  throw new DslError(`a # ${kind} is not content and cannot be built into the registry`);
 };
 
 // Curried so that the value type is written and the map name is inferred: a
 // single call cannot do both, and the map name has to stay the literal it was
 // written as or the registry it keys cannot derive its own maps.
 export const section =
-  <
-    V extends { id: string },
-    F extends keyof V = never,
-    E extends keyof V = never,
-  >() =>
-  <
-    const Name extends string = never,
-    Filled extends Record<string, unknown> = Record<Name, V>,
-  >(
+  <V extends { id: string }, F extends keyof V = never, E extends keyof V = never>() =>
+  <const Name extends string = never, Filled extends Record<string, unknown> = Record<Name, V>>(
     spec: (Schematic<V, F, E> | Bespoke<V>) & {
       map?: Name;
       maps?: Lands<V, Filled>;
     },
   ): Section<V, Filled> => {
-    const {
-      kind,
-      ids,
-      map,
-      maps,
-      nestsActions = false,
-      text = [],
-      validate,
-      visit,
-      merge,
-      print,
-    } = spec;
-    const schema =
-      "fields" in spec
-        ? ({ ...spec, kind } as unknown as AnySchema)
-        : undefined;
+    const { kind, ids, map, maps, nestsActions = false, text = [], validate, visit, merge, print } = spec;
+    const schema = 'fields' in spec ? ({ ...spec, kind } as unknown as AnySchema) : undefined;
     if (nestsActions) ACTION_OWNERS.add(kind);
+  // A kind declares its fields or it brings a parser; neither is a kind that
+  // cannot read itself. Refused here rather than at the first section, because
+  // a half-initialised import is what makes this undefined and the file that
+  // did it is the one worth naming.
+  if (schema === undefined && typeof (spec as Bespoke<V>).parse !== 'function') throw new Error(`# ${kind} declares neither fields nor a parse`);
     const built = (value: V): V => {
       const problem = validate?.(value);
       if (problem) throw new DslError(`# ${kind} ${value.id}: ${problem}`);
@@ -145,47 +110,14 @@ export const section =
       kind,
       ids,
       map: map ?? (maps === undefined ? null : Object.keys(maps)[0]!),
-      maps: (maps ??
-        (map === undefined
-          ? {}
-          : { [map]: (value: V) => [[value.id, value] as const] })) as Lands<
-        V,
-        Filled
-      >,
+      maps: (maps ?? (map === undefined ? {} : { [map]: (value: V) => [[value.id, value] as const] })) as Lands<V, Filled>,
       nestsActions,
       text,
       schema,
-      parse: sectionParser(
-        schema
-          ? (raw) => parseAnySection(raw, schema)
-          : (spec as Bespoke<V>).parse,
-      ),
-      merge:
-        merge ??
-        ((into, from) =>
-          schema
-            ? mergeFields(
-                (into as Record<string, unknown>) ?? { id: (from as V).id },
-                from as Record<string, unknown>,
-                schema,
-              )
-            : (into ?? from)),
-      build: schema
-        ? (authored, context) =>
-            built(
-              hydrateSection(
-                authored as Authored<V>,
-                schema as unknown as SectionSchema<V, F, E>,
-                context,
-              ) as V,
-            )
-        : (authored) => built(authored as V),
-      print:
-        print ??
-        (schema
-          ? (value, context) =>
-              printSection(value, schema, context, actionLines)
-          : () => notContent(kind)),
+      parse: sectionParser(schema ? (raw) => parseAnySection(raw, schema) : (spec as Bespoke<V>).parse),
+      merge: merge ?? ((into, from) => (schema ? mergeFields((into as Record<string, unknown>) ?? { id: (from as V).id }, from as Record<string, unknown>, schema) : (into ?? from))),
+      build: schema ? (authored, context) => built(hydrateSection(authored as Authored<V>, schema as unknown as SectionSchema<V, F, E>, context) as V) : (authored) => built(authored as V),
+      print: print ?? (schema ? (value, context) => printSection(value, schema, context, actionLines) : () => notContent(kind)),
       visit: visit ?? (() => {}),
     } as Section<V, Filled>;
   };

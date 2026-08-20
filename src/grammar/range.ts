@@ -1,4 +1,4 @@
-import { DslError, Parser } from "./parser";
+import { DslError, Parser } from './parser';
 
 // Stored rather than collapsed at authoring time, so `4-7` rolls fresh per use
 // instead of averaging to 5.5 forever.
@@ -13,15 +13,9 @@ export const point = (value: number): Range => ({ min: value, max: value });
 // is the one source of a Range nothing parsed, so the question has to be asked
 // somewhere; here, because this is where what a Range is is decided.
 export const isRange = (value: unknown): value is Range => {
-  if (typeof value !== "object" || value === null) return false;
+  if (typeof value !== 'object' || value === null) return false;
   const { min, max } = value as { min?: unknown; max?: unknown };
-  return (
-    typeof min === "number" &&
-    Number.isFinite(min) &&
-    typeof max === "number" &&
-    Number.isFinite(max) &&
-    min <= max
-  );
+  return typeof min === 'number' && Number.isFinite(min) && typeof max === 'number' && Number.isFinite(max) && min <= max;
 };
 
 export const isPoint = (range: Range): boolean => range.min === range.max;
@@ -38,17 +32,12 @@ export const scaleRange = (range: Range, factor: number): Range => ({
 
 export const midpoint = (range: Range): number => (range.min + range.max) / 2;
 
-export const sampleRange = (range: Range, roll: number): number =>
-  range.min + (range.max - range.min) * roll;
+export const sampleRange = (range: Range, roll: number): number => range.min + (range.max - range.min) * roll;
 
 // Items and xp are whole, so `4-7` must land on one of four values rather than
 // on 5.2. `roll` is taken as [0, 1] rather than [0, 1), which is what the clamp
 // buys: this stays total for any caller, without a claim about any one of them.
-export const sampleCount = (range: Range, roll: number): number =>
-  Math.min(
-    range.max,
-    Math.floor(range.min + (range.max - range.min + 1) * roll),
-  );
+export const sampleCount = (range: Range, roll: number): number => Math.min(range.max, Math.floor(range.min + (range.max - range.min + 1) * roll));
 
 const RANGE = /(?<lo>-?\d+(?:\.\d+)?)(?:-(?<hi>-?\d+(?:\.\d+)?))?/;
 
@@ -60,21 +49,15 @@ export const range: Parser<Range> = {
       start: cursor.abs(start),
       end: cursor.abs(start + (match?.[0].length ?? 0)),
     };
-    if (!match)
-      throw new DslError("expected a number or a range like 4-7", span);
+    if (!match) throw new DslError('expected a number or a range like 4-7', span);
     cursor.pos += match[0].length;
 
     const min = Number(match.groups!.lo);
     if (match.groups!.hi === undefined) return point(min);
     const max = Number(match.groups!.hi);
-    if (max < min)
-      throw new DslError(
-        `range upper bound must be at least its lower bound, got ${match[0]}`,
-        span,
-      );
+    if (max < min) throw new DslError(`range upper bound must be at least its lower bound, got ${match[0]}`, span);
     return { min, max };
   },
-  print: (value) =>
-    isPoint(value) ? String(value.min) : `${value.min}-${value.max}`,
-  examples: ["5", "4-7", "-3", "1.5", "0.5-2", "-3--1"],
+  print: (value) => (isPoint(value) ? String(value.min) : `${value.min}-${value.max}`),
+  examples: ['5', '4-7', '-3', '1.5', '0.5-2', '-3--1'],
 };
