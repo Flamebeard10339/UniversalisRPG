@@ -1,3 +1,4 @@
+import { actionResultLists } from '../../grammar/action';
 import { Action, actionBody, actionLines } from '../../grammar/action';
 import { Condition, condition } from '../../grammar/condition';
 import { list } from '../../grammar/list';
@@ -164,6 +165,8 @@ const printLocation = (value: Location, context: PrintContext): readonly string[
 };
 
 export const location = section<Location, 'starting', 'actions'>()({
+  flags: [DISCOVERED],
+  says: (value) => value.actions.flatMap(actionResultLists),
   ...SCHEMA,
   ids: 'owned',
   map: 'locations',

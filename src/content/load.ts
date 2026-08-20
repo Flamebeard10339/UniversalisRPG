@@ -150,20 +150,13 @@ function recordProse(registry: Registry, owner: ProseOwner, field: string, text:
   return key;
 }
 
-const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onFailure, action.onUnfinished].filter((list): list is ActionResult[] => list !== undefined);
 
 function authoredResults(registry: Registry): Array<[string, string, ActionResult[][]]> {
-  const owners: Array<[string, string, ActionResult[][]]> = [];
-  for (const [id, action] of registry.actions) owners.push(['action', id, actionResultLists(action)]);
-  for (const entity of registry.entities.values()) {
-    const blocks = entity.blocks.flatMap((block) => (isHandlerBlock(block) ? [block.results] : actionResultLists(block)));
-    owners.push(['entity', entity.id, [...blocks, entity.onHit, entity.whenHit]]);
-  }
-  for (const location of registry.locations.values()) owners.push(['location', location.id, location.actions.flatMap(actionResultLists)]);
-  for (const item of registry.items.values()) owners.push(['item', item.id, [...item.actions.flatMap(actionResultLists), item.onHit, item.whenHit]]);
-  for (const [id, table] of registry.dropTables) owners.push(['droptable', id, [table.results]]);
-  for (const [id, action] of registry.recipeActions) owners.push(['recipe', id, actionResultLists(action)]);
-  return owners;
+  return contentSectionMaps().flatMap(([kind, mapName]) => {
+    const says = sectionFor(kind)!.says as ((value: unknown) => ActionResult[][]) | undefined;
+    if (says === undefined) return [];
+    return [...mapOf(registry, mapName)].map(([id, value]) => [kind, id, says(value)] as [string, string, ActionResult[][]]);
+  });
 }
 
 function stampSays(registry: Registry, owner: ProseOwner, lists: readonly (readonly ActionResult[])[], field: (index: number) => string): void {

@@ -1,3 +1,4 @@
+import { actionResultLists } from '../../grammar/action';
 import { Action, actionBody } from '../../grammar/action';
 import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
@@ -62,6 +63,7 @@ function roleProblem(item: Item): string | undefined {
 }
 
 export const item = section<Item, never, 'actions'>()({
+  says: (value) => [...value.actions.flatMap(actionResultLists), value.onHit, value.whenHit],
   kind: 'item',
   ids: 'owned',
   map: 'items',

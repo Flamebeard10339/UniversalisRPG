@@ -1,3 +1,4 @@
+import { actionResultLists } from '../../grammar/action';
 import { Action, actionBody } from '../../grammar/action';
 import { ActionResult, resultBlock, resultList } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
@@ -100,6 +101,7 @@ const entityBlock: EntryBody = {
 };
 
 export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
+  says: (value) => [...value.blocks.flatMap((block) => (isHandlerBlock(block) ? [block.results] : actionResultLists(block))), value.onHit, value.whenHit],
   kind: 'entity',
   ids: 'owned',
   maps: {

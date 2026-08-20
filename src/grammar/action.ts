@@ -386,3 +386,5 @@ export function actionLines(action: Action): string[] {
   printResultBlock(lines, `${at('onUnfinished')}on unfinished`, action.onUnfinished, 4);
   return lines;
 }
+
+export const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onFailure, action.onUnfinished].filter((list): list is ActionResult[] => list !== undefined);

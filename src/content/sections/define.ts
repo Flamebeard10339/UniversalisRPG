@@ -1,4 +1,5 @@
 import { actionLines } from '../../grammar/action';
+import { ActionResult } from '../../grammar/actionResult';
 import { DslError } from '../../grammar/parser';
 import { RawSection, sectionParser } from '../../grammar/structure';
 import { AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, parseAnySection, printSection } from '../../grammar/section';
@@ -22,6 +23,8 @@ export interface Section<V extends { id: string } = { id: string }, M extends Re
   map: string | null;
   maps: Lands<V, M>;
   nestsActions: boolean;
+  flags: readonly string[];
+  says?: (value: V) => ActionResult[][];
   text: readonly string[];
   schema?: AnySchema;
   parse(raw: RawSection): object;
@@ -36,6 +39,10 @@ interface Common<V extends { id: string }> {
   kind: string;
   ids: Ids;
   nestsActions?: true;
+  // Flags every section of this kind owns without an author writing them.
+  flags?: readonly string[];
+  // The result lists an author wrote here, whose spoken lines key under this id.
+  says?: (value: V) => ActionResult[][];
   text?: readonly string[];
   validate?: (value: V) => string | undefined;
   visit?: (value: V, where: string, visit: Visit) => void;
@@ -67,7 +74,7 @@ export const section =
       maps?: Lands<V, Filled>;
     },
   ): Section<V, Filled> => {
-    const { kind, ids, map, maps, nestsActions = false, text = [], validate, visit, merge, print, prune } = spec;
+    const { kind, ids, map, maps, nestsActions = false, flags = [], says, text = [], validate, visit, merge, print, prune } = spec;
     const walk = visit ?? ((): void => {});
     const schema = 'fields' in spec ? ({ ...spec, kind } as unknown as AnySchema) : undefined;
     if (nestsActions) ACTION_OWNERS.add(kind);
@@ -83,6 +90,8 @@ export const section =
       map: map ?? (maps === undefined ? null : Object.keys(maps)[0]!),
       maps: (maps ?? (map === undefined ? {} : { [map]: (value: V) => [[value.id, value] as const] })) as Lands<V, Filled>,
       nestsActions,
+      flags,
+      says,
       text,
       schema,
       parse: sectionParser(schema ? (raw) => parseAnySection(raw, schema) : (spec as Bespoke<V>).parse),

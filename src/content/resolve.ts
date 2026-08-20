@@ -1,6 +1,5 @@
 import { Action } from '../grammar/action';
 import { actionSlug } from './locale';
-import { DISCOVERED } from './sections/location';
 import { DslError } from '../grammar/parser';
 import { EntityBlock, isHandlerBlock } from './sections/entity';
 import { lastSegment } from '../grammar/values';
@@ -8,7 +7,7 @@ import { VISITS } from '../grammar/condition';
 import { isFieldEdits, listMembers } from '../grammar/section';
 import { ACTION_MEMBER, Namespace, qualify } from './namespace';
 import { isNamespacedKind } from './sections';
-import { isActionOwnerKind } from './sections';
+import { isActionOwnerKind, sectionFor } from './sections';
 import { ParsedModule } from './universe';
 import { ReferenceKind } from './refs';
 import { visitSection } from './sections';
@@ -88,10 +87,10 @@ export function actionAddresses(kind: string, value: MemberOwner): string[] {
 
 export function declareMembers(namespace: Namespace, kind: string, value: MemberOwner): Member[] {
   const declared: Member[] = [];
-  if (kind === 'location')
+  for (const minted of sectionFor(kind)?.flags ?? [])
     declared.push({
       kind: 'flag',
-      key: namespace.declareMember('flag', kind, value.id, DISCOVERED),
+      key: namespace.declareMember('flag', kind, value.id, minted),
     });
   for (const flag of addedMembers<string>(value.flags))
     declared.push({

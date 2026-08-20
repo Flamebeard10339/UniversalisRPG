@@ -1,3 +1,4 @@
+import { actionResultLists } from '../../grammar/action';
 import { Action, actionBody, actionLines, actionProblem, assembledActionProblem } from '../../grammar/action';
 import { DslError } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
@@ -39,6 +40,7 @@ export const actionTextKey = (owner: ActionTextOwner): string => localeKey(owner
 const TITLE = /^title:[ \t]*/;
 
 export const action = section<ActionDeclaration>()({
+  says: (value) => actionResultLists(value),
   kind: 'action',
   ids: 'owned',
   map: 'actions',

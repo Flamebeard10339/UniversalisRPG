@@ -10,6 +10,7 @@ export interface DropTable {
 }
 
 export const droptable = section<DropTable>()({
+  says: (value) => [value.results],
   kind: 'droptable',
   ids: 'owned',
   map: 'dropTables',

@@ -1,3 +1,4 @@
+import { actionResultLists } from '../../grammar/action';
 import { Action } from '../../grammar/action';
 import { ActionResult } from '../../grammar/actionResult';
 import { list } from '../../grammar/list';
@@ -34,7 +35,7 @@ export const recipeSkillValue: Parser<{ skill: string; amount: number }> = {
   examples: ['smithing 5'],
 };
 
-function recipeAction(recipe: Recipe): ActionDeclaration {
+function compile(recipe: Recipe): ActionDeclaration {
   const takes: ActionResult[] = recipe.in.map((q) => ({
     kind: 'take',
     item: q.item,
@@ -86,7 +87,20 @@ function recipeAction(recipe: Recipe): ActionDeclaration {
   return action;
 }
 
+const compiled = new WeakMap<Recipe, ActionDeclaration>();
+
+// One compiled craft per recipe, because keying the words it speaks stamps the
+// result objects themselves — the registry and the prose walk must hold the same.
+function recipeAction(recipe: Recipe): ActionDeclaration {
+  const already = compiled.get(recipe);
+  if (already) return already;
+  const made = compile(recipe);
+  compiled.set(recipe, made);
+  return made;
+}
+
 export const recipe = section<Recipe>()({
+  says: (value) => actionResultLists(recipeAction(value)),
   kind: 'recipe',
   ids: 'owned',
   maps: {
