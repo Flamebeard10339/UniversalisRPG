@@ -1,6 +1,6 @@
-import { ClusterJewel, DEFAULT_MOD_SLOTS } from '../content/clusterJewel';
+import { ClusterJewel, DEFAULT_MOD_SLOTS } from '../content/sections/clusterJewel';
 import { Direction, DIRECTIONS, Hex, hexKey, NEIGHBOR_DELTA, opposite, parseHexKey, PlaneNode, rotate, rotationOnto } from '../content/hex';
-import { isBase, Item } from '../content/item';
+import { isBase, Item } from '../content/sections/item';
 import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';
 import { aCount, anId, says, type Said } from './said';

@@ -1,10 +1,10 @@
 import { RuntimeError } from './error';
 import { ActionResult } from '../grammar/actionResult';
 import { evaluateCondition } from './conditions';
-import { Action } from '../content/entity';
-import { actionAddress, ActionDeclaration } from '../content/action';
+import { Action } from '../content/sections/entity';
+import { actionAddress, ActionDeclaration } from '../content/sections/action';
 import { humanizeEn } from '../grammar/values';
-import { Location } from '../content/location';
+import { Location } from '../content/sections/location';
 import { Registry } from '../content/registry';
 import { copiesOf } from './itemInstance';
 import { BASE_LANGUAGE, localizerFor, type Localized, type Localizer } from './localized';

@@ -1,8 +1,8 @@
 import { RuntimeError } from './error';
 import { Action } from '../grammar/action';
-import { actionTextKey, actionTextOwner } from '../content/action';
+import { actionTextKey, actionTextOwner } from '../content/sections/action';
 import { EngineKey, localeKey, Locales } from '../content/locale';
-import { parseSegments, TextSegment } from '../content/dialogue';
+import { parseSegments, TextSegment } from '../content/sections/dialogue';
 import { Registry } from '../content/registry';
 import { articleEn } from '../grammar/values';
 

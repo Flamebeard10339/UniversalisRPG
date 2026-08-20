@@ -1,5 +1,5 @@
 import { ActionResult } from '../grammar/actionResult';
-import { Entity } from '../content/entity';
+import { Entity } from '../content/sections/entity';
 import { grantValue, SkillGrant } from '../grammar/skillGrant';
 import { point } from '../grammar/range';
 import { Registry } from '../content/registry';

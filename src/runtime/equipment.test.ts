@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { armFightAction, createGameState, equip, GameState, initResources, resolve, statValue, unequip } from './runtime';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
-import { parseSaveSection } from '../content/saveSection';
+import { parseSaveSection } from '../content/sections/save';
 import { carriedCount, carriesItem, feedItem } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { secondsToMs, toMilliUnits } from './units';

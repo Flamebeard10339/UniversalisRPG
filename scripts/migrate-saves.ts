@@ -4,7 +4,7 @@ import path from 'node:path';
 import { qualify } from '../src/content/namespace';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
-import { parseSaveSection } from '../src/content/saveSection';
+import { parseSaveSection } from '../src/content/sections/save';
 import type { ModuleSource } from '../src/content/universe';
 import { splitSections } from '../src/grammar/structure';
 import type { Span } from '../src/grammar/parser';
@@ -145,8 +145,8 @@ export function migrate(files: readonly ContentFile[], change: ShapeChange | nul
     const namespace = namespaces.get(sources[index]) ?? null;
     for (const section of splitSections(file.text)) {
       if (section.kind !== 'save') continue;
-      const { id, saved } = parseSaveSection(section);
-      const fixture: Fixture = { id: qualify(namespace, id), file: file.path, version: saved.version };
+      const saved = parseSaveSection(section);
+      const fixture: Fixture = { id: qualify(namespace, saved.id), file: file.path, version: saved.version };
       fixtures.push(fixture);
       if (saved.version === SAVE_VERSION) {
         skipped.push(fixture);

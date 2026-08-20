@@ -1,4 +1,4 @@
-import { ClusterEffect, Item } from '../content/item';
+import { ClusterEffect, Item } from '../content/sections/item';
 import { Direction, DIRECTIONS, Hex, hexKey, NEIGHBOR_DELTA, opposite, PlaneNode } from '../content/hex';
 import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';

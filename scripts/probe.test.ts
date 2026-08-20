@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CONTENT_SECTION_MAPS } from '../src/content/registry';
+
+import { contentSectionMaps } from '../src/content/sections';
 import type { ModuleSource } from '../src/content/universe';
 import { tsxCli } from './lib/tsxCli';
 import { parseProbeArgs, probe, splitDocuments, type ProbeOptions } from './probe';
@@ -69,7 +70,7 @@ describe('probe: --show', () => {
   });
 
   it('accepts every kind the loader defines, without naming any of them itself', () => {
-    for (const [kind] of CONTENT_SECTION_MAPS) {
+    for (const [kind] of contentSectionMaps()) {
       const result = report([BASE], { show: [`${kind}.base.nothing-by-this-name`], roundTrip: false });
       expect(result.lines.join('\n'), kind).not.toContain('names nothing the registry holds');
     }
@@ -93,7 +94,7 @@ describe('probe: --show', () => {
     const lines = result.lines.join('\n');
     expect(lines).toContain('names nothing the registry holds');
     expect(lines).toMatch(/section kinds: .*\bentity\b/);
-    for (const [kind] of CONTENT_SECTION_MAPS) expect(lines).toContain(kind);
+    for (const [kind] of contentSectionMaps()) expect(lines).toContain(kind);
   });
 
   it('refuses an absent id and lists what that kind does define', () => {

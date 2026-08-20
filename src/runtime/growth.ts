@@ -1,6 +1,6 @@
 import { RuntimeError } from './error';
 import { Registry } from '../content/registry';
-import { GrowthDirective, isGrowthDirective, parseDirectiveLine } from '../content/test';
+import { GrowthDirective, isGrowthDirective, parseDirectiveLine } from '../content/sections/test';
 import { applyClusterEffect } from './clusterEffect';
 import { allocate, feedItem, Growth, slotJewel } from './itemInstance';
 import { GameState } from './state';

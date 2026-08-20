@@ -12,10 +12,10 @@ import {
   renderLocalChangesModule,
   upsertLocalSection,
 } from '../content/localChanges';
-import { isGrowthDirective, parseDirectiveLine, type Directive } from '../content/test';
+import { isGrowthDirective, parseDirectiveLine, type Directive } from '../content/sections/test';
 import { printDirective } from '../content/serialize';
 import { resolveCarried, resolveDirective } from '../content/typed';
-import { type ParsedSave } from '../content/saveSection';
+import { type ParsedSave } from '../content/sections/save';
 import { describeCondition } from './runtime';
 import { wornCopySlot } from './itemInstance';
 import { type Answer, type Localized, type Localizer } from './localized';

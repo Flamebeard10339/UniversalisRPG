@@ -1,4 +1,4 @@
-import { Item } from '../content/item';
+import { Item } from '../content/sections/item';
 import { Registry } from '../content/registry';
 import { addRanges, point, Range, scaleRange } from '../grammar/range';
 import { BonusAmount, Counter } from '../grammar/tagClause';

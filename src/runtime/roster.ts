@@ -1,6 +1,6 @@
 import { Action } from '../grammar/action';
-import { actionAddress } from '../content/action';
-import { declaredId, Entity } from '../content/entity';
+import { actionAddress } from '../content/sections/action';
+import { declaredId, Entity } from '../content/sections/entity';
 import { Registry } from '../content/registry';
 import { actionVisible, findActiveAction, findActionOwner, requiresMet } from './actions';
 import { type Cadence, GameState, PLAYER, type Seat, templateOf } from './state';

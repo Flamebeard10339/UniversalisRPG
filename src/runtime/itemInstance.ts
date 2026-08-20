@@ -1,5 +1,5 @@
 import { Direction, Hex, PlaneNode } from '../content/hex';
-import { Item } from '../content/item';
+import { Item } from '../content/sections/item';
 import { Registry } from '../content/registry';
 import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
 import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';

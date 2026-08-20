@@ -1,4 +1,4 @@
-import { DISCOVERED } from '../content/location';
+import { DISCOVERED } from '../content/sections/location';
 import type { Registry } from '../content/registry';
 import { evaluateCondition, truthy } from './conditions';
 import type { GameState } from './state';

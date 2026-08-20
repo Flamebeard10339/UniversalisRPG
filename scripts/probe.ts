@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatVersion } from '../src/grammar/dependency';
-import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, type Registry } from '../src/content/registry';
+import {  formatModuleDiagnostic, type Registry } from '../src/content/registry';
+import { mapOf } from '../src/content/registry';
+import { contentSectionMaps } from '../src/content/sections';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from '../src/content/serialize';
 import { type ModuleSource, type ParsedModule } from '../src/content/universe';
@@ -28,7 +30,7 @@ export interface ProbeReport {
 // by. `--show variables.x` used to be the spelling for the four maps no section
 // kind claimed, and `variable` was the natural wrong guess; it is now the right
 // one.
-const SHOWABLE = new Map<string, keyof Registry>(CONTENT_SECTION_MAPS);
+const SHOWABLE = new Map<string, string>(contentSectionMaps());
 
 export const DOCUMENT_SEPARATOR = '---';
 
@@ -88,8 +90,8 @@ export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
 
 function counts(registry: Registry): string {
   const parts: string[] = [];
-  for (const [kind, map] of CONTENT_SECTION_MAPS) {
-    const size = (registry[map] as ReadonlyMap<string, unknown>).size;
+  for (const [kind, map] of contentSectionMaps()) {
+    const size = (mapOf(registry, map) as ReadonlyMap<string, unknown>).size;
     if (size > 0) parts.push(`${kind} ${size}`);
   }
   return parts.length > 0 ? parts.join(', ') : 'nothing';
@@ -102,10 +104,10 @@ function showRecord(registry: Registry, spec: string): { lines: string[]; ok: bo
   const id = spec.slice(dot + 1);
   const map = SHOWABLE.get(kind);
   if (map === undefined) {
-    const kinds = CONTENT_SECTION_MAPS.map(([each]) => each).join(', ');
+    const kinds = contentSectionMaps().map(([each]) => each).join(', ');
     return { lines: [`${spec}: ${kind} names nothing the registry holds.`, `  section kinds: ${kinds}`], ok: false };
   }
-  const records = registry[map] as ReadonlyMap<string, unknown>;
+  const records = mapOf(registry, map) as ReadonlyMap<string, unknown>;
   const record = records.get(id);
   if (record === undefined) {
     const defined = [...records.keys()].sort();

@@ -80,10 +80,10 @@ const showing = (html: string): string[] => paired(html, 'data-surface', 'data-s
 
 const opened = (html: string): string[] => paired(html, 'data-section', 'data-opened');
 
-const SECTIONS = addressable(SHIPPED_SOURCES);
+const addressed = addressable(SHIPPED_SOURCES);
 
 const found = (kind: string): string => {
-  const section = SECTIONS.find((each) => each.kind === kind);
+  const section = addressed.find((each) => each.kind === kind);
   if (!section) throw new Error(`the shipped modules hold no # ${kind}`);
   return sectionKey(section);
 };

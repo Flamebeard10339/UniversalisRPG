@@ -7,7 +7,7 @@ import { declaredKey } from '../src/content/resolve';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { registryDiff } from '../src/content/registryDiff';
-import type { Removal } from '../src/content/removal';
+import type { Removal } from '../src/content/sections/remove';
 import type { ModuleSource, ParsedModule } from '../src/content/universe';
 
 export interface Declaration {

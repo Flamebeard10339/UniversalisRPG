@@ -3,7 +3,7 @@ import { armAction, armFightAction, createGameState, GameState, initResources, r
 import { HOOK_LABELS } from '../grammar/hook';
 import { loadInEnglish } from '../content/engineLocale';
 import { Registry } from '../content/registry';
-import { TRIGGER_NAMES } from '../content/event';
+import { TRIGGER_NAMES } from '../content/sections/event';
 import { secondsToMs } from './units';
 
 interface Moment {

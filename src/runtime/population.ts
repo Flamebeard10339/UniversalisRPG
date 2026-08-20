@@ -1,4 +1,4 @@
-import { Location, populationCount } from '../content/location';
+import { Location, populationCount } from '../content/sections/location';
 import { Registry } from '../content/registry';
 import { templateOf } from './state';
 import { evaluateCondition } from './conditions';

@@ -1,8 +1,8 @@
 import { RuntimeError } from './error';
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { actionAddress } from '../content/action';
-import { declaredId } from '../content/entity';
+import { actionAddress } from '../content/sections/action';
+import { declaredId } from '../content/sections/entity';
 import { everyActionTable } from '../content/registry';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { ENGINE_KEYS } from '../content/locale';

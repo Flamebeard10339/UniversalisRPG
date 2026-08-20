@@ -1,6 +1,6 @@
 import type { ModalChoice, ModalOption } from './modalOption';
 import { hexKey } from '../content/hex';
-import { Item } from '../content/item';
+import { Item } from '../content/sections/item';
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
 import { Answer, Localized, Localizer, localizerOf } from './localized';

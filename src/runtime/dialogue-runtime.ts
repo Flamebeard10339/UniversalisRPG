@@ -1,6 +1,6 @@
 import { RuntimeError } from './error';
 import { evaluateCondition, renderSegments } from './conditions';
-import { Choice, Dialogue, DialogueNode, Spoken } from '../content/dialogue';
+import { Choice, Dialogue, DialogueNode, Spoken } from '../content/sections/dialogue';
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';

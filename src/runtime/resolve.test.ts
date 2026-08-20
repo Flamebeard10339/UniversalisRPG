@@ -1,7 +1,7 @@
 import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
 import { ActiveAction, armAction, buffsOf, craft, createGameState, GameState, grantBuff, initResources, PLAYER, resolve, statValue, useAction } from './runtime';
-import { actionAddress } from '../content/action';
+import { actionAddress } from '../content/sections/action';
 import { Boundary, BoundarySource, boundarySourceName, requireBoundaryNotPast, requireForwardProgress, STALL_BOUND } from './forwardProgress';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { Registry } from '../content/registry';

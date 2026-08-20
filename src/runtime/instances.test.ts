@@ -13,7 +13,7 @@ import { anId, type Said } from './said';
 import { nextRandom } from './rng';
 import { createGameState } from './state';
 import { initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
-import { parseSaveSection } from '../content/saveSection';
+import { parseSaveSection } from '../content/sections/save';
 
 const MODULE = `
 # location camp

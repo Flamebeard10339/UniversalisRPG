@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Location } from '../content/location';
+import type { Location } from '../content/sections/location';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { addressable, MAPPED_KIND, NOWHERE, offeredBy, type Section } from './authoringSurface';
 import { drawnAt, PER_UNIT, placedAt, type Node } from './discovery';
@@ -7,9 +7,9 @@ import { createDriver, type Driver } from './driver';
 import { answering, droppedAt, movedTo, placedInto, settledOn } from './mapEdit';
 import { SHIPPED_SOURCES } from './shippedContent';
 
-const SECTIONS = addressable(SHIPPED_SOURCES);
+const addressed = addressable(SHIPPED_SOURCES);
 
-const DRAWN = offeredBy(SECTIONS, NOWHERE, 'map');
+const DRAWN = offeredBy(addressed, NOWHERE, 'map');
 
 const shipped = (): Map<string, Location> => loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations;
 

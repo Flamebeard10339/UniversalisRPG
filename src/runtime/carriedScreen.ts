@@ -1,5 +1,5 @@
 import type { ModalChoice, ModalOption } from './modalOption';
-import { isBase, Item } from '../content/item';
+import { isBase, Item } from '../content/sections/item';
 import type { EngineKey } from '../content/locale';
 import { Registry } from '../content/registry';
 import { equip, unequip } from './equipment';

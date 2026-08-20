@@ -1,5 +1,5 @@
 import type { Registry } from '../content/registry';
-import type { Item } from '../content/item';
+import type { Item } from '../content/sections/item';
 import { isTagClause, type TagClause } from '../grammar/tagClause';
 import { localizerOf } from './localized';
 import type { PruneWarning } from './pruning';

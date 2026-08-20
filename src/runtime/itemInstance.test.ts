@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
-import { parseSaveSection } from '../content/saveSection';
+import { parseSaveSection } from '../content/sections/save';
 import { Hex, PlaneNode } from '../content/hex';
 import { clusterAt, ORIGIN, pointsSpent } from './clusterPlane';
 import { equip } from './equipment';

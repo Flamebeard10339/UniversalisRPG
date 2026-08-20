@@ -1,13 +1,13 @@
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
-import { Action } from '../content/entity';
-import { actionAddress } from '../content/action';
+import { Action } from '../content/sections/entity';
+import { actionAddress } from '../content/sections/action';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { createGameState, GameState } from './state';
 import type { PruneWarning } from './pruning';
 import { initResources } from './effects';
 import { Registry } from '../content/registry';
-import { ParsedSave } from '../content/saveSection';
+import { ParsedSave } from '../content/sections/save';
 import { findActionOwner, parseOwnerRef, travelEndProblem, TRAVEL_PAIR } from './actions';
 import { isBuffList, pruneBuffs } from './buffs';
 import { isInstanceTable, pruneInstances } from './instances';

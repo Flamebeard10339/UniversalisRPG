@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DISCOVERED } from '../content/location';
+import { DISCOVERED } from '../content/sections/location';
 import { engineLocale } from '../content/engineLocale';
 import { type Registry } from '../content/registry';
 import { loadUniverseWithDiagnostics } from '../content/load';
-import { parseSaveSection } from '../content/saveSection';
+import { parseSaveSection } from '../content/sections/save';
 import { reachable, roadsFrom, routeTo } from './journey';
 import { loadSave } from './save';
 import { apply, applyDirective, beginAction, cancelAction, runTest, serializeSession, sessionStatus, startSession, view, wait, type PlaySession, type PlayView } from './session';
@@ -322,7 +322,7 @@ describe('setting off for somewhere that is not next door', () => {
     beginAction(session, 'travel:chain.c');
     const carried = sessionStatus(session).journey;
 
-    const { saved } = parseSaveSection({
+    const saved = parseSaveSection({
       kind: 'save',
       id: 'mid-walk',
       body: [{ text: serializeSession(session), span: { start: 0, end: 0 }, children: [] }],
@@ -339,7 +339,7 @@ describe('setting off for somewhere that is not next door', () => {
     const registry = universe(CHAIN, 'chain');
     const session = walkedOut(registry);
     beginAction(session, 'travel:chain.c');
-    const { saved } = parseSaveSection({
+    const saved = parseSaveSection({
       kind: 'save',
       id: 'mid-walk',
       body: [{ text: serializeSession(session), span: { start: 0, end: 0 }, children: [] }],

@@ -1,12 +1,12 @@
 import { RuntimeError } from './error';
-import { Action } from '../content/entity';
+import { Action } from '../content/sections/entity';
 import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
 import { actorEntity, participants } from './roster';
 import { sideOf } from '../grammar/action';
 import { Registry } from '../content/registry';
 import { carriedPassives, CounterLevel, itemContribution, scaledAmount, StatContribution } from './itemContribution';
-import { Item } from '../content/item';
+import { Item } from '../content/sections/item';
 import { itemInstance, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
 import { skillLevel } from './skills';

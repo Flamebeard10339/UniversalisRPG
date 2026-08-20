@@ -4,13 +4,13 @@ import { draftIn, editControls, kindsIn, openedIn, rowsIn, sectionKey, type Edit
 import { FORGOTTEN, type Editing } from './editorMemory';
 import { SHIPPED_SOURCES } from './shippedContent';
 
-const SECTIONS = addressable(SHIPPED_SOURCES);
+const addressed = addressable(SHIPPED_SOURCES);
 
 const GUIDE_HOUSE: Standing = { location: 'tutorial-island.guide-house', entities: ['tutorial-island.miki'] };
 
-const MIKI = SECTIONS.find((section) => section.kind === 'entity' && section.address === 'tutorial-island.miki')!;
+const MIKI = addressed.find((section) => section.kind === 'entity' && section.address === 'tutorial-island.miki')!;
 
-function watching(editing: Editing, sections: readonly Section[] = SECTIONS): { controls: EditControls; sent: string[]; said: string[]; handed: number; at: Editing[] } {
+function watching(editing: Editing, sections: readonly Section[] = addressed): { controls: EditControls; sent: string[]; said: string[]; handed: number; at: Editing[] } {
   const sent: string[] = [];
   const said: string[] = [];
   const at: Editing[] = [];
@@ -111,19 +111,19 @@ describe('what a control on the editing page does', () => {
 
 describe('what the page draws, assembled once', () => {
   it('narrows Global by the kind chosen and leaves Local whole', () => {
-    const everything = rowsIn({ sections: SECTIONS, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'global' } });
-    const items = rowsIn({ sections: SECTIONS, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'global', kind: 'item' } });
+    const everything = rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'global' } });
+    const items = rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'global', kind: 'item' } });
 
     expect(items.length).toBeGreaterThan(0);
     expect(items.length).toBeLessThan(everything.length);
     expect([...new Set(items.map((section) => section.kind))]).toEqual(['item']);
-    expect(rowsIn({ sections: SECTIONS, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'local', kind: 'item' } }).map(sectionKey)).toEqual(
-      rowsIn({ sections: SECTIONS, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'local' } }).map(sectionKey),
+    expect(rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'local', kind: 'item' } }).map(sectionKey)).toEqual(
+      rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'local' } }).map(sectionKey),
     );
   });
 
   it('offers the kinds the surface has something of and no others', () => {
-    const kinds = kindsIn({ sections: SECTIONS, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'global' } });
+    const kinds = kindsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'global' } });
 
     expect(kinds).toEqual([...kinds].sort());
     expect(kinds).not.toContain('location');
@@ -131,13 +131,13 @@ describe('what the page draws, assembled once', () => {
   });
 
   it('puts the section in the field until something is typed, and what was typed after', () => {
-    expect(draftIn(SECTIONS, opened)).toBe(MIKI.text);
-    expect(draftIn(SECTIONS, { ...opened, draft: 'typed' })).toBe('typed');
-    expect(draftIn(SECTIONS, FORGOTTEN)).toBe('');
-    expect(openedIn(SECTIONS, { ...FORGOTTEN, open: 'entity nothing.at-all' })).toBeNull();
+    expect(draftIn(addressed, opened)).toBe(MIKI.text);
+    expect(draftIn(addressed, { ...opened, draft: 'typed' })).toBe('typed');
+    expect(draftIn(addressed, FORGOTTEN)).toBe('');
+    expect(openedIn(addressed, { ...FORGOTTEN, open: 'entity nothing.at-all' })).toBeNull();
   });
 
   it('offers nothing local where nothing is standing', () => {
-    expect(rowsIn({ sections: SECTIONS, standing: NOWHERE, editing: FORGOTTEN })).toEqual([]);
+    expect(rowsIn({ sections: addressed, standing: NOWHERE, editing: FORGOTTEN })).toEqual([]);
   });
 });

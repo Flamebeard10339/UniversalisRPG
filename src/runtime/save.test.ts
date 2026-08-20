@@ -7,10 +7,10 @@ import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal } from './modals';
 import { openModalNamed } from './modalStack';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave } from './save';
-import { parseSaveSection } from '../content/saveSection';
+import { parseSaveSection } from '../content/sections/save';
 import { runTest } from './session';
 import { travelAction, TRAVEL_ADDRESS } from './actions';
-import { actionAddress } from '../content/action';
+import { actionAddress } from '../content/sections/action';
 import { CRAFT_ADDRESS, type Registry } from '../content/registry';
 import { loadUniverse } from '../content/load';
 import { GameState, type ModalFrame } from './state';
@@ -103,7 +103,7 @@ describe('loadSave', () => {
     const serialized = serializeSave(state, registry);
     expect(JSON.parse(serialized).resources).toEqual({ health: toMilliUnits(4) });
 
-    const { saved } = parseSaveSection({
+    const saved = parseSaveSection({
       kind: 'save',
       id: 'x',
       body: [{ text: serialized, span: { start: 0, end: 0 }, children: [] }],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Direction, Location, locationSchema, recursivelyResolveRelativeCoordinates } from '../content/location';
+import { Direction, Location, location as locationSection, recursivelyResolveRelativeCoordinates } from '../content/sections/location';
 import { Authored, hydrateSection } from '../grammar/section';
 import { loadModule } from '../content/load';
 import { apply, startSession, view } from './session';
@@ -53,8 +53,8 @@ describe('recursivelyResolveRelativeCoordinates', () => {
   });
 
   it('resolves hydrated locations, whose coordinates are read-only getters', () => {
-    const home = hydrateSection({ id: 'home' } as Authored<Location>, locationSchema);
-    const east = hydrateSection({ id: 'east-of-home', relative: { direction: 'east', of: 'home' } } as Authored<Location>, locationSchema);
+    const home = hydrateSection({ id: 'home' } as Authored<Location>, locationSection.schema as never);
+    const east = hydrateSection({ id: 'east-of-home', relative: { direction: 'east', of: 'home' } } as Authored<Location>, locationSection.schema as never);
     expect(() => {
       (east as { x: number }).x = 99;
     }).toThrow(TypeError);

@@ -1,12 +1,12 @@
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
 import { ActionResult, DropRow, nestedResults, Party } from '../grammar/actionResult';
-import { DISCOVERED } from '../content/location';
-import { DropTable } from '../content/dropTable';
-import { EventTrigger, GameEvent } from '../content/event';
+import { DISCOVERED } from '../content/sections/location';
+import { DropTable } from '../content/sections/droptable';
+import { EventTrigger, GameEvent } from '../content/sections/event';
 import { isPoint, Range, sampleCount, sampleRange } from '../grammar/range';
 import { Registry } from '../content/registry';
-import { Resource } from '../content/resource';
+import { Resource } from '../content/sections/resource';
 import { evaluateCondition } from './conditions';
 import { actorEntity } from './roster';
 import { hasPool } from './stats';

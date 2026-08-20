@@ -6,7 +6,8 @@ import { restorePools } from './effects';
 import { Registry } from '../content/registry';
 import { engineLocale, withEngineLocale } from '../content/engineLocale';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
-import { NAMESPACED_KINDS } from '../content/namespace';
+import { ownedSectionKinds } from '../content/sections';
+import { MEMBER_KINDS } from '../content/namespace';
 import { loadUniverse } from '../content/load';
 import { runTest } from './session';
 import { initialState } from './save';
@@ -199,7 +200,7 @@ describe('the archetype jewels are paired added-then-increased', () => {
 describe('no shipped identifier is named after this content', () => {
   const declaredIds = (registry: Registry, namespace: string): Set<string> => {
     const own = new Set<string>();
-    for (const kind of NAMESPACED_KINDS) {
+    for (const kind of [...ownedSectionKinds(), ...MEMBER_KINDS]) {
       for (const key of registry.namespace.declaredKeys(kind)) {
         if (!key.startsWith(`${namespace}.`)) continue;
         const id = key.slice(namespace.length + 1);

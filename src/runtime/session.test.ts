@@ -12,7 +12,7 @@ import { secondsToMs } from './units';
 import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, startSession, submitModal, view, wait } from './session';
 import { skillLevel, xpForLevel } from './skills';
 import { inEnglish } from './sayFixture';
-import { parseDirectiveLine, useChoiceId, type UseDirective } from '../content/test';
+import { parseDirectiveLine, useChoiceId, type UseDirective } from '../content/sections/test';
 import { printDirective } from '../content/serialize';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');

@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import { SECTION_KINDS } from '../../src/content/sectionKind';
+import { sectionKinds } from '../../src/content/sections';
 import { programOverShippedModules, relativeTo, repoRoot } from './shippedProgram';
 
 // A declaration that answers a question about section kinds. Its subjects are
@@ -23,7 +23,7 @@ function stringsUnder(node: ts.ArrayLiteralExpression): string[] {
   for (const element of node.elements) {
     if (ts.isStringLiteral(element)) found.push(element.text);
     // A list of pairs answers a question about its first column, which is
-    // where `CONTENT_SECTION_MAPS` keeps its kinds.
+    // where `contentSectionMaps()` keeps its kinds.
     else if (ts.isArrayLiteralExpression(element)) for (const inner of element.elements) if (ts.isStringLiteral(inner)) found.push(inner.text);
   }
   return found;
@@ -58,7 +58,7 @@ export interface KindTableReport {
 
 export function kindTablesIn(
   program: ts.Program,
-  kinds: readonly string[] = SECTION_KINDS,
+  kinds: readonly string[] = sectionKinds(),
   include: (relative: string) => boolean = (relative) => /^(src|scripts)\//.test(relative),
   root: string = repoRoot,
 ): KindTableReport {
@@ -95,7 +95,7 @@ export function kindTablesIn(
 
 export const untotalledKindTables = (): KindTableReport => kindTablesIn(programOverShippedModules());
 
-export function report(tables: readonly KindTable[], examined: number, kinds: readonly string[] = SECTION_KINDS): string[] {
+export function report(tables: readonly KindTable[], examined: number, kinds: readonly string[] = sectionKinds()): string[] {
   const lines = [`${kinds.length} section kinds, derived from the row: ${[...kinds].join(', ')}`, `${examined} declaration(s) read.`, ''];
   if (tables.length === 0) return [...lines, 'Every question about a kind is a field of the row.'];
   lines.push(`${tables.length} declaration(s) answer a question about a section kind from somewhere other than the row:`, '');

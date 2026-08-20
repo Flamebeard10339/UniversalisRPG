@@ -3,7 +3,7 @@ import { Action, isTwoSided, sideOf } from '../grammar/action';
 import { attemptDuration, hasPool, statValue } from './stats';
 import { actorEntity, participants, performable, seatOf } from './roster';
 import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
-import { declaredId } from '../content/entity';
+import { declaredId } from '../content/sections/entity';
 import { hostile, Registry } from '../content/registry';
 import { findActiveAction } from './actions';
 import { type ActiveAction, type ActorState, type Cadence, GameState, PLAYER } from './state';
