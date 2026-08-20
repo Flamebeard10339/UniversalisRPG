@@ -1,12 +1,6 @@
-// A codec. Both halves are required: an optional `print` is a hole, and the
-// only thing that keeps a spelling from being restated somewhere else is that
-// there is nowhere else to put it.
 export interface Parser<T> {
   parse(cursor: Cursor): T;
   print(value: T): string;
-  // Authored spellings this parser accepts, each of which must survive
-  // parse-then-print as the same text. `codec.test.ts` walks the collected
-  // grammar and asks; a parser with none fails there rather than passing.
   examples: readonly string[];
 }
 
@@ -57,9 +51,6 @@ export class Cursor {
   }
 }
 
-// A sub-parser stops at the first thing it does not understand and hands back
-// what it did read, so a caller that does not demand the rest of the line drops
-// the author's typo instead of reporting it.
 export function requireEnd(cursor: Cursor, what: string): void {
   cursor.take(/[ \t]*/);
   if (cursor.done) return;

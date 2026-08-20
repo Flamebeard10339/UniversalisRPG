@@ -4,10 +4,6 @@ import { ActionResult, hookResultList } from './actionResult';
 import { Cursor } from './parser';
 import { splitSections } from './structure';
 
-// An action is authored as one labelled entry inside some section's body, and
-// `actionBody` is what every section that owns actions reads it with. Driving it
-// through the real splitter is what keeps these tests about the grammar rather
-// than about a hand-built line tree.
 function parse(body: string, label = 'swing'): Action {
   const indented = body
     .trim()
@@ -30,8 +26,6 @@ const refusal = (body: string, label = 'swing'): string => {
   throw new Error('expected the load path to refuse this action');
 };
 
-// The same lines read as a hook's body rather than as an action's, which is the
-// one list a party phrase reads in.
 function hook(body: string): ActionResult[] {
   const indented = body
     .trim()
@@ -131,8 +125,6 @@ describe('contests', () => {
     }
   });
 
-  // Asked of a whole action rather than of a block: an entity's overload names
-  // only what it changes, and the pool may be on the declaration it overlays.
   it('refuses a side-naming action with nothing to deplete', () => {
     expect(assembledActionProblem(parse('accuracy: my accuracy vs their evasion'))).toContain('nothing to deplete is not a contest');
     expect(parse('accuracy: my accuracy vs their evasion').accuracy).toBeDefined();
@@ -178,10 +170,6 @@ describe('the table over an assembled action', () => {
   });
 });
 
-// An action is the verb, shared by everyone who performs it, so a hook on one
-// would fire for every character in the game that swings it. A carrier claims
-// the two labels as fields before an action body can see them; every section
-// that does not reaches one of the two refusals below.
 describe('a hook is carried by a character, not by a verb', () => {
   const CARRIER = 'write it on the `# entity` or `# item` that carries it';
 
@@ -194,9 +182,6 @@ describe('a hook is carried by a character, not by a verb', () => {
     expect(() => actionBody.parse(new Cursor('drain: 3 health from them', 0, 0), written)).toThrow(CARRIER);
   });
 
-  // Every cell of the cross product an earlier plan spelled, and the moment
-  // name it used for being hit: nothing here may reach an action label, which
-  // is what a carrier gets when no rule refuses the line.
   it.each([['on hit self'], ['on hit me'], ['on hit them'], ['when hit self'], ['when hit me'], ['when hit them'], ['on struck self'], ['on struck me'], ['on struck them'], ['on struck']])('refuses the retired spelling %s: by name, on both routes', (written) => {
     expect(refusal(`${written}: drain: 3 health`)).toContain(`${written}: was never implemented`);
     expect(refusal('drain: 3 health', written)).toContain(`${written}: was never implemented`);
@@ -208,8 +193,6 @@ describe('a hook is carried by a character, not by a verb', () => {
   });
 });
 
-// The party is a phrase on the result that moves the amount, which costs no
-// nesting and reads as one sentence.
 describe('which party a drain: or restore: moves its amount between', () => {
   it("reads the phrase where English puts it, and leaves an unmarked result the carrier's", () => {
     expect(hook('drain: 3 health from them\nrestore: 5 rage to me\nrestore: 1 rage')).toEqual([
@@ -257,21 +240,14 @@ describe('which party a drain: or restore: moves its amount between', () => {
     expect(hookRefusal('drain: 3 health from us')).toContain('`from me` for the character this is read off');
   });
 
-  // Nothing is consumed unless a phrase opens, so the end-of-line demand
-  // describes a typo after the resource better than a party reader could.
   it('leaves a word that is not a preposition to the end-of-line demand', () => {
     expect(hookRefusal('drain: 3 health twice')).toContain('unexpected content after a result');
   });
 
-  // A moment with one actor identifies no other, and an unrefused phrase there
-  // would be applied to the one actor — the opposite of what it says.
   it('refuses the phrase in a result list that is not a hook, at any depth', () => {
     expect(refusal('drain: 3 health from them')).toContain('reads only inside `on hit:` or `when hit:`');
     expect(refusal('on success:\n  1 in 4:\n    restore: 2 rage to me')).toContain('reads only inside `on hit:` or `when hit:`');
-    // The inline route into a result group, which is a second reader and not a
-    // second rule: `on success: <results>` never reaches the per-line one.
     expect(refusal('on success: drain: 3 health from them')).toContain('reads only inside `on hit:` or `when hit:`');
-    // Unmarked is untouched by the rule: it names no party to be wrong about.
     expect(parse('drain: 3 health').results).toEqual([{ kind: 'pool', resource: 'health', delta: { min: -3, max: -3 } }]);
   });
 });

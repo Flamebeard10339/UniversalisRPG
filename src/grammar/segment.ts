@@ -2,9 +2,6 @@ import { Condition, condition, printReference, Reference } from './condition';
 import { DslError, parseWhole } from './parser';
 import { REFERENCE } from './values';
 
-// Interpolated prose: the grammar every player-visible line is written in, not
-// one section kind's own. A dialogue line, a `# locale` translation of it and
-// the walk that resolves what it names all read the same segments.
 export type TextSegment = { kind: 'literal'; text: string } | { kind: 'interpolate'; reference: Reference } | { kind: 'conditional'; condition: Condition; text: string };
 
 function parseFragment(raw: string, base: number): TextSegment {
@@ -50,9 +47,6 @@ export function parseSegments(text: string, base: number): TextSegment[] {
   return segments;
 }
 
-// The spelling a translator reads back and writes beside, which is why the load
-// path records a spoken line's authored words through this and not through any
-// other rendering of them.
 export function printSegments(values: readonly TextSegment[] | undefined): string {
   return (values ?? [])
     .map((segment) => {

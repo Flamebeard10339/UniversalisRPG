@@ -1,11 +1,7 @@
-// Generic engine: field value-types are erased internally via the AnyFields casts; the rejected alternative was a hand-written parser per section kind.
 import { Cursor, DslError, Parser, Span } from './parser';
 import { ListParser } from './list';
 import { RawLine, RawSection, hasBlock, indentLines, sectionParser, takeBlock } from './structure';
 
-// What a default may know beyond the section it is filling in. A field-level
-// default cannot see the module its section came from, and c5 turns on that
-// question, so the module's answer is handed down to it.
 export interface HydrateContext {
   language: string;
 }
@@ -13,23 +9,11 @@ export interface HydrateContext {
 export const DEFAULT_LANGUAGE = 'en';
 export const DEFAULT_CONTEXT: HydrateContext = { language: DEFAULT_LANGUAGE };
 
-// When a field is written back out. Most are written when they hold something
-// — which for a list means holding a member. `always` is a field the language
-// spells even at its default, and `unless-default` is one it spells only when
-// the author moved it off the default, which is the difference between
-// `display:` and `max-level:`.
 export type PrintWhen = 'when-set' | 'always' | 'unless-default';
 
-// What a printer needs beyond the parser, said once beside the parser. Every
-// one of these was a decision a hand-written printer made per call site, where
-// nothing could check it against the field it was printing.
 export interface FieldPrinting {
   printed?: PrintWhen;
-  // Written as the block indented under its keyword rather than after it.
   block?: true;
-  // A field the engine can fill in for itself, so whether the author wrote one
-  // cannot be told from the value: `title: Gold` on `# item gold` is what the
-  // engine would have minted anyway. The caller is asked instead.
   generated?: true;
 }
 
@@ -39,25 +23,14 @@ export interface Field<T, Self> extends FieldPrinting {
   keyword?: string; // DSL surface keyword, when it differs from the field name
 }
 
-// A field whose authored form is not its held form. A stat sheet is authored as
-// a list, so `+stats:` can address one assignment, and held as a map keyed by
-// stat id, so a later assignment to the same stat wins. `hydrate` runs after
-// merging, on whatever the `+`/`-` operations left.
 export interface MappedField<T, Self> extends FieldPrinting {
   parser: Parser<unknown>;
   hydrate(parsed: unknown): NonNullable<T>;
-  // The inverse: the members to print, from whatever `hydrate` made. Needed
-  // only where the held form is not already a list — a stat sheet is a map, and
-  // the order it prints in is this field's to decide.
   dehydrate?: (held: NonNullable<T>) => unknown[];
   default?: (self: Self, context: HydrateContext) => T;
   keyword?: string;
 }
 
-// An open-ended, dynamically-labelled collection (e.g. an entity's actions):
-// each `<label>:` that is not a fixed field becomes one entry `{ label, ...body }`.
-// The label is passed in because an entry body cannot see its own heading, and
-// an error about the entry has to be able to name which one it is about.
 export interface EntryBody {
   parse(cursor: Cursor, label: string): object;
   parseBlock(lines: RawLine[], label: string): object;
@@ -71,9 +44,6 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
   clauses?: Exclude<keyof H, 'id' | Flags | Entries>;
   bare?: Exclude<keyof H, 'id' | Flags | Entries>;
   keywords?: readonly Flags[];
-  // The field the keyword flags are written after. They are bare words with no
-  // label, so nothing about them says where in a printed section they belong,
-  // and a printer walking the fields in order has to be told.
   keywordsAfter?: Exclude<keyof H, 'id' | Flags | Entries>;
   entries?: { into: Entries; body: EntryBody };
   exclusive?: readonly (readonly Exclude<keyof H, 'id' | Flags | Entries>[])[];
@@ -81,10 +51,6 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
 
 export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H, 'id'>>;
 
-// A schema's generics describe one kind's authoring type, so a table holding
-// every kind sees them through this shape instead. It carries exactly what a
-// caller that does not know the kind can act on — which now includes printing
-// one, so the printing half of a field is here too.
 export interface AnyField extends FieldPrinting {
   parser: unknown;
   keyword?: string;
@@ -106,29 +72,19 @@ const isListParser = (parser: unknown): boolean => typeof parser === 'object' &&
 
 export const isListField = (schema: AnySchema, name: string): boolean => isListParser(schema.fields[name]?.parser);
 
-// A field the section reaches by a line's position — as its clause list or as
-// its bare value — rather than by a `name:` label. Asked by the line reader
-// below and by anything walking the schemas, so the two cannot disagree about
-// which fields have no keyword form.
 export const isPositionalField = (schema: Pick<AnySchema, 'clauses' | 'bare'>, name: string): boolean => name === schema.clauses || name === schema.bare;
 
-// What a `+key:`/`-key:` line contributes, kept apart from a bare assignment so
-// that merging can tell "add these" from "this is now the whole list".
 export interface FieldEdits {
   ops: { op: '+' | '-'; values: unknown[] }[];
 }
 
 export const isFieldEdits = (value: unknown): value is FieldEdits => typeof value === 'object' && value !== null && 'ops' in value;
 
-// A list field holds either its members or the `+`/`-` operations that will
-// produce them, and a caller reading what it names wants both.
 export function listMembers<T>(value: unknown): T[] {
   if (isFieldEdits(value)) return value.ops.flatMap((op) => op.values as T[]);
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
-// A `-label:` line inside an entries field, carried in the entries array itself
-// so that removals and additions in one section stay in source order.
 export interface EntryRemoval {
   label: string;
   removed: true;
@@ -200,18 +156,11 @@ function withinOneEdit(a: string, b: string): boolean {
 
 const SHORTEST_TYPO = 3;
 
-// An entries field takes any unclaimed key as a label, which is what lets an
-// author name an action freely — and what lets `tag:` become a playable action
-// instead of the `tags:` they meant.
 function typoOf(key: string, known: readonly string[]): string | undefined {
   if (key.length < SHORTEST_TYPO) return undefined;
   return known.find((field) => withinOneEdit(field, key));
 }
 
-// An indented block hangs off the whole line, so the one key that ends the line
-// is the only one that could take it — and a key that read its value inline
-// would drop it without a word. Asked after the value is read, because what
-// remains on the line is what says whether another key follows.
 const claimsTheBlock = (cursor: Cursor, line: RawLine): boolean => hasBlock(line) && cursor.rest().replace(/[ \t,]+$/, '') === '';
 
 function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, keywords: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
@@ -244,7 +193,6 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         const inline = !cursor.done;
         const value = inline ? fields[name].parser.parse(cursor) : hasBlock(line) ? parseBlock(fields[name].parser, takeBlock(line), line.span) : undefined;
         if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} field ${key} is written inline and as a block; give it one`, keySpan);
-        // an empty value with no block is unspecified: leave the field absent
         if (value === undefined) continue;
         if (op === undefined) authored[name] = value;
         else
@@ -343,15 +291,8 @@ export function hydrateSection<H extends { id: string }, F extends keyof H = nev
   return view;
 }
 
-// What a printer knows beyond the value. `authored` answers whether the author
-// wrote a field the engine could have minted for itself — the load recorded it,
-// because the value cannot say: `title: Gold` on `# item gold` is exactly what
-// the loader would have filled in.
 export interface PrintContext {
   moduleId: string;
-  // The key the value hangs under in its map, which is the id a section is
-  // printed with. Read from here rather than from the value, because `# save`
-  // stores a recorded state that carries no id of its own.
   id: string;
   authored(field: string): boolean;
 }
@@ -360,9 +301,6 @@ const keywordOf = (name: string, spec: AnyField): string => spec.keyword ?? name
 
 export const moduleLocalId = (moduleId: string, id: string): string => (id.startsWith(`${moduleId}.`) ? id.slice(moduleId.length + 1) : id);
 
-// One field, printed from what it declares. Every branch here was a decision a
-// hand-written printer made at its call site, where nothing could check it
-// against the field it was printing.
 function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Record<string, unknown>, context: PrintContext): string[] {
   const value = held[name];
   if (value === undefined) return [];
@@ -376,8 +314,6 @@ function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Recor
   if (members !== undefined) {
     if (members.length === 0 && spec.printed !== 'always') return [];
     const lines = parser.printBlock!(members);
-    // A positional field has no label to hang a block off, so its block form is
-    // one member to a line — which is how `# skill` writes what trains it.
     if (spec.block) return positional ? lines : [`${keywordOf(name, spec)}:`, ...indentLines(lines)];
     return label(lines.join(', '));
   }
@@ -387,9 +323,6 @@ function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Recor
   return label(printed);
 }
 
-// A whole section, printed by walking what its schema declares, so a field
-// added to a schema is printed by the walk rather than by a loop somebody
-// remembered to add.
 export function printSection(value: object, schema: AnySchema, context: PrintContext, entryLines: (entry: never) => string[]): string[] {
   const held = value as Record<string, unknown>;
   const lines = [`# ${schema.kind} ${moduleLocalId(context.moduleId, context.id)}`];

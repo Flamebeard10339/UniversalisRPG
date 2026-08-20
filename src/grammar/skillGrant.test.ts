@@ -27,8 +27,6 @@ describe('a grant is one coefficient and one bound amount', () => {
     expect(() => parse('gain experience on rat-bitten')).toThrow('expected a grant like');
   });
 
-  // Anything more general is a second evaluator with its own variable binding,
-  // and the refusal is what keeps this one from becoming one.
   it('refuses a second variable, a second term and an operator that is not the product', () => {
     for (const line of ['gain 4*damage experience on rat-bitten', 'gain amount*amount experience on rat-bitten', 'gain 4 + amount experience on rat-bitten', 'gain 4*amount+1 experience on rat-bitten', 'gain amount*4 experience on rat-bitten']) {
       expect(() => parse(line), line).toThrow('expected a grant like');

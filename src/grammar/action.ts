@@ -8,19 +8,15 @@ import { RawLine, hasBlock, indentLines, takeBlock } from './structure';
 import { TagClause, tagClause } from './tagClause';
 import { decimal, DECIMAL, id, refuseRange } from './values';
 
-// What ends the action, which is a different question from how fast it attempts.
 export type ActionKind = 'instant' | 'duration' | 'continuous';
 
 export type Side = 'my' | 'their';
 
-// A stat, pool or skill together with the participant it is read off. Both sides
-// carry the name, so the marker is the only thing that says which one is meant.
 export interface Sided {
   side?: Side;
   id: string;
 }
 
-// `X vs Y`: my X against their Y. An absent right half is the neutral default.
 export interface Contest {
   left: Sided;
   right?: Sided;
@@ -28,12 +24,7 @@ export interface Contest {
 
 export interface Action {
   label: string;
-  // The label was made from the id rather than authored, so it is English by
-  // construction. Set where the label is generated, read where a label becomes
-  // a locale entry, and never printed back out.
   generatedLabel?: true;
-  // Absent is `duration`, and absent is what an untagged action records — so a
-  // block overriding an inherited action keeps the kind it did not restate.
   kind?: ActionKind;
   requires?: Condition;
   hiddenIf?: Condition;
@@ -42,37 +33,22 @@ export interface Action {
   onSuccess?: ActionResult[];
   onFailure?: ActionResult[];
   onUnfinished?: ActionResult[];
-  // The cadence, one axis in two spellings: `time` is seconds per attempt and
-  // `rate` is attempts per minute, where a name is the stat holding that number.
-  // At most one, and absent on a `duration` action defers to the tuning variable.
   time?: number;
   rate?: number | Sided;
   accuracy?: Contest;
   damage?: Contest;
-  // The pool a landed hit reduces, and what makes an action a fight rather than
-  // a fixed count of hits.
   depletes?: Sided;
   attempts?: number;
-  // The fields this block wrote with a leading `+`. Meaningful only where a
-  // block overlays another — an entity's overload of an action it `uses:` — and
-  // empty everywhere else, because a first declaration has nothing to append to.
   appended?: string[];
 }
 
 const results = resultList;
 const tagClauses = list(tagClause);
 
-// The kinds an author writes. `duration` is what an untagged action is, so it
-// has no tag to write and naming it would give one kind two spellings.
 const TAGGED_ACTION_KINDS = ['instant', 'continuous'] as const;
 
-// Every bare word an action's tag list may hold. The set is closed because a
-// word an action keeps and never reads cannot be told apart from a typo, and a
-// mistyped kind would silently mean `duration`.
 const ACTION_KEYWORD_TAGS: ReadonlySet<string> = new Set<string>(TAGGED_ACTION_KINDS);
 
-// Words that meant something once, or look like they should. Each names what to
-// write instead, because "unknown tag" is not an answer to "then how do I?".
 const RETIRED_ACTION_TAGS: Readonly<Record<string, string>> = {
   once: 'tag "once" was never implemented — gate the action with `hidden if: <flag>` and `set:` that flag among its results',
   repeating: 'tag "repeating" was renamed — write `continuous`',
@@ -85,8 +61,6 @@ export const SIDES: readonly Side[] = ['my', 'their'];
 
 const SIDE = /(?:my|their)(?![\w-])/;
 
-// A marker is optional here and demanded by the table below, because whether one
-// is required follows from the whole action rather than from any one line.
 function sided(cursor: Cursor): Sided {
   const marker = cursor.take(SIDE);
   if (marker === null) return { id: id.parse(cursor) };
@@ -100,8 +74,6 @@ function contest(cursor: Cursor): Contest {
   return { left, right: sided(cursor) };
 }
 
-// Every value reader takes the label for the same reason the table check does:
-// an error about an action is unreadable if it cannot say which action.
 type ActionValue = (cursor: Cursor, line: RawLine, label: string) => unknown;
 
 const conditionValue: ActionValue = (cursor) => (cursor.done ? undefined : condition.parse(cursor));
@@ -120,9 +92,6 @@ const resultsValue: ActionValue = (cursor, line, label) => {
   return inline;
 };
 
-// A shared value parser reports what it expected but not what it was reading,
-// and pins the span to the cursor rather than the line. Every reader below is
-// wrapped so an unreadable value names its field, its action, and its line.
 function named<T>(written: string, label: string, line: RawLine, read: () => T): T {
   try {
     return read();
@@ -134,9 +103,6 @@ function named<T>(written: string, label: string, line: RawLine, read: () => T):
 
 const seconds: ActionValue = (cursor, line, label) => named('time', label, line, () => decimal.parse(cursor));
 
-// A literal is attempts per minute; a name is the stat holding that number,
-// which is what makes a haste buff move a swing without touching the action.
-// Positivity is the table's business, checked once for both spellings.
 const perMinute: ActionValue = (cursor, line, label) =>
   named('rate', label, line, () => {
     const raw = cursor.take(DECIMAL);
@@ -152,9 +118,6 @@ const positiveCount =
     return Number(raw);
   };
 
-// Field name as written, the label that introduces it, and how its value reads.
-// One row per field is the whole shape: the once-guard and the end-of-line
-// demand below are what keep a new row from inventing its own laxity.
 const ACTION_FIELDS: readonly {
   written: string;
   label: RegExp;
@@ -219,9 +182,6 @@ const ACTION_FIELDS: readonly {
   },
 ];
 
-// A field that was removed rather than renamed away silently: without a row
-// here, `speed: cooking-speed` falls through to the tag parser and reports an
-// unrecognized clause, which says nothing about where the field went.
 const RETIRED_ACTION_FIELDS: readonly { label: RegExp; message: string }[] = [
   {
     label: /speed:[ \t]*/,
@@ -251,30 +211,19 @@ const RETIRED_ACTION_FIELDS: readonly { label: RegExp; message: string }[] = [
     label: /on escape:[ \t]*/,
     message: 'on escape: was retired — write `on unfinished:`, which runs when `attempts:` ran out before the action completed',
   },
-  // A hook is a field of nothing: it belongs to the character, so an action's
-  // body is the one place it cannot be written.
   ...HOOK_FIELD_REFUSALS,
 ];
 
-// One field per line, and the whole line: `requireEnd` is what the generic
-// section engine does by looping to the end of the line, and without it a typo
-// after a value — `time: 1 typo`, `attempts: 3 times` — is silently dropped.
 function parseActionLine(line: RawLine, action: Omit<Action, 'label'>, label: string): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
   parseActionField(line, cursor, action, label);
   requireEnd(cursor, 'an action field');
 }
 
-// A `+` line adds to what a block overlays instead of replacing it, which only
-// two kinds of value can do: a condition gains an `and`, and a result group
-// gains more results. Anything else has one value and no way to hold two.
 const APPENDABLE: ReadonlySet<string> = new Set(['requires', 'hidden if', 'on success', 'on failure', 'on unfinished']);
 
 function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'label'>, label: string): void {
   const held = action as Record<string, unknown>;
-  // A leading `+` is an append marker only when a field follows it. `+3 attack`
-  // is a stat bonus and `+100% luck` a percent one, so the cursor rewinds rather
-  // than eating the sign off a tag clause.
   const beforePlus = cursor.pos;
   const appends = cursor.take(/\+[ \t]*/) !== null;
   for (const retired of RETIRED_ACTION_FIELDS) {
@@ -292,8 +241,6 @@ function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'l
   if (appends) cursor.pos = beforePlus;
 
   if (startsResult(cursor)) {
-    // The whole line, because a wrapper's body may be the block hanging off it,
-    // and a cursor over the line's text alone cannot see one.
     action.results.push(...parseResultLine(line));
     cursor.pos = line.text.length;
   } else {
@@ -303,9 +250,6 @@ function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'l
 
 const isSided = (value: number | Sided | undefined): value is Sided => typeof value === 'object' && value !== null;
 
-// Every field of an action that names a stat, a pool or a skill, beside the word
-// that introduced it. One walk, so a field added above cannot quietly escape the
-// marker rule by being missed here.
 export function sidedFields(action: Action): { written: string; value: Sided }[] {
   const found: { written: string; value: Sided }[] = [];
   if (isSided(action.rate)) found.push({ written: 'rate', value: action.rate });
@@ -321,28 +265,16 @@ export function sidedFields(action: Action): { written: string; value: Sided }[]
   return found;
 }
 
-// Which participant a marked name is read off. The marker is written down, so
-// this is a lookup rather than a rule about who is swinging.
 export const sideOf = (field: Sided, self: string, other: string): string => (field.side === 'their' ? other : self);
 
-// Side vocabulary in the body is the whole declaration of kind: an action that
-// writes one is brought by a performer and applied to a target, and one that
-// writes none belongs to the object declaring it.
 export const isTwoSided = (action: Action): boolean => sidedFields(action).some((field) => field.value.side !== undefined);
 
-// The whole table, as one predicate over a finished action: a kind says what
-// ends the action, and carries exactly one positive cadence or none. Returning
-// the problem rather than throwing is what lets the two places an action can be
-// assembled — authored, and compiled from a recipe — share the rule instead of
-// each growing its own copy of it.
 export function actionTableProblem(action: Action): string | undefined {
   const cadence = [action.time !== undefined && 'time:', action.rate !== undefined && 'rate:'].filter((written): written is string => written !== false);
   if (cadence.length > 1) return 'time: and rate: are the same axis written two ways; give one';
 
   const kind = actionKind(action);
   if (kind === 'instant' && cadence.length > 0) return `an instant action takes no ${cadence[0]}`;
-  // Nothing else ends it, so a cadence it does not have is one the tuning
-  // default would have to supply, and a default of 0 spins the resolver.
   if (kind === 'continuous' && cadence.length === 0) return 'a continuous action needs a time: or rate: to set its pace';
 
   const written = action.time !== undefined ? 'time:' : 'rate:';
@@ -355,9 +287,6 @@ export function actionTableProblem(action: Action): string | undefined {
   return undefined;
 }
 
-// What is true of a WHOLE action and not of a fragment. An entity's overload
-// names only what it changes, so a block that writes a side and leaves the
-// pool to the declaration it overlays is well-formed until the two are one.
 export function assembledActionProblem(action: Action): string | undefined {
   const problem = actionTableProblem(action);
   if (problem) return problem;
@@ -365,12 +294,8 @@ export function assembledActionProblem(action: Action): string | undefined {
   return undefined;
 }
 
-// Reported wherever an action is finished, so every message names the action it
-// is about. A section that owns one prefixes itself; see `validateActionTable`.
 export const actionProblem = (label: string, problem: string): string => `action ${JSON.stringify(label)}: ${problem}`;
 
-// A tag list is the one place an action accepts free-form words, so it is the
-// one place a typo has nowhere to land.
 function checkTags(action: Omit<Action, 'label'>, label: string, span: RawLine['span'] | undefined): void {
   for (const tag of action.tags ?? []) {
     if (tag.kind === 'duration') throw new DslError(actionProblem(label, 'a duration clause paces nothing on an action — write `time: <seconds>` or `rate: <per minute>`'), span);
@@ -391,10 +316,6 @@ function resolveKind(action: Omit<Action, 'label'>, label: string, lines: RawLin
   return tagged[0];
 }
 
-// A section whose labelled blocks are actions takes any unclaimed label, so a
-// hook written on one is an action named `on hit` unless the label is read here.
-// The carriers intercept the two labels as fields before an action body sees
-// them; everything else reaches this and is refused.
 function refuseHookLabel(label: string, span: Span | undefined): void {
   const problem = hookLabelProblem(label);
   if (problem !== undefined) throw new DslError(problem, span);
@@ -417,12 +338,6 @@ export const actionBody: EntryBody = {
   },
 };
 
-// ------------------------------------------------------------------- printing
-
-// An action prints itself, beside the grammar that reads it. Here rather than in
-// the serializer because an action is not a section — every kind that nests one
-// prints it this way, and a printer that lived a layer up would be a second
-// place this grammar is written down.
 function printResultBlock(lines: string[], label: string, values: readonly ActionResult[] | undefined, childSpaces = 2): void {
   if (!values || values.length === 0) return;
   lines.push(`${label}:`, ...indentLines(values.flatMap(resultLines), childSpaces));
@@ -450,17 +365,12 @@ export function actionLines(action: Action): string[] {
 
   if (!modifiers && action.results.length === 1 && !spansLines(action.results)) return [`${action.label}: ${resultList.print(action.results)}`];
 
-  // A `+` line adds to what this block overlays, so the marker is part of the
-  // field rather than of the value, and dropping it would turn an addition into
-  // a replacement on reload.
   const appended = new Set(action.appended ?? []);
   const at = (name: keyof Action): string => (appended.has(name) ? '  +' : '  ');
   const lines: string[] = [`${action.label}:`];
   if (action.requires) lines.push(`${at('requires')}requires: ${condition.print(action.requires)}`);
   if (action.hiddenIf) lines.push(`${at('hiddenIf')}hidden if: ${condition.print(action.hiddenIf)}`);
   if (action.kind !== undefined && action.kind !== 'duration') lines.push(`  ${action.kind}`);
-  // The tags the kind above already spells; re-emitting one would round-trip
-  // into a second copy of the same fact.
   const lifted = new Set(['instant', 'continuous']);
   const tags = (action.tags ?? []).filter((each) => each.kind !== 'keyword' || !lifted.has(each.value));
   if (tags.length > 0) lines.push(`  ${tags.map((each) => tagClause.print(each)).join(', ')}`);

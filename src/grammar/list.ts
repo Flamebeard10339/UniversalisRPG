@@ -4,9 +4,6 @@ import { RawLine } from './structure';
 export interface ListParser<E> extends Parser<E[]> {
   element: Parser<E>;
   parseBlock(lines: RawLine[]): E[];
-  // The mirror of `parseBlock`: the lines a block form is written as, one
-  // member to a line unless the members nest. Declared beside the reader so a
-  // list cannot be read one way and printed another.
   printBlock(values: readonly E[]): string[];
 }
 
@@ -21,8 +18,6 @@ export function list<E>(element: Parser<E>): ListParser<E> {
   };
 
   const print = (values: readonly E[]): string => values.map((value) => element.print(value)).join(', ');
-  // Derived from the element's, so a list never states a spelling of its own
-  // and a new element example is a new list example with no edit here.
   const examples = [...element.examples, element.examples.join(', ')];
   const line: Parser<E[]> = { parse: parseInline, print, examples };
 

@@ -2,8 +2,6 @@ import { DslError, Parser } from './parser';
 
 export type DependencyPrefix = 'required' | 'incompatible' | 'unordered' | 'optional' | 'recommended';
 
-// Factorio's prefixes, whose grammar this follows:
-// https://lua-api.factorio.com/latest/auxiliary/mod-structure.html
 const PREFIXES: Record<string, DependencyPrefix> = {
   '!': 'incompatible',
   '~': 'unordered',

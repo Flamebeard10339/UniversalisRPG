@@ -5,8 +5,6 @@ export interface Reference {
   path: string[];
 }
 
-// State the engine keeps rather than any module: the clock and the player sheet,
-// which no module declares and nothing resolves.
 export const TIME = 'time';
 export const PLAYER = 'player';
 
@@ -14,8 +12,6 @@ export const ENGINE_ROOTS: readonly string[] = [TIME, PLAYER];
 
 export const isEngineRoot = (path: readonly string[]): boolean => ENGINE_ROOTS.includes(path[0]);
 
-// A counter the engine keeps against a node the module does declare, so the
-// owner resolves like any other path and only the last segment is the engine's.
 export const VISITS = 'visits';
 
 export const visitedNode = (path: readonly string[]): readonly string[] | null => (path.length > 1 && path[path.length - 1] === VISITS ? path.slice(0, -1) : null);
@@ -47,9 +43,6 @@ function parseReference(cursor: Cursor): Reference {
   return { path: raw.split('.') };
 }
 
-// `has <item>` / `has <n> <item>` must be checked before parseReference: a
-// hyphenated item id like `has-shrimp` is itself a valid reference, so only a
-// `has` followed by whitespace is treated as this predicate.
 function parseHas(cursor: Cursor): Condition | null {
   if (cursor.take(/has[ \t]+/) === null) return null;
   const hasCount = cursor.peek(/\d/) !== null;
@@ -93,8 +86,6 @@ function parseOr(cursor: Cursor): Condition {
   return conditions.length === 1 ? conditions[0] : { kind: 'or', conditions };
 }
 
-// A reference is its path, dotted. Exported because a `{ }` interpolation in a
-// spoken line carries one and is written by whoever prints that line.
 export const printReference = (value: Reference): string => value.path.join('.');
 
 function printCondition(value: Condition): string {

@@ -2,25 +2,12 @@ import { DslError, Parser, Span } from './parser';
 import { isRange, Range } from './range';
 import { duration } from './values';
 
-// How much a bonus is worth and which channel it lands in. A percent bonus never
-// takes a range, so the two are separate members.
 export type BonusAmount = { percent: false; amount: Range } | { percent: true; amount: number };
 
-// What a `per` counts: a resource's level, or how many stacks of one buff the
-// character is holding. Two live facts about a character, spelled apart because
-// no reader could tell a resource id from a buff's by looking at it.
 export type Counter = { kind: 'resource'; id: string } | { kind: 'stack'; id: string };
 
-// `per` says which counter scales the magnitude, and sits on the clause rather
-// than on BonusAmount because `# skill`'s `per-level:` reads the same magnitude
-// and already has its counter — a bonus that named a second one there would be a
-// field one of the two readers has to refuse.
 export type TagClause = { kind: 'keyword'; value: string } | ({ kind: 'stat-bonus'; statId: string; per?: Counter } & BonusAmount) | { kind: 'duration'; seconds: number };
 
-// One check per member of TagClause, keyed by the union's own discriminant, so
-// a fourth member is a type error here rather than a refusal a reader of
-// unparsed clauses discovers at run time. A `# save` body is that reader: it is
-// hand-written JSON, and nothing between it and a fold parses what it holds.
 const CLAUSE_HOLDS: {
   [K in TagClause['kind']]: (clause: Record<string, unknown>) => boolean;
 } = {
@@ -53,7 +40,6 @@ const BARE_AMOUNT = new RegExp(`^${AMOUNT}$`);
 const KEYWORD = /^[a-z][a-z0-9-]*$/;
 
 function parseAmount(groups: Record<string, string | undefined>, raw: string, span: Span): BonusAmount {
-  // The sign leads the whole clause: `-3-6 dr` is between -6 and -3.
   const sign = groups.sign === '-' ? -1 : 1;
   const lo = Number(groups.lo);
 
@@ -136,7 +122,6 @@ export const tagClause: Parser<TagClause> = {
   examples: ['sharp', '30s', '2m', '1m30s', '+4-7 attack', '-2 defence', '+25% max-health', '-10% max-health', '+1 attack per mana', '+2 attack per stack of fervour'],
 };
 
-// The same magnitude without the stat, for a field that names its stat itself.
 export const bonusAmount: Parser<BonusAmount> = {
   parse(cursor) {
     const start = cursor.pos;
