@@ -1,19 +1,17 @@
+import { list } from '../../grammar/list';
+import { Cursor, DslError, Parser } from '../../grammar/parser';
+import { listMembers } from '../../grammar/section';
+import { id, number, text } from '../../grammar/values';
+import { DIRECTIONS, Direction } from '../hex';
+import { getShape, Shape } from '../shapes';
+import { type Loose } from '../refs';
+import { section } from './define';
 import { TITLE_FIELD } from './info';
-import { DIRECTIONS, Direction } from './hex';
-import { Shape } from './shapes';
-import { list } from '../grammar/list';
-import { Cursor, DslError, Parser } from '../grammar/parser';
-import { SectionSchema } from '../grammar/section';
-import { id, number, text } from '../grammar/values';
 
 const NON_ROOT_DIRECTIONS: readonly Direction[] = DIRECTIONS.filter((direction) => direction !== 'w');
 
 export const DEFAULT_MOD_SLOTS = 2;
 
-// `# cluster-jewel` names a shape, says which of the five non-root edges are
-// open, and fills numbered positions with passive references. `positions` is
-// the `# entity` `stats:` shape (c4): a list hydrated into a map, so it reads
-// inline or one pair to a line.
 export interface ClusterJewel {
   id: string;
   title: string;
@@ -24,8 +22,6 @@ export interface ClusterJewel {
   modSlots: number;
 }
 
-// `<position> <passive>`, the way src/content/entity.ts's `statAssignment`
-// reads `<stat> <range>` for `stats:`.
 export const positionValue: Parser<[number, string]> = {
   parse(cursor: Cursor) {
     const position = number.parse(cursor);
@@ -36,9 +32,8 @@ export const positionValue: Parser<[number, string]> = {
   examples: ['0 keen-eye', '3 tough-hide'],
 };
 
-// Unlike `# entity stats:`, which lets a later assignment to the same key win,
-// a cluster jewel refuses the duplicate outright (c4): two positions is
-// authoring a shape wrong, not patching one.
+// Two pairs naming one position is authoring a shape wrong rather than patching
+// one, so the duplicate is refused instead of letting the later assignment win.
 function hydratePositions(parsed: unknown): Record<number, string> {
   const pairs = parsed as [number, string][];
   const positions: Record<number, string> = {};
@@ -49,26 +44,6 @@ function hydratePositions(parsed: unknown): Record<number, string> {
   return positions;
 }
 
-export const clusterJewelSchema: SectionSchema<ClusterJewel> = {
-  kind: 'cluster-jewel',
-  fields: {
-    title: TITLE_FIELD,
-    examine: { parser: text },
-    shape: { parser: id },
-    openConnections: { parser: list(id), default: () => [], keyword: 'open-connections', printed: 'always' },
-    // A plane reads in position order rather than in whatever order the author
-    // happened to write the pairs in.
-    positions: { parser: list(positionValue), hydrate: hydratePositions, dehydrate: (held) => Object.keys(held).map(Number).sort((one, other) => one - other).map((at) => [at, held[at]!] as [number, string]), default: () => ({}), keyword: 'passives' },
-    modSlots: { parser: number, default: () => DEFAULT_MOD_SLOTS, keyword: 'mod-slots', printed: 'unless-default' },
-  },
-};
-
-// Everything `# cluster-jewel` refuses at load beyond the shape lookup
-// (`getShape` already throws its own error, listing the shapes that exist):
-// `open-connections` names 1-5 of the five non-root edges with no repeats and
-// never the west edge (c6), and every position sits within the shape's range
-// (c4). Pure so it can be unit-tested against a `Shape` without loading a
-// module.
 export function clusterJewelProblem(clusterJewel: ClusterJewel, shape: Shape): string | undefined {
   if (clusterJewel.openConnections.length === 0) return 'open-connections: needs at least one edge, or the plane never has anywhere left to grow';
   const seen = new Set<string>();
@@ -85,3 +60,35 @@ export function clusterJewelProblem(clusterJewel: ClusterJewel, shape: Shape): s
   }
   return undefined;
 }
+
+export const clusterJewel = section<ClusterJewel>()({
+  kind: 'cluster-jewel',
+  ids: 'owned',
+  map: 'clusterJewels',
+  text: ['title', 'examine'],
+  fields: {
+    title: TITLE_FIELD,
+    examine: { parser: text },
+    shape: { parser: id },
+    openConnections: { parser: list(id), default: () => [], keyword: 'open-connections', printed: 'always' },
+    positions: { parser: list(positionValue), hydrate: hydratePositions, dehydrate: (held) => Object.keys(held).map(Number).sort((one, other) => one - other).map((at) => [at, held[at]!] as [number, string]), default: () => ({}), keyword: 'passives' },
+    modSlots: { parser: number, default: () => DEFAULT_MOD_SLOTS, keyword: 'mod-slots', printed: 'unless-default' },
+  },
+  // Reading `positions` is where a position filled twice is raised, and
+  // `getShape` throws its own list of the shapes that exist. Both are already
+  // the words an author reads, so they are answered as this kind's problem
+  // rather than leaving without the section that carried them.
+  validate: (value) => {
+    try {
+      return clusterJewelProblem(value, getShape(value.shape));
+    } catch (raw) {
+      if (!(raw instanceof DslError)) throw raw;
+      return raw.message;
+    }
+  },
+  visit: (value, where, visit) => {
+    for (const assignment of listMembers<[number, string]>((value as unknown as Loose).positions)) {
+      assignment[1] = visit('passive', assignment[1], `${where} passives:`);
+    }
+  },
+});
