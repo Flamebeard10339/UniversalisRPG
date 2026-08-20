@@ -16,8 +16,6 @@ export interface Mutation {
   note?: string;
 }
 
-// The two effects, taken as parameters so the decisions below can be tested
-// without a working tree or a test run.
 export interface FileStore {
   read(file: string): string;
   write(file: string, text: string): void;
@@ -25,14 +23,8 @@ export interface FileStore {
 
 export interface TestRun {
   failed: number;
-  // Counted separately from total, which includes skips: a `-t` name that
-  // matches nothing skips everything, and failed + passed is the only number
-  // that says whether any test actually ran.
   passed: number;
   total: number;
-  // Files that failed as files. A file that could not be collected reports here
-  // and not in `failed`, so a mutation that does not build looks like a clean
-  // run of whatever else collected.
   filesFailed: number;
   failures: string[];
   raw: string;
@@ -47,10 +39,6 @@ export interface Baseline {
   failures: string[];
 }
 
-// Looked up rather than handed over as a map, so a scope nobody reaches is never
-// measured — including the whole suite, which only an escalation needs. Every
-// call must happen while the tree is unmutated; runMutations is what guarantees
-// that, by asking before it writes.
 export type BaselineFor = (tests: readonly string[] | undefined, test?: string) => Baseline | undefined;
 
 export type Verdict = 'KILLED' | 'SURVIVED' | 'ERROR' | 'UNSTABLE';
@@ -77,9 +65,6 @@ export interface MutationReport {
   results: MutationResult[];
   refusals: string[];
   unrestored: string[];
-  // Present when the run could list the tree's paths before and after. Gained
-  // paths are reported and left in place: a run that silently removed files
-  // would be a worse tool than one that silently left them.
   treeDelta?: { gained: string[]; lost: string[] };
   ok: boolean;
 }
@@ -120,8 +105,6 @@ export function parseManifest(text: string): Mutation[] {
   });
 }
 
-// The whole tally, not the exit code: a run that exits non-zero because it
-// collected nothing has not killed anything.
 export function parseVitestTally(output: string): { failed: number; passed: number; total: number; filesFailed: number } | null {
   const files = [...output.matchAll(/^[ \t]*Test Files[ \t]+(.+)$/gm)];
   const filesFailed = files.length === 0 ? 0 : Number(/(\d+) failed/.exec(files[files.length - 1][1])?.[1] ?? 0);
@@ -134,16 +117,6 @@ export function parseVitestTally(output: string): { failed: number; passed: numb
   return { failed: Number(/(\d+) failed/.exec(summary)?.[1] ?? 0), passed: Number(/(\d+) passed/.exec(summary)?.[1] ?? 0), total: Number(total[1]), filesFailed };
 }
 
-// The `Failed Tests` section, which is the only place a run says *which* test
-// failed. A line with no ` > ` is a file that never collected, named without a
-// test inside it, and is already reported as `filesFailed`. Colour codes are
-// stripped rather than assumed absent: they appear whenever a caller's
-// environment forces them, and a name carrying one matches nothing.
-//
-// Every printed line is kept, never a distinct set. Two tests can print one
-// name — an `it.each` name whose distinguishing part follows an embedded
-// newline prints identically up to it — and collapsing them breaks the
-// correspondence with the tally that `tallyOf` refuses on.
 export function parseFailedTests(output: string): string[] {
   const named: string[] = [];
   for (const match of output.replace(/\u001b\[[0-9;]*m/g, '').matchAll(/^\s*FAIL\s+(?:\|[^|\n]+\|\s+)?(\S+ > .*\S)\s*$/gm)) {
@@ -152,20 +125,12 @@ export function parseFailedTests(output: string): string[] {
   return named;
 }
 
-// Which stream the tally is read from is a decision, so it is data here rather
-// than a line inside the spawn wrapper where no test can reach it. vitest writes
-// its summary to stdout and its failure detail to stderr; a test printing a
-// tally-shaped line of its own must not be able to win, and the same reasoning
-// keeps the names off stdout.
+// vitest prints its summary tally on stdout and its `Failed Tests` detail on stderr.
 export function tallyOf(streams: { stdout: string; stderr: string }): TestRun {
   const raw = `${streams.stdout}${streams.stderr}`;
   const tally = parseVitestTally(streams.stdout);
   if (tally === null) throw new Error(`could not read a test tally out of the run\n${outputTail(raw)}`);
   const failures = parseFailedTests(streams.stderr);
-  // Fewer names than failures is the one direction that costs a verdict: a
-  // reporter this cannot read would attribute a kill to whatever it did name.
-  // More is ordinary — a suite whose hook threw is named here while its tests
-  // are counted as skipped rather than failed.
   if (failures.length < tally.failed) {
     throw new Error(`the run reported ${tally.failed} failing test(s) and named ${failures.length} of them, so no verdict could be attributed to a test\n${outputTail(raw)}`);
   }
@@ -188,15 +153,6 @@ export const scopeOf = (mutation: Pick<Mutation, 'tests' | 'test'>): string => {
 
 const occurrences = (text: string, find: string): number => text.split(find).length - 1;
 
-// The refusal a find miss is worth. "does not contain the find text" is true
-// and useless: it cost three separate sessions two rounds each, twice on line
-// endings — one file CRLF on disk, one LF, both messages identical and `cat
-// -A` through git-bash showing LF for both — and once on escaping, a heredoc
-// turning `\t` into a literal tab before it reached the JSON. All three are
-// invisible in the manifest and obvious the moment the nearest line is put
-// beside what was asked for, which the checker already has open. Scored on
-// the longest shared run of characters rather than on words, because the
-// drift that causes this is inside a line, not between lines.
 function nearestLine(text: string, find: string): { line: string; number: number } | null {
   const needle = find.split('\n')[0].trim();
   if (needle === '') return null;
@@ -206,14 +162,9 @@ function nearestLine(text: string, find: string): { line: string; number: number
     const score = sharedRun(lines[i], needle);
     if (best === null || score > best.score) best = { line: lines[i], number: i + 1, score };
   }
-  // Half the needle is the floor: below it the "nearest" line is a coincidence
-  // of punctuation, and printing one would send a reader to the wrong place.
   return best === null || best.score * 2 < needle.length ? null : { line: best.line, number: best.number };
 }
 
-// The longest substring the two share, computed over the shorter one's
-// windows. Both sides here are one line of source, so the quadratic walk is
-// bounded by a line length and runs once per refused mutation.
 function sharedRun(a: string, b: string): number {
   const [short, long] = a.length <= b.length ? [a, b] : [b, a];
   for (let size = short.length; size > 0; size--) {
@@ -224,11 +175,6 @@ function sharedRun(a: string, b: string): number {
   return 0;
 }
 
-// Whitespace and line endings are what the eye cannot see and what the miss is
-// usually made of, so they are spelled out rather than printed as themselves.
-// Leading runs as well as trailing: a find text copied without its indentation
-// misses for a reason that is invisible until the two lines are put one above
-// the other and the margin is drawn.
 export function visibleWhitespace(text: string): string {
   return text
     .replace(/\r/g, '\\r')
@@ -275,14 +221,8 @@ export function refusalsFor(mutations: readonly Mutation[], files: FileStore, or
 function verdictOf(mutation: Mutation, scope: string, run: TestRun, baseline: Baseline | undefined): MutationResult {
   const errored = (detail: string): MutationResult => ({ name: mutation.name, verdict: 'ERROR', failed: 0, total: 0, scope, detail, output: outputTail(run.raw) });
   if (run.total === 0) return errored('the run reported no tests — the mutation may not build');
-  // A file that fails as a file while no test fails did not run: vitest counts a
-  // collection failure on `Test Files` only, so the tests that did collect would
-  // otherwise read as a clean sweep of a suite that never assembled.
   if (run.filesFailed > 0 && run.failed === 0) return errored(`${run.filesFailed} test file(s) failed to collect — the mutation may not build`);
 
-  // Against the tests the baseline saw fail, not against how many. A count
-  // corrects for a tree that was already red; it cannot tell a test the
-  // mutation broke from a test that was going to fail during this run anyway.
   const wasFailing = baseline?.failed ?? 0;
   const before = new Set(baseline?.failures ?? []);
   const attributed = run.failures.filter((name) => !before.has(name));
@@ -290,10 +230,6 @@ function verdictOf(mutation: Mutation, scope: string, run: TestRun, baseline: Ba
     return errored(`${run.failed} test(s) failed against ${wasFailing} in this scope's baseline, and not one of them is a test the baseline saw pass — a count going up is not a kill`);
   }
   const shortfall = baseline !== undefined && run.total < baseline.total ? baseline.total - run.total : undefined;
-  // A test the baseline saw fail and this run saw pass changed in the one
-  // direction breaking a line cannot explain. Suppressed when tests stopped
-  // running, where the same shape means only that the mutation stopped
-  // collecting the file it was in.
   const flaked = shortfall === undefined ? [...before].filter((name) => !run.failures.includes(name)) : [];
   return {
     name: mutation.name,
@@ -309,13 +245,8 @@ function verdictOf(mutation: Mutation, scope: string, run: TestRun, baseline: Ba
   };
 }
 
-// Files rather than the test names they came from: `-t` takes a regex over the
-// whole suite, and the file the run already named is both narrower and exact.
 export const filesOf = (tests: readonly string[]): string[] => [...new Set(tests.map((name) => name.split(' > ')[0]))].sort();
 
-// A failure that did not happen again, on the same tree with the same mutant on
-// disk, is reported and never resolved — the tool refuses to present it as
-// fact, and what to do about it is the auditor's.
 export function confirmKill(result: MutationResult, run: TestRun, baseline: Baseline | undefined, scope: string): MutationResult {
   const attributed = result.attributed ?? [];
   const before = new Set(baseline?.failures ?? []);
@@ -326,8 +257,6 @@ export function confirmKill(result: MutationResult, run: TestRun, baseline: Base
 
 const WHOLE_SUITE: readonly string[] | undefined = undefined;
 
-// The scopes a survivor still has to face, in the order it faces them: a named
-// test widens to the file it lives in, a file to the whole suite.
 const ladderAbove = (mutation: Mutation): Pick<Mutation, 'tests' | 'test'>[] => {
   const rungs: Pick<Mutation, 'tests' | 'test'>[] = [];
   if (mutation.test !== undefined) rungs.push({ tests: mutation.tests });
@@ -340,8 +269,6 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
   const refusals = refusalsFor(mutations, files, originals);
   if (refusals.length > 0) return { results: [], refusals, unrestored: [], ok: false };
 
-  // Before the first test runs, not merely the first write: a test can write
-  // files whether or not a mutant is on disk, and this run owns both.
   let before: readonly string[] | undefined;
   try {
     before = tree?.();
@@ -349,9 +276,6 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
     before = undefined;
   }
 
-  // Memoized here as well as by the caller, so however many mutations share a
-  // scope or escalate into one, the run asks for its baseline once — and never
-  // asks for a scope nothing reaches.
   const baselines = new Map<string, Baseline | undefined>();
   const baselineAt = (scope: Pick<Mutation, 'tests' | 'test'>): Baseline | undefined => {
     const key = scopeOf(scope);
@@ -359,8 +283,6 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
     return baselines.get(key);
   };
 
-  // A named test its own scope never ran is a typo, not a measurement: the run
-  // would skip everything and call the mutation SURVIVED.
   for (const mutation of mutations) {
     if (mutation.test === undefined) continue;
     const baseline = baselineAt(mutation);
@@ -371,9 +293,6 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
   const touched = new Set<string>();
   const restoreFailures = new Set<string>();
 
-  // Mutate, measure, put back. Every baseline is taken by the caller BEFORE this
-  // is entered, because a baseline measured with the mutant on disk is not a
-  // baseline — it is a second reading of the same thing.
   const around = (mutation: Mutation, scope: string, measure: () => MutationResult): MutationResult => {
     const original = originals.get(mutation.file)!;
     touched.add(mutation.file);
@@ -396,10 +315,6 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
     return around(mutation, scopeOf(mutation), () => verdictOf(mutation, scopeOf(mutation), runTests(mutation.tests, mutation.test), baseline));
   });
 
-  // Escalation is a second phase rather than a nested run, so every wider
-  // baseline is taken on a clean tree too — and only when something survived a
-  // narrower rung, which is what keeps a narrow scope cheap. A verdict keeps
-  // every scope it climbed through.
   for (let index = 0; index < results.length; index++) {
     for (const rung of ladderAbove(mutations[index])) {
       if (results[index].verdict !== 'SURVIVED') break;
@@ -412,11 +327,6 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
     }
   }
 
-  // Every kill faces the same bar however wide the scope that produced it, so
-  // widening the scope cannot widen what counts as one. A kill found wider than
-  // its named tests' own files is re-measured there, where a failure that
-  // needed a contended run stops appearing; one already found there is measured
-  // twice, which is the same tree answering the same question.
   for (let index = 0; index < results.length; index++) {
     const found = results[index];
     if (found.verdict !== 'KILLED' || found.attributed === undefined) continue;
@@ -426,9 +336,6 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
     results[index] = { ...around(mutations[index], scope, () => confirmKill(found, runTests(rung.tests, rung.test), baseline, scope)), escalatedFrom: found.escalatedFrom };
   }
 
-  // Not trust — proof. The restore above is the only thing standing between a
-  // mutation run and a corrupted working tree, so the run reports whether it
-  // actually happened.
   const unrestored: string[] = [];
   for (const file of touched) {
     let current: string | null = null;
@@ -440,8 +347,6 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
     if (current !== originals.get(file) || restoreFailures.has(file)) unrestored.push(file);
   }
 
-  // The mutation targets are proven byte-identical above; this is the rest of
-  // the tree, which the restore cannot reach because it never captured it.
   let treeDelta: { gained: string[]; lost: string[] } | undefined;
   if (before !== undefined) {
     try {
@@ -462,8 +367,6 @@ const ORDER: Record<Verdict, number> = { SURVIVED: 0, UNSTABLE: 1, ERROR: 2, KIL
 const nameList = (names: readonly string[], limit = 2): string => (names.length <= limit ? names.join(', ') : `${names.slice(0, limit).join(', ')} and ${names.length - limit} more`);
 
 export function formatReport(report: MutationReport): string {
-  // Indented per line, not per refusal: a refusal that quotes the file spans
-  // several lines, and only the first would otherwise sit under the heading.
   if (report.refusals.length > 0) return ['applied nothing — the manifest was refused:', ...report.refusals.flatMap((refusal) => refusal.split('\n').map((line) => `  ${line}`))].join('\n');
 
   const sorted = [...report.results].sort((a, b) => ORDER[a.verdict] - ORDER[b.verdict]);
@@ -533,34 +436,21 @@ const usage = [
   'shortfall rather than as a verdict over a silently smaller suite.',
 ].join('\n');
 
-// The captured bytes live in this process, which is the design's strength — git
-// cannot discard uncommitted work it never sees — and its single point of
-// failure. The journal is the same bytes on disk, so a killed run is recoverable
-// by the next one.
 export interface Journal {
   root: string;
   pid: number;
   startedAt: string;
-  // The commit the captured bytes were read at, or null on a journal written
-  // before this field existed — which reads as unknown, not as a match.
   head: string | null;
   files: Record<string, string>;
 }
 
-// null when this is not a git checkout, or git cannot answer. Both read as
-// "nothing says the tree has not moved", which `recoveryStanding` treats as a
-// reason to report rather than restore.
 export function headOf(root: string): string | null {
   const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' });
   return result.status === 0 && typeof result.stdout === 'string' && result.stdout.trim() !== '' ? result.stdout.trim() : null;
 }
 
-// Keyed by the tree it was captured from. One journal per machine would let a
-// run in one checkout restore its bytes into another checkout's files.
 export const journalPathFor = (root: string): string => path.join(os.tmpdir(), `universalis-mutate-${createHash('sha256').update(path.resolve(root)).digest('hex').slice(0, 16)}.json`);
 
-// A journal is written by a process that can die mid-write, so nothing here may
-// assume it parses. Unreadable is a state to report and discard, not to crash on.
 export function readJournal(text: string): Journal | null {
   let parsed: unknown;
   try {
@@ -581,24 +471,19 @@ export function readJournal(text: string): Journal | null {
   };
 }
 
-// A run that has been going this long is not a run, it is a pid that got reused.
-// Without it a recycled pid wedges every later run behind a permanent "busy".
 export const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 
-// EPERM means the process exists and is not ours, which is the most alive a pid
-// can be. Only ESRCH is "gone". The probe is a parameter so that distinction is
-// reachable without spawning a process to not own.
+const SIGNAL_REFUSED_BY_A_PROCESS_WE_DO_NOT_OWN = 'EPERM';
+
 export function pidIsAlive(pid: number, probe: (target: number, signal: number) => void = (target, signal) => process.kill(target, signal)): boolean {
   try {
     probe(pid, 0);
     return true;
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
+    return (error as NodeJS.ErrnoException).code === SIGNAL_REFUSED_BY_A_PROCESS_WE_DO_NOT_OWN;
   }
 }
 
-// A journal left by a run that is still going is not wreckage to clean up, it is
-// another process's only copy of the truth.
 export function journalVerdict(journal: Pick<Journal, 'pid' | 'startedAt'>, self: number, alive: (pid: number) => boolean, now = Date.now()): 'recover' | 'busy' {
   if (typeof journal.pid !== 'number' || journal.pid === self) return 'recover';
   if (!alive(journal.pid)) return 'recover';
@@ -611,11 +496,6 @@ export interface Recovery {
   refused: string[];
 }
 
-// Recovery writes bytes over files nobody asked it to touch, which is only
-// right while the tree is still the one they were read from. `stale` is the
-// refusal to guess: the bytes may be a mid-write tree worth rescuing or a
-// journal nobody cleaned up, nothing here distinguishes those, and restoring
-// the wrong one reverts committed work.
 export type RecoveryStanding = { kind: 'recover' } | { kind: 'stale'; reason: string };
 
 export function recoveryStanding(journal: Pick<Journal, 'head'>, head: string | null): RecoveryStanding {
@@ -625,9 +505,6 @@ export function recoveryStanding(journal: Pick<Journal, 'head'>, head: string | 
   return { kind: 'recover' };
 }
 
-// What a run owes its tree on the way out, whichever exit it takes: every file
-// it captured back as it found it. Returns the ones it could not put back,
-// which are the only reason to keep a journal.
 export function putBackAll(captured: ReadonlyMap<string, string>, read: (file: string) => string, write: (file: string, text: string) => void): string[] {
   const failed: string[] = [];
   for (const [file, text] of captured) {
@@ -640,8 +517,6 @@ export function putBackAll(captured: ReadonlyMap<string, string>, read: (file: s
   return failed;
 }
 
-// `allowed` is the same containment the manifest goes through. Journal keys are
-// data this process never validated, and they are acted on before anything else.
 export function recoverFrom(entries: Record<string, string>, files: FileStore, allowed: (file: string) => boolean): Recovery {
   const restored: string[] = [];
   const refused: string[] = [];
@@ -661,16 +536,6 @@ export function recoverFrom(entries: Record<string, string>, files: FileStore, a
   return { restored, refused };
 }
 
-// Resolved the way node resolves it, not by joining a path onto the repo root.
-// A worktree under `.claude/worktrees/` has no `node_modules` of its own, so
-// the join named a file that does not exist while `npx vitest` and `npm test`
-// in the same tree worked — node's own resolution walks up to the main
-// checkout. Every mutation in that worktree returned "could not read a test
-// tally out of the run", twelve of twelve, and the run said nothing about why.
-// scripts/lib/tsxCli.ts is the in-repo pattern, written for this exact reason.
-// Asked of the package rather than assumed: `vitest/vitest.mjs` is not an
-// exported subpath, so the CLI's location comes from the `bin` field of the
-// package.json that resolution found.
 export function resolveVitest(): { cli: string } | { missing: string } {
   try {
     const manifest = createRequire(import.meta.url).resolve('vitest/package.json');
@@ -691,9 +556,6 @@ function main(): void {
     process.exit(2);
   }
 
-  // Before the manifest, the journal and the baselines: a run that cannot
-  // start the test command can only report every mutation as an error, and
-  // saying so once beats saying it once per mutation with a stack attached.
   const vitest = resolveVitest();
   if ('missing' in vitest) {
     console.error(`vitest could not be resolved from ${import.meta.filename}, so no mutation could be measured — ${vitest.missing}`);
@@ -715,8 +577,6 @@ function main(): void {
     process.exit(2);
   }
 
-  // Captured on first read, which happens during validation before anything is
-  // written — so this is the pre-mutation content even if the run dies mid-way.
   const captured = new Map<string, string>();
   const files: FileStore = {
     read(file: string): string {
@@ -762,8 +622,6 @@ function main(): void {
     captured.clear();
   }
 
-  // Take the journal as a lock before reading anything, so two runs cannot both
-  // decide the tree is theirs. It starts empty because nothing is mutated yet.
   const stamp = { root: repoRoot, pid: process.pid, startedAt: new Date().toISOString(), head: headOf(repoRoot) };
   try {
     writeFileSync(JOURNAL, JSON.stringify({ ...stamp, files: {} } satisfies Journal), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
@@ -772,24 +630,16 @@ function main(): void {
     process.exit(2);
   }
 
-  // Read every target before the first write, so the journal holds the
-  // pre-mutation content of everything this run can touch.
   for (const file of new Set(mutations.map((mutation) => mutation.file))) {
     try {
       files.read(file);
     } catch {
-      // runMutations refuses it by name a moment later, with a better message.
     }
   }
-  // Written aside and renamed over, so a kill mid-write cannot leave a half
-  // journal where a whole one is expected.
   const pending = `${JOURNAL}.writing`;
   writeFileSync(pending, JSON.stringify({ ...stamp, files: Object.fromEntries(captured) } satisfies Journal), { encoding: 'utf8', mode: 0o600 });
   renameSync(pending, JOURNAL);
 
-  // Restoring the tree and forgetting the journal are one act, in one place,
-  // because every exit between here and the report owes both. A file that
-  // cannot be put back keeps the journal, which is the one thing it is for.
   const putBack = (): void => {
     if (putBackAll(captured, (file) => readFileSync(path.resolve(repoRoot, file), 'utf8'), (file, text) => writeFileSync(path.resolve(repoRoot, file), text, 'utf8')).length === 0) {
       rmSync(JOURNAL, { force: true });
@@ -799,30 +649,19 @@ function main(): void {
   process.on('SIGINT', () => process.exit(130));
   process.on('SIGTERM', () => process.exit(143));
 
-  // -t takes a regex and the manifest names text, so the name's own characters
-  // are escaped rather than read as a pattern.
   const runTests: RunTests = (tests, test) => {
     const name = test === undefined ? [] : ['-t', test.replace(/[$()*+.?[\\\]^{|}]/g, '\\$&')];
-    // The failure detail is now what a verdict is attributed to, so the buffer
-    // it arrives in is sized for a whole suite going red rather than for the
-    // twelve lines a tail prints.
     const result = spawnSync(process.execPath, [vitest.cli, 'run', '--configLoader', 'runner', ...(tests ?? []), ...name], { cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
     if (result.error) throw new Error(`the test command did not run: ${result.error.message}`);
     return tallyOf({ stdout: result.stdout ?? '', stderr: result.stderr ?? '' });
   };
 
-  // Before the baselines, not after: refusalsFor needs only the files, and the
-  // baselines are the most expensive thing in the run. Spending them on a
-  // manifest already known to be unusable is pure loss.
   const refusals = refusalsFor(mutations, files);
   if (refusals.length > 0) {
     console.log(formatReport({ results: [], refusals, unrestored: [], ok: false }));
     process.exit(1);
   }
 
-  // Measured on first use and remembered, so a run pays for the scopes it
-  // actually reaches. An escalation is what asks for the whole suite, and most
-  // runs never need it.
   const measured = new Map<string, Baseline | undefined>();
   const baselineFor: BaselineFor = (tests, test) => {
     const key = scopeOf({ tests: tests === undefined ? undefined : [...tests], test });
@@ -839,8 +678,6 @@ function main(): void {
     return measured.get(key);
   };
 
-  // Tracked plus untracked-unignored: the paths a test could add or remove
-  // that anyone would later notice.
   const tree = (): readonly string[] => {
     const listing = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: repoRoot, encoding: 'utf8' });
     if (listing.error) throw listing.error;
@@ -850,8 +687,6 @@ function main(): void {
 
   const report = runMutations(mutations, files, runTests, baselineFor, tree);
   console.log(formatReport(report));
-  // The journal goes in `putBack`, which this exit runs — one place, so the
-  // success path cannot be the only one that cleans up.
   process.exit(report.ok ? 0 : 1);
 }
 

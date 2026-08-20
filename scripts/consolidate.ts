@@ -57,9 +57,6 @@ function headingLine(text: string, start: number): string {
 
 const declarationKey = (kind: string, id: string): string => `${kind} ${id}`;
 
-// Which file declared an id, asked of the loader's own rule rather than of a
-// second spelling of it: `declaredKey` is what settles a section's id during a
-// load, and null there means the heading is an edit rather than a declaration.
 function declarations(sources: readonly ModuleSource[], namespaces: ReadonlyMap<string, string | null>): Map<string, Declaration[]> {
   const found = new Map<string, Declaration[]>();
   for (const source of sources) {
@@ -87,10 +84,6 @@ const targetOf = (section: ParsedModule['sections'][number]): Target =>
     ? { kind: (section.value as Removal).kind, id: (section.value as Removal).target, remove: true }
     : { kind: section.kind, id: (section.value as { id: string }).id, remove: false };
 
-// The staged sections paired with the ids the loader settled them on. The pair
-// is what makes placement derived rather than guessed: the text comes from the
-// file and the id from the load that just accepted it, and neither is
-// re-resolved here.
 function staged(local: ModuleSource, parsed: readonly ParsedModule[]): { section: LocalSection; target: Target }[] | null {
   const module = parsed.find((each) => each.source.name === local.name);
   if (!module) return null;
@@ -109,9 +102,6 @@ interface Edit {
   text: string | null;
 }
 
-// A deletion takes the section's own lines and the blank ones separating it
-// from the next section, so removing the middle of three does not leave the gap
-// two sections wide.
 function deletionEnd(text: string, end: number): number {
   let stop = end;
   while (stop < text.length && text[stop] !== '\n') stop += 1;
@@ -154,9 +144,6 @@ export function consolidate(base: readonly ModuleSource[], local: ModuleSource):
     return { section, target, declaration: at[0], refused: '' };
   });
 
-  // Two staged sections resolving onto one span leave both staged rather than
-  // one of them: which of the two the file should end up saying is exactly what
-  // an author has not said.
   const span = (declaration: Declaration): string => `${declaration.source}:${declaration.start}`;
   const claims = new Map<string, number>();
   for (const each of resolved) if (each.declaration) claims.set(span(each.declaration), (claims.get(span(each.declaration)) ?? 0) + 1);
@@ -183,9 +170,6 @@ export function consolidate(base: readonly ModuleSource[], local: ModuleSource):
 
   const sources = base.map((source) => (edits.has(source.name) ? { ...source, text: applyEdits(source.text, edits.get(source.name)!) } : source));
 
-  // No dependencies are offered, so the header the author wrote survives a
-  // consolidation whole: what the local module depends on is its own statement
-  // and taking sections out of it is not a reason to restate it.
   let text = local.text;
   for (const { section } of sections) {
     if (!placed.some((each) => each.heading === `# ${section.kind} ${section.id}`)) continue;
@@ -252,9 +236,6 @@ const repoPath = (file: string): string => path.resolve(repoRoot, file);
 
 const sourceName = (file: string): string => path.basename(file).replace(/\.[^.]*$/, '');
 
-// The directory is the manifest, the way it is for the browser's glob and for
-// the shipped-content replay: a `.dsl` added to content/ is a file an edit can
-// go home to on the commit that authors it.
 export function contentFiles(args: Args): string[] {
   if (args.contentFiles) return args.contentFiles;
   const local = repoPath(args.localFile);

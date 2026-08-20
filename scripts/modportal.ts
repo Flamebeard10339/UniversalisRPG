@@ -23,8 +23,6 @@ interface Args {
   contentFiles: string[];
 }
 
-// The in-process exit: `run` turns it into an exit code, so a test driving
-// `run(args)` directly never has its own process killed under it.
 class ExitSignal extends Error {
   constructor(readonly code: number) {
     super(`exit ${code}`);
@@ -121,8 +119,6 @@ function issuesFromGitHub(args: Args, label: string): unknown[] {
   return Array.isArray(parsed) ? parsed : [parsed];
 }
 
-// gh's repeated --label is an AND, so each listable tier is its own query. An
-// issue carrying both labels reaches us twice and keeps the stronger tier.
 function issueList(args: Args): ApprovedModIssue[] {
   if (args.fromFile) {
     const parsed = JSON.parse(readFileSync(repoPath(args.fromFile), 'utf8').replace(/^\uFEFF/, '')) as unknown;
@@ -205,8 +201,6 @@ function list(args: Args): void {
   }
 }
 
-// Reads what is on disk rather than what was just materialized, because this is
-// the check `enable` needs: whether the cache as it would stand loads.
 function validateCachedEnabled(args: Args, entries: readonly ModportalEntry[]): string[] {
   const diagnostics: string[] = [];
   const sources = args.contentFiles.map(contentSource);
@@ -218,8 +212,6 @@ function validateCachedEnabled(args: Args, entries: readonly ModportalEntry[]): 
   return [...diagnostics, ...loadUniverseWithDiagnostics(sources).diagnostics.map(formatModuleDiagnostic)];
 }
 
-// Enabling is staged and proved before it is written; disabling needs no proof,
-// so a cache holding a broken enabled mod is always repairable.
 function toggle(args: Args, enabled: boolean): void {
   const manifest = readManifest(args);
   const entry = findEntry(manifest, args.target!);

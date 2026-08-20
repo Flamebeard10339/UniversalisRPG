@@ -3,20 +3,10 @@ import { BonusAmount } from '../src/grammar/tagClause';
 import { Localized, Localizer } from '../src/runtime/localized';
 import { ClusterReport, PayloadReport, PlaneReport, PositionReport, SlotReport, Standing } from '../src/runtime/planeReport';
 
-// Every line one plane is drawn as. Named so the published-surface walk has a
-// root here (c1): this file invents no word, so a `string[]` return would be
-// the one edit that put English back into it without anything going red.
 export type PlaneLines = readonly Localized[];
 
-// What each standing means to a player holding points, rather than what it is
-// called in the plane. The words are the shell's, keyed once and read by
-// whichever driver is drawing, so a terminal and a screen cannot end up saying
-// different things about the same node (c5).
 const STANDING: Record<Standing, EngineKey> = { allocated: 'engine.shell.spent', available: 'engine.shell.ready', unreached: 'engine.shell.locked', blocked: 'engine.shell.dead' };
 
-// The node column takes the longest thing that goes in it: `Slot ne` is short and
-// `Position 10` is not, and both are one key away from being longer in another
-// language.
 const COLUMNS = [7, 12] as const;
 
 interface Row {
@@ -26,10 +16,6 @@ interface Row {
   worth: Localized;
 }
 
-// A cell is a word the localizer produced and a column is a width, so a row of
-// them padded out to their columns is still exactly what the localizer said.
-// The one seam in this file where a line is laid out, and the only reason it
-// reaches for `identifier` — what it adds is spaces.
 const laidOut = (localizer: Localizer, cells: readonly Localized[], widths: readonly number[]): Localized =>
   localizer.identifier(cells.map((cell, at) => cell.padEnd(widths[at] ?? 0)).join('').trimEnd());
 
@@ -47,8 +33,6 @@ function magnitude(bonus: BonusAmount): string {
   return `${signed(bonus.amount.min)}-${trim(Math.abs(bonus.amount.max))}`;
 }
 
-// The effective number leads and the factor that made it trails, so a reader
-// never has to multiply to know what a position pays (c19).
 function payload(report: PayloadReport): string {
   const scale = report.scale === 1 ? '' : ` ×${trim(report.scale)}`;
   return `${magnitude(report.effective)} ${report.statTitle}${scale}`;
@@ -81,8 +65,6 @@ function slotRow(slot: SlotReport, localizer: Localizer): Row {
   };
 }
 
-// The hexagon in hand is marked in the margin, so which of three things a
-// growth line names is read off the screen rather than remembered.
 function clusterHeading(cluster: ClusterReport, focused: boolean, localizer: Localizer): Localized[] {
   const from =
     cluster.entry === null
@@ -121,10 +103,6 @@ function pad(rows: readonly Row[], localizer: Localizer): Localized[] {
   return rows.map((row) => laidOut(localizer, [localizer.identifier(''), row.standing, row.node, row.what, row.worth], widths));
 }
 
-// One plane, as what standing on it is worth. c17: no row spells the directive
-// that would act on it, because the screen this is drawn above publishes that
-// act as an option a number answers. `focused` is the hexagon a screen holding
-// this plane has in hand, or null where it is read without one.
 export function formatPlane(plane: PlaneReport, worn: boolean, focused: string | null, localizer: Localizer): PlaneLines {
   const lines = [heading(plane, worn, localizer)];
   for (const cluster of plane.clusters) {

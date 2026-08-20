@@ -26,10 +26,6 @@ export interface ProbeReport {
   ok: boolean;
 }
 
-// One vocabulary, because the row gives every registry map a kind to be named
-// by. `--show variables.x` used to be the spelling for the four maps no section
-// kind claimed, and `variable` was the natural wrong guess; it is now the right
-// one.
 const SHOWABLE = new Map<string, string>(contentSectionMaps());
 
 export const DOCUMENT_SEPARATOR = '---';
@@ -116,11 +112,6 @@ function showRecord(registry: Registry, spec: string): { lines: string[]; ok: bo
   return { lines: [`${kind}.${id}`, JSON.stringify(record, null, 2)], ok: true };
 }
 
-// One module at a time, reloaded beside the other sources unchanged. That is
-// what publishing a single module does, and it is the only shape in which a
-// patch module owning no ids shows up as serializing to nothing. It is not the
-// question `--round-trip` answers by default, because those other sources then
-// replay their own edits over the print.
 function roundTripEachModule(sources: readonly ModuleSource[], parsed: readonly ParsedModule[], loaded: Registry): { lines: string[]; ok: boolean } {
   const lines: string[] = [];
   let ok = true;
@@ -199,12 +190,6 @@ export function probe(sources: readonly ModuleSource[], options: ProbeOptions): 
   return { lines, ok };
 }
 
-// A source's name is its module id when the document declares no `# info`, so
-// the separator this puts between the name and the ordinal has to be one an id
-// may contain. `stdin[3]` was not: every document without an `# info` was
-// refused as "stdin[3] is not a usable module id", which made a survey unable
-// to tell a variant that loads from one the loader rejected — the whole point
-// of `--each`.
 export function splitDocuments(name: string, text: string): ModuleSource[] {
   const documents = text.split(new RegExp(`^${DOCUMENT_SEPARATOR}[ \\t]*$`, 'm'));
   if (documents.length === 1) return [{ name, text }];

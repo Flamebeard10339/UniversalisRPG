@@ -104,10 +104,6 @@ if (loaded.diagnostics.length > 0) fail(['Cannot squash while diagnostics are pr
 
 const globals = new Set<string>(declaredGlobalIds(target));
 const localParsed = parsedModules.find((module) => module.source === localSource);
-// A variable is a global tuning knob and a slot is a global vocabulary, neither
-// of them module-owned content, so one created locally can become part of the
-// squashed module's globals. A local-created item/entity/etc. is still refused
-// by registryDiff below.
 if (localParsed && localParsed.info.id !== targetId) for (const id of declaredGlobalIds(localParsed)) globals.add(id);
 
 const validationSources = parsedModules

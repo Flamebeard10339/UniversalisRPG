@@ -16,11 +16,9 @@ export interface ContentFile {
   text: string;
 }
 
-// Everything a `# save` body holds except its version stamp.
 export type SaveBody = Record<string, unknown>;
 
 export interface Fixture {
-  // The qualified id a `# test` names, not the bare id in the heading.
   id: string;
   file: string;
   version: number;
@@ -28,21 +26,12 @@ export interface Fixture {
 
 export interface ShapeChange {
   writtenFor: number;
-  // Printed by every run, so the diff it produced is readable beside what its
-  // author said it would do.
   declared: string;
   moved(body: SaveBody, fixture: Fixture): SaveBody;
 }
 
 export const noFieldMoved = (writtenFor: number): ShapeChange => ({ writtenFor, declared: 'no field moved', moved: (body) => body });
 
-// Written by the branch that bumps SAVE_VERSION and deleted by the one after
-// it; `git log -p` on this file is the history of every bump's shape change.
-// null is "nobody said", not "nothing moved" — migrate refuses it, and a bump
-// that moved no field says so with noFieldMoved.
-// c5: activeAction.actionLabel became actionSlug, holding what addresses an
-// action under its owner rather than the title it is shown under. No shipped
-// fixture carries an action under way, so no body moves.
 export const SHAPE_CHANGE: ShapeChange | null = noFieldMoved(11);
 
 export function isStaleDeclaration(change: ShapeChange | null): boolean {
@@ -69,9 +58,6 @@ function moduleSourceOf(file: ContentFile): ModuleSource {
   return { name: path.basename(file.path).replace(/\.[^.]*$/, ''), text: file.text };
 }
 
-// Every fixture the run saw starts unreferenced and is upgraded by the tests
-// that name it, so a `# save` no `# test` reaches is reported rather than
-// simply absent from the classification.
 function classify(registry: Registry, fixtures: readonly Fixture[]): (id: string) => Classification {
   const found = new Map<string, Classification>();
   for (const fixture of fixtures) found.set(fixture.id, 'unreferenced');
@@ -112,9 +98,6 @@ function validationProblems(rewrites: readonly Rewrite[], registry: Registry): s
       problems.push(`${rewrite.fixture.id}: ${(error as Error).message}`);
       continue;
     }
-    // The path, not the sentence: a report is read by a developer against a
-    // universe that may ship no locale, and a key says nothing about which
-    // record moved. `message` is what a player reads; `path` is the fact.
     for (const warning of warnings) problems.push(`${rewrite.fixture.id}: ${warning.path} — ${warning.message}`);
   }
   return problems;
