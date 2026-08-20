@@ -1,23 +1,24 @@
 import { Action, Contest, Sided } from '../grammar/action';
-import { ActionResult, DropRow, nestedResults } from '../grammar/actionResult';
-import { Condition, Reference } from '../grammar/condition';
-import { formatDependency, formatVersion, Version } from '../grammar/dependency';
-import { HookCarrier } from '../grammar/hook';
-import { isPoint, Range, scaleRange } from '../grammar/range';
-import { BonusAmount, Counter, TagClause } from '../grammar/tagClause';
-import { SkillGrant } from '../grammar/skillGrant';
-import { Produced, Quantified } from '../grammar/values';
+import { ActionResult, resultLines, resultList, spansLines } from '../grammar/actionResult';
+import { condition, printReference } from '../grammar/condition';
+import { dependency, version as versionParser, Version } from '../grammar/dependency';
+import { HOOK_FIELDS, HookCarrier } from '../grammar/hook';
+import { range } from '../grammar/range';
+import { bonusAmount, tagClause } from '../grammar/tagClause';
+import { SkillGrant, skillGrant } from '../grammar/skillGrant';
+import { duration, produced, quantified } from '../grammar/values';
+import { indentLines } from '../grammar/structure';
 import { Dialogue, TextSegment } from './dialogue';
 import { DropTable } from './dropTable';
 import { ActionDeclaration } from './action';
-import { Entity } from './entity';
+import { allyValue, Entity, statAssignmentValue } from './entity';
 import { GameEvent } from './event';
-import { ClusterJewel, DEFAULT_MOD_SLOTS } from './clusterJewel';
+import { ClusterJewel, DEFAULT_MOD_SLOTS, positionValue } from './clusterJewel';
 import { Passive } from './passive';
 import { Faction } from './faction';
-import { DEFAULT_MAX_LEVEL, Item } from './item';
-import { Location, Population } from './location';
-import { Recipe } from './recipe';
+import { clusterEffectValue, DEFAULT_MAX_LEVEL, Item } from './item';
+import { edgeValue, Location, populationValue, relativeValue } from './location';
+import { Recipe, recipeSkillValue } from './recipe';
 import { Registry } from './registry';
 import type { ModuleDiagnostic, UniverseLoadResult } from './registry';
 import { registryDiff } from './registryDiff';
@@ -41,181 +42,21 @@ export interface SerializeModuleOptions {
   globals?: readonly string[];
 }
 
-const n = (value: number): string => String(value);
-
-function range(value: Range): string {
-  return isPoint(value) ? n(value.min) : `${n(value.min)}-${n(value.max)}`;
-}
-
-function ref(value: Reference): string {
-  return value.path.join('.');
-}
-
-function condition(value: Condition): string {
-  switch (value.kind) {
-    case 'reference':
-      return ref(value.reference);
-    case 'comparison':
-      return `${ref(value.left)} ${value.operator} ${n(value.right)}`;
-    case 'has':
-      return value.count === 1 ? `has ${value.item}` : `has ${n(value.count)} ${value.item}`;
-    case 'not':
-      return `not ${condition(value.condition)}`;
-    case 'and':
-    case 'or':
-      return value.conditions.map(condition).join(` ${value.kind} `);
-  }
-}
-
-function quantified(value: Quantified): string {
-  return value.amount === undefined ? value.item : `${n(value.amount)} ${value.item}`;
-}
-
-// The no-draw reader of a produced amount: the range as written, not a sample of
-// it. `sampleCount` is the other half of the same fork.
-function producedQuantity(value: Produced): string {
-  return value.amount === undefined ? value.item : `${range(value.amount)} ${value.item}`;
-}
-
-function result(value: ActionResult): string {
-  switch (value.kind) {
-    case 'say':
-      return `say: ${value.text}`;
-    case 'set':
-      return `set: ${value.variable}`;
-    case 'unset':
-      return `unset: ${value.variable}`;
-    case 'add':
-      return `add: ${value.variable} ${n(value.amount)}`;
-    case 'give':
-      return `give: ${producedQuantity(value)}`;
-    case 'take':
-      return `take: ${quantified({ item: value.item, amount: value.amount })}`;
-    case 'xp':
-      return `xp: ${value.skill} ${range(value.amount)}`;
-    case 'relocate':
-      return `relocate: ${value.location}`;
-    case 'discover':
-      return `discover: ${value.location}`;
-    case 'open-modal':
-      return `open modal: ${value.modal}`;
-    case 'pool': {
-      // The exact inverse of what `parsePool` did: it scaled the written
-      // magnitude by the verb's sign, so undoing it is the same scale again.
-      // Taking abs of each bound instead inverted a restore's range — a
-      // symmetric operation on a point, which is why nothing saw it.
-      const magnitude = value.delta.max < 0 ? scaleRange(value.delta, -1) : value.delta;
-      // The preposition follows the verb, so it is re-derived from the sign
-      // rather than held: two fields agreeing by convention can disagree.
-      const party = value.party === undefined ? '' : ` ${value.delta.max < 0 ? 'from' : 'to'} ${value.party}`;
-      return `${value.delta.max < 0 ? 'drain' : 'restore'}: ${range(magnitude)} ${value.resource}${party}`;
-    }
-    case 'inflict': {
-      // The preposition is the one this verb takes rather than a stored field,
-      // exactly as a pool's is re-derived from its sign.
-      const party = value.party === undefined ? '' : ` on ${value.party}`;
-      return `inflict: ${value.buff}${party}`;
-    }
-    case 'roll':
-      return `roll: ${value.table}`;
-    case 'stop':
-      return 'stop';
-    // A wrapper is never one line, so it has no spelling here; resultLines owns
-    // it and the guard below is what stops a caller reaching this arm.
-    case 'chance':
-    case 'contest':
-    case 'gate':
-    case 'credit':
-    case 'one-of':
-      throw new Error(`a ${value.kind} result spans lines and cannot be inlined`);
-  }
-}
-
-const side = (value: number | string): string => (typeof value === 'string' ? value : n(value));
-
-function rowLines(row: DropRow): Lines {
-  const gate = row.requires ? ` if ${condition(row.requires)}` : '';
-  const label = `${typeof row.weight === 'string' ? row.weight : `${n(row.weight)}x`}${gate}:`;
-  if (row.results.length === 0) return [`${label} nothing`];
-  return [label, ...indented(row.results.flatMap(resultLines))];
-}
-
-// A wrapper prints as its selector over an indented body, which is the one form
-// that reloads: the inline form cannot carry a nested block.
-function resultLines(value: ActionResult): Lines {
-  switch (value.kind) {
-    case 'chance':
-      return [`${n(value.numerator)} in ${n(value.denominator)}:`, ...indented(value.results.flatMap(resultLines))];
-    case 'contest':
-      return [`${side(value.left)} vs ${side(value.right)}:`, ...indented(value.results.flatMap(resultLines))];
-    case 'gate':
-      return [`if ${condition(value.condition)}:`, ...indented(value.results.flatMap(resultLines))];
-    case 'credit':
-      return ['credit:', ...indented(value.results.flatMap(resultLines))];
-    case 'one-of':
-      return ['one of:', ...indented(value.rows.flatMap(rowLines))];
-    default:
-      return [result(value)];
-  }
-}
-
-const spansLines = (values: readonly ActionResult[] | undefined): boolean => (values ?? []).some((value) => nestedResults(value).length > 0);
-
-function results(values: readonly ActionResult[] | undefined): string {
-  return (values ?? []).map(result).join(', ');
-}
-
-function duration(seconds: number): string {
-  if (seconds % 60 === 0) return `${seconds / 60}m`;
-  const minutes = Math.floor(seconds / 60);
-  const left = seconds - minutes * 60;
-  return minutes > 0 ? `${minutes}m${left}s` : `${left}s`;
-}
-
-function bonusAmount(value: BonusAmount): string {
-  if (value.percent) {
-    const sign = value.amount < 0 ? '-' : '+';
-    return `${sign}${n(Math.abs(value.amount))}%`;
-  }
-  const sign = value.amount.min < 0 || value.amount.max < 0 ? '-' : '+';
-  const lo = Math.min(Math.abs(value.amount.min), Math.abs(value.amount.max));
-  const hi = Math.max(Math.abs(value.amount.min), Math.abs(value.amount.max));
-  return lo === hi ? `${sign}${n(lo)}` : `${sign}${n(lo)}-${n(hi)}`;
-}
-
-const counter = (value: Counter): string => (value.kind === 'stack' ? `stack of ${value.id}` : value.id);
-
-function tag(value: TagClause): string {
-  switch (value.kind) {
-    case 'keyword':
-      return value.value;
-    case 'duration':
-      return duration(value.seconds);
-    case 'stat-bonus':
-      return `${bonusAmount(value)} ${value.statId}${value.per === undefined ? '' : ` per ${counter(value.per)}`}`;
-  }
-}
-
-function indented(lines: readonly string[], spaces = 2): Lines {
-  const pad = ' '.repeat(spaces);
-  return lines.map((line) => `${pad}${line}`);
-}
-
 function block(lines: Lines, label: string, values: readonly string[]): void {
   if (values.length === 0) return;
-  lines.push(`${label}:`, ...indented(values));
+  lines.push(`${label}:`, ...indentLines(values));
 }
 
-function resultBlock(lines: Lines, label: string, values: readonly ActionResult[] | undefined, childSpaces = 2): void {
+function printResultBlock(lines: Lines, label: string, values: readonly ActionResult[] | undefined, childSpaces = 2): void {
   if (!values || values.length === 0) return;
-  lines.push(`${label}:`, ...indented(values.flatMap(resultLines), childSpaces));
+  lines.push(`${label}:`, ...indentLines(values.flatMap(resultLines), childSpaces));
 }
 
 // Printed by every carrier, so a kind that joins the gather prints its hooks by
 // calling this rather than by growing its own copy of the two labels.
 function hookLines(lines: Lines, carrier: HookCarrier): void {
-  resultBlock(lines, 'on hit', carrier.onHit);
-  resultBlock(lines, 'when hit', carrier.whenHit);
+  printResultBlock(lines, HOOK_FIELDS.onHit.keyword!, carrier.onHit);
+  printResultBlock(lines, HOOK_FIELDS.whenHit.keyword!, carrier.whenHit);
 }
 
 const sided = (value: Sided): string => (value.side === undefined ? value.id : `${value.side} ${value.id}`);
@@ -238,7 +79,7 @@ function actionLines(action: Action): Lines {
     action.depletes ||
     action.attempts !== undefined;
 
-  if (!modifiers && action.results.length === 1 && !spansLines(action.results)) return [`${action.label}: ${results(action.results)}`];
+  if (!modifiers && action.results.length === 1 && !spansLines(action.results)) return [`${action.label}: ${resultList.print(action.results)}`];
 
   // A `+` line adds to what this block overlays, so the marker is part of the
   // field rather than of the value, and dropping it would turn an addition into
@@ -246,24 +87,24 @@ function actionLines(action: Action): Lines {
   const appended = new Set(action.appended ?? []);
   const at = (name: keyof Action): string => (appended.has(name) ? '  +' : '  ');
   const lines = [`${action.label}:`];
-  if (action.requires) lines.push(`${at('requires')}requires: ${condition(action.requires)}`);
-  if (action.hiddenIf) lines.push(`${at('hiddenIf')}hidden if: ${condition(action.hiddenIf)}`);
+  if (action.requires) lines.push(`${at('requires')}requires: ${condition.print(action.requires)}`);
+  if (action.hiddenIf) lines.push(`${at('hiddenIf')}hidden if: ${condition.print(action.hiddenIf)}`);
   if (action.kind !== undefined && action.kind !== 'duration') lines.push(`  ${action.kind}`);
   // The tags the kind above already spells; re-emitting one would round-trip
   // into a second copy of the same fact.
   const lifted = new Set(['instant', 'continuous']);
   const tags = (action.tags ?? []).filter((each) => each.kind !== 'keyword' || !lifted.has(each.value));
-  if (tags.length > 0) lines.push(`  ${tags.map(tag).join(', ')}`);
-  if (action.time !== undefined) lines.push(`  time: ${n(action.time)}`);
-  if (action.rate !== undefined) lines.push(`  rate: ${typeof action.rate === 'number' ? n(action.rate) : sided(action.rate)}`);
+  if (tags.length > 0) lines.push(`  ${tags.map((each) => tagClause.print(each)).join(', ')}`);
+  if (action.time !== undefined) lines.push(`  time: ${action.time}`);
+  if (action.rate !== undefined) lines.push(`  rate: ${typeof action.rate === 'number' ? action.rate : sided(action.rate)}`);
   if (action.accuracy) lines.push(`  accuracy: ${contest(action.accuracy)}`);
   if (action.damage) lines.push(`  damage: ${contest(action.damage)}`);
   if (action.depletes) lines.push(`  depletes: ${sided(action.depletes)}`);
-  if (action.attempts !== undefined) lines.push(`  attempts: ${n(action.attempts)}`);
-  lines.push(...indented(action.results.flatMap(resultLines)));
-  resultBlock(lines, `${at('onSuccess')}on success`, action.onSuccess, 4);
-  resultBlock(lines, `${at('onFailure')}on failure`, action.onFailure, 4);
-  resultBlock(lines, `${at('onUnfinished')}on unfinished`, action.onUnfinished, 4);
+  if (action.attempts !== undefined) lines.push(`  attempts: ${action.attempts}`);
+  lines.push(...indentLines(action.results.flatMap(resultLines)));
+  printResultBlock(lines, `${at('onSuccess')}on success`, action.onSuccess, 4);
+  printResultBlock(lines, `${at('onFailure')}on failure`, action.onFailure, 4);
+  printResultBlock(lines, `${at('onUnfinished')}on unfinished`, action.onUnfinished, 4);
   return lines;
 }
 
@@ -274,8 +115,8 @@ export function printSegments(values: readonly TextSegment[] | undefined): strin
   return (values ?? [])
     .map((segment) => {
       if (segment.kind === 'literal') return segment.text;
-      if (segment.kind === 'interpolate') return `{${ref(segment.reference)}}`;
-      return `{${condition(segment.condition)}: ${segment.text}}`;
+      if (segment.kind === 'interpolate') return `{${printReference(segment.reference)}}`;
+      return `{${condition.print(segment.condition)}: ${segment.text}}`;
     })
     .join('');
 }
@@ -309,7 +150,7 @@ export function printDirective(value: Directive): string {
     case 'refuse':
       return `refuse: ${inlined(value.inner)}`;
     case 'assert':
-      return `assert: ${condition(value.condition)}`;
+      return `assert: ${condition.print(value.condition)}`;
     case 'expect':
       return `expect: ${value.save}`;
     case 'load':
@@ -317,7 +158,7 @@ export function printDirective(value: Directive): string {
     case 'cancel':
       return 'cancel';
     case 'wait':
-      return `wait: ${n(value.seconds)}`;
+      return `wait: ${value.seconds}`;
     case 'equip':
       return `equip: ${value.item}`;
     case 'unequip':
@@ -334,6 +175,10 @@ export function printDirective(value: Directive): string {
       return `open-modal: ${value.modal}`;
     case 'submit-modal':
       return `submit-modal: ${value.key}=${value.value}`;
+    default: {
+      const unreached: never = value;
+      return unreached;
+    }
   }
 }
 
@@ -367,12 +212,12 @@ function itemSection(registry: Registry, moduleId: string, item: Item): string {
   const lines = [`# item ${moduleLocalId(moduleId, item.id)}`];
   titled(lines, registry, moduleId, 'item', item);
   if (item.slot) lines.push(`slot: ${item.slot}`);
-  if (item.tags && item.tags.length > 0) lines.push(item.tags.map(tag).join(', '));
+  if (item.tags && item.tags.length > 0) lines.push(item.tags.map((each) => tagClause.print(each)).join(', '));
   if (item.clusterJewel) lines.push(`cluster-jewel: ${item.clusterJewel}`);
   if (item.originCluster) lines.push(`origin-cluster: ${item.originCluster}`);
-  if (item.clusterEffect) lines.push(`cluster-effect: ${item.clusterEffect.percent < 0 ? '-' : '+'}${Math.abs(item.clusterEffect.percent)}% ${item.clusterEffect.statId}`);
-  if (item.itemExperience !== undefined) lines.push(`item-experience: ${n(item.itemExperience)}`);
-  if (item.maxLevel !== DEFAULT_MAX_LEVEL) lines.push(`max-level: ${n(item.maxLevel)}`);
+  if (item.clusterEffect) lines.push(`cluster-effect: ${clusterEffectValue.print(item.clusterEffect)}`);
+  if (item.itemExperience !== undefined) lines.push(`item-experience: ${item.itemExperience}`);
+  if (item.maxLevel !== DEFAULT_MAX_LEVEL) lines.push(`max-level: ${item.maxLevel}`);
   hookLines(lines, item);
   for (const action of item.actions ?? []) lines.push(...actionLines(action));
   return lines.join('\n');
@@ -381,7 +226,7 @@ function itemSection(registry: Registry, moduleId: string, item: Item): string {
 function passiveSection(registry: Registry, moduleId: string, passive: Passive): string {
   const lines = [`# passive ${moduleLocalId(moduleId, passive.id)}`];
   titled(lines, registry, moduleId, 'passive', passive);
-  if (passive.tags.length > 0) lines.push(passive.tags.map(tag).join(', '));
+  if (passive.tags.length > 0) lines.push(passive.tags.map((each) => tagClause.print(each)).join(', '));
   hookLines(lines, passive);
   return lines.join('\n');
 }
@@ -394,8 +239,8 @@ function clusterJewelSection(registry: Registry, moduleId: string, jewel: Cluste
   const positions = Object.keys(jewel.positions)
     .map(Number)
     .sort((one, other) => one - other);
-  if (positions.length > 0) lines.push(`passives: ${positions.map((position) => `${n(position)} ${jewel.positions[position]}`).join(', ')}`);
-  if (jewel.modSlots !== DEFAULT_MOD_SLOTS) lines.push(`mod-slots: ${n(jewel.modSlots)}`);
+  if (positions.length > 0) lines.push(`passives: ${positions.map((position) => positionValue.print([position, jewel.positions[position]])).join(', ')}`);
+  if (jewel.modSlots !== DEFAULT_MOD_SLOTS) lines.push(`mod-slots: ${jewel.modSlots}`);
   return lines.join('\n');
 }
 
@@ -416,25 +261,25 @@ function factionSection(registry: Registry, moduleId: string, faction: Faction):
 }
 
 // The bare line a `# skill` carries one of per thing that trains it.
-const grantLine = (grant: SkillGrant): string => `gain ${grant.coefficient === 1 && grant.amount ? '' : n(grant.coefficient)}${grant.coefficient !== 1 && grant.amount ? ' * ' : ''}${grant.amount ? 'amount' : ''} experience on ${grant.event}`;
+const grantLine = (grant: SkillGrant): string => skillGrant.print(grant);
 
-const population = (value: Population): string => (value.count === undefined ? value.entity : `${n(value.count)} ${value.entity}`);
+
 
 function entitySection(registry: Registry, moduleId: string, entity: Entity): string {
   const lines = [`# entity ${moduleLocalId(moduleId, entity.id)}`];
   titled(lines, registry, moduleId, 'entity', entity);
   if (entity.aggressive) lines.push('aggressive');
-  if (entity.hiddenIf) lines.push(`hidden if: ${condition(entity.hiddenIf)}`);
-  if (entity.respawnAfter !== undefined) lines.push(`respawn after: ${duration(entity.respawnAfter)}`);
+  if (entity.hiddenIf) lines.push(`hidden if: ${condition.print(entity.hiddenIf)}`);
+  if (entity.respawnAfter !== undefined) lines.push(`respawn after: ${duration.print(entity.respawnAfter)}`);
   block(lines, 'stations', entity.capabilities);
-  const stats = Object.entries(entity.stats).map(([statId, value]) => `${statId} ${range(value)}`);
+  const stats = Object.entries(entity.stats).map((assignment) => statAssignmentValue.print(assignment));
   if (stats.length > 0) lines.push(`stats: ${stats.join(', ')}`);
   if (entity.skills.length > 0) lines.push(`skills: ${entity.skills.join(', ')}`);
   if (entity.passives.length > 0) lines.push(`passives: ${entity.passives.join(', ')}`);
   if (entity.equipmentSlots.length > 0) lines.push(`equipment-slots: ${entity.equipmentSlots.join(', ')}`);
   if (entity.uses.length > 0) lines.push(`uses: ${entity.uses.join(', ')}`);
   if (entity.faction.length > 0) lines.push(`faction: ${entity.faction.join(', ')}`);
-  if (entity.allies.length > 0) lines.push(`allies: ${entity.allies.map((ally) => (ally.count === undefined ? ally.entity : `${n(ally.count)} ${ally.entity}`)).join(', ')}`);
+  if (entity.allies.length > 0) lines.push(`allies: ${entity.allies.map((each) => allyValue.print(each)).join(', ')}`);
   block(lines, 'flags', entity.flags);
   hookLines(lines, entity);
   // As authored: `actions` and `handlers` are what the linker made of these, and
@@ -445,15 +290,15 @@ function entitySection(registry: Registry, moduleId: string, entity: Entity): st
 
 function locationSection(registry: Registry, moduleId: string, location: Location): string {
   const lines = [`# location ${moduleLocalId(moduleId, location.id)}`];
-  if (location.relative) lines.push(`${location.relative.direction} of ${location.relative.of}`);
-  else lines.push(`x: ${n(location.x)}, y: ${n(location.y)}, z: ${n(location.z)}`);
+  if (location.relative) lines.push(relativeValue.print(location.relative));
+  else lines.push(`x: ${location.x}, y: ${location.y}, z: ${location.z}`);
   titled(lines, registry, moduleId, 'location', location);
   if (location.starting) lines.push('starting');
-  block(lines, 'entities', location.entities.map(population));
+  block(lines, 'entities', location.entities.map((each) => populationValue.print(each)));
   block(
     lines,
     'adjacent',
-    location.adjacent.map((edge) => (edge.condition ? `${edge.target} while ${condition(edge.condition)}` : edge.target)),
+    location.adjacent.map((each) => edgeValue.print(each)),
   );
   block(lines, 'flags', location.flags);
   for (const action of location.actions) lines.push(...actionLines(action));
@@ -463,15 +308,15 @@ function locationSection(registry: Registry, moduleId: string, location: Locatio
 function recipeSection(moduleId: string, recipe: Recipe): string {
   const lines = [`# recipe ${moduleLocalId(moduleId, recipe.id)}`];
   if (recipe.requiresCapability) lines.push(`station: ${recipe.requiresCapability}`);
-  block(lines, 'in', recipe.in.map(quantified));
-  block(lines, 'out', recipe.out.map(producedQuantity));
-  if (recipe.skill) lines.push(`skill: ${recipe.skill.skill} ${n(recipe.skill.amount)}`);
+  block(lines, 'in', recipe.in.map((each) => quantified.print(each)));
+  block(lines, 'out', recipe.out.map((each) => produced.print(each)));
+  if (recipe.skill) lines.push(`skill: ${recipeSkillValue.print(recipe.skill)}`);
   if (recipe.say) lines.push(`say: ${recipe.say}`);
-  if (recipe.time !== undefined) lines.push(`time: ${n(recipe.time)}`);
-  if (recipe.rate !== undefined) lines.push(`rate: ${typeof recipe.rate === 'string' ? recipe.rate : n(recipe.rate)}`);
+  if (recipe.time !== undefined) lines.push(`time: ${recipe.time}`);
+  if (recipe.rate !== undefined) lines.push(`rate: ${recipe.rate}`);
   if (recipe.accuracy) lines.push(`accuracy: ${recipe.accuracy}`);
   if (recipe.evasion) lines.push(`evasion: ${recipe.evasion}`);
-  block(lines, 'burnt', recipe.burnt.map(producedQuantity));
+  block(lines, 'burnt', recipe.burnt.map((each) => produced.print(each)));
   return lines.join('\n');
 }
 
@@ -480,7 +325,7 @@ function resourceSection(registry: Registry, moduleId: string, resource: Resourc
   lines.push(...titleLine(registry, moduleId, 'resource', resource));
   if (resource.rate) lines.push(`rate: ${resource.rate}`);
   lines.push(`max: ${resource.max}`);
-  if (resource.start !== undefined) lines.push(`start: ${n(resource.start)}`);
+  if (resource.start !== undefined) lines.push(`start: ${resource.start}`);
   lines.push(`display: ${resource.display}`);
   return lines.join('\n');
 }
@@ -495,19 +340,19 @@ function dialogueSection(moduleId: string, dialogue: Dialogue): string {
   for (const node of dialogue.nodes) {
     if (lines.length > 1) lines.push('');
     lines.push(`node ${node.name}:`);
-    if (node.when) lines.push(`  when: ${condition(node.when)}`);
+    if (node.when) lines.push(`  when: ${condition.print(node.when)}`);
     if (node.once) lines.push('  once');
     if (node.sticky) lines.push('  sticky');
     if (node.again) lines.push(`  again: ${printSegments(node.again.segments)}`);
     for (const step of node.steps) {
       if (step.kind === 'say') lines.push(`  ${printSegments(step.segments)}`);
-      else if (step.kind === 'effect') lines.push(...indented(resultLines(step.result)));
+      else if (step.kind === 'effect') lines.push(...indentLines(resultLines(step.result)));
       else if (step.kind === 'goto') lines.push(`  goto ${step.target}`);
       else {
         for (const choice of step.choices) {
-          lines.push(`  -> ${printSegments(choice.segments)}${choice.when ? ` (when ${condition(choice.when)})` : ''}`);
+          lines.push(`  -> ${printSegments(choice.segments)}${choice.when ? ` (when ${condition.print(choice.when)})` : ''}`);
           if (choice.goto) lines.push(`    goto ${choice.goto}`);
-          for (const effect of choice.effects) lines.push(...indented(resultLines(effect), 4));
+          for (const effect of choice.effects) lines.push(...indentLines(resultLines(effect), 4));
         }
       }
     }
@@ -526,10 +371,10 @@ function testSection(moduleId: string, test: Test): string {
 function infoLines(info: SerializeModuleOptions['info']): Lines {
   const lines = [`# info ${info.id}`];
   const version: Version = info.version ?? [0, 0, 0];
-  lines.push(`version: ${formatVersion(version)}`);
+  lines.push(`version: ${versionParser.print(version)}`);
   if (info.pack) lines.push(`pack: ${info.pack}`);
   if (info.language !== undefined && info.language !== DEFAULT_LANGUAGE) lines.push(`language: ${info.language}`);
-  if (info.dependencies && info.dependencies.length > 0) lines.push('dependencies:', ...indented(info.dependencies.map(formatDependency)));
+  if (info.dependencies && info.dependencies.length > 0) lines.push('dependencies:', ...indentLines(info.dependencies.map((each) => dependency.print(each))));
   return lines;
 }
 
@@ -542,11 +387,11 @@ function inModule(moduleId: string, id: string): boolean {
 function serializeRegistryModule(registry: Registry, options: SerializeModuleOptions): string {
   const moduleId = options.info.id;
   const sections: string[] = [];
-  for (const stat of registry.stats.values()) if (inModule(moduleId, stat.id)) sections.push([`# stat ${moduleLocalId(moduleId, stat.id)}`, ...titleLine(registry, moduleId, 'stat', stat), `base: ${range(stat.base)}`].join('\n'));
+  for (const stat of registry.stats.values()) if (inModule(moduleId, stat.id)) sections.push([`# stat ${moduleLocalId(moduleId, stat.id)}`, ...titleLine(registry, moduleId, 'stat', stat), `base: ${range.print(stat.base)}`].join('\n'));
   for (const skill of registry.skills.values())
     if (inModule(moduleId, skill.id))
       sections.push(
-        [`# skill ${moduleLocalId(moduleId, skill.id)}`, ...titleLine(registry, moduleId, 'skill', skill), ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : []), ...(skill['per-level'] ? [`per-level: ${bonusAmount(skill['per-level'])}`] : []), ...skill.grants.map(grantLine)].join('\n'),
+        [`# skill ${moduleLocalId(moduleId, skill.id)}`, ...titleLine(registry, moduleId, 'skill', skill), ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : []), ...(skill['per-level'] ? [`per-level: ${bonusAmount.print(skill['per-level'])}`] : []), ...skill.grants.map(grantLine)].join('\n'),
       );
   for (const item of registry.items.values()) if (inModule(moduleId, item.id)) sections.push(itemSection(registry, moduleId, item));
   for (const passive of registry.passives.values()) if (inModule(moduleId, passive.id)) sections.push(passiveSection(registry, moduleId, passive));
@@ -565,7 +410,7 @@ function serializeRegistryModule(registry: Registry, options: SerializeModuleOpt
     const slot = registry.slots.get(globalId);
     if (slot) sections.push([`# slot ${slot.id}`, ...slotTitleLine(registry, slot)].join('\n'));
     const variable = registry.variables.get(globalId);
-    if (variable) sections.push([`# variable ${variable.id}`, ...(variable.value !== undefined ? [`value: ${n(variable.value)}`] : [])].join('\n'));
+    if (variable) sections.push([`# variable ${variable.id}`, ...(variable.value !== undefined ? [`value: ${variable.value}`] : [])].join('\n'));
   }
   // A locale belongs to the module that wrote it rather than to any id, so it
   // is printed by attribution and never by `inModule`.

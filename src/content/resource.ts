@@ -26,6 +26,8 @@ const displayValue: Parser<ResourceDisplay> = {
     }
     return raw as ResourceDisplay;
   },
+  print: (value) => value,
+  examples: [...RESOURCE_DISPLAYS],
 };
 
 export const resourceSchema: SectionSchema<Resource> = {

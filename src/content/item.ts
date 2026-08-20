@@ -41,7 +41,7 @@ export type AuthoredItem = Authored<Item>;
 
 const CLUSTER_EFFECT = /^(?<sign>[+-])(?<amount>\d+)%[ \t]+(?<stat>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
 
-const clusterEffect: Parser<ClusterEffect> = {
+export const clusterEffectValue: Parser<ClusterEffect> = {
   parse(cursor: Cursor) {
     const start = cursor.pos;
     const raw = (cursor.take(/[^\n]+/) ?? '').trim();
@@ -49,6 +49,8 @@ const clusterEffect: Parser<ClusterEffect> = {
     if (!groups) throw new DslError(`expected a percent stat bonus like +25% max-health, got ${JSON.stringify(raw)}`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
     return { statId: groups.stat!, percent: Number(groups.amount) * (groups.sign === '-' ? -1 : 1) };
   },
+  print: (value) => `${value.percent < 0 ? '-' : '+'}${Math.abs(value.percent)}% ${value.statId}`,
+  examples: ['+25% max-health', '-10% max-health'],
 };
 
 // `max-level:` defaults to 99 — an "unbounded" sentinel a base can lower to
@@ -87,7 +89,7 @@ export const itemSchema: SectionSchema<Item, never, 'actions'> = {
     tags: { parser: list(tagClause), default: () => [] },
     clusterJewel: { parser: id, keyword: 'cluster-jewel' },
     originCluster: { parser: id, keyword: 'origin-cluster' },
-    clusterEffect: { parser: clusterEffect, keyword: 'cluster-effect' },
+    clusterEffect: { parser: clusterEffectValue, keyword: 'cluster-effect' },
     itemExperience: { parser: number, keyword: 'item-experience' },
     maxLevel: { parser: number, default: () => DEFAULT_MAX_LEVEL, keyword: 'max-level' },
     ...HOOK_FIELDS,

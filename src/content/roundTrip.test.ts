@@ -1,8 +1,112 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { type ModuleDiagnostic, type UniverseLoadResult } from './registry';
-import { loadModule, loadUniverseWithDiagnostics } from './load';
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { formatModuleDiagnostic, type ModuleDiagnostic, type UniverseLoadResult } from './registry';
+import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './load';
 import { canSerialize, declaredGlobalIds, republishModule, roundTripModule, roundTripUniverse } from './serialize';
 import { parseUniverse, type ModuleSource } from './universe';
+import { collectionFailures, exportedCodecs, isCodec, reachableCodecs } from '../grammar/codec';
+import { AnySchema } from '../grammar/section';
+import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
+import { SCHEMAS } from './module';
+
+
+// The content layer's own modules, read from the directory. Together with the
+// walk in `src/grammar/codec.test.ts` this is every codec the tree holds: the
+// two layers are where a `Parser` can be written, and `layer-check` is what
+// keeps that true.
+const MODULES = import.meta.glob(['./*.ts', '!./*.test.ts'], { eager: true }) as Record<string, object>;
+
+// The other route to the same population, and the one the load path itself
+// takes: every field of every collected schema, and a list parser's element
+// under it. A kind added to `SCHEMAS` brings its parsers into this set with no
+// edit here, which a list of parsers could not do.
+const fromSchemas = () =>
+  reachableCodecs(
+    Object.entries(SCHEMAS).flatMap(([kind, schema]) => Object.entries((schema as AnySchema).fields).map(([field, spec]) => [`${kind}.${field}`, spec.parser] as const)),
+  );
+
+describe('every parser in the grammar is a codec that survives its own examples', () => {
+  it('reaches the content layer parsers and finds each one round-tripping', () => {
+    const codecs = exportedCodecs(MODULES);
+    expect(codecs.size).toBeGreaterThanOrEqual(8);
+    expect(collectionFailures(codecs)).toEqual([]);
+  });
+
+  // Two kinds keep their value parsers unexported, so the export walk above
+  // cannot see them and the schema walk is what does. Asserting the schema set
+  // is not a subset of the export set is what stops that from silently
+  // becoming untrue.
+  it('reaches the parsers only a schema names, and finds each one round-tripping', () => {
+    const codecs = fromSchemas();
+    expect(codecs.size).toBeGreaterThanOrEqual(20);
+    expect(collectionFailures(codecs)).toEqual([]);
+    const exported = exportedCodecs(MODULES);
+    expect([...codecs.keys()].some((parser) => !exported.has(parser as never))).toBe(true);
+  });
+
+  // Every field of every kind, asked directly rather than through the walk
+  // above, whose object-identity dedupe means a shared parser is named only
+  // after the first kind that reached it.
+  it('finds a codec behind every field of every collected kind', () => {
+    const fields = Object.entries(SCHEMAS).flatMap(([kind, schema]) => Object.entries((schema as AnySchema).fields).map(([field, spec]) => [`${kind}.${field}`, spec.parser] as const));
+    expect(fields.length).toBeGreaterThan(40);
+    expect(fields.filter(([, parser]) => !isCodec(parser)).map(([name]) => name)).toEqual([]);
+  });
+});
+
+// The bytes every shipped module printed to at this branch's merge base,
+// captured there rather than regenerated here. A change that alters the print
+// and the parse consistently still fails this, which regenerating could not
+// see. `>>>>` opens each module because no line the serializer emits starts
+// with it: a heading starts with `#` and a field with a lowercase letter.
+const FIXTURE = readFileSync(path.join(import.meta.dirname, 'printedCorpus.fixture.txt'), 'utf8');
+
+const SEPARATOR = '>>>> ';
+
+const shippedSources = (): ModuleSource[] => {
+  const dir = path.join(import.meta.dirname, '../../content');
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.dsl'))
+    .map((name) => ({ name: name.replace(/[.]dsl$/, ''), text: readFileSync(path.join(dir, name), 'utf8') }))
+    .filter((source) => source.name !== LOCAL_CHANGES_MODULE_ID);
+};
+
+const fixtureSources = (): ModuleSource[] =>
+  FIXTURE.split(SEPARATOR)
+    .filter((chunk) => chunk.length > 0)
+    .map((chunk) => ({ name: chunk.slice(0, chunk.indexOf('\n')), text: chunk.slice(chunk.indexOf('\n') + 1) }));
+
+describe('nothing that loads today loads differently, and nothing prints differently', () => {
+  const printCorpus = () => {
+    const sources = shippedSources();
+    expect(sources.length).toBeGreaterThan(1);
+    const trip = roundTripUniverse(loadUniverse(sources), parseUniverse(sources).filter(canSerialize), (printed) => loadUniverseWithDiagnostics(printed));
+    expect(trip.diagnostics.map(formatModuleDiagnostic)).toEqual([]);
+    expect(trip.differences).toEqual([]);
+    return trip.sources;
+  };
+
+  it('prints every shipped module to the bytes it printed to at the branch base', () => {
+    expect(printCorpus().map((source) => `${SEPARATOR}${source.name}\n${source.text}`).join('')).toEqual(FIXTURE);
+  });
+
+  it('carries the whole corpus in the fixture, so an emptied one cannot pass', () => {
+    expect(FIXTURE.length).toBeGreaterThan(40000);
+    expect(fixtureSources().map((source) => source.name).sort()).toEqual(shippedSources().map((source) => source.name).sort());
+  });
+
+  // The other direction of c7. Byte equality of the print says nothing about
+  // what the sources parse to unless the two registries are compared, and the
+  // fixture is the only side of that comparison this branch cannot have moved.
+  it('loads the shipped sources to a registry deep-equal to the one the base bytes load to', () => {
+    const fromSources = loadUniverseWithDiagnostics(shippedSources());
+    const fromFixture = loadUniverseWithDiagnostics(fixtureSources());
+    expect(fromFixture.diagnostics.map(formatModuleDiagnostic)).toEqual([]);
+    expect(fromSources.registry.items.size).toBeGreaterThan(20);
+    expect(fromFixture.registry).toEqual(fromSources.registry);
+  });
+});
 
 const BASE = ['# info base', 'version: 1.0.0', '', '# item bread', 'title: Bread', '', '# location camp', 'x: 0, y: 0', 'starting'].join('\n');
 

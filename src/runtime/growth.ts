@@ -18,6 +18,10 @@ export function grow(state: GameState, registry: Registry, directive: GrowthDire
       return allocate(state, registry, directive.target, directive.node);
     case 'apply':
       return applyClusterEffect(state, registry, directive.target, directive.effect, directive.hex);
+    default: {
+      const unreached: never = directive;
+      return unreached;
+    }
   }
 }
 

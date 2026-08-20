@@ -1,0 +1,1161 @@
+>>>> engine-en
+# info engine-en
+version: 1.0.0
+
+# locale en
+engine.travel.to: Travel to {destination}
+engine.travel.no-way: There is no way from here to {destination}.
+engine.travel.unknown-origin: unknown travel origin: {location}
+engine.travel.unknown-destination: unknown travel destination: {location}
+engine.craft.label: Craft {recipe}
+engine.talk.to: Talk to {entity}
+engine.inputs.short: You don't have enough {item}.
+engine.inputs.grown: Your {item} has grown a plane of its own, and a grown item is never spent.
+engine.inputs.worn: Your {item} is the one you are wearing, and what you wear is never spent.
+engine.combat.player.hit: You hit the {target} for {damage}.
+engine.combat.player.miss: You miss the {target}.
+engine.combat.foe.hit: The {attacker} hits you for {damage}.
+engine.combat.foe.miss: The {attacker} misses you.
+engine.combat.other.hit: The {attacker} hits the {target} for {damage}.
+engine.combat.other.miss: The {attacker} misses the {target}.
+engine.item.examine: This is {article} {item}.
+engine.item.modified: Modified {item}
+engine.carried.stack: {item} x{count}
+engine.carried.worn: {item} ({slot})
+engine.modal.name: Name
+engine.modal.race: Race
+engine.modal.choice: Choice
+engine.modal.item: Item
+engine.modal.confirm: {verb} {item} for good?
+engine.carried.verb.grow: Grow
+engine.carried.verb.equip: Equip
+engine.carried.verb.unequip: Unequip
+engine.carried.verb.destroy: Destroy
+engine.carried.close: Close
+engine.carried.confirmed: Go ahead
+engine.race.human: Human
+engine.race.elf: Elf
+engine.race.dwarf: Dwarf
+engine.race.orc: Orc
+engine.growth.max-level: {item} is already at level {level}, which is its maximum
+engine.growth.no-copy: you carry no {item}
+engine.growth.no-worn: you wear nothing in {slot}
+engine.growth.unknown-item: there is no item or item instance called {item}
+engine.growth.not-a-base: {item} is not a base: only an item you can wear has a plane to grow
+engine.growth.no-experience: {item} grants no item experience
+engine.growth.not-a-jewel: {item} is not a cluster jewel
+engine.plane.base: Base
+engine.plane.go: Go to {hex}
+engine.plane.slot: slot: {direction} with {jewel}
+engine.plane.allocate.slot: allocate: slot {direction}
+engine.plane.allocate.position: allocate: position {position}
+engine.plane.feed: feed: with {item}
+engine.plane.back: Back to inventory
+engine.plane.heading: {plane} at {hex}
+engine.plane.heading.said: {plane} at {hex} — {said}
+engine.plane.node.slot: the {direction} slot of {hex}
+engine.plane.node.position: position {position} of {hex}
+engine.plane.no-slot: there is no jewel slot on the {direction} edge of {hex}
+engine.plane.slot-blocked: the {direction} slot of {hex} is blocked: a cluster already stands in {beyond}
+engine.plane.slot-filled: the {direction} slot of {hex} already holds a jewel
+engine.plane.slot-unallocated: the {direction} slot of {hex} has not been allocated
+engine.plane.no-cluster: no cluster stands in {hex}
+engine.plane.no-position: {shape} has no position {position} (1-{count})
+engine.plane.already-allocated: {node} is already allocated
+engine.plane.no-points: {node} costs a point and none remain
+engine.plane.unreachable: {node} touches nothing allocated
+engine.plane.repair.origin: the origin cluster {jewel} is not loaded, so the base's own cluster stands in its place
+engine.plane.repair.cluster: dropped the {jewel} cluster at {hex}, whose declaration is gone, and everything allocated in it
+engine.plane.repair.stranded: dropped the {jewel} cluster at {hex}, which entered through a {direction} slot of {parent} that is gone
+engine.plane.repair.dropped: dropped {node}, which {jewel} no longer has, returning its point
+engine.plane.repair.unreachable: dropped {node}, which nothing allocated reaches any more, returning its point
+engine.plane.repair.effect: dropped the {effect} effect on the cluster at {hex}, whose declaration is gone
+engine.cluster.not-an-effect: {item} carries no cluster effect
+engine.cluster.effect-repeated: the cluster at {hex} already carries {effect}
+engine.cluster.slots-full: the cluster at {hex} fills all {count} of its mod slots
+engine.said.elided: … {dropped} more lines
+engine.modal.opened: modal:{modal}
+engine.prune.record: Removed {path} {id} because its {kind} is not loaded.
+engine.prune.location: Moved from unavailable location {from} to {to}.
+engine.prune.nowhere: (nowhere)
+engine.prune.buff.actor: Removed every buff on {actor} because it is not a character this world has.
+engine.prune.buff.stat: Removed buff {buff} on {actor} because its stat {stat} is not loaded.
+engine.prune.buff.item: Removed buff {buff} on {actor} because its item {item} is not loaded.
+engine.prune.buff.resource: Removed buff {buff} on {actor} because its resource {resource} is not loaded.
+engine.prune.equipped.missing: Unequipped {slot} because its item {item} is not loaded.
+engine.prune.equipped.slot: Unequipped {slot} because its item {item} no longer declares that slot.
+engine.prune.modal: Closed modal {modal} because {reason}.
+engine.modal.stale.unknown: it is not a modal this engine knows
+engine.modal.stale.no-option: it has no option {option}
+engine.modal.stale.no-value: it has no {option} that takes {value}
+engine.modal.stale.unanswerable: it asks for {option} and nothing answers it
+engine.modal.stale.answered: it was saved with every option already answered
+engine.plane.stale.uncarried: it grows {item}, which the player no longer carries
+engine.plane.stale.slot: it grows what was worn in {slot}, and that slot is empty
+engine.plane.stale.hex: it holds {hex}, where that plane has no cluster
+engine.dialogue.stale.unloaded: dialogue {dialogue} is not loaded
+engine.dialogue.stale.no-node: dialogue {dialogue} has no node {node}
+engine.dialogue.stale.no-menu: dialogue {dialogue} node {node} no longer offers a menu there
+engine.action.stale.owner: unknown {kind}: {id}
+engine.action.stale.action: unknown action {action} on {owner}
+engine.action.stale.actor: unknown encounter actor: {actor}
+engine.action.stale.cadence: unknown encounter cadence actor: {actor}
+engine.action.stale.resource: unknown encounter resource: {resource}
+engine.prune.journey: Stopped the journey to {to} because location {lost} is not loaded.
+engine.prune.action: Stopped unavailable action {action}: {reason}.
+engine.prune.instance.kind: Removed instance {instance} because {kind} is not an instance kind this engine knows.
+engine.prune.instance.template: Removed instance {instance} because its template {template} is not loaded.
+engine.prune.instance.empty: Removed instance {instance} because nothing is left recorded about it.
+engine.prune.instance.repaired: Repaired instance {instance}: {repair}.
+engine.prune.population.location: Removed the population record for {entity} at {location} because its location {location} is not loaded.
+engine.prune.population.entity: Removed the population record for {entity} at {location} because its entity {entity} is not loaded.
+engine.command.invalid-choice: invalid choice: {choice}
+engine.command.speed: Speed set to {speed}x.
+engine.command.stopped: Stopped.
+engine.shell.map: Map
+engine.skill.levelled: Congratulations! You have levelled up {skill} to level {level}!
+engine.shell.recentre: Recentre
+engine.shell.socket: Jewel socket
+engine.shell.allocate: Allocate
+engine.shell.insert: Socket a jewel
+engine.shell.feed: Feed
+engine.shell.empty: Empty
+engine.shell.experience: Experience
+engine.shell.to-next: To next level
+engine.shell.an-hour: Experience an hour
+engine.shell.until-next: Until next level
+engine.shell.edit: Edit
+engine.shell.home: Home
+engine.shell.settings: Settings
+engine.shell.stats: Stats
+engine.shell.skills: Skills
+engine.shell.equipment: Equipment
+engine.shell.inventory: Inventory
+engine.shell.command: Command
+engine.shell.run: Run
+engine.shell.level: Level
+engine.shell.points: Points
+engine.shell.spent: Spent
+engine.shell.ready: Ready
+engine.shell.locked: Locked
+engine.shell.dead: Dead
+engine.shell.free: Free
+engine.shell.node.position: Position {position}
+engine.shell.node.slot: Slot {direction}
+engine.shell.local: Here
+engine.shell.global: World
+engine.shell.every-kind: Every kind
+engine.shell.section: Section
+engine.shell.stage: Stage
+engine.shell.unstage: Unstage
+engine.shell.copy: Copy
+engine.shell.place: Place
+engine.shell.dev: Dev mode
+engine.shell.speed: Speed
+engine.shell.clear: Clear local changes
+engine.shell.reopen: Open again
+engine.repl.place: {location} ({id})
+engine.repl.here: Here: {entities}
+engine.repl.clock: [time: {time}s]
+engine.repl.pool: {resource}: {meter}
+engine.repl.swing: Your swing {meter}
+engine.repl.choice: {index}) {choice}
+engine.repl.choice.owned: {index}) {owner}: {choice}
+engine.repl.modal: [{modal}] {options}
+engine.repl.modal.answered: [{modal}] (answered)
+engine.repl.modal.asking: {option}:
+engine.repl.modal.free: submit-modal: {option}=<text>
+engine.repl.state.location: Location: {location}
+engine.repl.state.time: Elapsed simulated time: {time}s
+engine.repl.state.flags: Flags: {flags}
+engine.repl.state.inventory: Inventory: {inventory}
+engine.repl.state.grown: Grown: {grown}
+engine.repl.state.xp: XP: {xp}
+engine.repl.state.equipped: Equipped: {equipped}
+engine.repl.live.running: {action}... {bar}{pools}  {clock}
+engine.repl.live.done: {action}: done.  {clock}
+engine.repl.live.pool: {resource} {current}/{max}
+engine.repl.live.counting: hits:{attempts} completion:{completion}
+engine.repl.live.stop: (press any key to stop)
+engine.repl.opening: Type /help for commands (/state and /inventory show your progress).
+engine.repl.plane.heading: {plane} — level {level}/{max}, {spent} spent, {points}
+engine.repl.plane.heading.worn: {plane} — worn — level {level}/{max}, {spent} spent, {points}
+engine.repl.plane.points.one: 1 point left
+engine.repl.plane.points.many: {points} points left
+engine.repl.plane.cluster: {hex}  {jewel} · {shape} · {from} · mods {mods}/{slots}
+engine.repl.plane.origin: origin
+engine.repl.plane.via: via {hex} {direction}
+engine.repl.plane.effect: {effect} {amount}% {stat}
+engine.repl.plane.empty: (empty)
+engine.repl.plane.blocked: blocked by {beyond}
+engine.repl.plane.holds: holds {beyond}
+>>>> tutorial-island
+# info tutorial-island
+version: 1.0.0
+
+# stat attack
+base: 10
+
+# stat defense
+base: 5
+
+# stat accuracy
+base: 100
+
+# stat evasion
+base: 0
+
+# stat attack-rate
+base: 25
+
+# stat regeneration
+base: 0
+
+# stat max-health
+base: 0
+
+# stat cooking-rate
+base: 55
+
+# stat luck
+base: 60
+
+# skill thieving
+stat-id: tutorial-island.attack
+
+# skill melee
+stat-id: tutorial-island.attack
+
+# skill cooking
+
+# item cooked-shrimp
+examine: A simple meal.
+food, +3 tutorial-island.regeneration, 1m
+eat:
+  instant
+  take: 1 tutorial-island.cooked-shrimp
+  say: You eat the shrimp. Simple, warm, and better than it looks.
+
+# item iron-sword
+examine: A well-balanced blade, standard adventurer's kit.
+slot: mainhand
+weapon, +2 tutorial-island.attack
+max-level: 10
+
+# item wooden-shield
+examine: A sturdy shield of banded oak.
+slot: offhand
+shield, +2 tutorial-island.defense
+
+# item lockpick
+examine: A bent sliver of metal, worn smooth from use.
+thieving-tool
+
+# item jug-of-water
+examine: A clay jug of clean water.
+
+# item pot-of-flour
+examine: A small pot of milled flour.
+
+# item dough
+examine: A ball of raw dough, ready for the oven.
+
+# item bread
+examine: A warm, golden loaf.
+food, +5 tutorial-island.regeneration, 1m30s
+eat:
+  instant
+  take: 1 tutorial-island.bread
+  say: You tear into the warm loaf - simple, filling, and worth the trouble.
+
+# item roasted-chestnut
+examine: A chestnut roasted soft and sweet in the oven's embers.
+
+# item rat-bone
+examine: A thin bone, picked clean.
+
+# item rat-tail
+examine: Still twitching, faintly.
+
+# item bent-coin
+examine: A copper coin someone stepped on.
+
+# item rats-eye-gem
+examine: A red stone the size of a thumbnail. It does not warm in your hand.
+
+# item keen-edge-jewel
+examine: A closed ring of iron, warm to the touch.
+cluster-jewel: tutorial-island.keen-edge
+
+# item stout-heart-jewel
+cluster-jewel: tutorial-island.stout-heart
+
+# item tempered-will-jewel
+cluster-jewel: tutorial-island.tempered-will
+
+# item great-work-jewel
+cluster-jewel: tutorial-island.great-work
+
+# item causeway-jewel
+cluster-jewel: tutorial-island.causeway
+
+# item crossroads-jewel
+cluster-jewel: tutorial-island.crossroads
+
+# item whetstone
+examine: A grey block, faintly oiled.
+item-experience: 1000
+
+# item masters-whetstone
+title: Master's Whetstone
+examine: The same grey block, cut true, and it lasts.
+item-experience: 10000
+
+# item orb-of-vitality
+title: Orb of Vitality
+examine: A dull red bead. It beats, very slowly.
+cluster-effect: +25% tutorial-island.max-health
+
+# item orb-of-the-edge
+title: Orb of the Edge
+examine: A sliver of something that was never blunt.
+cluster-effect: +25% tutorial-island.attack
+
+# item lesser-orb-of-the-edge
+title: Lesser Orb of the Edge
+examine: The same sliver, ground down by whoever had it first.
+cluster-effect: +10% tutorial-island.attack
+
+# item orb-of-the-bulwark
+title: Orb of the Bulwark
+examine: Heavier than the hand expects.
+cluster-effect: +25% tutorial-island.defense
+
+# item orb-of-renewal
+title: Orb of Renewal
+examine: Cool, and faintly wet, and it does not dry.
+cluster-effect: +25% tutorial-island.regeneration
+
+# item heartwood-blade
+examine: The grain still moves, slowly, when you are not looking.
+slot: mainhand
+weapon, +4 tutorial-island.attack
+origin-cluster: tutorial-island.heartwood-core
+max-level: 40
+
+# passive hale
+life, +15 tutorial-island.max-health
+
+# passive constitution
+life, +20 tutorial-island.max-health
+
+# passive tempered-frame
+life, +12% tutorial-island.max-health
+
+# passive mending
+life, recovery, +2 tutorial-island.regeneration
+
+# passive warded
+armour, +2 tutorial-island.defense
+
+# passive plated
+armour, +3 tutorial-island.defense
+
+# passive hardened
+armour, +10% tutorial-island.defense
+
+# passive whetted
+physical, +2 tutorial-island.attack
+
+# passive honed
+physical, +3 tutorial-island.attack
+
+# passive brutal
+physical, +8% tutorial-island.attack
+
+# passive swift-hands
+speed, +2 tutorial-island.attack-rate
+
+# passive flurry
+speed, +3 tutorial-island.attack-rate
+
+# passive frenzied
+speed, +10% tutorial-island.attack-rate
+
+# passive keen-eye
+precision, +6 tutorial-island.accuracy
+
+# passive marksman
+precision, +8 tutorial-island.accuracy
+
+# passive deadly-precision
+precision, +12% tutorial-island.accuracy
+
+# passive quickstep
+evasion, +8 tutorial-island.evasion
+
+# passive evasive
+evasion, +15% tutorial-island.evasion
+
+# passive fortune
+utility, +5 tutorial-island.luck
+
+# cluster-jewel keen-edge
+examine: Six facets, each one sharpened against the last.
+shape: ring
+open-connections: e
+passives: 1 tutorial-island.whetted, 2 tutorial-island.keen-eye, 3 tutorial-island.honed, 4 tutorial-island.brutal, 5 tutorial-island.swift-hands, 6 tutorial-island.whetted
+
+# cluster-jewel stout-heart
+examine: A knot of iron that will not be moved.
+shape: ring
+open-connections: ne, se
+passives: 1 tutorial-island.warded, 2 tutorial-island.hale, 3 tutorial-island.constitution, 5 tutorial-island.hale, 6 tutorial-island.mending
+
+# cluster-jewel tempered-will
+examine: It does not add. It insists.
+shape: wheel
+open-connections: e, se
+passives: 1 tutorial-island.hale, 2 tutorial-island.tempered-frame, 3 tutorial-island.brutal, 4 tutorial-island.hardened, 5 tutorial-island.tempered-frame, 6 tutorial-island.brutal, 7 tutorial-island.fortune
+
+# cluster-jewel great-work
+examine: Twelve years of somebody's evenings, and they are not finished.
+shape: double-ring
+open-connections: e, sw
+passives: 1 tutorial-island.warded, 2 tutorial-island.plated, 3 tutorial-island.constitution, 4 tutorial-island.marksman, 5 tutorial-island.hale, 6 tutorial-island.honed, 7 tutorial-island.fortune, 10 tutorial-island.flurry
+
+# cluster-jewel causeway
+examine: A road, and nothing on either side of it.
+shape: spindle
+open-connections: e
+passives: 2 tutorial-island.hale
+
+# cluster-jewel crossroads
+examine: A junction stone. It offers roads, not shelter.
+shape: point
+open-connections: ne, e, se, sw, nw
+
+# cluster-jewel heartwood-core
+shape: spindle
+open-connections: e, ne
+passives: 1 tutorial-island.mending, 2 tutorial-island.tempered-frame
+
+# faction world
+
+# faction player
+
+# event death
+resource: tutorial-island.health
+trigger: on empty
+
+# action melee-combat
+title: Fight
+rate: my tutorial-island.attack-rate
+accuracy: my tutorial-island.accuracy vs their tutorial-island.evasion
+damage: my tutorial-island.attack vs their tutorial-island.defense
+depletes: their tutorial-island.health
+
+# entity player
+title: You
+stats: tutorial-island.max-health 30, tutorial-island.attack 10, tutorial-island.defense 5, tutorial-island.attack-rate 25, tutorial-island.accuracy 100, tutorial-island.evasion 0
+skills: tutorial-island.melee, tutorial-island.cooking, tutorial-island.thieving
+equipment-slots: mainhand, offhand
+uses: tutorial-island.melee-combat
+faction: tutorial-island.player
+on death:
+  say: You slump to the floor, spent. (You should have eaten something.)
+  set: tutorial-island.fainted
+  stop
+
+# entity miki
+examine: A weathered man in patched leather, quick to smile.
+faction: tutorial-island.player
+
+# entity front-door
+examine: A heavy wooden door, bound in iron.
+flags:
+  unlocked
+pick lock:
+  requires: has tutorial-island.lockpick
+  hidden if: tutorial-island.front-door.unlocked
+  time: 4
+  xp: tutorial-island.thieving 4
+  on success:
+    set: tutorial-island.front-door.unlocked
+    say: The lock clicks open.
+
+# entity mirror
+examine: A tall mirror in a gilt frame. Your reflection waits, nameless.
+look in:
+  hidden if: tutorial-island.mirror-done
+  instant
+  open modal: character-creation
+  set: tutorial-island.mirror-done
+
+# entity oven
+examine: A stone oven, its coals still glowing.
+stations:
+  oven
+roast chestnuts:
+  continuous
+  rate: tutorial-island.cooking-rate
+  give: 1 tutorial-island.roasted-chestnut
+  xp: tutorial-island.cooking 40-80
+  on success:
+    say: Another chestnut pops from the embers, roasted through.
+
+# entity stairs
+title: Stairs
+ascend:
+  instant
+  relocate: tutorial-island.guide-house-upstairs
+  say: You climb to the second floor.
+descend:
+  instant
+  relocate: tutorial-island.basement
+  say: You head down into the basement.
+
+# entity stairs-down
+title: Stairs
+descend:
+  instant
+  relocate: tutorial-island.guide-house
+  say: You head back down to the ground floor.
+
+# entity stairs-up
+title: Stairs
+ascend:
+  instant
+  relocate: tutorial-island.guide-house
+  say: You climb back up to the ground floor.
+
+# entity smiths-chest
+title: Smith's Chest
+examine: A banded chest shoved under the workbench, its lid unlatched.
+flags:
+  emptied
+open:
+  hidden if: tutorial-island.smiths-chest.emptied
+  instant
+  roll: tutorial-island.smiths-cache
+  set: tutorial-island.smiths-chest.emptied
+  say: Whetstones, a handful of cut stones, and a blade nobody came back for.
+
+# entity dresser
+examine: A dusty dresser, one drawer left slightly ajar.
+flags:
+  searched
+search drawer:
+  hidden if: tutorial-island.dresser.searched
+  give: tutorial-island.lockpick
+  say: Tucked beneath old linens, a set of worn lockpicks.
+  set: tutorial-island.dresser.searched
+  tutorial-island.luck vs 60:
+    roll: tutorial-island.trinket
+
+# entity giant-rat
+title: Giant Rat
+examine: A hunched rat claws at an overturned crate, eyes red in the dark.
+hidden if: tutorial-island.rats-killed >= 3
+stats: tutorial-island.attack 8, tutorial-island.defense 0, tutorial-island.max-health 20, tutorial-island.attack-rate 16, tutorial-island.accuracy 60, tutorial-island.evasion 40
+uses: tutorial-island.melee-combat
+on death:
+  add: tutorial-island.rats-killed 1
+  say: You put down another rat.
+  credit:
+    xp: tutorial-island.melee 4-6
+    roll: tutorial-island.rat-remains
+    1 in 3:
+      roll: tutorial-island.trinket
+
+# location guide-house
+x: 0, y: 0, z: 0
+examine: A cluttered but cozy cottage. Miki's guide house.
+starting
+entities:
+  tutorial-island.miki
+  tutorial-island.front-door
+  tutorial-island.stairs
+  tutorial-island.mirror
+  tutorial-island.oven
+  tutorial-island.smiths-chest
+adjacent:
+  tutorial-island.guide-house-upstairs
+  tutorial-island.basement
+  tutorial-island.beach while tutorial-island.front-door.unlocked
+
+# location guide-house-upstairs
+x: 0, y: 0, z: 1
+examine: A narrow landing with a dresser and a view of the coast.
+entities:
+  tutorial-island.dresser
+  tutorial-island.stairs-down
+adjacent:
+  tutorial-island.guide-house
+
+# location basement
+x: 0, y: 0, z: -1
+examine: A damp cellar, crates stacked against the walls.
+entities:
+  3 tutorial-island.giant-rat
+  tutorial-island.stairs-up
+adjacent:
+  tutorial-island.guide-house
+
+# location beach
+x: 1, y: 0, z: 0
+examine: Pale sand and the sound of the tide. The mainland waits past the water.
+adjacent:
+  tutorial-island.guide-house
+
+# recipe dough
+in:
+  tutorial-island.jug-of-water
+  tutorial-island.pot-of-flour
+out:
+  tutorial-island.dough
+skill: tutorial-island.cooking 2
+say: You knead water and flour into a ball of dough.
+time: 2
+
+# recipe bread
+station: oven
+in:
+  tutorial-island.dough
+out:
+  tutorial-island.bread
+skill: tutorial-island.cooking 4
+say: The oven bakes your dough into a golden loaf.
+time: 3
+
+# resource health
+rate: tutorial-island.regeneration
+max: tutorial-island.max-health
+display: full
+
+# droptable rat-remains
+give: 1-3 tutorial-island.rat-bone
+1 in 4:
+  give: 1 tutorial-island.rat-tail
+
+# droptable smiths-cache
+give: 1 tutorial-island.heartwood-blade
+give: 1 tutorial-island.iron-sword
+give: 6 tutorial-island.whetstone
+give: 4 tutorial-island.masters-whetstone
+give: 1 tutorial-island.keen-edge-jewel
+give: 1 tutorial-island.stout-heart-jewel
+give: 1 tutorial-island.tempered-will-jewel
+give: 1 tutorial-island.great-work-jewel
+give: 1 tutorial-island.causeway-jewel
+give: 1 tutorial-island.crossroads-jewel
+give: 1 tutorial-island.orb-of-vitality
+give: 2 tutorial-island.orb-of-the-edge
+give: 1 tutorial-island.lesser-orb-of-the-edge
+give: 1 tutorial-island.orb-of-the-bulwark
+give: 1 tutorial-island.orb-of-renewal
+
+# droptable trinket
+one of:
+  8x: nothing
+  3x:
+    give: 2-5 tutorial-island.bent-coin
+  1x:
+    give: 1 tutorial-island.rats-eye-gem
+    say: Something glints in the dust, and it is looking back at you.
+
+# dialogue miki
+owner = tutorial-island.miki
+
+node greeting:
+  when: not tutorial-island.quest-given
+  Greetings, adventurer! Welcome to UniversalisRPG.
+  The name's Miki, your tutorial guide, here to walk you through your first steps.
+  What do you say I show you the ropes?
+  -> Sounds good. Teach me.
+  -> I'd rather find my own way.
+    goto snub
+    set: tutorial-island.snubbed-miki
+  Splendid! We start with what gives an adventurer purpose: quests.
+  Your first task: find the mirror in this house and decide who you are, your name and your people.
+  set: tutorial-island.quest-given
+
+node remind-mirror:
+  when: tutorial-island.quest-given
+  sticky
+  again: The mirror's still waiting. Name yourself first, then we'll talk.
+  The mirror's still waiting. Name yourself first, then we'll talk.
+
+node buffs:
+  when: tutorial-island.mirror-done
+  once
+  again: Knead that dough and get it in the oven, {player.name} - water and flour won't bake themselves.
+  There you are, {player.name}. A fine name.
+  give: tutorial-island.jug-of-water
+  give: tutorial-island.pot-of-flour
+  Water and flour make dough - knead them together, then bake the dough in the oven.
+  Give it a go. I'll wait.
+
+node baked:
+  when: tutorial-island.mirror-done and has tutorial-island.bread and not tutorial-island.made-bread
+  once
+  A warm loaf! Well done, {player.name}.
+  Keep it in your pack - eat it whenever you're hungry.
+  set: tutorial-island.made-bread
+
+node skills:
+  when: tutorial-island.made-bread
+  once
+  again: Still those rats, {player.name}? Downstairs, in the basement.
+  Every swing and catch builds a skill, and skills raise your stats.
+  Here, gear changes your stats the moment you equip it.
+  give: tutorial-island.iron-sword
+  give: tutorial-island.wooden-shield
+  Downstairs in the basement you'll find giant rats. Put them down and watch your stats work.
+
+node skills-annoyed:
+  when: tutorial-island.miki.skills.visits >= 5
+  sticky
+  Are you deaf, {player.name}? Rats. Basement. Now.
+
+node sendoff:
+  when: tutorial-island.rats-killed >= 3
+  once
+  again: Still here? The boat to the mainland won't wait forever.
+  Ha! Barely a scratch on you. You're a natural.
+  Truth be told, there's little left I can teach you.
+  So here's the last of it: get off this island. There's a boat to the mainland, and a whole world of skills waiting past it.
+  set: tutorial-island.miki-complete
+  set: tutorial-island.front-door.unlocked
+  Go on. Make some trouble worth telling stories about.
+
+node snub:
+  Hmph. Suit yourself. Don't come crying when a door won't open.
+
+# flag fainted
+
+# flag mirror-done
+
+# flag made-bread
+
+# flag rats-killed
+
+# flag quest-given
+
+# flag snubbed-miki
+
+# flag miki-complete
+
+# variable default-action-duration
+value: 0
+
+# slot mainhand
+title: Main Hand
+
+# slot offhand
+title: Off Hand
+
+# variable travel-seconds-per-unit
+value: 5
+
+# save miki-route-start
+{"version":11}
+
+# save miki-route-end
+{"version":11,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.beach.discovered":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"elf"}}
+
+# save dresser-trinket-end
+{"version":11,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}
+
+# save explored-and-unlocked
+{"version":11,"flags":{"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true}}
+
+# save growing-a-heartwood-blade-start
+{"version":11,"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true}}
+
+# save growing-a-heartwood-blade-end
+{"version":11,"inventory":{"tutorial-island.heartwood-blade":0,"tutorial-island.iron-sword":0,"tutorial-island.whetstone":2,"tutorial-island.masters-whetstone":1,"tutorial-island.keen-edge-jewel":0,"tutorial-island.stout-heart-jewel":1,"tutorial-island.tempered-will-jewel":1,"tutorial-island.great-work-jewel":1,"tutorial-island.causeway-jewel":0,"tutorial-island.crossroads-jewel":0,"tutorial-island.orb-of-vitality":0,"tutorial-island.orb-of-the-edge":1,"tutorial-island.lesser-orb-of-the-edge":0,"tutorial-island.orb-of-the-bulwark":1,"tutorial-island.orb-of-renewal":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"tutorial-island.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"tutorial-island.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["tutorial-island.orb-of-vitality"]},"1,-1":{"jewel":"tutorial-island.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["tutorial-island.orb-of-the-edge","tutorial-island.lesser-orb-of-the-edge"]},"1,0":{"jewel":"tutorial-island.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"tutorial-island.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"tutorial-island.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+
+# save growing-through-the-inventory-screen-end
+{"version":11,"inventory":{"tutorial-island.heartwood-blade":1,"tutorial-island.iron-sword":0,"tutorial-island.whetstone":6,"tutorial-island.masters-whetstone":3,"tutorial-island.keen-edge-jewel":0,"tutorial-island.stout-heart-jewel":1,"tutorial-island.tempered-will-jewel":1,"tutorial-island.great-work-jewel":1,"tutorial-island.causeway-jewel":1,"tutorial-island.crossroads-jewel":0,"tutorial-island.orb-of-vitality":1,"tutorial-island.orb-of-the-edge":2,"tutorial-island.lesser-orb-of-the-edge":1,"tutorial-island.orb-of-the-bulwark":1,"tutorial-island.orb-of-renewal":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"tutorial-island.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"tutorial-island.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"tutorial-island.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}
+
+# test tutorial-quest-given
+talk: tutorial-island.miki
+choose: 0
+assert: tutorial-island.quest-given
+
+# test miki-route-full
+load: tutorial-island.miki-route-start
+run: tutorial-island.tutorial-quest-given
+use: entity.tutorial-island.mirror.look-in
+submit-modal: name=Rowan
+submit-modal: race=elf
+assert: tutorial-island.mirror-done
+talk: tutorial-island.miki
+assert: has tutorial-island.jug-of-water
+craft: tutorial-island.dough
+assert: has tutorial-island.dough
+craft: tutorial-island.bread
+assert: has tutorial-island.bread
+talk: tutorial-island.miki
+assert: tutorial-island.made-bread
+use: entity.tutorial-island.stairs.descend
+use: tutorial-island.melee-combat on tutorial-island.giant-rat
+wait: 30
+use: tutorial-island.melee-combat on tutorial-island.giant-rat
+wait: 30
+use: tutorial-island.melee-combat on tutorial-island.giant-rat
+wait: 30
+assert: tutorial-island.rats-killed >= 3
+use: entity.tutorial-island.stairs-up.ascend
+talk: tutorial-island.miki
+assert: tutorial-island.miki-complete
+assert: tutorial-island.front-door.unlocked
+travel: tutorial-island.beach
+expect: tutorial-island.miki-route-end
+
+# test dresser-trinket
+travel: tutorial-island.guide-house-upstairs
+use: entity.tutorial-island.dresser.search-drawer
+assert: has tutorial-island.lockpick
+assert: tutorial-island.dresser.searched
+expect: tutorial-island.dresser-trinket-end
+
+# test save-restores-object-owned-flags
+load: tutorial-island.explored-and-unlocked
+assert: tutorial-island.front-door.unlocked
+assert: tutorial-island.beach.discovered
+
+# test growing-a-heartwood-blade
+load: tutorial-island.growing-a-heartwood-blade-start
+use: entity.tutorial-island.smiths-chest.open
+refuse: feed tutorial-island.heartwood-blade with tutorial-island.orb-of-vitality
+refuse: allocate tutorial-island.heartwood-blade at 0,0 position 3
+feed: tutorial-island.heartwood-blade with tutorial-island.whetstone
+feed: 1 with tutorial-island.whetstone
+feed: 1 with tutorial-island.whetstone
+feed: 1 with tutorial-island.whetstone
+allocate: 1 at 0,0 position 2
+allocate: 1 at 0,0 position 3
+allocate: 1 at 0,0 slot ne
+slot: 1 at 0,0 ne with tutorial-island.keen-edge-jewel
+allocate: 1 at 0,0 slot e
+slot: 1 at 0,0 e with tutorial-island.crossroads-jewel
+refuse: slot 1 at 0,0 e with tutorial-island.causeway-jewel
+feed: 1 with tutorial-island.masters-whetstone
+refuse: allocate 1 at 0,0 position 2
+allocate: 1 at 1,-1 position 1
+allocate: 1 at 1,-1 position 2
+allocate: 1 at 1,-1 position 3
+allocate: 1 at 1,-1 position 4
+allocate: 1 at 1,-1 position 5
+allocate: 1 at 1,0 position 1
+refuse: allocate 1 at 1,0 slot nw
+refuse: slot 1 at 1,0 nw with tutorial-island.causeway-jewel
+allocate: 1 at 1,0 slot ne
+refuse: allocate 1 at 1,0 slot se
+apply: 1 at 1,-1 with tutorial-island.orb-of-the-edge
+apply: 1 at 1,-1 with tutorial-island.lesser-orb-of-the-edge
+refuse: apply 1 at 1,-1 with tutorial-island.orb-of-the-edge
+refuse: apply 1 at 1,-1 with tutorial-island.orb-of-the-bulwark
+apply: 1 at 0,0 with tutorial-island.orb-of-vitality
+feed: tutorial-island.iron-sword with tutorial-island.masters-whetstone
+feed: 2 with tutorial-island.masters-whetstone
+refuse: feed 2 with tutorial-island.masters-whetstone
+allocate: 2 at 0,0 slot e
+slot: 2 at 0,0 e with tutorial-island.causeway-jewel
+expect: tutorial-island.growing-a-heartwood-blade-end
+
+# test growing-through-the-inventory-screen
+load: tutorial-island.growing-a-heartwood-blade-start
+use: entity.tutorial-island.smiths-chest.open
+open-modal: carried-items
+submit-modal: item=tutorial-island.iron-sword
+submit-modal: verb=grow
+submit-modal: plane=allocate: slot e
+submit-modal: plane=slot: e with tutorial-island.crossroads-jewel
+submit-modal: plane=feed: with tutorial-island.masters-whetstone
+submit-modal: plane=go: 1,0
+submit-modal: plane=allocate: position 1
+submit-modal: plane=allocate: slot ne
+submit-modal: plane=slot: ne with tutorial-island.keen-edge-jewel
+submit-modal: plane=go: 2,-1
+submit-modal: plane=allocate: position 1
+submit-modal: plane=back
+submit-modal: verb=equip
+open-modal: carried-items
+submit-modal: item=close
+expect: tutorial-island.growing-through-the-inventory-screen-end
+>>>> combat-expansion
+# info combat-expansion
+version: 1.0.0
+dependencies:
+  tutorial-island
+
+# stat max-rage
+base: 0
+
+# stat rage-drain
+base: -30
+
+# item accelerated-vigor
+title: Accelerated Vigor
+examine: The swing after the last one, and faster than it.
+stacks, +2 tutorial-island.attack-rate, 1m
+
+# item venom
+title: Venom
+examine: It works while you are busy with something else.
+poison, -30 tutorial-island.regeneration, 20s
+
+# item blood-frenzy-jewel
+examine: A dark red disc, and it is warm.
+cluster-jewel: combat-expansion.blood-frenzy
+
+# item wrath-jewel
+cluster-jewel: combat-expansion.wrath
+
+# item iron-bulwark-jewel
+cluster-jewel: combat-expansion.iron-bulwark
+
+# item retribution-jewel
+cluster-jewel: combat-expansion.retribution
+
+# item wracking-blades-jewel
+cluster-jewel: combat-expansion.wracking-blades
+
+# item creeping-rot-jewel
+cluster-jewel: combat-expansion.creeping-rot
+
+# item proving-blade
+title: Proving Blade
+examine: Unlovely, well balanced, and it has never been anywhere.
+slot: mainhand
+weapon, +2 tutorial-island.attack
+max-level: 40
+
+# passive goring-edge
+berserker, physical, +3 tutorial-island.attack
+
+# passive bloodlust
+berserker, speed, +3 tutorial-island.attack-rate
+
+# passive reckless
+berserker, physical, +10% tutorial-island.attack, -2 tutorial-island.defense
+
+# passive rising-fury
+title: Rising Fury
+berserker, physical, +20 combat-expansion.max-rage, +2% tutorial-island.attack per combat-expansion.rage
+on hit:
+  restore: 3 combat-expansion.rage
+
+# passive spurred
+berserker, speed
+on hit:
+  1 in 4:
+    inflict: combat-expansion.accelerated-vigor on me
+
+# passive quickening
+berserker, speed, +3% tutorial-island.attack-rate per stack of combat-expansion.accelerated-vigor
+
+# passive iron-carapace
+juggernaut, armour, +4 tutorial-island.defense
+
+# passive immovable
+juggernaut, life, +25 tutorial-island.max-health
+
+# passive slow-and-certain
+juggernaut, armour, +3 tutorial-island.defense, -2 tutorial-island.attack-rate
+
+# passive retribution
+juggernaut, thorns
+when hit:
+  drain: 5 tutorial-island.health from them
+
+# passive wracking-blades
+assassin, precision, +6 tutorial-island.accuracy, +2 tutorial-island.attack-rate
+
+# passive silent-step
+assassin, evasion, +12 tutorial-island.evasion
+
+# passive exposed-throat
+assassin, precision, +10 tutorial-island.accuracy, -1 tutorial-island.attack
+
+# passive envenom
+assassin, poison
+on hit:
+  inflict: combat-expansion.venom on them
+
+# cluster-jewel blood-frenzy
+title: Blood Frenzy
+examine: It does not get tired. That is the problem with it.
+shape: double-ring
+open-connections: ne, e
+passives: 1 combat-expansion.goring-edge, 2 combat-expansion.bloodlust, 3 combat-expansion.goring-edge, 4 tutorial-island.flurry, 5 combat-expansion.bloodlust, 6 tutorial-island.swift-hands, 7 combat-expansion.goring-edge, 10 tutorial-island.flurry
+
+# cluster-jewel wrath
+title: Wrath
+examine: Every blow lands harder than the one before it.
+shape: wheel
+open-connections: e
+passives: 1 combat-expansion.reckless, 2 combat-expansion.quickening, 3 tutorial-island.frenzied, 4 combat-expansion.reckless, 5 combat-expansion.spurred, 6 tutorial-island.brutal, 7 combat-expansion.rising-fury
+
+# cluster-jewel iron-bulwark
+title: Iron Bulwark
+examine: Banding over banding, until the shape stops mattering.
+shape: double-ring
+open-connections: e, sw
+passives: 1 tutorial-island.warded, 2 combat-expansion.iron-carapace, 3 combat-expansion.immovable, 4 tutorial-island.plated, 5 combat-expansion.immovable, 6 combat-expansion.iron-carapace, 7 combat-expansion.slow-and-certain, 10 tutorial-island.constitution
+
+# cluster-jewel retribution
+title: Retribution
+examine: Striking it is its own punishment.
+shape: ring
+open-connections: ne, se
+passives: 1 tutorial-island.warded, 2 tutorial-island.hardened, 3 tutorial-island.tempered-frame, 4 combat-expansion.retribution, 5 tutorial-island.hardened, 6 tutorial-island.tempered-frame
+
+# cluster-jewel wracking-blades
+title: Wracking Blades
+examine: Fast, accurate, and not interested in a long fight.
+shape: ring
+open-connections: e, ne
+passives: 1 tutorial-island.keen-eye, 2 combat-expansion.wracking-blades, 3 combat-expansion.silent-step, 4 tutorial-island.marksman, 5 combat-expansion.exposed-throat, 6 tutorial-island.quickstep
+
+# cluster-jewel creeping-rot
+title: Creeping Rot
+examine: The cut is the smallest part of it.
+shape: wheel
+open-connections: se
+passives: 1 tutorial-island.keen-eye, 3 tutorial-island.deadly-precision, 5 tutorial-island.evasive, 7 combat-expansion.envenom
+
+# entity armourers-chest
+title: Armourer's Chest
+examine: A long crate, stencilled, and nobody has come for it.
+flags:
+  emptied
+open:
+  hidden if: combat-expansion.armourers-chest.emptied
+  instant
+  roll: combat-expansion.archetype-cache
+  set: combat-expansion.armourers-chest.emptied
+  say: Six jewels, a plain blade, and enough whetstone to make something of it.
+
+# entity proving-post
+title: Proving Post
+examine: A banded post, chest high, and it has taken worse than you.
+stats: tutorial-island.max-health 2000, tutorial-island.defense 0, tutorial-island.evasion 0, tutorial-island.accuracy 0
+
+# entity spined-urchin
+title: Spined Urchin
+examine: A knot of black spines around something that has not moved in years.
+stats: tutorial-island.max-health 2000, tutorial-island.defense 0, tutorial-island.evasion 0, tutorial-island.accuracy 0
+passives: combat-expansion.retribution
+
+# location proving-ground
+x: 3, y: 0, z: 0
+examine: A walled yard behind the armoury, sand raked flat and stained.
+entities:
+  combat-expansion.armourers-chest
+  combat-expansion.proving-post
+  combat-expansion.spined-urchin
+adjacent:
+  tutorial-island.beach
+
+# resource rage
+rate: combat-expansion.rage-drain
+max: combat-expansion.max-rage
+start: 0
+display: minimal
+
+# droptable archetype-cache
+give: 1 combat-expansion.proving-blade
+give: 6 tutorial-island.masters-whetstone
+give: 1 combat-expansion.blood-frenzy-jewel
+give: 1 combat-expansion.wrath-jewel
+give: 1 combat-expansion.iron-bulwark-jewel
+give: 1 combat-expansion.retribution-jewel
+give: 1 combat-expansion.wracking-blades-jewel
+give: 1 combat-expansion.creeping-rot-jewel
+
+# save at-the-proving-ground
+{"version":11,"location":"combat-expansion.proving-ground","flags":{"combat-expansion.proving-ground.discovered":true}}
+
+# save rage-rises-as-swings-land-end
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"tutorial-island.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"resources":{"combat-expansion.rage":20000},"resourceRateRemainders":{"combat-expansion.rage":0},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":1200,"attemptsMade":13}},"roster":{"player":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"tutorial-island.health":1825520,"combat-expansion.rage":0},"rateRemainders":{}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":32400,"rng":2882385315}
+
+# save rage-drains-when-the-swinging-stops-end
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"tutorial-island.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"resourceRateRemainders":{"combat-expansion.rage":0},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":92400,"rng":2882385315}
+
+# save accelerated-vigor-stacks-behind-its-gate-end
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"tutorial-island.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"buffs":{"player":[{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":69600},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":101955},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":109759},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":111534},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":114780},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":117760}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":518,"attemptsMade":31}},"roster":{"player":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"tutorial-island.health":1617680,"combat-expansion.rage":0},"rateRemainders":{}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,2,6,5],"allocatedSlots":[],"effects":[]}}}}}},"time":62400,"rng":2103776196}
+
+# save poison-holds-the-struck-enemy-end
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"tutorial-island.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":0},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"buffs":{"combat-expansion.proving-post":[{"source":"combat-expansion.venom","tags":[{"kind":"keyword","value":"poison"},{"kind":"stat-bonus","statId":"tutorial-island.regeneration","percent":false,"amount":{"min":-30,"max":-30}},{"kind":"duration","seconds":20}],"expiresAt":32000}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"tutorial-island.health":1935000,"combat-expansion.rage":0},"rateRemainders":{"tutorial-island.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":12400,"rng":278522923}
+
+# save poison-lifts-when-its-own-duration-runs-out-end
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"tutorial-island.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":0},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":42400,"rng":278522923}
+
+# save striking-a-thorned-enemy-costs-the-striker-end
+{"version":11,"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true},"resources":{"tutorial-island.health":5000},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.spined-urchin"}},"actors":{"combat-expansion.spined-urchin":{"resources":{"tutorial-island.health":1950000,"combat-expansion.rage":0},"rateRemainders":{}}}},"time":12400,"rng":278522923}
+
+# test rage-rises-as-swings-land
+load: combat-expansion.at-the-proving-ground
+use: entity.combat-expansion.armourers-chest.open
+feed: combat-expansion.proving-blade with tutorial-island.masters-whetstone
+feed: 1 with tutorial-island.masters-whetstone
+allocate: 1 at 0,0 slot e
+slot: 1 at 0,0 e with combat-expansion.wrath-jewel
+allocate: 1 at 1,0 position 1
+allocate: 1 at 1,0 position 7
+equip: 1
+use: tutorial-island.melee-combat on combat-expansion.proving-post
+wait: 30
+expect: combat-expansion.rage-rises-as-swings-land-end
+
+# test rage-drains-when-the-swinging-stops
+run: combat-expansion.rage-rises-as-swings-land
+cancel
+wait: 60
+expect: combat-expansion.rage-drains-when-the-swinging-stops-end
+
+# test accelerated-vigor-stacks-behind-its-gate
+load: combat-expansion.at-the-proving-ground
+use: entity.combat-expansion.armourers-chest.open
+feed: combat-expansion.proving-blade with tutorial-island.masters-whetstone
+feed: 1 with tutorial-island.masters-whetstone
+allocate: 1 at 0,0 slot e
+slot: 1 at 0,0 e with combat-expansion.wrath-jewel
+allocate: 1 at 1,0 position 1
+allocate: 1 at 1,0 position 2
+allocate: 1 at 1,0 position 6
+allocate: 1 at 1,0 position 5
+equip: 1
+use: tutorial-island.melee-combat on combat-expansion.proving-post
+wait: 60
+expect: combat-expansion.accelerated-vigor-stacks-behind-its-gate-end
+
+# test poison-holds-the-struck-enemy
+load: combat-expansion.at-the-proving-ground
+use: entity.combat-expansion.armourers-chest.open
+feed: combat-expansion.proving-blade with tutorial-island.masters-whetstone
+feed: 1 with tutorial-island.masters-whetstone
+allocate: 1 at 0,0 slot e
+slot: 1 at 0,0 e with combat-expansion.creeping-rot-jewel
+allocate: 1 at 1,0 position 1
+allocate: 1 at 1,0 position 7
+equip: 1
+use: tutorial-island.melee-combat on combat-expansion.proving-post
+wait: 10
+expect: combat-expansion.poison-holds-the-struck-enemy-end
+
+# test poison-lifts-when-its-own-duration-runs-out
+run: combat-expansion.poison-holds-the-struck-enemy
+cancel
+wait: 30
+expect: combat-expansion.poison-lifts-when-its-own-duration-runs-out-end
+
+# test striking-a-thorned-enemy-costs-the-striker
+load: combat-expansion.at-the-proving-ground
+use: tutorial-island.melee-combat on combat-expansion.spined-urchin
+wait: 10
+expect: combat-expansion.striking-a-thorned-enemy-costs-the-striker-end

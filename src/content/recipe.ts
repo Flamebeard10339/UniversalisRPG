@@ -22,12 +22,14 @@ export interface Recipe {
   burnt: Produced[];
 }
 
-const recipeSkill: Parser<{ skill: string; amount: number }> = {
+export const recipeSkillValue: Parser<{ skill: string; amount: number }> = {
   parse(cursor) {
     const skill = id.parse(cursor);
     cursor.take(/[ \t]+/);
     return { skill, amount: number.parse(cursor) };
   },
+  print: (value) => `${id.print(value.skill)} ${number.print(value.amount)}`,
+  examples: ['smithing 5'],
 };
 
 export const recipeSchema: SectionSchema<Recipe> = {
@@ -36,7 +38,7 @@ export const recipeSchema: SectionSchema<Recipe> = {
     requiresCapability: { parser: id, keyword: 'station' },
     in: { parser: list(quantified), default: () => [] },
     out: { parser: list(produced), default: () => [] },
-    skill: { parser: recipeSkill },
+    skill: { parser: recipeSkillValue },
     say: { parser: text },
     time: { parser: decimal },
     rate: { parser: numberOrStat },

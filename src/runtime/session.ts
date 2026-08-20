@@ -605,8 +605,35 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
       return armFightAction(directive.action, directive.target, registry, state);
     case 'travel':
       return state.location ? armJourney(directive.location, registry, state) : null;
-    default:
+    // Everything a session can be told to do that is applied where it is read
+    // rather than begun. Named one by one so that a directive added later is a
+    // compile error here until somebody decides which of the two it is — the
+    // silent `return null` this replaced would have armed nothing and said so
+    // to nobody.
+    case 'run':
+    case 'talk':
+    case 'choose':
+    case 'goto':
+    case 'begin':
+    case 'assert':
+    case 'expect':
+    case 'load':
+    case 'cancel':
+    case 'wait':
+    case 'equip':
+    case 'unequip':
+    case 'feed':
+    case 'slot':
+    case 'allocate':
+    case 'apply':
+    case 'refuse':
+    case 'open-modal':
+    case 'submit-modal':
       return null;
+    default: {
+      const unreached: never = directive;
+      return unreached;
+    }
   }
 }
 
@@ -664,6 +691,10 @@ function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'use-on' | 'trave
       return `travel:${inner.location}`;
     case 'craft':
       return `craft:${inner.recipe}`;
+    default: {
+      const unreached: never = inner;
+      return unreached;
+    }
   }
 }
 
@@ -769,6 +800,10 @@ function performDirective(session: PlaySession, directive: Directive): { failure
       const growth = grow(state, registry, directive.inner);
       grew(session, state, growth);
       return growth.ok ? { failure: `${printDirective(directive.inner)} was not refused` } : {};
+    }
+    default: {
+      const unreached: never = directive;
+      return unreached;
     }
   }
 }

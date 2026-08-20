@@ -47,7 +47,7 @@ export interface Location {
   actions: Action[];
 }
 
-const population: Parser<Population> = {
+export const populationValue: Parser<Population> = {
   parse(cursor) {
     const start = cursor.pos;
     const count = cursor.take(/\d+(?![\w-])/);
@@ -56,9 +56,11 @@ const population: Parser<Population> = {
     cursor.take(/[ \t]+/);
     return { count: Number(count), entity: id.parse(cursor) };
   },
+  print: (value) => (value.count === undefined ? value.entity : `${value.count} ${id.print(value.entity)}`),
+  examples: ['rat', '3 rat'],
 };
 
-const edge: Parser<Edge> = {
+export const edgeValue: Parser<Edge> = {
   parse(cursor) {
     const target = id.parse(cursor);
     if (cursor.take(/[ \t]+while[ \t]+/) !== null) {
@@ -66,17 +68,21 @@ const edge: Parser<Edge> = {
     }
     return { target };
   },
+  print: (value) => (value.condition === undefined ? value.target : `${value.target} while ${condition.print(value.condition)}`),
+  examples: ['clearing', 'clearing while has-key'],
 };
 
 const DIRECTION = /north|south|east|west|up|down/;
 
-const relative: Parser<Relative> = {
+export const relativeValue: Parser<Relative> = {
   parse(cursor) {
     const direction = cursor.take(DIRECTION);
     if (direction === null) throw new DslError('expected a direction', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
     if (cursor.take(/[ \t]+of[ \t]+/) === null) throw new DslError("expected 'of' after a direction", { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
     return { direction: direction as Direction, of: id.parse(cursor) };
   },
+  print: (value) => `${value.direction} of ${id.print(value.of)}`,
+  examples: ['north of clearing', 'down of shaft'],
 };
 
 const DIRECTION_VECTORS: Record<Direction, [number, number, number]> = {
@@ -130,10 +136,10 @@ export const locationSchema: SectionSchema<Location, 'starting', 'actions'> = {
     z: { parser: number, default: () => 0 },
     title: { parser: text, default: defaultTitle },
     examine: { parser: text },
-    entities: { parser: list(population), default: () => [] },
-    adjacent: { parser: list(edge), default: () => [] },
+    entities: { parser: list(populationValue), default: () => [] },
+    adjacent: { parser: list(edgeValue), default: () => [] },
     flags: { parser: list(id), default: () => [] },
-    relative: { parser: relative },
+    relative: { parser: relativeValue },
   },
   keywords: ['starting'],
   bare: 'relative',

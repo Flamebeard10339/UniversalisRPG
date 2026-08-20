@@ -79,6 +79,32 @@ function parseOr(cursor: Cursor): Condition {
   return conditions.length === 1 ? conditions[0] : { kind: 'or', conditions };
 }
 
+// A reference is its path, dotted. Exported because a `{ }` interpolation in a
+// spoken line carries one and is written by whoever prints that line.
+export const printReference = (value: Reference): string => value.path.join('.');
+
+function printCondition(value: Condition): string {
+  switch (value.kind) {
+    case 'reference':
+      return printReference(value.reference);
+    case 'comparison':
+      return `${printReference(value.left)} ${value.operator} ${number.print(value.right)}`;
+    case 'has':
+      return value.count === 1 ? `has ${value.item}` : `has ${number.print(value.count)} ${value.item}`;
+    case 'not':
+      return `not ${printCondition(value.condition)}`;
+    case 'and':
+    case 'or':
+      return value.conditions.map(printCondition).join(` ${value.kind} `);
+    default: {
+      const unreached: never = value;
+      return unreached;
+    }
+  }
+}
+
 export const condition: Parser<Condition> = {
   parse: parseOr,
+  print: printCondition,
+  examples: ['has-key', 'quest.stage >= 2', 'has plank', 'has 3 plank', 'not has-key', 'has-key and not has-rope', 'has-key or has-rope', 'a and b or c'],
 };

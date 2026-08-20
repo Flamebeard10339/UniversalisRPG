@@ -505,6 +505,37 @@ one headline claim was understated rather than wrong (zero exhaustiveness guards
 tree-wide, not merely absent from two files). Budget verification time per agent;
 the reports are leads, not evidence.
 
+---
+
+## 2026-08-18 — One coding agent over stages 2 and 3 of a live spec
+
+Dispatched per `docs/workflow.md` step 5 — one instruction pointing at
+`work-prompt` — plus only the facts the record could not carry: a tsc-verified
+worklist (30 sites / 15 files), the 2026-08-16 ruling it must not reverse, and
+three environment traps measured in the dispatching session (CRLF working
+copies breaking exact-match edits and mutate manifests; `inspect` rejecting TS
+syntax; heredocs mangling regex escapes in manifests). ~270k tokens, 30 min.
+
+Paid off, and the reason is worth separating from the output. The agent landed
+two clauses met and mutation-verified on the first aim, 12 killed 0 survived —
+but the load-bearing result was that its derived proof found a real defect no
+test could have: `skillGrant` consumed to end of line while its schema declares
+`grants` as a comma-separated clause list, so a second grant on one line was
+refused. No shipped `.dsl` authored one, which is exactly why the corpus round
+trip could never have reached it. That is the case for derivation over
+enumeration, produced rather than argued.
+
+It also stopped where it was told to stop rather than half-landing c3's walk,
+and filed six concrete reasons a field-derived printer disagrees with today's
+bytes. The dispatching session had failed at the same task for the opposite
+reason — context exhaustion mid-conversion — so the cost that mattered was not
+capability but a fresh context over a fully specified job.
+
+Carry forward: passing measured environment traps in the prompt is cheap and
+removed the exact failure that ended the previous attempt.
+
+| 85 | Opus 5 (cold spawn, read-only, adversarial) x2 independent | **Grade a spec before dispatch.** Both got the author's message verbatim, the committed spec, and a mandate to break it. A was aimed at the metric's validity and gameability; B at simulating two hypothetical features against the tree and at finding a better metric in the same data. | 100.9k / 138.5k | 30 / 39 | 645s / 628s | **high**: named the claims to re-derive and forbade agreement without first trying to break them | The highest-value delegation recorded here, and the only one that paid before a line of code was written. Both independently refuted the spec's single calibration claim — `parser.ts` was already answer-dominant (20/36) at the merge base, so the metric did *not* detect the codec conversion it was said to agree with. B then measured the proposed metric against 56 merged branches and found Spearman 0.195, against 0.505 for its own dual, with `serialize.ts` — the most-changed file in the tree — ranked 163rd of 234 by the chosen number. A found the columns were overlapping sets, not a partition, which flips the hub list the spec's own justification depends on. Both found c8 false at the commit that introduced it. |
+
 ## 2026-08-19 — two read-only measurement agents beside a refactor
 
 Both were dispatched to *measure* while the main session refactored, on the rule
@@ -529,3 +560,4 @@ and an agreement is cheap to accept; an unanchored survey is neither.
 The probe agent also reported the checkout switching branches underneath it and
 declined to "restore" what it found, snapshotting the SHA it was asked about
 instead. That is the correct call and it is worth knowing an agent will make it.
+

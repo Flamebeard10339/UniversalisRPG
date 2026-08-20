@@ -52,6 +52,10 @@ export function evaluateCondition(condition: Condition, state: GameState): boole
       return condition.conditions.some((c) => evaluateCondition(c, state));
     case 'has':
       return heldCount(state, condition.item) >= condition.count;
+    default: {
+      const unreached: never = condition;
+      return unreached;
+    }
   }
 }
 
@@ -69,6 +73,10 @@ export function describeCondition(condition: Condition): string {
       return condition.conditions.map(describeCondition).join(' or ');
     case 'has':
       return condition.count === 1 ? `has ${condition.item}` : `has ${condition.count} ${condition.item}`;
+    default: {
+      const unreached: never = condition;
+      return unreached;
+    }
   }
 }
 
@@ -82,6 +90,10 @@ export function renderSegments(segments: TextSegment[], state: GameState): strin
           return String(resolveReference(segment.reference, state) ?? '');
         case 'conditional':
           return evaluateCondition(segment.condition, state) ? segment.text : '';
+        default: {
+          const unreached: never = segment;
+          return unreached;
+        }
       }
     })
     .join('');

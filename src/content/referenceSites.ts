@@ -96,6 +96,11 @@ function condition(value: Condition | undefined, where: string, visit: Visit): v
     case 'and':
     case 'or':
       for (const inner of value.conditions) condition(inner, where, visit);
+      return;
+    default: {
+      const unreached: never = value;
+      void unreached;
+    }
   }
 }
 
@@ -148,6 +153,21 @@ function results(list: ActionResult[] | undefined, where: string, visit: Visit):
       case 'add':
         put(result, 'variable', 'flag', `${where} ${result.kind}:`, visit);
         break;
+      // Named rather than left to fall through, so that a kind added to the
+      // union has to be sorted into one of these two lists by whoever adds it.
+      // `credit` and `chance` hold only a nested list, which the walk above
+      // already reached; `open-modal` names a modal the engine declares and no
+      // reference kind covers; `say` and `stop` carry no id at all.
+      case 'say':
+      case 'stop':
+      case 'chance':
+      case 'credit':
+      case 'open-modal':
+        break;
+      default: {
+        const unreached: never = result;
+        void unreached;
+      }
     }
   }
 }
@@ -284,10 +304,19 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     // `submit-modal:` an option key, none of which is a section's id, so they
     // resolve nothing here; a slot is checked against what items declare by
     // validateTestReferences, and a screen only the layer above can name is
-    // refused where it is raised.
+    // refused where it is raised. `choose:` names an offered option by its
+    // position, `cancel:` and `wait:` name nothing at all.
     case 'unequip':
     case 'open-modal':
     case 'submit-modal':
+    case 'choose':
+    case 'cancel':
+    case 'wait':
+      return;
+    default: {
+      const unreached: never = value;
+      void unreached;
+    }
   }
 }
 

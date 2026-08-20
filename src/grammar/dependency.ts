@@ -28,6 +28,8 @@ export const version: Parser<Version> = {
     if (raw === null) throw new DslError('expected a version like 1.0.0', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
     return raw.split('.').map(Number);
   },
+  print: (value) => formatVersion(value),
+  examples: ['1', '0.1', '1.0.0'],
 };
 
 export const formatVersion = (value: Version): string => value.join('.');
@@ -76,4 +78,6 @@ export const dependency: Parser<Dependency> = {
     cursor.take(/[ \t]*/);
     return { prefix, module, operator, version: version.parse(cursor) };
   },
+  print: (value) => formatDependency(value),
+  examples: ['core', '! oldmod', '~ other', '? extras', '+ nice', '? extras >= 1.2.0', 'core = 2.0.0'],
 };
