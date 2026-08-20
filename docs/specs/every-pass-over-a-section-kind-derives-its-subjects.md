@@ -9,7 +9,7 @@ downstream can be keyed on it even where the author wanted to be. Thirteen sites
 set; two are compiler-enforced, two derive, and **nine are hand-written with nothing relating
 them to the spine**: `BESPOKE` (7, `Record<string, …>`), `CONTENT_SECTION_MAPS` (15),
 `applySection` (20 arms on `kind: string`, no `default`), `visitSection` (14 arms, no `default`),
-`serializeRegistryModule` (19 hand-written loops), `NAMESPACED_KINDS` (19),
+`serializeRegistryModule` (20 registry maps walked by hand), `NAMESPACED_KINDS` (19),
 `GLOBAL_SECTION_KINDS` (2), `ACTION_OWNER_KINDS` (3) and `ReferenceKind` (19). The measured drift
 between them is not hypothetical: `sectionNotNamespaced` is `['info','slot','variable','remove','locale']`
 and `sectionNotInMaps` is `['info','slot','flag','variable','save','remove','locale']`, and no
@@ -60,6 +60,14 @@ Proof:
   proof: `npm test`
 - [c7] `npm run tasks -- merge-ready` passes before the spec is marked done.
   proof: `npm run tasks -- merge-ready`
+
+Where each of the nine goes, so the count reconciles rather than being asserted:
+`BESPOKE` is the spine's second half rather than a fact beside it — `PARSERS` is `SCHEMAS` plus
+`BESPOKE`, so typing the spine at c2 types it. `CONTENT_SECTION_MAPS`, `NAMESPACED_KINDS`,
+`GLOBAL_SECTION_KINDS` and `ACTION_OWNER_KINDS` are the four lists c3 folds into the row.
+`applySection`, `visitSection` and `serializeRegistryModule` are the three dispatchers c4
+narrows. `ReferenceKind` is deliberately left alone, for the reason recorded under Decisions.
+One plus four plus three plus one is the nine.
 
 ## Goal
 
@@ -114,6 +122,14 @@ modules both need a shape, the shape goes beneath both, which adds no module. `s
 already exists and already holds `SchemaKind`; the row goes there.
 
 ## Open questions
+
+**Does c1 mean CI is red for the life of the branch?** The clause says the gate lands before the
+repair and is watched failing, which is the whole reason it is c1 and not c7. Written as a
+`vitest` case that fails, `.github/workflows/test.yml` is red on every push until c2 and c3 land,
+and a red check nobody can distinguish from a broken one is its own hazard. The alternative is to
+land it as a reporting command first and flip it to a failing assertion in the same commit that
+makes it pass, which buys a green CI and gives up the thing c1 exists for. This is the author's
+call and nothing else in the spec depends on which way it goes.
 
 **Does `ACTION_OWNER_KINDS` belong to this set at all?** It says three kinds own an action
 (`entity`, `location`, `item`) and `src/content/references.ts:120` refuses any other `use:`, while
