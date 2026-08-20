@@ -1,3 +1,5 @@
 import { report, untotalledKindTables } from './lib/sectionKind';
 
-for (const line of report(untotalledKindTables())) console.log(line);
+const found = untotalledKindTables();
+
+for (const line of report(found.tables, found.examined)) console.log(line);

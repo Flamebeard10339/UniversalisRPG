@@ -67,7 +67,10 @@ const BESPOKE = {
 
 const SCHEMA_PARSERS = Object.fromEntries(Object.entries(SCHEMAS).map(([kind, schema]) => [kind, sectionParser((section: RawSection) => parseAnySection(section, schema))])) as Record<SchemaKind, SectionParser>;
 
-const PARSERS = { ...SCHEMA_PARSERS, ...BESPOKE } satisfies Record<SectionKind, SectionParser>;
+// Total over `SectionKind` by construction rather than by a third assertion:
+// the two halves above are checked against the row's two halves, which
+// partition it. A `satisfies` here would restate that and could not fail.
+const PARSERS = { ...SCHEMA_PARSERS, ...BESPOKE };
 
 // The table as something to ask questions of. `blocks.test.ts` asks whether
 // every kind's parser answers for the blocks it was handed, which is what

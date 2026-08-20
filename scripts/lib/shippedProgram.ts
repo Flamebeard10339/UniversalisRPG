@@ -22,9 +22,34 @@ export function programOverSource(name: string, source: string): ts.Program {
   return ts.createProgram([name], { strict: true, noEmit: true, skipLibCheck: true }, host);
 }
 
-export function programOverShippedModules(root: string = repoRoot): ts.Program {
+// `overrides` replaces the text of a tracked file for one compilation, keyed by
+// repository-relative path and written nowhere. It is what lets a rule about
+// what the compiler refuses be asked the question directly — add a kind, ask
+// which files stop compiling — instead of asserting that it would.
+export function programOverShippedModules(overrides: Readonly<Record<string, string>> = {}, root: string = repoRoot): ts.Program {
   const configPath = ts.findConfigFile(root, ts.sys.fileExists, 'tsconfig.json');
   if (configPath === undefined) throw new Error('no tsconfig.json at the repository root');
   const parsed = ts.parseJsonConfigFileContent(ts.readConfigFile(configPath, ts.sys.readFile).config, ts.sys, root);
-  return ts.createProgram(shippedModules().map((file) => path.resolve(root, file)), { ...parsed.options, noEmit: true });
+  const options = { ...parsed.options, noEmit: true };
+  const files = shippedModules().map((file) => path.resolve(root, file));
+  const entries = Object.entries(overrides);
+  if (entries.length === 0) return ts.createProgram(files, options);
+  const replaced = new Map(entries.map(([file, text]) => [path.resolve(root, file).replace(/\\/g, '/'), text]));
+  for (const name of replaced.keys()) if (!files.some((file) => file.replace(/\\/g, '/') === name)) throw new Error(`${name} is not a shipped module, so overriding it would compile nothing`);
+  const host = ts.createCompilerHost(options);
+  const original = host.getSourceFile.bind(host);
+  host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) => {
+    const text = replaced.get(fileName.replace(/\\/g, '/'));
+    return text === undefined ? original(fileName, languageVersion, onError, shouldCreate) : ts.createSourceFile(fileName, text, languageVersion, true);
+  };
+  host.readFile = (fileName) => replaced.get(fileName.replace(/\\/g, '/')) ?? ts.sys.readFile(fileName);
+  return ts.createProgram(files, options, host);
+}
+
+// Every semantic error the program reports, as `<relative path>: <message>`.
+export function semanticErrors(program: ts.Program, root: string = repoRoot): string[] {
+  return program
+    .getSemanticDiagnostics()
+    .filter((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error && diagnostic.file !== undefined)
+    .map((diagnostic) => `${relativeTo(root, diagnostic.file!.fileName.replace(/\\/g, '/'))}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`);
 }

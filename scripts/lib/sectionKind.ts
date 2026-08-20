@@ -48,21 +48,31 @@ const keyedByAnyString = (checker: ts.TypeChecker, node: ts.Node): boolean => ch
 // happen to carry one.
 const literal = (node: ts.Expression): ts.Expression => (ts.isAsExpression(node) || ts.isSatisfiesExpression(node) ? literal(node.expression) : node);
 
+// `examined` is how many declarations the walk actually opened. A rule whose
+// answer is "nothing to report" is worth what its instrument is worth, and a
+// walk that stopped reaching the tree gives the same answer as a clean one.
+export interface KindTableReport {
+  examined: number;
+  tables: KindTable[];
+}
+
 export function kindTablesIn(
   program: ts.Program,
   kinds: readonly string[] = SECTION_KINDS,
   include: (relative: string) => boolean = (relative) => /^(src|scripts)\//.test(relative),
   root: string = repoRoot,
-): KindTable[] {
+): KindTableReport {
   const checker = program.getTypeChecker();
   const set = new Set<string>(kinds);
   const found: KindTable[] = [];
+  let examined = 0;
   for (const file of program.getSourceFiles()) {
     if (file.isDeclarationFile) continue;
     const relative = relativeTo(root, file.fileName);
     if (!include(relative)) continue;
     const visit = (node: ts.Node): void => {
       if (ts.isVariableDeclaration(node) && node.initializer !== undefined && ts.isIdentifier(node.name)) {
+        examined++;
         const at = { where: `${relative}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`, name: node.name.text };
         const initializer = literal(node.initializer);
         if (ts.isArrayLiteralExpression(initializer)) {
@@ -80,13 +90,13 @@ export function kindTablesIn(
     };
     visit(file);
   }
-  return found;
+  return { examined, tables: found };
 }
 
-export const untotalledKindTables = (): KindTable[] => kindTablesIn(programOverShippedModules());
+export const untotalledKindTables = (): KindTableReport => kindTablesIn(programOverShippedModules());
 
-export function report(tables: readonly KindTable[], kinds: readonly string[] = SECTION_KINDS): string[] {
-  const lines = [`${kinds.length} section kinds, derived from the parser table: ${[...kinds].join(', ')}`, ''];
+export function report(tables: readonly KindTable[], examined: number, kinds: readonly string[] = SECTION_KINDS): string[] {
+  const lines = [`${kinds.length} section kinds, derived from the row: ${[...kinds].join(', ')}`, `${examined} declaration(s) read.`, ''];
   if (tables.length === 0) return [...lines, 'Every question about a kind is a field of the row.'];
   lines.push(`${tables.length} declaration(s) answer a question about a section kind from somewhere other than the row:`, '');
   for (const table of tables) lines.push(`  ${table.where}  ${table.name} (${table.kinds.length} of ${kinds.length})`, `    ${table.why}`);

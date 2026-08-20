@@ -35,7 +35,7 @@ import { getShape } from './shapes';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
 import { mergeSection } from './merge';
 import { ModuleSection } from './module';
-import { isActionOwnerKind, isSectionKind, sectionOf, SectionKind } from './sectionKind';
+import { isActionOwnerKind, isSectionKind, SECTION_KIND, sectionOf, SectionKind } from './sectionKind';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
 import { ACTION_MEMBER, memberKey, Namespace, NAMESPACED_KINDS } from './namespace';
@@ -1098,9 +1098,11 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
             namespace.undeclare(kind, target);
             continue;
           }
-          // A locale is not content: it never enters the merge, so no id it
-          // names can be added, patched or removed by it (c6).
-          if (section.kind === 'locale') continue;
+          // A kind that builds no object never enters the merge, which the row
+          // answers rather than a name written here. A locale is the one that
+          // reaches this line, and keeping it out is what stops any id it names
+          // from being added, patched or removed by it (c6).
+          if (SECTION_KIND[section.kind].map === null) continue;
           if (!owns(section.kind)) continue;
           const byId = merged.get(section.kind) ?? new Map<string, OwnedSection>();
           const id = (section.value as { id: string }).id;

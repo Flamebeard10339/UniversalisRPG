@@ -138,3 +138,57 @@ which are not section kinds. One concept, two memberships, no relation between t
 content-side list into the row; the runtime-side disagreement is a question about the domain, not
 about where a list lives, and this branch does not answer it. It needs a ruling before anyone
 makes the two agree, because either could be the wrong one.
+
+## Decisions taken while implementing
+
+**The row is the spine, and the parser table answers for it — the reverse of what c2 forecast.**
+`scripts/lib/acyclic.ts` counts type-only imports. A row typed `Record<SectionKind, …>` over a
+`SectionKind` read off `PARSERS` has to import `module.ts`, and `map: keyof Registry` has to import
+`registry.ts`, which reaches `universe.ts`, which reaches `module.ts`, which reaches `action.ts`,
+which reaches `namespace.ts`, which reads the row. That was built and measured: a seven-module
+cycle, which is the thing the file's own opening comment was written to prevent. So
+`src/content/sectionKind.ts` imports nothing, declares the set, and `module.ts` is checked against
+it in two halves — `SCHEMAS satisfies Record<SchemaKind, AnySchema>` and `BESPOKE satisfies
+Record<Exclude<SectionKind, SchemaKind>, SectionParser>`, where `SchemaKind` is the kinds the row
+answers `schema: true` for. c2 asked that a member without a parser not compile; this holds that and
+also the reverse, and both halves are mutation-verified. The row spells `map` as a string and
+`CONTENT_SECTION_MAPS` in `registry.ts` reads it as a `keyof Registry`, which is where a map name
+nothing answers to fails to compile.
+
+**Row order is print order.** The serializer walks the row, so a kind added to it is printed by the
+walk rather than by a loop somebody remembered to add. Nothing else reads the order, and
+`printedCorpus.fixture.txt` is what catches a reordering.
+
+**Global sections print as one block by id, not kind by kind.** `tutorial-island` interleaves a
+`# variable`, two `# slot`s and a second `# variable` in one sorted run of global ids, so a per-kind
+walk would move the bytes and fail c6. The block is emitted where the row first reaches a global
+kind, which keeps its place in the order without a second list saying where.
+
+**`CONTENT_SECTION_MAPS` is now every kind that builds an object, not the fifteen a reference can be
+authored inside.** "Which map holds you" is one fact; "do you hold references" was a second one kept
+in step with `visitSection` by hand. The four extra kinds cost the validation walk one visit each
+that returns. `registryDiffMaps` and `modportal`'s rename list were both that same set plus four map
+names spelled by hand, and are now the row; `probe`'s two vocabularies collapse into one, so
+`--show variable.x` is the spelling where `--show variables.x` used to be.
+
+**`# locale` is the one kind the print walk asks about by name.** `registry.locales` is not a map
+keyed by id and cannot be one, so a locale is gathered by attribution. Every other kind is gathered
+from `row.map`, and the `sectionText` switch is total, so a kind added to the row still fails to
+compile until it can be printed.
+
+**`ACTION_OWNER_KINDS` is a field of each row rather than a list on the action's.** Writing it as
+"an action nests under these three" would have left a kind added tomorrow with nothing to answer,
+which is the whole of what c3 asks for. An action stays a first-class kind with its own row; what
+the field says is that a section of this kind may carry one nested.
+
+**`node` and `action-slug` stay in `namespace.ts`.** They are namespaced kinds and not section
+kinds — both hang under an object rather than standing beside one — so the row cannot answer for
+them and `NAMESPACED_KINDS` is the row's owned kinds plus that pair. The open question about
+`findActionOwner`'s six kinds is untouched, as the spec said.
+
+**One mutation survives, deliberately.** `applySection`'s refusal of `info`, `remove` and `locale`
+is unreachable: the merge keeps every kind whose row says it builds no object out of `merged`, so
+nothing can arrive at that arm. Replacing the `throw` with a `return` survives the whole suite. It
+is kept rather than deleted because the invariant it states is real and is now proved where it is
+enforced — mutating the merge's skip so a locale does reach the build is killed by sixteen tests,
+which is the same guard read from the side that can fail.
