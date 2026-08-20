@@ -1,6 +1,6 @@
+import { point, Range, range } from '../../grammar/range';
+import { section } from './define';
 import { TITLE_FIELD } from './info';
-import { point, Range, range } from '../grammar/range';
-import { SectionSchema } from '../grammar/section';
 
 export interface Stat {
   id: string;
@@ -10,10 +10,13 @@ export interface Stat {
   base: Range;
 }
 
-export const statSchema: SectionSchema<Stat> = {
+export const stat = section<Stat>()({
   kind: 'stat',
+  ids: 'owned',
+  map: 'stats',
+  text: ['title'],
   fields: {
     title: TITLE_FIELD,
     base: { parser: range, default: () => point(0), printed: 'always' },
   },
-};
+});

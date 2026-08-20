@@ -1,7 +1,8 @@
-import { Dependency, dependency, Version, version } from '../grammar/dependency';
-import { list } from '../grammar/list';
-import { DEFAULT_LANGUAGE, HydrateContext, SectionSchema } from '../grammar/section';
-import { humanizeEn, id, lastSegment, text } from '../grammar/values';
+import { Dependency, dependency, Version, version } from '../../grammar/dependency';
+import { list } from '../../grammar/list';
+import { DEFAULT_LANGUAGE, HydrateContext } from '../../grammar/section';
+import { humanizeEn, id, lastSegment, text } from '../../grammar/values';
+import { section } from './define';
 
 export interface ModuleInfo {
   id: string;
@@ -14,15 +15,16 @@ export interface ModuleInfo {
   language: string;
 }
 
-export const infoSchema: SectionSchema<ModuleInfo> = {
+export const info = section<ModuleInfo>()({
   kind: 'info',
+  ids: 'none',
   fields: {
     version: { parser: version, default: () => [0, 0, 0] },
     dependencies: { parser: list(dependency), default: () => [] },
     pack: { parser: id },
     language: { parser: text, default: () => DEFAULT_LANGUAGE },
   },
-};
+});
 
 // The title an unauthored section gets. `humanizeEn` is English grammar, so it
 // supplies one only where the module says it is writing English; anywhere else

@@ -1,7 +1,7 @@
 // Generic engine: field value-types are erased internally via the AnyFields casts; the rejected alternative was a hand-written parser per section kind.
 import { Cursor, DslError, Parser, Span } from './parser';
 import { ListParser } from './list';
-import { RawLine, RawSection, hasBlock, sectionParser, takeBlock } from './structure';
+import { RawLine, RawSection, hasBlock, indentLines, sectionParser, takeBlock } from './structure';
 
 // What a default may know beyond the section it is filling in. A field-level
 // default cannot see the module its section came from, and c5 turns on that
@@ -302,4 +302,60 @@ export function hydrateSection<H extends { id: string }, F extends keyof H = nev
     Object.defineProperty(view, into, { enumerable: true, value: read[into] ?? [] });
   }
   return view;
+}
+
+// What a printer knows beyond the value. `authored` answers whether the author
+// wrote a field the engine could have minted for itself — the load recorded it,
+// because the value cannot say: `title: Gold` on `# item gold` is exactly what
+// the loader would have filled in.
+export interface PrintContext {
+  moduleId: string;
+  authored(field: string): boolean;
+}
+
+const keywordOf = (name: string, spec: AnyField): string => spec.keyword ?? name;
+
+export const moduleLocalId = (moduleId: string, id: string): string => (id.startsWith(`${moduleId}.`) ? id.slice(moduleId.length + 1) : id);
+
+// One field, printed from what it declares. Every branch here was a decision a
+// hand-written printer made at its call site, where nothing could check it
+// against the field it was printing.
+function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Record<string, unknown>, context: PrintContext): string[] {
+  const value = held[name];
+  if (value === undefined) return [];
+  if (spec.generated && !context.authored(name)) return [];
+
+  const parser = spec.parser as Parser<unknown> & Partial<ListParser<unknown>>;
+  const positional = isPositionalField(schema, name);
+  const label = (text: string): string[] => (positional ? [text] : [`${keywordOf(name, spec)}: ${text}`]);
+
+  const members = Array.isArray(value) ? value : (spec.dehydrate as ((held: unknown) => unknown[]) | undefined)?.(value);
+  if (members !== undefined) {
+    if (members.length === 0 && spec.printed !== 'always') return [];
+    const lines = parser.printBlock!(members);
+    // A positional field has no label to hang a block off, so its block form is
+    // one member to a line — which is how `# skill` writes what trains it.
+    if (spec.block) return positional ? lines : [`${keywordOf(name, spec)}:`, ...indentLines(lines)];
+    return label(lines.join(', '));
+  }
+
+  const printed = parser.print(value);
+  if (spec.printed === 'unless-default' && spec.default !== undefined && parser.print(spec.default(held as never, DEFAULT_CONTEXT)) === printed) return [];
+  return label(printed);
+}
+
+// A whole section, printed by walking what its schema declares, so a field
+// added to a schema is printed by the walk rather than by a loop somebody
+// remembered to add.
+export function printSection(value: object, schema: AnySchema, context: PrintContext, entryLines: (entry: never) => string[]): string[] {
+  const held = value as Record<string, unknown>;
+  const id = held.id as string;
+  const lines = [`# ${schema.kind} ${moduleLocalId(context.moduleId, id)}`];
+  for (const [name, spec] of Object.entries(schema.fields)) {
+    lines.push(...fieldLines(schema, name, spec, held, context));
+    if (name === schema.keywordsAfter) lines.push(...(schema.keywords ?? []).filter((word) => held[word] === true));
+  }
+  const entries = schema.entries === undefined ? [] : ((held[schema.entries.into] as never[] | undefined) ?? []);
+  for (const entry of entries) lines.push(...entryLines(entry));
+  return lines;
 }

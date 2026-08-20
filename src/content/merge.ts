@@ -1,5 +1,3 @@
-import { Dialogue, DialogueNode } from './dialogue';
-import { schemaFor } from './module';
 import { AnySchema, FieldEdits, isEntryRemoval, isFieldEdits, isListField } from '../grammar/section';
 
 type Fields = Record<string, unknown>;
@@ -13,7 +11,7 @@ interface Labelled extends Fields {
 // an entry is to remove it, not to write nothing.
 const respecified = (value: unknown): boolean => value !== undefined && !(Array.isArray(value) && value.length === 0);
 
-const overlay = (into: Fields, from: Fields): Fields => {
+export const overlay = (into: Fields, from: Fields): Fields => {
   const merged = { ...into };
   for (const [key, value] of Object.entries(from)) if (respecified(value)) merged[key] = value;
   return merged;
@@ -53,7 +51,7 @@ function mergeEntries(into: Labelled[], from: Labelled[]): Labelled[] {
   return merged;
 }
 
-function mergeAuthored(into: Fields, from: Fields, schema: AnySchema): Fields {
+export function mergeFields(into: Fields, from: Fields, schema: AnySchema): Fields {
   const entries = schema.entries?.into;
   const merged = { ...into };
   for (const [key, value] of Object.entries(from)) {
@@ -62,28 +60,4 @@ function mergeAuthored(into: Fields, from: Fields, schema: AnySchema): Fields {
     else merged[key] = value;
   }
   return merged;
-}
-
-// A dialogue is addressed one node at a time, which is what keeps a one-line fix
-// a two-line module. Steps within a node carry no ids to address them by, so a
-// respecified node replaces them wholesale.
-function mergeDialogue(into: Dialogue, from: Dialogue): Dialogue {
-  const nodes = [...into.nodes];
-  for (const node of from.nodes) {
-    const at = nodes.findIndex((existing) => existing.name === node.name);
-    if (at === -1) nodes.push(node);
-    else nodes[at] = overlay(nodes[at] as unknown as Fields, node as unknown as Fields) as unknown as DialogueNode;
-  }
-  return { ...into, ...(from.owner !== undefined ? { owner: from.owner } : {}), nodes };
-}
-
-// The rule, whole: a section names an id, the fields it lists are applied over
-// whatever that id already holds, and the fields it does not list are untouched.
-// Whether the section creates or edits is not declared — it follows from whether
-// the id was already there when this module loaded.
-export function mergeSection(kind: string, into: object | undefined, from: object): object {
-  const schema = schemaFor(kind);
-  if (schema) return mergeAuthored((into as Fields) ?? { id: (from as { id: string }).id }, from as Fields, schema);
-  if (into === undefined) return from;
-  return kind === 'dialogue' ? mergeDialogue(into as Dialogue, from as Dialogue) : from;
 }

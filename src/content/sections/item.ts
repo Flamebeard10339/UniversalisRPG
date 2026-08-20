@@ -1,16 +1,13 @@
-import { Action, actionBody } from '../grammar/action';
-import { HOOK_FIELDS, HookCarrier } from '../grammar/hook';
-import { list } from '../grammar/list';
-import { Cursor, DslError, Parser } from '../grammar/parser';
-import { Authored, SectionSchema } from '../grammar/section';
-import { TagClause, tagClause } from '../grammar/tagClause';
-import { id, number, text } from '../grammar/values';
+import { Action, actionBody } from '../../grammar/action';
+import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
+import { list } from '../../grammar/list';
+import { Cursor, DslError, Parser } from '../../grammar/parser';
+import { TagClause, tagClause } from '../../grammar/tagClause';
+import { id, number, text } from '../../grammar/values';
+import { actions, hooks, put, visitTags, type Loose } from '../refs';
+import { section } from './define';
 import { TITLE_FIELD } from './info';
 
-// The value `cluster-effect:` takes: a percentage and a stat, per the spec's
-// c15 ("names a percentage and a stat") — a narrower grammar than
-// `tagClause`'s, which also accepts a flat, ranged or keyword clause. Written
-// `+25% max-health`, the same `+N%` token the language already uses elsewhere.
 export interface ClusterEffect {
   statId: string;
   percent: number;
@@ -19,25 +16,16 @@ export interface ClusterEffect {
 export interface Item extends HookCarrier {
   id: string;
   title: string;
-  // Optional because the sentence that used to fill it in was English grammar
-  // built by `article()`; it is `engine.item.examine` now and belongs to the
-  // language being played, not to the item.
   examine?: string;
   slot?: string;
   tags: TagClause[];
   actions: Action[];
-  // Names a `# cluster-jewel` to become the droppable jewel, so it drops
-  // through `droptables` and is carried by the ordinary item machinery (c10).
   clusterJewel?: string;
-  // Names the `# cluster-jewel` that stands at hex (0,0) of this base's plane
-  // (c9). `clusterJewel` says the item is one; this says the item has one.
   originCluster?: string;
   clusterEffect?: ClusterEffect;
   itemExperience?: number;
   maxLevel: number;
 }
-
-export type AuthoredItem = Authored<Item>;
 
 const CLUSTER_EFFECT = /^(?<sign>[+-])(?<amount>\d+)%[ \t]+(?<stat>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
 
@@ -53,21 +41,15 @@ export const clusterEffectValue: Parser<ClusterEffect> = {
   examples: ['+25% max-health', '-10% max-health'],
 };
 
-// `max-level:` defaults to 99 — an "unbounded" sentinel a base can lower to
-// tier itself, per the spec's decision on the field.
 export const DEFAULT_MAX_LEVEL = 99;
 
-// You grow what you can wear (c9): a base is spelled `slot:` and nothing else,
-// so this is the one place the question is answered for every verb that asks.
-export function isBase(item: Item): boolean {
-  return item.slot !== undefined;
-}
+// You grow what you can wear: a base is spelled `slot:` and nothing else.
+export const isBase = (item: Item): boolean => item.slot !== undefined;
 
-// c9's roles, asked of one assembled item: `cluster-jewel:` says the item is a
-// jewel and `cluster-effect:` says it is an orb, `slot:` and `origin-cluster:`
-// say it is a base with a plane, and an item claiming a base role alongside a
-// jewel or orb role would be consumed by the growth it can undergo.
-export function itemRoleProblem(item: Item): string | undefined {
+// `cluster-jewel:` makes the item a jewel and `cluster-effect:` an orb; `slot:`
+// and `origin-cluster:` make it a base. An item claiming a base role alongside
+// a jewel or orb role would be consumed by the growth it can undergo.
+function roleProblem(item: Item): string | undefined {
   if (item.clusterJewel !== undefined && (isBase(item) || item.originCluster !== undefined)) {
     return `cluster-jewel: makes ${item.id} a jewel, which is exclusive with the ${isBase(item) ? 'slot:' : 'origin-cluster:'} that makes it a base`;
   }
@@ -80,8 +62,12 @@ export function itemRoleProblem(item: Item): string | undefined {
   return undefined;
 }
 
-export const itemSchema: SectionSchema<Item, never, 'actions'> = {
+export const item = section<Item, never, 'actions'>()({
   kind: 'item',
+  ids: 'owned',
+  map: 'items',
+  nestsActions: true,
+  text: ['title', 'examine'],
   fields: {
     title: TITLE_FIELD,
     examine: { parser: text },
@@ -96,4 +82,14 @@ export const itemSchema: SectionSchema<Item, never, 'actions'> = {
   },
   clauses: 'tags',
   entries: { into: 'actions', body: actionBody },
-};
+  validate: roleProblem,
+  visit: (value, where, visit) => {
+    const held = value as unknown as Loose;
+    visitTags(held.tags, where, visit);
+    actions(held.actions, where, visit);
+    hooks(held, where, visit);
+    put(held, 'clusterJewel', 'cluster-jewel', `${where} cluster-jewel:`, visit);
+    put(held, 'originCluster', 'cluster-jewel', `${where} origin-cluster:`, visit);
+    if (held.clusterEffect) put(held.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
+  },
+});

@@ -18,17 +18,17 @@ import { TagClause } from '../grammar/tagClause';
 // and the check that reads it cannot disagree about how it is spelled.
 export const INFLICT_SITE = 'inflict:';
 
-export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'action' | 'event' | 'faction' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node' | 'passive' | 'cluster-jewel' | typeof ACTION_MEMBER;
+export type ReferenceKind = string;
 
 // Returns what the id should become. Resolution rewrites it into a namespaced
 // key; validation hands it back and throws if it names nothing.
 export type Visit = (kind: ReferenceKind, id: string, where: string) => string;
 
-type Loose = Record<string, unknown>;
+export type Loose = Record<string, unknown>;
 
 // Hydrated fields are defined without a setter, so an unchanged id must not be
 // written back — validation walks the same sites as resolution and changes none.
-function put<T extends object>(holder: T, key: keyof T & string, kind: ReferenceKind, where: string, visit: Visit): void {
+export function put<T extends object>(holder: T, key: keyof T & string, kind: ReferenceKind, where: string, visit: Visit): void {
   const current = (holder as Loose)[key];
   if (typeof current !== 'string') return;
   const next = visit(kind, current, where);
@@ -40,13 +40,13 @@ function put<T extends object>(holder: T, key: keyof T & string, kind: Reference
 // anywhere. The shape is what tells them apart, so a name that could not have
 // been minted is still resolved and a typo'd item id is still caught, while a
 // bare number is left for the runtime, which alone knows what is live.
-function putCarried<T extends object>(holder: T, key: keyof T & string, where: string, visit: Visit): void {
+export function putCarried<T extends object>(holder: T, key: keyof T & string, where: string, visit: Visit): void {
   const current = (holder as Loose)[key];
   if (typeof current === 'string' && mayBeInstanceId(current)) return;
   put(holder, key, 'item', where, visit);
 }
 
-function strings(holder: Loose, key: string, kind: ReferenceKind, where: string, visit: Visit): void {
+export function strings(holder: Loose, key: string, kind: ReferenceKind, where: string, visit: Visit): void {
   const list = holder[key];
   const rewrite = (values: unknown[]): void => {
     values.forEach((value, index) => {
@@ -60,7 +60,7 @@ function strings(holder: Loose, key: string, kind: ReferenceKind, where: string,
 // A reference in a condition names a flag, or a node whose visits the engine
 // counts. Either way the owner is a path and resolves like one; only the clock
 // and the player sheet belong to nobody and are left as written.
-function reference(value: Reference | undefined, where: string, visit: Visit): void {
+export function reference(value: Reference | undefined, where: string, visit: Visit): void {
   if (!value || isEngineRoot(value.path)) return;
   const node = visitedNode(value.path);
   const raw = (node ?? value.path).join('.');
@@ -68,18 +68,18 @@ function reference(value: Reference | undefined, where: string, visit: Visit): v
   value.path = node ? [...resolved.split('.'), VISITS] : resolved.split('.');
 }
 
-function segments(list: TextSegment[] | undefined, where: string, visit: Visit): void {
+export function segments(list: TextSegment[] | undefined, where: string, visit: Visit): void {
   for (const segment of list ?? []) {
     if (segment.kind === 'conditional') condition(segment.condition, where, visit);
     if (segment.kind === 'interpolate') reference(segment.reference, where, visit);
   }
 }
 
-function quantified(list: unknown, kind: ReferenceKind, where: string, visit: Visit): void {
+export function quantified(list: unknown, kind: ReferenceKind, where: string, visit: Visit): void {
   for (const entry of listMembers<Quantified>(list)) put(entry, 'item', kind, where, visit);
 }
 
-function condition(value: Condition | undefined, where: string, visit: Visit): void {
+export function condition(value: Condition | undefined, where: string, visit: Visit): void {
   if (!value) return;
   switch (value.kind) {
     case 'has':
@@ -109,7 +109,7 @@ export function visitResults(list: ActionResult[] | undefined, where: string, vi
   results(list, where, visit);
 }
 
-function results(list: ActionResult[] | undefined, where: string, visit: Visit): void {
+export function results(list: ActionResult[] | undefined, where: string, visit: Visit): void {
   for (const result of list ?? []) {
     // A wrapper's body is an ordinary result list, so every site inside one is
     // reached by the same walk rather than by a second copy of it.
@@ -188,7 +188,7 @@ export function visitTags(list: unknown, where: string, visit: Visit): void {
 // Through `listMembers` because a hook is a list field: `+on hit:` in a patch
 // module holds the operations until merge resolves them, and resolution runs
 // first.
-function hooks(carrier: Loose, where: string, visit: Visit): void {
+export function hooks(carrier: Loose, where: string, visit: Visit): void {
   results(listMembers<ActionResult>(carrier.onHit), `${where} on hit:`, visit);
   results(listMembers<ActionResult>(carrier.whenHit), `${where} when hit:`, visit);
 }
@@ -217,14 +217,14 @@ export function visitAction(action: Action, where: string, visit: Visit): void {
   for (const group of [action.results, action.onSuccess, action.onFailure, action.onUnfinished]) results(group, where, visit);
 }
 
-function actions(list: unknown, where: string, visit: Visit): void {
+export function actions(list: unknown, where: string, visit: Visit): void {
   for (const action of listMembers<Action>(list)) visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit);
 }
 
 // An entity's labelled blocks. A handler's event name is the reference its label
 // carries, and it is rewritten in place so `on death:` resolves the way `uses:`
 // does rather than being matched by spelling later.
-function blocks(list: unknown, where: string, visit: Visit): void {
+export function blocks(list: unknown, where: string, visit: Visit): void {
   for (const block of listMembers<EntityBlock>(list)) {
     if (!isHandlerBlock(block)) {
       visitAction(block, `${where} action ${JSON.stringify(block.label)}`, visit);
@@ -321,7 +321,7 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
   }
 }
 
-function dialogue(value: Dialogue, where: string, visit: Visit): void {
+export function dialogue(value: Dialogue, where: string, visit: Visit): void {
   put(value, 'owner', 'entity', `${where} owner`, visit);
   for (const node of value.nodes ?? []) {
     const at = `${where} node ${node.name}`;
@@ -346,103 +346,3 @@ function dialogue(value: Dialogue, where: string, visit: Visit): void {
 // as the discriminated union rather than as a kind and a value, so that a kind
 // this walk has no answer for is a compile error and not a section whose
 // references nobody looked at.
-export function visitSection(each: ModuleSection, where: string, visit: Visit): void {
-  const value = each.value;
-  const section = value as Loose;
-  switch (each.kind) {
-    case 'entity': {
-      // A stat sheet is authored as a list of assignments; the stat id leading
-      // each one is the reference.
-      for (const assignment of listMembers<[string, unknown]>(section.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
-      strings(section, 'uses', 'action', `${where} uses:`, visit);
-      strings(section, 'faction', 'faction', `${where} faction:`, visit);
-      strings(section, 'skills', 'skill', `${where} skills:`, visit);
-      strings(section, 'passives', 'passive', `${where} passives:`, visit);
-      for (const entry of listMembers<Ally>(section.allies)) put(entry, 'entity', 'entity', `${where} allies:`, visit);
-      condition(section.hiddenIf as Condition | undefined, `${where} hidden if:`, visit);
-      // A block is an action unless its label names an event, which is the one
-      // label shape whose name is a reference rather than a title.
-      blocks(section.blocks, where, visit);
-      hooks(section, where, visit);
-      return;
-    }
-    case 'action':
-      visitAction(value as Action, where, visit);
-      return;
-    case 'event':
-      put(section, 'resource', 'resource', `${where} resource:`, visit);
-      return;
-    case 'faction':
-      return;
-    case 'item':
-      visitTags(section.tags, where, visit);
-      actions(section.actions, where, visit);
-      hooks(section, where, visit);
-      put(section, 'clusterJewel', 'cluster-jewel', `${where} cluster-jewel:`, visit);
-      put(section, 'originCluster', 'cluster-jewel', `${where} origin-cluster:`, visit);
-      if (section.clusterEffect) put(section.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
-      return;
-    case 'passive':
-      visitTags(section.tags, where, visit);
-      hooks(section, where, visit);
-      return;
-    case 'cluster-jewel':
-      // Positions are authored as `<position> <passive>` pairs, the same
-      // list-of-pairs shape `# entity stats:` walks above — the key here is a
-      // position number rather than a stat id, so only the value resolves.
-      for (const assignment of listMembers<[number, string]>(section.positions)) {
-        assignment[1] = visit('passive', assignment[1], `${where} passives:`);
-      }
-      return;
-    case 'location':
-      for (const entry of listMembers<Population>(section.entities)) put(entry, 'entity', 'entity', `${where} entities:`, visit);
-      for (const edge of listMembers<Edge>(section.adjacent)) {
-        put(edge, 'target', 'location', `${where} adjacent:`, visit);
-        condition(edge.condition, `${where} adjacent: ${edge.target} while`, visit);
-      }
-      if (section.relative) put(section.relative as Relative, 'of', 'location', `${where} relative`, visit);
-      actions(section.actions, where, visit);
-      return;
-    case 'skill':
-      put(section, 'stat-id', 'stat', `${where} stat-id:`, visit);
-      for (const grant of listMembers<SkillGrant>(section.grants)) put(grant, 'event', 'event', `${where} gain`, visit);
-      return;
-    case 'recipe':
-      for (const field of ['in', 'out', 'burnt'] as const) quantified(section[field], 'item', `${where} ${field}:`, visit);
-      for (const field of ['rate', 'accuracy', 'evasion'] as const) put(section, field, 'stat', `${where} ${field}:`, visit);
-      put(section, 'requiresCapability', 'capability', `${where} station`, visit);
-      if (section.skill) put(section.skill as Loose & { skill: string }, 'skill', 'skill', `${where} skill:`, visit);
-      return;
-    case 'resource':
-      put(section, 'max', 'stat', `${where} max:`, visit);
-      put(section, 'rate', 'stat', `${where} rate:`, visit);
-      return;
-    case 'droptable':
-      results(section.results as ActionResult[], where, visit);
-      return;
-    case 'dialogue':
-      dialogue(value as Dialogue, where, visit);
-      return;
-    case 'test':
-      for (const directive of (section.directives as Directive[]) ?? []) visitDirective(directive, where, visit);
-      return;
-    // The kinds that name nothing. A stat is a range, a flag is a name and a
-    // boolean, a variable is a number, a slot is a title, a save is a recorded
-    // state and the other three build no object at all. Named rather than
-    // absorbed by a default, so that a kind added tomorrow has to say which
-    // group it is in.
-    case 'stat':
-    case 'flag':
-    case 'variable':
-    case 'slot':
-    case 'save':
-    case 'info':
-    case 'remove':
-    case 'locale':
-      return;
-    default: {
-      const unreached: never = each;
-      void unreached;
-    }
-  }
-}
