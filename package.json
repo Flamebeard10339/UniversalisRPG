@@ -21,8 +21,7 @@
     "contribution:issue": "tsx scripts/publish-local-changes.ts",
     "contribution:consolidate": "tsx scripts/consolidate.ts",
     "contribution:squash": "tsx scripts/squash-local-changes.ts",
-    "modportal": "tsx scripts/modportal.ts",
-    "section-kinds": "tsx scripts/section-kinds.ts"
+    "modportal": "tsx scripts/modportal.ts"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
