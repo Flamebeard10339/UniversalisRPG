@@ -99,3 +99,14 @@ export const ACTION_OWNER_KINDS: readonly ActionOwnerKind[] = kindsWhere<ActionO
 export const isActionOwnerKind = (kind: string): kind is ActionOwnerKind => (ACTION_OWNER_KINDS as readonly string[]).includes(kind);
 
 export const isSectionKind = (kind: string): kind is SectionKind => (SECTION_KINDS as readonly string[]).includes(kind);
+
+// A parsed section, discriminated by its kind. What a parser returns is an
+// object either way; what the union buys is that a switch on `kind` is a switch
+// TypeScript narrows, so a pass over the set is total or does not compile.
+export type ModuleSection = { [K in SectionKind]: { kind: K; value: object } }[SectionKind];
+
+// A kind and its value, as the union. Every constituent holds an `object`, so
+// the pairing is sound whichever kind it is; what TypeScript will not do is
+// correlate a `kind` held in a variable with the constituent it selects, which
+// is what the assertion is for and the whole of what it is for.
+export const sectionOf = (kind: SectionKind, value: object): ModuleSection => ({ kind, value }) as ModuleSection;

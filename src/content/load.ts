@@ -35,7 +35,7 @@ import { getShape } from './shapes';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
 import { mergeSection } from './merge';
 import { ModuleSection } from './module';
-import { isActionOwnerKind, isSectionKind, SectionKind } from './sectionKind';
+import { isActionOwnerKind, isSectionKind, sectionOf, SectionKind } from './sectionKind';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
 import { ACTION_MEMBER, memberKey, Namespace, NAMESPACED_KINDS } from './namespace';
@@ -332,10 +332,15 @@ function localeValueProblem(locales: Locales, language: string, key: string, val
 
 function applySection(registry: Registry, section: ModuleSection, context: HydrateContext): void {
   switch (section.kind) {
-    // Not skipped where it would be harmless: a locale reaching the content
-    // build is the failure c6 forbids, so the one route to it says so.
+    // The three that build no object, refused rather than skipped where it
+    // would be harmless. A locale reaching the content build is the failure c6
+    // forbids; an info is the module's own header and never enters the merge;
+    // a remove is spent where it stands, so one arriving here would mean the
+    // merge let it through.
     case 'locale':
-      throw new DslError('a # locale is not content and cannot be built into the registry');
+    case 'info':
+    case 'remove':
+      throw new DslError(`a # ${section.kind} is not content and cannot be built into the registry`);
     case 'entity': {
       const entity = hydrateSection(section.value as Authored<AuthoredEntity>, entitySchema, context);
       // `actions` and `handlers` are what `blocks` becomes once `uses:` can be
@@ -464,6 +469,10 @@ function applySection(registry: Registry, section: ModuleSection, context: Hydra
       const { id, saved } = section.value as { id: string; saved: ParsedSave };
       registry.saves.set(id, saved);
       break;
+    }
+    default: {
+      const unreached: never = section;
+      void unreached;
     }
   }
 }
@@ -600,7 +609,7 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
     }
 
     for (const [id, event] of registry.events) {
-      if (referencesLoaded(() => visitSection('event', { ...event }, `# event ${id}`, visit))) continue;
+      if (referencesLoaded(() => visitSection({ kind: 'event', value: { ...event } }, `# event ${id}`, visit))) continue;
       dropContent(registry, 'event', id, pruned, [registry.events]);
       changed = true;
     }
@@ -693,7 +702,7 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
       const adjacent = location.adjacent.filter((edge) =>
         !namesDanglingRoot('location', edge.target, danglingRoots) &&
         !referencePruned('location', edge.target, pruned) &&
-        referencesLoaded(() => visitSection('location', { ...location, entities: [], adjacent: [{ ...edge }], relative: undefined, actions: [] }, `# location ${id}`, visit)),
+        referencesLoaded(() => visitSection({ kind: 'location', value: { ...location, entities: [], adjacent: [{ ...edge }], relative: undefined, actions: [] } }, `# location ${id}`, visit)),
       );
       const actions = pruneActions(location.actions, `# location ${id}`, visit);
       if (entities.length !== location.entities.length || adjacent.length !== location.adjacent.length || actions.length !== location.actions.length) {
@@ -703,31 +712,31 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
     }
 
     for (const [id, recipe] of registry.recipes) {
-      if (referencesLoaded(() => visitSection('recipe', { ...recipe }, `# recipe ${id}`, visit))) continue;
+      if (referencesLoaded(() => visitSection({ kind: 'recipe', value: { ...recipe } }, `# recipe ${id}`, visit))) continue;
       dropContent(registry, 'recipe', id, pruned, [registry.recipes, registry.recipeActions]);
       changed = true;
     }
 
     for (const [id, resource] of registry.resources) {
-      if (referencesLoaded(() => visitSection('resource', { ...resource }, `# resource ${id}`, visit))) continue;
+      if (referencesLoaded(() => visitSection({ kind: 'resource', value: { ...resource } }, `# resource ${id}`, visit))) continue;
       dropContent(registry, 'resource', id, pruned, [registry.resources]);
       changed = true;
     }
 
     for (const [id, table] of registry.dropTables) {
-      if (referencesLoaded(() => visitSection('droptable', { ...table }, `# droptable ${id}`, visit))) continue;
+      if (referencesLoaded(() => visitSection({ kind: 'droptable', value: { ...table } }, `# droptable ${id}`, visit))) continue;
       dropContent(registry, 'droptable', id, pruned, [registry.dropTables]);
       changed = true;
     }
 
     for (const [id, dialogue] of registry.dialogues) {
-      if (referencesLoaded(() => visitSection('dialogue', { ...dialogue, nodes: dialogue.nodes.map((node) => ({ ...node })) }, `# dialogue ${id}`, visit))) continue;
+      if (referencesLoaded(() => visitSection({ kind: 'dialogue', value: { ...dialogue, nodes: dialogue.nodes.map((node) => ({ ...node })) } }, `# dialogue ${id}`, visit))) continue;
       dropContent(registry, 'dialogue', id, pruned, [registry.dialogues]);
       changed = true;
     }
 
     for (const [id, test] of registry.tests) {
-      if (referencesLoaded(() => visitSection('test', { ...test }, `# test ${id}`, visit))) continue;
+      if (referencesLoaded(() => visitSection({ kind: 'test', value: { ...test } }, `# test ${id}`, visit))) continue;
       dropContent(registry, 'test', id, pruned, [registry.tests]);
       changed = true;
     }
@@ -965,7 +974,7 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
     for (const [id, value] of registry[map] as ReadonlyMap<string, object>) {
       try {
         validateActionTable(kind, id, value as ActionOwner);
-        validateSectionReferences(kind, id, value, registry);
+        validateSectionReferences(sectionOf(kind, value), id, registry);
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
         return { module: sectionOwner(owners, kind, id)!, stage: 'validate', error };

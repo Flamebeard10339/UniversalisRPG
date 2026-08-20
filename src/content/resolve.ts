@@ -171,7 +171,7 @@ function resolveReferences(module: ParsedModule, namespace: Namespace, loaded: R
     // a bare flag name means this object's before it means anyone else's.
     const visit = (kind: ReferenceKind, raw: string, where: string): string =>
       isNamespaced(kind) && !namesMissingOptional(kind, raw, missingOptional) ? namespace.resolve(kind, raw, self, visible, where, id) : raw;
-    visitSection(section.kind, section.value, `# ${section.kind} ${id}`, visit);
+    visitSection(section, `# ${section.kind} ${id}`, visit);
   }
 }
 

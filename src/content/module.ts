@@ -1,5 +1,5 @@
 import { parseActionSection } from './action';
-import type { SchemaKind, SectionKind } from './sectionKind';
+import type { ModuleSection, SchemaKind, SectionKind } from './sectionKind';
 import { clusterJewelSchema } from './clusterJewel';
 import { parseDialogue } from './dialogue';
 import { parseDropTable } from './dropTable';
@@ -74,12 +74,7 @@ const PARSERS = { ...SCHEMA_PARSERS, ...BESPOKE } satisfies Record<SectionKind, 
 // keeps that from being eight hand-written wraps nobody checks.
 export const parserFor = (kind: string): SectionParser | undefined => (PARSERS as Record<string, SectionParser | undefined>)[kind];
 
-export type { SchemaKind, SectionKind };
-
-// A parsed section, discriminated by its kind. What a parser returns is an
-// object either way; what the union buys is that a switch on `kind` is a switch
-// TypeScript narrows, so a pass over the set is total or does not compile.
-export type ModuleSection = { [K in SectionKind]: { kind: K; value: object } }[SectionKind];
+export type { ModuleSection, SchemaKind, SectionKind };
 
 export function parseModule(source: string): ModuleSection[] {
   return splitSections(source).map((section) => {

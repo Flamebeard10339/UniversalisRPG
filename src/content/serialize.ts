@@ -19,19 +19,23 @@ import { Faction } from './faction';
 import { clusterEffectValue, DEFAULT_MAX_LEVEL, Item } from './item';
 import { edgeValue, Location, populationValue, relativeValue } from './location';
 import { Recipe, recipeSkillValue } from './recipe';
-import { Registry } from './registry';
+import { Registry, registryMapOf } from './registry';
 import type { ModuleDiagnostic, UniverseLoadResult } from './registry';
 import { registryDiff } from './registryDiff';
-import { GLOBAL_SECTION_KINDS } from './sectionKind';
+import { GLOBAL_SECTION_KINDS, SECTION_KIND, SECTION_KINDS, sectionOf, type ModuleSection, type SectionKind } from './sectionKind';
 import type { ModuleSource, ParsedModule } from './universe';
 import { Slot } from './slot';
+import { Stat } from './stat';
+import { Skill } from './skill';
+import { Flag } from './flag';
+import { Variable } from './variable';
 import { Resource } from './resource';
 import { ParsedSave } from './saveSection';
 import { Test, Directive, usePayload } from './test';
 import { hexKey } from './hex';
 import { ModuleInfo } from './info';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
-import { localeKey, moduleLocaleSections } from './locale';
+import { localeKey, moduleLocaleSections, type LocaleDeclaration } from './locale';
 
 type Lines = string[];
 
@@ -382,43 +386,134 @@ function inModule(moduleId: string, id: string): boolean {
   return id.startsWith(`${moduleId}.`);
 }
 
+// A section this module prints, beside the key it hangs under. Every registry
+// map is keyed by the id its value declares, except `saves`, whose value has no
+// id of its own — so the key is what both the own-module filter and the printer
+// read, and neither has to know which kind is the exception.
+interface Printed {
+  id: string;
+  section: ModuleSection;
+}
+
+const mapOf = (registry: Registry, kind: SectionKind): ReadonlyMap<string, object> => registry[registryMapOf(kind)!] as ReadonlyMap<string, object>;
+
+// What a module prints, in the order it prints it, walked off the row rather
+// than written out as one loop per kind. A kind added to the row is carried by
+// this walk with no edit, which is the whole repair: `# passive` was parsed for
+// a day and a half while a loop nobody remembered to add discarded it.
+function printedSections(registry: Registry, options: SerializeModuleOptions): Printed[] {
+  const moduleId = options.info.id;
+  const printed: Printed[] = [];
+  let globalsDone = false;
+  for (const kind of SECTION_KINDS) {
+    const row = SECTION_KIND[kind];
+    // A global id belongs to nobody, so the module says which it declared and
+    // the whole group prints in that one order — by id, across the kinds,
+    // rather than kind by kind. Emitted where the row first reaches a global
+    // kind, which is what keeps the group's place in the order the row's.
+    if (row.ids === 'global') {
+      if (globalsDone) continue;
+      globalsDone = true;
+      for (const id of options.globals ?? []) {
+        for (const global of GLOBAL_SECTION_KINDS) {
+          const value = mapOf(registry, global).get(id);
+          if (value !== undefined) printed.push({ id, section: sectionOf(global, value) });
+        }
+      }
+      continue;
+    }
+    // A locale belongs to the module that wrote it rather than to any id, so it
+    // is printed by attribution and never by `inModule`.
+    if (kind === 'locale') {
+      for (const declared of moduleLocaleSections(registry.locales, moduleId)) printed.push({ id: declared.language, section: sectionOf('locale', declared) });
+      continue;
+    }
+    if (row.map === null) continue;
+    for (const [id, value] of mapOf(registry, kind)) if (inModule(moduleId, id)) printed.push({ id, section: sectionOf(kind, value) });
+  }
+  return printed;
+}
+
+// One section's text. Total over the kinds by a `never` guard, so a kind the
+// row declares and this cannot print is a compile error rather than a section
+// that disappears on republish.
+function sectionText(registry: Registry, moduleId: string, { id, section }: Printed): string {
+  const value = section.value;
+  switch (section.kind) {
+    case 'stat': {
+      const stat = value as Stat;
+      return [`# stat ${moduleLocalId(moduleId, stat.id)}`, ...titleLine(registry, moduleId, 'stat', stat), `base: ${range.print(stat.base)}`].join('\n');
+    }
+    case 'skill': {
+      const skill = value as Skill;
+      return [
+        `# skill ${moduleLocalId(moduleId, skill.id)}`,
+        ...titleLine(registry, moduleId, 'skill', skill),
+        ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : []),
+        ...(skill['per-level'] ? [`per-level: ${bonusAmount.print(skill['per-level'])}`] : []),
+        ...skill.grants.map(grantLine),
+      ].join('\n');
+    }
+    case 'item':
+      return itemSection(registry, moduleId, value as Item);
+    case 'passive':
+      return passiveSection(registry, moduleId, value as Passive);
+    case 'cluster-jewel':
+      return clusterJewelSection(registry, moduleId, value as ClusterJewel);
+    case 'faction':
+      return factionSection(registry, moduleId, value as Faction);
+    case 'event':
+      return eventSection(registry, moduleId, value as GameEvent);
+    case 'action':
+      return actionSection(moduleId, value as ActionDeclaration);
+    case 'entity':
+      return entitySection(registry, moduleId, value as Entity);
+    case 'location':
+      return locationSection(registry, moduleId, value as Location);
+    case 'recipe':
+      return recipeSection(moduleId, value as Recipe);
+    case 'resource':
+      return resourceSection(registry, moduleId, value as Resource);
+    case 'droptable':
+      return dropTableSection(moduleId, value as DropTable);
+    case 'dialogue':
+      return dialogueSection(moduleId, value as Dialogue);
+    case 'flag':
+      return `# flag ${moduleLocalId(moduleId, (value as Flag).id)}`;
+    case 'slot': {
+      const slot = value as Slot;
+      return [`# slot ${slot.id}`, ...slotTitleLine(registry, slot)].join('\n');
+    }
+    case 'variable': {
+      const variable = value as Variable;
+      return [`# variable ${variable.id}`, ...(variable.value !== undefined ? [`value: ${variable.value}`] : [])].join('\n');
+    }
+    case 'locale': {
+      const declared = value as LocaleDeclaration;
+      return [`# locale ${declared.language}`, ...declared.entries.map((entry) => `${entry.key}: ${entry.value}`)].join('\n');
+    }
+    case 'save':
+      return saveSection(moduleId, id, value as ParsedSave);
+    case 'test':
+      return testSection(moduleId, value as Test);
+    // Neither is a section a module prints back: the header is `infoLines`
+    // above, written from the options rather than from the registry, and a
+    // `# remove` is spent at merge and leaves nothing behind to print.
+    case 'info':
+    case 'remove':
+      throw new Error(`# ${section.kind} is not a section a printed module carries`);
+    default: {
+      const unreached: never = section;
+      void unreached;
+      return '';
+    }
+  }
+}
+
 // Not exported, so that printed content cannot leave this file without the
 // comparison the three round trips below make of it.
 function serializeRegistryModule(registry: Registry, options: SerializeModuleOptions): string {
-  const moduleId = options.info.id;
-  const sections: string[] = [];
-  for (const stat of registry.stats.values()) if (inModule(moduleId, stat.id)) sections.push([`# stat ${moduleLocalId(moduleId, stat.id)}`, ...titleLine(registry, moduleId, 'stat', stat), `base: ${range.print(stat.base)}`].join('\n'));
-  for (const skill of registry.skills.values())
-    if (inModule(moduleId, skill.id))
-      sections.push(
-        [`# skill ${moduleLocalId(moduleId, skill.id)}`, ...titleLine(registry, moduleId, 'skill', skill), ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : []), ...(skill['per-level'] ? [`per-level: ${bonusAmount.print(skill['per-level'])}`] : []), ...skill.grants.map(grantLine)].join('\n'),
-      );
-  for (const item of registry.items.values()) if (inModule(moduleId, item.id)) sections.push(itemSection(registry, moduleId, item));
-  for (const passive of registry.passives.values()) if (inModule(moduleId, passive.id)) sections.push(passiveSection(registry, moduleId, passive));
-  for (const jewel of registry.clusterJewels.values()) if (inModule(moduleId, jewel.id)) sections.push(clusterJewelSection(registry, moduleId, jewel));
-  for (const faction of registry.factions.values()) if (inModule(moduleId, faction.id)) sections.push(factionSection(registry, moduleId, faction));
-  for (const event of registry.events.values()) if (inModule(moduleId, event.id)) sections.push(eventSection(registry, moduleId, event));
-  for (const action of registry.actions.values()) if (inModule(moduleId, action.id)) sections.push(actionSection(moduleId, action));
-  for (const entity of registry.entities.values()) if (inModule(moduleId, entity.id)) sections.push(entitySection(registry, moduleId, entity));
-  for (const location of registry.locations.values()) if (inModule(moduleId, location.id)) sections.push(locationSection(registry, moduleId, location));
-  for (const recipe of registry.recipes.values()) if (inModule(moduleId, recipe.id)) sections.push(recipeSection(moduleId, recipe));
-  for (const resource of registry.resources.values()) if (inModule(moduleId, resource.id)) sections.push(resourceSection(registry, moduleId, resource));
-  for (const table of registry.dropTables.values()) if (inModule(moduleId, table.id)) sections.push(dropTableSection(moduleId, table));
-  for (const dialogue of registry.dialogues.values()) if (inModule(moduleId, dialogue.id)) sections.push(dialogueSection(moduleId, dialogue));
-  for (const flag of registry.flags.values()) if (inModule(moduleId, flag.id)) sections.push(`# flag ${moduleLocalId(moduleId, flag.id)}`);
-  for (const globalId of options.globals ?? []) {
-    const slot = registry.slots.get(globalId);
-    if (slot) sections.push([`# slot ${slot.id}`, ...slotTitleLine(registry, slot)].join('\n'));
-    const variable = registry.variables.get(globalId);
-    if (variable) sections.push([`# variable ${variable.id}`, ...(variable.value !== undefined ? [`value: ${variable.value}`] : [])].join('\n'));
-  }
-  // A locale belongs to the module that wrote it rather than to any id, so it
-  // is printed by attribution and never by `inModule`.
-  for (const declared of moduleLocaleSections(registry.locales, moduleId)) {
-    sections.push([`# locale ${declared.language}`, ...declared.entries.map((entry) => `${entry.key}: ${entry.value}`)].join('\n'));
-  }
-  for (const [id, save] of registry.saves) if (inModule(moduleId, id)) sections.push(saveSection(moduleId, id, save));
-  for (const test of registry.tests.values()) if (inModule(moduleId, test.id)) sections.push(testSection(moduleId, test));
+  const sections = printedSections(registry, options).map((each) => sectionText(registry, options.info.id, each));
   return [infoLines(options.info).join('\n'), ...sections].join('\n\n').trimEnd() + '\n';
 }
 

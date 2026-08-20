@@ -1,4 +1,4 @@
-import { GLOBAL_SECTION_KINDS } from './sectionKind';
+import { GLOBAL_SECTION_KINDS, sectionOf, type SectionKind } from './sectionKind';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import { contributionBase, extractContributionDsl } from './contribution';
 import type { ContributionBase } from './contribution';
@@ -104,13 +104,13 @@ function cloned<T>(value: T): T {
 // A save is addressed by the key it hangs under and carries no `id` field, so
 // the field is rewritten where there is one and the key is rewritten either
 // way by the caller.
-function rewriteHydratedSection(kind: string, key: string, value: object, from: string, to: string): object {
+function rewriteHydratedSection(kind: SectionKind, key: string, value: object, from: string, to: string): object {
   const next = cloned(value) as { id?: string; stats?: Record<string, unknown> };
   if (typeof next.id === 'string') next.id = renamedId(next.id, from, to);
   if (kind === 'entity' && next.stats) {
     next.stats = Object.fromEntries(Object.entries(next.stats).map(([statId, range]) => [renamedId(statId, from, to), range]));
   }
-  visitSection(kind, next, `# ${kind} ${key}`, (_kind, id) => renamedId(id, from, to));
+  visitSection(sectionOf(kind, next), `# ${kind} ${key}`, (_kind, id: string) => renamedId(id, from, to));
   return next;
 }
 

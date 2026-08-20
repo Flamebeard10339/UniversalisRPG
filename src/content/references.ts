@@ -4,7 +4,7 @@ import { Registry } from './registry';
 import { Dialogue } from './dialogue';
 import { Directive, Test } from './test';
 import { NAMESPACED_KINDS } from './namespace';
-import { isActionOwnerKind } from './sectionKind';
+import { isActionOwnerKind, sectionOf, type ModuleSection } from './sectionKind';
 import { INFLICT_SITE, Visit, visitSection } from './referenceSites';
 
 // Resolution qualifies a name; it cannot prove the name still points at
@@ -16,7 +16,7 @@ import { INFLICT_SITE, Visit, visitSection } from './referenceSites';
 //
 // The namespace answers rather than the registry maps, because it is the one
 // place that already knows a member goes away with the object that owned it.
-export function validateSectionReferences(kind: string, id: string, value: object, registry: Registry): void {
+export function validateSectionReferences(section: ModuleSection, id: string, registry: Registry): void {
   const visit: Visit = (referenced, target, where) => {
     if (NAMESPACED_KINDS.includes(referenced) && !registry.namespace.has(referenced, target)) {
       throw new DslError(`${where} names an unknown ${referenced}: ${target}`);
@@ -24,7 +24,7 @@ export function validateSectionReferences(kind: string, id: string, value: objec
     if (where.endsWith(INFLICT_SITE)) refuseUntimedPayload(target, where, registry);
     return target;
   };
-  visitSection(kind, { ...value }, `# ${kind} ${id}`, visit);
+  visitSection(sectionOf(section.kind, { ...section.value }), `# ${section.kind} ${id}`, visit);
 }
 
 // An `inflict:` grants one instance of a declaration for as long as that

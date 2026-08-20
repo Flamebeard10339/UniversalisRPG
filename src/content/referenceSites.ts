@@ -7,7 +7,7 @@ import { Ally, EntityBlock, isHandlerBlock } from './entity';
 import { Edge, Population, Relative } from './location';
 import { isFieldEdits, listMembers } from '../grammar/section';
 import { ACTION_MEMBER, memberKey } from './namespace';
-import { isActionOwnerKind } from './sectionKind';
+import { isActionOwnerKind, type ModuleSection } from './sectionKind';
 import { lastSegment } from '../grammar/values';
 import { mayBeInstanceId } from './instanceId';
 import { Quantified } from '../grammar/values';
@@ -342,10 +342,14 @@ function dialogue(value: Dialogue, where: string, visit: Visit): void {
 }
 
 // Every place the grammar can carry a reference to a named object, in one
-// traversal, so that resolving one and validating one cannot drift apart.
-export function visitSection(kind: string, value: object, where: string, visit: Visit): void {
+// traversal, so that resolving one and validating one cannot drift apart. Taken
+// as the discriminated union rather than as a kind and a value, so that a kind
+// this walk has no answer for is a compile error and not a section whose
+// references nobody looked at.
+export function visitSection(each: ModuleSection, where: string, visit: Visit): void {
+  const value = each.value;
   const section = value as Loose;
-  switch (kind) {
+  switch (each.kind) {
     case 'entity': {
       // A stat sheet is authored as a list of assignments; the stat id leading
       // each one is the reference.
@@ -420,6 +424,25 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       dialogue(value as Dialogue, where, visit);
       return;
     case 'test':
-      for (const each of (section.directives as Directive[]) ?? []) visitDirective(each, where, visit);
+      for (const directive of (section.directives as Directive[]) ?? []) visitDirective(directive, where, visit);
+      return;
+    // The kinds that name nothing. A stat is a range, a flag is a name and a
+    // boolean, a variable is a number, a slot is a title, a save is a recorded
+    // state and the other three build no object at all. Named rather than
+    // absorbed by a default, so that a kind added tomorrow has to say which
+    // group it is in.
+    case 'stat':
+    case 'flag':
+    case 'variable':
+    case 'slot':
+    case 'save':
+    case 'info':
+    case 'remove':
+    case 'locale':
+      return;
+    default: {
+      const unreached: never = each;
+      void unreached;
+    }
   }
 }

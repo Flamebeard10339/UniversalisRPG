@@ -1,6 +1,7 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { programOverShippedModules, programOverSource, relativeTo, repoRoot } from './lib/shippedProgram';
+import { SECTION_KINDS } from '../src/content/sectionKind';
 
 const root = repoRoot;
 
@@ -146,6 +147,16 @@ describe('every consumer of a discriminated union is total', () => {
   // A derived proof that stops naming anything otherwise passes in silence.
   it('the walk had subjects', () => {
     expect(consumers.length).toBeGreaterThan(10);
+  });
+
+  // The rule's subjects include the passes over the section kinds, and each of
+  // them is asked about every kind the spine declares. Without this the three
+  // could stop being subjects — by taking a kind and a value again rather than
+  // the union — and every clause above would go on passing over what was left.
+  it('reaches the passes over a parsed section, and asks each about every kind', () => {
+    const passes = consumers.filter((consumer) => consumer.union === 'ModuleSection');
+    expect(passes.length).toBeGreaterThanOrEqual(3);
+    expect(passes.filter((pass) => pass.members !== SECTION_KINDS.length).map((pass) => `${pass.where} sees ${pass.members} of ${SECTION_KINDS.length}`)).toEqual([]);
   });
 
   it('no switch leaves a member of its union unhandled', () => {
