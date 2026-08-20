@@ -6,17 +6,12 @@ import { memoryDriver, slotStore, type SlotDriver } from './store';
 
 const SPECIFIER = /\b(?:from|import|require)\s*\(?\s*(['"`])([^'"`]+)\1/g;
 
-// Resolved the way the loader would. A specifier that names no module raises
-// here rather than dropping out of the walk, so a closure cannot come back
-// short and read as clean.
 function moduleAt(specifier: string): string {
   const found = ['.ts', '.tsx', '/index.ts'].map((ending) => `${specifier}${ending}`).find((candidate) => existsSync(candidate));
   if (found === undefined) throw new Error(`${specifier} resolves to no module`);
   return found;
 }
 
-// Everything a module reaches, at any depth, and every specifier in that
-// closure that is not a file of this repository's.
 function reachedFrom(entry: string): { modules: string[]; outside: string[] } {
   const modules = new Set<string>();
   const outside = new Set<string>();
@@ -34,8 +29,6 @@ function reachedFrom(entry: string): { modules: string[]; outside: string[] } {
   return { modules: [...modules].sort(), outside: [...outside].sort() };
 }
 
-// A clock the test turns, so a stamp is a fact this file decided rather than
-// one it read off the machine it happens to be running on.
 function turning(start = 1_000): { now: () => number; pass: (ms: number) => void } {
   let at = start;
   return { now: () => at, pass: (ms) => void (at += ms) };
@@ -43,9 +36,6 @@ function turning(start = 1_000): { now: () => number; pass: (ms: number) => void
 
 const stored = (now: () => number = () => 0): ReturnType<typeof slotStore> => slotStore(memoryDriver(), now);
 
-// Everything a payload can be that a store which parsed one would spoil: text
-// that is not JSON, JSON that is not a save, the empty body, a body whose
-// whitespace and key order are the whole of what a `# save` fixture compares by.
 const PAYLOADS = [
   '{"version":11,"time":5000}',
   '{ "version" : 11 ,  "time" : 5000 }',
@@ -73,18 +63,10 @@ describe('the slot store keeps named text and nothing else (c1)', () => {
     store.remove('player');
     expect(store.read('player')).toBeNull();
     expect(store.list()).toEqual(['dev']);
-    // Removing what is not there is what it is: the slot is gone either way.
     expect(() => store.remove('player')).not.toThrow();
   });
 
-  // The claim is structural and so is the proof: a module that cannot reach the
-  // save modules cannot be shaped by them, and a module that imports nothing
-  // from node cannot be doing its own I/O whatever its functions say.
   it('reaches neither a save nor the filesystem, so a driver is the only thing that touches either', () => {
-    // The whole closure rather than the first hop, and closed rather than
-    // filtered: an import added under this file at any depth lands here and is
-    // read, where a blocklist of names passes anything that avoided the words
-    // in it.
     expect(reachedFrom('src/runtime/store.ts')).toEqual({ modules: ['src/runtime/error.ts', 'src/runtime/store.ts'], outside: [] });
   });
 
@@ -93,8 +75,6 @@ describe('the slot store keeps named text and nothing else (c1)', () => {
     const store = slotStore(driver, () => 7);
     store.write('player', '{"version":11}');
 
-    // The envelope is the store's, so the payload inside it is still text -- a
-    // store that had parsed the save would have written its fields out here.
     expect(JSON.parse(driver.read('player')!)).toEqual({ writtenAt: 7, payload: '{"version":11}' });
   });
 });
@@ -121,8 +101,6 @@ describe('a slot knows when it was written, and the payload does not (c2)', () =
 
     const player = store.read('player')!;
     const dev = store.read('dev')!;
-    // Two slots, one payload, two stamps: the instant is the slot's and cannot
-    // ride inside the bytes an exported save is made of.
     expect(player.payload).toBe(dev.payload);
     expect(dev.writtenAt - player.writtenAt).toBe(60_000);
   });

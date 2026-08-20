@@ -1,5 +1,5 @@
-import { Cursor, Parser, parseWhole } from './parser';
-import { RawLine } from './structure';
+import { Cursor, Parser, parseWhole } from "./parser";
+import { RawLine } from "./structure";
 
 export interface ListParser<E> extends Parser<E[]> {
   element: Parser<E>;
@@ -20,10 +20,11 @@ export function list<E>(element: Parser<E>): ListParser<E> {
     return items;
   };
 
-  const print = (values: readonly E[]): string => values.map((value) => element.print(value)).join(', ');
+  const print = (values: readonly E[]): string =>
+    values.map((value) => element.print(value)).join(", ");
   // Derived from the element's, so a list never states a spelling of its own
   // and a new element example is a new list example with no edit here.
-  const examples = [...element.examples, element.examples.join(', ')];
+  const examples = [...element.examples, element.examples.join(", ")];
   const line: Parser<E[]> = { parse: parseInline, print, examples };
 
   return {
@@ -31,7 +32,10 @@ export function list<E>(element: Parser<E>): ListParser<E> {
     parse: parseInline,
     print,
     examples,
-    parseBlock: (lines) => lines.flatMap((raw) => parseWhole(line, raw.text, raw.span.start, 'a list item')),
+    parseBlock: (lines) =>
+      lines.flatMap((raw) =>
+        parseWhole(line, raw.text, raw.span.start, "a list item"),
+      ),
     printBlock: (values) => values.map((value) => element.print(value)),
   };
 }

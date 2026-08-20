@@ -6,13 +6,6 @@ import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from '
 import { Registry } from '../content/registry';
 import { type DialogueCursor, GameState } from './state';
 
-// A resumable cursor, not a loop: a menu hands control back to the driver.
-// Named, not held: every field is an id or a number, so the cursor survives a
-// save and a driver never holds a registry object it would have to re-resolve.
-
-// A line the dialogue speaks, at the address the load path stamped on it. A
-// line without one was built in code rather than loaded, and there is no
-// language it could be shown in.
 function spokenLine(registry: Registry, state: GameState, line: Spoken): Localized {
   if (line.key === undefined) throw new RuntimeError(`a dialogue line reached the log with no address: ${JSON.stringify(renderSegments(line.segments, state))}`);
   return localizerOf(registry, state).line(line.key, (segments) => renderSegments(segments, state));
@@ -34,8 +27,6 @@ export function cursorProblem(localizer: Localizer, cursor: DialogueCursor, regi
   return null;
 }
 
-// A cursor this stale is a fault rather than a screen, so it is stated in the
-// language the engine is written in and never reaches a player.
 function resolveMenu(cursor: DialogueCursor, registry: Registry): { dialogue: Dialogue; node: DialogueNode; choices: Choice[] } {
   const problem = cursorProblem(localizerFor(registry, BASE_LANGUAGE), cursor, registry);
   if (problem) throw new RuntimeError(`stale dialogue cursor: ${problem}`);
@@ -45,7 +36,6 @@ function resolveMenu(cursor: DialogueCursor, registry: Registry): { dialogue: Di
   return { dialogue, node, choices: step.kind === 'menu' ? step.choices : [] };
 }
 
-// A choice with no goto falls through to the rest of the node.
 function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, state: GameState, start: number, replay: boolean): DialogueCursor | null {
   for (let i = start; i < node.steps.length; i++) {
     const step = node.steps[i];
@@ -70,8 +60,6 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, st
 }
 
 function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, state: GameState): DialogueCursor | null {
-  // Keyed by the node's path, not its bare name: two dialogues may each have a
-  // node called greeting, and they are not the same counter.
   const counter = `${dialogue.id}.${node.name}`;
   const visit = (state.visits[counter] = (state.visits[counter] ?? 0) + 1);
   const replay = visit === 1 || node.sticky === true;
@@ -91,20 +79,12 @@ export function talk(entityId: string, registry: Registry, state: GameState): Di
   return enterNode(dialogue, chosen, registry, state);
 }
 
-// One gate, one rendering: the offer and the answer are read off the same list,
-// so a choice withheld by its `when:` cannot be reachable by typing its text.
-// c2: the index is the option's place among the choices its node declares, not
-// among the ones offered here, so a choice a `when:` withholds does not shift
-// the answer to every choice after it.
 function offered(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ choice: Choice; index: number }> {
   return resolveMenu(cursor, registry)
     .choices.map((choice, index) => ({ choice, index }))
     .filter((entry) => !entry.choice.when || evaluateCondition(entry.choice.when, state));
 }
 
-// The index is what a driver answers with and the display is what it draws:
-// the two halves of a choice, and the reason a menu option is as translatable
-// as the lines around it (c6).
 export function menuChoices(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ index: number; display: Localized }> {
   return offered(cursor, registry, state).map((entry) => ({ index: entry.index, display: spokenLine(registry, state, entry.choice) }));
 }

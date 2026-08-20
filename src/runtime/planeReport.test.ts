@@ -105,8 +105,6 @@ function ok(outcome: Growth): string {
   return outcome.instance;
 }
 
-// One copy fed `levels` times, so every route below starts from a plane with
-// points to spend rather than from a refusal.
 function fed(itemId: string, levels: number, extra: Record<string, number> = {}): GameState {
   const state = initialState(registry);
   Object.assign(state.inventory, { [itemId]: 1, whetstone: levels, ...extra });
@@ -115,8 +113,6 @@ function fed(itemId: string, levels: number, extra: Record<string, number> = {})
   return state;
 }
 
-// A point origin puts every edge on the free root, so a slot is reachable
-// without first walking a shape — which is a different clause's subject.
 function hub(jewels: Record<string, number>, filling: Array<[Direction, string]>): GameState {
   const state = fed('hub-blade', 6, jewels);
   for (const [direction, jewel] of filling) {
@@ -150,8 +146,6 @@ describe('planeReport', () => {
     expect(plane).toMatchObject({ instance: '1', template: 'blade', title: 'Blade', level: 3, maxLevel: 20, spent: 0, remaining: 3 });
   });
 
-  // c16: the report carries the name every screen holding this plane spells, so
-  // a surface never works out from `instance` and `template` what to call it.
   it('names a grown copy under the descriptor and a base still in its stack by its title', () => {
     const state = initialState(registry);
     Object.assign(state.inventory, { blade: 1 });
@@ -190,7 +184,6 @@ describe('planeReport', () => {
   it('names the neighbour behind a filled slot and behind a blocked one', () => {
     const plane = report(hub({ 'junction-jewel': 2 }, [['e', 'junction-jewel'], ['ne', 'junction-jewel']]));
     expect(slotAt(plane, '0,0', 'ne')).toMatchObject({ standing: 'allocated', beyond: '1,-1' });
-    // The cluster at 1,0 opens an edge onto the hex the ne slot already filled.
     expect(slotAt(plane, '1,0', 'nw')).toMatchObject({ standing: 'blocked', beyond: '1,-1' });
     expect(slotAt(plane, '1,0', 'sw')).toMatchObject({ standing: 'unreached', beyond: null });
   });
@@ -218,10 +211,6 @@ describe('planeReport', () => {
     });
   });
 
-  // A plane belongs to an item and a counter is a fact about whoever carries it,
-  // so what is stated is what one point of the counter pays — and it says which
-  // counter, in the words that name it, rather than printing a bare magnitude
-  // that is only true at zero.
   it('names the counter a payload is paid per, whichever of the two sources it is', () => {
     const plane = report(fed('counting-blade', 3));
     expect(positionAt(plane, '0,0', 1)).toMatchObject({
@@ -251,8 +240,6 @@ describe('planeReport', () => {
     expect(planeReport(registry, fed('blade', 1), '9')).toBeUndefined();
   });
 
-  // A growth verb spells its target either way a base is carried, so the report
-  // answers for both: a base still in its stack has the plane growing it mints.
   it('reports the plane a base still in its stack would mint', () => {
     const state = initialState(registry);
     Object.assign(state.inventory, { blade: 1, 'plain-blade': 1 });
@@ -286,9 +273,6 @@ describe('planeReport', () => {
     expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['1', '2', 'blade']);
   });
 
-  // A plane screen can be opened on a base still in its stack, and a focus names
-  // the plane it points at rather than carrying one, so every plane the player
-  // could be looking at has to be among the published ones.
   it('reports the plane of a stack the player carries, and drops it when the last one leaves', () => {
     const state = initialState(registry);
     Object.assign(state.inventory, { blade: 1, whetstone: 3 });
@@ -302,10 +286,6 @@ describe('planeReport', () => {
     expect(planeReports(registry, initialState(registry))).toEqual([]);
   });
 
-  // c21 took the worn copy out of its stack, so a base whose only copy is on the
-  // player is a plane a screen can still be opened on and one no other read here
-  // would reach. The slot's spelling is the one its equipment row opens, so a
-  // focus on it has a published plane to be drawn from.
   it('reports the plane of a base the player is wearing, with no stack left behind it', () => {
     const state = initialState(registry);
     Object.assign(state.inventory, { blade: 1 });
@@ -317,9 +297,6 @@ describe('planeReport', () => {
     expect(planeReports(registry, state).map((plane) => plane.instance)).toEqual(['blade', 'worn:mainhand']);
   });
 
-  // The worn copy and the stack it left are two copies of one item, so the slot
-  // is what tells its plane from the stack's — an item id names the stack, and
-  // reaching the worn one through it would depend on the stack being empty.
   it('reports the worn copy’s plane apart from the stack standing behind it', () => {
     const state = fed('blade', 3);
     ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position: 2 }));

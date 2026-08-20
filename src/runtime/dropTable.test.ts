@@ -7,10 +7,6 @@ import { GameState } from './state';
 
 const ITEMS = ['# item bones', '# item coins', '# item gem', '# item tail'];
 
-// Loaded once per body: a rate is measured over four thousand seeds and the
-// content is the same for every one of them, so reloading it per seed is four
-// thousand universe builds for one answer. Only the state a run is given
-// differs, and `run` builds that fresh.
 const loaded = new Map<string, { registry: Registry; results: ActionResult[] }>();
 
 function fight(...body: string[]) {
@@ -23,7 +19,6 @@ function fight(...body: string[]) {
   return built;
 }
 
-// One state per run, so what a run produces depends on the seed alone.
 function run(seed: number, body: string[], count = 1, before: (state: GameState, registry: Registry) => void = () => {}): GameState {
   const { registry, results } = fight(...body);
   const state = createGameState();
@@ -33,7 +28,6 @@ function run(seed: number, body: string[], count = 1, before: (state: GameState,
   return state;
 }
 
-// Over many seeds, so a rate is measured rather than asserted from one draw.
 function rate(body: string[], runs = 4000, before?: (state: GameState, registry: Registry) => void): (item: string) => number {
   const counts: Record<string, number> = {};
   for (let seed = 1; seed <= runs; seed++) {
@@ -61,7 +55,6 @@ describe('a wrapper draws for its own selector', () => {
     const observed = rate(body);
     expect(observed('coins')).toBeCloseTo(0.3, 1);
     expect(observed('gem')).toBeCloseTo(0.1, 1);
-    // Exactly one: never both, and the two shares plus nothing account for all of it.
     for (let seed = 1; seed <= 200; seed++) {
       const held = run(seed, body).inventory;
       expect((held.coins ?? 0) + (held.gem ?? 0)).toBeLessThanOrEqual(1);
@@ -70,7 +63,6 @@ describe('a wrapper draws for its own selector', () => {
 
   it('reads a row weight from a stat, so a buff shifts the distribution', () => {
     const body = ['one of:', '  1x: give: 1 coins', '  luck: give: 1 gem'];
-    // luck's base is 60 against a weight of 1, so the gem is the near-certainty.
     expect(rate(body)('gem')).toBeGreaterThan(0.9);
   });
 
@@ -90,7 +82,6 @@ describe('a wrapper draws for its own selector', () => {
       state.flags.lit = true;
     });
     expect(lit.inventory.gem).toBe(1);
-    // A certainty costs no draw, so the seed is where it started.
     expect(lit.rng).toBe(1);
   });
 });
@@ -99,8 +90,6 @@ describe('a gated row leaves the pool before the draw', () => {
   const body = ['one of:', '  1x if lit: give: 1 coins', '  1x: give: 1 gem'];
 
   it('gives the survivors the failed row s share rather than voiding a selection', () => {
-    // With `lit` unset the coins row is not in the pool at all, so the gem row is
-    // certain. The wrong reading — select, then produce nothing — would halve it.
     expect(rate(body, 500)('gem')).toBe(1);
     const both = rate(body, 2000, (state) => {
       state.flags.lit = true;
@@ -154,7 +143,6 @@ describe('draw order is fixed and total', () => {
 
 describe('a stochastic group is applied count times, not scaled once', () => {
   it('rolls a chance per repetition', () => {
-    // Scaling one roll would give either 0 or 10 tails and nothing between.
     const between = new Set<number>();
     for (let seed = 1; seed <= 200; seed++) between.add(run(seed, ['1 in 2: give: 1 tail'], 10).inventory.tail ?? 0);
     expect(between.size).toBeGreaterThan(3);
@@ -164,7 +152,6 @@ describe('a stochastic group is applied count times, not scaled once', () => {
   it('rolls a range per repetition', () => {
     const totals = new Set<number>();
     for (let seed = 1; seed <= 200; seed++) totals.add(run(seed, ['give: 1-2 coins'], 4).inventory.coins!);
-    // Scaling would only ever produce 4 or 8; rolling four times fills between.
     expect([...totals].some((total) => total > 4 && total < 8)).toBe(true);
   });
 
@@ -175,8 +162,6 @@ describe('a stochastic group is applied count times, not scaled once', () => {
       applyResultsNow(state, registry, results, 5);
       return state.log.filter((line) => line === 'hi').length;
     };
-    // The same action, once without a draw in it and once with. A result that
-    // ignores count speaks once for the batch either way.
     expect(speaks(['say: hi', 'give: 1 bones'])).toBe(1);
     expect(speaks(['say: hi', '1 in 1000000: give: 1 gem'])).toBe(1);
   });
@@ -184,8 +169,6 @@ describe('a stochastic group is applied count times, not scaled once', () => {
   it('opens a modal once for the batch too, the other line a count ignores', () => {
     const { registry } = fight('give: 1 bones');
     const state = createGameState();
-    // Opening is idempotent; the line it logs is not, which is the half that
-    // had to be gated with `say:` rather than beside it.
     applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'character-creation' }, { kind: 'give', item: 'coins', amount: { min: 1, max: 4 } }], 5);
     expect(state.log.filter((line) => line === 'modal:character-creation')).toHaveLength(1);
     expect(state.modals.map((frame) => frame.name)).toEqual(['character-creation']);

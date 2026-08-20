@@ -82,7 +82,7 @@ function grow(state: GameState, target: string, node: PlaneNode): string {
 }
 
 function parse(serialized: string): { version: number; diff: Record<string, unknown> } {
-  return parseSaveSection({ kind: 'save', id: 'x', body: [{ text: serialized, span: { start: 0, end: 0 }, children: [] }], span: { start: 0, end: 0 } }).saved;
+  return parseSaveSection({ kind: 'save', id: 'x', body: [{ text: serialized, span: { start: 0, end: 0 }, children: [] }], span: { start: 0, end: 0 } });
 }
 
 const refusalOf = (outcome: Growth | Destruction): string => (outcome.ok ? 'not refused' : inEnglish(registry, outcome.refused));
@@ -140,9 +140,6 @@ describe('an item is a stack until something is recorded about one of them', () 
   });
 });
 
-// c9: you grow what you can wear. An item is a base if and only if it declares
-// a slot:, so the whole of what has a plane is decided once, at the one door,
-// rather than by each verb remembering to ask.
 describe('an item with no slot has no plane', () => {
   it('refuses every growth verb, leaving the stack and what it would have consumed whole', () => {
     const state = carrying({ whetstone: 4, 'crossroads-jewel': 2 });
@@ -162,8 +159,6 @@ describe('an item with no slot has no plane', () => {
   });
 });
 
-// The reproduction that filed this: `slot:` and `cluster-jewel:` named one
-// field, so the shipped level-40 base was consumable into another base's plane.
 describe('a base is not a jewel', () => {
   it('refuses a base as the jewel a slot is filled with, since only a jewel declares cluster-jewel:', () => {
     const state = carrying({ 'heartwood-blade': 2, whetstone: 4 });
@@ -317,8 +312,6 @@ describe('an instance across a reload', () => {
   });
 });
 
-// c12: this is the rule half. No screen, no confirmation and no second question
-// live here — what it costs to be sure belongs to the frame that calls it.
 describe('destroying a carried item', () => {
   it('takes one copy off the stack and leaves the rest countable', () => {
     const state = carrying({ 'iron-sword': 3, whetstone: 1 });
@@ -401,15 +394,10 @@ describe('destroying a carried item', () => {
 
     destroyItem(state, 'iron-sword');
     expect(state.equipped).toEqual({ mainhand: '1' });
-    // c21: the copy is on and is counted nowhere on the carried side, so the
-    // stack going empty is the whole of what the count has to say.
     expect(carriedCount(state, 'iron-sword')).toBe(0);
   });
 });
 
-// c21, growing side. The stack a copy is minted out of has two places to be
-// once carried and worn are disjoint, and which one it came out of is the whole
-// of what says where the minted copy ends up.
 describe('growing a copy the player is wearing', () => {
   it('grows the worn copy and puts what it minted back on, once the stack behind it is empty', () => {
     const state = carrying({ 'iron-sword': 1, whetstone: 1 });
@@ -431,8 +419,6 @@ describe('growing a copy the player is wearing', () => {
     expect(carriedCount(state, 'iron-sword')).toBe(1);
   });
 
-  // The copy came out of the slot, so the stack is not where it came from and is
-  // not touched — including a stack that was never written down at all.
   it('leaves the stack alone when it mints out of a slot', () => {
     const state = carrying({ whetstone: 1 });
     state.equipped.mainhand = 'iron-sword';

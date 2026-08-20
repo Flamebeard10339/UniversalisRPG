@@ -5,10 +5,6 @@ import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { secondsToMs, toMilliUnits } from './units';
 
-// Two independent mechanisms: `requires:`/inputs are re-checked by the resolver,
-// while a pool running out is content's call via `stop` in the handler the
-// entity it ran out for writes. The rat bites 16/min for 10 against 30 health,
-// so the player dies at t=11.25; the rat always outlives them.
 const MODULE = `
 # stat attack
 base: 10
@@ -165,7 +161,6 @@ stop
 stats: max-health 20, dr 0
 `;
 
-// The control: nothing declares health fatal, so nothing stops.
 const WITHOUT_STOP = MODULE.split('\n')
   .filter((line) => line.trim() !== 'stop')
   .join('\n');
@@ -191,10 +186,8 @@ describe('a pool running out stops the fight', () => {
     expect(state.resources['health']).toBe(0);
     expect(state.activeAction).toBeNull();
     expect(state.log).toContain('You black out.');
-    // No tail: under a settle-at-span-end reading the player would have swung
-    // through the whole 300s and felled the rat at 240s.
     expect(state.inventory['rat-tail'] ?? 0).toBe(0);
-    expect(state.time).toBe(secondsToMs(300)); // time still passes; the player just isn't fighting
+    expect(state.time).toBe(secondsToMs(300));
   });
 
   it('pins that instant to the third bite', () => {
@@ -213,9 +206,6 @@ describe('a pool running out stops the fight', () => {
     const { registry, state } = fighting(WITHOUT_STOP);
     resolve(state, registry, secondsToMs(300));
 
-    // The engine has no opinion about a pool named `health`: the player fights
-    // on through an empty one and fells the rat at t=240, which is the fact the
-    // fatal reading above rules out.
     expect(state.resources['health']).toBe(0);
     expect(state.inventory['rat-tail']).toBe(1);
     expect(state.populations['den']['giant-rat']).toEqual({ down: 1, due: [] });
@@ -226,7 +216,7 @@ describe('a pool running out stops the fight', () => {
     state.inventory['rat-tail'] = 3;
     resolve(state, registry, secondsToMs(300));
 
-    expect(state.inventory['rat-tail']).toBe(2); // `take: 1 rat-tail` on blacking out
+    expect(state.inventory['rat-tail']).toBe(2);
     expect(state.log.filter((line) => line === 'You black out.')).toHaveLength(1);
   });
 
@@ -235,14 +225,11 @@ describe('a pool running out stops the fight', () => {
     armAction('entity', 'treadmill', 'run', registry, state);
     resolve(state, registry, secondsToMs(100));
 
-    // -60/min against 30 empties at t=30, and nextBoundary lands the segment
-    // there, so this path is exact rather than segment-granular.
     expect(state.inventory['blessing']).toBe(30);
     expect(state.resources['health']).toBe(0);
     expect(state.activeAction).toBeNull();
   });
 
-  // A pool can also empty because its CEILING fell, with nothing draining it.
   it('fires on empty: when a shrinking max squeezes a pool to nothing', () => {
     const { registry, state } = started();
     armAction('entity', 'beacon', 'tend', registry, state);
@@ -253,7 +240,6 @@ describe('a pool running out stops the fight', () => {
 
     expect(state.resources['vigor']).toBe(0);
     expect(state.log).toContain('Your vigor gutters out.');
-    // And the stop beside it took effect: 10 blessings, not 20.
     expect(state.activeAction).toBeNull();
     expect(state.inventory['blessing']).toBe(10);
   });
@@ -278,8 +264,6 @@ describe('a pool running out stops the fight', () => {
 describe('`stop` among an action’s own results', () => {
   function stopping(entity: string, action: string): { registry: Registry; state: GameState } {
     const s = started();
-    // A two-sided action is reached by id and applied to what it names; a
-    // one-sided one is offered by the object that owns it.
     if (s.registry.actions.has(action)) armFightAction(action, entity, s.registry, s.state);
     else armAction('entity', entity, action, s.registry, s.state);
     return s;
@@ -296,10 +280,6 @@ describe('`stop` among an action’s own results', () => {
   });
 
   it('sees a stop behind a selector, so the batch is still capped at one completion', () => {
-    // The stop is 1-in-4, so a planner blind to it batches the whole 100s span
-    // and settles four completions' worth of blessings inside one segment. Seeing
-    // it lands the boundary on each completion instead, so the span is walked one
-    // blessing at a time and the two readings part on the count.
     const { registry, state } = stopping('cloister', 'chant');
     resolve(state, registry, secondsToMs(100));
     expect(state.activeAction).toBeNull();
@@ -362,7 +342,7 @@ describe('a start condition that stops holding', () => {
 
     delete state.flags['shrine.moon-up'];
     resolve(state, registry, secondsToMs(10));
-    expect(state.inventory['blessing']).toBe(3); // nothing since the moon set
+    expect(state.inventory['blessing']).toBe(3);
     expect(state.activeAction).toBeNull();
   });
 
@@ -371,7 +351,6 @@ describe('a start condition that stops holding', () => {
     state.flags['training-post.permitted'] = true;
     armFightAction('drill', 'training-post', registry, state);
 
-    // 30 health at 10 a hit is 3 swings, so a fight turns over every 7.2s.
     resolve(state, registry, secondsToMs(15));
     expect(state.inventory['blessing']).toBe(2);
 

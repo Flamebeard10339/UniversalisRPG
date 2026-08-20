@@ -50,7 +50,6 @@ item-experience: 1000
 
 const registry = loadInEnglish(MODULE);
 
-// One fed copy, which is the only way a plane with points to spend exists.
 function fed(extra: Record<string, number> = {}): GameState {
   const state = initialState(registry);
   Object.assign(state.inventory, { blade: 1, whetstone: 1, ...extra });
@@ -87,16 +86,12 @@ describe('the four verbs a growth names', () => {
     expect(planeReport(registry, state, '1')?.clusters[0].effects.map((each) => each.id)).toEqual(['goad']);
   });
 
-  // The dispatch owns no rule of its own: the refusal a caller reads is the one
-  // the plane wrote, handed back rather than restated here.
   it('hands back the refusal the verb itself wrote', () => {
     expect(refusalOf(grow(fed(), registry, { kind: 'allocate', target: '1', node: { hex: { q: 9, r: 9 }, kind: 'position', position: 1 } }))).toBe('no cluster stands in 9,9');
   });
 });
 
 describe('a growth reached from a line', () => {
-  // The seam a screen composing one of its own values goes through: the same
-  // four verbs, read by the parser every `# test` line is read by.
   it('reaches the same four verbs a parsed directive does', () => {
     const line = fed({ 'spark-jewel': 1 });
     const parsed = fed({ 'spark-jewel': 1 });
@@ -120,10 +115,6 @@ describe('a growth reached from a line', () => {
   });
 });
 
-// c4: a refusal reaches the player through a key, so it reads in the language
-// being played and shows that key where the language has nothing for it. Half
-// of these are translated and half are not, because a screen full of Spanish
-// hides which half the engine is answering from.
 describe('a refusal is a key, not a sentence', () => {
   const SPANISH = [
     '# info camp-es',

@@ -99,7 +99,7 @@ describe('loadSave', () => {
     const state = initialState(registry);
     state.inventory.gold = 3;
     state.flags.done = true;
-    restorePools(state, { health: toMilliUnits(4) }); // a damaged pool must survive the round trip, not reset to full
+    restorePools(state, { health: toMilliUnits(4) });
     const serialized = serializeSave(state, registry);
     expect(JSON.parse(serialized).resources).toEqual({ health: toMilliUnits(4) });
 
@@ -149,8 +149,6 @@ describe('loadSave', () => {
     loadSave(restored, { version, diff }, registry);
     expect(restored.modals).toEqual([{ name: 'character-creation', answers: { name: 'Rowan' } }]);
 
-    // Every one of these used to load clean and then kill the next view() with
-    // a raw TypeError from inside the code the validator exists to protect.
     for (const body of [
       'character-creation',
       [{ answers: {} }],
@@ -167,8 +165,6 @@ describe('loadSave', () => {
     }
   });
 
-  // A frame carrying two ids of its own is a frame a `# save` can hold, so what
-  // it points at is checked on the way in rather than trusted.
   it('carries a plane screen across a round trip while the copy it grows is still carried', () => {
     const registry = loadInEnglish(MODULE);
     const state = createGameState();
@@ -232,8 +228,6 @@ node hello:
   Hi.
 `;
 
-// One more stat and one more item than the registry these are pruned against,
-// which is the shape of a mod that was loaded when the save was taken.
 const WIDER_MODULE = `${PRUNE_MODULE}
 # stat agility
 
@@ -398,9 +392,6 @@ unequip: neck
 assert: has charm
 `;
 
-// The deliverable claims equipping is reachable through the same directive
-// surface as every other play input; a `# test` section replaying it is what
-// that claim means.
 describe('a # test section records an equip', () => {
   function replaying(testId: string): ReturnType<typeof createGameState> {
     const registry = loadInEnglish(SAVE_TEST_MODULE);
@@ -414,9 +405,6 @@ describe('a # test section records an equip', () => {
     const state = replaying('equips-a-charm');
     expect(state.equipped).toEqual({ neck: 'charm' });
     expect(statValue('might', state, loadInEnglish(SAVE_TEST_MODULE))).toBe(5);
-    // c21: equipping moves the copy. The stack it came out of is empty, and the
-    // `assert: has charm` the section replays still holds, because having a
-    // thing and carrying it are two questions and only one of them is the stack.
     expect(state.inventory['charm']).toBe(0);
   });
 
@@ -507,9 +495,6 @@ describe('equipped survives a registry that no longer matches it', () => {
   });
 });
 
-// The Deliverable's headline sentence on the one save field that was still a
-// sentence: `activeAction.actionSlug` held `Travel to <title>`, and a rename
-// of that title alone stopped the walk it was under.
 describe('a walk under way survives its destination being retitled', () => {
   const ISLAND = (far: string): string => ['# info isla', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'adjacent:', '  far', '', '# location far', `title: ${far}`, 'x: 30, y: 0', 'adjacent:', '  shore'].join('\n');
 
@@ -526,9 +511,6 @@ describe('a walk under way survives its destination being retitled', () => {
     expect(JSON.parse(serializeSave(walking(), loadInEnglish(ISLAND('Far Beach')))).activeAction.actionSlug).toBe(TRAVEL_ADDRESS);
   });
 
-  // The address and the label were one string, so this file could assert a save
-  // holds `TRAVEL_LABEL` and mean nothing by it. Held apart here, because the
-  // arming path reaching for the wrong one is only catchable while they differ.
   it('holds a label that is not the address, so reaching for the wrong one does not arm', () => {
     const registry = loadInEnglish(ISLAND('Far Beach'));
     const action = travelAction('isla.shore', 'isla.far', registry);
@@ -544,8 +526,6 @@ describe('a walk under way survives its destination being retitled', () => {
     expect(state.activeAction).not.toBeNull();
   });
 
-  // The other half: a destination that is gone still stops the walk, and says
-  // so through a key rather than by relaying what the lookup threw.
   it('stops the walk when the destination is gone, and says so from a key', () => {
     const state = walking();
     const registry = loadInEnglish(['# info isla', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting'].join('\n'));
@@ -556,8 +536,6 @@ describe('a walk under way survives its destination being retitled', () => {
   });
 });
 
-// The same field on the other owner of an action, the one the loader compiles
-// rather than an author writing it.
 describe('a craft under way stores an id, not the sentence it is offered as', () => {
   const KITCHEN = (recipe: string): string =>
     ['# info cocina', 'version: 1.0.0', 'language: es', '', '# location horno', 'x: 0, y: 0', 'starting', '', '# item harina', 'title: Harina', '', '# item pan', 'title: Pan', '', `# recipe ${recipe}`, 'time: 60', 'in: 1 harina', 'out: 1 pan'].join('\n');
@@ -613,11 +591,6 @@ describe('a craft under way stores an id, not the sentence it is offered as', ()
   });
 });
 
-// The third and last owner of an action label: the one an author writes. Its
-// `title:` line WAS the identifier, so `# action melee-combat` titled "Fight"
-// stored "Fight" and a rename to "Combat" dropped the fight and put an English
-// word into a Spanish player's log. Reproduced by pass 3 of
-// `what-is-stored-or-replayed-is-an-id` against the shipped content's own shape.
 describe('a fight under way survives its action being retitled', () => {
   const ARENA = (title: string): string =>
     [
@@ -697,10 +670,6 @@ describe('a fight under way survives its action being retitled', () => {
     expect(state.activeAction).not.toBeNull();
   });
 
-  // The other half, on the owner that can actually lose one: an inline block
-  // renamed out from under a save stops the action and says so from a key, with
-  // no word the played language did not supply. `Fight drawer` slugs as
-  // `fight-drawer`, so retitling the fixture retitles this block with it.
   const searching = (): GameState => {
     const registry = universe('Fight');
     const state = initialState(registry, 'es');
@@ -718,12 +687,6 @@ describe('a fight under way survives its action being retitled', () => {
   });
 });
 
-// c14. The subjects come off `SAVE_FIELDS`, so the field added to `GameState`
-// next month is walked here by the entry the compiler already forces somebody
-// to write for it, and nobody edits this file to make that happen. What each
-// case asserts is the whole clause: a value the gate accepts is a value the
-// loader reads, and never a raw `TypeError` from inside the gate that exists
-// to prevent one.
 describe('what checkSave accepts, loadSave can read, for every field there is', () => {
   const registry = loadInEnglish(MODULE);
   const entries = Object.entries(SAVE_FIELDS);
@@ -733,8 +696,6 @@ describe('what checkSave accepts, loadSave can read, for every field there is', 
   });
 
   for (const [field, rule] of entries) {
-    // A sample the field's own `holds` rejects would prove nothing about the
-    // loader, because `checkSave` would refuse it before the loader was reached.
     it(`admits the sparsest ${field}`, () => {
       expect(rule.holds(rule.sparsest)).toBe(true);
     });
@@ -745,10 +706,6 @@ describe('what checkSave accepts, loadSave can read, for every field there is', 
     });
   }
 
-  // The list above says what is worth refusing by name. This says what happens
-  // to the field nobody here thought of — `roster` was one until an audit found
-  // it, and `Seat` can gain a fourth. Whatever the pruner reaches into, a
-  // payload leaves this function as a diagnostic and never as a raw TypeError.
   it('turns a raise from below the checks into a diagnostic, whatever raised', () => {
     const raising = loadInEnglish(MODULE);
     const asking = raising.locations.has.bind(raising.locations);
@@ -767,7 +724,6 @@ describe('what checkSave accepts, loadSave can read, for every field there is', 
   it('refuses the shapes that used to reach the loader, naming the field rather than raising from inside it', () => {
     const refuses = (diff: Record<string, unknown>) => expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff }, registry)).toThrow(/^save field/);
 
-    // Every one of these got past `isObject` and crashed the pruner below it.
     refuses({ activeAction: {} });
     refuses({ activeAction: { ownerRef: 'entity.chest', actionSlug: 'open', repeating: false, implicitTarget: 0 } });
     refuses({ activeAction: { ownerRef: 'entity.chest', actionSlug: 'open', repeating: false, implicitTarget: 0, cadences: {}, actors: { rat: {} } } });
@@ -779,9 +735,6 @@ describe('what checkSave accepts, loadSave can read, for every field there is', 
   });
 });
 
-// c5. Nothing on the way in reads a clock, so the time a save was written at is
-// the time the session stands at once it is loaded -- which is what lets
-// `offline-progression` put its own entry point outside this path later.
 describe('no load path advances time', () => {
   const registry = loadInEnglish(MODULE);
 
@@ -804,7 +757,7 @@ describe('no load path advances time', () => {
   it('round-trips a clock that was moved, through the bytes a `# save` section is made of', () => {
     const state = initialState(registry);
     state.time = 42_000;
-    const saved = parseSaveSection({ kind: 'save', id: 'x', body: [{ text: serializeSave(state, registry), span: { start: 0, end: 0 }, children: [] }], span: { start: 0, end: 0 } }).saved;
+    const saved = parseSaveSection({ kind: 'save', id: 'x', body: [{ text: serializeSave(state, registry), span: { start: 0, end: 0 }, children: [] }], span: { start: 0, end: 0 } });
 
     const target = initialState(registry);
     loadSave(target, saved, registry);

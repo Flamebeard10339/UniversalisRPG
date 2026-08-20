@@ -3,9 +3,6 @@ import { loadInEnglish } from '../content/engineLocale';
 import { applyDirective, PlaySession, startSession, view } from './session';
 import { SAVE_VERSION } from './save';
 
-// A blade with a slot: has a plane, so feeding it takes it out of its stack.
-// Everything else here names the blade from a different reader: an entity
-// action's `requires: has`, a recipe's inputs, an item action, and a cost.
 const MODULE = `
 # location forge
 x: 0, y: 0
@@ -116,8 +113,6 @@ describe('a grown copy is never spent', () => {
     expect(played.grown).toEqual({ '1': 'blade' });
   });
 
-  // c21: the copy is out of its stack twice over, and the sentence names the
-  // reason the player can act on — take it off and it is theirs to spend.
   it('refuses an action whose cost only the copy in the slot covers, and says why', () => {
     const session = grownFrom('one-blade');
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'smith', actionId: 'temper' });
@@ -129,8 +124,6 @@ describe('a grown copy is never spent', () => {
     expect(played.equipment).toEqual([{ slot: 'mainhand', title: 'Mainhand', item: '1', name: 'Modified Blade' }]);
   });
 
-  // The same refusal without a plane behind it: c21 is what takes a plain stack
-  // copy out of the stack, so wearing one is enough to make it unspendable.
   it('refuses a cost a worn stack copy alone covers, and leaves it on', () => {
     const session = startSession(registry);
     applyDirective(session, { kind: 'load', save: 'one-blade' });

@@ -7,9 +7,6 @@ import { startSession, view } from './session';
 import { attemptDuration } from './stats';
 import { secondsToMs, toMilliUnits } from './units';
 
-// `rate:` is attempts per minute, read straight off the stat: player 25/min =
-// 2.4s, rat 16/min = 3.75s, hasted 31.25/min = 1.92s.
-// giant-rat carries a deep pool; punchbag `uses:` nothing and keeps no clock.
 const MODULE = `
 # stat attack
 base: 10
@@ -104,7 +101,6 @@ describe('independent cadences', () => {
     const state = fighting(registry);
     resolve(state, registry, secondsToMs(12));
 
-    // player at 2.4 / 4.8 / 7.2 / 9.6 / 12.0; rat at 3.75 / 7.5 / 11.25
     expect(playerClock(state).attemptsMade).toBe(5);
     expect(ratClock(state)!.attemptsMade).toBe(3);
   });
@@ -114,9 +110,7 @@ describe('independent cadences', () => {
     const state = fighting(registry);
     resolve(state, registry, secondsToMs(12));
 
-    // player attack 10 - rat dr 2 = 8, five times
     expect(ratOf(state).resources.health).toBe(toMilliUnits(10000 - 5 * 8));
-    // rat attack 4 - player dr 0 = 4, three times
     expect(state.resources['health']).toBe(toMilliUnits(100 - 3 * 4));
   });
 
@@ -126,15 +120,12 @@ describe('independent cadences', () => {
     expect(state.activeAction!.cadences['punchbag']).toBeUndefined();
 
     resolve(state, registry, secondsToMs(12));
-    expect(state.resources['health']).toBe(toMilliUnits(100)); // nothing swings back
+    expect(state.resources['health']).toBe(toMilliUnits(100));
   });
 
-  // The den holds one punchbag and it declares no respawn, so the fight is over
-  // when it goes down rather than standing a fresh one up out of nothing.
   it('ends the fight when the last of a population is down', () => {
     const registry = loaded();
     const state = fighting(registry, 'punchbag');
-    // 24 hp at 10 a hit: three swings, so it falls at t=7.2.
     resolve(state, registry, secondsToMs(8));
 
     expect(state.inventory['rat-tail']).toBeUndefined();
@@ -142,8 +133,6 @@ describe('independent cadences', () => {
     expect(state.populations['den']['punchbag']).toEqual({ down: 1, due: [] });
   });
 
-  // One block, brought by whoever swings: the player is offered its own copy
-  // against each foe, and the rat's copy is never a choice of the player's.
   it('offers the two-sided action once per foe, and never as the foe own move', () => {
     const registry = loaded();
     const session = startSession(registry);
@@ -153,7 +142,6 @@ describe('independent cadences', () => {
   });
 });
 
-// `progress` is elapsed seconds, so raising a rate shortens the swing under way.
 describe('a rate raised mid-swing (absolute carry)', () => {
   function hasted(at: number): { registry: Registry; state: GameState } {
     const registry = loaded();
@@ -164,7 +152,6 @@ describe('a rate raised mid-swing (absolute carry)', () => {
   }
 
   it('lands the in-flight swing 0.72s later, not 0.96s or 1.2s', () => {
-    // 1.2s banked into a 2.4s swing; at 1.92s per swing, 0.72s remain.
     const { registry, state } = hasted(1.2);
     expect(playerClock(state).progress).toBe(secondsToMs(1.2));
 
@@ -182,7 +169,6 @@ describe('a rate raised mid-swing (absolute carry)', () => {
   it('quickens every later swing too', () => {
     const { registry, state } = hasted(1.2);
     resolve(state, registry, secondsToMs(12));
-    // 1.92, 3.84, 5.76, 7.68, 9.6, 11.52 — six swings where 25/min gave five.
     expect(playerClock(state).attemptsMade).toBe(6);
   });
 });
@@ -200,7 +186,6 @@ describe('two cadences stay associative', () => {
     };
 
     for (let trial = 0; trial < 25; trial++) {
-      // 60 and 120 are where 2.4 and 3.75 collide, so roster order must decide.
       const waypoints = new Set<number>([60, 120]);
       for (let i = 0; i < 3 + Math.floor(rand() * 6); i++) waypoints.add(rand() * 300);
       const sorted = [...waypoints].filter((t) => t > 0 && t < 300).sort((a, b) => a - b);
@@ -243,15 +228,11 @@ describe('the rat sheet', () => {
     });
   });
 
-  // `uses:` order is the tiebreak, and the pool the attacker carries is the
-  // filter: `shell-crack` comes first and reaches a pool the player has none of.
   it('answers with the first action in uses: whose depletes: names a pool the attacker has', () => {
     const registry = loaded();
     const state = fighting(registry);
     expect(state.activeAction!.roster!['giant-rat']).toEqual({ ownerRef: 'action.fight', actionSlug: 'fight', target: PLAYER });
 
-    // The same rat against a target that DOES carry a carapace answers with the
-    // earlier one, so the order is doing work rather than the filter alone.
     const shelled = loadModule(MODULE.replace('stats: attack 10, dr 0, max-health 100, attack-rate 25', 'stats: attack 10, dr 0, max-health 100, max-carapace 20, attack-rate 25'));
     const against = fighting(shelled);
     expect(against.activeAction!.roster!['giant-rat'].actionSlug).toBe('shell-crack');
@@ -264,9 +245,6 @@ describe('the rat sheet', () => {
   });
 });
 
-// The rewrite from `time: 60` + `speed: <per-minute stat>` to `rate: <stat>` has
-// to be arithmetic-neutral, or every timing assertion above is measuring the
-// change rather than the engine. These are the durations the suite is built on.
 describe('rate: as the per-minute cadence, to the millisecond', () => {
   const action = (registry: Registry, entityId: string, label: string) => registry.entities.get(entityId)!.actions.find((each) => each.label === label)!;
 

@@ -52,18 +52,16 @@ describe('# resource: parsing and defaults', () => {
     const registry = loadModule(MODULE);
 
     const health = registry.resources.get('health')!;
-    expect(health.title).toBe('Health'); // humanized default
+    expect(health.title).toBe('Health');
     expect(health.rate).toBe('regeneration');
     expect(health.max).toBe('max-health');
-    expect(health.start).toBeUndefined(); // absent => start full
+    expect(health.start).toBeUndefined();
     expect(health.display).toBe('full');
-    // A `# resource` declares the pool's shape and nothing else; what happens
-    // when it runs out is an event, and a handler on whoever it ran out for.
     expect(eventsFor(registry, 'health', 'on empty').map((event) => event.id)).toEqual(['fainting']);
     expect(eventsFor(registry, 'health', 'on full')).toEqual([]);
 
     const focus = registry.resources.get('focus')!;
-    expect(focus.rate).toBeUndefined(); // static pool, no rate stat
+    expect(focus.rate).toBeUndefined();
     expect(focus.start).toBe(0);
     expect(focus.display).toBe('minimal');
     expect(eventsFor(registry, 'focus', 'on full').map((event) => event.id)).toEqual(['focused']);
@@ -75,18 +73,18 @@ describe('# resource: parsing and defaults', () => {
     const state = createGameState();
     initResources(state, registry);
 
-    expect(state.resources['health']).toBe(toMilliUnits(20)); // full = statValue(max-health) base
-    expect(state.resources['focus']).toBe(0); // explicit start
+    expect(state.resources['health']).toBe(toMilliUnits(20));
+    expect(state.resources['focus']).toBe(0);
   });
 
   it('initResources only fills missing pools, so a loaded/mid-game level survives', () => {
     const registry = loadModule(MODULE);
     const state = createGameState();
-    restorePools(state, { health: 7 }); // pretend a save restored a damaged pool
+    restorePools(state, { health: 7 });
     initResources(state, registry);
 
-    expect(state.resources['health']).toBe(7); // restorePools writes the stored save value verbatim
-    expect(state.resources['focus']).toBe(0); // still filled
+    expect(state.resources['health']).toBe(7);
+    expect(state.resources['focus']).toBe(0);
   });
 
   it('a fresh baseline game carries full pools, so the save diff stays empty', () => {
@@ -145,13 +143,12 @@ describe('drain: / restore: — the direct pool write', () => {
 
     delete state.flags.fainted;
     applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: point(-5) }]);
-    expect(state.flags.fainted).toBeUndefined(); // already empty: no second crossing
+    expect(state.flags.fainted).toBeUndefined();
     expect(state.log).toEqual(['You collapse.']);
   });
 
   it('rolls a meter over per fill, batching the handler and keeping the remainder', () => {
     const { registry, state } = started();
-    // focus caps at 4 and starts at 0; +10 is two full meters with 2 left over.
     applyResultsNow(state, registry, [{ kind: 'pool', resource: 'focus', delta: point(10) }]);
     expect(state.resources['focus']).toBe(toMilliUnits(2));
     expect(state.inventory['focus-charge']).toBe(2);

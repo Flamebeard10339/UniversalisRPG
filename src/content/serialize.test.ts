@@ -1,11 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
-import path from 'node:path';
-import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
-import { formatModuleDiagnostic } from './registry';
-import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './load';
-import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from './serialize';
-import { ModuleSource, parseModuleSource, parseUniverse } from './universe';
+import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { LOCAL_CHANGES_MODULE_ID } from "./localChanges";
+import { formatModuleDiagnostic } from "./registry";
+import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from "./load";
+import {
+  canSerialize,
+  declaredGlobalIds,
+  roundTripModule,
+  roundTripUniverse,
+} from "./serialize";
+import { ModuleSource, parseModuleSource, parseUniverse } from "./universe";
 
 const FULL_MODULE = `
 # info base
@@ -147,73 +152,115 @@ submit-modal: race=Elf
 expect: blank
 `;
 
-describe('what the serializer prints, reached through the round trip that is its only door', () => {
+describe("what the serializer prints, reached through the round trip that is its only door", () => {
   function expectSemanticRoundTrip(source: ModuleSource): void {
     const parsed = parseModuleSource(source);
-    const trip = roundTripModule(loadUniverse([source]), { info: parsed.info, globals: declaredGlobalIds(parsed) }, (printed) =>
-      loadUniverseWithDiagnostics([{ ...source, text: printed }]),
+    const trip = roundTripModule(
+      loadUniverse([source]),
+      { info: parsed.info, globals: declaredGlobalIds(parsed) },
+      (printed) => loadUniverseWithDiagnostics([{ ...source, text: printed }]),
     );
 
     expect(trip.diagnostics.map(formatModuleDiagnostic)).toEqual([]);
     expect(trip.differences).toEqual([]);
   }
 
-  it('preserves the loaded semantics of a broad fixture', () => {
-    expectSemanticRoundTrip({ name: 'base', text: FULL_MODULE });
+  it("preserves the loaded semantics of a broad fixture", () => {
+    expectSemanticRoundTrip({ name: "base", text: FULL_MODULE });
   });
 
   // The directory is the manifest, the way the browser's glob and the shipped
   // replay both read it: a module added to content/ is round-tripped on the
   // commit that authors it. Reloaded as one universe rather than one at a time,
   // because a module naming another's ids does not load alone.
-  it('preserves the loaded semantics of every shipped module, as one universe', () => {
-    const dir = path.join(import.meta.dirname, '../../content');
+  it("preserves the loaded semantics of every shipped module, as one universe", () => {
+    const dir = path.join(import.meta.dirname, "../../content");
     const sources = readdirSync(dir)
-      .filter((name) => name.endsWith('.dsl'))
-      .map((name) => ({ name: name.replace(/\.dsl$/, ''), text: readFileSync(path.join(dir, name), 'utf8') }))
+      .filter((name) => name.endsWith(".dsl"))
+      .map((name) => ({
+        name: name.replace(/\.dsl$/, ""),
+        text: readFileSync(path.join(dir, name), "utf8"),
+      }))
       .filter((source) => source.name !== LOCAL_CHANGES_MODULE_ID);
     expect(sources.length).toBeGreaterThan(1);
 
     const modules = parseUniverse(sources);
-    const trip = roundTripUniverse(loadUniverse(sources), modules.filter(canSerialize), (printed) => loadUniverseWithDiagnostics(printed));
+    const trip = roundTripUniverse(
+      loadUniverse(sources),
+      modules.filter(canSerialize),
+      (printed) => loadUniverseWithDiagnostics(printed),
+    );
 
     expect(trip.diagnostics.map(formatModuleDiagnostic)).toEqual([]);
     expect(trip.differences).toEqual([]);
   });
 
-  it('prints readable canonical sections for the broad fixture', () => {
+  it("prints readable canonical sections for the broad fixture", () => {
     const registry = loadModule(FULL_MODULE);
-    const printed = roundTripModule(registry, { info: { id: 'base', version: [1, 2, 3], pack: 'core' }, globals: ['travel-seconds-per-unit'] }, (text) =>
-      loadUniverseWithDiagnostics([{ name: 'base', text }]),
+    const printed = roundTripModule(
+      registry,
+      {
+        info: { id: "base", version: [1, 2, 3], pack: "core" },
+        globals: ["travel-seconds-per-unit"],
+      },
+      (text) => loadUniverseWithDiagnostics([{ name: "base", text }]),
     ).printed;
     const roundTrip = loadModule(printed);
 
-    expect(printed).toContain('# info base');
-    expect(printed).toContain('# entity npc');
-    expect(printed).toContain('# action haul');
-    expect(printed).toContain('per-level: +2%');
-    expect(printed).toContain('per-level: +2-5');
-    expect(printed).toContain('per-level: -3%');
-    expect(printed).toContain('use: entity.base.npc.cheer');
-    expect(printed).toContain('+2 base.vigor per base.stamina');
-    expect(printed).toContain('drain: 4 base.stamina from them');
+    expect(printed).toContain("# info base");
+    expect(printed).toContain("# entity npc");
+    expect(printed).toContain("# action haul");
+    expect(printed).toContain("per-level: +2%");
+    expect(printed).toContain("per-level: +2-5");
+    expect(printed).toContain("per-level: -3%");
+    expect(printed).toContain("use: entity.base.npc.cheer");
+    expect(printed).toContain("+2 base.vigor per base.stamina");
+    expect(printed).toContain("drain: 4 base.stamina from them");
     // The one carrier whose labelled blocks were all actions until now, so its
     // hook and its action have to come back as two different things.
-    const mail = roundTrip.items.get('base.bramble-mail');
-    expect(mail?.onHit).toEqual([{ kind: 'chance', numerator: 1, denominator: 4, results: [{ kind: 'pool', resource: 'base.stamina', delta: { min: -3, max: -3 }, party: 'them' }] }]);
-    expect(mail?.whenHit).toEqual([{ kind: 'pool', resource: 'base.stamina', delta: { min: -2, max: -2 }, party: 'them' }]);
-    expect(mail?.actions.map((each) => each.label)).toEqual(['polish']);
-    expect(roundTrip.entities.get('base.npc')?.whenHit).toEqual([{ kind: 'pool', resource: 'base.stamina', delta: { min: 1, max: 1 } }]);
-    const npcAction = (label: string) => roundTrip.entities.get('base.npc')?.actions.find((each) => each.label === label);
-    expect(npcAction('haul')).toMatchObject({ kind: 'continuous', rate: 12 });
-    expect(npcAction('cheer')?.onSuccess).toEqual([{ kind: 'say', text: 'Hello.', key: 'base.entity.npc.say.0' }]);
-    expect(npcAction('sequence')?.results).toEqual([
-      { kind: 'set', variable: 'base.levered' },
-      { kind: 'say', text: 'Middle.', key: 'base.entity.npc.say.1' },
-      { kind: 'unset', variable: 'base.levered' },
+    const mail = roundTrip.items.get("base.bramble-mail");
+    expect(mail?.onHit).toEqual([
+      {
+        kind: "chance",
+        numerator: 1,
+        denominator: 4,
+        results: [
+          {
+            kind: "pool",
+            resource: "base.stamina",
+            delta: { min: -3, max: -3 },
+            party: "them",
+          },
+        ],
+      },
     ]);
-    expect(roundTrip.locations.get('base.grove')?.x).toBe(1);
-    expect(roundTrip.dialogues.get('base.npc-chat')?.owner).toBe('base.npc');
-    expect(roundTrip.tests.has('base.smoke')).toBe(true);
+    expect(mail?.whenHit).toEqual([
+      {
+        kind: "pool",
+        resource: "base.stamina",
+        delta: { min: -2, max: -2 },
+        party: "them",
+      },
+    ]);
+    expect(mail?.actions.map((each) => each.label)).toEqual(["polish"]);
+    expect(roundTrip.entities.get("base.npc")?.whenHit).toEqual([
+      { kind: "pool", resource: "base.stamina", delta: { min: 1, max: 1 } },
+    ]);
+    const npcAction = (label: string) =>
+      roundTrip.entities
+        .get("base.npc")
+        ?.actions.find((each) => each.label === label);
+    expect(npcAction("haul")).toMatchObject({ kind: "continuous", rate: 12 });
+    expect(npcAction("cheer")?.onSuccess).toEqual([
+      { kind: "say", text: "Hello.", key: "base.entity.npc.say.0" },
+    ]);
+    expect(npcAction("sequence")?.results).toEqual([
+      { kind: "set", variable: "base.levered" },
+      { kind: "say", text: "Middle.", key: "base.entity.npc.say.1" },
+      { kind: "unset", variable: "base.levered" },
+    ]);
+    expect(roundTrip.locations.get("base.grove")?.x).toBe(1);
+    expect(roundTrip.dialogues.get("base.npc-chat")?.owner).toBe("base.npc");
+    expect(roundTrip.tests.has("base.smoke")).toBe(true);
   });
 });

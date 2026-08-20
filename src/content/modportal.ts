@@ -1,26 +1,29 @@
-import { GLOBAL_SECTION_KINDS, sectionOf, type SectionKind } from './sectionKind';
-import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
-import { contributionBase, extractContributionDsl } from './contribution';
-import type { ContributionBase } from './contribution';
-import { parseModuleSource } from './universe';
-import { CONTENT_SECTION_MAPS, formatModuleDiagnostic } from './registry';
-import { loadUniverseWithDiagnostics } from './load';
-import type { Registry } from './registry';
-import type { ModuleSource } from './universe';
-import { declaredGlobalIds, republishModule } from './serialize';
-import { visitSection } from './referenceSites';
+import { GLOBAL_SECTION_KINDS, sectionOf, type SectionKind } from "./sections";
+import { LOCAL_CHANGES_MODULE_ID } from "./localChanges";
+import { contributionBase, extractContributionDsl } from "./contribution";
+import type { ContributionBase } from "./contribution";
+import { parseModuleSource } from "./universe";
+import { CONTENT_SECTION_MAPS } from "./sections";
+import { mapOf } from "./registry";
+import { formatModuleDiagnostic } from "./registry";
+import { loadUniverseWithDiagnostics } from "./load";
+import type { Registry } from "./registry";
+import type { ModuleSource } from "./universe";
+import { declaredGlobalIds, republishModule } from "./serialize";
+import { visitSection } from "./sections";
 
-export const MOD_PENDING_LABEL = 'mod-pending';
-export const MOD_APPROVED_LABEL = 'mod-approved';
-export const MOD_AUTO_ENABLED_LABEL = 'mod-auto-enabled';
+export const MOD_PENDING_LABEL = "mod-pending";
+export const MOD_APPROVED_LABEL = "mod-approved";
+export const MOD_AUTO_ENABLED_LABEL = "mod-auto-enabled";
 export const MODPORTAL_MANIFEST_VERSION = 2;
 
-export type ModTier = 'approved' | 'auto-enabled';
+export type ModTier = "approved" | "auto-enabled";
 
-export const LISTABLE_MOD_LABELS: readonly { label: string; tier: ModTier }[] = [
-  { label: MOD_APPROVED_LABEL, tier: 'approved' },
-  { label: MOD_AUTO_ENABLED_LABEL, tier: 'auto-enabled' },
-];
+export const LISTABLE_MOD_LABELS: readonly { label: string; tier: ModTier }[] =
+  [
+    { label: MOD_APPROVED_LABEL, tier: "approved" },
+    { label: MOD_AUTO_ENABLED_LABEL, tier: "auto-enabled" },
+  ];
 
 export interface ApprovedModIssue {
   number: number;
@@ -73,13 +76,13 @@ export interface ModportalManifest {
 }
 
 export function tierDefaultsEnabled(tier: ModTier): boolean {
-  return tier === 'auto-enabled';
+  return tier === "auto-enabled";
 }
 
 export function issueTier(issue: ApprovedModIssue): ModTier {
   if (issue.tier) return issue.tier;
   const labels = issue.labels?.map((label) => label.name) ?? [];
-  return labels.includes(MOD_AUTO_ENABLED_LABEL) ? 'auto-enabled' : 'approved';
+  return labels.includes(MOD_AUTO_ENABLED_LABEL) ? "auto-enabled" : "approved";
 }
 
 function generatedModuleId(issue: number): string {
@@ -91,9 +94,13 @@ function renamedId(id: string, from: string, to: string): string {
 }
 
 function replaceInfoId(source: string, from: string, to: string): string {
-  const pattern = new RegExp(`^(\\uFEFF?# info[ \\t]+)${from}(?=[ \\t]*(?:\\r?\\n|$))`, 'm');
+  const pattern = new RegExp(
+    `^(\\uFEFF?# info[ \\t]+)${from}(?=[ \\t]*(?:\\r?\\n|$))`,
+    "m",
+  );
   const replaced = source.replace(pattern, `$1${to}`);
-  if (replaced === source) throw new Error(`approved mod issue did not declare # info ${from}`);
+  if (replaced === source)
+    throw new Error(`approved mod issue did not declare # info ${from}`);
   return replaced;
 }
 
@@ -104,20 +111,45 @@ function cloned<T>(value: T): T {
 // A save is addressed by the key it hangs under and carries no `id` field, so
 // the field is rewritten where there is one and the key is rewritten either
 // way by the caller.
-function rewriteHydratedSection(kind: SectionKind, key: string, value: object, from: string, to: string): object {
-  const next = cloned(value) as { id?: string; stats?: Record<string, unknown> };
-  if (typeof next.id === 'string') next.id = renamedId(next.id, from, to);
-  if (kind === 'entity' && next.stats) {
-    next.stats = Object.fromEntries(Object.entries(next.stats).map(([statId, range]) => [renamedId(statId, from, to), range]));
+function rewriteHydratedSection(
+  kind: SectionKind,
+  key: string,
+  value: object,
+  from: string,
+  to: string,
+): object {
+  const next = cloned(value) as {
+    id?: string;
+    stats?: Record<string, unknown>;
+  };
+  if (typeof next.id === "string") next.id = renamedId(next.id, from, to);
+  if (kind === "entity" && next.stats) {
+    next.stats = Object.fromEntries(
+      Object.entries(next.stats).map(([statId, range]) => [
+        renamedId(statId, from, to),
+        range,
+      ]),
+    );
   }
-  visitSection(sectionOf(kind, next), `# ${kind} ${key}`, (_kind, id: string) => renamedId(id, from, to));
+  visitSection(sectionOf(kind, next), `# ${kind} ${key}`, (_kind, id: string) =>
+    renamedId(id, from, to),
+  );
   return next;
 }
 
-function localGlobalIds(parsed: ReturnType<typeof parseModuleSource>, moduleId: string): string[] {
+function localGlobalIds(
+  parsed: ReturnType<typeof parseModuleSource>,
+  moduleId: string,
+): string[] {
   return parsed.sections
     .filter((section) => GLOBAL_SECTION_KINDS.includes(section.kind))
-    .map((section) => renamedId((section.value as { id: string }).id, LOCAL_CHANGES_MODULE_ID, moduleId));
+    .map((section) =>
+      renamedId(
+        (section.value as { id: string }).id,
+        LOCAL_CHANGES_MODULE_ID,
+        moduleId,
+      ),
+    );
 }
 
 // Every map the rename has to reach is every map a kind lands in, which the row
@@ -130,14 +162,26 @@ function localGlobalIds(parsed: ReturnType<typeof parseModuleSource>, moduleId: 
 function renamedRegistry(loaded: Registry, moduleId: string): Registry {
   const registry = { ...loaded };
   for (const [kind, mapName] of CONTENT_SECTION_MAPS) {
-    const sourceMap = loaded[mapName] as ReadonlyMap<string, object>;
+    const sourceMap = mapOf(loaded, mapName) as unknown as ReadonlyMap<
+      string,
+      object
+    >;
     const next = new Map(sourceMap);
     for (const [id, value] of sourceMap) {
       if (!id.startsWith(`${LOCAL_CHANGES_MODULE_ID}.`)) continue;
       next.delete(id);
-      next.set(renamedId(id, LOCAL_CHANGES_MODULE_ID, moduleId), rewriteHydratedSection(kind, id, value, LOCAL_CHANGES_MODULE_ID, moduleId));
+      next.set(
+        renamedId(id, LOCAL_CHANGES_MODULE_ID, moduleId),
+        rewriteHydratedSection(
+          kind,
+          id,
+          value,
+          LOCAL_CHANGES_MODULE_ID,
+          moduleId,
+        ),
+      );
     }
-    (registry[mapName] as Map<string, object>) = next;
+    (registry as unknown as Record<string, unknown>)[mapName] = next;
   }
   return registry;
 }
@@ -145,36 +189,79 @@ function renamedRegistry(loaded: Registry, moduleId: string): Registry {
 // Canonicalising is an offer, not a promise: what the serializer cannot carry
 // travels as the author's own bytes under the new id instead. Every edit to
 // another module's content and every `# remove` is in that set.
-function canonicalLocalChangesModule(source: string, moduleId: string, base: readonly ModuleSource[]): string {
-  const asWritten = (): string => replaceInfoId(source, LOCAL_CHANGES_MODULE_ID, moduleId);
-  const checked = loadUniverseWithDiagnostics([...base, { name: LOCAL_CHANGES_MODULE_ID, text: source }]);
+function canonicalLocalChangesModule(
+  source: string,
+  moduleId: string,
+  base: readonly ModuleSource[],
+): string {
+  const asWritten = (): string =>
+    replaceInfoId(source, LOCAL_CHANGES_MODULE_ID, moduleId);
+  const checked = loadUniverseWithDiagnostics([
+    ...base,
+    { name: LOCAL_CHANGES_MODULE_ID, text: source },
+  ]);
   if (checked.diagnostics.length > 0) return asWritten();
-  const parsed = parseModuleSource({ name: LOCAL_CHANGES_MODULE_ID, text: source });
+  const parsed = parseModuleSource({
+    name: LOCAL_CHANGES_MODULE_ID,
+    text: source,
+  });
   const republished = republishModule(
     checked.registry,
     { info: parsed.info, globals: declaredGlobalIds(parsed) },
-    (printed) => loadUniverseWithDiagnostics([...base, { name: LOCAL_CHANGES_MODULE_ID, text: printed }]),
-    { registry: renamedRegistry(checked.registry, moduleId), options: { info: { ...parsed.info, id: moduleId }, globals: localGlobalIds(parsed, moduleId) } },
+    (printed) =>
+      loadUniverseWithDiagnostics([
+        ...base,
+        { name: LOCAL_CHANGES_MODULE_ID, text: printed },
+      ]),
+    {
+      registry: renamedRegistry(checked.registry, moduleId),
+      options: {
+        info: { ...parsed.info, id: moduleId },
+        globals: localGlobalIds(parsed, moduleId),
+      },
+    },
   );
   return republished.printed ?? asWritten();
 }
 
-export function materializeApprovedModIssue(issue: ApprovedModIssue, baseSources: readonly ModuleSource[] = []): MaterializedMod {
-  if (!Number.isInteger(issue.number) || issue.number <= 0) throw new Error('approved mod issue requires a positive issue number');
-  if (!issue.title) throw new Error(`approved mod issue #${issue.number} requires a title`);
-  if (!issue.body) throw new Error(`approved mod issue #${issue.number} has no body`);
+export function materializeApprovedModIssue(
+  issue: ApprovedModIssue,
+  baseSources: readonly ModuleSource[] = [],
+): MaterializedMod {
+  if (!Number.isInteger(issue.number) || issue.number <= 0)
+    throw new Error("approved mod issue requires a positive issue number");
+  if (!issue.title)
+    throw new Error(`approved mod issue #${issue.number} requires a title`);
+  if (!issue.body)
+    throw new Error(`approved mod issue #${issue.number} has no body`);
   const extracted = extractContributionDsl(issue.body);
-  const parsed = parseModuleSource({ name: `issue-${issue.number}`, text: extracted });
+  const parsed = parseModuleSource({
+    name: `issue-${issue.number}`,
+    text: extracted,
+  });
   const contribution = contributionBase(issue.body);
   // The universe a web contributor names is read rather than filed: a module
   // that does not depend on what its author says it targets was validated
   // against something other than what the maintainer is about to load.
-  const declared = parsed.info.dependencies.map((dependency) => dependency.module);
-  if (contribution.universe !== undefined && !declared.includes(contribution.universe)) {
-    throw new Error(`approved mod issue #${issue.number} targets universe ${contribution.universe}, which its module does not declare a dependency on (it declares ${declared.join(', ') || 'none'})`);
+  const declared = parsed.info.dependencies.map(
+    (dependency) => dependency.module,
+  );
+  if (
+    contribution.universe !== undefined &&
+    !declared.includes(contribution.universe)
+  ) {
+    throw new Error(
+      `approved mod issue #${issue.number} targets universe ${contribution.universe}, which its module does not declare a dependency on (it declares ${declared.join(", ") || "none"})`,
+    );
   }
-  const moduleId = parsed.info.id === LOCAL_CHANGES_MODULE_ID ? generatedModuleId(issue.number) : parsed.info.id;
-  const text = moduleId === parsed.info.id ? extracted : canonicalLocalChangesModule(extracted, moduleId, baseSources);
+  const moduleId =
+    parsed.info.id === LOCAL_CHANGES_MODULE_ID
+      ? generatedModuleId(issue.number)
+      : parsed.info.id;
+  const text =
+    moduleId === parsed.info.id
+      ? extracted
+      : canonicalLocalChangesModule(extracted, moduleId, baseSources);
   parseModuleSource({ name: moduleId, text });
   return {
     issue: issue.number,
@@ -207,9 +294,13 @@ export interface SyncPlan {
 // user asked for wins a conflict against one merely on by default.
 export function planModportalSync(plan: SyncPlan): ModportalManifest {
   const intent = plan.existing.intent;
-  const wanted = (mod: MaterializedMod): boolean => intent[String(mod.issue)] ?? tierDefaultsEnabled(mod.tier);
-  const chosen = (mod: MaterializedMod): boolean => intent[String(mod.issue)] === true;
-  const ordered = [...plan.materialized].sort((a, b) => Number(chosen(b)) - Number(chosen(a)) || a.issue - b.issue);
+  const wanted = (mod: MaterializedMod): boolean =>
+    intent[String(mod.issue)] ?? tierDefaultsEnabled(mod.tier);
+  const chosen = (mod: MaterializedMod): boolean =>
+    intent[String(mod.issue)] === true;
+  const ordered = [...plan.materialized].sort(
+    (a, b) => Number(chosen(b)) - Number(chosen(a)) || a.issue - b.issue,
+  );
 
   const admitted: ModuleSource[] = [];
   const entries: ModportalEntry[] = [];
@@ -229,7 +320,11 @@ export function planModportalSync(plan: SyncPlan): ModportalManifest {
     if (!wanted(mod)) continue;
 
     const source: ModuleSource = { name: mod.moduleId, text: mod.text };
-    const diagnostics = loadUniverseWithDiagnostics([...plan.base, ...admitted, source]).diagnostics.map(formatModuleDiagnostic);
+    const diagnostics = loadUniverseWithDiagnostics([
+      ...plan.base,
+      ...admitted,
+      source,
+    ]).diagnostics.map(formatModuleDiagnostic);
     if (diagnostics.length > 0) {
       entry.diagnostics = diagnostics;
       continue;

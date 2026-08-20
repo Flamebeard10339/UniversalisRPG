@@ -17,16 +17,11 @@ import { isModalFrame, pruneModals } from './modals';
 import { Localized, Localizer, localizerOf } from './localized';
 import { PLAYER, templateOf } from './state';
 
-// Bumped on any shape change; with no migration path, a stale save is rejected.
+// Bumped on any shape change; there is no migration path, so a stale save is rejected.
 export const SAVE_VERSION = 11;
 
-// A sparse diff against initialState: a new game saves as `{}`, and neither
-// `log` nor `language` is state — one is drained by reading it, the other is
-// the player's setting for the session rather than the world's.
 export type SaveDiff = Partial<Omit<GameState, 'log' | 'language'>>;
 
-// A Record over the exhaustive key type, so adding a GameState field is a type
-// error here until it is classified as diffed key-by-key or carried whole.
 type SaveField = Exclude<keyof GameState, 'log' | 'language'>;
 
 interface RecordPrune {
@@ -34,21 +29,11 @@ interface RecordPrune {
   loaded(registry: Registry, id: string): boolean;
 }
 
-// How a field survives a registry that no longer matches it.
 type Prune = RecordPrune | 'pruned by a rule of its own' | 'holds no registry id';
 
 interface SaveFieldRule {
-  // Whether a save diff carries this field key-by-key or whole.
   shape: 'record' | 'scalar';
-  // What the field will accept. A `# save` body is hand-written JSON that
-  // nothing else checks, so this is where a `"time":"potato"` is caught.
   holds(value: unknown): boolean;
-  // The least this field can carry and still get past `holds` — for a record
-  // field, the least one of its entries can be. A nullable field names its
-  // emptiest object rather than its null, because null is the case the loader
-  // already has an answer for and this is the sample that walks the rest of it.
-  // Every field carries one so that "what the gate accepts, the loader reads"
-  // is proved over this table rather than over a list somebody maintains.
   sparsest: unknown;
   prune: Prune;
 }
@@ -66,11 +51,6 @@ function everyValue(value: unknown, holds: (held: unknown) => boolean): boolean 
   return isObject(value) && Object.values(value as Record<string, unknown>).every(holds);
 }
 
-// What the pruner and the engine under it reach into without asking first.
-// `isObject` alone let a payload past this gate and into a `TypeError` raised
-// by the destructuring below it, which is the shape c14 forbids. These say what
-// a field is worth refusing *by name* for; what makes the clause hold for a
-// field nobody here thought of is `pruned` below, not the length of this list.
 const isActor = (value: unknown): boolean => at(value, 'resources', (held) => everyValue(held, isNumber)) && at(value, 'rateRemainders', (held) => everyValue(held, isNumber));
 
 const isCadence = (value: unknown): boolean => at(value, 'progress', isNumber) && at(value, 'attemptsMade', isInteger);
@@ -168,9 +148,6 @@ function pruneRecord<T>(
   }
 }
 
-// A travel pair is the one owner ref naming two things, and the only one whose
-// lookup throws, so it is asked about before the lookup rather than caught out
-// of it: what a player reads here comes from a key like everything else.
 function activeActionProblem(localizer: Localizer, state: GameState, registry: Registry): Localized | null {
   const active = state.activeAction;
   if (!active) return null;
@@ -197,8 +174,6 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   const localizer = localizerOf(registry, state);
   const named = localizer.identifier;
 
-  // First, so every rule under it asks a settled table rather than one still
-  // being pruned beneath it: a field holding an instance id gets one answer.
   warnings.push(...pruneInstances(state, registry));
   warnings.push(...prunePopulations(state, registry));
 
@@ -214,13 +189,8 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     pruneRecord(state[field] as unknown as Record<string, unknown>, field, (id) => rule.loaded(registry, id), rule.of, warnings, localizer);
   }
 
-  // Who counts as a character is this module's answer everywhere else in it, so
-  // the buff engine is handed the same one rather than deciding a second time.
   warnings.push(...pruneBuffs(state, registry, (actorId) => actorId === PLAYER || registry.entities.has(templateOf(actorId))));
 
-  // A worn id may spell a grown copy, and pruneInstances has already settled
-  // which of those are left, so an id that no longer resolves to one is read as
-  // the item id it would otherwise be and drops the same way a missing item does.
   for (const [slot, wornId] of Object.entries(state.equipped)) {
     const itemId = itemTemplate(state, wornId);
     const item = registry.items.get(itemId);
@@ -235,8 +205,6 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     addWarning(warnings, `modals.${name}`, name, localizer.engine('engine.prune.modal', { modal: named(name), reason }));
   }
 
-  // A walk whose destination or any of whose legs has gone is a walk to
-  // nowhere; there is no half of it worth keeping, so the whole of it goes.
   const journey = state.journey;
   if (journey) {
     const lost = [journey.to, ...journey.legs].find((place) => !registry.locations.has(place));
@@ -294,13 +262,6 @@ function checkSave(saved: ParsedSave): void {
   }
 }
 
-// The gate that exists to keep a corrupt payload out of the engine may not
-// itself be the thing that crashes on one. `checkSave` refuses what it knows to
-// look for and names the field; anything it did not think to look at reaches the
-// pruner and arrives here as a raw `TypeError` from a destructuring below. It
-// leaves as a diagnostic — which is what makes c14 hold for the field `Seat`
-// gains next month as well as for the ones written above, because a gate spelled
-// out as a list of fields is a list somebody has to keep in step with a type.
 function pruned(state: GameState, registry: Registry): PruneWarning[] {
   try {
     return pruneStateForRegistry(state, registry);
@@ -310,11 +271,9 @@ function pruned(state: GameState, registry: Registry): PruneWarning[] {
   }
 }
 
-// Mutates `state` in place: resets every field to initialState, then applies
 export function loadSave(state: GameState, saved: ParsedSave, registry: Registry): PruneWarning[] {
   checkSave(saved);
   const base = initialState(registry);
-  // A save outlives the load, so the state may not be built from its objects.
   const diff = structuredClone(saved.diff);
   const target = state as unknown as Record<string, unknown>;
   const baseline = base as unknown as Record<string, unknown>;
@@ -323,7 +282,6 @@ export function loadSave(state: GameState, saved: ParsedSave, registry: Registry
     target[field] = { ...(baseline[field] as object), ...(diff[field] as object) };
   }
   for (const field of SCALAR_FIELDS) {
-    // `in`, not `!== undefined`: a diff can carry an explicit undefined.
     if (field in diff) target[field] = diff[field];
     else if (field in baseline) target[field] = baseline[field];
     else delete target[field];

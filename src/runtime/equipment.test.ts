@@ -75,7 +75,7 @@ function fighting(registry: Registry, entityId: string): GameState {
 function damageDealt(state: GameState, entityId: string): number {
   const pool = state.activeAction!.actors![entityId].resources.health;
   const maxHealth = toMilliUnits(100000);
-  return (maxHealth - pool) / toMilliUnits(1); // damage per attempt in milli-units
+  return (maxHealth - pool) / toMilliUnits(1);
 }
 
 function damageTaken(state: GameState): number {
@@ -107,9 +107,6 @@ describe('equipment', () => {
     expect(equippedDamage).toBeGreaterThan(bareDamage);
   });
 
-  // Through the foe's retaliation rather than through the stat: the deliverable
-  // asks whether the shield changes damage taken, and a stat that moves without
-  // reaching `dr` would satisfy a stat assertion while changing nothing.
   it('equipment-slots: an equipped +defense item lowers incoming damage, a carried one does not', () => {
     const registry = loaded();
     const ATTEMPTS = 100;
@@ -134,8 +131,6 @@ describe('equipment', () => {
     expect(equippedTaken).toBeLessThan(bareTaken);
   });
 
-  // Against content/tutorial-island.dsl itself, not a copy of it: a copy would
-  // stay green after the shipped `slot:` or `+2 attack` changed underneath it.
   it('equipment-slots: the SHIPPED tutorial sword and shield move real stats once equipped', () => {
     const tutorial = loadInEnglish(readFileSync('content/tutorial-island.dsl', 'utf8'));
     const sword = 'tutorial-island.iron-sword';
@@ -149,8 +144,6 @@ describe('equipment', () => {
     const bareAttack = statValue('tutorial-island.attack', state, tutorial);
     const bareDefense = statValue('tutorial-island.defense', state, tutorial);
 
-    // Carried, not equipped: the tutorial hands both over at node `skills`, and
-    // holding them must not by itself move a stat.
     state.inventory[sword] = 1;
     state.inventory[shield] = 1;
     expect(statValue('tutorial-island.attack', state, tutorial)).toBe(bareAttack);
@@ -166,8 +159,6 @@ describe('equipment', () => {
     expect(statValue('tutorial-island.defense', state, tutorial)).toBe(bareDefense + 2);
   });
 
-  // c21: a worn copy is out of the stack, so it is the slot and nothing else
-  // that says the player has it, and it is worth its bonus on those terms.
   it('equipment-slots: a worn copy contributes on the strength of being worn, with no stack behind it', () => {
     const registry = loaded();
     const state = createGameState('arena');
@@ -181,8 +172,6 @@ describe('equipment', () => {
   });
 });
 
-// c21, and the whole of it: what the player carries and what they are wearing
-// are two places, a copy is in exactly one of them, and equipping is the move.
 describe('carried and worn are disjoint', () => {
   it('reads two carried and one equipped out of a stack of three, and three again once it comes off', () => {
     const registry = loaded();
@@ -211,12 +200,9 @@ describe('carried and worn are disjoint', () => {
     unequip(state, 'mainhand');
     expect(carriedCount(state, 'attack-bonus')).toBe(1);
     expect(carriesItem(state, grownId)).toBe(true);
-    // A grown copy is in no stack, so neither move writes one under its id.
     expect(state.inventory).toEqual({ 'attack-bonus': 0, whetstone: 0 });
   });
 
-  // A slot that is filled while it is occupied is two moves of one copy each:
-  // without the first, the copy that was in it is in no place at all.
   it('gives back what a slot was holding when another copy takes it', () => {
     const registry = loaded();
     const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
@@ -234,10 +220,6 @@ describe('carried and worn are disjoint', () => {
     expect(carriedCount(state, 'attack-bonus')).toBe(1);
   });
 
-  // An item id names the stack and not the copy in the slot, so what makes a
-  // second wearing possible is a stack that still has one — not the slot being
-  // free. Refusing on a stack of one is the same rule read where the stack has
-  // run out, and the two only look alike where nothing distinguishes them.
   it('wears a second copy out of a stack that still has one, and refuses once the stack is empty', () => {
     const registry = loaded();
     const state = carrying(registry, { 'attack-bonus': 3 });
@@ -271,7 +253,7 @@ function fed(state: GameState, registry: Registry, target: string): string {
 
 function reloaded(state: GameState, registry: Registry): GameState {
   const target = initialState(registry);
-  loadSave(target, parseSaveSection({ kind: 'save', id: 'x', body: [{ text: serializeSave(state, registry), span: { start: 0, end: 0 }, children: [] }], span: { start: 0, end: 0 } }).saved, registry);
+  loadSave(target, parseSaveSection({ kind: 'save', id: 'x', body: [{ text: serializeSave(state, registry), span: { start: 0, end: 0 }, children: [] }], span: { start: 0, end: 0 } }), registry);
   return target;
 }
 
@@ -307,9 +289,6 @@ describe('a grown item is worn like any other', () => {
     expect(statValue('attack', state, registry)).toBe(BARE + 2);
   });
 
-  // The slot follows the copy only when the stack it came out of is empty:
-  // with copies still in it the worn id still names something the player has,
-  // and moving the slot would change what they wear without being asked.
   it('leaves a slot on the stack when growing one copy did not empty it', () => {
     const registry = loaded();
     const state = carrying(registry, { 'attack-bonus': 2, whetstone: 1 });
@@ -337,8 +316,6 @@ describe('a grown item is worn like any other', () => {
     const grownId = fed(state, registry, 'attack-bonus');
     equip(state, registry, grownId);
 
-    // Pruning drops the copy first and the slot after, so the slot is reported
-    // against the id it was holding rather than against the item that has gone.
     const warnings = pruneStateForRegistry(state, loaded(MODULE.replace('# item attack-bonus\nslot: mainhand\nmax-level: 10\n+2 attack\n', '')));
     expect(warnings.map((warning) => warning.message)).toContain(`Removed instance ${grownId} because its template attack-bonus is not loaded.`);
     expect(warnings.map((warning) => warning.message)).toContain(`Unequipped mainhand because its item ${grownId} is not loaded.`);

@@ -2,17 +2,9 @@ import { isEngineKey, type EngineKey } from '../content/locale';
 import { carriedName } from './carriedName';
 import type { Localized, Localizer, Params } from './localized';
 
-// A sentence the engine has settled on and has not said yet: the key, and the
-// parameters it takes. What a save holds, because which words it is depends on
-// who loads it, and a save is read by whoever does.
 export type Said =
-  // An engine pattern, whose parameters are themselves unsaid.
   | { readonly engine: EngineKey; readonly params?: Readonly<Record<string, Said>> }
-  // A carried thing, named by the one rule every screen names one by: the
-  // template, and the ordinal of the copy or null for one still in its stack.
   | { readonly copy: { readonly kind: string; readonly template: string; readonly ordinal: string | null } }
-  // A value that is an id rather than words, and a number, which no language
-  // spells with letters here.
   | { readonly id: string }
   | { readonly count: number };
 
@@ -35,9 +27,6 @@ export function say(localizer: Localizer, said: Said): Localized {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-// Shape only, and the key checked against the union, because a save naming a
-// key this engine does not have is a save that would render as that key
-// forever rather than one that is merely stale.
 export function isSaid(value: unknown): value is Said {
   if (!isRecord(value)) return false;
   if ('id' in value) return typeof value.id === 'string' && Object.keys(value).length === 1;

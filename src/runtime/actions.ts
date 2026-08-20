@@ -40,30 +40,18 @@ function locationDistance(a: Location, b: Location): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
-// A travel ownerRef packs both ends of the journey into one objId, and a module
-// namespaces its ids with dots, so the pair is joined by a character an id
-// cannot contain.
 export const TRAVEL_PAIR = '>';
 
 export const travelPair = (origin: string, dest: string): string => `${origin}${TRAVEL_PAIR}${dest}`;
 
-// What addresses a compiled travel, which is an id and not its label: the label
-// is display text that no surface draws — a walk under way is said by
-// `engine.travel.to` — and a save holds this. `humanizeEn` fills the label from
-// it exactly as a `# action` with no `title:` is filled, so the two are visibly
-// not the same string and a caller reaching for the wrong one does not arm.
 export const TRAVEL_ADDRESS = 'travel';
 
-// The two ends of a pair, and what is said about either of them being gone.
-// Asked rather than thrown wherever the answer reaches a player.
 export function travelEndProblem(localizer: Localizer, originId: string, destId: string, registry: Registry): Localized | null {
   if (!registry.locations.has(originId)) return localizer.engine('engine.travel.unknown-origin', { location: localizer.identifier(originId) });
   if (!registry.locations.has(destId)) return localizer.engine('engine.travel.unknown-destination', { location: localizer.identifier(destId) });
   return null;
 }
 
-// Shaped as a one-attempt fight so a journey spans like any other action. The
-// origin comes from the ownerRef: state.location holds it until relocate fires.
 export function travelAction(originId: string, destId: string, registry: Registry): ActionDeclaration {
   const problem = travelEndProblem(localizerFor(registry, BASE_LANGUAGE), originId, destId, registry);
   if (problem) throw new RuntimeError(problem);
@@ -93,15 +81,12 @@ export function findActiveAction(active: ActiveAction, registry: Registry): Acti
 
 export type FightOutcome = 'completion' | 'unfinished';
 
-// Reads authored fields only, so it cannot flip partway and strand a planned batch.
 export function resolvesPerAttempt(action: Action): boolean {
   return action.accuracy !== undefined || action.depletes !== undefined;
 }
 
-// Visibility is excluded: a fight must not abort because a kill count hid it.
 export function actionStillValid(action: Action, active: ActiveAction, state: GameState): boolean {
   if (!requiresMet(action, state)) return false;
-  // A single completion's worth was already checked when the action armed.
   return !active.repeating || inputLimit(action, state).completions > 0;
 }
 
@@ -122,14 +107,8 @@ export function perCompletionCost(action: Action): Map<string, number> {
 }
 
 export interface InputLimit {
-  // What the stack can pay for, which is what the action may actually run.
   completions: number;
-  // An input the player does not have at all, however it is spelled.
   short?: string;
-  // An input the player has only out of its stack — grown, worn, or both. It
-  // affords the cost, so the action is offered and the recipe is craftable, and
-  // it is refused at the moment of spending because neither is ever taken. Which
-  // of the two is named, because the sentence refusing it says why.
   unspendable?: { item: string; kind: 'grown' | 'worn' };
 }
 
@@ -151,15 +130,10 @@ export function outcomeResults(action: Action, outcome: FightOutcome): ActionRes
   return outcome === 'completion' ? [...action.results, ...(action.onSuccess ?? [])] : (action.onUnfinished ?? []);
 }
 
-// Deliberately shallow. A `stop` nested inside a selector is reached by
-// `samplesPerApplication`, which applies such a group one repetition at a time
-// and breaks the moment one stops — so the cap here would be a second guard over
-// the same case, and no test can tell the two readings apart.
 export function stopsOnOutcome(action: Action, outcome: FightOutcome): boolean {
   return outcomeResults(action, outcome).some((result) => result.kind === 'stop');
 }
 
-// A `stop` caps the batch at one completion, or a batched span stops nothing.
 export function fightBatch(action: Action, count: number, outcome: FightOutcome): { results: ActionResult[]; count: number } {
   const results = outcomeResults(action, outcome);
   return { results, count: stopsOnOutcome(action, outcome) ? Math.min(count, 1) : count };

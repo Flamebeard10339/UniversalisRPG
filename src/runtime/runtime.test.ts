@@ -131,8 +131,6 @@ describe('evaluateCondition', () => {
 });
 
 describe('applyResult', () => {
-  // Only a `pool` result reads content; every other verb touches state alone,
-  // so these gates run against an empty registry.
   const registry = loadInEnglish('');
 
   it('sets and unsets flags', () => {
@@ -393,7 +391,6 @@ open:
     useAction('entity', 'oven', 'roast', registry, state);
     expect(state.time).toBe(secondsToMs(4));
     expect(state.inventory['roasted-chestnut']).toBe(1);
-    // repeating: stays armed for a live driver (or another wait()) to continue.
     expect(state.activeAction).not.toBeNull();
   });
 });
@@ -435,7 +432,7 @@ out: 1 cooked-shrimp
     expect(armed).toEqual({ armed: true, firstUnit: secondsToMs(2) });
     expect(state.time).toBe(0);
     expect(state.inventory['cooked-shrimp'] ?? 0).toBe(0);
-    expect(state.inventory['raw-shrimp']).toBe(1); // not consumed until resolve()
+    expect(state.inventory['raw-shrimp']).toBe(1);
 
     craft('cook', registry, state);
     expect(state.time).toBe(secondsToMs(2));
@@ -443,13 +440,6 @@ out: 1 cooked-shrimp
   });
 });
 
-// Four repeating deterministic actions against a 30-unit pool their own results
-// drain, so each settles `on empty:` a few grinds into a span rather than at
-// whatever segment boundary the caller happens to ask for. They differ in what
-// the batch planner has to see through: `sap` is settled by a rate as well,
-// `ichor`'s drain is drawn from a selector rather than fixed at 12, and `ash`
-// says its piece without a `stop`, so its action grinds on against a pool that
-// is already empty.
 const DRAIN_MODULE = `
 # stat max-vigor
 base: 30
@@ -584,8 +574,6 @@ describe('a deterministic batch settles `on empty:` at the completion that drain
   });
 
   it('reads a rate settling the same pool, which crosses zero a grind before the results alone would', () => {
-    // -300/min is 5 a second against 12 a grind: 30 is gone on the second one,
-    // where results alone reach it on the third and the rate alone at t=6.
     const oneShot = grinding('millstone', 'grind', [200]);
 
     expect(oneShot.inventory['trophy']).toBe(2);

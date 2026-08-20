@@ -1,17 +1,18 @@
-import { DslError, Parser } from './parser';
+import { DslError, Parser } from "./parser";
 
-export type DependencyPrefix = 'required' | 'incompatible' | 'unordered' | 'optional' | 'recommended';
+export type DependencyPrefix =
+  "required" | "incompatible" | "unordered" | "optional" | "recommended";
 
 // Factorio's prefixes, whose grammar this follows:
 // https://lua-api.factorio.com/latest/auxiliary/mod-structure.html
 const PREFIXES: Record<string, DependencyPrefix> = {
-  '!': 'incompatible',
-  '~': 'unordered',
-  '?': 'optional',
-  '+': 'recommended',
+  "!": "incompatible",
+  "~": "unordered",
+  "?": "optional",
+  "+": "recommended",
 };
 
-export type VersionOperator = '<' | '<=' | '=' | '>=' | '>';
+export type VersionOperator = "<" | "<=" | "=" | ">=" | ">";
 
 export type Version = readonly number[];
 
@@ -25,14 +26,18 @@ export interface Dependency {
 export const version: Parser<Version> = {
   parse(cursor) {
     const raw = cursor.take(/\d+(?:\.\d+)*/);
-    if (raw === null) throw new DslError('expected a version like 1.0.0', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
-    return raw.split('.').map(Number);
+    if (raw === null)
+      throw new DslError("expected a version like 1.0.0", {
+        start: cursor.abs(cursor.pos),
+        end: cursor.abs(cursor.pos),
+      });
+    return raw.split(".").map(Number);
   },
   print: (value) => formatVersion(value),
-  examples: ['1', '0.1', '1.0.0'],
+  examples: ["1", "0.1", "1.0.0"],
 };
 
-export const formatVersion = (value: Version): string => value.join('.');
+export const formatVersion = (value: Version): string => value.join(".");
 
 export function compareVersions(left: Version, right: Version): number {
   for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
@@ -42,26 +47,35 @@ export function compareVersions(left: Version, right: Version): number {
   return 0;
 }
 
-export function satisfies(actual: Version, operator: VersionOperator, required: Version): boolean {
+export function satisfies(
+  actual: Version,
+  operator: VersionOperator,
+  required: Version,
+): boolean {
   const order = compareVersions(actual, required);
   switch (operator) {
-    case '<':
+    case "<":
       return order < 0;
-    case '<=':
+    case "<=":
       return order <= 0;
-    case '=':
+    case "=":
       return order === 0;
-    case '>=':
+    case ">=":
       return order >= 0;
-    case '>':
+    case ">":
       return order > 0;
   }
 }
 
 export function formatDependency(value: Dependency): string {
-  const symbol = Object.keys(PREFIXES).find((key) => PREFIXES[key] === value.prefix);
-  const head = symbol === undefined ? value.module : `${symbol} ${value.module}`;
-  return value.operator === undefined ? head : `${head} ${value.operator} ${formatVersion(value.version!)}`;
+  const symbol = Object.keys(PREFIXES).find(
+    (key) => PREFIXES[key] === value.prefix,
+  );
+  const head =
+    symbol === undefined ? value.module : `${symbol} ${value.module}`;
+  return value.operator === undefined
+    ? head
+    : `${head} ${value.operator} ${formatVersion(value.version!)}`;
 }
 
 export const dependency: Parser<Dependency> = {
@@ -69,9 +83,13 @@ export const dependency: Parser<Dependency> = {
     const symbol = cursor.take(/[!~?+]/);
     cursor.take(/[ \t]*/);
     const module = cursor.take(/[a-z][a-z0-9-]*/);
-    if (module === null) throw new DslError('expected a module id', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+    if (module === null)
+      throw new DslError("expected a module id", {
+        start: cursor.abs(cursor.pos),
+        end: cursor.abs(cursor.pos),
+      });
 
-    const prefix = symbol === null ? 'required' : PREFIXES[symbol];
+    const prefix = symbol === null ? "required" : PREFIXES[symbol];
     cursor.take(/[ \t]*/);
     const operator = cursor.take(/<=|>=|<|=|>/) as VersionOperator | null;
     if (operator === null) return { prefix, module };
@@ -79,5 +97,13 @@ export const dependency: Parser<Dependency> = {
     return { prefix, module, operator, version: version.parse(cursor) };
   },
   print: (value) => formatDependency(value),
-  examples: ['core', '! oldmod', '~ other', '? extras', '+ nice', '? extras >= 1.2.0', 'core = 2.0.0'],
+  examples: [
+    "core",
+    "! oldmod",
+    "~ other",
+    "? extras",
+    "+ nice",
+    "? extras >= 1.2.0",
+    "core = 2.0.0",
+  ],
 };

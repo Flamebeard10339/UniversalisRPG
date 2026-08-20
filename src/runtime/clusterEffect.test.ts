@@ -117,8 +117,6 @@ function carrying(inventory: Record<string, number>): GameState {
   return state;
 }
 
-// One copy, fed a level per position it is about to spend one on plus a
-// spare, with those positions allocated in the origin cluster.
 function grown(itemId: string, positions: number[], extra: Record<string, number> = {}): GameState {
   const state = carrying({ [itemId]: 1, whetstone: positions.length + 1, ...extra });
   let target = ok(feedItem(state, registry, itemId, 'whetstone'));
@@ -203,9 +201,6 @@ describe('applying a cluster effect', () => {
     expect(state.inventory).toEqual({ blade: 1, 'lesser-orb': 0 });
   });
 
-  // c15: never to a jewel in inventory. A jewel declares no `slot:`, so it is
-  // not a base and has no plane for the effect to be recorded against — and
-  // both items survive, still stackable and still usable for what they are.
   it('refuses a jewel in inventory as its target, leaving both items stacked and uninstanced', () => {
     const state = carrying({ 'node-jewel': 3, 'lesser-orb': 1 });
     expect(refusalOf(applyClusterEffect(state, registry, 'node-jewel', 'lesser-orb', ORIGIN))).toBe('node-jewel is not a base: only an item you can wear has a plane to grow');
@@ -214,9 +209,6 @@ describe('applying a cluster effect', () => {
     expect(state.instances.byId).toEqual({});
   });
 
-  // c9's orb third of "a consumable, a jewel and an orb have no plane": an
-  // orb declares no `slot:` either, so it is exactly as inert a target as the
-  // jewel case above.
   it('refuses an orb in inventory as its target, leaving both items stacked and uninstanced', () => {
     const state = carrying({ 'lesser-orb': 1, 'greater-orb': 1 });
     expect(refusalOf(applyClusterEffect(state, registry, 'lesser-orb', 'greater-orb', ORIGIN))).toBe('lesser-orb is not a base: only an item you can wear has a plane to grow');
@@ -262,7 +254,6 @@ describe('an effect scales a payload without moving it between channels', () => 
 });
 
 describe('an effect stops at its cluster and a percent payload does not', () => {
-  // The origin's node cluster and the one slotted east of it both carry hale.
   const twoClusters = (): GameState => {
     const state = carrying({ 'chain-blade': 1, 'node-jewel': 1, 'lesser-orb': 1, whetstone: 3 });
     let target = ok(feedItem(state, registry, 'chain-blade', 'whetstone'));

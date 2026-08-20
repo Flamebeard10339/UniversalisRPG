@@ -101,8 +101,6 @@ function carrying(inventory: Record<string, number>): GameState {
   return state;
 }
 
-// One copy, fed a level per position it spends one on plus a spare, with those
-// positions allocated in the origin cluster.
 function grown(itemId: string, positions: number[], extra: Record<string, number> = {}): GameState {
   const state = carrying({ [itemId]: 1, whetstone: positions.length + 1, ...extra });
   let target = ok(feedItem(state, registry, itemId, 'whetstone'));
@@ -114,8 +112,6 @@ function grown(itemId: string, positions: number[], extra: Record<string, number
 function contribution(state: GameState, id: string): StatContribution[] {
   const item = registry.items.get(itemTemplate(state, id));
   if (!item) throw new Error(`no item behind ${id}`);
-  // The counter comes off the state, exactly as `statRange` supplies it: a
-  // fold asked without one reads every `per` payload as nothing at all.
   return itemContribution(registry, item, itemInstance(state, id), counterLevels(state));
 }
 
@@ -183,8 +179,6 @@ describe('a plane payload paid per counter', () => {
     const state = raging(3);
     state.inventory['edge-orb'] = 1;
     ok(applyClusterEffect(state, registry, '1', 'edge-orb', ORIGIN));
-    // Both factors, and neither instead of the other: 5% per point, three
-    // points held, and a quarter again from the orb.
     expect(on(contribution(state, '1'), 'attack').increased).toBeCloseTo(5 * 3 * 1.25, 10);
   });
 });

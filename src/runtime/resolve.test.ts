@@ -8,12 +8,6 @@ import { Registry } from '../content/registry';
 import { loadModule } from '../content/load';
 import { secondsToMs, toMilliUnits } from './units';
 
-// Fixtures: campfire-cook (no in:, so an infinite input limit), smokehouse-cook
-// (in: raw-shrimp bounds it), grill-cook (accuracy-gated, burns on a miss),
-// torch (a plain duration action with a real time:), and tree (a deterministic
-// multi-hit fight).
-// The three cooks are recipes because turning inputs into outputs is what a
-// recipe models; tree stays an entity action, for the reason given at its use.
 const MODULE = `
 // Completions per minute: 60/min is one a second, and a +100% buff halves that
 // to 0.5s without the action naming a number at all.
@@ -192,8 +186,6 @@ function loaded(): Registry {
   return loadModule(MODULE);
 }
 
-// Read through `actionAddress` rather than off the label, because what a save
-// holds is the address and the two are no longer the same string.
 function recipeActive(registry: Registry, recipeId: string): ActiveAction {
   const action = registry.recipeActions.get(recipeId)!;
   const slug = actionAddress(action);
@@ -213,11 +205,9 @@ describe('resolve: associativity (the core invariant)', () => {
   it('resolve(resolve(s, t1), t2) === resolve(s, t2) for random split points, including the buff-expiry instant and mid-completion splits', () => {
     const registry = loaded();
 
-    // One big jump, straight to t=1000.
     const oneShot = withCampfireCooking(registry, true);
     resolve(oneShot, registry, secondsToMs(1000));
 
-    // Seeded so a failure reproduces without depending on Math.random.
     let seed = 42;
     const rand = () => {
       seed = (seed * 1103515245 + 12345) % 2147483648;
@@ -225,9 +215,9 @@ describe('resolve: associativity (the core invariant)', () => {
     };
 
     for (let trial = 0; trial < 25; trial++) {
-      const waypoints = new Set<number>([500]); // force a split exactly at the buff's expiry
+      const waypoints = new Set<number>([500]);
       const splitCount = 3 + Math.floor(rand() * 5);
-      for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 1000); // random mid-completion splits (duration is 0.5 and 1, so these rarely land on a boundary)
+      for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 1000);
       const sorted = [...waypoints].filter((t) => t > 0 && t < 1000).sort((a, b) => a - b);
       sorted.push(1000);
 
@@ -238,8 +228,6 @@ describe('resolve: associativity (the core invariant)', () => {
       expect(folded.inventory).toEqual(oneShot.inventory);
       expect(folded.activeAction).toEqual(oneShot.activeAction);
       expect(folded.buffs).toEqual(oneShot.buffs);
-      // xp must batch per completion, not per segment: this is what catches a
-      // non-associative batch where a live driver over-fires against the REPL.
       expect(folded.flags).toEqual(oneShot.flags);
       expect(folded.xp).toEqual(oneShot.xp);
       expect(folded.resources).toEqual(oneShot.resources);
@@ -266,7 +254,7 @@ describe('resolve: associativity (the core invariant)', () => {
     };
 
     for (let trial = 0; trial < 15; trial++) {
-      const waypoints = new Set<number>([28]); // exactly the exhaustion instant
+      const waypoints = new Set<number>([28]);
       for (let i = 0; i < 4; i++) waypoints.add(rand() * 1000);
       const sorted = [...waypoints].filter((t) => t > 0 && t < 1000).sort((a, b) => a - b);
       sorted.push(1000);
@@ -282,8 +270,6 @@ describe('resolve: associativity (the core invariant)', () => {
   });
 });
 
-// The one shape where clamping is not associative: writing each drain immediately
-// floors the pool at 0 and lets the rate refill it, so the split changes the level.
 describe('resolve: direct pool writes stay associative alongside a rate', () => {
   function draining(registry: Registry, entityId: string, label: string): GameState {
     const state = createGameState('nowhere');
@@ -292,15 +278,12 @@ describe('resolve: direct pool writes stay associative alongside a rate', () => 
     return state;
   }
 
-  // Starts 30, +60/min, drained 2 per completion at one a second — net -1/s, so
-  // 25s leaves it mid-range rather than saturated where any two answers agree.
   const HORIZON = 25;
 
   it('holds for a deterministic repeating drain across random split points', () => {
     const registry = loaded();
     const oneShot = draining(registry, 'grindstone', 'sharpen');
     resolve(oneShot, registry, secondsToMs(HORIZON));
-    // Pinning the value rules out the clamp-per-write reading, which refills to 25.
     expect(oneShot.resources['vigor']).toBe(toMilliUnits(5));
     expect(oneShot.inventory['edge']).toBe(25);
 
@@ -328,7 +311,7 @@ describe('resolve: direct pool writes stay associative alongside a rate', () => 
     const registry = loaded();
     const oneShot = draining(registry, 'whetstone', 'grind');
     resolve(oneShot, registry, secondsToMs(HORIZON));
-    expect(oneShot.inventory['edge']).toBeGreaterThan(0); // misses alone would make this vacuous
+    expect(oneShot.inventory['edge']).toBeGreaterThan(0);
 
     let seed = 13;
     const rand = () => {
@@ -389,8 +372,6 @@ describe('resolve: input-limited repeating action ends in O(1) segments (test 4)
     expect(state.inventory['cooked-shrimp']).toBe(28);
     expect(state.inventory['raw-shrimp']).toBe(0);
     expect(state.activeAction).toBeNull();
-    // The point of the closed-form segment math is that cost is independent of the
-    // target time and the completion count. A generous ceiling catches a fixed-dt.
     expect(elapsedMs).toBeLessThan(50);
   });
 
@@ -428,7 +409,7 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
   it('craft() on a repeating recipe produces exactly one completion, then stays active for a later resolve()/wait to continue', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
-    expect(() => craft('smokehouse-cook', registry, state)).toThrow(RuntimeError); // no raw-shrimp: recipeCraftable gate fails atomically
+    expect(() => craft('smokehouse-cook', registry, state)).toThrow(RuntimeError);
     expect(state.activeAction).toBeNull();
 
     state.inventory['raw-shrimp'] = 10;
@@ -452,8 +433,6 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
     expect(statValue('cooking-rate', state, registry)).toBe(120);
   });
 
-  // While this hung off useAction, a food with a `time:` buffed in instant mode
-  // and not at all once a live driver armed it.
   it('grants a slow meal’s buff on the armed path as well as the instant one, with the clock starting when the bowl is empty', () => {
     const registry = loaded();
 
@@ -463,13 +442,12 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
 
     const armed = createGameState('nowhere');
     armed.inventory['stew'] = 1;
-    armAction('item', 'stew', 'eat', registry, armed); // what beginAction does for a live driver
+    armAction('item', 'stew', 'eat', registry, armed);
     resolve(armed, registry, secondsToMs(10));
 
     for (const state of [instant, armed]) {
       expect(state.inventory['stew']).toBe(0);
       expect(statValue('cooking-rate', state, registry)).toBe(120);
-      // The 60s window starts at the last spoonful, not when the bowl was picked up.
       expect(buffsOf(state, PLAYER)[0].expiresAt).toBe(secondsToMs(63));
     }
   });
@@ -483,16 +461,11 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
     expect(state.log).toEqual(['The torch flares to life.']);
   });
 
-  // A continuous action with no cadence used to reach the runtime and be caught
-  // by a positive-duration guard there; the kind refuses it at load instead, so
-  // the loop it would have spun is now unauthorable.
   it('a continuous action with no cadence is a load error, not a runtime one', () => {
     const module = ['# item ash', 'examine: Grey.', '# entity broken-oven', 'cook:', '  continuous', '  give: 1 ash'].join('\n');
     expect(() => loadModule(module)).toThrow(/continuous action needs a time: or rate:/);
   });
 
-  // A rate stat reading 0 makes the duration Infinity, which slips through every
-  // `<= 0` guard; the resulting NaN serializes to null and survives a save.
   it('an action whose rate stat reads 0 refuses to start rather than resolving an infinite attempt duration', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
@@ -503,9 +476,6 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
   });
 });
 
-// grill-cook is STOCHASTIC (cooking 100 vs complexity 60 => ~0.72, and a miss on
-// the one attempt a craft gets fails to `burnt`, since accuracy compiles to
-// attempts: 1). tree is DETERMINISTIC: health 3 at 1/hit is always 3 attempts.
 function withGrillCooking(registry: Registry, rawShrimp: number): GameState {
   const state = createGameState('nowhere');
   state.inventory['raw-shrimp'] = rawShrimp;
@@ -526,7 +496,6 @@ describe('resolve: stochastic associativity — the accuracy/RNG core gate', () 
     const oneShot = withGrillCooking(registry, 100_000);
     resolve(oneShot, registry, secondsToMs(200));
 
-    // A separate seeded LCG for split points, distinct from the state.rng under test.
     let seed = 99;
     const rand = () => {
       seed = (seed * 1103515245 + 12345) % 2147483648;
@@ -536,7 +505,7 @@ describe('resolve: stochastic associativity — the accuracy/RNG core gate', () 
     for (let trial = 0; trial < 25; trial++) {
       const waypoints = new Set<number>();
       const splitCount = 3 + Math.floor(rand() * 6);
-      for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 200); // random mid-attempt splits (duration is 1s, these rarely land on an attempt boundary)
+      for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 200);
       const sorted = [...waypoints].filter((t) => t > 0 && t < 200).sort((a, b) => a - b);
       sorted.push(200);
 
@@ -550,8 +519,6 @@ describe('resolve: stochastic associativity — the accuracy/RNG core gate', () 
       expect(folded.log.length).toBe(oneShot.log.length);
       expect(folded.activeAction).toEqual(oneShot.activeAction);
       expect(folded.buffs).toEqual(oneShot.buffs);
-      // The draw deciding attempt N must be the SAME draw however the calls split.
-      // An RNG keyed by segment count instead of attempt order would break here.
       expect(folded.rng).toBe(oneShot.rng);
     }
   });
@@ -563,7 +530,7 @@ describe('resolve: raw-to-burnt outcome distribution (accuracy < 1, attempts: 1)
     const fights = 500;
     const state = withGrillCooking(registry, fights);
 
-    resolve(state, registry, secondsToMs(fights * 10)); // generous horizon; input runs out well before this
+    resolve(state, registry, secondsToMs(fights * 10));
 
     const cooked = state.inventory['cooked-shrimp'] ?? 0;
     const burnt = state.inventory['burnt-shrimp'] ?? 0;
@@ -580,19 +547,19 @@ describe('resolve: deterministic multi-hit fights (implicit target, no accuracy)
     const registry = loaded();
 
     const oneShot = withTreeChopping();
-    resolve(oneShot, registry, secondsToMs(3)); // exactly one full fight (3 attempts * 1s)
+    resolve(oneShot, registry, secondsToMs(3));
     expect(oneShot.inventory['wood']).toBe(1);
-    expect(oneShot.activeAction).toEqual({ ownerRef: 'entity.tree', actionSlug: 'chop', repeating: true, implicitTarget: toMilliUnits(1), cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionSlug: 'chop', target: 'tree' } } }); // rearmed fresh
+    expect(oneShot.activeAction).toEqual({ ownerRef: 'entity.tree', actionSlug: 'chop', repeating: true, implicitTarget: toMilliUnits(1), cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionSlug: 'chop', target: 'tree' } } });
 
     const midFight = withTreeChopping();
-    resolve(midFight, registry, secondsToMs(1)); // 1 of 3 attempts
+    resolve(midFight, registry, secondsToMs(1));
     expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionSlug: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 1 } }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionSlug: 'chop', target: 'tree' } } });
     expect(midFight.inventory['wood'] ?? 0).toBe(0);
 
-    resolve(midFight, registry, secondsToMs(2)); // 2 of 3 attempts
+    resolve(midFight, registry, secondsToMs(2));
     expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionSlug: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - 2 * toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 2 } }, roster: { [PLAYER]: { ownerRef: 'entity.tree', actionSlug: 'chop', target: 'tree' } } });
 
-    resolve(midFight, registry, secondsToMs(3)); // completes the fight
+    resolve(midFight, registry, secondsToMs(3));
     expect(midFight.inventory['wood']).toBe(1);
     expect(midFight.activeAction).toEqual(oneShot.activeAction);
     expect(midFight.time).toBe(oneShot.time);
@@ -610,7 +577,7 @@ describe('resolve: onSuccess batches per completion, not per segment (Pass-1 reg
     }
 
     const oneShot = withKilnFiring();
-    resolve(oneShot, registry, secondsToMs(1000)); // 1000 completions at 1s each
+    resolve(oneShot, registry, secondsToMs(1000));
 
     let seed = 123;
     const rand = () => {
@@ -621,26 +588,22 @@ describe('resolve: onSuccess batches per completion, not per segment (Pass-1 reg
     for (let trial = 0; trial < 20; trial++) {
       const waypoints = new Set<number>();
       const splitCount = 3 + Math.floor(rand() * 5);
-      for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 1000); // mid-completion splits
+      for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 1000);
       const sorted = [...waypoints].filter((t) => t > 0 && t < 1000).sort((a, b) => a - b);
       sorted.push(1000);
 
       const folded = withKilnFiring();
       for (const t of sorted) resolve(folded, registry, secondsToMs(t));
 
-      expect(folded.inventory).toEqual(oneShot.inventory); // give (results) batches per completion
-      expect(folded.flags).toEqual(oneShot.flags); // add: (onSuccess) — would over-fire if batched per segment
-      expect(folded.xp).toEqual(oneShot.xp); // xp: (onSuccess) — same
+      expect(folded.inventory).toEqual(oneShot.inventory);
+      expect(folded.flags).toEqual(oneShot.flags);
+      expect(folded.xp).toEqual(oneShot.xp);
     }
-    // `add: bricks-fired` is entity-scoped to `kiln.bricks-fired`; xp stays global.
     expect(oneShot.flags['kiln.bricks-fired']).toBe(1000);
     expect(oneShot.xp['smithing']).toBe(2000);
   });
 });
 
-// Rates are per MINUTE. `engine.run` fills a rollover meter (spark, +240/min into
-// a cap-3 pool) and drains a plain one (hp, -120/min from 100, empty at t=50)
-// while it runs, so one fixture covers rollover, on-empty and completion batching.
 const RESOURCE_MODULE = `
 # stat regen-rate
 base: 0
@@ -714,7 +677,7 @@ on charged:
     const state = createGameState();
     initResources(state, registry);
 
-    resolve(state, registry, secondsToMs(60)); // one minute
+    resolve(state, registry, secondsToMs(60));
 
     expect(state.inventory['spark']).toBe(2);
     expect(state.resources['charge']).toBe(toMilliUnits(0.5));
@@ -741,16 +704,16 @@ on dried:
   set: dry
 `);
     const state = createGameState();
-    initResources(state, registry); // pond = 5 (full)
+    initResources(state, registry);
 
     const started = performance.now();
     resolve(state, registry, secondsToMs(1_000_000_000));
     const elapsedMs = performance.now() - started;
 
-    expect(state.resources['pond']).toBe(toMilliUnits(5)); // never moved: net rate 0 => no boundary
+    expect(state.resources['pond']).toBe(toMilliUnits(5));
     expect(state.flags['dry']).toBeUndefined();
     expect(state.time).toBe(secondsToMs(1_000_000_000));
-    expect(elapsedMs).toBeLessThan(50); // a couple of segments, not a fixed-dt march
+    expect(elapsedMs).toBeLessThan(50);
   });
 });
 
@@ -760,17 +723,16 @@ describe('resolve: resource associativity (the invariant, extended to pools)', (
 
     function fresh(): GameState {
       const state = createGameState();
-      initResources(state, registry); // hp = 100 (full), spark = 0
+      initResources(state, registry);
       state.activeAction = { ownerRef: 'entity.engine', actionSlug: 'run', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() }, roster: { [PLAYER]: { ownerRef: 'entity.engine', actionSlug: 'run', target: 'engine' } } };
       return state;
     }
 
     const oneShot = fresh();
     resolve(oneShot, registry, secondsToMs(55));
-    // Sanity on the fixture: hp empties at t=50 and stays there; spark rolled over.
     expect(oneShot.flags['fainted']).toBe(true);
     expect(oneShot.resources['hp']).toBe(0);
-    expect(oneShot.inventory['cog']).toBe(55); // one completion per second
+    expect(oneShot.inventory['cog']).toBe(55);
     expect(oneShot.inventory['ember']).toBeGreaterThan(0);
 
     let seed = 2026;
@@ -780,7 +742,7 @@ describe('resolve: resource associativity (the invariant, extended to pools)', (
     };
 
     for (let trial = 0; trial < 25; trial++) {
-      const waypoints = new Set<number>([50]); // force a split exactly on the emptying instant
+      const waypoints = new Set<number>([50]);
       const splitCount = 3 + Math.floor(rand() * 5);
       for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 55);
       const sorted = [...waypoints].filter((t) => t > 0 && t < 55).sort((a, b) => a - b);
@@ -790,7 +752,6 @@ describe('resolve: resource associativity (the invariant, extended to pools)', (
       for (const t of sorted) resolve(folded, registry, secondsToMs(t));
 
       expect(folded.time).toBe(oneShot.time);
-      // Discrete outcomes must be bit-exact regardless of split.
       expect(folded.inventory).toEqual(oneShot.inventory);
       expect(folded.flags).toEqual(oneShot.flags);
       expect(folded.xp).toEqual(oneShot.xp);
@@ -821,8 +782,6 @@ food, stacks, +50 seep-rate, 7s
   }
 
   it('integrates a rate too small to move the pool in one segment, so a split cannot make it vanish', () => {
-    // 5/min over one second is 83 milli-units. Truncating each segment instead of
-    // carrying its remainder would score a thousand 1ms segments as zero.
     const registry = loadModule(poolModule(5, 100, 0));
 
     const oneShot = createGameState();
@@ -841,7 +800,6 @@ food, stacks, +50 seep-rate, 7s
     const FLIP = secondsToMs(7);
     const HORIZON = secondsToMs(20);
 
-    // +20/min while the buff holds, -30/min once it expires.
     function fresh(): GameState {
       const state = createGameState();
       initResources(state, registry);
@@ -880,7 +838,7 @@ food, stacks, +50 seep-rate, 7s
     initResources(state, registry);
 
     resolve(state, registry, secondsToMs(60));
-    expect(state.resources['seep']).toBe(toMilliUnits(4)); // held at max
+    expect(state.resources['seep']).toBe(toMilliUnits(4));
     expect(state.resourceRateRemainders['seep']).toBe(0);
   });
 
@@ -893,8 +851,6 @@ food, stacks, +50 seep-rate, 7s
     resolve(state, registry, OFFLINE_CAP_MS);
 
     expect(state.resources['seep']).toBe(toMilliUnits(4 * 60 * 1000));
-    // The accumulator is rate * dt, and this rate is already an implausible
-    // 1000 units a minute: 1.44e13 against a 9.0e15 ceiling.
     expect(toMilliUnits(1000) * OFFLINE_CAP_MS).toBeLessThan(Number.MAX_SAFE_INTEGER / 100);
   });
 });
@@ -921,8 +877,6 @@ describe('resolve: forward progress', () => {
     expect(() => requireForwardProgress(stalled, secondsToMs(4), secondsToMs(4), STALL_BOUND)).toThrow(/resource pool/);
   });
 
-  // What 2c2ccee/f9dfd72 claimed and left unchecked: on the integer scale a
-  // boundary is at the current instant or after it, never before.
   it('rejects a boundary before the current instant', () => {
     const tide: BoundarySource = { kind: 'buff', actorId: PLAYER, source: 'tide' };
     expect(() => requireBoundaryNotPast({ at: secondsToMs(4) - 1, source: tide }, secondsToMs(4))).toThrow(RuntimeError);
@@ -930,9 +884,6 @@ describe('resolve: forward progress', () => {
     expect(() => requireBoundaryNotPast({ at: secondsToMs(4), source: tide }, secondsToMs(4))).not.toThrow();
   });
 
-  // A rate slow enough that one milli-unit takes longer than a minute sends
-  // msUntilEmpty negative for a level under one, so the pool asks to be emptied
-  // before the span started.
   it('rejects a boundary before the current instant through resolve, not only as a rule', () => {
     const registry = loadModule(`
 # stat seep-rate
@@ -960,9 +911,6 @@ on dried:
     expect(state.time).toBe(0);
   });
 
-  // A pool level off the integer scale is what the ULP class looked like: the
-  // emptying instant rounds back onto now, so the boundary never moves and
-  // nothing consumes it. Before the guard this hung the process outright.
   it('reports a boundary that never advances instead of spinning on it', () => {
     const registry = loadModule(`
 # stat leak-rate
@@ -1009,8 +957,6 @@ on dried:
     const markers = 20;
     expect(markers).toBeGreaterThan(STALL_BOUND);
 
-    // One source that stacks, so twenty instances are twenty expiries a second
-    // apart, each its own boundary.
     const state = withCampfireCooking(registry, false);
     for (let i = 1; i <= markers; i++) grantBuff(state, PLAYER, registry.items.get('marker')!, secondsToMs(i));
 

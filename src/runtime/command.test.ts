@@ -34,8 +34,6 @@ import {
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
-// One wearable stack, and a save that puts it in the player's hands, which is the
-// smallest world the inventory screen has anything to list.
 const CARRYING_MODULE = `
 # skill smithing
 
@@ -54,7 +52,6 @@ slot: hand
 {"version":${SAVE_VERSION},"inventory":{"gauntlet":1},"equipped":{"hand":"gauntlet"}}
 `;
 
-// tutorial-island.dsl has no `# save` section, so /load and /expect need their own.
 const SAVE_MODULE = `
 # location camp
 x: 0, y: 0
@@ -79,8 +76,6 @@ assert: time >= 0
 assert: time < 0
 `;
 
-// Unaliased on purpose: no entity offers a free relocate to `ruins`, so the edge
-// surfaces as a genuine kind: 'travel' choice, which tutorial-island never has.
 const TRAVEL_MODULE = `
 # location camp
 x: 0, y: 0
@@ -92,8 +87,6 @@ adjacent:
 x: 1, y: 0
 `;
 
-// Two places with no road between them, so nothing a walk can do reaches the
-// second — which is the state the teleport is about.
 const CUT_OFF_MODULE = `
 # location camp
 x: 0, y: 0
@@ -148,10 +141,6 @@ function choiceIndex(ctx: CommandContext, id: string): string {
   return String(index + 1);
 }
 
-
-// What a screen offers, as the answers alone: the words beside each are asserted
-// where the language they are in is the point, and everywhere else they are
-// noise between an option and the answers it takes.
 const answered = (options: readonly ModalOption[] | undefined) => (options ?? []).map((option) => ({ ...option, values: option.values?.map((choice) => choice.value) ?? null }));
 const takes = (option: { values?: readonly { value: string }[] | null } | undefined) => option?.values?.map((choice) => choice.value);
 
@@ -176,8 +165,6 @@ describe('the command table is the one definition of the command set', () => {
       for (const spelling of [spec.name, ...spec.aliases]) {
         const line = spec.argHint === '' ? spelling : `${spelling} always-passes`;
         const parsed = parseLine(ctx, line);
-        // A parse may refuse the argument; what it may never do is reach a
-        // different entry than the one the token names.
         if ('problem' in parsed) expect(parsed.problem, line).toContain(spec.name.slice(1));
         else expect(parsed.spec, line).toBe(spec);
       }
@@ -187,8 +174,6 @@ describe('the command table is the one definition of the command set', () => {
   it('spells out in help exactly the argument its shape declares, so neither can drift from the other', () => {
     for (const spec of COMMANDS) {
       if (spec.match !== 'name') continue;
-      // The rule that refuses `/quit junk` reads `arg`, and this is what keeps
-      // `argHint` -- the half a player reads -- honest about the same thing.
       expect(spec.arg === 'none', spec.name).toBe(spec.argHint === '');
     }
   });
@@ -201,8 +186,6 @@ describe('the command table is the one definition of the command set', () => {
     for (const spec of argumentless) {
       for (const spelling of [spec.name, ...spec.aliases]) {
         const result = runLine(ctx, `${spelling} junk`);
-        // Refused as a line, not performed with the argument thrown away: the
-        // merge base refused every one of these and `/quit junk` ended nothing.
         expect(errors(result), spelling).toEqual([`unknown command: ${spelling} junk`]);
         expect(result.quit, spelling).toBe(false);
         expect(result.output, spelling).toHaveLength(1);
@@ -214,10 +197,6 @@ describe('the command table is the one definition of the command set', () => {
 
   it('takes a command to be a whole token, so no name can shadow a longer one', () => {
     const { ctx, session } = fixture(SAVE_MODULE);
-    // The merge base tested `/create-test` with startsWith and had to try
-    // `/create-valid-test` first to stay reachable. A token cannot shadow, so
-    // the two entries need no order between them -- and the run-on spellings
-    // that ordering made meaningful name no command at all.
     for (const line of ['/create-valid-testfoo', '/speedxyz', '/loadempty', '/testalways-passes']) {
       expect(errors(runLine(ctx, line)), line).toEqual([`unknown command: ${line}`]);
     }
@@ -357,8 +336,6 @@ describe('the commands a player plays with', () => {
     expect(sessionStatus(session).time).toBe(42);
   });
 
-  // c1: the screen is the only thing /inv produces, and the line that opens it is
-  // recorded, so the route is a directive a `# test` replays and not a gesture.
   it('/inventory opens the screen and prints nothing beside it', () => {
     const { ctx } = fixture(CARRYING_MODULE);
     runLine(ctx, '/load stocked');
@@ -369,8 +346,6 @@ describe('the commands a player plays with', () => {
     expect(opened.view?.modals.map((modal) => ({ ...modal, options: answered(modal.options) }))).toEqual([{ name: 'carried-items', leaving: 'close', options: [{ key: 'item', label: 'Item', values: ['gauntlet', 'close'] }] }]);
   });
 
-  // c1: the argument a GUI row hands over is the same dispatch a player types,
-  // and selecting is answering the screen's own first question.
   it('/inventory <item> opens the same screen with that item already selected', () => {
     const { ctx } = fixture(CARRYING_MODULE);
     runLine(ctx, '/load stocked');
@@ -381,9 +356,6 @@ describe('the commands a player plays with', () => {
     expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['grow', 'equip', 'destroy', 'close'] }]);
   });
 
-  // c1 and c18: the equipment row dispatches the same command, and the id it
-  // hands over names the copy in the slot rather than the stack that copy left —
-  // so the screen opens on the worn one and offers it Unequip.
   it('/inventory <slot> opens the copy that is worn while its stack still stands', () => {
     const { ctx } = fixture(CARRYING_MODULE);
     runLine(ctx, '/load armed');
@@ -410,8 +382,6 @@ describe('the commands a player plays with', () => {
     expect(ctx.view.modals).toEqual([]);
   });
 
-  // c16: the slot spelling is the runtime's own and names nothing a player has
-  // met, so an empty slot is refused as an empty slot rather than printed back.
   it('refuses an empty slot by naming the slot, and never by the spelling for it', () => {
     const { ctx } = fixture(CARRYING_MODULE);
     runLine(ctx, '/load stocked');
@@ -431,8 +401,6 @@ describe('the commands a player plays with', () => {
     expect(equipped.view?.modals).toEqual([]);
   });
 
-  // c15: the last listed value of every question this screen asks leaves it, and
-  // taking it moves nothing.
   it('closes on the value that leaves, from either question, and moves no state', () => {
     const { ctx, session } = fixture(CARRYING_MODULE);
     runLine(ctx, '/load stocked');
@@ -502,8 +470,6 @@ describe('the commands a player plays with', () => {
     expect(ctx.live.speed).toBe(4);
   });
 
-  // c8, c9. The teleport reaches a place no road does, spreads discovery the
-  // way an arrival does, and leaves a line behind that a `# test` replays.
   it('/goto stands the player somewhere no road reaches, and records a line that replays', () => {
     const { ctx, session, recorder } = fixture(CUT_OFF_MODULE);
     expect(ctx.view.choices.some((choice) => choice.leadsTo === 'island')).toBe(false);
@@ -513,8 +479,6 @@ describe('the commands a player plays with', () => {
     expect(errors(result)).toEqual([]);
     expect(result.view?.location.id).toBe('island');
     expect(recorder.history).toEqual(['goto: island']);
-    // The arrival's own consequence: the place is known, and so is what it
-    // leads on to.
     expect(sessionStatus(session).flags).toMatchObject({ 'island.discovered': true, 'cave.discovered': true });
 
     const replayed = fixture(`${CUT_OFF_MODULE}\n# test teleported\ngoto: island\nassert: cave.discovered\n`);
@@ -530,8 +494,6 @@ describe('the commands a player plays with', () => {
     expect(ctx.view.location.id).toBe('camp');
   });
 
-  // c11's half of the mark: the table carries it, and the table acts on nothing
-  // — the CLI has every command whatever the session is.
   it('marks the dev-only commands, and the tokens are read off the marks', () => {
     expect(DEV_TOKENS).toEqual(COMMANDS.filter((spec) => spec.dev).flatMap((spec) => [spec.name, ...spec.aliases]));
     expect(DEV_TOKENS).toContain('/goto');
@@ -539,7 +501,6 @@ describe('the commands a player plays with', () => {
     for (const token of DEV_TOKENS) expect(devTokenIn(`${token} somewhere`), token).toBe(token);
     expect(devTokenIn('/look')).toBeUndefined();
     expect(devTokenIn('  /goto  island  ')).toBe('/goto');
-    // A leading token that merely starts with one is a different command.
     expect(devTokenIn('/gotofar island')).toBeUndefined();
   });
 
@@ -568,7 +529,7 @@ describe('the commands a player plays with', () => {
 describe('/test, /load, /expect, /assert, /cancel', () => {
   it('/load <id> loads a save by id, erroring cleanly (not throwing) on an unknown one', () => {
     const { ctx } = fixture(SAVE_MODULE);
-    runLine(ctx, '/wait 99'); // diverge, so we can observe /load resetting it
+    runLine(ctx, '/wait 99');
 
     const ok = runLine(ctx, '/load empty');
     expect(ok.recorded).toEqual(['load: empty']);
@@ -583,7 +544,7 @@ describe('/test, /load, /expect, /assert, /cancel', () => {
     expect(tones(match)).toEqual(['ok']);
     expect(match.recorded).toEqual([]);
 
-    runLine(ctx, 'use: entity.chest.open'); // diverge from the empty save
+    runLine(ctx, 'use: entity.chest.open');
     expect(tones(runLine(ctx, '/expect empty'))).toEqual(['warn']);
   });
 
@@ -611,8 +572,6 @@ describe('/test, /load, /expect, /assert, /cancel', () => {
   });
 });
 
-// A mirror that opens the shipped multi-field modal and a sage whose menu is
-// the other shape one comes in, plus a `# test` that crosses both.
 const MODAL_MODULE = `
 # location camp
 x: 0, y: 0
@@ -648,8 +607,6 @@ submit-modal: name=Rowan
 submit-modal: race=elf
 `;
 
-// A dialogue whose own effect raises a second modal underneath it, so the
-// driver has two open at once and has to pick which it is asking about.
 const STACKED_MODAL_MODULE = `
 # location camp
 x: 0, y: 0
@@ -692,8 +649,6 @@ describe('a modal is driven by its published name and options', () => {
     const opened = runLine(ctx, 'talk: sage');
     expect(takes(opened.view?.modals[0].options[0])).toEqual(['0', '1']);
 
-    // The second value, not the first: a driver that answered by position but
-    // always handed back the head of the list would pass on `1` alone.
     const answered = runLine(ctx, '2');
     expect(answered.recorded).toEqual(['submit-modal: choice=1']);
     expect(answered.view?.modals).toEqual([]);
@@ -706,8 +661,6 @@ describe('a modal is driven by its published name and options', () => {
     const opened = runLine(ctx, 'talk: sage');
     expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
 
-    // The dialogue is on top, so its menu is what a number answers — the bottom
-    // modal's first option is free text and takes no number at all.
     const answered = runLine(ctx, '1');
     expect(answered.recorded).toEqual(['submit-modal: choice=0']);
     expect(answered.view?.modals.map((modal) => modal.name)).toEqual(['character-creation']);
@@ -717,7 +670,6 @@ describe('a modal is driven by its published name and options', () => {
     const { ctx, session, recorder } = fixture(MODAL_MODULE);
 
     runLine(ctx, 'use: entity.mirror.look-in');
-    // The line the old prompt would have swallowed as the name.
     expect(errors(runLine(ctx, 'Rowan'))).toEqual(['invalid choice: "Rowan"']);
     expect(statusOf(runLine(ctx, '/state')).status.location.id).toBe('camp');
 
@@ -734,7 +686,6 @@ describe('a modal is driven by its published name and options', () => {
     expect(messages(replayed)[0].text).toBe(`Test 'crosses-a-modal' PASSED`);
     expect(replayed.view?.modals).toEqual([]);
 
-    // The two lines that used to be eaten as the name and the race.
     expect(statusOf(runLine(ctx, '/state')).status.location.id).toBe('camp');
     expect(kinds(runLine(ctx, '/inventory'))).toEqual(['view']);
   });
@@ -759,8 +710,6 @@ describe('a modal is driven by its published name and options', () => {
   });
 });
 
-// `oven.roast` repeats and never self-completes; `anvil.strike` completes after
-// its single attempt. Both shapes a live run's loop has to end for.
 const LIVE_MODULE = `
 # location camp
 x: 0, y: 0
@@ -797,8 +746,6 @@ sit:
 {"version":${SAVE_VERSION}}
 `;
 
-// One foe, one two-sided action, deterministic rolls: a run with a named pool
-// to whittle down rather than a completion of its own.
 const FIGHT_MODULE = `
 # stat attack
 base: 6
@@ -856,8 +803,6 @@ uses: swing
 `;
 
 describe('the live clock', () => {
-  // Driven through the table, not around it: a live run is what the `<N>` entry
-  // does when the driver says it can advance one.
   function liveFixture(text: string, choiceId: string, speed = 1) {
     const session = startSession(loadInEnglish(text));
     const recorder: Recorder = { history: [], startSave: serializeSession(session) };
@@ -869,7 +814,7 @@ describe('the live clock', () => {
 
   it('advances sim-time by exactly elapsedMs/1000 * the speed dial for one tick', () => {
     const { started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast', 2);
-    const progress = started.live!.tick(500); // 0.5s real * 2x = 1 sim-second
+    const progress = started.live!.tick(500);
     expect(progress.time).toBe(1);
     expect(progress.view.time).toBe(1);
     expect(progress.active).toBe(true);
@@ -885,11 +830,10 @@ describe('the live clock', () => {
   it('a repeating action stays active across many ticks and eventually produces output', () => {
     const { started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
 
-    // 25 ticks of 200ms at 1x = 5 simulated seconds, clearing the 4s cycle.
     let last = started.live!.tick(200);
     for (let i = 1; i < 25; i++) {
       last = started.live!.tick(200);
-      expect(last.active).toBe(true); // repeating: never self-completes
+      expect(last.active).toBe(true);
     }
     expect(last.time).toBe(5);
     expect(last.view.inventory['roasted-chestnut']).toBe(1);
@@ -900,10 +844,10 @@ describe('the live clock', () => {
     const { started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
     expect(started.live).toBeDefined();
 
-    expect(started.live!.tick(1000).active).toBe(true); // 1s of 3
-    expect(started.live!.tick(1000).active).toBe(true); // 2s of 3
+    expect(started.live!.tick(1000).active).toBe(true);
+    expect(started.live!.tick(1000).active).toBe(true);
 
-    const done = started.live!.tick(2000); // crosses the 3s completion boundary
+    const done = started.live!.tick(2000);
     expect(done.active).toBe(false);
     expect(done.view.action).toBeNull();
     expect(done.view.inventory.ingot).toBe(1);
@@ -998,8 +942,6 @@ ring:
     started.live!.end(false);
     expect(recorder.history).toEqual(['begin: use entity.oven.roast']);
 
-    // Ten seconds already on the clock before the second run is armed, which is
-    // the difference between the elapsed time and the reading.
     runLine(ctx, '/wait 10');
     const index = ctx.view.choices.findIndex((choice) => choice.id === 'use:entity.anvil.strike') + 1;
     const second = runLine(ctx, String(index));
@@ -1016,15 +958,11 @@ ring:
 
   it('publishes no completion countdown for a run whittling a named pool down', () => {
     const { started } = liveFixture(FIGHT_MODULE, 'fight:swing:rat');
-    // Two ticks, because the first lands no blow: a run that has swung is where
-    // an untargeted one would start counting, so it is the tick that discriminates.
     const progress = [started.live!.tick(900), started.live!.tick(900)];
     expect(progress[1].pools).toEqual([
       { title: 'Health', current: 30, max: 30 },
       { title: 'Rat', current: 6, max: 12 },
     ]);
-    // A fight has a target to narrate, so the run's own countdown is absent
-    // rather than merely outranked by the driver that prints one of the two.
     for (const each of progress) expect(each.implicit).toBeNull();
   });
 
@@ -1036,7 +974,6 @@ ring:
     const history = [...recorder.history];
     expect(history).toEqual(['begin: use entity.oven.roast', 'wait: 1', 'cancel']);
 
-    // The driver owns a timer and a keypress and cannot make both arrive first.
     expect(started.live!.end(true)).toBe(first);
     expect(started.live!.end(false)).toBe(first);
     expect(recorder.history).toEqual(history);
@@ -1060,9 +997,6 @@ ring:
   it('names the action it is driving from its own last tick, not from state another command can move', () => {
     const { ctx, started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
     started.live!.tick(1000);
-    // A second driver can run a command mid-run, and `/load` is the one that
-    // takes the in-flight action out of the view the context carries. The run
-    // still knows what it was driving, because it kept its own record.
     runLine(ctx, '/load fresh');
     expect(ctx.view.action).toBeNull();
     expect(started.live!.tick(3000)).toMatchObject({ active: false, label: 'strike' });
@@ -1125,8 +1059,6 @@ describe('the recorder: /create-test and /create-valid-test', () => {
     expect(blocks[blocks.length - 1]).toContain('expect: bar-end');
     expect(session.registry.tests.has('bar')).toBe(true);
 
-    // The correctness gate: paste the emitted blocks into a brand-new module,
-    // sharing no state with the recording session, and replay them.
     const pasted = `${TRAVEL_MODULE}\n${blocks.map((block) => block.join('\n')).join('\n\n')}\n`;
     expect(runTest('bar', loadInEnglish(pasted), createGameState()).passed).toBe(true);
   });
@@ -1142,8 +1074,6 @@ describe('the recorder: /create-test and /create-valid-test', () => {
   });
 
   it('says so rather than throwing when the session began without a start save', () => {
-    // What newContext hands a driver that keeps no recorder of its own: an
-    // empty start save, which is not a save and is not JSON either.
     const session = startSession(loadInEnglish(TRAVEL_MODULE));
     const ctx = newContext(session, view(session));
     runLine(ctx, choiceIndex(ctx, 'travel:ruins'));
@@ -1185,9 +1115,6 @@ open:
 title: Coin
 `;
 
-// The local module as a file two processes share: this session reaches it
-// through the context it was handed, and `elsewhere` is the other process
-// writing it while this one is playing.
 function authoringFixture() {
   const baseSources: ModuleSource[] = [engineLocale(), { name: 'base', text: AUTHORING_MODULE }];
   const writes: string[] = [];
@@ -1203,8 +1130,6 @@ function authoringFixture() {
     readLocalChanges: () => onDisk,
   };
   const elsewhere = (...sections: string[]): void => void (onDisk = renderLocalChangesModule(['base'], sections));
-  // The whole file, header included, for the cases where the other process
-  // wrote lines this session would never have rendered.
   const elsewhereWholeFile = (text: string): void => void (onDisk = text);
   return { ...fixture(AUTHORING_MODULE, authoring), authoring, writes, elsewhere, elsewhereWholeFile };
 }
@@ -1340,17 +1265,10 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
   });
 });
 
-// A place the base module does not have, written into the local file by whoever
-// is authoring it, and the base's own starting location routed to it. Together
-// they are the edit c1 asks a running session to pick up.
 const TOWER = ['# location tower', 'title: Tower', 'x: 1, y: 0'].join('\n');
 const ROAD_TO_TOWER = ['# location base.camp', 'adjacent:', '  tower'].join('\n');
 const BROKEN_CHEST = ['# entity base.chest', 'open:', '  give: missing-item'].join('\n');
 
-// What `view` would report if the session were asked again, and the bytes it
-// would serialize to: c5's "identical" spelled as the two things a session is,
-// so a reload that moved either is a reload that told an agent something. The
-// clock and the drained log come with the status.
 function snapshotOf(session: PlaySession) {
   return {
     status: JSON.stringify(sessionStatus(session)),
@@ -1388,9 +1306,7 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     expect(errors(refused)).toEqual(['local changes did not load.']);
     expect(messages(refused)[0].detail?.some((line) => line.includes('missing-item'))).toBe(true);
     expect(snapshotOf(session)).toEqual(before);
-    // Not the half that parsed either: there is no partial adoption.
     expect(session.registry.locations.has('local-changes.tower')).toBe(false);
-    // Play continues, on the session the reload left alone.
     expect(errors(runLine(ctx, '/wait 1'))).toEqual([]);
     expect(sessionStatus(session).time).toBe(6);
   });
@@ -1406,7 +1322,6 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     expect(sessionStatus(session).location.id).toBe('local-changes.outpost');
     expect(ctx.view.inventory['local-changes.gem']).toBe(1);
 
-    // The author deletes both, out from under a player standing in one of them.
     elsewhere();
     const reloaded = runLine(ctx, '/reload');
 
@@ -1426,7 +1341,6 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
 
     expect(snapshotOf(session)).toEqual(before);
     expect(first.view?.said).toEqual([]);
-    // Twice more, because a driver reloading every turn is what c5 makes safe.
     for (const each of [runLine(ctx, '/reload'), runLine(ctx, '/reload')]) {
       expect(messages(each).map((out) => out.text)).toEqual(messages(first).map((out) => out.text));
       expect(snapshotOf(session)).toEqual(before);
@@ -1467,14 +1381,11 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
 
   it('composes a staged section against the file, not against what this session last wrote', () => {
     const { ctx, session, authoring, writes, elsewhere } = authoringFixture();
-    // The other process writes; this session is told nothing and does not reload.
     elsewhere(TOWER);
     expect(authoring.localSource.text).not.toContain('# location tower');
 
     expect(errors(runLine(ctx, '/dsl item gem title: Gem'))).toEqual([]);
 
-    // Both sections in the file afterwards: the section this session staged, and
-    // the one it never saw.
     expect(writes).toHaveLength(1);
     expect(writes[0]).toContain('# location tower');
     expect(writes[0]).toContain('# item gem');
@@ -1531,8 +1442,6 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
 
   it('refuses in the local file’s own name when the local file is what will not parse', () => {
     const { ctx, writes, elsewhereWholeFile } = authoringFixture();
-    // A section with no id, which `splitSections` refuses — not a load
-    // diagnostic but a parse failure, and the other process left it there.
     elsewhereWholeFile(['# info local-changes', 'version: 0.0.0', 'pack: local', 'dependencies:', '  base', '', '# item', 'title: Nameless', ''].join('\n'));
 
     for (const line of ['/dsl item gem title: Gem', '/local', '/local delete item gem']) {
@@ -1542,8 +1451,6 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     }
     expect(writes).toEqual([]);
 
-    // The two commands that still work, and they are the pair an author needs:
-    // one to look at the text, one to replace it.
     const printed = runLine(ctx, '/local show').output[0];
     expect(printed.kind === 'source' && printed.lines).toContain('# item');
     expect(messages(runLine(ctx, '/local clear'))[0].text).toBe('Cleared local-changes.');
@@ -1551,14 +1458,10 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
 
   it('refuses a bad line in the line’s own name, so the two failures do not sound alike', () => {
     const { ctx } = authoringFixture();
-    // The file parses; it is the typed section that does not.
     expect(errors(runLine(ctx, '/dsl nosuchkind gem title: Gem'))).toEqual(['unknown section kind: nosuchkind']);
   });
 
   it('stages against a header narrower than the session, rather than refusing what a wider one allows', () => {
-    // Pass 3's reproduction: a hand-authored file naming only what its author
-    // needed. Widening it is the caller's half of the header, and refusing to
-    // would make an edit depend on which process created the file.
     const { ctx, session, writes, elsewhereWholeFile } = authoringFixture();
     elsewhereWholeFile(['# info local-changes', 'version: 1.0.0', ''].join('\n'));
 
@@ -1575,29 +1478,20 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     elsewhereWholeFile(['# info some-other-module', 'version: 1.0.0', 'dependencies:', '  base', ''].join('\n'));
 
     expect(messages(runLine(ctx, '/dsl item ruby title: Ruby'))[0].text).toBe('Staged # item ruby in local-changes.');
-    // The report said local-changes, so the item is under local-changes.
     expect(session.registry.items.get('local-changes.ruby')?.title).toBe('Ruby');
     expect(session.registry.items.has('some-other-module.ruby')).toBe(false);
   });
 
   it('reads the remembered copy in exactly one place, which is the place that consults the file', () => {
-    // The assignment that fills the cache is not a read.
     const source = readFileSync('src/runtime/command.ts', 'utf8');
     expect(source.match(/localSource\.text(?!\s*=)/g)).toHaveLength(1);
   });
 
   it('adopts through the one path /dsl adopts through: the file has exactly one adopt in it', () => {
-    // c3's structural half. `/dsl` is that path with a write in front and
-    // `/reload` is it with a read; a second copy of the sequence would be a
-    // second place the diagnostic gate could be decided differently, which is
-    // the defect the clause names. Counted at the call, because the count is
-    // what a copy changes.
     expect(readFileSync('src/runtime/command.ts', 'utf8').match(/\badoptRegistry\(/g)).toHaveLength(1);
   });
 });
 
-// A clock a test moves by hand, and a timer a test fires by hand: the two are
-// separate because the whole question here is what happens when they disagree.
 function fakeClock(): Clock & { at: number; cadence: number[]; stops: number; fire(): void } {
   const fires: Array<() => void> = [];
   return {
@@ -1626,7 +1520,6 @@ describe('the ticker a live run is advanced by', () => {
 
     clock.at = 1_200;
     clock.fire();
-    // The tab was backgrounded: one fire, four seconds of wall clock behind it.
     clock.at = 5_200;
     clock.fire();
 
@@ -1650,9 +1543,6 @@ describe('the ticker a live run is advanced by', () => {
   });
 });
 
-// A recording is what a `# test` is authored from, so what it says has to be
-// what happened: a growth the plane turned down records as the refusal, and
-// the line replays green instead of asserting the opposite of the session.
 describe('recording a growth the plane refused', () => {
   const GROWTH_MODULE = `
 # location camp
@@ -1695,11 +1585,6 @@ item-experience: 1000
   });
 });
 
-// c4: whose words a message is. The universe is loaded twice — once as
-// authored and once with every word it can address replaced, engine patterns
-// included — and the same script is driven through both. A message that moved
-// went through the localizer; a message that did not is the tool speaking its
-// own language, which is the whole of what the type now says.
 describe('a command says whose words it answered in (c4)', () => {
   const CAMP = ['# info camp', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', 'entities:', '  chest', '', '# entity chest', 'title: Chest', 'open:', '  time: 40'].join('\n');
 
@@ -1742,17 +1627,12 @@ describe('a command says whose words it answered in (c4)', () => {
 
   it('relays a fault out of the engine as the tool speaking, never as the player being refused', () => {
     const ctx = played();
-    // Raised inside the run rather than by the parser, which is the route
-    // `refused()` owns.
     const answered = runLine(ctx, 'submit-modal: verb=grow');
 
     expect(spoken(answered, 'player')).toEqual([]);
     expect(spoken(answered, 'tool')).toEqual(['no modal is open to answer: verb']);
   });
 
-  // The rule the four above are examples of, read off the table rather than
-  // listed: every entry twice, bare and with an argument, through both
-  // universes at once. Nobody edits this when a command is added.
   it('moves every player message with the language and no authoring message, over the whole table', () => {
     const shaped: Record<string, string> = { '<N>': '1', '<enter>': '', '<directive>': 'use: entity.camp.chest.open' };
     const script = COMMANDS.flatMap((spec) => [shaped[spec.name] ?? spec.name, `${shaped[spec.name] ?? spec.name} 1`]);
@@ -1767,12 +1647,9 @@ describe('a command says whose words it answered in (c4)', () => {
     expect(asPlayed.map(({ line, words }) => `${line}: ${words}`)).toEqual(asAuthored.map(({ line, words }) => `${line}: ${words}`));
     expect(new Set(asPlayed.map((each) => each.words))).toEqual(new Set(['player', 'tool']));
 
-    // A message with no word of its own has nothing a translation could move,
-    // and none of these has one; the filter is what keeps that honest.
     const moved = asPlayed.filter((each, at) => each.text !== asAuthored[at].text);
     expect(asPlayed.filter((each) => each.words === 'player' && hasWords(each.text) && !moved.includes(each))).toEqual([]);
     expect(asPlayed.filter((each) => each.words === 'tool' && moved.includes(each))).toEqual([]);
-    // And a run in which nothing moved would pass both lines above.
     expect(moved.length).toBeGreaterThan(0);
   });
 });

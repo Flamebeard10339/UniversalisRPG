@@ -17,12 +17,6 @@ const SPANISH = { name: 'island-es', text: ['# info island-es', 'version: 1.0.0'
 const english = () => localizerFor(loadInEnglish(ISLAND), 'en');
 const spanish = () => localizerFor(loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, SPANISH]), 'es');
 
-// c1's compile fixture stood here: sixteen `@ts-expect-error` lines, one per
-// branded field, which is a list of what somebody remembered rather than a rule
-// about the surface. It had missed seven fields. `published.test.ts` walks the
-// published types from their roots instead, so a field is covered by being on
-// the surface rather than by being named.
-
 function unkeyedEngineTextDoesNotCompile(): void {
   const localizer = english();
   // @ts-expect-error c2: an engine string with no key
@@ -75,9 +69,6 @@ describe('an item with no examine of its own', () => {
     expect(itemExamine(localizer, registry.items.get('island.rope')!)).toBe('This is a Rope.');
   });
 
-  // Against a Spanish `engine.item.examine` that does have an entry, so the
-  // pattern is reached and the article's absence is what the assertion turns
-  // on. Asserting the key alone could not tell the guard from its absence.
   const withExamine = (pattern: string) =>
     loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, { name: 'island-es', text: ['# info island-es', 'version: 1.0.0', 'dependencies:', '  island', '', '# locale es', `engine.item.examine: ${pattern}`].join('\n') }]);
 
@@ -96,8 +87,6 @@ describe('an item with no examine of its own', () => {
 
 void unkeyedEngineTextDoesNotCompile;
 
-// pass 1: `prose` was being used as the cast that turned ids into Localized, so
-// a translated warning named nothing at all. An id belongs to no language.
 describe('an id survives translation, and prose does not', () => {
   const ISLAND_WITH_GHOSTS = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope'].join('\n');
   const PRUNE_ES = [
@@ -128,11 +117,6 @@ describe('an id survives translation, and prose does not', () => {
   });
 });
 
-// pass 2: the door asked every loaded module, and the shipped engine locale
-// always declares `en`, so it could never open for a player of anything else.
-// c6 retires the question: a `say:` is addressed, so what a player of another
-// language is shown is the key, which is what every other door already answers
-// with and what a translator needs in order to fill it in.
 describe('authored prose answers by its address', () => {
   const SPANISH_ISLAND = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# entity puerta', 'abrir:', '  instant', '  say: se abre la puerta'].join('\n');
   const registry = loadUniverse([engineLocale(), { name: 'isla', text: SPANISH_ISLAND }]);
@@ -147,10 +131,6 @@ describe('authored prose answers by its address', () => {
   });
 });
 
-// The proof lives in the content layer, where nothing calls the localizer, so
-// on two passes a mutation to the slug lookup survived that file (pass 3). The
-// property is that the display is looked up under what addresses the action,
-// and only a lookup can show it.
 describe('an action is displayed under the address it is identified by', () => {
   const DOOR = ['# info hall', 'version: 1.0.0', '', '# location porch', 'x: 0, y: 0', 'starting', 'entities:', '  door', '', '# entity door', 'pick lock:', '  instant', '  say: click'].join('\n');
   const DOOR_ES = ['# info hall-es', 'version: 1.0.0', 'dependencies:', '  hall', '', '# locale es', 'hall.entity.door.pick-lock: Forzar la cerradura'].join('\n');
@@ -167,12 +147,6 @@ describe('an action is displayed under the address it is identified by', () => {
   });
 });
 
-// c7, the half no content-layer test can reach: one `# locale` line under the
-// declaration has to move the words for every owner that performs it, which is
-// a lookup and not a table. Derived over the loader's own walk and the shipped
-// island, so a declaration added to the content is covered here unedited — and
-// over a translation minted from the declarations themselves rather than a
-// hand-written locale that would go stale beside them.
 describe('one line translates an action for every owner that performs it (c7)', () => {
   const source = readFileSync('content/tutorial-island.dsl', 'utf8');
   const english = loadUniverse([engineLocale(), { name: 'tutorial-island', text: source }]);

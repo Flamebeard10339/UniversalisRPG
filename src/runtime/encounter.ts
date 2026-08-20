@@ -14,19 +14,12 @@ export function newCadence(): Cadence {
   return { progress: 0, attemptsMade: 0 };
 }
 
-// Installed rather than defaulted, because callers write attemptsMade and
-// progress back through this. An action can reach here without one: a `# save`
-// carries `cadences` as authored JSON and nothing before now required a clock
-// in it.
 export function playerCadence(active: ActiveAction): Cadence {
   return (active.cadences[PLAYER] ??= newCadence());
 }
 
 export const IMPLICIT_TARGET_FULL = MILLI_UNITS;
 
-// Unconditional and unauthored: the first two-sided action in the entity's
-// `uses:` whose `depletes:` names a pool its attacker has. `uses:` order is the
-// one place an entity says which attack it prefers.
 export function retaliation(state: GameState, registry: Registry, actorId: string, attackerId: string): { id: string; action: Action } | undefined {
   for (const action of actorEntity(registry, actorId)?.actions ?? []) {
     const id = declaredId(action);
@@ -38,7 +31,6 @@ export function retaliation(state: GameState, registry: Registry, actorId: strin
   return undefined;
 }
 
-// The actor's own max, not initResources' `start`, a player-lifecycle concept.
 export function enterEncounter(active: ActiveAction, actorId: string, state: GameState, registry: Registry, attackerId: string): void {
   const resources: Record<string, number> = {};
   for (const resource of registry.resources.values()) {
@@ -67,15 +59,10 @@ export function actorInEncounter(state: GameState, actorId: string): ActorState 
   return actor;
 }
 
-// The name a swing says. An actor whose entity is no longer loaded has no
-// title in any language, so its key stands in — which is what c3 asks for and
-// what a humanized id was pretending not to be.
 export function actorTitle(actorId: string, registry: Registry, state: GameState): Localized {
   return localizerOf(registry, state).title('entity', actorEntity(registry, actorId)?.id ?? actorId);
 }
 
-// Everyone in the fight who is hostile to this actor, which is what a fight's
-// sides are: derived from factions, never declared.
 export function opposes(registry: Registry, a: string, b: string): boolean {
   return hostile(registry, actorEntity(registry, a), actorEntity(registry, b));
 }
@@ -136,21 +123,12 @@ export function damageTarget(state: GameState, registry: Registry, action: Actio
   return damagePool(state, registry, sideOf(action.depletes, self, other), action.depletes.id, milliAmount, deltas);
 }
 
-// Rounded, because the log is prose: sub-unit precision belongs in the pool,
-// not in a sentence reporting a hit for 4.873. Handed to the pattern as a
-// number, so how a language spells one stays the pattern's business.
 function spoken(milliAmount: number): number {
   return Math.round(fromMilliUnits(milliAmount) * 10) / 10;
 }
 
-// Four patterns rather than one assembled sentence: who swings decides which
-// two of them there are, and a language is free to put the actor, the verb and
-// the amount wherever it puts them.
 export function logSwing(state: GameState, registry: Registry, self: string, other: string, damage: number | null): void {
   const localizer = localizerOf(registry, state);
-  // A swing the player lands on themselves is neither of the two sides the
-  // patterns name, so it is said the way one between two others is: whoever
-  // swings is named, and so is whoever it lands on.
   const attacker = self === PLAYER && other !== PLAYER ? undefined : actorTitle(self, registry, state);
   const target = other === PLAYER && self !== PLAYER ? undefined : actorTitle(other, registry, state);
   const side = attacker === undefined ? 'player' : target === undefined ? 'foe' : 'other';
@@ -166,10 +144,7 @@ export function poolLevel(state: GameState, registry: Registry, actorId: string,
   return actorInEncounter(state, actorId).resources[resourceId] ?? 0;
 }
 
-// Accrued for every actor alike, so where a caller splits a span cannot change
-// the level reached.
 export function damagePool(state: GameState, registry: Registry, actorId: string, resourceId: string, milliAmount: number, deltas: PoolDeltas): number {
   addDelta(deltas, actorId, resourceId, -milliAmount);
-  // Where the segment is heading; the clamped write happens at segment end.
   return Math.max(0, poolLevel(state, registry, actorId, resourceId) + getDelta(deltas, actorId, resourceId));
 }

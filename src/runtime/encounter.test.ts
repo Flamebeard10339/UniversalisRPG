@@ -6,9 +6,6 @@ import { loadModule } from '../content/load';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
-// training-dummy: point damage, for exact arithmetic.
-// straw-man: ranged damage, for sampling and the associativity gate.
-// iron-golem: dr above the attacker's whole range, for the min-damage floor.
 const MODULE = `
 # stat attack
 base: 10
@@ -117,8 +114,8 @@ describe('# entity stats: — an actor sheet', () => {
     const registry = loaded();
     const state = started(registry);
     expect(statValue('max-health', state, registry, 'training-dummy')).toBe(12);
-    expect(statValue('max-health', state, registry, PLAYER)).toBe(30); // the global # stat
-    expect(statValue('attack', state, registry, 'training-dummy')).toBe(10); // not named: falls through
+    expect(statValue('max-health', state, registry, PLAYER)).toBe(30);
+    expect(statValue('attack', state, registry, 'training-dummy')).toBe(10);
   });
 
   it('keeps the player buffs and the running action off other actors', () => {
@@ -137,18 +134,14 @@ describe('encounter state', () => {
     const state = started(registry);
     armFightAction('strike', 'training-dummy', registry, state);
 
-    // 12, from the dummy's own max-health — not the player's 30, and its own
-    // rate remainders, which start empty because no span has settled yet.
     expect(state.activeAction!.actors).toEqual({ 'training-dummy': { resources: { health: toMilliUnits(12), sawdust: toMilliUnits(8) }, rateRemainders: {} } });
     expect(state.resources['health']).toBe(toMilliUnits(30));
   });
 
-  // An actor stands up mid-fight and has no fresh game to begin, so honouring
-  // `start:` spawned every enemy at the player's starting level.
   it('fills an actor from its own max even when the resource declares a start:', () => {
     const registry = loadModule(MODULE.replace('max: max-health\n', 'max: max-health\nstart: 5\n'));
     const state = started(registry);
-    expect(state.resources['health']).toBe(toMilliUnits(5)); // the player does begin there
+    expect(state.resources['health']).toBe(toMilliUnits(5));
 
     armFightAction('strike', 'training-dummy', registry, state);
     expect(state.activeAction!.actors!['training-dummy'].resources.health).toBe(toMilliUnits(12));
@@ -177,26 +170,23 @@ describe('damage against a target pool', () => {
   it('drains the target by attack minus its own dr, truncated', () => {
     const registry = loaded();
     const state = started(registry);
-    useFight('strike', 'training-dummy', registry, state); // one attempt
+    useFight('strike', 'training-dummy', registry, state);
 
     expect(state.time).toBe(secondsToMs(1));
-    expect(state.activeAction!.actors!['training-dummy'].resources.health).toBe(toMilliUnits(4)); // 12 - (10 - 2)
+    expect(state.activeAction!.actors!['training-dummy'].resources.health).toBe(toMilliUnits(4));
   });
 
   it('ends the fight when the pool empties, firing on success, and stands a fresh target up', () => {
     const registry = loaded();
     const state = started(registry);
     useFight('strike', 'training-dummy', registry, state);
-    resolve(state, registry, secondsToMs(2)); // second hit takes 4 -> 0
+    resolve(state, registry, secondsToMs(2));
 
-    expect(state.flags['training-dummy.dummies-felled']).toBe(1); // entity-scoped, as any bare counter is
-    expect(state.activeAction!.actors!['training-dummy'].resources.health).toBe(toMilliUnits(12)); // refilled
+    expect(state.flags['training-dummy.dummies-felled']).toBe(1);
+    expect(state.activeAction!.actors!['training-dummy'].resources.health).toBe(toMilliUnits(12));
     expect(state.time).toBe(secondsToMs(2));
   });
 
-  // The dummy's handler writes to a pool the dummy carries, so the subject is
-  // what this reads: rewriting it to the player would move the sawdust onto the
-  // player's own store, which the second assertion rules out.
   it('runs the felled actor own handler on the felled actor', () => {
     const registry = loaded();
     const state = started(registry);
@@ -206,7 +196,6 @@ describe('damage against a target pool', () => {
 
     expect(state.activeAction!.actors!['training-dummy'].resources['sawdust']).toBeGreaterThan(0);
     expect(state.resources['sawdust']).toBe(0);
-    // "You black out." belongs to the player's health, not a felled dummy's.
     expect(state.log).not.toContain('You black out.');
     expect(state.resources['health']).toBe(toMilliUnits(30));
   });
@@ -214,12 +203,11 @@ describe('damage against a target pool', () => {
   it('floors at min-damage so a target harder than the attacker still dies', () => {
     const registry = loaded();
     const state = started(registry);
-    // dr 99 against a flat 10 attack: every hit lands for exactly 1.
     useFight('chip', 'iron-golem', registry, state);
     expect(state.activeAction!.actors!['iron-golem'].resources.health).toBe(toMilliUnits(2));
 
     resolve(state, registry, secondsToMs(3));
-    expect(state.activeAction).toBeNull(); // 3 hp, 3 hits, fight over
+    expect(state.activeAction).toBeNull();
   });
 
   it('samples ranged damage per hit rather than averaging it', () => {
@@ -232,11 +220,10 @@ describe('damage against a target pool', () => {
       resolve(state, registry, secondsToMs(t));
       levels.push(state.activeAction!.actors!['straw-man'].resources.health);
     }
-    // wild-attack is 4-7 and the straw man's dr is 1, so each hit is in the range 3-6.
     const hits = levels.map((level, i) => (i === 0 ? toMilliUnits(40) : levels[i - 1]) - level);
     for (const hit of hits) expect(hit).toBeGreaterThanOrEqual(toMilliUnits(3));
     for (const hit of hits) expect(hit).toBeLessThanOrEqual(toMilliUnits(6));
-    expect(new Set(hits).size).toBeGreaterThan(1); // genuinely varying, not a constant
+    expect(new Set(hits).size).toBeGreaterThan(1);
   });
 });
 
@@ -251,7 +238,7 @@ describe('a two-sided action resolves per attempt, and stays associative doing i
 
     const oneShot = fighting();
     resolve(oneShot, registry, secondsToMs(200));
-    expect(oneShot.inventory['straw']).toBeGreaterThan(0); // fights really complete
+    expect(oneShot.inventory['straw']).toBeGreaterThan(0);
 
     let seed = 5;
     const rand = () => {

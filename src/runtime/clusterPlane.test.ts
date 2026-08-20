@@ -47,11 +47,8 @@ passives: 1 hale
 `;
 
 const registry = loadInEnglish(COMMON + CROSSROADS);
-// The engine's own English, so a refusal reads here as it reads on a screen.
 const english = localizerFor(registry, 'en');
 const words = (said: Said | undefined): string | undefined => (said === undefined ? undefined : say(english, said));
-// Content moved underneath a plane two ways: a whole declaration gone, and one
-// that still exists with fewer positions and fewer ways out than it had.
 const withoutCrossroads = loadInEnglish(COMMON);
 const narrowed = loadInEnglish(`${COMMON.replace('shape: ring\nopen-connections: e, ne\npassives: 1 hale, 4 stout', 'shape: spindle\nopen-connections: ne\npassives: 1 hale')}${CROSSROADS}`);
 
@@ -69,9 +66,6 @@ function allocateAll(plane: Plane, nodes: PlaneNode[]): void {
   }
 }
 
-// The origin ring with its e slot open and allocated, which is the shortest
-// plane anything can be slotted into: 1 is free, 2-3-4 is the corridor to the
-// east edge, and the slot itself is the fourth point.
 function reachedEastSlot(): Plane {
   const plane = originPlane('ringlet');
   allocateAll(plane, [position(ORIGIN, 2), position(ORIGIN, 3), position(ORIGIN, 4), slot(ORIGIN, 'e')]);
@@ -169,9 +163,6 @@ describe('slotting a jewel', () => {
   });
 });
 
-// The two children of the origin end up side by side, which is the only way a
-// hex can be faced by a slot that did not place it: a cluster never has a slot
-// on the edge its own root came in through.
 function twoNeighbouringChildren(): Plane {
   const plane = reachedEastSlot();
   fillSlot(registry, plane, ORIGIN, 'e', 'crossroads');

@@ -4,12 +4,6 @@ import { GameState } from './state';
 import { msToSeconds } from './units';
 import { heldCount } from './itemInstance';
 
-// Rendering asks the same questions of state that conditions do, which is why
-// the two live together.
-
-// Flat dotted keys, not nested lookups. Which paths the engine answers rather
-// than the flag table is the same question load-time resolution asks when it
-// decides what to rewrite, so both read it off `grammar/condition`.
 export function resolveReference(reference: Reference, state: GameState): boolean | number | string | undefined {
   const { path } = reference;
   if (path[0] === TIME) return msToSeconds(state.time);

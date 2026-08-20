@@ -1,23 +1,12 @@
 import { RuntimeError } from './error';
 
-// How a driver says it could not: part of the interface rather than a thing
-// each implementation goes and finds, because the command table turns exactly
-// this into a message and lets the session carry on. A driver raising anything
-// else ends the session standing behind it.
 export { RuntimeError };
 
-// One named slot: whatever text was written into it, and when. The stamp is the
-// store's, never the payload's — a payload is opaque here, and a store that
-// looked inside one would be a save store rather than a slot store.
 export interface Slot {
   readonly payload: string;
   readonly writtenAt: number;
 }
 
-// What a driver supplies, and the only thing in this file that touches the
-// world: the bytes of a named slot, in and out. A file under the CLI, a Map
-// under test. Everything a slot means — the stamp, the ordering, an absent slot
-// reading as nothing — is decided above this and cannot differ between drivers.
 export interface SlotDriver {
   read(name: string): string | null;
   write(name: string, text: string): void;

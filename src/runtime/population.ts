@@ -19,13 +19,9 @@ export function isPopulations(value: unknown): boolean {
 
 const deficitOf = (state: GameState, locationId: string, entityId: string): Deficit | undefined => state.populations[locationId]?.[entityId];
 
-// One entry per type that still has a copy standing, with the count it is down
-// to. Absent from the deficit is the whole population standing.
 export function standing(state: GameState, registry: Registry, location: Location): { entity: string; count: number }[] {
   return location.entities
     .filter((entry) => {
-      // `hidden if:` on an entity means it is not present, which is a different
-      // sentence from an action of its own being hidden.
       const gate = registry.entities.get(entry.entity)?.hiddenIf;
       return !gate || !evaluateCondition(gate, state);
     })
@@ -37,11 +33,7 @@ export function isStanding(state: GameState, registry: Registry, location: Locat
   return standing(state, registry, location).some((entry) => entry.entity === templateOf(entityId));
 }
 
-// A copy has left the world. It is due back after the entity's `respawn after:`,
-// and absent means never — so a boss omits it and zero is not a magic value.
 export function downOne(state: GameState, registry: Registry, locationId: string, entityId: string): void {
-  // A deficit is a fact about a place holding that population. A fight-scoped
-  // copy, or one fought somewhere it does not stand, has no place to be down at.
   if (!registry.locations.get(locationId)?.entities.some((entry) => entry.entity === entityId)) return;
   const byEntity = (state.populations[locationId] ??= {});
   const deficit = (byEntity[entityId] ??= { down: 0, due: [] });
@@ -50,8 +42,6 @@ export function downOne(state: GameState, registry: Registry, locationId: string
   if (after !== undefined) deficit.due.push(state.time + secondsToMs(after));
 }
 
-// The next instant a copy is due back, so a respawn lands on its own boundary
-// rather than whenever a segment happens to end.
 export function nextRespawn(state: GameState): number | undefined {
   let soonest: number | undefined;
   for (const byEntity of Object.values(state.populations)) {
@@ -62,9 +52,6 @@ export function nextRespawn(state: GameState): number | undefined {
   return soonest;
 }
 
-// Draws no randomness: a due time was fixed when the copy went down, so a
-// session that waits through a respawn rolls the same numbers as one that does
-// not.
 export function applyRespawns(state: GameState): boolean {
   let changed = false;
   for (const [locationId, byEntity] of Object.entries(state.populations)) {
@@ -82,8 +69,6 @@ export function applyRespawns(state: GameState): boolean {
   return changed;
 }
 
-// Pruned when the entity or the location leaves the registry, which is what
-// keeps a deficit from outliving the place it is a fact about.
 export function prunePopulations(state: GameState, registry: Registry): { path: string; id: string; message: Localized }[] {
   const warnings: { path: string; id: string; message: Localized }[] = [];
   const localizer = localizerOf(registry, state);

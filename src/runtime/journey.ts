@@ -5,24 +5,12 @@ import type { GameState } from './state';
 
 const discovered = (state: GameState, id: string): boolean => truthy(state.flags[`${id}.${DISCOVERED}`]);
 
-// Every place a road leads to from here that the player could walk today. A
-// shut edge is a road they know about and cannot take, which is why the
-// condition is evaluated rather than the edge merely counted.
 export function roadsFrom(from: string, registry: Registry, state: GameState): string[] {
   const location = registry.locations.get(from);
   if (!location) return [];
   return location.adjacent.filter((edge) => !edge.condition || evaluateCondition(edge.condition, state)).map((edge) => edge.target);
 }
 
-// The way there, as the places still to cross ending at the destination, or
-// null when the roads do not reach. Breadth-first, so the route is the one with
-// the fewest legs; ties fall to the order the content wrote its edges in, which
-// is the only order either end of this has.
-//
-// A route is walked through places the player has already found and may end in
-// one they have not: stepping into the unknown is how a neighbour is
-// discovered, and routing through the unknown would make the shape of the
-// unfound map readable off how long a journey took.
 export function routeTo(from: string, to: string, registry: Registry, state: GameState): string[] | null {
   if (from === to || !registry.locations.has(to)) return null;
 
@@ -51,14 +39,6 @@ export function routeTo(from: string, to: string, registry: Registry, state: Gam
   return null;
 }
 
-// Every discovered place the roads reach from here, each with how many legs
-// away it is. What a driver needs to know which places it may set off for, and
-// how far, without walking the graph itself.
-//
-// A place the player has not found is neither crossed nor named, so nothing of
-// the map they have not walked can be counted or read off what comes back. The
-// road out of the room they are standing in is not this function's to offer, so
-// nothing here narrows the step into the unknown next door.
 export function reachable(from: string, registry: Registry, state: GameState): Map<string, number> {
   const found = new Map<string, number>();
   const seen = new Set([from]);

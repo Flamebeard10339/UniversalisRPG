@@ -1,12 +1,12 @@
-import { Action, actionBody } from '../../grammar/action';
-import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
-import { list } from '../../grammar/list';
-import { Cursor, DslError, Parser } from '../../grammar/parser';
-import { TagClause, tagClause } from '../../grammar/tagClause';
-import { id, number, text } from '../../grammar/values';
-import { actions, hooks, put, visitTags, type Loose } from '../refs';
-import { section } from './define';
-import { TITLE_FIELD } from './info';
+import { Action, actionBody } from "../../grammar/action";
+import { HOOK_FIELDS, HookCarrier } from "../../grammar/hook";
+import { list } from "../../grammar/list";
+import { Cursor, DslError, Parser } from "../../grammar/parser";
+import { TagClause, tagClause } from "../../grammar/tagClause";
+import { id, number, text } from "../../grammar/values";
+import { actions, hooks, put, visitTags, type Loose } from "../refs";
+import { section } from "./define";
+import { TITLE_FIELD } from "./info";
 
 export interface ClusterEffect {
   statId: string;
@@ -27,18 +27,27 @@ export interface Item extends HookCarrier {
   maxLevel: number;
 }
 
-const CLUSTER_EFFECT = /^(?<sign>[+-])(?<amount>\d+)%[ \t]+(?<stat>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
+const CLUSTER_EFFECT =
+  /^(?<sign>[+-])(?<amount>\d+)%[ \t]+(?<stat>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
 
 export const clusterEffectValue: Parser<ClusterEffect> = {
   parse(cursor: Cursor) {
     const start = cursor.pos;
-    const raw = (cursor.take(/[^\n]+/) ?? '').trim();
+    const raw = (cursor.take(/[^\n]+/) ?? "").trim();
     const groups = CLUSTER_EFFECT.exec(raw)?.groups;
-    if (!groups) throw new DslError(`expected a percent stat bonus like +25% max-health, got ${JSON.stringify(raw)}`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
-    return { statId: groups.stat!, percent: Number(groups.amount) * (groups.sign === '-' ? -1 : 1) };
+    if (!groups)
+      throw new DslError(
+        `expected a percent stat bonus like +25% max-health, got ${JSON.stringify(raw)}`,
+        { start: cursor.abs(start), end: cursor.abs(cursor.pos) },
+      );
+    return {
+      statId: groups.stat!,
+      percent: Number(groups.amount) * (groups.sign === "-" ? -1 : 1),
+    };
   },
-  print: (value) => `${value.percent < 0 ? '-' : '+'}${Math.abs(value.percent)}% ${value.statId}`,
-  examples: ['+25% max-health', '-10% max-health'],
+  print: (value) =>
+    `${value.percent < 0 ? "-" : "+"}${Math.abs(value.percent)}% ${value.statId}`,
+  examples: ["+25% max-health", "-10% max-health"],
 };
 
 export const DEFAULT_MAX_LEVEL = 99;
@@ -50,11 +59,17 @@ export const isBase = (item: Item): boolean => item.slot !== undefined;
 // and `origin-cluster:` make it a base. An item claiming a base role alongside
 // a jewel or orb role would be consumed by the growth it can undergo.
 function roleProblem(item: Item): string | undefined {
-  if (item.clusterJewel !== undefined && (isBase(item) || item.originCluster !== undefined)) {
-    return `cluster-jewel: makes ${item.id} a jewel, which is exclusive with the ${isBase(item) ? 'slot:' : 'origin-cluster:'} that makes it a base`;
+  if (
+    item.clusterJewel !== undefined &&
+    (isBase(item) || item.originCluster !== undefined)
+  ) {
+    return `cluster-jewel: makes ${item.id} a jewel, which is exclusive with the ${isBase(item) ? "slot:" : "origin-cluster:"} that makes it a base`;
   }
-  if (item.clusterEffect !== undefined && (isBase(item) || item.originCluster !== undefined)) {
-    return `cluster-effect: makes ${item.id} an orb, which is exclusive with the ${isBase(item) ? 'slot:' : 'origin-cluster:'} that makes it a base`;
+  if (
+    item.clusterEffect !== undefined &&
+    (isBase(item) || item.originCluster !== undefined)
+  ) {
+    return `cluster-effect: makes ${item.id} an orb, which is exclusive with the ${isBase(item) ? "slot:" : "origin-cluster:"} that makes it a base`;
   }
   if (item.originCluster !== undefined && !isBase(item)) {
     return `origin-cluster: is the cluster hex (0,0) of ${item.id}'s plane, and only a base has one: give it a slot: or drop the field`;
@@ -62,34 +77,58 @@ function roleProblem(item: Item): string | undefined {
   return undefined;
 }
 
-export const item = section<Item, never, 'actions'>()({
-  kind: 'item',
-  ids: 'owned',
-  map: 'items',
+export const item = section<Item, never, "actions">()({
+  kind: "item",
+  ids: "owned",
+  map: "items",
   nestsActions: true,
-  text: ['title', 'examine'],
+  text: ["title", "examine"],
   fields: {
     title: TITLE_FIELD,
     examine: { parser: text },
     slot: { parser: id },
     tags: { parser: list(tagClause), default: () => [] },
-    clusterJewel: { parser: id, keyword: 'cluster-jewel' },
-    originCluster: { parser: id, keyword: 'origin-cluster' },
-    clusterEffect: { parser: clusterEffectValue, keyword: 'cluster-effect' },
-    itemExperience: { parser: number, keyword: 'item-experience' },
-    maxLevel: { parser: number, default: () => DEFAULT_MAX_LEVEL, keyword: 'max-level', printed: 'unless-default' },
+    clusterJewel: { parser: id, keyword: "cluster-jewel" },
+    originCluster: { parser: id, keyword: "origin-cluster" },
+    clusterEffect: { parser: clusterEffectValue, keyword: "cluster-effect" },
+    itemExperience: { parser: number, keyword: "item-experience" },
+    maxLevel: {
+      parser: number,
+      default: () => DEFAULT_MAX_LEVEL,
+      keyword: "max-level",
+      printed: "unless-default",
+    },
     ...HOOK_FIELDS,
   },
-  clauses: 'tags',
-  entries: { into: 'actions', body: actionBody },
+  clauses: "tags",
+  entries: { into: "actions", body: actionBody },
   validate: roleProblem,
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
     visitTags(held.tags, where, visit);
     actions(held.actions, where, visit);
     hooks(held, where, visit);
-    put(held, 'clusterJewel', 'cluster-jewel', `${where} cluster-jewel:`, visit);
-    put(held, 'originCluster', 'cluster-jewel', `${where} origin-cluster:`, visit);
-    if (held.clusterEffect) put(held.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
+    put(
+      held,
+      "clusterJewel",
+      "cluster-jewel",
+      `${where} cluster-jewel:`,
+      visit,
+    );
+    put(
+      held,
+      "originCluster",
+      "cluster-jewel",
+      `${where} origin-cluster:`,
+      visit,
+    );
+    if (held.clusterEffect)
+      put(
+        held.clusterEffect as Loose & { statId: string },
+        "statId",
+        "stat",
+        `${where} cluster-effect:`,
+        visit,
+      );
   },
 });

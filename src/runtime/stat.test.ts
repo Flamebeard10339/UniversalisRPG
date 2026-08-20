@@ -9,8 +9,6 @@ import { loadModule } from '../content/load';
 import { tagClause } from '../grammar/tagClause';
 import { toMilliUnits } from './units';
 
-// `dummy.strike` carries both a ranged flat bonus and a percent one, so the
-// action-tag half of statRange is exercised alongside the buff half.
 const MODULE = `
 # stat attack
 base: 4-7
@@ -98,7 +96,6 @@ describe('statRange', () => {
   it('sums flat bonuses endpoint-wise onto a ranged base, from buffs and the active action alike', () => {
     const registry = loaded();
     const state = withStrike();
-    // base 4-7, the action's +2-3, and a +1-2 buff.
     grantBuff(state, PLAYER, registry.items.get('war-brew')!, 60);
     expect(statRange('attack', state, registry)).toEqual({ min: 7, max: 12 });
   });
@@ -112,7 +109,6 @@ describe('statRange', () => {
 
   it('makes a percent bonus over no flat bonus do nothing at all', () => {
     const registry = loaded();
-    // `dummy.strike` carries +10% dr and nothing adds flat dr: 0 × 1.1 = 0.
     expect(statRange('dr', withStrike(), registry)).toEqual(point(0));
   });
 
@@ -135,7 +131,6 @@ describe('sampleStat', () => {
 
   it('consumes exactly one draw however many ranged sources contribute', () => {
     const registry = loaded();
-    // One ranged source versus three stacked: both must cost one RNG step.
     const one = createGameState('nowhere');
     sampleStat('spread', one, registry);
 
@@ -153,7 +148,6 @@ describe('sampleStat', () => {
 
     expect(Math.min(...rolls)).toBeGreaterThanOrEqual(4);
     expect(Math.max(...rolls)).toBeLessThanOrEqual(7);
-    // Loose bounds, so this stays a distribution check and not an LCG restatement.
     expect(rolls.reduce((sum, roll) => sum + roll, 0) / rolls.length).toBeCloseTo(5.5, 1);
     expect(Math.min(...rolls)).toBeLessThan(4.2);
     expect(Math.max(...rolls)).toBeGreaterThan(6.8);
@@ -192,8 +186,6 @@ describe('hitDamage', () => {
   });
 });
 
-// A counter-scaled bonus needs a pool to read, which the module above has none
-// of. `plain-blade` is the control: the same shape without `per`.
 const COUNTER_MODULE = `
 # stat attack
 base: 4
@@ -278,8 +270,6 @@ describe('a stat bonus scaled by a counter', () => {
       actors: { ogre: { resources: { fury: toMilliUnits(4) }, rateRemainders: {} } },
     };
 
-    // The ogre's own swing carries the bonus and the ogre's own pool is the
-    // count: 4 + 5 x 4, and never 4 + 5 x the player's 3.
     expect(statValue('attack', state, registry, 'ogre')).toBe(24);
     expect(statValue('attack', state, registry)).toBe(4);
   });

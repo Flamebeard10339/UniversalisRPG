@@ -43,7 +43,6 @@ describe('recursivelyResolveRelativeCoordinates', () => {
   });
 
   it('resolves a chain whose origin is itself relative, regardless of order', () => {
-    // 'far' is placed relative to 'near', which parses after it.
     const map = place(relative('far', 'east', 'near'), relative('near', 'east', 'home'), loc('home'));
     expect(map.get('near')).toMatchObject({ x: 1, y: 0, z: 0 });
     expect(map.get('far')).toMatchObject({ x: 2, y: 0, z: 0 });
@@ -69,8 +68,6 @@ describe('recursivelyResolveRelativeCoordinates', () => {
   });
 });
 
-// The runtime resolved `use:location.<id>.<action>` all along, but locationSchema
-// declared no entries, so authoring one was a parse error and the path was dead.
 const WITH_ACTIONS = `
 # location shore
 x: 0, y: 0
@@ -96,7 +93,6 @@ describe('a location’s own actions', () => {
     const session = startSession(registry);
     const ids = view(session).choices.map((c) => c.id);
     expect(ids).toContain('use:location.shore.search-tideline');
-    // Its bare reference is scoped to the location, as an entity action's is.
     expect(ids).not.toContain('use:location.shore.light-beacon');
   });
 

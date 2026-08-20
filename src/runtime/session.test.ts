@@ -17,8 +17,6 @@ import { printDirective } from '../content/serialize';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
-// A save is how a session starts anywhere but the beginning, so it is how a
-// test stocks one too.
 function primed(registry: Registry, diff: SaveDiff): PlaySession {
   registry.saves.set('primed', { version: SAVE_VERSION, diff });
   const session = startSession(registry);
@@ -37,10 +35,6 @@ function modalNames(v: PlayView): string[] {
 }
 
 describe('session', () => {
-  // Not a second copy of the `# test` that walks the same route: that one
-  // asserts flags and an end-state save, this one asserts the choice-list API
-  // around them — which ids are offered and withdrawn, `inDialogue`, the
-  // encounter readout, `said` — none of which a `# test` directive can reach.
   it('drives the tutorial-island miki route through the choice-list API', () => {
     const registry = loadInEnglish(source);
     const session = startSession(registry);
@@ -53,8 +47,6 @@ describe('session', () => {
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual(['dialogue']);
-    // The menu arrives as the one option of a dialogue modal, not as a
-    // second kind of choice sitting beside the world's.
     expect(v.choices).toEqual([]);
     const menu = v.modals[0].options[0];
     expect(menu.key).toBe('choice');
@@ -67,8 +59,6 @@ describe('session', () => {
     v = apply(session, 'use:entity.tutorial-island.mirror.look-in');
     expect(v.said).toContain('modal:character-creation');
     expect(v.flags['tutorial-island.mirror-done']).toBe(true);
-    // A modal sits atop the world, so nothing in the room is offered until it
-    // is answered — and it takes two answers to be done with.
     expect(v.choices).toEqual([]);
     v = submitModal(session, { name: 'Rowan' });
     expect(modalNames(v)).toEqual(['character-creation']);
@@ -113,8 +103,6 @@ describe('session', () => {
     expect(v.location.id).toBe('tutorial-island.basement');
     expect(ids(v)).toContain('fight:tutorial-island.melee-combat:tutorial-island.giant-rat');
 
-    // A real fight: one `use:` is one swing, so each rat needs the clock to run
-    // on. 30s is far longer than the ~6s one actually lasts.
     for (let killed = 1; killed <= 3; killed++) {
       v = apply(session, 'fight:tutorial-island.melee-combat:tutorial-island.giant-rat');
       expect(v.encounter).not.toBeNull();
@@ -122,7 +110,7 @@ describe('session', () => {
 
       v = wait(session, 30);
       expect(v.flags['tutorial-island.rats-killed']).toBe(killed);
-      expect(v.encounter).toBeNull(); // the fight is over, so is the readout
+      expect(v.encounter).toBeNull();
     }
     expect(ids(v)).not.toContain('fight:tutorial-island.melee-combat:tutorial-island.giant-rat');
 
@@ -145,16 +133,6 @@ describe('session', () => {
     v = apply(session, 'travel:tutorial-island.beach');
     expect(v.location.id).toBe('tutorial-island.beach');
 
-    // The route's mechanical sim-time: dough (2s) + bread (3s) + three rat
-    // fights + the beach journey (1 unit east × the authored
-    // travel-seconds-per-unit). Talking, the mirror and ascend/descend (instant
-    // stairs actions) cost nothing. This doubles as a measured-playtime
-    // invariant; the beach leg is derived from content so it tracks the authored
-    // variable rather than a hardcoded pace.
-    //
-    // A rat costs the opening swing (60/25 = 2.4s) plus the 30s waited out above
-    // — the loop above waits a fixed span rather than exactly as long as the
-    // fight, so this measures the route as driven, not the fights themselves.
     const beachJourney = 1 * travelSecondsPerUnit(registry);
     const ratRound = 60 / 25 + 30;
     expect(v.time).toBeCloseTo(2 + 3 + 3 * ratRound + beachJourney, 9);
@@ -184,7 +162,6 @@ eat: take: 1 bread, say: You eat the bread.
 
     v = apply(session, 'use:item.bread.eat');
     expect(v.said).toContain('You eat the bread.');
-    // Spent, so it is gone from what is published rather than held at zero.
     expect(v.inventory).toEqual({});
     expect(ids(v)).not.toContain('use:item.bread.eat');
   });
@@ -220,8 +197,6 @@ node greeting:
     ] }]);
     expect(v.player).toEqual({ name: '', race: '' });
 
-    // Answered one option at a time: the modal stays up, publishing only what
-    // is left, until the last answer lands.
     v = submitModal(session, { name: 'Rowan' });
     expect(v.modals[0].options.map((option) => option.key)).toEqual(['race']);
     expect(v.player).toEqual({ name: '', race: '' });
@@ -253,24 +228,17 @@ starting
   });
 });
 
-// One world and the world that replaces it under a live session: the second
-// has no `outpost` for the player to be standing in, no `relic` for them to be
-// holding and no `charted` for them to be carrying, and it opens a road out of
-// the starting location to somewhere the first did not have at all.
 const ADOPT_BEFORE = ['# location camp', 'x: 0, y: 0', 'starting', '', '# location outpost', 'x: 1, y: 0', 'entities:', '  watcher', '', '# entity watcher', 'title: Watcher', 'poke:', '  say: Nothing here.', '', '# item relic', 'title: Relic', '', '# flag charted'].join('\n');
 const ADOPT_AFTER = ['# location camp', 'x: 0, y: 0', 'starting', 'adjacent:', '  tower', '', '# location tower', 'title: Tower', 'x: 0, y: 1'].join('\n');
 
 describe('adoptRegistry: content changed under a live session', () => {
   it('prunes what the new registry cannot resolve, says every prune, and re-spreads discovery', () => {
     const session = primed(loadInEnglish(ADOPT_BEFORE), { location: 'outpost', inventory: { relic: 1 }, flags: { charted: true } });
-    // Drained, so what `said` holds afterwards is the adopt's own words.
     view(session);
 
     adoptRegistry(session, loadInEnglish(ADOPT_AFTER));
     const after = view(session);
 
-    // Every prune said, and the state each one left resolves against the
-    // registry that replaced it.
     expect(after.said.some((line) => line.includes('outpost'))).toBe(true);
     expect(after.said.some((line) => line.includes('relic'))).toBe(true);
     expect(after.said.some((line) => line.includes('charted'))).toBe(true);
@@ -278,10 +246,6 @@ describe('adoptRegistry: content changed under a live session', () => {
     expect(session.registry.locations.has(after.location.id)).toBe(true);
     expect(after.inventory.relic).toBeUndefined();
 
-    // The roads may have moved: an edge the old registry did not have is a
-    // place the player can walk to, and knows about, without leaving and
-    // coming back. The flag is the half a choice list cannot show — a travel
-    // choice is offered whether or not the place has been discovered.
     expect(ids(after)).toContain('travel:tower');
     const flags = (JSON.parse(serializeSession(session)) as { flags: Record<string, boolean> }).flags;
     expect(flags['tower.discovered']).toBe(true);
@@ -292,11 +256,6 @@ describe('adoptRegistry: content changed under a live session', () => {
     const session = primed(loadInEnglish(ADOPT_BEFORE), { location: 'outpost', inventory: { relic: 1 }, flags: { charted: true } });
     view(session);
 
-    // A line said and not yet read: `applyDirective` writes the log and `view`
-    // is what drains it, so not calling one leaves the line standing. Nothing a
-    // command can do reaches this — every route through `runCommand` that says
-    // anything views before it answers — which is why the witness for the log
-    // half of "a reload leaves the session identical" is here and not there.
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'watcher', actionId: 'poke' });
     adoptRegistry(session, loadInEnglish(ADOPT_AFTER));
     const after = view(session);
@@ -398,9 +357,6 @@ out: 1 mix
 });
 
 describe('travel is a distance-timed journey', () => {
-  // beach sits one unit east of camp, so a journey between them lasts
-  // 1 × the authored travel-seconds-per-unit. A distinctive value (7, not the
-  // engine default) proves the journey time is read from content, not baked in.
   const module = `
 # variable travel-seconds-per-unit
 value: 7
@@ -451,8 +407,6 @@ describe('travel edges aliased by a free entity relocate are hidden', () => {
     const session = startSession(registry);
 
     const choiceIds = ids(view(session));
-    // The stairs entity relocates to both floors, so the duplicate vertical
-    // travel edges are suppressed in favor of ascend/descend.
     expect(choiceIds).toContain('use:entity.tutorial-island.stairs.ascend');
     expect(choiceIds).toContain('use:entity.tutorial-island.stairs.descend');
     expect(choiceIds).not.toContain('travel:tutorial-island.basement');
@@ -487,8 +441,6 @@ enter:
     const session = primed(loadInEnglish(module), { inventory: { coin: 1 } });
 
     const choiceIds = ids(view(session));
-    // gate.enter relocates to cave but costs a coin, so it is not a free alias —
-    // the travel edge to cave stays; and nothing aliases summit.
     expect(choiceIds).toContain('travel:cave');
     expect(choiceIds).toContain('travel:summit');
   });
@@ -496,18 +448,18 @@ enter:
 
 describe('cancelAction', () => {
   it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
-    const session = primed(loadInEnglish(source), { inventory: { 'tutorial-island.dough': 2 } }); // two loaves' worth
+    const session = primed(loadInEnglish(source), { inventory: { 'tutorial-island.dough': 2 } });
 
     beginAction(session, 'craft:tutorial-island.bread');
-    const baked = wait(session, 4); // one full 3s bake done, a second one 1s in
+    const baked = wait(session, 4);
     expect(baked.inventory['tutorial-island.bread']).toBe(1);
     expect(baked.action).not.toBeNull();
 
     const v = cancelAction(session);
     expect(v.action).toBeNull();
-    expect(v.inventory['tutorial-island.bread']).toBe(1); // no partial credit for the aborted bake
-    expect(v.inventory['tutorial-island.dough']).toBe(1); // its input was not consumed
-    expect(v.choices.length).toBeGreaterThan(0); // back to ordinary choices
+    expect(v.inventory['tutorial-island.bread']).toBe(1);
+    expect(v.inventory['tutorial-island.dough']).toBe(1);
+    expect(v.choices.length).toBeGreaterThan(0);
   });
 
   it('is a no-op when nothing is active', () => {
@@ -646,9 +598,6 @@ submit-modal: choice=0
   });
 });
 
-// Everything c4 names, in one world: a stat with a base and an item that raises
-// it, a skill that earns xp, a slot to fill, and a location reached only by
-// being told about it.
 const PUBLISHED_MODULE = `
 # stat might
 base: 4
@@ -780,9 +729,6 @@ item-experience: 1000
 `;
 
 describe('what the engine publishes', () => {
-  // c9: a stat reaches a page under a title rather than under the id the number
-  // is keyed by, and the title is the localizer's — an authored one where the
-  // content wrote one, and English's own reading of the id where it did not.
   it('names every stat it counts, on the row it counted it on', () => {
     const v = view(startSession(loadInEnglish(PUBLISHED_MODULE)));
 
@@ -793,8 +739,6 @@ describe('what the engine publishes', () => {
     ]);
   });
 
-  // A pool nothing gives this character a ceiling for cannot move and is not
-  // drawn; what gives it one is what makes it appear.
   it('publishes a pool once something gives the character a ceiling for it, and not before', () => {
     const session = primed(loadInEnglish(PUBLISHED_MODULE), { inventory: { censer: 1 } });
     expect(view(session).resources.map((each) => each.id)).toEqual([]);
@@ -813,7 +757,6 @@ describe('what the engine publishes', () => {
 
     applyDirective(session, { kind: 'equip', item: 'gauntlet' });
     const armed = view(session);
-    // c10: the slot arrives with the words for it, and so does what fills it.
     expect(armed.equipment).toEqual([{ slot: 'hand', title: 'Hand', item: 'gauntlet', name: 'Gauntlet' }]);
     expect(statValueOf(armed, 'might')).toBe(7);
 
@@ -823,10 +766,6 @@ describe('what the engine publishes', () => {
     expect(statValueOf(bare, 'might')).toBe(4);
   });
 
-  // Wearing a thing and taking it off are what a copy takes rather than what it
-  // does, and the carried-items screen is where a copy's verbs are taken. A room
-  // offering them as well put the same act in two places and scoped an item to a
-  // location, which nothing about an item is.
   it('offers no room-level way to wear a carried thing or take a worn one off', () => {
     const session = primed(loadInEnglish(PUBLISHED_MODULE), { inventory: { gauntlet: 1 } });
 
@@ -835,17 +774,12 @@ describe('what the engine publishes', () => {
     applyDirective(session, { kind: 'equip', item: 'gauntlet' });
     expect(ids(view(session)).filter((id) => id.startsWith('unequip:'))).toEqual([]);
 
-    // The screen that does own them still does, under the one name every
-    // surface spells a carried thing by.
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
     submitModal(session, { item: 'worn:hand' });
     const asked = view(session).modals[0].options;
     expect(asked[asked.length - 1].values?.map((choice) => choice.value)).toContain('unequip');
   });
 
-  // Grown against a state and handed to the session as a save, so what is
-  // under test is the published view of a copy rather than the verb that made
-  // one; the verbs have their own describe below.
   it('names a grown copy beside the stacks, and offers it as its own row to wear', () => {
     const registry = loadInEnglish(GROWN_MODULE);
     const grownState = createGameState('camp');
@@ -861,8 +795,6 @@ describe('what the engine publishes', () => {
     expect(carried.grown).toEqual({ [grown.instance]: 'gauntlet' });
     expect(statValueOf(carried, 'might')).toBe(4);
 
-    // c16: the world names a copy the one way every screen does — under a
-    // descriptor, and never under the id the row itself carries.
     expect(carried.carried).toEqual([
       { id: 'gauntlet', name: 'Gauntlet', count: 1, shown: 'Gauntlet x1', grown: false },
       { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet', grown: true },
@@ -872,8 +804,6 @@ describe('what the engine publishes', () => {
     const armed = view(session);
     expect(armed.equipment).toEqual([{ slot: 'hand', title: 'Hand', item: grown.instance, name: 'Modified Gauntlet' }]);
     expect(statValueOf(armed, 'might')).toBe(7);
-    // The worn copy leaves the carried side and is named there instead (c21),
-    // still under the id that says which of the two the player meant.
     expect(armed.carried).toEqual([
       { id: 'gauntlet', name: 'Gauntlet', count: 1, shown: 'Gauntlet x1', grown: false },
       { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet (Hand)', grown: true, worn: { slot: 'hand', title: 'Hand' } },
@@ -885,15 +815,9 @@ describe('what the engine publishes', () => {
     const session = startSession(registry);
     applyDirective(session, { kind: 'load', save: 'stocked' });
 
-    // A skill nobody has earned in is one the character has, at the level
-    // everyone starts at. A page reading only the totals that have moved would
-    // be reading the save rather than the world.
     expect(view(session).xp).toEqual([{ id: 'smithing', title: 'Smithing', value: 0, level: 1, earned: 0, span: xpForLevel(2) }]);
 
     const forged = apply(session, 'craft:ingot');
-    // The level and where inside it the total stands are published beside the
-    // total, because the curve is the engine's and a screen drawing a ring must
-    // not re-derive it.
     expect(forged.xp).toEqual([{ id: 'smithing', title: 'Smithing', value: 5, level: skillLevel(5), earned: 5 - xpForLevel(skillLevel(5)), span: xpForLevel(skillLevel(5) + 1) - xpForLevel(skillLevel(5)) }]);
     expect(forged.inventory).toEqual({ ingot: 1, gauntlet: 1 });
   });
@@ -903,17 +827,12 @@ describe('what the engine publishes', () => {
 
     const opening = view(session);
 
-    // The forge because the player is in it, the overlook because a road leads
-    // there. Not the vault, whose road is shut; not the shipwreck, which no
-    // road reaches at all.
     expect(opening.discovered.map((place) => place.id).sort()).toEqual(['forge', 'overlook']);
   });
 
   it('fills the map in as the player walks, from wherever they are standing now', () => {
     const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
-    // The ridge is two roads out, so nothing about it is knowable from the
-    // forge; arriving at the overlook is what puts it on the map.
     expect(view(session).discovered.map((place) => place.id)).not.toContain('ridge');
 
     const walked = apply(session, 'travel:overlook');
@@ -921,9 +840,6 @@ describe('what the engine publishes', () => {
     expect(walked.discovered.map((place) => place.id).sort()).toEqual(['forge', 'overlook', 'ridge']);
   });
 
-  // Arriving is what discovers, so being put down somewhere is arriving too.
-  // A `# test` opens with no location, which makes its first travel: the one
-  // arrival in the engine that reaches no relocate: to spread from.
   it('discovers where a player was put down, and not only where they walked to', () => {
     const registry = loadInEnglish(PUBLISHED_MODULE);
     const state = createGameState();
@@ -932,16 +848,10 @@ describe('what the engine publishes', () => {
 
     expect(state.flags['forge.discovered']).toBe(true);
     expect(state.flags['overlook.discovered']).toBe(true);
-    // The vault's road is shut and the shipwreck has none, so neither is
-    // reachable from where the player was put and neither is discovered.
     expect(state.flags['vault.discovered']).toBeUndefined();
     expect(state.flags['shipwreck.discovered']).toBeUndefined();
   });
 
-  // Discovery is monotone with respect to position: a place the player can
-  // reach is discovered, and no result may hide it. The unset lands and is
-  // recomputed within the same application, which is the rule holding rather
-  // than the result failing.
   it('cannot be hidden from a player who can reach it, whatever a result asks', () => {
     const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
@@ -953,9 +863,6 @@ describe('what the engine publishes', () => {
   it('works out what a save should have known, since a save carries both its inputs at once', () => {
     const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
-    // Written before any of this existed: it names a location and no discovery
-    // at all, and loading it must not leave the player somewhere with a blank
-    // map they cannot fill in without walking back the way they came.
     applyDirective(session, { kind: 'load', save: 'at-the-overlook' });
 
     expect(view(session).discovered.map((place) => place.id).sort()).toEqual(['forge', 'overlook', 'ridge']);
@@ -975,8 +882,6 @@ describe('what the engine publishes', () => {
 
     const told = apply(session, 'use:entity.window.look-through');
 
-    // No road runs to it from anywhere the player has stood, so this one can
-    // only have arrived by being scouted.
     expect(told.discovered.map((place) => place.id)).toContain('shipwreck');
     expect(told.flags['shipwreck.discovered']).toBe(true);
   });
@@ -984,9 +889,6 @@ describe('what the engine publishes', () => {
   it('says a road is shut rather than hiding it, once both of its ends are known', () => {
     const session = startSession(loadInEnglish(PUBLISHED_MODULE));
 
-    // Scouted through the window, so the vault is known before the hatch that
-    // leads to it is: knowing a road is there and being able to walk it are two
-    // different facts and the map draws both.
     const scouted = apply(session, 'use:entity.window.look-through');
     const opened = apply(session, 'use:entity.hatch.unlock');
 
@@ -1013,12 +915,8 @@ describe('what the engine publishes', () => {
     const session = startSession(loadInEnglish(PUBLISHED_MODULE));
     const leads = (id: string): string | undefined => view(session).choices.find((choice) => choice.id === id)?.leadsTo;
 
-    // The road itself, and the ladder that is only a way down: a staircase
-    // publishes an action, so a map reading the choice's kind would miss it.
     expect(leads('travel:overlook')).toBe('overlook');
     expect(leads('use:entity.ladder.climb-down')).toBe('vault');
-    // The same move with a flag hung on it is not only a move, so it leads
-    // nowhere as far as a map is concerned.
     expect(leads('use:entity.ladder.kick')).toBeUndefined();
     expect(leads('use:entity.hatch.unlock')).toBeUndefined();
   });
@@ -1037,8 +935,6 @@ describe('what the engine publishes', () => {
 
     const opened = apply(session, 'use:entity.hatch.unlock');
 
-    // Adjacency to a place the player has not found would draw the shape of
-    // what is still hidden, so an edge arrives only once both ends have.
     expect(before.find((place) => place.id === 'forge')?.adjacent).toEqual([{ to: 'overlook', open: true }]);
     expect(opened.discovered.find((place) => place.id === 'forge')?.adjacent).toEqual([
       { to: 'overlook', open: true },
@@ -1050,12 +946,7 @@ describe('what the engine publishes', () => {
 
 describe('what the engine withholds', () => {
   it('has a standing answer for every GameState field, so a new one cannot arrive unclassified', () => {
-    // The Record is the guard, not the assertion: adding a field to GameState
-    // stops compiling here until somebody says whether a driver sees it.
-    // `instances` reached this repo unpublished with nothing noticing, which is
-    // what this exists to stop happening twice.
     const classified: Record<keyof GameState, 'published' | 'withheld'> = {
-      // The player chose it, so the engine does not tell them what it is.
       language: 'withheld',
       location: 'published',
       time: 'published',
@@ -1068,37 +959,24 @@ describe('what the engine withholds', () => {
       player: 'published',
       activeAction: 'published',
       journey: 'published',
-      // `said` is this drained, so the array itself never leaves the engine.
       log: 'withheld',
-      // Bookkeeping the engine reasons with and no driver renders. Each stays
-      // withheld until something asks: a field published before anything reads
-      // it is how `discovered` became a list that is always empty.
       rng: 'withheld',
       visits: 'withheld',
       buffs: 'withheld',
       resourceRateRemainders: 'withheld',
-      // Which grown copies the player carries, and nothing about what is inside
-      // one: a driver has to name what it is equipping, and a plane is read
-      // through a surface of its own.
       instances: 'published',
-      // How many of each place's population are down. A driver renders what is
-      // standing, which `entities` already carries.
       populations: 'withheld',
     };
 
-    // The constructor, not the type: the two drift only if a field is built
-    // without being declared, which the type above cannot see.
     expect(Object.keys(createGameState()).sort()).toEqual(Object.keys(classified).sort());
 
     const published = Object.keys(classified).filter((field) => classified[field as keyof GameState] === 'published');
     const carried = new Set(Object.keys(view(startSession(loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n')))));
-    // Two of them are renamed on the way out and one is drained into `said`.
     const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action', instances: 'grown' };
     for (const field of published) expect(carried.has(renamed[field] ?? field), field).toBe(true);
   });
 });
 
-// A pool to whittle down, so encounterView reads the player clock too.
 const FIGHT_MODULE = `
 # stat attack
 base: 2
@@ -1156,8 +1034,6 @@ roast:
   give: 1 bun
 `;
 
-  // `registry.saves` is writable and is the only route a driver has to load
-  // one, so what a save carries has to stop being the state once it lands.
   it('does not leave the author of a save holding the state it loaded', () => {
     const registry = loadInEnglish(module);
     const session = startSession(registry);
@@ -1174,21 +1050,16 @@ roast:
   it('does not let play rewrite the save it was loaded from', () => {
     const registry = loadInEnglish(module);
     const session = startSession(registry);
-    // The clock, not the player: modals.ts answers by replacing `state.player`
-    // wholesale, so an alias could never show through it. The engine writes
-    // progress into the cadence in place, which is what an alias would move.
     const fixture = { ownerRef: 'entity.oven', actionSlug: 'roast', repeating: true, implicitTarget: 1000, cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'entity.oven', actionSlug: 'roast', target: '' } } };
     registry.saves.set('midbake', { version: SAVE_VERSION, diff: { activeAction: fixture } });
 
     applyDirective(session, { kind: 'load', save: 'midbake' });
-    const v = wait(session, 3); // three seconds into the four-second roast
+    const v = wait(session, 3);
 
     expect(v.action!.progress).toBe(0.75);
     expect(fixture.cadences.player.progress).toBe(0);
   });
 
-  // One missing clock, every path that reads one. publishAction was guarded on
-  // its own first and the other two still died on the same input.
   it('plays on through every path when a save left an action with no player clock', () => {
     const registry = loadInEnglish(FIGHT_MODULE);
     const session = startSession(registry);
@@ -1199,20 +1070,16 @@ roast:
 
     applyDirective(session, { kind: 'load', save: 'midfight' });
 
-    // The encounter readout reads the player clock before the action block does.
     const v = view(session);
     expect(v.encounter!.cadence).toBe(0);
     expect(v.action!.label).toBe('hit');
 
-    // And the simulation reads it again, which `view` alone never reaches.
     expect(() => wait(session, 3)).not.toThrow();
   });
 
   it('publishes an action a save left without a player clock instead of dying on the next look', () => {
     const registry = loadInEnglish(module);
     const session = startSession(registry);
-    // checkSave takes any object here, and pruneStateForRegistry keeps it: the
-    // owner and the label both resolve. Only the clock is missing.
     registry.saves.set('midbake', {
       version: SAVE_VERSION,
       diff: { activeAction: { ownerRef: 'entity.oven', actionSlug: 'roast', repeating: true, implicitTarget: 1000, cadences: {}, roster: { player: { ownerRef: 'entity.oven', actionSlug: 'roast', target: '' } } } },
@@ -1229,9 +1096,6 @@ describe('the handle a driver obtains', () => {
   it('carries no route to the state it plays, by enumeration or by key', () => {
     const session = startSession(loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n'));
 
-    // `session.state` is the compile-time half and tsc owns it. This is the
-    // runtime half: a symbol member satisfied the type and handed the live
-    // GameState back out of getOwnPropertySymbols.
     expect(Object.getOwnPropertySymbols(session)).toEqual([]);
     expect(Object.keys(session)).toEqual(['registry']);
     expect(Object.values(session).some((value) => value instanceof Object && 'inventory' in value)).toBe(false);
@@ -1252,8 +1116,6 @@ describe('starting a session with nowhere to begin', () => {
 });
 
 describe('view: what a long span hands back', () => {
-  // An unkillable dummy at one swing a second: the big-jump path resolve() exists
-  // for, logging one line per swing for as long as the span lasts.
   const arena = `
 # stat attack
 base: 1
@@ -1389,9 +1251,6 @@ describe('the four growth verbs through the directive surface', () => {
     return state;
   }
 
-  // The whole loop c22 replays: a target named as an item id mints a copy, the
-  // copy is named by the id minting gave it, and every refusal is a written
-  // line rather than an absence.
   it('replays a whole growth, and each refusal, out of an authored # test', () => {
     const state = stocked();
     expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
@@ -1420,8 +1279,6 @@ describe('the four growth verbs through the directive surface', () => {
     expect(sessionStatus(session).grown).toEqual({});
   });
 
-  // Nothing is minted for a verb that was refused, so the counter a later
-  // authored line names is the one the successful verb advanced.
   it('mints only on a growth that succeeded', () => {
     const state = stocked();
     expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
@@ -1430,9 +1287,6 @@ describe('the four growth verbs through the directive surface', () => {
   });
 });
 
-// c3. Playing a language a module was not authored in, with no entry for a
-// key, puts the key on screen — never the module's own language, never a
-// humanized id — and it does so for content keys and engine keys alike.
 describe('a missing translation shows its key, in every direction', () => {
   const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'examine: Shingle and a drawn-up boat.', 'entities:', '  crab', 'adjacent:', '  cove', '', '# entity crab', 'title: Giant Crab', '', '# location cove', 'x: 1, y: 0'].join('\n');
   const SPANISH = ['# info island-es', 'version: 1.0.0', 'dependencies:', '  island', '', '# locale es', 'island.location.shore.title: Orilla', 'engine.travel.to: Viaja a {destination}'].join('\n');
@@ -1463,9 +1317,6 @@ describe('a missing translation shows its key, in every direction', () => {
 
     expect(v.location.title).toBe('Orilla');
     expect(v.location.description).toBe('island.location.shore.examine');
-    // The destination is looked up in the played language before it is put into
-    // the pattern, so an untranslated place shows its key inside a translated
-    // sentence rather than dragging English in with it.
     expect(v.choices.map((choice) => choice.label)).toContain('Viaja a island.location.cove.title');
   });
 
@@ -1473,9 +1324,6 @@ describe('a missing translation shows its key, in every direction', () => {
     const spanishModule = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# entity rata-gigante', 'title: Rata Gigante'].join('\n');
     const v = view(startSession(loadUniverse([engineLocale(), { name: 'isla', text: spanishModule }]), 'en'));
 
-    // Neither direction: the English player gets the key rather than Spanish,
-    // and the Spanish player gets it too, because `humanizeEn` never ran to
-    // make an entry out of an id that is not English.
     expect(v.location.title).toBe('isla.location.orilla.title');
     expect(view(startSession(loadUniverse([engineLocale(), { name: 'isla', text: spanishModule }]), 'es')).location.title).toBe('isla.location.orilla.title');
   });
@@ -1487,10 +1335,6 @@ describe('a missing translation shows its key, in every direction', () => {
     expect(v.choices.map((choice) => choice.label)).toEqual(['engine.travel.to']);
   });
 
-  // The refusal a growth verb says is on the one line of that screen carrying
-  // words, and it was built in TypeScript around the registry's own `.title` —
-  // so a module writing a language with no title for an item put its raw id
-  // there while every other surface on the same screen showed the key (pass 5).
   it('shows the key on what a refused growth says, and the translation where a locale supplies one', () => {
     const ISLA = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location playa', 'x: 0, y: 0', 'starting', '', '# item cuerda-larga', 'slot: hand', 'max-level: 1', '', '# item miga', 'item-experience: 5'].join('\n');
     const saidOnRefusal = (...extra: ModuleSource[]): string[] => {
@@ -1507,8 +1351,6 @@ describe('a missing translation shows its key, in every direction', () => {
   });
 });
 
-// pass 1: the choice that starts a craft and the bar that reports it were keyed
-// separately, so translating one left the other in English.
 describe('a craft is one string with one key', () => {
   const KITCHEN = ['# info kitchen', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# item flour', '', '# item bread', '', '# recipe bread', 'in: flour', 'out: bread', 'time: 4'].join('\n');
   const SPANISH = ['# info kitchen-es', 'version: 1.0.0', 'dependencies:', '  kitchen', '', '# locale es', 'engine.craft.label: Prepara {recipe}', 'kitchen.recipe.bread.title: Pan'].join('\n');
@@ -1536,9 +1378,6 @@ describe('a craft is one string with one key', () => {
   });
 });
 
-// pass 2: three surfaces read `.title` off the registry instead of asking the
-// localizer, so a Spanish player was shown the base language on the carried
-// screen, the plane screen and the modal built from them.
 describe('every screen a title reaches is played in one language', () => {
   const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# cluster-jewel core', 'shape: point', 'open-connections: e', '', '# item blade', 'title: Blade', 'slot: mainhand', 'origin-cluster: core'].join('\n');
   const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada'].join('\n');
@@ -1568,9 +1407,6 @@ describe('every screen a title reaches is played in one language', () => {
   });
 });
 
-// pass 3: the plane screen composed its heading out of the registry's title and
-// an English refusal, and `ModalOption.label` was a plain string, so nothing
-// stopped it. c3 held on every other screen and failed on this one.
 describe('a modal names what it is about in the language being played', () => {
   const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# cluster-jewel core', 'shape: point', 'open-connections: e', '', '# item blade', 'title: Blade', 'slot: mainhand', 'max-level: 1', 'origin-cluster: core'].join('\n');
   const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada', 'engine.plane.heading: {plane} en {hex}', 'engine.modal.item: Objeto'].join('\n');
@@ -1601,9 +1437,6 @@ describe('a modal names what it is about in the language being played', () => {
   });
 });
 
-// pass 4: an answer is read as well as replayed. Branding the label alone left
-// `values` carrying the base language on the very screens the label fixed, and
-// pass 2's carried-name fix had made the answer itself move with the player.
 describe('an answer is spelled once and read in the language being played', () => {
   const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', 'entities:', '  smith', '', '# item blade', 'title: Blade', 'slot: mainhand', '', '# flag greeted', '', '# entity smith', 'title: Smith', '', '# dialogue smith', 'owner = smith', 'node greeting:', '  when: not greeted', '  say: Well met.', '  -> Ask the way.', '  -> Say nothing.'].join('\n');
   const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada', 'engine.carried.stack: {item} x{count}', 'forge.dialogue.smith.greeting.choice.0: Pregunta el camino.'].join('\n');
@@ -1620,8 +1453,6 @@ describe('an answer is spelled once and read in the language being played', () =
   const offered = (session: PlaySession) => view(session).modals[0].options[0].values!;
 
   it('reads a carried row in the played language and answers it in the base one', () => {
-    // The way out is the engine's own word, so a player of a language nobody
-    // translated it into is shown its key while the answer stays `Close`.
     expect(offered(carried('es')).map((choice) => choice.shown)).toEqual(['Espada x1', 'engine.carried.close']);
     expect(offered(carried('en')).map((choice) => choice.shown)).toEqual(['Blade x1', 'Close']);
     expect(offered(carried('es')).map((choice) => choice.value)).toEqual(offered(carried('en')).map((choice) => choice.value));
@@ -1645,10 +1476,6 @@ describe('an answer is spelled once and read in the language being played', () =
   });
 });
 
-// pass 5: `spelled()` set the words to the answer on three of the four modals,
-// so every word the engine offers was read verbatim in every language; and the
-// plane screen spelled its answers through the played localizer, so an answer
-// recorded in one language named nothing in another.
 describe('a modal answer is spelled in the base language on every screen, and only the words move', () => {
   const FORGE = [
     '# info forge',
@@ -1679,8 +1506,6 @@ describe('a modal answer is spelled in the base language on every screen, and on
     'title: Whetstone',
     'item-experience: 1000',
   ].join('\n');
-  // Some of the engine's words translated and some left alone, because what an
-  // untranslated one shows is the half of c3 a screen full of translations hides.
   const FORGE_ES = [
     '# info forge-es',
     'version: 1.0.0',
@@ -1734,8 +1559,6 @@ describe('a modal answer is spelled in the base language on every screen, and on
   it('offers the same answers in every language, on every screen', () => {
     expect(answers(races('es'))).toEqual(answers(races('en')));
     expect(answers(verbs('es'))).toEqual(answers(verbs('en')));
-    // The one the plane screen spelled through the played localizer: a jewel or
-    // a food in the value put the player's language into what a `# test` replays.
     expect(answers(moves('es'))).toEqual(answers(moves('en')));
     expect(answers(moves('en'))).toContain('feed: with forge.whetstone');
   });
@@ -1754,10 +1577,6 @@ describe('a modal answer is spelled in the base language on every screen, and on
   });
 });
 
-// c6. The choice id the runtime offers and the `use:` an author writes are one
-// string in two places, and each used to carry its own template and its own
-// regex. Walked over the shipped content rather than a fixture, because what
-// the two have to agree on is every id a real session hands out.
 describe('a use: choice id and a use: directive are one shape', () => {
   const useChoices = (v: PlayView) => v.choices.filter((choice) => choice.kind === 'action' && choice.id.startsWith('use:'));
 

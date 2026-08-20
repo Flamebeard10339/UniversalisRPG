@@ -114,7 +114,6 @@ describe('applyResults: watching what was applied', () => {
 
     expect(seen.map((application) => [application.result.kind, application.actor, application.magnitude])).toEqual([
       ['give', 'brute', 3],
-      // Five asked for, two held plus the three just given: what moved is -5.
       ['take', 'brute', -5],
       ['xp', 'brute', 4],
       ['set', 'brute', 0],
@@ -126,8 +125,6 @@ describe('applyResults: watching what was applied', () => {
     const { seen, observer } = watched();
     const segment = newSegment(state, registry, [observer]);
 
-    // Read off the registry rather than written here, because a `say:` speaks
-    // through the address the load path stamped on it and code cannot mint one.
     applyResults(segment, [
       registry.dropTables.get('bakery')!.results[0],
       { kind: 'give', item: 'coin', amount: { min: 1, max: 4 } },

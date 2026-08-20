@@ -9,17 +9,11 @@ import { GameState } from './state';
 
 export const ITEM_INSTANCE = 'item';
 
-// Everything one grown item records: how much experience it has been fed, and
-// a plane. Every number the player earns is derived from the first and every
-// payload from the second, so nothing here is a rolled or cached value.
 export interface ItemInstance {
   experience: number;
   plane: Plane;
 }
 
-// What a refused verb tells the player: the key and the parameters it takes,
-// unsaid, because a refusal outlives the screen it was taken on — a plane frame
-// carries one across a save, and which words it is depends on who loads it (c3).
 export type Refusal = { ok: false; refused: Said };
 export type Growth = { ok: true; instance: string } | Refusal;
 export type Destruction = { ok: true; item: string } | Refusal;
@@ -32,10 +26,6 @@ export function isItemInstance(payload: unknown): payload is ItemInstance {
   return typeof held.experience === 'number' && Number.isInteger(held.experience) && held.experience >= 0 && isPlane(held.plane);
 }
 
-// An item that has left its stack is the item, whether or not the plane still
-// records anything: the substrate drops an empty payload rather than handing
-// the copy back to its stack, and losing the player's sword to a content edit
-// is worse than keeping an instance that has nothing to say.
 defineInstanceKind<ItemInstance>(ITEM_INSTANCE, {
   templateLoaded: (registry, template) => registry.items.has(template),
   holds: isItemInstance,
@@ -53,27 +43,15 @@ export function itemInstance(state: GameState, id: string): ItemInstance | undef
   return grown(state, named(state, id))?.payload;
 }
 
-// A grown copy is spelled by its instance id and a stack by its item id. These
-// two are the whole of the difference between the spellings, so a consumer asks
-// which item stands behind an id and whether the player still has the one thing
-// the id names, and never which spelling it was handed.
 export function itemTemplate(state: GameState, id: string): string {
   const copy = named(state, id);
   return grown(state, copy)?.template ?? copy;
 }
 
-// Which spelling an id is: the minted id of a copy that has left its stack, or
-// the item id a stack is spelled by. Asked wherever the two are moved
-// differently, because only one of them is counted in a stack at all.
 export function isGrownCopy(state: GameState, id: string): boolean {
   return grown(state, named(state, id)) !== undefined;
 }
 
-// The third way one copy is spelled, and the one an item id cannot manage. A
-// grown copy's minted id names the copy wherever it is; a stack copy that has
-// been worn left its stack with no id of its own, so an item id would name both
-// it and the stack it left and every route would reach whichever came first.
-// The slot wearing it is what tells the two apart.
 const WORN = 'worn:';
 
 export function wornCopy(slot: string): string {
@@ -84,44 +62,22 @@ export function wornCopySlot(id: string): string | undefined {
   return id.startsWith(WORN) ? id.slice(WORN.length) : undefined;
 }
 
-// The copy a spelling names: a slot's spelling stands for whatever is in the
-// slot, and every other spelling stands for itself. Where a verb needs to know
-// that the slot is where the copy is rather than only which copy it is, it asks
-// stackCopy instead.
 function named(state: GameState, id: string): string {
   const slot = wornCopySlot(id);
   if (slot === undefined) return id;
   return state.equipped[slot] ?? id;
 }
 
-// Which slot an id is worn in, where it is worn in one. A slot holds either
-// spelling, so this is asked of the id in hand and not of the item behind it.
 export function wornIn(state: GameState, id: string): string | undefined {
   const copy = named(state, id);
   return Object.entries(state.equipped).find(([, worn]) => worn === copy)?.[0];
 }
 
-// Whether the id names a copy on the carried side of c21, which is what equip
-// asks before it moves one — not whether the player has one at all, which is
-// what a gate asks and `heldCount` answers. The two spellings answer by
-// different rules because they name different things: a grown copy's id names
-// one copy, so wearing that copy is what takes it off this side, while an item
-// id names the stack, whose copies are interchangeable — a stack of three with
-// one worn still has two to put on. This is the one reader that resolves
-// neither spelling through `named`: a slot's spelling names the copy in the
-// slot, and that copy is worn, which is the answer an unresolved id already
-// gives.
 export function carriesItem(state: GameState, id: string): boolean {
   if (grown(state, id) !== undefined) return wornIn(state, id) === undefined;
   return copiesOf(state, id).stack > 0;
 }
 
-// The three places a copy of one item can be, and the whole of the asymmetry a
-// plane rests on. `stack` is the only side a directive may spend; `grown` and
-// `worn` are the copies that satisfy every gate and are never taken, so no cost,
-// recipe or take: can destroy a plane or strip a slot. c21 is the line between
-// the first two and the third: what is worn is not carried, and it is counted
-// here so that one read answers both what the player carries and what they have.
 export interface Copies {
   stack: number;
   grown: number;
@@ -130,10 +86,6 @@ export interface Copies {
 
 const NO_COPIES: Copies = { stack: 0, grown: 0, worn: 0 };
 
-// The one read of where an item's copies are, so there is one answer to both
-// questions. A stack the player is wearing one of was decremented when the slot
-// was filled, so `stack` needs no subtraction here; a grown copy is in no stack,
-// so which side it counts on is the slot's to say.
 export function itemCopies(state: GameState): Map<string, Copies> {
   const items = new Map<string, Copies>();
   const entry = (id: string): Copies => {
@@ -157,23 +109,16 @@ export function copiesOf(state: GameState, itemId: string): Copies {
   return itemCopies(state).get(itemId) ?? NO_COPIES;
 }
 
-// How many the player carries, which is what an inventory row states: a stack of
-// three with one worn reads two (c21).
 export function carriedCount(state: GameState, itemId: string): number {
   const { stack, grown } = copiesOf(state, itemId);
   return stack + grown;
 }
 
-// How many the player has, however they have them, which is what a gate asks:
-// `requires: has blade` is a question about the player and not about their
-// inventory, so wearing the blade is not a way to stop having one.
 export function heldCount(state: GameState, itemId: string): number {
   const { stack, grown, worn } = copiesOf(state, itemId);
   return stack + grown + worn;
 }
 
-// The one write, and the reason a grown copy survives every directive: it moves
-// the stack and nothing else, floored at empty. Returns what actually moved.
 export function stockItem(state: GameState, itemId: string, delta: number): number {
   const before = copiesOf(state, itemId).stack;
   const after = Math.max(0, before + delta);
@@ -181,10 +126,6 @@ export function stockItem(state: GameState, itemId: string, delta: number): numb
   return after - before;
 }
 
-// Every grown copy the player has, by the id it is named by, whether it is
-// carried or worn. They are not in `inventory` — c11 took them out of their
-// stacks — so a surface that lists what the player has reads both, and one that
-// lists only what is carried asks `itemCopies` instead.
 export function grownItems(state: GameState): Record<string, string> {
   const copies: Record<string, string> = {};
   for (const [id, row] of Object.entries(state.instances.byId)) {
@@ -193,19 +134,11 @@ export function grownItems(state: GameState): Record<string, string> {
   return copies;
 }
 
-// A slot may only name a copy that still exists, so a destroyed one is taken
-// off. The id destroyed is the id in hand, so this names the slot holding it
-// rather than re-deciding every slot from what is carried — a sweep on that
-// question empties every occupied slot once carried and worn are disjoint.
 function takeOff(state: GameState, id: string): void {
   const slot = wornIn(state, id);
   if (slot !== undefined) delete state.equipped[slot];
 }
 
-// Where the one copy a verb reaches is. c21 gives a stack copy two places to be:
-// a slot's spelling is in no stack and so goes straight to the slot, while an
-// item id names the stack, whose copies are interchangeable — so the stack
-// answers while it has one and the slot answers once it has not.
 type StackCopy = { readonly from: 'stack' } | { readonly from: 'slot'; readonly slot: string };
 
 function stackCopy(state: GameState, id: string): StackCopy | undefined {
@@ -214,18 +147,10 @@ function stackCopy(state: GameState, id: string): StackCopy | undefined {
   return slot === undefined ? undefined : { from: 'slot', slot };
 }
 
-// Whether the player has the one stack copy an id names, wherever c21 puts it.
-// A grown copy is not this question — its instance is what says whether it is
-// still there — so a target that is one is asked about before this is reached.
 export function hasStackCopy(state: GameState, id: string): boolean {
   return stackCopy(state, id) !== undefined;
 }
 
-// c12: the one way an item leaves the player for good, and the only verb that
-// ends a plane — a grown copy goes with everything recorded about it, and what
-// its plane consumed does not come back. A stack loses one, and an emptied
-// stack goes rather than staying on as a count of none. Nothing here puts the
-// item down anywhere, and nothing here asks whether the player meant it.
 export function destroyItem(state: GameState, id: string): Destruction {
   const copy = named(state, id);
   const standing = grown(state, copy);
@@ -263,14 +188,6 @@ const held = (state: GameState, itemId: string): number => copiesOf(state, itemI
 
 const take = (state: GameState, itemId: string): void => void stockItem(state, itemId, -1);
 
-// The one door onto a plane, and the whole of c11's laziness. A target names
-// either a live instance or a stack; a stack is minted only once the change
-// has succeeded, so a refused verb leaves the stack whole and no instance
-// behind. Everything a caller may do to a plane comes through here, which is
-// why no other file needs to know that instancing happens at all.
-// Minting out of a slot is what keeps growing what you wear one press away: the
-// copy that left is the copy that was worn, so the slot names the minted id and
-// the player wears what they grew.
 export function growItem(state: GameState, registry: Registry, growing: Growing): Growth {
   const { target, consumes } = growing;
   const copy = named(state, target);
@@ -298,7 +215,6 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
   return { ok: true, instance: minted };
 }
 
-// c12: the only event in the game that moves an item's experience.
 export function feedItem(state: GameState, registry: Registry, target: string, food: string): Growth {
   const experience = registry.items.get(food)?.itemExperience;
   if (experience === undefined) return refused(says('engine.growth.no-experience', { item: anId(food) }));

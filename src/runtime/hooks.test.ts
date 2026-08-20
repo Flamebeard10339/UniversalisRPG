@@ -7,11 +7,6 @@ import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { fromMilliUnits, secondsToMs, toMilliUnits } from './units';
 
-// Three carriers on the player — its own sheet and two slots — and three
-// targets: `dummy` swings nothing back and dodges everything, `biter` answers,
-// `anvil` is what a one-sided attempt is performed on. Nothing here is authored
-// after an archetype: what the fixtures are called is not what the runtime
-// knows.
 const MODULE = `
 # stat attack
 base: 0
@@ -205,8 +200,6 @@ describe('a passive an entity declares is carried by it', () => {
   it('pays its stat bonus onto the character carrying it, out of the one walk that gathered the hook', () => {
     const registry = loaded();
     const state = arena(registry);
-    // Neither sheet declares `dr` at all, so the whole of the difference
-    // between them is the passive one of the two carries.
     expect(statValue('dr', state, registry, 'urchin')).toBe(1);
     expect(statValue('dr', state, registry, 'dummy')).toBe(0);
   });
@@ -219,7 +212,6 @@ describe('a hook is gathered the way a stat bonus is (c2)', () => {
     wearing(registry, state, 'serpent-blade');
     armFightAction('swing', 'dummy', registry, state);
 
-    // The swing is worth 1 and the blade's `on hit:` another 3.
     resolve(state, registry, secondsToMs(1));
     expect(foeHealth(state, 'dummy')).toBe(16);
 
@@ -248,8 +240,6 @@ describe('a hook is gathered the way a stat bonus is (c2)', () => {
   it('reads the entity block off whoever is being evaluated, whatever the player wears', () => {
     const registry = loaded();
     const state = arena(registry);
-    // Every store but the entity's own belongs to the player, so a foe carries
-    // exactly what its sheet says and nothing an item could add.
     expect(characterHooks(state, registry, 'biter', 'whenHit')).toEqual([[{ kind: 'pool', resource: 'health', delta: { min: -2, max: -2 }, party: 'them' }]]);
     expect(characterHooks(state, registry, 'biter', 'onHit')).toEqual([]);
   });
@@ -308,7 +298,6 @@ describe('only a landed two-sided swing fires one (c6)', () => {
     armAction('entity', 'anvil', 'pry', registry, state);
 
     resolve(state, registry, secondsToMs(1));
-    // The attempt landed — the implicit target moved — and still nothing fired.
     expect(state.activeAction!.implicitTarget).toBeLessThan(IMPLICIT_TARGET_FULL);
     expect(own(state, 'fury')).toBe(0);
   });
@@ -321,9 +310,6 @@ describe('firing never recurses (c7)', () => {
     wearing(registry, state, 'briar-mail');
     armFightAction('swing', 'biter', registry, state);
 
-    // Both swing at 60/min and the player is first in. Its swing takes 1 and
-    // the biter's `when hit:` takes 2 back; the biter's swing takes 1 and the
-    // mail takes 5 back. Neither answer is a swing, so neither answers again.
     resolve(state, registry, secondsToMs(1));
     expect(foeHealth(state, 'biter')).toBe(14);
     expect(own(state, 'health')).toBe(97);
@@ -347,8 +333,6 @@ describe('firing order within one swing is fixed (c8)', () => {
     wearing(registry, state, 'bell-charm');
     armFightAction('swing', 'dummy', registry, state);
 
-    // The sheet restores 2 and the charm drains 1, both unmarked, so both land
-    // on the carrier and the net is one per swing.
     resolve(state, registry, secondsToMs(3));
     expect(own(state, 'fury')).toBe(3);
   });
@@ -362,7 +346,6 @@ describe('depletion is decided after the hooks, over everyone they reached (c9)'
     armFightAction('swing', 'biter', registry, state);
     setFoeHealth(state, 'biter', 4);
 
-    // The swing alone leaves 3; the blade's `on hit:` takes the rest.
     resolve(state, registry, secondsToMs(1));
     expect(state.activeAction).toBeNull();
     expect(state.inventory['ear']).toBe(1);
@@ -388,14 +371,11 @@ describe('depletion is decided after the hooks, over everyone they reached (c9)'
     armFightAction('swing', 'boss', registry, state);
     expect(Object.keys(state.activeAction!.actors!).sort()).toEqual(['boss', 'minion']);
 
-    // The minion's own swing is answered by the mail for the whole of its
-    // pool, and the boss is who the fight is measured on, so the fight stands.
     resolve(state, registry, secondsToMs(3));
     expect(state.activeAction).not.toBeNull();
     expect(Object.keys(state.activeAction!.roster!).sort()).toEqual([PLAYER, 'boss'].sort());
     expect(Object.keys(state.activeAction!.actors!)).toEqual(['boss']);
     expect(state.activeAction!.cadences['minion']).toBeUndefined();
-    // It swung once and never again.
     expect(state.log.filter((line) => line.startsWith('The Minion hits you'))).toHaveLength(1);
     expect(state.log.filter((line) => line.startsWith('The Boss hits you'))).toHaveLength(3);
   });
@@ -406,9 +386,6 @@ describe('depletion is decided after the hooks, over everyone they reached (c9)'
     wearing(registry, state, 'briar-mail');
     armFightAction('swing', 'wisp', registry, state);
 
-    // The wisp saps spirit, which it carries none of itself. Its own swing
-    // fires the mail, so the verdict reaches it -- and reads the pool the
-    // fight is measured on, which for the wisp is a ceiling of zero.
     resolve(state, registry, secondsToMs(1));
     expect(state.activeAction).not.toBeNull();
     expect(Object.keys(state.activeAction!.actors!)).toEqual(['wisp']);
@@ -421,19 +398,13 @@ describe('depletion is decided after the hooks, over everyone they reached (c9)'
     const state = arena(registry);
     wearing(registry, state, 'briar-mail');
     armFightAction('swing', 'biter', registry, state);
-    // The player's swing takes 1 and the biter's `when hit:` takes 2 back, so
-    // the biter reaches its own swing at 5 and the mail answers it for 5.
     setFoeHealth(state, 'biter', 6);
 
     resolve(state, registry, secondsToMs(1));
     expect(state.activeAction).toBeNull();
-    // Credited to the character whose hook did it, not to the character that
-    // swung: the biter's own blow is what emptied its pool.
     expect(state.inventory['ear']).toBe(1);
     expect(state.populations['arena']['biter']).toEqual({ down: 1, due: [] });
     expect(own(state, 'health')).toBe(97);
-    // 2 from the swing's own `on hit:`, and 3 the death credited to whoever
-    // emptied the pool -- which was the mail, not the character that swung.
     expect(own(state, 'fury')).toBe(5);
   });
 });

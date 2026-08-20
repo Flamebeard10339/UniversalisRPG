@@ -1,49 +1,75 @@
-import { Condition, condition } from './condition';
-import { ListParser } from './list';
-import { Cursor, DslError, Parser, Span, requireEnd } from './parser';
-import { range, Range, scaleRange } from './range';
-import { RawLine, hasBlock, indentLines, requireNoBlock, takeBlock } from './structure';
-import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantified, refuseRange, REFERENCE } from './values';
+import { Condition, condition } from "./condition";
+import { ListParser } from "./list";
+import { Cursor, DslError, Parser, Span, requireEnd } from "./parser";
+import { range, Range, scaleRange } from "./range";
+import {
+  RawLine,
+  hasBlock,
+  indentLines,
+  requireNoBlock,
+  takeBlock,
+} from "./structure";
+import {
+  countRange,
+  decimalRange,
+  id,
+  numberOrStat,
+  produced,
+  Produced,
+  quantified,
+  refuseRange,
+  REFERENCE,
+} from "./values";
 
 // Whose pool an amount moves between. `me` is the character the result is read
 // off and `them` is the other party the moment identifies.
-export type Party = 'me' | 'them';
+export type Party = "me" | "them";
 
 export type ActionResult =
   // `key` is the address a `# locale` translates the line by. A `say:` has no
   // id of its own, so it is addressed by the object that authored it and its
   // place in that object, neither of which the grammar can know: a line is not
   // under an owner until it is loaded, and the load path stamps it there.
-  | { kind: 'say'; text: string; key?: string }
-  | { kind: 'set'; variable: string }
-  | { kind: 'unset'; variable: string }
-  | { kind: 'add'; variable: string; amount: number }
-  | { kind: 'give'; item: string; amount?: Range }
-  | { kind: 'take'; item: string; amount?: number }
-  | { kind: 'xp'; skill: string; amount: Range }
-  | { kind: 'relocate'; location: string }
-  | { kind: 'discover'; location: string }
-  | { kind: 'open-modal'; modal: string }
+  | { kind: "say"; text: string; key?: string }
+  | { kind: "set"; variable: string }
+  | { kind: "unset"; variable: string }
+  | { kind: "add"; variable: string; amount: number }
+  | { kind: "give"; item: string; amount?: Range }
+  | { kind: "take"; item: string; amount?: number }
+  | { kind: "xp"; skill: string; amount: Range }
+  | { kind: "relocate"; location: string }
+  | { kind: "discover"; location: string }
+  | { kind: "open-modal"; modal: string }
   // One signed kind rather than two, as a pool's rate is one signed stat. An
   // absent party is the character the result is read off, which is what lets one
   // rule serve a hook whichever end of the swing carried it.
-  | { kind: 'pool'; resource: string; delta: Range; party?: Party }
+  | { kind: "pool"; resource: string; delta: Range; party?: Party }
   // Puts one instance of a declared payload on a character for as long as that
   // declaration says it lasts. One result whichever sign the payload carries: a
   // debuff is a buff with a minus, and asking which would be a second path.
-  | { kind: 'inflict'; buff: string; party?: Party }
+  | { kind: "inflict"; buff: string; party?: Party }
   // Abandons the action in flight, exactly as a player-initiated cancel does.
-  | { kind: 'stop' }
+  | { kind: "stop" }
   // The five wrappers. Each holds an ordinary result list, so layering a drop is
   // nesting one inside another and needs no rule of its own.
-  | { kind: 'chance'; numerator: number; denominator: number; results: ActionResult[] }
-  | { kind: 'contest'; left: number | string; right: number | string; results: ActionResult[] }
-  | { kind: 'gate'; condition: Condition; results: ActionResult[] }
+  | {
+      kind: "chance";
+      numerator: number;
+      denominator: number;
+      results: ActionResult[];
+    }
+  | {
+      kind: "contest";
+      left: number | string;
+      right: number | string;
+      results: ActionResult[];
+    }
+  | { kind: "gate"; condition: Condition; results: ActionResult[] }
   // Moves the subject rather than selecting: what is inside lands on whoever
   // caused the moment, where an unmarked result lands on whoever it happened to.
-  | { kind: 'credit'; results: ActionResult[] }
-  | { kind: 'one-of'; rows: DropRow[] }
-  | { kind: 'roll'; table: string };
+  | { kind: "credit"; results: ActionResult[] }
+  | { kind: "one-of"; rows: DropRow[] }
+  | { kind: "roll"; table: string };
 
 // A row's gate lives in its selector rather than its body because a row that
 // fails leaves the pool BEFORE the draw and lets the survivors' shares grow;
@@ -58,14 +84,24 @@ export interface DropRow {
 // Every result kind that holds results, so a walker cannot miss one by knowing
 // only the kinds that existed when it was written.
 export function nestedResults(result: ActionResult): ActionResult[][] {
-  if (result.kind === 'one-of') return result.rows.map((row) => row.results);
-  if (result.kind === 'chance' || result.kind === 'contest' || result.kind === 'gate' || result.kind === 'credit') return [result.results];
+  if (result.kind === "one-of") return result.rows.map((row) => row.results);
+  if (
+    result.kind === "chance" ||
+    result.kind === "contest" ||
+    result.kind === "gate" ||
+    result.kind === "credit"
+  )
+    return [result.results];
   return [];
 }
 
 function parseVariable(cursor: Cursor): string {
   const raw = cursor.take(REFERENCE);
-  if (raw === null) throw new DslError('expected a variable', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+  if (raw === null)
+    throw new DslError("expected a variable", {
+      start: cursor.abs(cursor.pos),
+      end: cursor.abs(cursor.pos),
+    });
   return raw;
 }
 
@@ -76,17 +112,32 @@ function parseAdd(cursor: Cursor): ActionResult {
   // signed is why this one produced count is not a range: `-3--1` cannot be told
   // from the hyphen that separates a range's bounds.
   const amount = cursor.take(/-?\d+/);
-  if (amount !== null) refuseRange(cursor, 'add: takes one signed count rather than a range: `-3--1` cannot be told from the hyphen that separates a range');
-  return { kind: 'add', variable, amount: amount !== null ? Number(amount) : 1 };
+  if (amount !== null)
+    refuseRange(
+      cursor,
+      "add: takes one signed count rather than a range: `-3--1` cannot be told from the hyphen that separates a range",
+    );
+  return {
+    kind: "add",
+    variable,
+    amount: amount !== null ? Number(amount) : 1,
+  };
 }
 
 // English puts the party after the thing moved, and the preposition follows the
 // verb rather than the author: an amount taken moves away *from* a party and an
 // amount given moves *to* one, so the wrong one is a mistake and not a dialect.
-const PREPOSITION = { drain: 'from', restore: 'to', inflict: 'on' } as const;
-const MOVES = { from: 'takes its amount away from a party', to: 'gives its amount to a party', on: 'puts what it names on a party' } as const;
+const PREPOSITION = { drain: "from", restore: "to", inflict: "on" } as const;
+const MOVES = {
+  from: "takes its amount away from a party",
+  to: "gives its amount to a party",
+  on: "puts what it names on a party",
+} as const;
 
-function parseParty(verb: keyof typeof PREPOSITION, cursor: Cursor): Party | undefined {
+function parseParty(
+  verb: keyof typeof PREPOSITION,
+  cursor: Cursor,
+): Party | undefined {
   const start = cursor.pos;
   // Peeked whole, so nothing is consumed unless a phrase opens: what follows may
   // be nothing, or a typo the caller's end-of-line demand describes better than
@@ -97,19 +148,34 @@ function parseParty(verb: keyof typeof PREPOSITION, cursor: Cursor): Party | und
   cursor.take(/[ \t]+/);
   const span = { start: cursor.abs(start), end: cursor.abs(cursor.src.length) };
   const party = cursor.take(/(?:me|them)(?![\w-])/) as Party | null;
-  if (party === null) throw new DslError(`${verb}: ${preposition} names a party — write \`${preposition} me\` for the character this is read off, or \`${preposition} them\` for the other`, span);
+  if (party === null)
+    throw new DslError(
+      `${verb}: ${preposition} names a party — write \`${preposition} me\` for the character this is read off, or \`${preposition} them\` for the other`,
+      span,
+    );
   const wanted = PREPOSITION[verb];
-  if (preposition !== wanted) throw new DslError(`${verb}: ${MOVES[wanted]}, so it is written \`${wanted} ${party}\` rather than \`${preposition} ${party}\``, span);
+  if (preposition !== wanted)
+    throw new DslError(
+      `${verb}: ${MOVES[wanted]}, so it is written \`${wanted} ${party}\` rather than \`${preposition} ${party}\``,
+      span,
+    );
   return party;
 }
 
 // Decimal because pools are float: an int pool rounds slow regeneration to zero.
 function parsePool(sign: 1 | -1, cursor: Cursor): ActionResult {
-  const delta = decimalRange(cursor, 'an amount and a resource, as in `drain: 5 health`');
+  const delta = decimalRange(
+    cursor,
+    "an amount and a resource, as in `drain: 5 health`",
+  );
   cursor.take(/[ \t]+/);
   const resource = id.parse(cursor);
-  const party = parseParty(sign < 0 ? 'drain' : 'restore', cursor);
-  const pool = { kind: 'pool' as const, resource, delta: scaleRange(delta, sign) };
+  const party = parseParty(sign < 0 ? "drain" : "restore", cursor);
+  const pool = {
+    kind: "pool" as const,
+    resource,
+    delta: scaleRange(delta, sign),
+  };
   return party === undefined ? pool : { ...pool, party };
 }
 
@@ -118,25 +184,39 @@ function parsePool(sign: 1 | -1, cursor: Cursor): ActionResult {
 // wrong, and the payload is what a reload reads back.
 function parseInflict(cursor: Cursor): ActionResult {
   const buff = id.parse(cursor);
-  const party = parseParty('inflict', cursor);
-  return party === undefined ? { kind: 'inflict', buff } : { kind: 'inflict', buff, party };
+  const party = parseParty("inflict", cursor);
+  return party === undefined
+    ? { kind: "inflict", buff }
+    : { kind: "inflict", buff, party };
 }
 
 function parseGive(value: Produced): ActionResult {
-  return value.amount === undefined ? { kind: 'give', item: value.item } : { kind: 'give', item: value.item, amount: value.amount };
+  return value.amount === undefined
+    ? { kind: "give", item: value.item }
+    : { kind: "give", item: value.item, amount: value.amount };
 }
 
 // A wrapper's body is written after the colon or as the line's indented block,
 // never both, and never neither — an empty wrapper is a line that does nothing
 // and a doubled one hides half of what it says.
-function wrapperBody(cursor: Cursor, line: RawLine | null, what: string, span: Span): ActionResult[] {
+function wrapperBody(
+  cursor: Cursor,
+  line: RawLine | null,
+  what: string,
+  span: Span,
+): ActionResult[] {
   cursor.take(/[ \t]*/);
   if (!cursor.done) {
     const inline = parseResults(cursor, null);
-      if (line !== null && hasBlock(line)) throw new DslError(`${what} is written inline and as a block; give it one`, span);
+    if (line !== null && hasBlock(line))
+      throw new DslError(
+        `${what} is written inline and as a block; give it one`,
+        span,
+      );
     return inline;
   }
-  if (line === null || !hasBlock(line)) throw new DslError(`${what} has an empty body`, span);
+  if (line === null || !hasBlock(line))
+    throw new DslError(`${what} has an empty body`, span);
   // The unchecked reader: a wrapper's body is part of the list its opener
   // belongs to, and `refuseParty` at that list's entry point already walks into
   // it. Reading it through the checked one would refuse a party phrase inside a
@@ -150,74 +230,150 @@ const WEIGHT = /\d+x(?![\w-])/;
 // and is not. Matched only in the whole shape of a selector, colon included:
 // half a match would claim `3-4 in every ten make it back.`, which is a line of
 // dialogue, and the odds a range cannot express are on both sides of `in`.
-const RANGED_SELECTOR = /\d+-\d+x(?![\w-])|\d+(?:-\d+)?[ \t]+in[ \t]+\d+(?:-\d+)?[ \t]*:/;
+const RANGED_SELECTOR =
+  /\d+-\d+x(?![\w-])|\d+(?:-\d+)?[ \t]+in[ \t]+\d+(?:-\d+)?[ \t]*:/;
 
 function refuseRangedSelector(cursor: Cursor, span: Span): void {
   const raw = cursor.peek(RANGED_SELECTOR);
   if (raw === null || !/\d-\d/.test(raw[0])) return;
-  throw new DslError(`${raw[0].replace(/[ \t]*:$/, '')} is odds, not a quantity, so it takes one number rather than a range`, span);
+  throw new DslError(
+    `${raw[0].replace(/[ \t]*:$/, "")} is odds, not a quantity, so it takes one number rather than a range`,
+    span,
+  );
 }
 
 function parseRow(line: RawLine): DropRow {
   const cursor = new Cursor(line.text, 0, line.span.start);
   refuseRangedSelector(cursor, line.span);
   const literal = cursor.take(WEIGHT);
-  const weight = literal !== null ? Number(literal.slice(0, -1)) : id.parse(cursor);
+  const weight =
+    literal !== null ? Number(literal.slice(0, -1)) : id.parse(cursor);
   const where = `one of: row ${JSON.stringify(literal ?? weight)}`;
-  if (weight === 0) throw new DslError(`${where} can never be selected`, line.span);
+  if (weight === 0)
+    throw new DslError(`${where} can never be selected`, line.span);
   // Refused rather than read as a weight: a contested check is an independent
   // probability, not a share of a total, so `vs` here would be a category error.
-  if (cursor.peek(/[ \t]+vs[ \t]/) !== null) throw new DslError(`${where}: a vs contest is an independent chance, not a weight — write it as a wrapper inside the row`, line.span);
-  const requires = cursor.take(/[ \t]+if[ \t]+/) !== null ? condition.parse(cursor) : undefined;
-  if (cursor.take(/[ \t]*:/) === null) throw new DslError(`expected a one of: row, as in \`5x: give: 20 coins\`, got ${JSON.stringify(line.text)}`, line.span);
+  if (cursor.peek(/[ \t]+vs[ \t]/) !== null)
+    throw new DslError(
+      `${where}: a vs contest is an independent chance, not a weight — write it as a wrapper inside the row`,
+      line.span,
+    );
+  const requires =
+    cursor.take(/[ \t]+if[ \t]+/) !== null
+      ? condition.parse(cursor)
+      : undefined;
+  if (cursor.take(/[ \t]*:/) === null)
+    throw new DslError(
+      `expected a one of: row, as in \`5x: give: 20 coins\`, got ${JSON.stringify(line.text)}`,
+      line.span,
+    );
 
   cursor.take(/[ \t]*/);
   // The one spelling for an empty body, which is the one empty case the grammar
   // cannot otherwise write.
   if (cursor.take(/nothing[ \t]*$/) !== null) {
-    if (hasBlock(line)) throw new DslError(`${where} says nothing and then holds a block`, line.span);
-    return requires === undefined ? { weight, results: [] } : { weight, requires, results: [] };
+    if (hasBlock(line))
+      throw new DslError(
+        `${where} says nothing and then holds a block`,
+        line.span,
+      );
+    return requires === undefined
+      ? { weight, results: [] }
+      : { weight, requires, results: [] };
   }
   const results = wrapperBody(cursor, line, where, line.span);
-  return requires === undefined ? { weight, results } : { weight, requires, results };
+  return requires === undefined
+    ? { weight, results }
+    : { weight, requires, results };
 }
 
-function parseOneOf(cursor: Cursor, line: RawLine | null, span: Span): ActionResult {
+function parseOneOf(
+  cursor: Cursor,
+  line: RawLine | null,
+  span: Span,
+): ActionResult {
   cursor.take(ONE_OF);
-  requireEnd(cursor, 'one of:');
-  if (line === null || !hasBlock(line)) throw new DslError('one of: needs indented rows, as in `5x: give: 20 coins`', span);
-  return { kind: 'one-of', rows: takeBlock(line).map(parseRow) };
+  requireEnd(cursor, "one of:");
+  if (line === null || !hasBlock(line))
+    throw new DslError(
+      "one of: needs indented rows, as in `5x: give: 20 coins`",
+      span,
+    );
+  return { kind: "one-of", rows: takeBlock(line).map(parseRow) };
 }
 
-function parseChance(cursor: Cursor, line: RawLine | null, span: Span): ActionResult {
+function parseChance(
+  cursor: Cursor,
+  line: RawLine | null,
+  span: Span,
+): ActionResult {
   const numerator = Number(cursor.take(/\d+/));
   cursor.take(/[ \t]+in[ \t]+/);
   const denominator = Number(cursor.take(/\d+/));
   cursor.take(/[ \t]*:/);
-  if (denominator === 0) throw new DslError(`${numerator} in 0 is not a chance`, span);
-  if (numerator === 0) throw new DslError(`0 in ${denominator} never happens`, span);
-  if (numerator > denominator) throw new DslError(`${numerator} in ${denominator} is more than certain`, span);
-  return { kind: 'chance', numerator, denominator, results: wrapperBody(cursor, line, `${numerator} in ${denominator}:`, span) };
+  if (denominator === 0)
+    throw new DslError(`${numerator} in 0 is not a chance`, span);
+  if (numerator === 0)
+    throw new DslError(`0 in ${denominator} never happens`, span);
+  if (numerator > denominator)
+    throw new DslError(
+      `${numerator} in ${denominator} is more than certain`,
+      span,
+    );
+  return {
+    kind: "chance",
+    numerator,
+    denominator,
+    results: wrapperBody(cursor, line, `${numerator} in ${denominator}:`, span),
+  };
 }
 
-function parseContest(cursor: Cursor, line: RawLine | null, span: Span): ActionResult {
+function parseContest(
+  cursor: Cursor,
+  line: RawLine | null,
+  span: Span,
+): ActionResult {
   const left = numberOrStat.parse(cursor);
   cursor.take(/[ \t]+vs[ \t]+/);
   const right = numberOrStat.parse(cursor);
   cursor.take(/[ \t]*:/);
-  return { kind: 'contest', left, right, results: wrapperBody(cursor, line, `${left} vs ${right}:`, span) };
+  return {
+    kind: "contest",
+    left,
+    right,
+    results: wrapperBody(cursor, line, `${left} vs ${right}:`, span),
+  };
 }
 
-function parseCredit(cursor: Cursor, line: RawLine | null, span: Span): ActionResult {
+function parseCredit(
+  cursor: Cursor,
+  line: RawLine | null,
+  span: Span,
+): ActionResult {
   cursor.take(CREDIT);
-  return { kind: 'credit', results: wrapperBody(cursor, line, 'credit:', span) };
+  return {
+    kind: "credit",
+    results: wrapperBody(cursor, line, "credit:", span),
+  };
 }
 
-function parseGate(cursor: Cursor, line: RawLine | null, span: Span): ActionResult {
+function parseGate(
+  cursor: Cursor,
+  line: RawLine | null,
+  span: Span,
+): ActionResult {
   cursor.take(/if[ \t]+/);
   const gate = condition.parse(cursor);
-  if (cursor.take(/[ \t]*:/) === null) throw new DslError('an if: wrapper needs a colon after its condition', span);
-  return { kind: 'gate', condition: gate, results: wrapperBody(cursor, line, 'if:', span) };
+  if (cursor.take(/[ \t]*:/) === null)
+    throw new DslError(
+      "an if: wrapper needs a colon after its condition",
+      span,
+    );
+  return {
+    kind: "gate",
+    condition: gate,
+    results: wrapperBody(cursor, line, "if:", span),
+  };
 }
 
 // Every selector demands its colon before it is recognized as one. A dialogue
@@ -247,7 +403,9 @@ function opensGate(cursor: Cursor): boolean {
 // Which wrapper a line opens, or null for a plain result list. Peeked rather
 // than consumed so the one table below is what both the reader and
 // `startsResult` answer from.
-function wrapperAt(cursor: Cursor): ((cursor: Cursor, line: RawLine | null, span: Span) => ActionResult) | null {
+function wrapperAt(
+  cursor: Cursor,
+): ((cursor: Cursor, line: RawLine | null, span: Span) => ActionResult) | null {
   if (cursor.peek(ONE_OF)) return parseOneOf;
   if (cursor.peek(CREDIT)) return parseCredit;
   if (cursor.peek(CHANCE)) return parseChance;
@@ -257,26 +415,38 @@ function wrapperAt(cursor: Cursor): ((cursor: Cursor, line: RawLine | null, span
 }
 
 function parseResult(cursor: Cursor): ActionResult {
-  if (cursor.take(/say:[ \t]*/) !== null) return { kind: 'say', text: cursor.take(/[^\n]*/) ?? '' };
-  if (cursor.take(/set[: \t][ \t]*/) !== null) return { kind: 'set', variable: parseVariable(cursor) };
-  if (cursor.take(/unset[: \t][ \t]*/) !== null) return { kind: 'unset', variable: parseVariable(cursor) };
+  if (cursor.take(/say:[ \t]*/) !== null)
+    return { kind: "say", text: cursor.take(/[^\n]*/) ?? "" };
+  if (cursor.take(/set[: \t][ \t]*/) !== null)
+    return { kind: "set", variable: parseVariable(cursor) };
+  if (cursor.take(/unset[: \t][ \t]*/) !== null)
+    return { kind: "unset", variable: parseVariable(cursor) };
   if (cursor.take(/add:[ \t]*/) !== null) return parseAdd(cursor);
-  if (cursor.take(/give:[ \t]*/) !== null) return parseGive(produced.parse(cursor));
-  if (cursor.take(/take:[ \t]*/) !== null) return { kind: 'take', ...quantified.parse(cursor) };
-  if (cursor.take(/roll:[ \t]*/) !== null) return { kind: 'roll', table: id.parse(cursor) };
+  if (cursor.take(/give:[ \t]*/) !== null)
+    return parseGive(produced.parse(cursor));
+  if (cursor.take(/take:[ \t]*/) !== null)
+    return { kind: "take", ...quantified.parse(cursor) };
+  if (cursor.take(/roll:[ \t]*/) !== null)
+    return { kind: "roll", table: id.parse(cursor) };
   if (cursor.take(/inflict:[ \t]*/) !== null) return parseInflict(cursor);
   if (cursor.take(/xp:[ \t]*/) !== null) {
     const skill = id.parse(cursor);
     cursor.take(/[ \t]+/);
-    return { kind: 'xp', skill, amount: countRange(cursor, 'an xp amount') };
+    return { kind: "xp", skill, amount: countRange(cursor, "an xp amount") };
   }
   if (cursor.take(/drain:[ \t]*/) !== null) return parsePool(-1, cursor);
   if (cursor.take(/restore:[ \t]*/) !== null) return parsePool(1, cursor);
-  if (cursor.take(/relocate:[ \t]*/) !== null) return { kind: 'relocate', location: id.parse(cursor) };
-  if (cursor.take(/discover:[ \t]*/) !== null) return { kind: 'discover', location: id.parse(cursor) };
-  if (cursor.take(/open modal:[ \t]*/) !== null) return { kind: 'open-modal', modal: id.parse(cursor) };
-  if (cursor.take(/stop(?![\w-])/) !== null) return { kind: 'stop' };
-  throw new DslError(`unrecognized action result: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+  if (cursor.take(/relocate:[ \t]*/) !== null)
+    return { kind: "relocate", location: id.parse(cursor) };
+  if (cursor.take(/discover:[ \t]*/) !== null)
+    return { kind: "discover", location: id.parse(cursor) };
+  if (cursor.take(/open modal:[ \t]*/) !== null)
+    return { kind: "open-modal", modal: id.parse(cursor) };
+  if (cursor.take(/stop(?![\w-])/) !== null) return { kind: "stop" };
+  throw new DslError(
+    `unrecognized action result: ${JSON.stringify(cursor.rest())}`,
+    { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) },
+  );
 }
 
 // A wrapper takes the rest of its line, so it is the last thing on it and the
@@ -285,35 +455,49 @@ function parseResults(cursor: Cursor, line: RawLine | null): ActionResult[] {
   const results: ActionResult[] = [];
   do {
     cursor.take(/[ \t]*/);
-    refuseRangedSelector(cursor, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.src.length) });
+    refuseRangedSelector(cursor, {
+      start: cursor.abs(cursor.pos),
+      end: cursor.abs(cursor.src.length),
+    });
     const wrapper = wrapperAt(cursor);
     if (wrapper === null) {
       results.push(parseResult(cursor));
       continue;
     }
     const start = cursor.pos;
-    results.push(wrapper(cursor, line, { start: cursor.abs(start), end: cursor.abs(cursor.src.length) }));
+    results.push(
+      wrapper(cursor, line, {
+        start: cursor.abs(start),
+        end: cursor.abs(cursor.src.length),
+      }),
+    );
     break;
   } while (cursor.take(/[ \t]*,[ \t]*/) !== null);
   return results;
 }
 
-const LEAF_RESULT = /(?:say|add|give|take|xp|roll|inflict|drain|restore|relocate|discover|open modal):|(?:set|unset)[: \t]|stop(?![\w-])/;
+const LEAF_RESULT =
+  /(?:say|add|give|take|xp|roll|inflict|drain|restore|relocate|discover|open modal):|(?:set|unset)[: \t]|stop(?![\w-])/;
 
 export function startsResult(cursor: Cursor): boolean {
   // A ranged selector is claimed here so the result reader is what explains it.
   // Left out, the line falls through to the tag parser and is reported as an
   // unrecognized tag clause, which says nothing about the range.
-  return cursor.peek(LEAF_RESULT) !== null || cursor.peek(RANGED_SELECTOR) !== null || wrapperAt(cursor) !== null;
+  return (
+    cursor.peek(LEAF_RESULT) !== null ||
+    cursor.peek(RANGED_SELECTOR) !== null ||
+    wrapperAt(cursor) !== null
+  );
 }
 
 function readResultLine(line: RawLine): ActionResult[] {
   const cursor = new Cursor(line.text, 0, line.span.start);
   const results = parseResults(cursor, line);
-  requireEnd(cursor, 'a result');
+  requireEnd(cursor, "a result");
   // A leaf line has no block to hold; the alternative is the silent drop that
   // this repo has already been bitten by once.
-  if (!results.some((result) => nestedResults(result).length > 0)) requireNoBlock(line);
+  if (!results.some((result) => nestedResults(result).length > 0))
+    requireNoBlock(line);
   return results;
 }
 
@@ -321,8 +505,10 @@ function readResultLine(line: RawLine): ActionResult[] {
 // off the result rather than off the verb that parsed it, because both readers
 // below walk a list of results and neither of them ever sees a verb.
 export function partyPhrase(result: ActionResult): string | undefined {
-  if (result.kind === 'pool' && result.party !== undefined) return `${PREPOSITION[result.delta.max < 0 ? 'drain' : 'restore']} ${result.party}`;
-  if (result.kind === 'inflict' && result.party !== undefined) return `${PREPOSITION.inflict} ${result.party}`;
+  if (result.kind === "pool" && result.party !== undefined)
+    return `${PREPOSITION[result.delta.max < 0 ? "drain" : "restore"]} ${result.party}`;
+  if (result.kind === "inflict" && result.party !== undefined)
+    return `${PREPOSITION.inflict} ${result.party}`;
   return undefined;
 }
 
@@ -350,11 +536,14 @@ function refuseParty(results: ActionResult[], span: Span): ActionResult[] {
   );
 }
 
-export const parseResultLine = (line: RawLine): ActionResult[] => refuseParty(readResultLine(line), line.span);
+export const parseResultLine = (line: RawLine): ActionResult[] =>
+  refuseParty(readResultLine(line), line.span);
 
-export const resultBlock = (lines: readonly RawLine[]): ActionResult[] => lines.flatMap(parseResultLine);
+export const resultBlock = (lines: readonly RawLine[]): ActionResult[] =>
+  lines.flatMap(parseResultLine);
 
-const readResultBlock = (lines: readonly RawLine[]): ActionResult[] => lines.flatMap(readResultLine);
+const readResultBlock = (lines: readonly RawLine[]): ActionResult[] =>
+  lines.flatMap(readResultLine);
 
 // A side of a contest: a flat number, or the id of the stat holding one.
 const printSide = (value: number | string): string => numberOrStat.print(value);
@@ -364,52 +553,59 @@ const printSide = (value: number | string): string => numberOrStat.print(value);
 // reaching past it.
 export function printResult(value: ActionResult): string {
   switch (value.kind) {
-    case 'say':
+    case "say":
       return `say: ${value.text}`;
-    case 'set':
+    case "set":
       return `set: ${value.variable}`;
-    case 'unset':
+    case "unset":
       return `unset: ${value.variable}`;
-    case 'add':
+    case "add":
       return `add: ${value.variable} ${value.amount}`;
-    case 'give':
+    case "give":
       return `give: ${produced.print(value)}`;
-    case 'take':
+    case "take":
       return `take: ${quantified.print({ item: value.item, amount: value.amount })}`;
-    case 'xp':
+    case "xp":
       return `xp: ${value.skill} ${range.print(value.amount)}`;
-    case 'relocate':
+    case "relocate":
       return `relocate: ${value.location}`;
-    case 'discover':
+    case "discover":
       return `discover: ${value.location}`;
-    case 'open-modal':
+    case "open-modal":
       return `open modal: ${value.modal}`;
-    case 'pool': {
+    case "pool": {
       // The exact inverse of what `parsePool` did: it scaled the written
       // magnitude by the verb's sign, so undoing it is the same scale again.
       // Taking abs of each bound instead inverted a restore's range — a
       // symmetric operation on a point, which is why nothing saw it.
-      const magnitude = value.delta.max < 0 ? scaleRange(value.delta, -1) : value.delta;
-      const verb = value.delta.max < 0 ? 'drain' : 'restore';
+      const magnitude =
+        value.delta.max < 0 ? scaleRange(value.delta, -1) : value.delta;
+      const verb = value.delta.max < 0 ? "drain" : "restore";
       // The preposition follows the verb, so it is re-derived from the sign
       // rather than held: two fields agreeing by convention can disagree.
-      const party = value.party === undefined ? '' : ` ${PREPOSITION[verb]} ${value.party}`;
+      const party =
+        value.party === undefined ? "" : ` ${PREPOSITION[verb]} ${value.party}`;
       return `${verb}: ${range.print(magnitude)} ${value.resource}${party}`;
     }
-    case 'inflict': {
-      const party = value.party === undefined ? '' : ` ${PREPOSITION.inflict} ${value.party}`;
+    case "inflict": {
+      const party =
+        value.party === undefined
+          ? ""
+          : ` ${PREPOSITION.inflict} ${value.party}`;
       return `inflict: ${value.buff}${party}`;
     }
-    case 'roll':
+    case "roll":
       return `roll: ${value.table}`;
-    case 'stop':
-      return 'stop';
-    case 'chance':
-    case 'contest':
-    case 'gate':
-    case 'credit':
-    case 'one-of':
-      throw new DslError(`a ${value.kind} result spans lines and cannot be inlined`);
+    case "stop":
+      return "stop";
+    case "chance":
+    case "contest":
+    case "gate":
+    case "credit":
+    case "one-of":
+      throw new DslError(
+        `a ${value.kind} result spans lines and cannot be inlined`,
+      );
     default: {
       const unreached: never = value;
       return unreached;
@@ -418,8 +614,8 @@ export function printResult(value: ActionResult): string {
 }
 
 function rowLines(row: DropRow): string[] {
-  const gate = row.requires ? ` if ${condition.print(row.requires)}` : '';
-  const label = `${typeof row.weight === 'string' ? row.weight : `${row.weight}x`}${gate}:`;
+  const gate = row.requires ? ` if ${condition.print(row.requires)}` : "";
+  const label = `${typeof row.weight === "string" ? row.weight : `${row.weight}x`}${gate}:`;
   if (row.results.length === 0) return [`${label} nothing`];
   return [label, ...indentLines(row.results.flatMap(resultLines))];
 }
@@ -428,44 +624,56 @@ function rowLines(row: DropRow): string[] {
 // that reloads: the inline form cannot carry a nested block.
 export function resultLines(value: ActionResult): string[] {
   switch (value.kind) {
-    case 'chance':
-      return [`${value.numerator} in ${value.denominator}:`, ...indentLines(value.results.flatMap(resultLines))];
-    case 'contest':
-      return [`${printSide(value.left)} vs ${printSide(value.right)}:`, ...indentLines(value.results.flatMap(resultLines))];
-    case 'gate':
-      return [`if ${condition.print(value.condition)}:`, ...indentLines(value.results.flatMap(resultLines))];
-    case 'credit':
-      return ['credit:', ...indentLines(value.results.flatMap(resultLines))];
-    case 'one-of':
-      return ['one of:', ...indentLines(value.rows.flatMap(rowLines))];
+    case "chance":
+      return [
+        `${value.numerator} in ${value.denominator}:`,
+        ...indentLines(value.results.flatMap(resultLines)),
+      ];
+    case "contest":
+      return [
+        `${printSide(value.left)} vs ${printSide(value.right)}:`,
+        ...indentLines(value.results.flatMap(resultLines)),
+      ];
+    case "gate":
+      return [
+        `if ${condition.print(value.condition)}:`,
+        ...indentLines(value.results.flatMap(resultLines)),
+      ];
+    case "credit":
+      return ["credit:", ...indentLines(value.results.flatMap(resultLines))];
+    case "one-of":
+      return ["one of:", ...indentLines(value.rows.flatMap(rowLines))];
     default:
       return [printResult(value)];
   }
 }
 
 // Whether any of these needs the block form above.
-export const spansLines = (values: readonly ActionResult[] | undefined): boolean => (values ?? []).some((value) => nestedResults(value).length > 0);
+export const spansLines = (
+  values: readonly ActionResult[] | undefined,
+): boolean => (values ?? []).some((value) => nestedResults(value).length > 0);
 
-const printResults = (values: readonly ActionResult[]): string => values.map(printResult).join(', ');
+const printResults = (values: readonly ActionResult[]): string =>
+  values.map(printResult).join(", ");
 
 const LEAF_EXAMPLES: readonly string[] = [
-  'say: the door is stuck',
-  'set: found-key',
-  'unset: found-key',
-  'add: gold 5',
-  'add: gold -3',
-  'give: 5-10 arrow',
-  'give: plank',
-  'take: 3 plank',
-  'xp: mining 4-7',
-  'relocate: camp',
-  'discover: camp',
-  'open modal: name-yourself',
-  'drain: 5 health',
-  'restore: 1-2 health',
-  'inflict: dazzled',
-  'roll: common-drops',
-  'stop',
+  "say: the door is stuck",
+  "set: found-key",
+  "unset: found-key",
+  "add: gold 5",
+  "add: gold -3",
+  "give: 5-10 arrow",
+  "give: plank",
+  "take: 3 plank",
+  "xp: mining 4-7",
+  "relocate: camp",
+  "discover: camp",
+  "open modal: name-yourself",
+  "drain: 5 health",
+  "restore: 1-2 health",
+  "inflict: dazzled",
+  "roll: common-drops",
+  "stop",
 ];
 
 export const actionResult: Parser<ActionResult> = {
@@ -478,7 +686,10 @@ export const actionResult: Parser<ActionResult> = {
 // groups read blocks through the child-aware reader rather than line by line.
 // Two list shapes over the same element, so both print the same way: the
 // comma form, which is what a field's inline value is.
-const RESULT_LIST_EXAMPLES: readonly string[] = [...LEAF_EXAMPLES, 'set: found-key, add: gold 5'];
+const RESULT_LIST_EXAMPLES: readonly string[] = [
+  ...LEAF_EXAMPLES,
+  "set: found-key, add: gold 5",
+];
 
 export const resultList: ListParser<ActionResult> = {
   element: actionResult,
@@ -486,7 +697,10 @@ export const resultList: ListParser<ActionResult> = {
   examples: RESULT_LIST_EXAMPLES,
   parse: (cursor) => {
     const start = cursor.pos;
-    return refuseParty(parseResults(cursor, null), { start: cursor.abs(start), end: cursor.abs(cursor.src.length) });
+    return refuseParty(parseResults(cursor, null), {
+      start: cursor.abs(start),
+      end: cursor.abs(cursor.src.length),
+    });
   },
   parseBlock: (lines) => resultBlock(lines),
   printBlock: (values) => values.flatMap(resultLines),

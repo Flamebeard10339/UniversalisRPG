@@ -1,25 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { slotStore, type SlotDriver } from './store';
 
-// What every implementation of `SlotDriver` owes, in one place, so that two of
-// them cannot answer differently. Each driver's own test file names its own
-// world — a directory, a `Storage` — and hands the verbs here.
-//
-// The methods are not listed: a `Proxy` records whichever ones the cases below
-// reach, and `DECLARED` is an exhaustive map over the interface, so a method
-// added to `SlotDriver` next month fails to compile here until the contract
-// exercises it, and every driver is then checked on it with no edit of its own.
 const DECLARED: Record<keyof SlotDriver, true> = { read: true, write: true, remove: true, names: true };
 
 export const SLOT_DRIVER_METHODS: readonly string[] = Object.keys(DECLARED).sort();
 
-// One value long enough that no implementation can be storing it in a place
-// sized for a short string, in the characters a driver is likeliest to spoil.
 const LONG = 'é 😀 line\n'.repeat(40_000);
 
-// Everything a driver that read what it moves would spoil: an empty body, text
-// that is not JSON, JSON that is not a slot, whitespace and key order, the
-// newlines at either end, characters outside ASCII, and length.
 export const CONTRACT_PAYLOADS: readonly string[] = [
   '',
   '   ',
@@ -46,8 +33,6 @@ function recording(driver: SlotDriver, seen: Set<string>): SlotDriver {
   });
 }
 
-// A name every implementation must take. The file-backed driver holds a slot
-// name to being a file name, so the contract's own names stay inside that.
 const SLOT = 'player';
 const OTHER = 'dev-snapshot';
 
@@ -101,9 +86,6 @@ export function describeSlotDriver(what: string, make: () => SlotDriver): void {
       expect(() => driver.remove(SLOT)).not.toThrow();
     });
 
-    // The store is what decides what a slot means, so a driver that satisfies
-    // the verbs above satisfies it: the stamp comes back beside the payload and
-    // is never read out of the bytes, which are the caller's alone.
     it('carries a store, so a payload comes back stamped and unparsed', () => {
       const clock = { at: 1_000 };
       const store = slotStore(fresh(), () => clock.at);
@@ -118,8 +100,6 @@ export function describeSlotDriver(what: string, make: () => SlotDriver): void {
       expect(store.list()).toEqual([OTHER, SLOT]);
     });
 
-    // Registered last so the cases above have run: what they reached is what
-    // this compares against the interface.
     it('is exercised on every verb the interface declares', () => {
       expect([...exercised].sort()).toEqual(SLOT_DRIVER_METHODS);
     });

@@ -30,10 +30,6 @@ title: Token
 base: 3
 `;
 
-// A payload the substrate has no idea about, standing in for the two real ones
-// that do not exist yet. It names a registry declaration and other instances,
-// which is every way a payload can go stale, and it is registered here so no
-// shipped content can reach it.
 interface Token {
   notes: string[];
   stat: string | null;
@@ -77,7 +73,7 @@ function parse(serialized: string): { version: number; diff: Record<string, unkn
     id: 'x',
     body: [{ text: serialized, span: { start: 0, end: 0 }, children: [] }],
     span: { start: 0, end: 0 },
-  }).saved;
+  });
 }
 
 describe('creating an instance', () => {
@@ -110,10 +106,6 @@ describe('creating an instance', () => {
     expect(instanceIsLive(state, first)).toBe(false);
   });
 
-  // c1: the ordinal is a counter reading and nothing else, so it is the one
-  // thing about a copy that no later edit to the copy can move. Rewriting the
-  // template through the table is what a transform would do; the copy answers
-  // to the same ordinal on the far side of it.
   it('mints an ordinal that does not encode what the copy is of, and keeps it when that changes', () => {
     const state = createGameState();
     const charm = createInstance(state, TOKEN, 'charm', token({ notes: ['first'] }));
@@ -125,9 +117,6 @@ describe('creating an instance', () => {
     expect(createInstance(state, TOKEN, 'charm', token({ notes: ['third'] }))).toBe('3');
   });
 
-  // The counters a `# save` may carry and the ones a mint may advance are one
-  // set on purpose, so the two tests below are the same property from each end:
-  // no accepted table mints a collision, and no mint leaves the accepted set.
   it('mints a distinct id from every counter a save is allowed to carry', () => {
     const registry = loadInEnglish(MODULE);
     for (const next of [0, 1, Number.MAX_SAFE_INTEGER - 2]) {
@@ -322,9 +311,6 @@ describe('content moving underneath an instance', () => {
 
   it('reports a repair once however many rounds the table takes to settle', () => {
     const state = initialState(loadInEnglish(MODULE));
-    // Minted against the iteration order on purpose: outer is walked before
-    // the middle it points at empties, so its own repair cannot happen until a
-    // second round — and the survivor is walked in both of them.
     const survivor = createInstance(state, TOKEN, 'token', token({ notes: ['outlives it'] }));
     const outer = createInstance(state, TOKEN, 'token', token({ notes: ['outlives it too'] }));
     const doomed = createInstance(state, TOKEN, 'charm', token({ notes: ['worn'] }));

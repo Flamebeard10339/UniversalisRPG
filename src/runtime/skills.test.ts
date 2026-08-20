@@ -5,8 +5,6 @@ import { applyResultsNow, createGameState, GameState, initResources, PLAYER, sta
 import { point } from '../grammar/range';
 import { skillLevel, xpForLevel } from './skills';
 
-// `brawling` feeds the flat channel and `footwork` the percent one, off the same
-// two entities, so a level reaching the wrong actor is visible as a wrong stat.
 const MODULE = `
 # stat attack
 base: 10
@@ -112,9 +110,6 @@ describe('the xp curve', () => {
     }
   });
 
-  // -1000/(r - 1) is where the logarithm's argument turns non-positive, so a
-  // total short of it is the first one an unclamped curve answers with a
-  // negative level or a NaN rather than with a small one.
   it('takes any negative total as no progress, including one past where the curve stops being real', () => {
     expect([-1, -13000, -13929, -20000, -1e9].map(skillLevel)).toEqual([1, 1, 1, 1, 1]);
   });
@@ -125,9 +120,6 @@ describe('the xp curve', () => {
       expect(skillLevel(xpForLevel(level))).toBe(level);
       expect(skillLevel(xpForLevel(level) - 1)).toBe(level - 1);
     }
-    // The exact domain is nine orders of magnitude past any reachable total —
-    // an `xp:` result cannot even be authored negative — so it is stated here
-    // rather than defended in the arithmetic.
     expect(level).toBeGreaterThan(390);
   });
 });
@@ -156,9 +148,6 @@ describe('a skill level feeding the stat it names', () => {
     const registry = loaded();
     const state = withXp({ brawling: xpForLevel(30) });
     expect(statValue('attack', state, registry, PLAYER)).toBe(10 + 30);
-    // The rat has `brawling` and no xp of its own, so it is a level-1 brawler
-    // however far the player has come — and listing it twice does not make it
-    // two brawlers.
     expect(registry.entities.get('rat')!.skills).toEqual(['brawling']);
     expect(statValue('attack', state, registry, 'rat')).toBe(3 + 1);
     expect(statValue('attack', state, registry, 'mannequin')).toBe(3);
@@ -193,8 +182,6 @@ describe('crossing a level threshold', () => {
     applyResultsNow(state, registry, [{ kind: 'xp', skill: 'brawling', amount: point(1) }]);
 
     expect(statValue('attack', state, registry)).toBe(14);
-    // The one thing besides the total that a crossing moves: the world says it,
-    // because a level is derived from the total and nothing else can tell.
     expect(state.log).toEqual(['engine.skill.levelled']);
     expect({ ...structuredClone(state), xp: undefined, log: undefined }).toEqual(before);
   });

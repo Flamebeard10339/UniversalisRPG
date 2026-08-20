@@ -1,37 +1,44 @@
-import { HOOK_LABELS } from '../../grammar/hook';
-import { DslError, Parser } from '../../grammar/parser';
-import { id } from '../../grammar/values';
-import { put } from '../refs';
-import { section } from './define';
-import { TITLE_FIELD } from './info';
+import { HOOK_LABELS } from "../../grammar/hook";
+import { DslError, Parser } from "../../grammar/parser";
+import { id } from "../../grammar/values";
+import { put } from "../refs";
+import { section } from "./define";
+import { TITLE_FIELD } from "./info";
 
 // The closed set of moments a name may be bound to, each beside whether it
 // watches a pool. The arity sits in the table because it is a property of the
 // moment, and it is what decides whether `resource:` belongs on a declaration.
 export const EVENT_TRIGGERS = {
-  'on empty': 'pool',
-  'on full': 'pool',
-  'damage-dealt': 'none',
-  'damage-taken': 'none',
-  missed: 'none',
-  evaded: 'none',
-  completed: 'none',
-  unfinished: 'none',
+  "on empty": "pool",
+  "on full": "pool",
+  "damage-dealt": "none",
+  "damage-taken": "none",
+  missed: "none",
+  evaded: "none",
+  completed: "none",
+  unfinished: "none",
 } as const;
 
 export type EventTrigger = keyof typeof EVENT_TRIGGERS;
 
-export const TRIGGER_NAMES: readonly EventTrigger[] = Object.keys(EVENT_TRIGGERS) as EventTrigger[];
+export const TRIGGER_NAMES: readonly EventTrigger[] = Object.keys(
+  EVENT_TRIGGERS,
+) as EventTrigger[];
 
-export const watchesAPool = (trigger: EventTrigger): boolean => EVENT_TRIGGERS[trigger] === 'pool';
+export const watchesAPool = (trigger: EventTrigger): boolean =>
+  EVENT_TRIGGERS[trigger] === "pool";
 
 // Asked of the assembled event, because a later module may be what supplies the
 // `resource:` line.
 export function triggerArityProblem(event: GameEvent): string | undefined {
   if (watchesAPool(event.trigger)) {
-    return event.resource ? undefined : `trigger: ${event.trigger} watches a pool, so it needs a resource: naming which one`;
+    return event.resource
+      ? undefined
+      : `trigger: ${event.trigger} watches a pool, so it needs a resource: naming which one`;
   }
-  return event.resource === undefined ? undefined : `trigger: ${event.trigger} watches no pool, so it takes no resource:`;
+  return event.resource === undefined
+    ? undefined
+    : `trigger: ${event.trigger} watches no pool, so it takes no resource:`;
 }
 
 export interface GameEvent {
@@ -45,9 +52,15 @@ const triggerValue: Parser<EventTrigger> = {
   parse(cursor) {
     const start = cursor.pos;
     const raw = cursor.take(/(?:on[ \t]+)?[a-z][a-z0-9-]*/);
-    const normalized = raw?.replace(/[ \t]+/, ' ');
-    if (!normalized || !(TRIGGER_NAMES as readonly string[]).includes(normalized)) {
-      throw new DslError(`event trigger must be one of ${TRIGGER_NAMES.join(', ')}, got ${JSON.stringify(raw ?? cursor.rest())}`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
+    const normalized = raw?.replace(/[ \t]+/, " ");
+    if (
+      !normalized ||
+      !(TRIGGER_NAMES as readonly string[]).includes(normalized)
+    ) {
+      throw new DslError(
+        `event trigger must be one of ${TRIGGER_NAMES.join(", ")}, got ${JSON.stringify(raw ?? cursor.rest())}`,
+        { start: cursor.abs(start), end: cursor.abs(cursor.pos) },
+      );
     }
     return normalized as EventTrigger;
   },
@@ -60,21 +73,25 @@ const triggerValue: Parser<EventTrigger> = {
 // entity that would have handled it never sees a problem — it gets a hook, and
 // the event goes unhandled with nothing to say so.
 function answeredByAHook(event: GameEvent): string | undefined {
-  const answered = event.id.split('.').pop()!;
+  const answered = event.id.split(".").pop()!;
   if (!HOOK_LABELS.includes(`on ${answered}`)) return undefined;
   return `an entity would answer this by writing \`on ${answered}:\`, which is a hook block — name the event something an entity can handle`;
 }
 
 export const event = section<GameEvent>()({
-  kind: 'event',
-  ids: 'owned',
-  map: 'events',
-  text: ['title'],
+  kind: "event",
+  ids: "owned",
+  map: "events",
+  text: ["title"],
   fields: {
     title: TITLE_FIELD,
     resource: { parser: id },
     trigger: { parser: triggerValue },
   },
-  validate: (value) => (value.trigger ? triggerArityProblem(value) ?? answeredByAHook(value) : 'requires a trigger:'),
-  visit: (value, where, visit) => put(value, 'resource', 'resource', `${where} resource:`, visit),
+  validate: (value) =>
+    value.trigger
+      ? (triggerArityProblem(value) ?? answeredByAHook(value))
+      : "requires a trigger:",
+  visit: (value, where, visit) =>
+    put(value, "resource", "resource", `${where} resource:`, visit),
 });

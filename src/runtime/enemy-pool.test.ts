@@ -4,10 +4,6 @@ import { Registry } from '../content/registry';
 import { loadModule } from '../content/load';
 import { secondsToMs } from './units';
 
-// No `accuracy:`, and every stat is a point, so nothing here draws from the rng:
-// the split comparisons below are about pool arithmetic, not about the stream.
-// The brute's stamina regenerates at 7/min, a rate that never divides evenly into
-// a second, so a carried remainder is what the associativity claim rests on.
 const MODULE = `
 # stat attack
 base: 5
@@ -97,10 +93,6 @@ function splitPoints(seed: number, horizon: number): number[][] {
 }
 
 describe('a regenerating enemy pool settles like the player\'s', () => {
-  // A foe enters the encounter AT its ceiling, and a pool saturated in its
-  // rate's direction is split-dependent for the same reason the player's is:
-  // settling while it is pinned clamps the rate away and resets the carried
-  // remainder. So the span under test opens once the foe is off its ceiling.
   const OPENS = 2;
   const HORIZON = 13;
 
@@ -116,9 +108,6 @@ describe('a regenerating enemy pool settles like the player\'s', () => {
     const oneShot = underway(registry);
     resolve(oneShot, registry, secondsToMs(HORIZON));
     const foe = oneShot.activeAction!.actors!['brute'];
-    // 100, less thirteen 5-damage swings, plus 7/min recovered over 13s — a span
-    // chosen so the regen does NOT divide evenly and a remainder must survive.
-    // 35.000 is a foe whose rate was never captured at all.
     expect(foe.resources['stamina']).toBe(36516);
     expect(foe.rateRemainders['stamina']).toBeGreaterThan(0);
 
@@ -135,9 +124,6 @@ describe('a regenerating enemy pool settles like the player\'s', () => {
 });
 
 describe('a fight pool emptied by a result, not by the hit that opened the segment', () => {
-  // Long enough that a segment-granular `on empty:` would bank several more
-  // completions before firing: nothing bounds a stochastic segment short of the
-  // horizon, so this is the whole span in one segment unless the drain ends it.
   const HORIZON = 200;
 
   it('fires on empty: at the drained instant, not at the end of the segment', () => {
@@ -146,8 +132,6 @@ describe('a fight pool emptied by a result, not by the hit that opened the segme
     const oneShot = fighting(registry, 'grind-down');
     resolve(oneShot, registry, secondsToMs(HORIZON));
 
-    // Vigor is 30 and each completion drains 12, so the third one empties it and
-    // its `stop` ends the action there. A late fire banks the rest of the span.
     expect(oneShot.inventory['trophy']).toBe(3);
     expect(oneShot.flags['spent']).toBe(true);
     expect(oneShot.activeAction).toBeNull();

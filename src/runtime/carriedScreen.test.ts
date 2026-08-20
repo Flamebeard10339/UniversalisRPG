@@ -41,7 +41,6 @@ function carrying(inventory: Record<string, number>, over: Registry = registry):
   return state;
 }
 
-// Feeds one copy out of its stack, which is the only way a grown copy exists.
 function withGrownBlade(): GameState {
   const state = carrying({ 'heartwood-blade': 2, whetstone: 1 });
   const grown = feedItem(state, registry, 'heartwood-blade', 'whetstone');
@@ -57,8 +56,6 @@ const values = (answers: Record<string, string>, state: GameState, key: string):
 const last = <T,>(list: readonly T[] | null | undefined): T | undefined => (list ? list[list.length - 1] : undefined);
 
 describe('what the screen lists', () => {
-  // c1: a stack is one line with a count on it, and a grown copy is not folded
-  // into the stack it left, because the two are not interchangeable.
   it('lists stacks by title and count, and each grown copy under its own name', () => {
     const state = withGrownBlade();
     Object.assign(state.inventory, { 'iron-sword': 3 });
@@ -70,8 +67,6 @@ describe('what the screen lists', () => {
     ]);
   });
 
-  // c16: the descriptor is the whole of what says a copy is grown, and the id it
-  // was minted under is nowhere in what the player reads.
   it('names a grown copy under a descriptor and no id, whatever id minting gave it', () => {
     const grown = carriedEntries(withGrownBlade(), registry).find((entry) => entry.grown);
 
@@ -83,8 +78,6 @@ describe('what the screen lists', () => {
     expect(carriedEntries(carrying({ rope: 0 }), registry)).toEqual([]);
   });
 
-  // c2: two items titled alike are answered by two ids, so nothing has to be
-  // made answerable after the fact — the ids never collided in the first place.
   it('tells two entries of the same title apart by the id each is named by', () => {
     const twins = loadInEnglish(`${MODULE}\n# item cord\ntitle: Rope\n`);
     const state = carrying({ rope: 2, cord: 2 }, twins);
@@ -94,8 +87,6 @@ describe('what the screen lists', () => {
     expect(entries.map((entry) => entry.shown)).toEqual(['Rope x2', 'Rope x2']);
   });
 
-  // c16: two grown copies of one base carry one name, so the value each is
-  // answered by is the one that has to be made distinct, and the name is not.
   it('leaves two grown copies of one base named alike and answerable apart', () => {
     const state = carrying({ 'heartwood-blade': 3, whetstone: 2 });
     for (const _ of [0, 1]) {
@@ -108,16 +99,10 @@ describe('what the screen lists', () => {
     expect(new Set(copies.map((entry) => entry.id)).size).toBe(2);
   });
 
-  // An item nothing declares has a title in no language, so its key stands in —
-  // and the key is built from the id the player is still carrying it under (c3).
   it('names an item the registry has lost by the id the player still carries it under', () => {
     expect(carriedEntries(carrying({ 'gone.relic': 1 }), registry)[0].shown).toBe('item.gone.relic.title x1');
   });
 
-  // c21: one copy, one row. The stack it came out of keeps its own row with one
-  // fewer on it, and the worn copy names the slot it is in. The two rows are two
-  // copies, so what names one names neither the other nor the item both are of:
-  // an item id names the stack, which the worn copy has left.
   it('lists a worn stack copy once, under its slot, and never under the id of the stack it left', () => {
     const state = carrying({ 'iron-sword': 3 });
     equip(state, registry, 'iron-sword');
@@ -147,8 +132,6 @@ describe('what the screen asks', () => {
     expect(carriedOptions({ item: 'rope' }, state, registry).map((option) => option.key)).toEqual(['item', 'verb']);
   });
 
-  // c1: the verbs are computed from the item already chosen, so an entry offers
-  // only what applies to it — equip for an item with a slot, destroy for anything.
   it('offers only the verbs the chosen item takes', () => {
     const state = carrying({ rope: 1, 'iron-sword': 1 });
 
@@ -156,13 +139,6 @@ describe('what the screen asks', () => {
     expect(values({ item: 'iron-sword' }, state, 'verb')).toEqual(['grow', 'equip', 'destroy', LEAVE]);
   });
 
-  // c18: an entry offers only verbs that apply to it, and an item already worn
-  // disproves the one that would do nothing. c21 adds the other half: the worn
-  // entry offers every verb a carried one does, so what the player most wants to
-  // improve is still one press from being grown.
-  // The stack the worn copy left is still stocked, so the two rows are of one
-  // item and differ only in which copy they are: what is worn takes Unequip and
-  // what is on the stack takes Equip, from the same item and at the same moment.
   it('offers a worn entry Unequip rather than an Equip that would do nothing', () => {
     const state = carrying({ 'iron-sword': 3, 'heartwood-blade': 1 });
     equip(state, registry, 'iron-sword');
@@ -172,8 +148,6 @@ describe('what the screen asks', () => {
     expect(values({ item: 'heartwood-blade' }, state, 'verb')).toEqual(['grow', 'equip', 'destroy', LEAVE]);
   });
 
-  // The slot holds the spelling that was worn, so a stack still in the stack does
-  // not make the grown copy in the slot read as carried.
   it('offers Unequip to the very copy in the slot and Equip to the one beside it', () => {
     const state = withGrownBlade();
     equip(state, registry, '1');
@@ -182,8 +156,6 @@ describe('what the screen asks', () => {
     expect(values({ item: 'heartwood-blade' }, state, 'verb')).toEqual(['grow', 'equip', 'destroy', LEAVE]);
   });
 
-  // c15: every question this screen asks publishes a way out of it, including
-  // the one it asks with nothing to list.
   it('publishes the value that leaves beside every question, empty hands included', () => {
     const state = withGrownBlade();
 
@@ -193,8 +165,6 @@ describe('what the screen asks', () => {
     expect(values({ item: '1', verb: 'destroy' }, state, 'confirm')).toEqual([CONFIRMED, LEAVE]);
   });
 
-  // c12: the second question is what names what is lost, and only a grown copy
-  // is asked it.
   it('asks a grown copy’s destruction once more, naming the copy, and asks a stack nothing', () => {
     const state = withGrownBlade();
 
@@ -238,9 +208,6 @@ describe('what the screen does with an answer', () => {
     expect(state.equipped).toEqual({ mainhand: 'iron-sword' });
   });
 
-  // c18: the row offers Equip while the stack it stands for has a copy, so
-  // taking it has to be a move and not an error. Offering it is asserted above;
-  // this is the other half, and the half the screen is removed by when it fails.
   it('wears a second copy off a row whose stack is short one already worn', () => {
     const state = carrying({ 'iron-sword': 3 });
     equip(state, registry, 'iron-sword');
@@ -259,8 +226,6 @@ describe('what the screen does with an answer', () => {
     expect(carriedCount(state, 'iron-sword')).toBe(1);
   });
 
-  // c12: a stack copy goes on the verb; a grown copy waits for the answer to the
-  // question naming it, and the other answer to that question leaves it standing.
   it('destroys a stack copy at once and a grown copy only once it is confirmed', () => {
     const state = withGrownBlade();
 
@@ -277,10 +242,6 @@ describe('what the screen does with an answer', () => {
     expect(carriedCount(state, 'heartwood-blade')).toBe(0);
   });
 
-  // c21: the equipment's entries take the verbs a carried entry takes, so the
-  // copy the player is wearing is the one they can grow without taking it off.
-  // A stack is left standing behind the slot throughout, because an item id
-  // answers for the stack while it has one and would reach past the worn copy.
   it('opens the plane of the copy in the slot, and puts what growing it minted back on', () => {
     const state = withGrownBlade();
     Object.assign(state.inventory, { 'heartwood-blade': 3, whetstone: 1 });

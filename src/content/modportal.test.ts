@@ -1,9 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { buildContributionIssueBody } from './contribution';
-import { loadUniverse, loadUniverseWithDiagnostics } from './load';
-import { emptyModportalManifest, issueTier, materializeApprovedModIssue, planModportalSync } from './modportal';
-import { registryDiff } from './registryDiff';
-import type { MaterializedMod, ModportalManifest, ModTier } from './modportal';
+import { describe, expect, it } from "vitest";
+import { buildContributionIssueBody } from "./contribution";
+import { loadUniverse, loadUniverseWithDiagnostics } from "./load";
+import {
+  emptyModportalManifest,
+  issueTier,
+  materializeApprovedModIssue,
+  planModportalSync,
+} from "./modportal";
+import { registryDiff } from "./registryDiff";
+import type { MaterializedMod, ModportalManifest, ModTier } from "./modportal";
 
 const BASE = `
 # info base
@@ -32,17 +37,24 @@ title: Gem
 food, +2 local-changes.vigor
 `;
 
-const base = [{ name: 'base', text: BASE }];
+const base = [{ name: "base", text: BASE }];
 
 function issueBody(localModule: string): string {
   const validation = loadUniverseWithDiagnostics([
-    { name: 'base', text: BASE },
-    { name: 'local-changes', text: localModule },
+    { name: "base", text: BASE },
+    { name: "local-changes", text: localModule },
   ]);
-  return buildContributionIssueBody({ notes: 'Adds a gem.', localModule, validation, contentFiles: ['content/base.dsl'] });
+  return buildContributionIssueBody({
+    notes: "Adds a gem.",
+    localModule,
+    validation,
+    contentFiles: ["content/base.dsl"],
+  });
 }
 
-function materialize(issue: Parameters<typeof materializeApprovedModIssue>[0]): ReturnType<typeof materializeApprovedModIssue> {
+function materialize(
+  issue: Parameters<typeof materializeApprovedModIssue>[0],
+): ReturnType<typeof materializeApprovedModIssue> {
   return materializeApprovedModIssue(issue, base);
 }
 
@@ -52,23 +64,37 @@ function mod(issue: number, tier: ModTier, body: string): MaterializedMod {
     issue,
     title: `Mod ${issue}`,
     tier,
-    base: { universe: 'base', contentFiles: [] },
+    base: { universe: "base", contentFiles: [] },
     moduleId,
     file: `${issue}-${moduleId}.dsl`,
     text: `# info ${moduleId}\nversion: 0.0.0\ndependencies:\n  base\n\n${body}`,
   };
 }
 
-const gem = (issue: number, tier: ModTier): MaterializedMod => mod(issue, tier, '# item gem\ntitle: Gem\n');
-const broken = (issue: number, tier: ModTier): MaterializedMod => mod(issue, tier, '# entity gull\ntitle: Gull\npeck:\n  give: no-such-item\n');
-const startsHere = (issue: number, tier: ModTier): MaterializedMod => mod(issue, tier, `# location home-${issue}\nx: ${issue}, y: 0\nstarting\n`);
+const gem = (issue: number, tier: ModTier): MaterializedMod =>
+  mod(issue, tier, "# item gem\ntitle: Gem\n");
+const broken = (issue: number, tier: ModTier): MaterializedMod =>
+  mod(issue, tier, "# entity gull\ntitle: Gull\npeck:\n  give: no-such-item\n");
+const startsHere = (issue: number, tier: ModTier): MaterializedMod =>
+  mod(issue, tier, `# location home-${issue}\nx: ${issue}, y: 0\nstarting\n`);
 
-function plan(materialized: readonly MaterializedMod[], intent: Record<string, boolean> = {}, over = base): ModportalManifest {
-  return planModportalSync({ existing: { ...emptyModportalManifest(), intent }, materialized, base: over, syncedAt: '2026-07-29T00:00:00.000Z' });
+function plan(
+  materialized: readonly MaterializedMod[],
+  intent: Record<string, boolean> = {},
+  over = base,
+): ModportalManifest {
+  return planModportalSync({
+    existing: { ...emptyModportalManifest(), intent },
+    materialized,
+    base: over,
+    syncedAt: "2026-07-29T00:00:00.000Z",
+  });
 }
 
 function enablement(manifest: ModportalManifest): Record<number, boolean> {
-  return Object.fromEntries(manifest.entries.map((entry) => [entry.issue, entry.enabled]));
+  return Object.fromEntries(
+    manifest.entries.map((entry) => [entry.issue, entry.enabled]),
+  );
 }
 
 // contribution-system-2026-07-30-h1: canonicalising an approved mod serialises
@@ -76,154 +102,288 @@ function enablement(manifest: ModportalManifest): Record<number, boolean> {
 // base content and every `# remove` came out the far side missing. Each case
 // asserts the universe the maintainer ends up with rather than a substring of
 // the file, which is what let the defect ship green.
-describe('an approved mod is the universe its contributor loaded', () => {
-  const contributing = (...body: string[]): string => [['# info local-changes', 'version: 0.0.0', 'dependencies:', '  base', '', ...body].join('\n'), ''].join('\n');
+describe("an approved mod is the universe its contributor loaded", () => {
+  const contributing = (...body: string[]): string =>
+    [
+      [
+        "# info local-changes",
+        "version: 0.0.0",
+        "dependencies:",
+        "  base",
+        "",
+        ...body,
+      ].join("\n"),
+      "",
+    ].join("\n");
 
   const published = (issue: number, localModule: string) => {
-    const materialized = materialize({ number: issue, title: `Mod ${issue}`, body: issueBody(localModule) });
+    const materialized = materialize({
+      number: issue,
+      title: `Mod ${issue}`,
+      body: issueBody(localModule),
+    });
     return {
-      staged: loadUniverse([...base, { name: 'local-changes', text: localModule }]),
-      reloaded: loadUniverse([...base, { name: materialized.file, text: materialized.text }]),
+      staged: loadUniverse([
+        ...base,
+        { name: "local-changes", text: localModule },
+      ]),
+      reloaded: loadUniverse([
+        ...base,
+        { name: materialized.file, text: materialized.text },
+      ]),
       text: materialized.text,
     };
   };
 
-  it('carries an edit to base content, which the module it prints does not own', () => {
-    const { staged, reloaded } = published(51, contributing('# item base.rock', 'title: Boulder'));
-    expect(staged.items.get('base.rock')?.title).toBe('Boulder');
+  it("carries an edit to base content, which the module it prints does not own", () => {
+    const { staged, reloaded } = published(
+      51,
+      contributing("# item base.rock", "title: Boulder"),
+    );
+    expect(staged.items.get("base.rock")?.title).toBe("Boulder");
     expect(registryDiff(staged, reloaded)).toEqual([]);
   });
 
-  it('carries a removal of base content, which the module it prints cannot express', () => {
-    const { staged, reloaded } = published(52, contributing('# remove item.base.rock'));
-    expect(staged.items.has('base.rock')).toBe(false);
+  it("carries a removal of base content, which the module it prints cannot express", () => {
+    const { staged, reloaded } = published(
+      52,
+      contributing("# remove item.base.rock"),
+    );
+    expect(staged.items.has("base.rock")).toBe(false);
     expect(registryDiff(staged, reloaded)).toEqual([]);
   });
 
-  it('still canonicalises the contribution it can carry whole', () => {
+  it("still canonicalises the contribution it can carry whole", () => {
     const { staged, reloaded, text } = published(53, LOCAL);
-    expect(text).toContain('# info approved-mod-53');
-    expect(text).not.toContain('local-changes.');
-    expect(registryDiff(staged, reloaded).filter((line) => !line.includes('local-changes') && !line.includes('approved-mod-53'))).toEqual([]);
+    expect(text).toContain("# info approved-mod-53");
+    expect(text).not.toContain("local-changes.");
+    expect(
+      registryDiff(staged, reloaded).filter(
+        (line) =>
+          !line.includes("local-changes") && !line.includes("approved-mod-53"),
+      ),
+    ).toEqual([]);
   });
 });
 
-describe('approved mod issues', () => {
-  it('turns a local-changes contribution into a unique issue module', () => {
-    const materialized = materialize({ number: 42, title: 'Gem mod', body: issueBody(LOCAL), url: 'https://example.test/42' });
+describe("approved mod issues", () => {
+  it("turns a local-changes contribution into a unique issue module", () => {
+    const materialized = materialize({
+      number: 42,
+      title: "Gem mod",
+      body: issueBody(LOCAL),
+      url: "https://example.test/42",
+    });
 
-    expect(materialized.moduleId).toBe('approved-mod-42');
-    expect(materialized.file).toBe('42-approved-mod-42.dsl');
-    expect(materialized.text).toContain('# info approved-mod-42');
-    expect(materialized.text).toContain('+2 approved-mod-42.vigor');
-    expect(materialized.text).not.toContain('# info local-changes');
-    expect(materialized.text).not.toContain('local-changes.vigor');
+    expect(materialized.moduleId).toBe("approved-mod-42");
+    expect(materialized.file).toBe("42-approved-mod-42.dsl");
+    expect(materialized.text).toContain("# info approved-mod-42");
+    expect(materialized.text).toContain("+2 approved-mod-42.vigor");
+    expect(materialized.text).not.toContain("# info local-changes");
+    expect(materialized.text).not.toContain("local-changes.vigor");
   });
 
   // A kind the rename does not reach keeps its `local-changes.` id, is dropped
   // by serialize's own-module filter, and leaves every reference that WAS
   // renamed pointing at a section the published mod no longer contains — so
   // the published module fails to load, blaming the contributor.
-  it('carries every section kind through the rename, so the published module still loads', () => {
-    const local = [LOCAL, '# action foe-swing', 'title: Swing', 'continuous', 'rate: local-changes.vigor', 'say: Swing.', '', '# entity rat', 'uses: local-changes.foe-swing'].join('\n');
-    const materialized = materialize({ number: 44, title: 'Foes', body: issueBody(local) });
+  it("carries every section kind through the rename, so the published module still loads", () => {
+    const local = [
+      LOCAL,
+      "# action foe-swing",
+      "title: Swing",
+      "continuous",
+      "rate: local-changes.vigor",
+      "say: Swing.",
+      "",
+      "# entity rat",
+      "uses: local-changes.foe-swing",
+    ].join("\n");
+    const materialized = materialize({
+      number: 44,
+      title: "Foes",
+      body: issueBody(local),
+    });
 
-    expect(materialized.text).toContain('# action foe-swing');
-    expect(materialized.text).toContain('uses: approved-mod-44.foe-swing');
-    expect(() => loadUniverse([...base, { name: materialized.file, text: materialized.text }])).not.toThrow();
+    expect(materialized.text).toContain("# action foe-swing");
+    expect(materialized.text).toContain("uses: approved-mod-44.foe-swing");
+    expect(() =>
+      loadUniverse([
+        ...base,
+        { name: materialized.file, text: materialized.text },
+      ]),
+    ).not.toThrow();
   });
 
-  it('canonicalizes approved local-changes modules without rewriting prose', () => {
+  it("canonicalizes approved local-changes modules without rewriting prose", () => {
     const local = `${LOCAL}\n# entity teller\nrepeat:\n  say: local-changes.vigor is prose here\n`;
-    const materialized = materialize({ number: 43, title: 'Prose', body: issueBody(local) });
+    const materialized = materialize({
+      number: 43,
+      title: "Prose",
+      body: issueBody(local),
+    });
 
-    expect(materialized.text).toContain('# info approved-mod-43');
-    expect(materialized.text).toContain('+2 approved-mod-43.vigor');
-    expect(materialized.text).toContain('say: local-changes.vigor is prose here');
+    expect(materialized.text).toContain("# info approved-mod-43");
+    expect(materialized.text).toContain("+2 approved-mod-43.vigor");
+    expect(materialized.text).toContain(
+      "say: local-changes.vigor is prose here",
+    );
   });
 
-  it('preserves a custom module id from an approved issue', () => {
-    const custom = LOCAL.replace('# info local-changes', '# info gem-pack').replace(/local-changes\./g, 'gem-pack.');
-    const materialized = materializeApprovedModIssue({ number: 7, title: 'Gem pack', body: issueBody(custom) });
+  it("preserves a custom module id from an approved issue", () => {
+    const custom = LOCAL.replace(
+      "# info local-changes",
+      "# info gem-pack",
+    ).replace(/local-changes\./g, "gem-pack.");
+    const materialized = materializeApprovedModIssue({
+      number: 7,
+      title: "Gem pack",
+      body: issueBody(custom),
+    });
 
-    expect(materialized.moduleId).toBe('gem-pack');
-    expect(materialized.file).toBe('7-gem-pack.dsl');
-    expect(materialized.text).toContain('# info gem-pack');
+    expect(materialized.moduleId).toBe("gem-pack");
+    expect(materialized.file).toBe("7-gem-pack.dsl");
+    expect(materialized.text).toContain("# info gem-pack");
   });
 
-  it('refuses an issue whose declared target universe its module does not depend on', () => {
-    const targeting = (universe: string): string => `### Target universe\n\n${universe}\n\n### Local changes DSL\n\n\`\`\`dsl\n${LOCAL.trim()}\n\`\`\`\n`;
+  it("refuses an issue whose declared target universe its module does not depend on", () => {
+    const targeting = (universe: string): string =>
+      `### Target universe\n\n${universe}\n\n### Local changes DSL\n\n\`\`\`dsl\n${LOCAL.trim()}\n\`\`\`\n`;
 
-    expect(materialize({ number: 8, title: 'Gem', body: targeting('base') }).base.universe).toBe('base');
-    expect(() => materialize({ number: 8, title: 'Gem', body: targeting('some-other-universe') })).toThrow(
+    expect(
+      materialize({ number: 8, title: "Gem", body: targeting("base") }).base
+        .universe,
+    ).toBe("base");
+    expect(() =>
+      materialize({
+        number: 8,
+        title: "Gem",
+        body: targeting("some-other-universe"),
+      }),
+    ).toThrow(
       /targets universe some-other-universe, which its module does not declare a dependency on \(it declares base\)/,
     );
   });
 
-  it('reads the activation tier from the issue labels, taking the stronger channel', () => {
-    expect(issueTier({ number: 1, title: 'One', labels: [{ name: 'mod-approved' }] })).toBe('approved');
-    expect(issueTier({ number: 1, title: 'One', labels: [{ name: 'mod-auto-enabled' }] })).toBe('auto-enabled');
-    expect(issueTier({ number: 1, title: 'One', labels: [{ name: 'mod-approved' }, { name: 'mod-auto-enabled' }] })).toBe('auto-enabled');
-    expect(issueTier({ number: 1, title: 'One', labels: [{ name: 'content' }] })).toBe('approved');
-    expect(issueTier({ number: 1, title: 'One' })).toBe('approved');
+  it("reads the activation tier from the issue labels, taking the stronger channel", () => {
+    expect(
+      issueTier({
+        number: 1,
+        title: "One",
+        labels: [{ name: "mod-approved" }],
+      }),
+    ).toBe("approved");
+    expect(
+      issueTier({
+        number: 1,
+        title: "One",
+        labels: [{ name: "mod-auto-enabled" }],
+      }),
+    ).toBe("auto-enabled");
+    expect(
+      issueTier({
+        number: 1,
+        title: "One",
+        labels: [{ name: "mod-approved" }, { name: "mod-auto-enabled" }],
+      }),
+    ).toBe("auto-enabled");
+    expect(
+      issueTier({ number: 1, title: "One", labels: [{ name: "content" }] }),
+    ).toBe("approved");
+    expect(issueTier({ number: 1, title: "One" })).toBe("approved");
   });
 
-  it('keeps the generated module id off the label, so promoting a mod does not rename it', () => {
+  it("keeps the generated module id off the label, so promoting a mod does not rename it", () => {
     const body = issueBody(LOCAL);
-    const approved = materialize({ number: 42, title: 'Gem mod', body, labels: [{ name: 'mod-approved' }] });
-    const promoted = materialize({ number: 42, title: 'Gem mod', body, labels: [{ name: 'mod-auto-enabled' }] });
+    const approved = materialize({
+      number: 42,
+      title: "Gem mod",
+      body,
+      labels: [{ name: "mod-approved" }],
+    });
+    const promoted = materialize({
+      number: 42,
+      title: "Gem mod",
+      body,
+      labels: [{ name: "mod-auto-enabled" }],
+    });
 
-    expect(promoted.tier).toBe('auto-enabled');
+    expect(promoted.tier).toBe("auto-enabled");
     expect(promoted.moduleId).toBe(approved.moduleId);
     expect(promoted.file).toBe(approved.file);
     expect(promoted.text).toBe(approved.text);
   });
 });
 
-describe('modportal sync plan', () => {
-  it('lists an approved mod switched off and enables only the auto-enabled tier', () => {
-    const manifest = plan([gem(3, 'approved'), gem(4, 'auto-enabled')]);
+describe("modportal sync plan", () => {
+  it("lists an approved mod switched off and enables only the auto-enabled tier", () => {
+    const manifest = plan([gem(3, "approved"), gem(4, "auto-enabled")]);
 
     expect(enablement(manifest)).toEqual({ 3: false, 4: true });
-    expect(manifest.entries.map((entry) => entry.diagnostics)).toEqual([undefined, undefined]);
+    expect(manifest.entries.map((entry) => entry.diagnostics)).toEqual([
+      undefined,
+      undefined,
+    ]);
   });
 
-  it('records a mod that does not load switched off with its diagnostic, without withholding the rest', () => {
-    const manifest = plan([broken(4, 'auto-enabled'), gem(9, 'auto-enabled')]);
+  it("records a mod that does not load switched off with its diagnostic, without withholding the rest", () => {
+    const manifest = plan([broken(4, "auto-enabled"), gem(9, "auto-enabled")]);
 
     expect(enablement(manifest)).toEqual({ 4: false, 9: true });
-    expect(manifest.entries[0].diagnostics?.[0]).toContain('names an unknown item: no-such-item');
+    expect(manifest.entries[0].diagnostics?.[0]).toContain(
+      "names an unknown item: no-such-item",
+    );
     expect(manifest.entries[1].diagnostics).toBeUndefined();
   });
 
-  it('lets stored intent override the tier default in both directions', () => {
-    const manifest = plan([gem(3, 'approved'), gem(4, 'auto-enabled')], { 3: true, 4: false });
+  it("lets stored intent override the tier default in both directions", () => {
+    const manifest = plan([gem(3, "approved"), gem(4, "auto-enabled")], {
+      3: true,
+      4: false,
+    });
 
     expect(enablement(manifest)).toEqual({ 3: true, 4: false });
   });
 
-  it('keeps intent for an issue that left the labelled set, so re-labelling does not resurrect it', () => {
-    const disabled = plan([gem(3, 'auto-enabled')], { 3: false });
-    const unlabelled = planModportalSync({ existing: disabled, materialized: [], base, syncedAt: '2026-07-29T00:01:00.000Z' });
-    const relabelled = planModportalSync({ existing: unlabelled, materialized: [gem(3, 'auto-enabled')], base, syncedAt: '2026-07-29T00:02:00.000Z' });
+  it("keeps intent for an issue that left the labelled set, so re-labelling does not resurrect it", () => {
+    const disabled = plan([gem(3, "auto-enabled")], { 3: false });
+    const unlabelled = planModportalSync({
+      existing: disabled,
+      materialized: [],
+      base,
+      syncedAt: "2026-07-29T00:01:00.000Z",
+    });
+    const relabelled = planModportalSync({
+      existing: unlabelled,
+      materialized: [gem(3, "auto-enabled")],
+      base,
+      syncedAt: "2026-07-29T00:02:00.000Z",
+    });
 
     expect(unlabelled.entries).toEqual([]);
     expect(unlabelled.intent).toEqual({ 3: false });
     expect(enablement(relabelled)).toEqual({ 3: false });
   });
 
-  it('admits an explicitly enabled mod ahead of one that is only on by default', () => {
+  it("admits an explicitly enabled mod ahead of one that is only on by default", () => {
     // Two mods that each want to own where a new game begins: either loads over
     // a start-less base, neither loads with the other, so which one is admitted
     // is a policy choice rather than an accident of ordering.
-    const rival = [startsHere(2, 'auto-enabled'), startsHere(8, 'auto-enabled')];
-    const startless = [{ name: 'base', text: BASE.replace('starting\n', '') }];
+    const rival = [
+      startsHere(2, "auto-enabled"),
+      startsHere(8, "auto-enabled"),
+    ];
+    const startless = [{ name: "base", text: BASE.replace("starting\n", "") }];
     const byDefault = plan(rival, {}, startless);
     const chosen = plan(rival, { 8: true }, startless);
 
     expect(enablement(byDefault)).toEqual({ 2: true, 8: false });
     expect(enablement(chosen)).toEqual({ 2: false, 8: true });
-    expect(byDefault.entries[1].diagnostics?.[0]).toContain('a new game begins in exactly one place');
-    expect(chosen.entries[0].diagnostics?.[0]).toContain('a new game begins in exactly one place');
+    expect(byDefault.entries[1].diagnostics?.[0]).toContain(
+      "a new game begins in exactly one place",
+    );
+    expect(chosen.entries[0].diagnostics?.[0]).toContain(
+      "a new game begins in exactly one place",
+    );
   });
 });

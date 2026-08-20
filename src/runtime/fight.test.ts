@@ -7,9 +7,6 @@ import { logSwing } from './encounter';
 import { isPopulations } from './population';
 import { secondsToMs, toMilliUnits } from './units';
 
-// One block, brought by whoever swings, and three factions: the player and miki
-// share one, the bandits share another, and the crab is in neither so it is
-// hostile to both. Every entity is measured by its own sheet.
 const MODULE = `
 # stat attack
 base: 4
@@ -162,8 +159,6 @@ describe('hostility is derived from factions and is symmetric', () => {
       ['player', 'miki', false],
       ['player', 'bandit', true],
       ['bandit', 'bandit-leader', false],
-      // `crab` names no faction, so it is `world` — which the player, in
-      // `player` alone, shares no bit with.
       ['player', 'crab', true],
       ['crab', 'bandit', true],
     ] as const) {
@@ -199,9 +194,6 @@ describe('aggressive opens the fight, and a location bounds it', () => {
     expect(state.activeAction).toBeNull();
   });
 
-  // Travelling out is how a fight is broken off, and it needs no authored
-  // leash. The urchin outlasts the span by four orders of magnitude, so the
-  // fight ending is the leash and never the fight being won.
   it('disengages when the target is no longer where the fight is', () => {
     const registry = loaded();
     const state = standing(registry, 'reef');
@@ -223,8 +215,6 @@ describe('allies: is a roster, not a filter over what the location holds', () =>
     const state = standing(registry, 'camp');
     armFightAction('swing', 'bandit-leader', registry, state);
 
-    // Two bandits from the leader's count, the leader itself, and miki — who
-    // stands in no location at all and joins by name.
     expect(Object.keys(state.activeAction!.actors!).sort()).toEqual(['bandit#1', 'bandit#2', 'bandit-leader', 'miki']);
     expect(state.activeAction!.roster!['bandit#1'].target).toBe(PLAYER);
     expect(state.activeAction!.roster!['miki'].target).toBe('bandit-leader');
@@ -244,15 +234,11 @@ describe('allies: is a roster, not a filter over what the location holds', () =>
     const registry = loaded();
     const state = standing(registry, 'camp');
     armFightAction('swing', 'bandit-leader', registry, state);
-    // The leader has 8 health against 4 a hit; miki and the player both swing
-    // at 60/min, so miki's second hit at t=2 is the one that lands last.
     resolve(state, registry, secondsToMs(4));
 
     expect(state.activeAction).toBeNull();
     expect(state.inventory['token']).toBe(1);
     expect(state.populations['camp']['bandit-leader']).toEqual({ down: 1, due: [] });
-    // A swing between two participants that are neither of them the player is
-    // still a swing, and the log says who it landed on.
     expect(state.log.some((line) => /^The Miki hits the Bandit Leader for /.test(line))).toBe(true);
     expect(state.log.some((line) => /^The Miki hits you/.test(line))).toBe(false);
   });
@@ -262,8 +248,6 @@ describe('allies: is a roster, not a filter over what the location holds', () =>
     const state = standing(registry, 'camp');
     armFightAction('swing', 'bandit-leader', registry, state);
 
-    // A minted copy is keyed by its type and which copy it is, and nothing in
-    // the registry answers to that key: its template is what answers for it.
     expect(registry.entities.has('bandit#1')).toBe(false);
     state.activeAction!.actors!['bandit#1'].resources['health'] = toMilliUnits(1);
     state.activeAction!.roster![PLAYER].target = 'bandit#1';
@@ -273,15 +257,11 @@ describe('allies: is a roster, not a filter over what the location holds', () =>
 });
 
 describe('an overload governs its own entity performance', () => {
-  // Everything the overload says, not only the gates it writes: what swings is
-  // the performer's own copy of the declaration.
   it('is what swings, so its damage: and rate: are the ones that land', () => {
     const registry = loaded();
     const state = standing(registry, 'camp');
     armFightAction('swing', 'ogre', registry, state);
 
-    // The ogre's own copy: 40 a hit at 30/min, so one bite of 40 lands by t=2
-    // where the declaration would have landed two of 4.
     resolve(state, registry, secondsToMs(2));
     expect(toMilliUnits(1000) - state.resources['health']).toBe(toMilliUnits(40));
   });
@@ -291,15 +271,11 @@ describe('an overload governs its own entity performance', () => {
     const declaration = registry.actions.get('swing')!;
     const overloaded = registry.entities.get('ogre')!.actions[0];
 
-    // Bare: the overload's damage: stands in for the declaration's, and what
-    // it does not name is inherited.
     expect(declaration.damage).toEqual({ left: { side: 'my', id: 'attack' }, right: { side: 'their', id: 'dr' } });
     expect(overloaded.damage).toEqual({ left: { side: 'my', id: 'hard-blow' }, right: { side: 'their', id: 'dr' } });
     expect(overloaded.depletes).toEqual(declaration.depletes);
   });
 
-  // The declaration carries a gate here, so replacing and appending are two
-  // different answers rather than the same one.
   it('tells a bare line from a + line where the declaration already holds one', () => {
     const registry = loaded();
     const truce = { kind: 'reference', reference: { path: ['truce'] } };
@@ -321,7 +297,6 @@ describe('an overload governs its own entity performance', () => {
     armFightAction('swing', 'boulder', registry, open);
     resolve(open, registry, secondsToMs(5));
 
-    // The boulder is fought either way; only its own answer is gated.
     expect(gated.resources['health']).toBe(toMilliUnits(1000));
     expect(open.resources['health']).toBeLessThan(toMilliUnits(1000));
   });
@@ -332,16 +307,13 @@ describe('respawn after: is the thing own fact, and the count is the place own',
     const registry = loaded();
     const state = standing(registry, 'shore');
     armFightAction('swing', 'crab', registry, state);
-    resolve(state, registry, secondsToMs(3)); // 12 health at 4 a hit, one a second
+    resolve(state, registry, secondsToMs(3));
 
     const due = state.populations['shore']['crab'].due;
     expect(state.populations['shore']['crab'].down).toBe(1);
     expect(due).toHaveLength(1);
-    // Thirty seconds after it went down, whenever that was.
     expect(due[0] - secondsToMs(30)).toBeLessThanOrEqual(state.time);
 
-    // Nothing else may swing over the wait, or a second crab going down would
-    // be what moved the deficit.
     state.activeAction = null;
     state.location = 'camp';
     const at = due[0];
@@ -352,8 +324,6 @@ describe('respawn after: is the thing own fact, and the count is the place own',
     expect(state.populations['shore']?.['crab']?.down ?? 0).toBe(0);
   });
 
-  // A due time is fixed when the copy goes down, so waiting through a respawn
-  // rolls the same numbers as not waiting.
   it('draws no randomness at spawn time', () => {
     const registry = loaded();
     const state = standing(registry, 'shore');
@@ -381,14 +351,9 @@ describe('respawn after: is the thing own fact, and the count is the place own',
 });
 
 describe('an overload bounds and ends the action it overlays', () => {
-  // What SWINGS and what ENDS the action have to be the same copy, or an
-  // overload governs half of its own entity's performance.
   const patient = MODULE.replace('# entity player', ['# entity player', 'swing:', '  attempts: 2', '  on unfinished:', '    set: gave-up'].join(String.fromCharCode(10)));
 
   it('reads attempts: and on unfinished: off the copy that swings', () => {
-    // The ogre carries 1000 health against 4 a hit and opens nothing itself, so
-    // nothing here completes and nothing re-arms: what ends it is the
-    // overload's own bound.
     const registry = loadInEnglish(patient);
     const overloaded = standing(registry, 'camp');
     armFightAction('swing', 'ogre', registry, overloaded);
@@ -407,11 +372,7 @@ describe('an overload bounds and ends the action it overlays', () => {
 });
 
 describe('a fight nobody can swing in is no fight', () => {
-  // `hidden if:` closing over every seat used to leave the action armed with
-  // no participant, which is a stall rather than an end.
   it('ends rather than stalling when every seat gate has closed', () => {
-    // No ally, so the boulder's gated seat and the player's are the whole
-    // roster; taking the player's clock away leaves nobody at all.
     const registry = loadInEnglish(MODULE.replace(`uses: swing${String.fromCharCode(10)}allies: miki`, 'uses: swing'));
     const state = standing(registry, 'camp');
     state.flags['truce'] = true;
@@ -466,9 +427,6 @@ describe('the populations save field', () => {
   });
 });
 
-// Four patterns cover three cases; a swing whose swinger and target are the
-// same player is the fourth, and before pass 2 the localizer threw for want of
-// a {target} rather than saying anything at all.
 describe('a swing the player lands on themselves', () => {
   it('is said the way one between two others is, rather than refused', () => {
     const registry = loadInEnglish(MODULE);

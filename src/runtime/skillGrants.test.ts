@@ -4,10 +4,6 @@ import { loadInEnglish } from '../content/engineLocale';
 import { compareSave, loadSave, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 
-// Every skill is declared by exactly one side, so which entity a moment fired
-// on is readable off which skill moved. `melee` and `flailing` are the
-// player's, `hide` and `ducking` are the rat's, and a moment landing on the
-// wrong subject shows up as a skill that stayed at nothing.
 const SHEET = `
 # stat attack
 base: 4
@@ -90,8 +86,6 @@ starting
 entities: rat
 `;
 
-// The rat brings no two-sided action, so nothing retaliates and every swing in
-// the fight is the player's.
 const ONE_SIDED = arena('swing', 'hide, ducking', '');
 const MISSING = arena('wild-swing', 'hide, ducking', '');
 const BOTH_SIDED = arena('swing', 'hide, ducking, gnawing', 'uses: swing');
@@ -108,8 +102,6 @@ function fought(source: string, action: string, seconds: number): GameState {
 describe('a trigger name says whose view it is', () => {
   it('trains the performer on what it dealt and the struck on what it took', () => {
     const state = fought(ONE_SIDED, 'swing', 4);
-    // Four swings at one attack-rate, each landing 4 damage: 4 x 4 for the
-    // performer's `4*amount`, and a flat 5 for the struck.
     expect(state.xp).toEqual({ melee: 64, hide: 20 });
   });
 
@@ -118,9 +110,6 @@ describe('a trigger name says whose view it is', () => {
     expect(state.xp).toEqual({ flailing: 28, ducking: 12 });
   });
 
-  // Both subjects are wrong in the same direction if the moment picks its
-  // entity from who swung rather than from the trigger's name, so the pair
-  // above only distinguishes them because no skill is on both sheets.
   it('leaves a skill alone where its moment landed on the other side', () => {
     expect(fought(ONE_SIDED, 'swing', 4).xp.gnawing).toBeUndefined();
     expect(fought(MISSING, 'wild-swing', 4).xp.melee).toBeUndefined();
@@ -128,8 +117,6 @@ describe('a trigger name says whose view it is', () => {
 });
 
 describe('the player is not special', () => {
-  // `gnawing` is on the rat's sheet and on no other, so xp under that name can
-  // only have come from the rat's own swing.
   it('earns an authored enemy experience from its own events, by the same path', () => {
     const state = fought(BOTH_SIDED, 'swing', 4);
     expect(state.xp.gnawing).toBe(32);
@@ -149,8 +136,6 @@ describe('one accumulator, and one place that writes it', () => {
     const state = createGameState('burrow');
     initResources(state, registry);
     armFightAction('swing', 'rat', registry, state);
-    // 16 xp a swing, so the first level lands inside the span rather than at
-    // the end of it, and the line is the one applyOne pushes for any source.
     resolve(state, registry, secondsToMs(70));
     expect(state.xp.melee).toBe(16 * 70);
     expect(state.log.filter((line) => line.includes('Melee') && line.includes('level'))).toHaveLength(1);
@@ -175,9 +160,6 @@ describe('one accumulator, and one place that writes it', () => {
 });
 
 describe('a grant costs nothing when nobody wrote one', () => {
-  // The index is derived from the registry once and held against it, so the
-  // walk that builds it is the only walk over declared skills a fight pays for
-  // however many moments it produces.
   it('walks the declared skills at most once however many moments fire', () => {
     const registry = loadInEnglish(BOTH_SIDED);
     const values = registry.skills.values.bind(registry.skills);
@@ -230,7 +212,6 @@ describe('an entity with no sheet at all', () => {
   });
 });
 
-// A fight the player can finish, and one bounded so tightly it cannot be.
 const OUTCOMES = `
 # stat attack
 base: 4
@@ -320,9 +301,6 @@ describe('an action that reached its end, and one that did not', () => {
     expect(state.xp).toEqual({ quitting: 6 });
   });
 
-  // A repeating action with no target settles a whole span's completions in one
-  // batch, so this is the count reaching the moment rather than the moment
-  // firing once per segment.
   it('grants once per completion a batched span produced', () => {
     const registry = loadInEnglish(OUTCOMES);
     const state = createGameState('burrow');

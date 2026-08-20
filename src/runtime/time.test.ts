@@ -83,8 +83,6 @@ glance:
     expect(state.time).toBe(0);
   });
 
-  // The whole point of separating the kind from the cadence: raising the default
-  // must move every action that never said it was over instantly, and no other.
   it('spans an untagged action by a raised default-action-duration and leaves an instant one at 0', () => {
     const registry = loadModule(`# variable default-action-duration\nvalue: 7\n${MODULE}`);
 
@@ -97,8 +95,6 @@ glance:
     expect(glancing.time).toBe(0);
   });
 
-  // A clamped-to-zero negative is a typo that survives to be wondered about
-  // later; contest-spread already refused its own bad value rather than clamp.
   it('refuses a negative default-action-duration instead of quietly reading it as 0', () => {
     expect(() => loadModule('# variable default-action-duration\nvalue: -5\n')).toThrow(/# variable default-action-duration must be at least 0, got -5/);
   });

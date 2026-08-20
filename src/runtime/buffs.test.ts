@@ -10,8 +10,6 @@ import { createGameState, equip, GameState, initResources, PLAYER, resolve, stat
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
-// `accelerated-vigor` stacks and `steady-draught` does not, so the two ways a
-// second application can land are both authored somewhere.
 const MODULE = `
 # stat attack
 base: 10
@@ -94,11 +92,7 @@ function loaded(): Registry {
   return loadInEnglish(MODULE);
 }
 
-// One more stat and one more item than `loaded()`, which is the shape of a mod
-// that was loaded when the buff was granted and is gone when it is read back.
 function wider(): Registry {
-  // mint-tonic keeps its id and swaps its payload, so it is a source the
-  // narrower registry still holds while the stat it names has gone with the mod.
   return loadInEnglish(
     `${MODULE}
 # stat panache
@@ -109,8 +103,6 @@ food, +1 attack, 60s
   );
 }
 
-// The one copy `giant-rat`'s `allies: 1 rat-whelp` mints, spelled the way
-// `enterEncounter` spells it.
 const COPY = 'rat-whelp#1';
 
 function started(registry: Registry): GameState {
@@ -198,16 +190,12 @@ describe('a stack count is a counter other modifiers read', () => {
     expect(statValue('attack', state, registry, PLAYER)).toBe(10);
 
     grantBuff(state, PLAYER, itemOf(registry, 'accelerated-vigor'), secondsToMs(60));
-    // 10 + 6, then +10% of it for the one stack held.
     expect(statValue('attack', state, registry, PLAYER)).toBeCloseTo(17.6, 10);
 
     grantBuff(state, PLAYER, itemOf(registry, 'accelerated-vigor'), secondsToMs(60));
-    // 10 + 12, then +20% for two.
     expect(statValue('attack', state, registry, PLAYER)).toBeCloseTo(26.4, 10);
   });
 
-  // A worn item is the player's alone, so the counter reaches a rat through a
-  // buff instead — the same fold, the same clause, a different holder.
   it('reads the count off whoever is being evaluated rather than off the player', () => {
     const registry = loaded();
     const state = started(registry);
@@ -218,9 +206,7 @@ describe('a stack count is a counter other modifiers read', () => {
     for (let i = 0; i < 5; i++) grantBuff(state, PLAYER, vigor, secondsToMs(60));
     for (let i = 0; i < 2; i++) grantBuff(state, 'giant-rat', vigor, secondsToMs(60));
 
-    // 10 + 5x6 from the stacks themselves, + 3 per stack from the war cry.
     expect(statRange('attack', state, registry, PLAYER)).toEqual(point(55));
-    // 5 + 2x6, + 3 per stack — two, not the five the player is holding.
     expect(statRange('attack', state, registry, 'giant-rat')).toEqual(point(23));
   });
 });
@@ -299,9 +285,6 @@ describe('an inflicted buff is granted by the declaration it names', () => {
     }
   });
 
-  // The duration is read off the declaration and nowhere else, which is what
-  // stops one payload having two answers about how long it runs. The fight is
-  // put down after the swing that granted it so nothing refreshes the clock.
   it('expires on the clock its own declaration set, without a second one being named', () => {
     const registry = loaded();
     const state = swinging(registry, 'flashing-blade');
@@ -335,15 +318,13 @@ describe('a buff on a fight-scoped copy dies with the copy', () => {
     grantBuff(state, 'giant-rat', itemOf(registry, 'accelerated-vigor'), secondsToMs(1e9));
     expect(statRange('attack', state, registry, 'giant-rat')).toEqual(point(11));
 
-    resolve(state, registry, secondsToMs(2)); // 10 a hit against 12 health
+    resolve(state, registry, secondsToMs(2));
 
-    expect(state.activeAction!.actors!['giant-rat'].resources.health).toBe(toMilliUnits(12)); // a fresh one
+    expect(state.activeAction!.actors!['giant-rat'].resources.health).toBe(toMilliUnits(12));
     expect(buffsOf(state, 'giant-rat')).toEqual([]);
     expect(statRange('attack', state, registry, 'giant-rat')).toEqual(point(5));
   });
 
-  // The entity that was fought is standing in the world before and after, so
-  // what it holds is not the fight's to end; only the minted copy's is.
   it('clears the copies the encounter minted when the action ends, and no other holder', () => {
     const registry = loaded();
     const state = started(registry);
@@ -424,8 +405,6 @@ describe('a buff survives a save, or is pruned with a warning', () => {
     expect(load([])).not.toThrow();
   });
 
-  // Each of these once loaded clean and then threw a raw TypeError out of the
-  // stat fold, because the kind was checked and the payload under it was not.
   it('refuses a tag whose kind is known and whose payload is not what that kind holds', () => {
     const registry = loaded();
     const load = (tag: unknown) => () =>
@@ -445,8 +424,6 @@ describe('a buff survives a save, or is pruned with a warning', () => {
     expect(load({ kind: 'duration', seconds: 60 })).not.toThrow();
   });
 
-  // A counter that resolves to nothing scales its bonus to nothing, so a buff
-  // keeping one would fold to base while looking like it survived intact.
   it('drops an instance whose counter names a resource or a source the registry no longer has', () => {
     const registry = loaded();
     const load = (per: unknown) => {
@@ -469,8 +446,6 @@ describe('a buff survives a save, or is pruned with a warning', () => {
     expect(statRange('attack', kept.state, registry, PLAYER)).toEqual(point(15));
   });
 
-  // An actor holding nothing is spelled as absent everywhere else, and a
-  // hand-written body is the one table this module did not assemble.
   it('normalises a holder a save left empty, so a load and a grant spell nothing the same way', () => {
     const registry = loaded();
     const state = initialState(registry);

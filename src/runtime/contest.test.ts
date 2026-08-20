@@ -7,8 +7,6 @@ import { Registry } from '../content/registry';
 import { loadModule } from '../content/load';
 import { secondsToMs, toMilliUnits } from './units';
 
-// Three entities differing only in what they oppose the player with: `dummy`
-// does not dodge, `phantom` matches the player exactly, `biter` swings back.
 const MODULE = `
 # stat attack
 base: 10
@@ -76,8 +74,8 @@ stats: max-health 1000000, dodge 0, attack 10, rat-skill 100, attack-rate 60
 uses: bite
 `;
 
-const ATTEMPTS = 2000; // one per second at 60/min
-const DAMAGE = 10; // attack 10 - dr 0, both unranged
+const ATTEMPTS = 2000;
+const DAMAGE = 10;
 const MAX_HEALTH = toMilliUnits(1000000);
 const DAMAGE_MILLI = toMilliUnits(DAMAGE);
 
@@ -92,7 +90,6 @@ function fighting(registry: Registry, entityId: string): GameState {
   return state;
 }
 
-// Hits are the only thing that moves the pool and each lands for a flat 10.
 function hitsLanded(state: GameState, entityId: string): number {
   const pool = state.activeAction!.actors![entityId].resources.health;
   return (MAX_HEALTH - pool) / DAMAGE_MILLI;
@@ -127,11 +124,8 @@ describe('the opposed roll', () => {
   });
 
   it('closes on certainty without reaching it, across any gap that can occur in play', () => {
-    // 15 spreads of advantage is already one loss in 10^15.
     expect(hitChance(1500, 0, registry)).toBeLessThan(1);
     expect(hitChance(0, 1500, registry)).toBeGreaterThan(0);
-    // Asymptotic in exact arithmetic but not in a double: past ~16 spreads the
-    // near side rounds to 1, which the [0, 1) uniform reads as "always hits".
     expect(hitChance(1700, 0, registry)).toBe(1);
   });
 
@@ -157,7 +151,6 @@ describe('a contest inside a fight', () => {
     const evasive = fighting(registry, 'phantom');
     resolve(evasive, registry, secondsToMs(ATTEMPTS));
 
-    // Only the target's `dodge` differs, so this pins `evasion:` to the TARGET.
     expect(hitsLanded(open, 'dummy') / ATTEMPTS).toBeCloseTo(0.909, 1);
     expect(hitsLanded(evasive, 'phantom') / ATTEMPTS).toBeCloseTo(0.5, 1);
     expect(hitsLanded(open, 'dummy')).toBeGreaterThan(hitsLanded(evasive, 'phantom'));
@@ -170,7 +163,6 @@ describe('a contest inside a fight', () => {
     resolve(bare, registry, secondsToMs(ATTEMPTS));
 
     const nimble = fighting(registry, 'biter');
-    // A ring of dodging: +100 closes the rat's 100-point skill advantage to nil.
     grantBuff(nimble, PLAYER, registry.items.get('ring-of-dodging')!, secondsToMs(1e9));
     resolve(nimble, registry, secondsToMs(ATTEMPTS));
 
@@ -185,7 +177,6 @@ describe('a contest inside a fight', () => {
     grantBuff(nimble, PLAYER, registry.items.get('ring-of-dodging')!, secondsToMs(1e9));
     resolve(nimble, registry, secondsToMs(ATTEMPTS));
 
-    // The player's own `evasion: dodge` reads the BITER's dodge, not their buff.
     expect(hitsLanded(nimble, 'biter') / ATTEMPTS).toBeCloseTo(0.909, 1);
   });
 
@@ -194,8 +185,6 @@ describe('a contest inside a fight', () => {
     const state = fighting(registry, 'phantom');
     resolve(state, registry, secondsToMs(ATTEMPTS));
 
-    // The reference cursor steps through nextRandom itself: restating the LCG
-    // here would pin this test to the implementation (rng.test.ts checks that).
     const reference = createGameState();
     for (let i = 0; i < ATTEMPTS; i++) nextRandom(reference);
     expect(state.rng).toBe(reference.rng);
@@ -228,10 +217,6 @@ describe('a contest inside a fight', () => {
     }
   });
 
-  // The audit measured one stat at 2.5 spending 2.5 down the healthless path and
-  // 2.0 down the `depletes:` path — the same authored number worth two amounts.
-  // Neither action carries `accuracy:`, so every attempt lands and the figures
-  // below are exact rather than sampled.
   function fighters(blow: number): Registry {
     return loaded(
       MODULE +
@@ -286,35 +271,26 @@ test-escaper:
   }
 
   it('unify-action-health-into-target: a target: hit spends the authored ability at its authored scale (runtime-2026-07-30-m2)', () => {
-    // 2000 was the reading this finding recorded, from truncating to whole units.
     expect(poolSpentPerAttempt(fighters(2.5), 4)).toBe(toMilliUnits(2.5));
-    // Below min-damage the old floor rounded a 0.4 hit UP to a whole unit.
     expect(poolSpentPerAttempt(fighters(0.4), 2)).toBe(toMilliUnits(0.4));
   });
 
-  // `attempts:` ends a fight with its target pool still full, so a completion
-  // test that reads the pool waits for a boundary the fight never reaches.
   it('escapes a deterministic fight on its attempt count, not on an emptied pool', () => {
-    const registry = fighters(0.4); // ceil(1000/400) = 3 attempts to complete
+    const registry = fighters(0.4);
     const state = createGameState('arena');
     initResources(state, registry);
     armAction('entity', 'striker', 'test-escaper', registry, state);
 
-    // Two attempts of 400 leave the implicit pool at 200, still unemptied.
     resolve(state, registry, secondsToMs(2));
     expect(state.activeAction).toBeNull();
     expect(state.flags['fled']).toBe(true);
   });
 
-  // A hit worth nothing empties no pool, so the fight would never end. A
-  // `damage:` naming a bare `# stat` reads zero, which the tutorial ships.
   it('keeps a hit above zero when the ability stat reads zero', () => {
     expect(poolSpentPerAttempt(fighters(0), 2)).toBe(1);
   });
 
   it('unify-action-health-into-target: the implicit target spends it at the same scale (runtime-2026-07-30-m2)', () => {
-    // ceil(1000 / 400) = 3 attempts, so `attempts: 5` leaves the fight in
-    // flight at two attempts and the pool readable rather than reset.
     const registry = fighters(0.4);
     const state = createGameState('arena');
     initResources(state, registry);

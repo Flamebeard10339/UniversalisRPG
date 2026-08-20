@@ -7,12 +7,6 @@ import { aCount, anId, says, type Said } from './said';
 
 export const ORIGIN: Hex = { q: 0, r: 0 };
 
-// What one hex of the plane holds. `entry` is the parent's slot direction this
-// cluster was slotted through and is the whole of what rotation is stored as
-// (c7); it is null exactly at the origin, which is never slotted. The origin's
-// root is allocated by the rule in `isAllocated` rather than by a record, so
-// the number of entries here is the number of points spent and nothing has to
-// remember which one was free.
 export interface Cluster {
   jewel: string | null;
   entry: Direction | null;
@@ -30,11 +24,6 @@ export interface Placement {
 
 export type SlotState = 'none' | 'open' | 'filled' | 'blocked';
 
-// The cluster an item base carries when it declares no `origin-cluster:` of its
-// own (c9). It is not a declaration and is never registered, so no content can
-// shadow it, `jewel: null` is what a save records for it, and the words a
-// report draws it under are `engine.plane.base` rather than this field, which
-// addresses nothing.
 const BASE_CLUSTER: ClusterJewel = {
   id: 'base',
   title: 'base',
@@ -44,9 +33,6 @@ const BASE_CLUSTER: ClusterJewel = {
   modSlots: DEFAULT_MOD_SLOTS,
 };
 
-// A plane is keyed by string so that it saves. Every walk over one wants the
-// hex back, so the key is read back here rather than at each of them, and a
-// key a hand-edited save left unparseable is skipped the same way everywhere.
 export function planeClusters(plane: Plane): { hex: Hex; cluster: Cluster }[] {
   const standing: { hex: Hex; cluster: Cluster }[] = [];
   for (const [key, cluster] of Object.entries(plane)) {
@@ -87,8 +73,6 @@ export function positionOnEdge(placement: Placement, direction: Direction): numb
   return getShape(placement.jewel.shape).edges[rotate(direction, -placement.rotation)];
 }
 
-// A node inside a sentence about it, which is a pattern the played language
-// supplies like any other rather than a phrase assembled before one.
 function describeNode(node: PlaneNode): Said {
   const hex = anId(hexKey(node.hex));
   return node.kind === 'slot' ? says('engine.plane.node.slot', { direction: anId(node.direction), hex }) : says('engine.plane.node.position', { position: aCount(node.position), hex });
@@ -102,8 +86,6 @@ export function slotState(registry: Registry, plane: Plane, hex: Hex, direction:
   return beyond.entry === direction ? 'filled' : 'blocked';
 }
 
-// The two refusals filling a slot and allocating one share, so c8's blocked
-// slot is one sentence refused in one place rather than two that can drift.
 function slotProblem(state: SlotState, hex: Hex, direction: Direction): Said | undefined {
   const at = { direction: anId(direction), hex: anId(hexKey(hex)) };
   if (state === 'none') return says('engine.plane.no-slot', at);
@@ -120,9 +102,6 @@ export function isAllocated(registry: Registry, plane: Plane, node: PlaneNode): 
   return cluster.entry === null && placement !== undefined && node.position === rootPosition(placement.jewel);
 }
 
-// Undirected throughout, and never a parent relation: a shape's own adjacency,
-// the slot each edge hangs off, and — across a slot that was actually filled —
-// the two roots that slot joins (c8, c13).
 export function neighbours(registry: Registry, plane: Plane, node: PlaneNode): PlaneNode[] {
   const cluster = clusterAt(plane, node.hex);
   const placement = cluster === undefined ? undefined : placementOf(registry, cluster);
@@ -160,16 +139,10 @@ export function originPlane(jewel: string | null): Plane {
   return { [hexKey(ORIGIN)]: { jewel, entry: null, allocatedPositions: [], allocatedSlots: [], effects: [] } };
 }
 
-// The plane an item starts with, and `undefined` for an item that has none: a
-// jewel, an orb and a consumable are not bases, so there is nothing to grow and
-// nothing for a worn stack copy to contribute (c9).
 export function basePlane(item: Item): Plane | undefined {
   return isBase(item) ? originPlane(item.originCluster ?? null) : undefined;
 }
 
-// Checks and then places, so no caller holds a way to put a cluster down
-// without them. The rotation is not stored: `entry` is, and it is what c7's
-// rule is read back out of.
 export function fillSlot(registry: Registry, plane: Plane, hex: Hex, direction: Direction, jewel: string): Said | undefined {
   const state = slotState(registry, plane, hex, direction);
   const problem = slotProblem(state, hex, direction);
@@ -227,10 +200,6 @@ export function isPlane(value: unknown): value is Plane {
   return true;
 }
 
-// What tells two nodes of one plane apart, and the same string wherever it is
-// asked for: the walk that checks reachability names a node by it, and so does
-// a report handing a surface the edges between them. A direction and a position
-// never collide, one being letters and the other digits.
 export const nodeKey = (node: PlaneNode): string => (node.kind === 'slot' ? `${hexKey(node.hex)}/${node.direction}` : `${hexKey(node.hex)}/${node.position}`);
 
 function allocatedNodes(plane: Plane): PlaneNode[] {
@@ -301,10 +270,6 @@ function dropVanishedEffects(registry: Registry, plane: Plane, repairs: Said[]):
   }
 }
 
-// Every allocation is reachable from the origin's root through allocated
-// nodes, and a repair that drops one may cut the path to another; walking the
-// survivors is how that stays true rather than being asserted of a plane
-// nothing checks.
 function dropUnreachableAllocations(registry: Registry, plane: Plane, repairs: Said[]): void {
   const placement = placementAt(registry, plane, ORIGIN);
   if (!placement) return;
@@ -325,10 +290,6 @@ function dropUnreachableAllocations(registry: Registry, plane: Plane, repairs: S
   }
 }
 
-// c21, from the plane's side: what a payload names may have gone, and what is
-// left has to be a plane the same rules would have built. Complete in one
-// call — a drop that strands a cluster beyond it is followed here rather than
-// left for a second pass the substrate only makes when an instance empties.
 export function repairPlane(registry: Registry, plane: Plane): Said[] {
   const repairs: Said[] = [];
   for (let settled = false; !settled; ) {

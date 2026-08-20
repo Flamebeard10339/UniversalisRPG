@@ -3,7 +3,7 @@ import { DEFAULT_RNG_SEED, nextRandom, RngCursor } from './rng';
 
 const MULTIPLIER = 1103515245n;
 const INCREMENT = 12345n;
-const MODULUS = 4294967296n; // 2^32
+const MODULUS = 4294967296n;
 
 function cursor(rng = DEFAULT_RNG_SEED): RngCursor {
   return { rng };
@@ -18,7 +18,6 @@ describe('nextRandom', () => {
       nextRandom(state);
       reference = (reference * MULTIPLIER + INCREMENT) % MODULUS;
       if (state.rng !== Number(reference)) {
-        // Reported rather than asserted per step so a failure names the step.
         expect({ step: i, actual: state.rng }).toEqual({ step: i, actual: Number(reference) });
       }
     }
@@ -44,7 +43,6 @@ describe('nextRandom', () => {
       expect(value).toBeLessThan(1);
       buckets[Math.floor(value * 10)]++;
     }
-    // A band wide enough to check uniformity without restating the sequence.
     for (const count of buckets) expect(count).toBeGreaterThan(9_000);
   });
 });

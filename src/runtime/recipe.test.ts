@@ -87,7 +87,6 @@ describe('craft', () => {
     expect(state.inventory.bread).toBe(1);
     expect(state.xp.cooking).toBe(4);
     expect(state.log).toContain('The oven bakes your dough into a golden loaf.');
-    // bread has no time:, so it compiles to an instant, non-repeating craft.
     expect(state.time).toBe(0);
     expect(state.activeAction).toBeNull();
   });
@@ -151,8 +150,6 @@ describe('session craft choices', () => {
   });
 });
 
-// A differently-named capability ("stove"), so the match is proved to be on the
-// capability id rather than a coincidence of reusing the word "oven".
 const STATION_MODULE = `
 # item water
 examine: A splash of water.
@@ -196,13 +193,11 @@ describe('recipe station capability', () => {
     atClearing.inventory.water = 1;
     expect(recipeCraftable(soup, registry, atClearing)).toBe(false);
 
-    // Stationless: craftable at both, purely on input affordability.
     expect(recipeCraftable(stew, registry, atCamp)).toBe(true);
     expect(recipeCraftable(stew, registry, atClearing)).toBe(true);
   });
 });
 
-// A time>0 recipe leaves a `recipe.<id>` activeAction for a later resolve().
 const SPANNABLE_MODULE = `
 # item raw-clay
 examine: A lump of raw clay.
@@ -232,14 +227,13 @@ describe('spannable repeating craft', () => {
     expect(state.time).toBe(secondsToMs(2));
     expect(state.activeAction).toEqual({ ownerRef: 'recipe.brick', actionSlug: CRAFT_ADDRESS, repeating: true, implicitTarget: toMilliUnits(1), cadences: { player: { progress: 0, attemptsMade: 0 } }, roster: { player: { ownerRef: 'recipe.brick', actionSlug: CRAFT_ADDRESS, target: 'brick' } } });
 
-    resolve(state, registry, secondsToMs(6)); // two more completions' worth of time
+    resolve(state, registry, secondsToMs(6));
     expect(state.inventory['clay-brick']).toBe(3);
     expect(state.inventory['raw-clay']).toBe(0);
-    expect(state.activeAction).toBeNull(); // input exhausted mid-way through the span
+    expect(state.activeAction).toBeNull();
   });
 });
 
-// Success + burnt must total the craft count, each consuming exactly one input.
 const BURN_MODULE = `
 # stat firing
 base: 80
@@ -277,7 +271,7 @@ describe('burn: accuracy < 1 with a burnt output', () => {
     state.inventory['raw-clay'] = attempts;
 
     craft('tile', registry, state);
-    resolve(state, registry, secondsToMs(attempts * 10)); // generous horizon; input exhausts well before this
+    resolve(state, registry, secondsToMs(attempts * 10));
 
     const fired = state.inventory['clay-tile'] ?? 0;
     const burnt = state.inventory['slag'] ?? 0;
