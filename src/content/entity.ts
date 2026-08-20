@@ -1,4 +1,4 @@
-import { defaultTitle } from './info';
+import { TITLE_FIELD } from './info';
 import { Action, actionBody } from '../grammar/action';
 import { ActionResult, resultBlock, resultList } from '../grammar/actionResult';
 import { Condition, condition } from '../grammar/condition';
@@ -119,28 +119,34 @@ const entityBlock: EntryBody = {
 
 export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'> = {
   kind: 'entity',
+  // Declaration order is print order, which is the whole of why these are in
+  // the order they are in. Reading does not care — a field is reached by its
+  // keyword — so this list is free to say the one thing a reader of a printed
+  // section sees.
   fields: {
-    title: { parser: text, default: defaultTitle },
+    title: TITLE_FIELD,
     examine: { parser: text },
-    capabilities: { parser: list(id), keyword: 'stations', default: () => [] },
+    hiddenIf: { parser: condition, keyword: 'hidden if' },
+    respawnAfter: { parser: duration, keyword: 'respawn after' },
+    capabilities: { parser: list(id), keyword: 'stations', default: () => [], block: true },
     stats: {
       parser: list(statAssignmentValue),
       hydrate: (parsed) => Object.fromEntries(parsed as [string, Range][]),
+      dehydrate: (held) => Object.entries(held),
       default: () => ({}),
     },
     skills: { parser: list(id), hydrate: (parsed) => [...new Set(parsed as string[])], default: () => [] },
     passives: { parser: list(id), default: () => [] },
     equipmentSlots: { parser: list(id), keyword: 'equipment-slots', default: () => [] },
-    flags: { parser: list(id), default: () => [] },
     uses: { parser: list(id), default: () => [] },
     faction: { parser: list(id), default: () => [] },
     allies: { parser: list(allyValue), default: () => [] },
-    respawnAfter: { parser: duration, keyword: 'respawn after' },
-    hiddenIf: { parser: condition, keyword: 'hidden if' },
+    flags: { parser: list(id), default: () => [], block: true },
     // Claimed as fields, so `on hit:` is a hook before the label dispatch below
     // can read it as an `on <event>:` handler.
     ...HOOK_FIELDS,
   },
   keywords: ['aggressive'],
+  keywordsAfter: 'examine',
   entries: { into: 'blocks', body: entityBlock },
 };

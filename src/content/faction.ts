@@ -1,6 +1,5 @@
-import { defaultTitle } from './info';
+import { TITLE_FIELD } from './info';
 import { SectionSchema } from '../grammar/section';
-import { text } from '../grammar/values';
 
 // A name an entity can belong to. The names are authored and the bits are
 // compiled, because `faction: 3` on a page is unreadable and a mistyped digit
@@ -13,7 +12,7 @@ export interface Faction {
 export const factionSchema: SectionSchema<Faction> = {
   kind: 'faction',
   fields: {
-    title: { parser: text, default: defaultTitle },
+    title: TITLE_FIELD,
   },
 };
 

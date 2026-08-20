@@ -1,9 +1,9 @@
-import { defaultTitle } from './info';
+import { TITLE_FIELD } from './info';
 import { list } from '../grammar/list';
 import { SectionSchema } from '../grammar/section';
 import { SkillGrant, skillGrant } from '../grammar/skillGrant';
 import { BonusAmount, bonusAmount } from '../grammar/tagClause';
-import { id, text } from '../grammar/values';
+import { id } from '../grammar/values';
 
 export interface Skill {
   id: string;
@@ -18,10 +18,10 @@ export interface Skill {
 export const skillSchema: SectionSchema<Skill> = {
   kind: 'skill',
   fields: {
-    title: { parser: text, default: defaultTitle },
+    title: TITLE_FIELD,
     'stat-id': { parser: id },
     'per-level': { parser: bonusAmount },
-    grants: { parser: list(skillGrant), default: () => [] },
+    grants: { parser: list(skillGrant), default: () => [], block: true },
   },
   clauses: 'grants',
 };

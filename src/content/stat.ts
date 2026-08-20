@@ -1,7 +1,6 @@
-import { defaultTitle } from './info';
+import { TITLE_FIELD } from './info';
 import { point, Range, range } from '../grammar/range';
 import { SectionSchema } from '../grammar/section';
-import { text } from '../grammar/values';
 
 export interface Stat {
   id: string;
@@ -14,7 +13,7 @@ export interface Stat {
 export const statSchema: SectionSchema<Stat> = {
   kind: 'stat',
   fields: {
-    title: { parser: text, default: defaultTitle },
-    base: { parser: range, default: () => point(0) },
+    title: TITLE_FIELD,
+    base: { parser: range, default: () => point(0), printed: 'always' },
   },
 };

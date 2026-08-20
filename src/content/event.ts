@@ -1,7 +1,7 @@
-import { defaultTitle } from './info';
+import { TITLE_FIELD } from './info';
 import { DslError, Parser } from '../grammar/parser';
 import { SectionSchema } from '../grammar/section';
-import { id, text } from '../grammar/values';
+import { id } from '../grammar/values';
 
 // The closed set of moments a name may be bound to, each beside whether it
 // watches a pool. It is closed because an entity's `on <name>:` resolves to a
@@ -61,7 +61,7 @@ const triggerValue: Parser<EventTrigger> = {
 export const eventSchema: SectionSchema<GameEvent> = {
   kind: 'event',
   fields: {
-    title: { parser: text, default: defaultTitle },
+    title: TITLE_FIELD,
     resource: { parser: id },
     trigger: { parser: triggerValue },
   },

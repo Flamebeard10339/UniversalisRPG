@@ -1,4 +1,4 @@
-import { defaultTitle } from './info';
+import { TITLE_FIELD } from './info';
 import { DIRECTIONS, Direction } from './hex';
 import { Shape } from './shapes';
 import { list } from '../grammar/list';
@@ -52,12 +52,14 @@ function hydratePositions(parsed: unknown): Record<number, string> {
 export const clusterJewelSchema: SectionSchema<ClusterJewel> = {
   kind: 'cluster-jewel',
   fields: {
-    title: { parser: text, default: defaultTitle },
+    title: TITLE_FIELD,
     examine: { parser: text },
     shape: { parser: id },
-    openConnections: { parser: list(id), default: () => [], keyword: 'open-connections' },
-    positions: { parser: list(positionValue), hydrate: hydratePositions, default: () => ({}), keyword: 'passives' },
-    modSlots: { parser: number, default: () => DEFAULT_MOD_SLOTS, keyword: 'mod-slots' },
+    openConnections: { parser: list(id), default: () => [], keyword: 'open-connections', printed: 'always' },
+    // A plane reads in position order rather than in whatever order the author
+    // happened to write the pairs in.
+    positions: { parser: list(positionValue), hydrate: hydratePositions, dehydrate: (held) => Object.keys(held).map(Number).sort((one, other) => one - other).map((at) => [at, held[at]!] as [number, string]), default: () => ({}), keyword: 'passives' },
+    modSlots: { parser: number, default: () => DEFAULT_MOD_SLOTS, keyword: 'mod-slots', printed: 'unless-default' },
   },
 };
 

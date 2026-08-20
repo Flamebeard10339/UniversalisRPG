@@ -5,7 +5,7 @@ import { Cursor, DslError, Parser } from '../grammar/parser';
 import { Authored, SectionSchema } from '../grammar/section';
 import { TagClause, tagClause } from '../grammar/tagClause';
 import { id, number, text } from '../grammar/values';
-import { defaultTitle } from './info';
+import { TITLE_FIELD } from './info';
 
 // The value `cluster-effect:` takes: a percentage and a stat, per the spec's
 // c15 ("names a percentage and a stat") — a narrower grammar than
@@ -83,7 +83,7 @@ export function itemRoleProblem(item: Item): string | undefined {
 export const itemSchema: SectionSchema<Item, never, 'actions'> = {
   kind: 'item',
   fields: {
-    title: { parser: text, default: defaultTitle },
+    title: TITLE_FIELD,
     examine: { parser: text },
     slot: { parser: id },
     tags: { parser: list(tagClause), default: () => [] },
@@ -91,7 +91,7 @@ export const itemSchema: SectionSchema<Item, never, 'actions'> = {
     originCluster: { parser: id, keyword: 'origin-cluster' },
     clusterEffect: { parser: clusterEffectValue, keyword: 'cluster-effect' },
     itemExperience: { parser: number, keyword: 'item-experience' },
-    maxLevel: { parser: number, default: () => DEFAULT_MAX_LEVEL, keyword: 'max-level' },
+    maxLevel: { parser: number, default: () => DEFAULT_MAX_LEVEL, keyword: 'max-level', printed: 'unless-default' },
     ...HOOK_FIELDS,
   },
   clauses: 'tags',

@@ -1,4 +1,4 @@
-import { defaultTitle } from './info';
+import { TITLE_FIELD } from './info';
 import { Action, actionBody } from '../grammar/action';
 import { Condition, condition } from '../grammar/condition';
 import { list } from '../grammar/list';
@@ -134,7 +134,7 @@ export const locationSchema: SectionSchema<Location, 'starting', 'actions'> = {
     x: { parser: number, default: () => 0 },
     y: { parser: number, default: () => 0 },
     z: { parser: number, default: () => 0 },
-    title: { parser: text, default: defaultTitle },
+    title: TITLE_FIELD,
     examine: { parser: text },
     entities: { parser: list(populationValue), default: () => [] },
     adjacent: { parser: list(edgeValue), default: () => [] },

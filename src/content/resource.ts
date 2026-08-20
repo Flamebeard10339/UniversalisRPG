@@ -1,7 +1,7 @@
-import { defaultTitle } from './info';
+import { TITLE_FIELD } from './info';
 import { DslError, Parser } from '../grammar/parser';
 import { SectionSchema } from '../grammar/section';
-import { id, decimal, text } from '../grammar/values';
+import { id, decimal } from '../grammar/values';
 
 export type ResourceDisplay = 'full' | 'minimal';
 
@@ -33,10 +33,10 @@ const displayValue: Parser<ResourceDisplay> = {
 export const resourceSchema: SectionSchema<Resource> = {
   kind: 'resource',
   fields: {
-    title: { parser: text, default: defaultTitle },
+    title: TITLE_FIELD,
     rate: { parser: id },
     max: { parser: id },
     start: { parser: decimal },
-    display: { parser: displayValue, default: () => 'full' },
+    display: { parser: displayValue, default: () => 'full', printed: 'always' },
   },
 };

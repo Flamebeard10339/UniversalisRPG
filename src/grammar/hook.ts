@@ -15,8 +15,8 @@ export interface HookCarrier {
 // because the serializer prints neither and a reload could only return one of
 // them — a hook a patch module emptied would not survive its own round trip.
 export const HOOK_FIELDS: { [K in keyof HookCarrier]: Field<ActionResult[], unknown> } = {
-  onHit: { parser: hookResultList, keyword: 'on hit', default: () => [] },
-  whenHit: { parser: hookResultList, keyword: 'when hit', default: () => [] },
+  onHit: { parser: hookResultList, keyword: 'on hit', default: () => [], block: true },
+  whenHit: { parser: hookResultList, keyword: 'when hit', default: () => [], block: true },
 };
 
 export const HOOK_LABELS: readonly string[] = Object.values(HOOK_FIELDS).map((field) => field.keyword!);

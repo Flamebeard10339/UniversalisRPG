@@ -1,4 +1,4 @@
-import { defaultTitle } from './info';
+import { TITLE_FIELD } from './info';
 import { HOOK_FIELDS, HookCarrier } from '../grammar/hook';
 import { list } from '../grammar/list';
 import { SectionSchema } from '../grammar/section';
@@ -21,7 +21,7 @@ export interface Passive extends HookCarrier {
 export const passiveSchema: SectionSchema<Passive> = {
   kind: 'passive',
   fields: {
-    title: { parser: text, default: defaultTitle },
+    title: TITLE_FIELD,
     examine: { parser: text },
     tags: { parser: list(tagClause), default: () => [] },
     ...HOOK_FIELDS,

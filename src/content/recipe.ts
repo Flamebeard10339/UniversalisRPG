@@ -36,14 +36,14 @@ export const recipeSchema: SectionSchema<Recipe> = {
   kind: 'recipe',
   fields: {
     requiresCapability: { parser: id, keyword: 'station' },
-    in: { parser: list(quantified), default: () => [] },
-    out: { parser: list(produced), default: () => [] },
+    in: { parser: list(quantified), default: () => [], block: true },
+    out: { parser: list(produced), default: () => [], block: true },
     skill: { parser: recipeSkillValue },
     say: { parser: text },
     time: { parser: decimal },
     rate: { parser: numberOrStat },
     accuracy: { parser: id },
     evasion: { parser: id },
-    burnt: { parser: list(produced), default: () => [] },
+    burnt: { parser: list(produced), default: () => [], block: true },
   },
 };

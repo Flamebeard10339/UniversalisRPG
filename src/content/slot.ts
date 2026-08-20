@@ -1,6 +1,5 @@
-import { defaultTitle } from './info';
+import { TITLE_FIELD } from './info';
 import { SectionSchema } from '../grammar/section';
-import { text } from '../grammar/values';
 
 // Where an equipment slot keeps its words. The vocabulary is still named by
 // `equipment-slots:` on the entities that wear one, and this declaration is
@@ -16,6 +15,6 @@ export interface Slot {
 export const slotSchema: SectionSchema<Slot> = {
   kind: 'slot',
   fields: {
-    title: { parser: text, default: defaultTitle },
+    title: TITLE_FIELD,
   },
 };

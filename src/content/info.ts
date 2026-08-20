@@ -30,3 +30,9 @@ export const infoSchema: SectionSchema<ModuleInfo> = {
 // puts the key on screen instead of a machine-made English phrase.
 export const defaultTitle = (self: { id: string }, { language }: HydrateContext): string =>
   language === DEFAULT_LANGUAGE ? humanizeEn(self.id) : lastSegment(self.id);
+
+// The title field, whole: how it reads, what the engine mints when nobody wrote
+// one, and the fact that it mints one — which is what a printer has to know to
+// avoid writing a minted title back as an authored one. Spread rather than
+// restated, so a kind cannot carry half of it.
+export const TITLE_FIELD = { parser: text, default: defaultTitle, generated: true } as const;

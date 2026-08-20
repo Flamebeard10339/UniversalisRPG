@@ -4,6 +4,10 @@ import { RawLine } from './structure';
 export interface ListParser<E> extends Parser<E[]> {
   element: Parser<E>;
   parseBlock(lines: RawLine[]): E[];
+  // The mirror of `parseBlock`: the lines a block form is written as, one
+  // member to a line unless the members nest. Declared beside the reader so a
+  // list cannot be read one way and printed another.
+  printBlock(values: readonly E[]): string[];
 }
 
 export function list<E>(element: Parser<E>): ListParser<E> {
@@ -28,5 +32,6 @@ export function list<E>(element: Parser<E>): ListParser<E> {
     print,
     examples,
     parseBlock: (lines) => lines.flatMap((raw) => parseWhole(line, raw.text, raw.span.start, 'a list item')),
+    printBlock: (values) => values.map((value) => element.print(value)),
   };
 }

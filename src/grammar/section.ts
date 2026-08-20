@@ -13,7 +13,27 @@ export interface HydrateContext {
 export const DEFAULT_LANGUAGE = 'en';
 export const DEFAULT_CONTEXT: HydrateContext = { language: DEFAULT_LANGUAGE };
 
-export interface Field<T, Self> {
+// When a field is written back out. Most are written when they hold something
+// — which for a list means holding a member. `always` is a field the language
+// spells even at its default, and `unless-default` is one it spells only when
+// the author moved it off the default, which is the difference between
+// `display:` and `max-level:`.
+export type PrintWhen = 'when-set' | 'always' | 'unless-default';
+
+// What a printer needs beyond the parser, said once beside the parser. Every
+// one of these was a decision a hand-written printer made per call site, where
+// nothing could check it against the field it was printing.
+export interface FieldPrinting {
+  printed?: PrintWhen;
+  // Written as the block indented under its keyword rather than after it.
+  block?: true;
+  // A field the engine can fill in for itself, so whether the author wrote one
+  // cannot be told from the value: `title: Gold` on `# item gold` is what the
+  // engine would have minted anyway. The caller is asked instead.
+  generated?: true;
+}
+
+export interface Field<T, Self> extends FieldPrinting {
   parser: Parser<NonNullable<T>>;
   default?: (self: Self, context: HydrateContext) => T;
   keyword?: string; // DSL surface keyword, when it differs from the field name
@@ -23,9 +43,13 @@ export interface Field<T, Self> {
 // a list, so `+stats:` can address one assignment, and held as a map keyed by
 // stat id, so a later assignment to the same stat wins. `hydrate` runs after
 // merging, on whatever the `+`/`-` operations left.
-export interface MappedField<T, Self> {
+export interface MappedField<T, Self> extends FieldPrinting {
   parser: Parser<unknown>;
   hydrate(parsed: unknown): NonNullable<T>;
+  // The inverse: the members to print, from whatever `hydrate` made. Needed
+  // only where the held form is not already a list — a stat sheet is a map, and
+  // the order it prints in is this field's to decide.
+  dehydrate?: (held: NonNullable<T>) => unknown[];
   default?: (self: Self, context: HydrateContext) => T;
   keyword?: string;
 }
@@ -45,6 +69,10 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
   clauses?: Exclude<keyof H, 'id' | Flags | Entries>;
   bare?: Exclude<keyof H, 'id' | Flags | Entries>;
   keywords?: readonly Flags[];
+  // The field the keyword flags are written after. They are bare words with no
+  // label, so nothing about them says where in a printed section they belong,
+  // and a printer walking the fields in order has to be told.
+  keywordsAfter?: Exclude<keyof H, 'id' | Flags | Entries>;
   entries?: { into: Entries; body: EntryBody };
   exclusive?: readonly (readonly Exclude<keyof H, 'id' | Flags | Entries>[])[];
 }
@@ -53,12 +81,22 @@ export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H
 
 // A schema's generics describe one kind's authoring type, so a table holding
 // every kind sees them through this shape instead. It carries exactly what a
-// caller that does not know the kind can act on.
+// caller that does not know the kind can act on — which now includes printing
+// one, so the printing half of a field is here too.
+export interface AnyField extends FieldPrinting {
+  parser: unknown;
+  keyword?: string;
+  default?: (self: never, context: HydrateContext) => unknown;
+  dehydrate?: (held: never) => unknown[];
+}
+
 export interface AnySchema {
   kind: string;
-  fields: Record<string, { parser: unknown; keyword?: string }>;
+  fields: Record<string, AnyField>;
   clauses?: string;
   bare?: string;
+  keywords?: readonly string[];
+  keywordsAfter?: string;
   entries?: { into: string };
 }
 

@@ -1,10 +1,10 @@
-import { ActionResult, parseResultLine, resultList, startsResult } from './actionResult';
+import { ActionResult, parseResultLine, resultLines, resultList, spansLines, startsResult } from './actionResult';
 import { Condition, condition } from './condition';
 import { HOOK_FIELD_REFUSALS, hookLabelProblem } from './hook';
 import { list } from './list';
 import { Cursor, DslError, requireEnd, Span } from './parser';
 import { EntryBody } from './section';
-import { RawLine, hasBlock, takeBlock } from './structure';
+import { RawLine, hasBlock, indentLines, takeBlock } from './structure';
 import { TagClause, tagClause } from './tagClause';
 import { decimal, DECIMAL, id, refuseRange } from './values';
 
@@ -333,3 +333,63 @@ export const actionBody: EntryBody = {
     return kind === undefined ? action : { ...action, kind };
   },
 };
+
+// ------------------------------------------------------------------- printing
+
+// An action prints itself, beside the grammar that reads it. Here rather than in
+// the serializer because an action is not a section — every kind that nests one
+// prints it this way, and a printer that lived a layer up would be a second
+// place this grammar is written down.
+function printResultBlock(lines: string[], label: string, values: readonly ActionResult[] | undefined, childSpaces = 2): void {
+  if (!values || values.length === 0) return;
+  lines.push(`${label}:`, ...indentLines(values.flatMap(resultLines), childSpaces));
+}
+
+const printSided = (value: Sided): string => (value.side === undefined ? value.id : `${value.side} ${value.id}`);
+
+const printContest = (value: Contest): string => (value.right === undefined ? printSided(value.left) : `${printSided(value.left)} vs ${printSided(value.right)}`);
+
+export function actionLines(action: Action): string[] {
+  const modifiers =
+    action.requires ||
+    action.hiddenIf ||
+    action.tags?.length ||
+    action.onSuccess?.length ||
+    action.onFailure?.length ||
+    action.onUnfinished?.length ||
+    (action.kind !== undefined && action.kind !== 'duration') ||
+    action.time !== undefined ||
+    action.rate !== undefined ||
+    action.accuracy ||
+    action.damage ||
+    action.depletes ||
+    action.attempts !== undefined;
+
+  if (!modifiers && action.results.length === 1 && !spansLines(action.results)) return [`${action.label}: ${resultList.print(action.results)}`];
+
+  // A `+` line adds to what this block overlays, so the marker is part of the
+  // field rather than of the value, and dropping it would turn an addition into
+  // a replacement on reload.
+  const appended = new Set(action.appended ?? []);
+  const at = (name: keyof Action): string => (appended.has(name) ? '  +' : '  ');
+  const lines: string[] = [`${action.label}:`];
+  if (action.requires) lines.push(`${at('requires')}requires: ${condition.print(action.requires)}`);
+  if (action.hiddenIf) lines.push(`${at('hiddenIf')}hidden if: ${condition.print(action.hiddenIf)}`);
+  if (action.kind !== undefined && action.kind !== 'duration') lines.push(`  ${action.kind}`);
+  // The tags the kind above already spells; re-emitting one would round-trip
+  // into a second copy of the same fact.
+  const lifted = new Set(['instant', 'continuous']);
+  const tags = (action.tags ?? []).filter((each) => each.kind !== 'keyword' || !lifted.has(each.value));
+  if (tags.length > 0) lines.push(`  ${tags.map((each) => tagClause.print(each)).join(', ')}`);
+  if (action.time !== undefined) lines.push(`  time: ${action.time}`);
+  if (action.rate !== undefined) lines.push(`  rate: ${typeof action.rate === 'number' ? action.rate : printSided(action.rate)}`);
+  if (action.accuracy) lines.push(`  accuracy: ${printContest(action.accuracy)}`);
+  if (action.damage) lines.push(`  damage: ${printContest(action.damage)}`);
+  if (action.depletes) lines.push(`  depletes: ${printSided(action.depletes)}`);
+  if (action.attempts !== undefined) lines.push(`  attempts: ${action.attempts}`);
+  lines.push(...indentLines(action.results.flatMap(resultLines)));
+  printResultBlock(lines, `${at('onSuccess')}on success`, action.onSuccess, 4);
+  printResultBlock(lines, `${at('onFailure')}on failure`, action.onFailure, 4);
+  printResultBlock(lines, `${at('onUnfinished')}on unfinished`, action.onUnfinished, 4);
+  return lines;
+}

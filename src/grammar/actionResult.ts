@@ -489,6 +489,7 @@ export const resultList: ListParser<ActionResult> = {
     return refuseParty(parseResults(cursor, null), { start: cursor.abs(start), end: cursor.abs(cursor.src.length) });
   },
   parseBlock: (lines) => resultBlock(lines),
+  printBlock: (values) => values.flatMap(resultLines),
 };
 
 // The one list a party phrase reads in, which is what makes the refusal above a
@@ -499,4 +500,5 @@ export const hookResultList: ListParser<ActionResult> = {
   examples: RESULT_LIST_EXAMPLES,
   parse: (cursor) => parseResults(cursor, null),
   parseBlock: readResultBlock,
+  printBlock: (values) => values.flatMap(resultLines),
 };
