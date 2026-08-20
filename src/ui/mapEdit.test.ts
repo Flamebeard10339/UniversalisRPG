@@ -9,15 +9,10 @@ import { SHIPPED_SOURCES } from './shippedContent';
 
 const SECTIONS = addressable(SHIPPED_SOURCES);
 
-// Every location the shipped content draws, taken off the map surface rather
-// than named: a location added to content/ tomorrow is dragged here too.
 const DRAWN = offeredBy(SECTIONS, NOWHERE, 'map');
 
 const shipped = (): Map<string, Location> => loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations;
 
-// What the load path made of the modules with one edit staged over them. The
-// registry rather than the view, because a location the player has not
-// discovered is still a location an author can move.
 const withStaged = (local: string): Map<string, Location> =>
   loadUniverseWithDiagnostics([...SHIPPED_SOURCES, { name: 'local-changes', text: local }]).registry.locations;
 
@@ -25,8 +20,6 @@ const opened = (): Driver => createDriver(SHIPPED_SOURCES, { ticker: () => () =>
 
 const REGISTRY_PLACES = shipped();
 
-// The staged module a line would have produced, without a session: the line
-// through the driver and the store is proved above, so this is about the line.
 function bodyOf(staged: { line: string }): string {
   const driver = opened();
   driver.send(staged.line);
@@ -35,8 +28,6 @@ function bodyOf(staged: { line: string }): string {
 
 const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.map((entry) => String(entry.text));
 
-// A location whose position is a fact about another one, found rather than
-// named so the case survives the tutorial being rewritten.
 const RELATIVE = DRAWN.filter((section) => /^[ \t]*(?:relative[ \t]*:[ \t]*)?(?:north|south|east|west|up|down)[ \t]+of[ \t]/m.test(section.text));
 
 const ABSOLUTE = DRAWN.filter((section) => !RELATIVE.includes(section));
@@ -49,9 +40,6 @@ describe('a drag is a section edit and nothing else (c8)', () => {
     expect(DRAWN.every((section) => section.kind === MAPPED_KIND)).toBe(true);
   });
 
-  // The whole of it, per location: what a drag produces is a `/dsl` line, the
-  // line goes through the driver, and what came out the far end is the same
-  // location standing somewhere else.
   for (const section of ABSOLUTE) {
     it(`stages ${section.address} where it was dropped, through the same door a typed edit takes`, () => {
       const driver = opened();
@@ -65,8 +53,6 @@ describe('a drag is a section edit and nothing else (c8)', () => {
       driver.send(line);
       expect(said(driver)).toContain(`Staged # ${MAPPED_KIND} ${section.address} in local-changes.`);
 
-      // The coordinates the drag settled on, the floor left where it was, and
-      // everything else the section says still saying it.
       expect(withStaged(driver.localChanges()!).get(section.address)).toEqual({ ...before, x: 11, y: -7 });
     });
   }
@@ -77,8 +63,6 @@ describe('a drag is a section edit and nothing else (c8)', () => {
 
       expect(moved).toHaveProperty('refused');
       expect((moved as { refused: string }).refused).toContain(section.address);
-      // Nothing was produced to send, so there is no coordinate on its way to
-      // the registry to be silently adopted.
       expect(moved).not.toHaveProperty('line');
     });
   }
@@ -120,8 +104,6 @@ describe('where a drag lets go is where the place is (c8)', () => {
     expect(settledOn({ x: 1.5, y: -1.5 })).toEqual({ x: 2, y: -1 });
   });
 
-  // The drawing nudges a place that is not on the floor being looked at, so a
-  // drag has to come back through the nudge before it says where the place is.
   it('undoes the nudge a place off the drawn floor was drawn with', () => {
     for (const z of [-2, -1, 0, 1, 2]) {
       for (const plane of [-1, 0, 1]) {
@@ -133,9 +115,6 @@ describe('where a drag lets go is where the place is (c8)', () => {
   });
 });
 
-// The path a gesture takes, out of the component and into a function a test can
-// call. What is left in MapPane is three lines of wiring: find the node the
-// sheet drew, hand what came back to `send` or to `note`.
 describe('where the map lets a place go (c8)', () => {
   const drawn = (address: string, climb = 0): Node => {
     const place = REGISTRY_PLACES.get(address)!;
@@ -154,16 +133,11 @@ describe('where the map lets a place go (c8)', () => {
     expect(withStaged(bodyOf(staged as { line: string })).get(moved)).toEqual({ ...before, x: before.x + 3, y: before.y - 2 });
   });
 
-  // Two floors up or down, because one floor's nudge is 0.42 of a unit and a
-  // coordinate is a whole one: an inverse that was never applied would round
-  // back to where it started and the case would pass over the bug.
   for (const climb of [-2, 2]) {
     it(`takes the drawing nudge back out for a place ${Math.abs(climb)} floors ${climb > 0 ? 'up' : 'down'}`, () => {
       const place = shipped().get(moved)!;
       const off: Node = { place: { id: moved, title: place.title as never, x: place.x, y: place.y, z: place.z, adjacent: [] }, here: false, climb, at: drawnAt({ ...place, adjacent: [] } as never, place.z - climb) };
 
-      // Let go exactly where it was drawn: the place has not moved, so the line
-      // restates where it already was rather than the nudge it was drawn with.
       const staged = droppedAt(DRAWN, off, { x: 0, y: 0 });
 
       expect(withStaged(bodyOf(staged as { line: string })).get(moved)).toEqual(place);
