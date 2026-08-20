@@ -252,6 +252,50 @@ describe('loadUniverseWithDiagnostics', () => {
     expect(spined.whenHit).toEqual([{ kind: 'give', item: 'base.charm', amount: { min: 1, max: 1 } }]);
   });
 
+  it("prunes each of an item's cluster fields by what that field makes the item", () => {
+    const addon: ModuleSource = {
+      ...module('addon', '# info addon', '# stat vigour', '# cluster-jewel gilded', 'shape: point', 'open-connections: e'),
+      enabled: false,
+    };
+    const base = module(
+      'base',
+      '# info base',
+      'dependencies: ? addon',
+      '# stat guile',
+      '# cluster-jewel band',
+      'shape: point',
+      'open-connections: e',
+      '# item shard',
+      'cluster-jewel: addon.gilded',
+      '# item charm',
+      'cluster-jewel: band',
+      '# item heartwood-blade',
+      'slot: mainhand',
+      'origin-cluster: addon.gilded',
+      '# item orb-of-vitality',
+      'cluster-effect: +25% addon.vigour',
+      '# item orb-of-guile',
+      'cluster-effect: +10% guile',
+    );
+
+    const { registry, loadedModules, diagnostics } = loadUniverseWithDiagnostics([base, addon]);
+
+    expect({ loadedModules, diagnostics }).toEqual({
+      loadedModules: ['base'],
+      diagnostics: [],
+    });
+
+    expect(registry.items.has('base.shard')).toBe(false);
+    expect(registry.namespace.has('item', 'base.shard')).toBe(false);
+    expect(registry.items.get('base.charm')!.clusterJewel).toBe('base.band');
+
+    const blade = registry.items.get('base.heartwood-blade')!;
+    expect({ slot: blade.slot, originCluster: blade.originCluster }).toEqual({ slot: 'mainhand', originCluster: undefined });
+
+    expect(registry.items.get('base.orb-of-vitality')!.clusterEffect).toBeUndefined();
+    expect(registry.items.get('base.orb-of-guile')!.clusterEffect).toEqual({ statId: 'base.guile', percent: 10 });
+  });
+
   it('undeclares what it prunes, so the namespace and the registry survive as one universe', () => {
     const addon: ModuleSource = {
       ...module('addon', '# info addon', '# item gem'),

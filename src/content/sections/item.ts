@@ -5,7 +5,7 @@ import { list } from '../../grammar/list';
 import { Cursor, DslError, Parser } from '../../grammar/parser';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { id, number, text } from '../../grammar/values';
-import { actions, hooks, pruneActions, pruneHook, pruneTags, put, visitTags, type Loose } from '../refs';
+import { actions, hooks, pruneActions, pruneHook, pruneTags, put, visitTags, type Loose, type ReferenceKind } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -99,10 +99,16 @@ export const item = section<Item, never, 'actions'>()({
     if (held.clusterEffect) put(held.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
   },
   prune: (value, at, where) => {
+    const present = (kind: ReferenceKind, ref: string | undefined, site: string): boolean => ref === undefined || !at.gone(kind, ref, `${where} ${site}`);
+    if (!present('cluster-jewel', value.clusterJewel, 'cluster-jewel:')) return null;
     const tags = pruneTags(value.tags, where, at);
     const kept = pruneActions(value.actions, where, at);
     const onHit = pruneHook(value.onHit, `${where} on hit:`, at);
     const whenHit = pruneHook(value.whenHit, `${where} when hit:`, at);
-    return tags.length === value.tags.length && kept.length === value.actions.length && onHit === value.onHit && whenHit === value.whenHit ? value : { ...value, tags, actions: kept, onHit, whenHit };
+    const originCluster = present('cluster-jewel', value.originCluster, 'origin-cluster:') ? value.originCluster : undefined;
+    const clusterEffect = present('stat', value.clusterEffect?.statId, 'cluster-effect:') ? value.clusterEffect : undefined;
+    return tags.length === value.tags.length && kept.length === value.actions.length && onHit === value.onHit && whenHit === value.whenHit && originCluster === value.originCluster && clusterEffect === value.clusterEffect
+      ? value
+      : { ...value, tags, actions: kept, onHit, whenHit, originCluster, clusterEffect };
   },
 });
