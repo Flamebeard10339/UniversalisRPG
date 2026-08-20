@@ -26,10 +26,9 @@ function clear(staging: string): void {
 // either the bytes that were there or the bytes going in, and a write that never
 // finished costs nothing at all.
 //
-// Deliberately without the retry loop `docs/tasks.jsonl` takes around the same
-// rename. That store is written by whichever `tasks` processes are in flight and
-// has to win the race; a save slot is written by the one game playing it, so a
-// rename that loses says so and the next autosave comes back in a cadence.
+// Deliberately without a retry loop around the rename: a save slot is written
+// by the one game playing it, so a rename that loses says so and the next
+// autosave comes back in a cadence.
 function replace(staging: string, file: string, name: string): void {
   try {
     renameSync(staging, file);
