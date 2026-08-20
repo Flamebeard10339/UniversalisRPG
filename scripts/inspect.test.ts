@@ -21,12 +21,12 @@ describe('inspect', () => {
   });
 
   it('runs a body of statements and prints what it returns', async () => {
-    expect(await run("const { stripComments } = await load('scripts/lib/stripComments.ts');\nreturn stripComments('a // b\\nc');")).toEqual(['a ', 'c']);
+    expect(await run("const { stripComments } = await load('scripts/lib/stripComments.ts');\nreturn stripComments('a // b\\nc').map((line) => line.trimEnd());")).toEqual(['a', 'c']);
   });
 
   it('resolves a specifier against the repo root, not against the caller\'s directory', async () => {
-    const module = (await load('scripts/lib/modportalCache.ts')) as { DEFAULT_MODPORTAL_CACHE: string };
-    expect(module.DEFAULT_MODPORTAL_CACHE).toBe('content/modportal.local');
+    const module = (await load('scripts/lib/sourceFiles.ts')) as { posix: (path: string) => string };
+    expect(module.posix('src\\content\\load.ts')).toBe('src/content/load.ts');
   });
 
   it('says the source is neither an expression nor a body rather than throwing at the caller', () => {
