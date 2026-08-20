@@ -14,9 +14,6 @@ import { ReferenceKind } from './refs';
 import { visitSection } from './sections';
 import { Removal } from './sections/remove';
 
-// What a module may name: its own namespace, and those of the dependencies it
-// declared. A module that could see its dependencies' dependencies would be
-// referencing a module it never named, which is what declaring one is for.
 function visibleTo(module: ParsedModule, loaded: ReadonlySet<string>): Set<string | null> {
   const visible = new Set<string | null>([module.namespace]);
   for (const dependency of module.info.dependencies) {
@@ -45,13 +42,6 @@ function unorderedDependencies(module: ParsedModule): ReadonlySet<string> {
   return new Set(module.info.dependencies.filter((dependency) => dependency.prefix === 'unordered').map((dependency) => dependency.module));
 }
 
-// A bare heading names something inside this module; a dotted one edits something
-// that already exists. You cannot create outside your own namespace, so adding a
-// dependency can never quietly turn a module's creation into an edit of another
-// module's object. Null is the second case, and is what a caller asking which
-// file declared an id has to skip — the question is asked from two places, and
-// two spellings of this rule would send an edit home to a file that never held
-// it.
 export function declaredKey(namespace: string | null, kind: string, id: string): string | null {
   if (!isNamespaced(kind)) return id;
   return id.includes('.') ? null : qualify(namespace, id);
@@ -68,9 +58,6 @@ function targetKey(module: ParsedModule, kind: string, id: string, namespace: Na
   return resolved;
 }
 
-// `<node>.visits` is how a condition asks how often a dialogue node has been
-// reached, so a flag by that name would be read as a node counter and resolve
-// against a node that does not exist.
 function declareFlag(namespace: Namespace, kind: string, id: string, name: string, where: string): string {
   if (name === VISITS) throw new DslError(`${where} declares a flag named ${VISITS}, which the engine reads as a dialogue node's visit counter`);
   return namespace.declareMember('flag', kind, id, name);
@@ -92,12 +79,6 @@ export interface Member {
   key: string;
 }
 
-// Read off what was authored rather than off the built table, because a member
-// is declared before `uses:` is resolved and reconciled against the merged
-// section long before either is linked. A shortened id names the same action as
-// the whole path, so the last segment is what survives resolution either way,
-// and a block whose label names a used action is that entity's overload of it
-// rather than an action of its own.
 export function actionAddresses(kind: string, value: MemberOwner): string[] {
   if (!isActionOwnerKind(kind)) return [];
   const used = addedMembers<string>(value.uses).map(lastSegment);
@@ -105,9 +86,6 @@ export function actionAddresses(kind: string, value: MemberOwner): string[] {
   return [...used, ...inline.filter((block) => !used.includes(lastSegment(block.label))).map((block) => actionSlug(block.label))];
 }
 
-// What hangs under an object rather than beside it: the flags it owns, the
-// actions it performs, and the nodes of a dialogue, whose visits the engine
-// counts against the node's path.
 export function declareMembers(namespace: Namespace, kind: string, value: MemberOwner): Member[] {
   const declared: Member[] = [];
   if (kind === 'location')
@@ -138,8 +116,6 @@ type Created = { kind: string; value: MemberOwner };
 
 const createdSections = (module: ParsedModule): Created[] => module.sections.filter((section) => section.kind !== 'remove') as Created[];
 
-// A section naming an absent optional dependency is dropped rather than failing
-// the module, which is what makes an optional dependency optional.
 function declareIds(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
   const missingOptional = missingOptionalDependencies(module, loaded);
   module.sections = module.sections.filter((section) => {
@@ -155,8 +131,6 @@ function declareIds(module: ParsedModule, namespace: Namespace, loaded: Readonly
   }
 }
 
-// Ids settle before members are declared, because a member hangs under the key
-// its object ended up with — and an edit's heading names another module's.
 function settleIds(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
   const visible = visibleTo(module, loaded);
   for (const section of createdSections(module)) {
@@ -179,22 +153,12 @@ function resolveReferences(module: ParsedModule, namespace: Namespace, loaded: R
       if (owner !== null && owner !== undefined && unorderedDependencies(module).has(owner)) {
         throw new DslError(`# remove ${removal.id} edits ${owner}, but ~ dependencies do not load before this module. Use a load-order dependency for patches.`);
       }
-      // Deliberately does not undeclare: a removal is a merge-time fact, and
-      // taking the id out of the namespace here made every later module's
-      // reference to it fail while every earlier module's silently survived.
-      // What survives is proved against the built registry instead.
       continue;
     }
     const { id } = section.value as { id: string };
-    // The section is the innermost context its own references are read from, so
-    // a bare flag name means this object's before it means anyone else's.
     const visit = (kind: ReferenceKind, raw: string, where: string): string => (isNamespaced(kind) && !namesMissingOptional(kind, raw, missingOptional) ? namespace.resolve(kind, raw, self, visible, where, id) : raw);
     visitSection(section, `# ${section.kind} ${id}`, visit);
   }
 }
 
-// Each pass runs over every module before the next begins, so what a name
-// resolves to follows from what is loaded rather than from where the naming
-// module sits in the load order — which is what `~` promises and what a
-// module-at-a-time resolution could not deliver.
 export const RESOLUTION_PASSES: readonly ((module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>) => void)[] = [declareIds, settleIds, resolveReferences];

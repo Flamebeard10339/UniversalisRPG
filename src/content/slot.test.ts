@@ -29,13 +29,9 @@ describe('a slot is a word with a key (c10)', () => {
 
     expect(titleOf(registry, 'mainhand')).toBe('Main Hand');
     expect(registry.slots.get('mainhand')?.title).toBe('Main Hand');
-    // The declaration is words and not vocabulary: what an item may name is
-    // still what an entity wears.
     expect(() => loadModule(lines(ISLAND, '', '# slot head', 'title: Head', '', '# item hat', 'slot: head'))).toThrow(/# item island.hat slot: names head, which no # entity declares among its equipment-slots:/);
   });
 
-  // The whole reason the key is not hung on the entity that declares the slot:
-  // two entities wearing `mainhand` are one slot, and one slot is one key.
   it('gives one slot one key however many entities declare it', () => {
     const shared = lines(ISLAND, '', '# entity guard', 'title: Guard', 'equipment-slots: mainhand');
 
@@ -50,8 +46,6 @@ describe('a slot is a word with a key (c10)', () => {
     const registry = loadUniverse([{ name: 'island', text: ISLAND }, spanish]);
 
     expect(registry.locales.declared.get('es')?.get('slot.mainhand.title')).toBe('Mano principal');
-    // And an untranslated one is reported, rather than reaching a player as an
-    // id nobody can read.
     expect(missingTranslations(registry.locales, 'es')).toContain('slot.offhand.title');
   });
 

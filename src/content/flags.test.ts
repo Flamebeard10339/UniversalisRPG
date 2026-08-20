@@ -209,9 +209,6 @@ describe('a member key is owned by every kind that declares it', () => {
   });
 });
 
-// c3. An action's address goes away with the action for the same reason a flag
-// goes away with the field that listed it, through the same reconciliation
-// against the merged section — no removal logic of its own.
 describe('an action a field edit takes away', () => {
   const BASE = module('base', '# action pry', 'instant', 'say: creak', '# entity dresser', 'uses: pry');
   const cut = (id: string): ModuleSource => module(id, 'dependencies: base', '# entity base.dresser', '-uses: pry');
@@ -237,10 +234,6 @@ describe('an action a field edit takes away', () => {
     ).toEqual(['Pry']);
   });
 
-  // An entity's own block is a member the same way. Cutting the block alone is
-  // what asks about the member: the entity is still there, so nothing but the
-  // action's own reconciliation can refuse the `use:` — where dropping the whole
-  // entity would have been refused for the entity and told us nothing.
   const shelf = module('base', '# entity shelf', 'dust it:', '  instant', '  say: puff');
   const dusts = module('watcher', 'dependencies: base', '# test walk', 'use: entity.base.shelf.dust-it');
 

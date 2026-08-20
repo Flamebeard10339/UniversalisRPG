@@ -9,15 +9,6 @@ import { isActionOwnerKind, sectionOf, type ModuleSection } from './sections';
 import { INFLICT_SITE, Visit } from './refs';
 import { visitSection } from './sections';
 
-// Resolution qualifies a name; it cannot prove the name still points at
-// something. Both `# remove` and a `-field:` edit decide what survives at merge,
-// after every reference was authored, so this is the check `referenceSites.ts`
-// promises: walk the same sites once the universe is built and throw if one names
-// nothing. Doing it during resolution instead made the answer depend on module
-// order — the removing module's peers failed, its predecessors dangled silently.
-//
-// The namespace answers rather than the registry maps, because it is the one
-// place that already knows a member goes away with the object that owned it.
 export function validateSectionReferences(section: ModuleSection, id: string, registry: Registry): void {
   const visit: Visit = (referenced, target, where) => {
     if (isNamespacedKind(referenced) && !registry.namespace.has(referenced, target)) {
@@ -29,11 +20,6 @@ export function validateSectionReferences(section: ModuleSection, id: string, re
   visitSection(sectionOf(section.kind, { ...section.value }), `# ${section.kind} ${id}`, visit);
 }
 
-// An `inflict:` grants one instance of a declaration for as long as that
-// declaration says it runs, and a declaration that says nothing runs for no time
-// at all — granted at an instant already past, gone at the next boundary, with
-// nothing said anywhere. Refused here because this is the one moment both halves
-// are loaded: the result naming the source, and the source's own clauses.
 function refuseUntimedPayload(itemId: string, where: string, registry: Registry): void {
   const source = registry.items.get(itemId);
   if (source && !source.tags.some((tag) => tag.kind === 'duration')) {
@@ -41,20 +27,12 @@ function refuseUntimedPayload(itemId: string, where: string, registry: Registry)
   }
 }
 
-// What is left for the per-section checks below are the references that point at
-// something other than a namespaced object — a capability, a node inside one
-// dialogue, an action's own label.
 export function registryCapabilities(registry: Registry): Set<string> {
   const capabilities = new Set<string>();
   for (const entity of registry.entities.values()) for (const capability of entity.capabilities) capabilities.add(capability);
   return capabilities;
 }
 
-// Items supply the slot vocabulary the way entities supply capabilities, so a
-// slot demanded by name is checked against what some item actually declares.
-// Entities supply the slot vocabulary the way they supply capabilities, and
-// items fall back to supplying it only while no entity declares any — a
-// vocabulary read off `slot:` alone quietly gives a rat a head.
 function declaredSlots(registry: Registry): Set<string> {
   const declared = new Set<string>();
   for (const entity of registry.entities.values()) for (const slot of entity.equipmentSlots) declared.add(slot);
@@ -69,8 +47,6 @@ export function registrySlots(registry: Registry): Set<string> {
   return slots;
 }
 
-// An item naming a slot nothing can wear can never be equipped, so it is a load
-// error rather than a refusal at the moment it is spent.
 export function validateItemSlots(registry: Registry): void {
   const declared = declaredSlots(registry);
   if (declared.size === 0) return;
@@ -109,17 +85,10 @@ export function validateTestReferences(test: Test, registry: Registry): void {
       if (!slots.has(value.slot)) throw new DslError(`${where} unequip: names an unknown slot: ${value.slot}`);
       return;
     }
-    // A two-sided action is reached by id and its target by pool, both of which
-    // the reference check already proved; what is left is that the performer can
-    // bring it, and the player is the performer of everything a test drives.
     if (value.kind === 'use-on') {
       if (!registry.player?.uses.some((used) => used === value.action)) throw new DslError(`${where} use: names an action the player does not use:: ${value.action}`);
       return;
     }
-    // What is left of `use:` here is the kind it leads with. Both halves after
-    // it are namespaced — the object, and the action hanging under it — so an
-    // action nothing declares is an unknown member, caught by the walk above
-    // rather than by a second comparison against the built table.
     if (value.kind === 'use' && !isActionOwnerKind(value.obj)) throw new DslError(`${where} use: names an unknown kind: ${value.obj}`);
   };
   for (const each of test.directives) directive(each, `# test ${test.id}`);

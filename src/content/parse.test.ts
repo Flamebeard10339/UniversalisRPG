@@ -16,8 +16,6 @@ import { variable } from './sections/variable';
 import { tagClause } from '../grammar/tagClause';
 import { text } from '../grammar/values';
 
-// A kind reads and hydrates its own sections, so a test naming `# item` goes
-// through the same door the loader does.
 function parseOne<V extends { id: string }, M extends Record<string, unknown>>(source: string, kind: Section<V, M>): Authored<V> {
   const found = splitSections(source);
   expect(found).toHaveLength(1);
@@ -52,8 +50,6 @@ describe('items and tag clauses', () => {
     ]);
   });
 
-  // The two counters a `per` can name, spelled apart on the clause so no reader
-  // has to guess which namespace an id came from.
   it('parses a counter-scaled stat bonus beside the flat and percent forms', () => {
     const blade = parseOne('# item blade\n+4-7 attack, +2 attack per rage, +10% attack per rage, +1% attack per stack of vigor', item);
     expect(blade.tags).toEqual([
@@ -120,8 +116,6 @@ describe('items and tag clauses', () => {
   });
 });
 
-// A hook is carried by the same things that carry `+4-7 attack`: an entity's own
-// block and an equipped item. Neither block names a side, an action or a weapon.
 describe('the two carriers of a hook', () => {
   const DRAIN_THEM = {
     kind: 'pool',
@@ -149,8 +143,6 @@ describe('the two carriers of a hook', () => {
       },
     ]);
     expect(berserker.whenHit).toEqual([DRAIN_THEM]);
-    // `on death:` is still the handler it was; `on hit:` no longer joins it as a
-    // handler for an event named "hit", which is what claiming the label costs.
     expect(berserker.blocks).toEqual([
       {
         label: 'on death',
@@ -193,8 +185,6 @@ describe('the two carriers of a hook', () => {
     expect(() => parseOne('# item blade\non hi: restore: 1 rage', item)).toThrow('unknown item field: on hi, one letter from on hit');
   });
 
-  // A hook is a list field, so the section engine accepts `+`/`-` on it and
-  // holds the operations until merge. Resolution runs first and must read them.
   it('resolves a hook written as an edit, on a carrier that has none to edit yet', () => {
     const module = '# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# entity rat\n+on hit: restore: 1 rage\n\n# item mail\n-when hit: restore: 1 rage\n';
     expect(loadModule(module).entities.get('rat')!.onHit).toEqual([{ kind: 'pool', resource: 'rage', delta: point(1) }]);
@@ -221,9 +211,6 @@ describe('the two carriers of a hook', () => {
     ]);
   });
 
-  // A hook is a result list rather than a labelled block, so what a reference
-  // that went away with an optional module costs is the whole hook — and only
-  // that one.
   it('drops the hook whose reference went away, and leaves the other standing', () => {
     const source = {
       name: 'base',
@@ -234,8 +221,6 @@ describe('the two carriers of a hook', () => {
     expect(rat.whenHit).toEqual([{ kind: 'pool', resource: 'base.rage', delta: point(1) }]);
   });
 
-  // An entity answers an event by writing `on <its name>:`, and one of those
-  // labels is now a hook. Refused where the name is bound.
   it('refuses an event whose name only a hook block could answer', () => {
     expect(() => loadModule('# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# event hit\nresource: rage\ntrigger: on empty\n')).toThrow('which is a hook block');
     expect(() => loadModule('# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# event spent\nresource: rage\ntrigger: on empty\n')).not.toThrow();
@@ -379,19 +364,12 @@ describe('parser guards', () => {
     expect(() => parseOne('# location dock\nx: 0, y: 0\neast of bridge', location)).toThrow(/cannot both be set/);
   });
 
-  // Both halves used to load with the block dropped and nothing said, which is
-  // what the result readers each carry their own copy of this rule to prevent.
   it('rejects a key written inline and as a block, rather than keeping the inline half', () => {
     expect(() => parseOne('# entity rat\nstats: vigor 3\n  attack 4', entity)).toThrow('entity field stats is written inline and as a block; give it one');
     expect(() => parseOne('# item blade\non hit: restore: 1 rage\n  restore: 5 rage', item)).toThrow('item field on hit is written inline and as a block; give it one');
-    // The labelled-block route, two lines down from the declared-field one and
-    // the same silence.
     expect(() => parseOne('# entity rat\nswing: say: a\n  say: b', entity)).toThrow('entity swing: is written inline and as a block; give it one');
   });
 
-  // The block hangs off the whole line, so only the key that ends the line could
-  // have taken it. Asking `is anything left on this line` instead refuses a
-  // comma list whose last key is the one with the block.
   it('leaves a comma line whose last key takes the block alone', () => {
     const camp = parseOne('# location camp\ny: 0, x: 1, adjacent:\n  grove', location);
     expect(camp).toMatchObject({ x: 1, y: 0, adjacent: [{ target: 'grove' }] });
@@ -494,8 +472,6 @@ describe('entity action modifiers', () => {
     expect(() => parseOne('# entity chest\nopen:\n  on success:\n    say: a\n  on success:\n    say: b', entity)).toThrow(/on success is defined more than once/);
   });
 
-  // Every action field, not the handful that happened to have a test: the guard
-  // is one shared rule, and a field added without it is what this catches.
   it.each([
     ['requires: a', 'requires'],
     ['hidden if: a', 'hidden if'],
@@ -541,9 +517,6 @@ describe('entity action modifiers', () => {
   });
 });
 
-// A kind says what ends the action; a cadence says how fast it attempts. The
-// table is the pair, and every combination it has no meaning for is a load
-// error rather than a silent default the runtime has to guess at.
 describe('action kinds and their cadence', () => {
   const parseAction = (...lines: string[]) => parseOne(['# entity forge', 'work:', ...lines.map((line) => `  ${line}`)].join('\n'), entity).blocks![0] as Action;
 
@@ -561,9 +534,6 @@ describe('action kinds and their cadence', () => {
     });
   });
 
-  // A tag list is the one place an action takes a free-form word, so it is the
-  // one place a typo has nowhere to land. `once` sat in shipped content doing
-  // nothing until this rule; `4s` was the front door meaning `time: 4`.
   it.each([
     [['once'], /tag "once" was never implemented/],
     [['repeating'], /tag "repeating" was renamed — write `continuous`/],
@@ -583,14 +553,10 @@ describe('action kinds and their cadence', () => {
     });
   });
 
-  // The compiled craft is judged by the same table as an authored action, so a
-  // recipe cannot express a cadence the grammar would have refused.
   it.each([['rate: 0'], ['rate: -30'], ['time: 0'], ['time: -3']])('refuses %s on a recipe, naming the recipe and its craft', (line) => {
     expect(() => loadModule(`# item ore\nexamine: Rock.\n# recipe dig\n${line}\nout: 1 ore\n`)).toThrow(/# recipe dig action "Craft": (time|rate): must be positive/);
   });
 
-  // A shared value parser says what it expected but not what it was reading;
-  // an author needs the field and the action as much as the table's errors do.
   it.each([
     [['rate:'], /action "work": rate: expected an id/],
     [['time: abc'], /action "work": time: expected a number/],
@@ -776,9 +742,6 @@ describe('the authored / derived boundary', () => {
     expect(hydrate(item, gold()).title).toBe('Gold');
   });
 
-  // Over a schema of its own, because no shipped kind reads one default from
-  // another any more: the item sentence that did was English grammar and is a
-  // `# locale` entry now.
   it('resolves a default that reads another default, with nothing ordering them', () => {
     const chained: SectionSchema<{ id: string; a: string; b: string }> = {
       kind: 'chained',
@@ -858,10 +821,8 @@ describe('a sub-parser must consume the whole line, like the section engine does
 
   it('refuses trailing garbage after an action field', () => {
     expect(load('# item coin', '# entity gull', 'peck:', '  requires: has coin typo', '  say: hi')).toThrow(/unexpected content after an action field: "typo"/);
-    // A results line is consumed by the result reader, which owns the demand.
     expect(load('# item coin', '# entity gull', 'peck:', '  give: coin typo')).toThrow(/unexpected content after a result: "typo"/);
     expect(load('# stat attack', '# entity gull', 'peck:', '  accuracy: attack typo', '  say: hi')).toThrow(/unexpected content after an action field/);
-    // The number parsers stop where they stop; what follows used to be dropped.
     expect(load('# entity gull', 'peck:', '  time: 1e3', '  say: hi')).toThrow(/unexpected content after an action field: "e3"/);
     expect(load('# entity gull', 'peck:', '  attempts: 3 times', '  say: hi')).toThrow(/unexpected content after an action field: "times"/);
   });
@@ -923,18 +884,10 @@ interface WalkableField {
   name: string;
   keyword: string;
   parser: object;
-  // Reached by its position in the line rather than by a `keyword:` label, so
-  // no probe below can address it and its block form does not exist.
   positional: boolean;
-  // Whether this field's section absorbs an unclaimed word as a clause, which
-  // is the one thing that lets an inline line read past where its field parser
-  // stopped.
   sectionTakesClauses: boolean;
 }
 
-// Every field of every kind, read through the shape the engine publishes, so
-// the walk shares the engine's own answers about which fields exist, what they
-// are written as, and which have no keyword form at all.
 function schemaFields(): WalkableField[] {
   return sections().flatMap((each) => {
     const schema = each.schema;
@@ -966,8 +919,6 @@ const attempt = (parse: () => unknown): Outcome => {
   }
 };
 
-// Through the loader's own entry point, because that is where a section parser
-// is asked whether it read every block it was handed.
 const parseProbe = (source: string): Outcome => attempt(() => parseModule(source)[0].value);
 
 const inlineSection = (field: WalkableField, op: string, authored: string): Outcome => parseProbe(`# ${field.kind} probe\n${op}${field.keyword}: ${authored}\n`);
@@ -983,15 +934,8 @@ const blockField = (field: WalkableField, authored: string): Outcome => attempt(
 
 const disagree = (a: Outcome, b: Outcome): boolean => a.read !== b.read || (a.read && b.read && a.value !== b.value);
 
-// One text per shape an author writes and per shape a typo leaves behind: a
-// clean item, an item with a word after it, a count, a decimal no id can
-// absorb, something that looks like the next key, a comma run, and a result
-// verb — the last because the two hook fields read a verb where every other
-// list reads an id.
 const AUTHORED = ['a', 'a b', 'a b c', '1 a', '2 a b', 'a 2.5', 'a b: c', 'a, b', 'drain: 5 health', 'drain: 5 health b'];
 
-// A patch is where a mod's typo arrives, so the walk covers what the
-// contribution system makes reachable as well as the bare assignment.
 const OPS = ['', '+', '-'];
 
 describe('a field that takes a block reads one exactly where it reads the same text inline', () => {
@@ -1031,19 +975,11 @@ describe('a field that takes a block reads one exactly where it reads the same t
     expect(readOnlyAsABlock).toEqual([]);
   });
 
-  // The other direction is the line loop's, not the block reader's: a section
-  // with a clause field gives an unclaimed word a home, so its inline form
-  // reads past where the field parser stopped. Characterised rather than
-  // excused — a section without clauses that does this is a new defect.
   it('reads inline past the field parser only where the section absorbs a clause', () => {
     const inlineReadsMore = blockCapable.flatMap((field) => OPS.flatMap((op) => AUTHORED.filter((authored) => inlineSection(field, op, authored).read && !blockSection(field, op, authored).read).map(() => field)));
     expect(inlineReadsMore.filter((field) => !field.sectionTakesClauses).map(fieldName)).toEqual([]);
   });
 
-  // The shape of the text, not only the field it sits under: a block line has
-  // an indented block of its own, and every reader `list` builds ignores it.
-  // The nested text is the field's own accepted one, so nothing here is a
-  // per-field input somebody wrote down.
   it('refuses a block line carrying an indented block of its own, on every field a block can address', () => {
     const swallowed = blockCapable
       .filter((field) => !field.positional)
@@ -1062,8 +998,6 @@ ${field.keyword}:
     expect(swallowed).toEqual([]);
   });
 
-  // Agreement is satisfied by a pair that refuses everything, so the walk also
-  // says which fields it saw read something.
   it('reads at least one authored text on every field a block can address', () => {
     const silent = blockCapable.filter((field) => !field.positional && !AUTHORED.some((authored) => blockSection(field, '', authored).read)).map(fieldName);
     expect(silent).toEqual([]);

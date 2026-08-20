@@ -11,9 +11,6 @@ interface FormField {
   rendered?: string;
 }
 
-// The shipped form, read rather than restated: the defect this file exists for
-// was the extractor and the form disagreeing about one heading, so a fixture
-// that hardcoded the labels would have agreed with itself and proved nothing.
 function formFields(): FormField[] {
   const yml = readFileSync(FORM, 'utf8');
   const fields = yml
@@ -28,8 +25,6 @@ function formFields(): FormField[] {
   return fields;
 }
 
-// How GitHub renders a submitted issue form: each field's label verbatim as an
-// H3, then its value, fenced with the `render:` language when it has one.
 function renderIssueForm(values: Record<string, string>): string {
   return formFields()
     .flatMap((field) => {

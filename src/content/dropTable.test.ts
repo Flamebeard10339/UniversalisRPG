@@ -116,22 +116,13 @@ describe('the four selectors', () => {
   });
 
   it('leaves prose that merely begins with a selector word alone', () => {
-    // A colon is not enough to claim a line: `you must` is not a condition, and
-    // a selector is only matched in its whole shape. Every line here was prose
-    // before this branch and has to stay prose after it.
     const prose = ['  if only it were so simple', '  if you must: leave now', '  one of us is lying:', '  3-4 in every ten make it back.', '  1 in 5 never do.'];
     const dialogue = loadModule(['# entity miki', '# dialogue chat', 'owner = miki', 'node a:', ...prose].join('\n'));
     expect(dialogue.dialogues.get('chat')!.nodes[0].steps.map((step) => step.kind)).toEqual(prose.map(() => 'say'));
   });
 
-  // The one collision left, kept as a load error rather than guessed at. `luck
-  // vs fighting:` is a grammatically complete contest — both sides are ids, and
-  // whether `fighting` is a stat is not knowable while parsing — so narrowing it
-  // would mean reading the body and falling back to prose when it fails, which
-  // turns a typo inside a real drop into a spoken line. Loud beats silent.
   it('reads a complete vs contest as one, even where a narrator meant prose', () => {
     expect(load('# stat luck', '# entity miki', '# dialogue chat', 'owner = miki', 'node a:', '  luck vs fighting: the old question.')).toThrow(/unrecognized action result/);
-    // Without the colon it is prose again, which is the escape.
     expect(load('# stat luck', '# entity miki', '# dialogue chat', 'owner = miki', 'node a:', '  luck vs fighting is the old question.')).not.toThrow();
   });
 });
@@ -172,8 +163,6 @@ describe('# droptable', () => {
       name: 'base',
       text: ['# info base', 'version: 1.0.0', '# item gem'].join('\n'),
     };
-    // `?extra` never loads, so the table naming it is dropped rather than failing
-    // the module — and the entity rolling that table goes with it.
     const pack = {
       name: 'pack',
       text: ['# info pack', 'version: 1.0.0', 'dependencies:', '  base', '  ?extra', '# droptable loot', 'give: 1 extra.relic', '# entity g', 'p:', '  roll: self.loot'].join('\n'),
@@ -211,8 +200,6 @@ describe('# droptable', () => {
       '# droptable layered',
       'give: 1 bones',
       'xp: prospecting 4-6',
-      // Both signs of a ranged pool write. A drain and a restore print through
-      // one line of code, and only the restore's bounds come back out of order.
       'drain: 2-4 health',
       'restore: 3-5 health',
       '1 in 3:',

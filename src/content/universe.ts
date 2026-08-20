@@ -16,9 +16,6 @@ export interface ModuleSource {
 export interface ParsedModule {
   source: ModuleSource;
   info: ModuleInfo;
-  // The prefix every id this module declares hangs under. A module that declares
-  // no `# info` has no identity to namespace with, so its ids are root ids —
-  // which is only safe alone, and `orderModules` is where that is enforced.
   namespace: string | null;
   sections: ModuleSection[];
 }
@@ -28,9 +25,6 @@ export interface ModuleOrderProblem {
   error: DslError;
 }
 
-// A module id may not shadow a section kind, a root the engine owns, or `self`.
-// Taken from the engine's own list rather than restated, so the two cannot drift
-// — `skills` sat here for a while and is not a root at all.
 const RESERVED_IDS: readonly string[] = [...sectionKinds(), ...ENGINE_ROOTS, 'self'];
 
 const MODULE_ID = /^[a-z][a-z0-9-]*$/;
@@ -142,8 +136,6 @@ export function moduleOrderProblems(modules: readonly ParsedModule[]): ModuleOrd
       }));
   }
 
-  // A module that is nothing but translations declares no id, so it is not one
-  // of the modules an unnamespaced module has to be kept apart from.
   const declaring = modules.filter((module) => module.sections.some((section) => section.kind !== 'locale'));
   const unnamed = declaring.filter((module) => module.namespace === null);
   if (declaring.length > 1 && unnamed.length > 0) {
@@ -168,7 +160,6 @@ export function moduleOrderProblems(modules: readonly ParsedModule[]): ModuleOrd
   return modules.filter((module) => cyclic.has(module.info.id)).map((module) => ({ module, error: new DslError(message) }));
 }
 
-// Lexicographically smallest topological order
 export function orderModules(modules: readonly ParsedModule[]): ParsedModule[] {
   const problems = moduleOrderProblems(modules);
   if (problems.length > 0) throw problems[0].error;

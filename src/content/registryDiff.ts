@@ -3,9 +3,6 @@ import { contentSectionMaps } from './sections';
 import { mapOf } from './registry';
 import { Registry } from './registry';
 
-// Asked for rather than held. This module is inside the cycle `serialize.ts`
-// closes now that the round trip lives there, so a binding read at load time
-// is a binding whose own module has not run yet.
 export const registryDiffMaps = (): readonly string[] => contentSectionMaps().map(([, map]) => map);
 
 function stable(value: unknown): unknown {
@@ -18,16 +15,10 @@ function stable(value: unknown): unknown {
   return value;
 }
 
-// Value equality over loaded content: array order is meaningful, key order is
-// not, because two equal values can have been built by different code paths.
 export const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(stable(a)) === JSON.stringify(stable(b));
 
 export function registryDiff(before: Registry, after: Registry): string[] {
   const lines: string[] = [];
-  // The `# locale` sections, which a round trip loses as silently as any other
-  // content if nothing compares them. Base text is not compared here: it is
-  // derived from the content maps below, so a difference in it is one of theirs
-  // reported twice.
   const left = localeLines(before.locales);
   const right = new Set(localeLines(after.locales));
   for (const line of left) if (!right.has(line)) lines.push(`  locales: missing ${line}`);

@@ -167,9 +167,6 @@ describe('a new game begins in exactly one place', () => {
   });
 });
 
-// c1. An action used to be reachable only by comparing its label against a
-// built table, which is why nothing outside the runtime could say whether one
-// existed. It hangs under its owner now, beside that owner's flags.
 describe("an action's address is a member of the namespace", () => {
   const ISLA = module('isla', '# action pry', 'instant', 'say: creak', '# entity dresser', 'flags: searched', 'uses: pry', 'search drawer:', '  instant', '  say: dust', '# location shore', 'x: 0, y: 0', 'starting', 'light beacon:', '  instant', '  say: lit', '# item lamp', 'polish:', '  instant', '  say: shine');
 
@@ -181,12 +178,9 @@ describe("an action's address is a member of the namespace", () => {
     expect(namespace().has(ACTION_MEMBER, 'item.isla.lamp.polish')).toBe(true);
   });
 
-  // Declared elsewhere and performed here, so the address is the id it was
-  // written under rather than a slug of the title it is shown as.
   it('hangs an action a `uses:` brings under the entity that brings it', () => {
     expect(namespace().has(ACTION_MEMBER, 'entity.isla.dresser.pry')).toBe(true);
     expect(namespace().has(ACTION_MEMBER, 'entity.isla.pry')).toBe(false);
-    // One id, two kinds: only the kind that performs it answers to the address.
     expect(namespace().has(ACTION_MEMBER, 'item.isla.dresser.pry')).toBe(false);
   });
 

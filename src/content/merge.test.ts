@@ -7,7 +7,6 @@ const module = (id: string, ...lines: string[]): ModuleSource => ({
   text: [`# info ${id}`, ...lines].join('\n'),
 });
 
-// A patch names the path it edits: a bare heading would create inside `patch`.
 const patch = (...lines: string[]): ModuleSource => module('patch', 'dependencies: base', ...lines);
 
 const BASE = module(
@@ -203,10 +202,6 @@ describe('# remove takes out what omission cannot', () => {
     expect(() => loadUniverse([BASE, patch('# remove location.atlantis')])).toThrow(/names an unknown location: atlantis/);
   });
 
-  // The defect this pins: removal used to undeclare mid-resolution, so a module
-  // that named the removed item failed only when it happened to sort after the
-  // remover. Sorting first, it resolved and left a reference to nothing, and the
-  // universe loaded clean with the item gone.
   it('rejects a reference to a removed item whichever module names it first', () => {
     const cut = (id: string): ModuleSource => module(id, 'dependencies: base', '# remove item.rope');
     const wants = (id: string): ModuleSource => module(id, 'dependencies: base', '# entity gull', 'fetch:', '  give: base.rope');

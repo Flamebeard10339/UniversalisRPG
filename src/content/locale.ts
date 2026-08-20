@@ -1,12 +1,5 @@
 import type {LocaleSection} from './sections/locale';
-// A `# locale <lang>` section: key/value pairs and nothing else. It never
-// reaches a content map, so it can neither add, patch nor remove content — the
-// property c6 asserts by comparing registries rather than by trusting this
-// sentence.
 
-// Every string the engine itself puts on screen. Closed, so a further one
-// cannot be written without appearing in this list, and mistyping one is a
-// compile error at the call site rather than a key on the player's screen.
 export const ENGINE_KEYS = [
   'engine.travel.to',
   'engine.travel.no-way',
@@ -117,10 +110,6 @@ export const ENGINE_KEYS = [
   'engine.command.invalid-choice',
   'engine.command.speed',
   'engine.command.stopped',
-  // c3, c5: the two drivers' own vocabulary. `shell` is what a screen and a
-  // terminal both name — a page, a standing, a node — and is read by whichever
-  // of them is drawing; `repl` is the terminal's alone, because a screen shows
-  // a clock and a resource bar as shapes rather than as lines of text.
   'engine.shell.map',
   'engine.skill.levelled',
   'engine.shell.recentre',
@@ -206,53 +195,24 @@ const ENGINE_KEY_SET: ReadonlySet<string> = new Set(ENGINE_KEYS);
 
 export const isEngineKey = (key: string): key is EngineKey => ENGINE_KEY_SET.has(key);
 
-
-// The one field whose absence the engine fills in, and so the one whose entry a
-// module can own without having authored it — but only in English, because
-// `humanizeEn` is the only generator there is.
 export const GENERATED_FIELD = 'title';
 
-// What a key is written as: the same path grammar an id follows, so a locale
-// file is addressable by the language the rest of the DSL already speaks.
-
-
-// The path a piece of player-visible text is addressed by: the module that owns
-// it, the kind, the id under that module, and the field. A module-less universe
-// drops the first segment, which is the empty case of the same rule.
 export function localeKey(namespace: string | null, kind: string, id: string, field: string): string {
   return [namespace, kind, localId(namespace, id), field].filter((segment) => segment !== null).join('.');
 }
 
-// The id as its own module writes it, which is the id with the namespace the
-// loader prefixed taken back off.
 export function localId(namespace: string | null, id: string): string {
   return namespace !== null && id.startsWith(`${namespace}.`) ? id.slice(namespace.length + 1) : id;
 }
 
-// Prose the DSL carries into the log has no id of its own, so it is addressed
-// by the object that authored it and its place in that object (c6). Each field
-// below is spelled with the word the DSL itself uses for the line, so a
-// translator reading a key can find what it names: `say:` a result, `line` a
-// bare line of dialogue, `->` a choice, `again:` a node's repeat.
-//
-// Reordering the lines under one owner moves their keys and breaks whatever
-// named them. That is accepted rather than designed around: an index is the
-// only address a line with no id has.
 export const sayField = (index: number): string => `say.${index}`;
 export const dialogueSayField = (node: string, index: number): string => `${node}.say.${index}`;
 export const dialogueLineField = (node: string, index: number): string => `${node}.line.${index}`;
 export const dialogueChoiceField = (node: string, index: number): string => `${node}.choice.${index}`;
 export const dialogueAgainField = (node: string): string => `${node}.again`;
 
-// How the words under a prose key are read back. A `say:` is printed as
-// written, because its braces are the author's own punctuation; a dialogue line
-// is parsed by the segment grammar it was authored in, so a translation carries
-// `{player.name}` where the English carried it.
 export type ProseShape = 'verbatim' | 'segments';
 
-// A label made into an id, by the rule ids already follow: `pick lock` becomes
-// `pick-lock`. What an action is addressed by is `actionAddress`, which reaches
-// for this only where an inline block has no id of its own.
 export function actionSlug(label: string): string {
   return label
     .toLowerCase()
@@ -260,41 +220,18 @@ export function actionSlug(label: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-
 export interface BaseEntry {
   text: string;
-  // The language the module that authored it declared, which is the only
-  // language this text is an entry for. There is no fallback to another.
   language: string;
-  // Made from the id by `humanizeEn` rather than written by anybody, which is
-  // what serialization must not print back out as if it had been.
   generated?: true;
 }
 
-// What a load hands the localizer: the text content authored, under the
-// language of the module that authored it, and whatever `# locale` sections
-// supplied, by language.
 export interface Locales {
-  // Every key the engine will ask for, whether or not any module has text for
-  // it. A key with no entry is exactly the one a player is shown and a
-  // translator has to fill in, so a report drawn from `base` alone would miss
-  // the whole of a module writing a language nobody has translated.
   addressable: Set<string>;
   base: Map<string, BaseEntry>;
-  // The keys whose words the DSL authored rather than the engine, and how each
-  // is read back. Braces in one belong to the grammar it was written in, not to
-  // the localizer's parameters, so the check that refuses an unsupplied
-  // parameter has nothing to say about it.
   prose: Map<string, ProseShape>;
-  // Every `# locale` section that loaded, in load order and still attributed to
-  // the module that wrote it, which is what lets a module be printed back out
-  // with its own translations and no one else's.
   sections: LocaleDeclaration[];
-  // The same entries flattened for lookup, later section winning.
   declared: Map<string, Map<string, string>>;
-  // The first English an engine key was given, which is the one that fixes what
-  // parameters every translation of it may name. Not the merged entry: a module
-  // overriding the pattern would otherwise be checked against itself.
   english: Map<string, string>;
 }
 
@@ -317,24 +254,6 @@ const PARAM = /\{([a-z][a-z0-9-]*)\}/g;
 
 export const parametersOf = (pattern: string): string[] => [...pattern.matchAll(PARAM)].map((match) => match[1]);
 
-// A translation may drop a parameter — a Spanish `engine.item.examine` needs no
-// `{article}` — but it cannot invent one, because nothing supplies it and the
-// render throws. Enforced here, where the value is assembled, rather than on the
-// screen it would have taken down.
-//
-// What an engine key supplies is fixed by the English pattern the engine ships,
-// whatever language the translation is written in — including English, where a
-// contributed `# locale en` is exactly as able to name a parameter nothing
-// passes. Where that English is not loaded there is nothing to compare against
-// and the check stands aside.
-//
-// A content key supplies nothing at all in any language: no caller passes a
-// parameter to a title. So it is checked whether or not any module has text for
-// it, which is every key of a module writing a language nobody has translated.
-// Authored prose supplies its own braces to its own grammar and takes no
-// parameter from any call site, so there is no such thing as one nothing
-// supplies: a `say:` prints them as written and a dialogue line renders them
-// through the segment grammar (c6).
 export function unsuppliedParameters(locales: Locales, key: string, value: string): string[] {
   if (locales.prose.has(key)) return [];
   if (!isEngineKey(key)) return parametersOf(value);
@@ -344,8 +263,6 @@ export function unsuppliedParameters(locales: Locales, key: string, value: strin
   return parametersOf(value).filter((name) => !known.has(name));
 }
 
-// The language the engine's own patterns are written in, which is what fixes
-// the parameters every other language's may name.
 const DEFAULT_LOCALE = 'en';
 
 export function addLocaleSection(locales: Locales, module: string | null, section: LocaleSection): void {
@@ -362,22 +279,16 @@ export function addLocaleSection(locales: Locales, module: string | null, sectio
   locales.declared.set(section.id, table);
 }
 
-// What a module declared, for printing it back out.
 export function moduleLocaleSections(locales: Locales, module: string | null): LocaleDeclaration[] {
   return locales.sections.filter((section) => section.module === module);
 }
 
-// Every translation a `# locale` supplied, as flat lines a diff can compare.
-// Base text is left out: it is the content maps' own text, read back.
 export function localeLines(locales: Locales): string[] {
   const lines: string[] = [];
   for (const [language, table] of locales.declared) for (const [key, value] of table) lines.push(`${language} ${key} = ${value}`);
   return lines.sort();
 }
 
-// c7: the keys a language does not cover, computed without a view. A base key
-// counts as covered by the language it was authored in — which is what makes
-// shipped English complete without an `en` file repeating every title.
 export function missingTranslations(locales: Locales, language: string): string[] {
   const declared = locales.declared.get(language);
   const missing: string[] = [];
@@ -393,9 +304,6 @@ export interface UnmatchedKey {
   key: string;
 }
 
-// c7: a translation of something that is not there. Reported rather than kept,
-// because a key nothing asks for is a key a translator spent time on for
-// nothing — usually a typo of the one they meant.
 export function unmatchedLocaleKeys(locales: Locales): UnmatchedKey[] {
   const unmatched: UnmatchedKey[] = [];
   for (const [language, table] of locales.declared) {

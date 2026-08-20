@@ -81,11 +81,6 @@ function enablement(manifest: ModportalManifest): Record<number, boolean> {
   return Object.fromEntries(manifest.entries.map((entry) => [entry.issue, entry.enabled]));
 }
 
-// contribution-system-2026-07-30-h1: canonicalising an approved mod serialises
-// it, and the serializer prints only what the module owns, so every edit to
-// base content and every `# remove` came out the far side missing. Each case
-// asserts the universe the maintainer ends up with rather than a substring of
-// the file, which is what let the defect ship green.
 describe('an approved mod is the universe its contributor loaded', () => {
   const contributing = (...body: string[]): string => [['# info local-changes', 'version: 0.0.0', 'dependencies:', '  base', '', ...body].join('\n'), ''].join('\n');
 
@@ -139,10 +134,6 @@ describe('approved mod issues', () => {
     expect(materialized.text).not.toContain('local-changes.vigor');
   });
 
-  // A kind the rename does not reach keeps its `local-changes.` id, is dropped
-  // by serialize's own-module filter, and leaves every reference that WAS
-  // renamed pointing at a section the published mod no longer contains — so
-  // the published module fails to load, blaming the contributor.
   it('carries every section kind through the rename, so the published module still loads', () => {
     const local = [LOCAL, '# action foe-swing', 'title: Swing', 'continuous', 'rate: local-changes.vigor', 'say: Swing.', '', '# entity rat', 'uses: local-changes.foe-swing'].join('\n');
     const materialized = materialize({
@@ -289,9 +280,6 @@ describe('modportal sync plan', () => {
   });
 
   it('admits an explicitly enabled mod ahead of one that is only on by default', () => {
-    // Two mods that each want to own where a new game begins: either loads over
-    // a start-less base, neither loads with the other, so which one is admitted
-    // is a policy choice rather than an accident of ordering.
     const rival = [startsHere(2, 'auto-enabled'), startsHere(8, 'auto-enabled')];
     const startless = [{ name: 'base', text: BASE.replace('starting\n', '') }];
     const byDefault = plan(rival, {}, startless);

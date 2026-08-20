@@ -89,10 +89,6 @@ function parseLocalSection(sectionSource: string): LocalSection {
   return section;
 }
 
-// Where a `dependencies:` declaration sits in a header and how far it runs: the
-// keyword line, plus the indented lines under it when it was written as a
-// block. Everything else in the header is somebody's text and is not this
-// module's to read, reorder or drop.
 function withoutDependencies(lines: readonly string[]): {
   kept: string[];
   at: number;
@@ -104,19 +100,6 @@ function withoutDependencies(lines: readonly string[]): {
   return { kept: [...lines.slice(0, start), ...lines.slice(end)], at: start };
 }
 
-// The header of the file this edit is rewriting. Three owners, and which line
-// belongs to which is the whole of it. The id is the runtime's: this file is
-// the local-changes module by construction, and a header naming another one
-// would have every staged section land under a name the report does not use.
-// The dependencies are shared, so they are the union — a module the file
-// declares keeps the file's own spelling, because `? extra` and `extra >= 1.2`
-// are statements a caller holding only a list of loaded ids cannot make, and a
-// module only the caller knows about is added plainly. Every other line is the
-// file's alone and survives where it stands.
-//
-// Both halves were learned by getting them wrong: rebuilding the header dropped
-// what the file declared, and carrying it across whole made a header the
-// session could not stage against and a module id the session lied about.
 function headerFor(source: string, modules: readonly string[]): string[] {
   const info = readSections(source).find((section) => section.kind === MANAGED_INFO);
   if (!info) return [`# info ${LOCAL_CHANGES_MODULE_ID}`, 'version: 0.0.0', 'pack: local', ...dependencyLines(required(modules))];

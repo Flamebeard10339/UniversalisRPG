@@ -3,9 +3,6 @@ import { loadModule } from './load';
 
 const JEWEL = ['# stat max-health', '# passive hale', '# cluster-jewel keen-edge', 'shape: point', 'open-connections: e', 'passives: 1 hale'].join('\n');
 
-// c10: a cluster jewel reaches the player as an ordinary item, named through
-// cluster-jewel:, and an unknown declaration is a load-time reference error
-// like every other reference in the language.
 describe('# item cluster-jewel:', () => {
   it('names a # cluster-jewel to become the droppable jewel', () => {
     const registry = loadModule([JEWEL, '# item keen-edge-jewel', 'cluster-jewel: keen-edge'].join('\n'));
@@ -22,9 +19,6 @@ describe('# item cluster-jewel:', () => {
   });
 });
 
-// c9 and c10: `cluster-jewel:` says the item is a jewel, `origin-cluster:` and
-// `slot:` say it is a base with a plane of its own, and the two roles are
-// exclusive — which is what stops a weapon being consumed as a jewel.
 describe('# item origin-cluster:', () => {
   const SWORD = ['# item heartwood-blade', 'slot: mainhand'].join('\n');
 
@@ -69,9 +63,6 @@ describe('# item cluster-effect:', () => {
     expect(() => loadModule('# item orb\ncluster-effect: +25% nope')).toThrow(/# item orb cluster-effect: names an unknown stat: nope/);
   });
 
-  // c9: a base and an orb are exclusive roles, the way a base and a jewel
-  // already are — an item claiming both would be a plane and, at the same
-  // time, consumable into someone else's.
   it('refuses an item declaring both slot: and cluster-effect:, since a base has no orb role', () => {
     expect(() => loadModule('# stat max-health\n\n# item warding-blade\nslot: mainhand\ncluster-effect: +25% max-health')).toThrow(/# item warding-blade: cluster-effect: makes warding-blade an orb, which is exclusive with the slot: that makes it a base/);
   });

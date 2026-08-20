@@ -7,20 +7,12 @@ import { mayBeInstanceId } from './instanceId';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
-// The tail every `inflict:` site's `where` ends with, so the walk that writes it
-// and the check that reads it cannot disagree about how it is spelled.
 export const INFLICT_SITE = 'inflict:';
 
 export type ReferenceKind = string;
 
-// Returns what the id should become. Resolution rewrites it into a namespaced
-// key; validation hands it back and throws if it names nothing.
 export type Visit = (kind: ReferenceKind, id: string, where: string) => string;
 
-// What a kind's `prune` may ask about the universe that survived a module going
-// absent. The two questions differ in what they cost: `intact` runs a walk and
-// reports whether every reference it made is still loaded, `gone` answers about
-// one named reference without walking anything.
 export interface Pruning {
   intact(walk: () => void): boolean;
   gone(kind: ReferenceKind, id: string, where: string): boolean;
@@ -29,8 +21,6 @@ export interface Pruning {
 
 export type Loose = Record<string, unknown>;
 
-// Hydrated fields are defined without a setter, so an unchanged id must not be
-// written back — validation walks the same sites as resolution and changes none.
 export function put<T extends object>(holder: T, key: keyof T & string, kind: ReferenceKind, where: string, visit: Visit): void {
   const current = (holder as Loose)[key];
   if (typeof current !== 'string') return;
@@ -38,11 +28,6 @@ export function put<T extends object>(holder: T, key: keyof T & string, kind: Re
   if (next !== current) (holder as Loose)[key] = next;
 }
 
-// A directive naming what the player carries may name a stack by its item id
-// or one grown copy by the id minting gave it, and only the first is declared
-// anywhere. The shape is what tells them apart, so a name that could not have
-// been minted is still resolved and a typo'd item id is still caught, while a
-// bare number is left for the runtime, which alone knows what is live.
 export function putCarried<T extends object>(holder: T, key: keyof T & string, where: string, visit: Visit): void {
   const current = (holder as Loose)[key];
   if (typeof current === 'string' && mayBeInstanceId(current)) return;
@@ -60,9 +45,6 @@ export function strings(holder: Loose, key: string, kind: ReferenceKind, where: 
   else if (Array.isArray(list)) rewrite(list);
 }
 
-// A reference in a condition names a flag, or a node whose visits the engine
-// counts. Either way the owner is a path and resolves like one; only the clock
-// and the player sheet belong to nobody and are left as written.
 export function reference(value: Reference | undefined, where: string, visit: Visit): void {
   if (!value || isEngineRoot(value.path)) return;
   const node = visitedNode(value.path);
@@ -110,8 +92,6 @@ export function condition(value: Condition | undefined, where: string, visit: Vi
 
 export function results(list: ActionResult[] | undefined, where: string, visit: Visit): void {
   for (const result of list ?? []) {
-    // A wrapper's body is an ordinary result list, so every site inside one is
-    // reached by the same walk rather than by a second copy of it.
     for (const nested of nestedResults(result)) results(nested, where, visit);
     switch (result.kind) {
       case 'give':
@@ -125,8 +105,6 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
         put(result, 'buff', 'item', `${where} ${INFLICT_SITE}`, visit);
         break;
       case 'contest':
-        // A side written as a name is a stat; a literal is left alone, exactly
-        // as an action's `rate:` is.
         for (const side of ['left', 'right'] as const) put(result, side, 'stat', `${where} vs:`, visit);
         break;
       case 'gate':
@@ -153,11 +131,6 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
       case 'add':
         put(result, 'variable', 'flag', `${where} ${result.kind}:`, visit);
         break;
-      // Named rather than left to fall through, so that a kind added to the
-      // union has to be sorted into one of these two lists by whoever adds it.
-      // `credit` and `chance` hold only a nested list, which the walk above
-      // already reached; `open-modal` names a modal the engine declares and no
-      // reference kind covers; `say` and `stop` carry no id at all.
       case 'say':
       case 'stop':
       case 'chance':
@@ -172,9 +145,6 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
   }
 }
 
-// A counter is what a `per` names: a resource whose level it reads, or the
-// source of the buff whose stacks it counts. A third joins by resolving here,
-// not by a second walk.
 export function visitTags(list: unknown, where: string, visit: Visit): void {
   for (const tag of listMembers<TagClause>(list)) {
     if (tag.kind !== 'stat-bonus') continue;
@@ -183,21 +153,13 @@ export function visitTags(list: unknown, where: string, visit: Visit): void {
   }
 }
 
-// The two blocks a character modifier carries, walked wherever one is carried.
-// Through `listMembers` because a hook is a list field: `+on hit:` in a patch
-// module holds the operations until merge resolves them, and resolution runs
-// first.
 export function hooks(carrier: Loose, where: string, visit: Visit): void {
   results(listMembers<ActionResult>(carrier.onHit), `${where} on hit:`, visit);
   results(listMembers<ActionResult>(carrier.whenHit), `${where} when hit:`, visit);
 }
 
-// A side marker says which participant a name is read off; the name itself
-// resolves like every other reference, whichever side carries it.
 function sidedNames(action: Action): { held: Sided; kind: ReferenceKind; written: string }[] {
   const sites: { held: Sided; kind: ReferenceKind; written: string }[] = [];
-  // `rate` is a stat only when it is written as a name; a per-minute literal is
-  // a number and carries no side to resolve.
   if (typeof action.rate === 'object' && action.rate !== null) sites.push({ held: action.rate, kind: 'stat', written: 'rate' });
   for (const [written, contest] of [
     ['accuracy', action.accuracy],
@@ -228,10 +190,6 @@ export function actions(list: unknown, where: string, visit: Visit): void {
   for (const action of listMembers<Action>(list)) visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit);
 }
 
-// What a carrier keeps of the three things more than one kind carries. Each
-// prunes at the granularity the grammar gives it: an action and a clause are
-// each one line an author wrote, and a hook is a result list rather than a
-// labelled block, so a dangling reference inside one costs the whole hook.
 export const pruneActions = (list: readonly Action[], where: string, at: Pruning): Action[] =>
   list.filter((action) => at.intact(() => visitAction(action, `${where} action ${JSON.stringify(action.label)}`, at.visit)));
 

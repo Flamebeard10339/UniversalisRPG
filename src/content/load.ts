@@ -81,24 +81,12 @@ function summarizeDisabled(statuses: readonly ModuleStatus[]): string[] {
   return statuses.filter((module) => !module.loaded).map((module) => module.moduleId);
 }
 
-// The base entries one section contributes: what it authored, plus the title
-// `humanizeEn` fills in — which is an English entry, so it is one only where the
-// module says it is writing English. A field left unauthored anywhere else has
-// no entry in any language, which is what puts its key on screen (c3, c5).
-// The one place a base entry is written, so a value naming a parameter nothing
-// supplies is refused the same whether it was authored as content or written as
-// a `# locale` line. No caller passes a parameter to a title or an examine, so
-// for a content key every parameter it names is one nothing supplies.
 function recordBase(registry: Registry, key: string, entry: BaseEntry): void {
   const unsupplied = unsuppliedParameters(registry.locales, key, entry.text);
   if (unsupplied.length > 0) throw new DslError(`${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
   registry.locales.base.set(key, entry);
 }
 
-// `namespace` is the one the key is written under and `language` the one the
-// words are in. They are the same module for anything a module owns, and are
-// not for a global id: a `# slot` is keyed under nobody and written in whatever
-// its declarer speaks, so the caller says which is which.
 function recordBaseText(registry: Registry, kind: string, authored: Record<string, unknown>, namespace: string | null, language: string): void {
   const fields = textFieldsOf(kind);
   if (!fields) return;
@@ -106,9 +94,6 @@ function recordBaseText(registry: Registry, kind: string, authored: Record<strin
   for (const field of fields) {
     const key = localeKey(namespace, kind, id, field);
     const authoredValue = authored[field];
-    // A title is asked for whatever anybody authored, so its key is addressable
-    // even where no module has text for it; an unauthored `examine:` is nothing
-    // the engine ever renders and so is not a gap in any language.
     if (field === GENERATED_FIELD || typeof authoredValue === 'string') registry.locales.addressable.add(key);
     if (typeof authoredValue === 'string') recordBase(registry, key, { text: authoredValue, language });
     else if (field === GENERATED_FIELD && language === DEFAULT_LANGUAGE)
@@ -120,13 +105,6 @@ function recordBaseText(registry: Registry, kind: string, authored: Record<strin
   }
 }
 
-// An action is keyed on what addresses it under whoever wrote its label, which
-// `actionTextOwner` decides: an address is unique per performer and the words
-// are not, so a declaration a dozen entities `use:` is one key and not a dozen
-// copies of one English string. Run over the built registry because an entity's
-// actions are assembled after its section is, so a used declaration is reached
-// once here and again from its own row — writing one key twice from one label
-// rather than needing an order between the two.
 function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly Action[]): void {
   const taken = new Set<string>();
   for (const action of actions) {
@@ -138,9 +116,6 @@ function recordActionText(registry: Registry, languages: ReadonlyMap<string | nu
     const language = languages.get(owner.namespace) ?? DEFAULT_LANGUAGE;
     const key = actionTextKey(owner);
     registry.locales.addressable.add(key);
-    // A generated label is `humanizeEn` of an id, so it is an entry for English
-    // and for nothing else — the same gate `defaultTitle` applies, applied
-    // where the other generator runs (c5).
     if (action.generatedLabel && language !== DEFAULT_LANGUAGE) continue;
     recordBase(registry, key, {
       text: action.label,
@@ -150,8 +125,6 @@ function recordActionText(registry: Registry, languages: ReadonlyMap<string | nu
   }
 }
 
-// Where a piece of authored prose hangs and what language it was written in,
-// asked once per owner because every line under one shares both.
 interface ProseOwner {
   namespace: string | null;
   kind: string;
@@ -179,11 +152,6 @@ function recordProse(registry: Registry, owner: ProseOwner, field: string, text:
 
 const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onFailure, action.onUnfinished].filter((list): list is ActionResult[] => list !== undefined);
 
-// Every result list a section AUTHORED, which is not every list a player can be
-// offered one from: an action an entity `uses:` was written once, under its own
-// declaration, and is keyed there however many entities perform it. An entity's
-// overload of one is written in that entity's block and is keyed under the
-// entity, which is where a translator will look for the words it changed.
 function authoredResults(registry: Registry): Array<[string, string, ActionResult[][]]> {
   const owners: Array<[string, string, ActionResult[][]]> = [];
   for (const [id, action] of registry.actions) owners.push(['action', id, actionResultLists(action)]);
@@ -194,15 +162,10 @@ function authoredResults(registry: Registry): Array<[string, string, ActionResul
   for (const location of registry.locations.values()) owners.push(['location', location.id, location.actions.flatMap(actionResultLists)]);
   for (const item of registry.items.values()) owners.push(['item', item.id, [...item.actions.flatMap(actionResultLists), item.onHit, item.whenHit]]);
   for (const [id, table] of registry.dropTables) owners.push(['droptable', id, [table.results]]);
-  // Under the recipe rather than the compiled action, because the recipe's
-  // `say:` is what an author wrote and the action is what the loader made of it.
   for (const [id, action] of registry.recipeActions) owners.push(['recipe', id, actionResultLists(action)]);
   return owners;
 }
 
-// One counter over one owner's lists, in the order they were authored: a
-// wrapper is the last thing on its line, so the lines inside its body come
-// after every leaf the same list already spoke.
 function stampSays(registry: Registry, owner: ProseOwner, lists: readonly (readonly ActionResult[])[], field: (index: number) => string): void {
   let index = 0;
   const walk = (list: readonly ActionResult[]): void => {
@@ -214,9 +177,6 @@ function stampSays(registry: Registry, owner: ProseOwner, lists: readonly (reado
   for (const list of lists) walk(list);
 }
 
-// A node is the owner of every line spoken under it, and its `say:` results are
-// keyed beside them under the same node rather than under the dialogue: a
-// reader looking for the words of one node reads one prefix.
 function stampDialogue(registry: Registry, languages: ReadonlyMap<string | null, string>, dialogue: Dialogue): void {
   const owner = proseOwner(registry, languages, 'dialogue', dialogue.id);
   for (const node of dialogue.nodes) {
@@ -256,9 +216,6 @@ function localeValueProblem(locales: Locales, language: string, key: string, val
   return new DslError(`# locale ${language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
 }
 
-// A parsed section and the module the merge attributed it to. It is a
-// `ModuleSection` and not a copy of one, so that handing it to a pass over the
-// kinds hands over the discrimination too.
 type OwnedSection = ModuleSection & { module: ParsedModule };
 
 interface BuildFailure {
@@ -311,10 +268,6 @@ interface ActionOwner {
   stats?: Record<string, unknown>;
 }
 
-// The grammar refuses an unauthorable action, but an action can also be
-// ASSEMBLED — patched across modules, overloaded by an entity, or compiled from
-// a recipe — and none of those went through the grammar. Same rule, applied
-// where the section that owns the action can name itself.
 function validateActionTable(kind: string, id: string, owner: ActionOwner): void {
   for (const action of owner.actions ?? []) {
     const problem = assembledActionProblem(action);
@@ -322,11 +275,6 @@ function validateActionTable(kind: string, id: string, owner: ActionOwner): void
   }
 }
 
-// The registry and the namespace must describe the same surviving universe:
-// drop one without the other and a save is pruned against content that is
-// present, or a reference resolves to content that is gone. Every map the kind
-// fills, because a kind that lands its values in two is cleaned out of both
-// without anyone here remembering which those are.
 function dropContent(registry: Registry, kind: string, id: string, pruned: Set<string>): void {
   for (const name of Object.keys(sectionFor(kind)?.maps ?? {})) mapOf(registry, name).delete(id);
   registry.namespace.undeclare(kind, id);
@@ -335,12 +283,6 @@ function dropContent(registry: Registry, kind: string, id: string, pruned: Set<s
 
 const ACTION_OWNER_MAPS = contentSectionMaps().filter(([kind]) => isActionOwnerKind(kind));
 
-// Pruning an object's actions is done by rebuilding the object, so no site that
-// drops one is in a position to take its member with it — and a member left
-// behind is a `use:` that resolves at load and finds nothing at runtime. Asked
-// of the whole universe rather than of the object being rebuilt, because a
-// member key carries no owner kind: an entity and an item sharing an id share
-// their members' keys, and one's loss is not the other's.
 function pruneStrandedActionMembers(registry: Registry, pruned: Set<string>): boolean {
   const surviving = new Set<string>();
   for (const [kind, map] of ACTION_OWNER_MAPS) {
@@ -357,10 +299,6 @@ function pruneStrandedActionMembers(registry: Registry, pruned: Set<string>): bo
   return dropped;
 }
 
-// Every map a kind fills beyond the one its values are read back out of,
-// refilled from the survivors. A secondary map is keyed on something other than
-// the id — a dialogue's owner is the standing case — so what it should hold
-// after a prune can only be recovered by landing the survivors again.
 function rebuildSecondaryMaps(registry: Registry): void {
   for (const [kind, primary] of contentSectionMaps()) {
     const survivors = [...(mapOf(registry, primary) as ReadonlyMap<string, { id: string }>).values()];
@@ -373,9 +311,6 @@ function rebuildSecondaryMaps(registry: Registry): void {
   }
 }
 
-// Content that reaches what an absent optional module was to have declared, and
-// the reference walk of every kind, asked until the answer stops changing:
-// dropping one object is what makes the next reference dangle.
 function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: ReadonlySet<string>): void {
   const pruned = new Set<string>();
   for (;;) {
@@ -408,9 +343,6 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
   }
 }
 
-// A table that reaches itself would recurse forever at the first roll. Checked
-// once over the built registry, where every table that will exist is present and
-// every name has already resolved.
 function dropTableCycle(registry: Registry): string[] | null {
   const rolls = new Map<string, string[]>();
   const collect = (results: readonly ActionResult[], into: string[]): void => {
@@ -449,8 +381,6 @@ function dropTableCycle(registry: Registry): string[] | null {
   return null;
 }
 
-// --- linking ---------------------------------------------------------------
-
 function compileFactionBits(registry: Registry): void {
   registry.factionBits.clear();
   let next = 0;
@@ -459,16 +389,12 @@ function compileFactionBits(registry: Registry): void {
   }
 }
 
-// A shortened id names the same object as the whole path, which is the rule the
-// namespace already resolves references by; an entity's overload block reaches
-// its action the same way rather than through a second spelling.
 const namesSame = (id: string, written: string): boolean => id === written || id.endsWith(`.${written}`);
 
 function appendCondition(base: Condition | undefined, added: Condition): Condition {
   return base ? { kind: 'and', conditions: [base, added] } : added;
 }
 
-// A bare overload line replaces the inherited value; a `+` line adds to it.
 function overlayAction(base: Action, over: Action): Action {
   const appended = new Set(over.appended ?? []);
   const merged = { ...base } as Record<string, unknown>;
@@ -482,9 +408,6 @@ function overlayAction(base: Action, over: Action): Action {
   return merged as unknown as Action;
 }
 
-// An overload governs that entity's own performance of the action and nothing
-// else, so a block naming an action the entity does not `use:` is refused rather
-// than quietly becoming an action of its own.
 function linkEntity(entity: Entity, registry: Registry): Entity {
   const handlers: Handler[] = [];
   const overloads = new Map<string, Action>();
@@ -516,9 +439,6 @@ function linkEntity(entity: Entity, registry: Registry): Entity {
   return { ...entity, actions: [...performed, ...own], handlers };
 }
 
-// The performer's side of the bargain: an entity performing a two-sided action
-// declares every stat that action reads off it, because falling through to the
-// global `# stat` bases would measure the rat by the player's sheet.
 function performerStatProblem(entity: Entity, action: Action, registry: Registry): string | undefined {
   for (const field of sidedFields(action)) {
     if (field.value.side !== 'my') continue;
@@ -532,8 +452,6 @@ function performerStatProblem(entity: Entity, action: Action, registry: Registry
 
 function entityProblem(entity: Entity, registry: Registry): string | undefined {
   for (const ally of entity.allies) {
-    // A side is you and your allies, so naming yourself makes you your own
-    // ally, and naming the player puts the player on both sides of the fight.
     if (namesSame(entity.id, ally.entity)) return `allies: names this entity itself: ${ally.entity}`;
     if (namesSame(ally.entity, PLAYER_ENTITY)) return `allies: names the player, who is a side rather than a member of one: ${ally.entity}`;
   }
@@ -561,8 +479,6 @@ function linkRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModu
       if (namesSame(id, PLAYER_ENTITY)) players.push(linked);
     } catch (raw) {
       if (!(raw instanceof DslError)) throw raw;
-      // Prefixed here, so every message an entity's own linking raises names the
-      // entity without each throw site repeating it.
       const error = new DslError(`# entity ${id}: ${raw.message}`, raw.span);
       const module = sectionOwner(owners, 'entity', id);
       if (!module) throw error;
@@ -579,10 +495,6 @@ function linkRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModu
   return null;
 }
 
-// Two `starting` locations used to resolve by source order, which is a coin
-// toss an author cannot see. Zero is not checked here — a module set is allowed
-// to hold locations without holding the one a new game begins in, and the
-// session says so when a game is actually started.
 function startingLocationFailure(registry: Registry, owners: ReadonlyMap<string, ParsedModule>): BuildFailure | null {
   const starting = [...registry.locations.values()].filter((location) => location.starting);
   if (starting.length < 2) return null;
@@ -733,9 +645,6 @@ function reconcileMembers(namespace: Namespace, merged: Map<SectionKind, Map<str
 function compileModules(modules: readonly ParsedModule[]): { registry: Registry } | { failure: BuildFailure } {
   const registry = emptyRegistry();
 
-  // Two phases, because merging must happen on the authored form: a hydrated
-  // object has every field filled in with defaults, so overlaying one would
-  // silently reset everything the patch did not mention.
   const merged = new Map<SectionKind, Map<string, OwnedSection>>();
   const declaredMembers = new Map<string, Member[]>();
   const owners = new Map<string, ParsedModule>();
@@ -748,9 +657,6 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
     }
   }
   namespace.declareModules(loaded);
-  // Before merging: a shortened reference resolves against its own module and
-  // that module's dependencies, and once sections are merged there is no longer
-  // a module to resolve it against.
   for (const pass of RESOLUTION_PASSES) {
     for (const module of modules) {
       try {
@@ -765,24 +671,14 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
     for (const module of modules) {
       try {
         for (const section of module.sections) {
-          // Removal is applied where it stands, so a later module can name the id
-          // again and get a fresh one rather than a hole.
           if (section.kind === 'remove') {
             const { kind, target, id } = section.value as Removal;
             if (!owns(kind)) continue;
             if (!isSectionKind(kind) || !merged.get(kind)?.delete(target)) throw new DslError(`# remove ${id} names nothing that is loaded`);
             owners.delete(ownerKey(kind, target));
-            // Undeclared here rather than during resolution, so that what a name
-            // resolves to stays independent of load order while the namespace and
-            // the surviving universe still agree — which is what lets the
-            // post-build reference check see a member go with its owner.
             namespace.undeclare(kind, target);
             continue;
           }
-          // A kind that builds no object never enters the merge, which the row
-          // answers rather than a name written here. A locale is the one that
-          // reaches this line, and keeping it out is what stops any id it names
-          // from being added, patched or removed by it (c6).
           if (sectionFor(section.kind)!.map === null) continue;
           if (!owns(section.kind)) continue;
           const byId = merged.get(section.kind) ?? new Map<string, OwnedSection>();
@@ -810,10 +706,6 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   if (mergeFailure) return { failure: mergeFailure };
   reconcileMembers(namespace, merged, declaredMembers);
   const languages = new Map<string | null, string>(modules.map((module) => [module.namespace, module.info.language]));
-  // Only the modules that declare content: a locale-only module writing English
-  // beside a Spanish island says nothing about what language its prose is in,
-  // and counting it would shut the prose door for every player of every
-  // language, since the shipped engine locale declares `en`.
   for (const module of modules) {
     for (const section of module.sections) {
       if (section.kind === 'locale') addLocaleSection(registry.locales, module.namespace, section.value as LocaleSection);
@@ -833,15 +725,8 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   }
   const validationFailure = validateBuiltRegistry(registry, owners, danglingRoots);
   if (validationFailure) return { failure: validationFailure };
-  // Both passes run after validation, so that content dropped for a dangling
-  // reference leaves no key behind for a translator to answer — and so that the
-  // labels keyed below are the assembled ones a player will be offered, since
-  // validation is where an entity's `uses:` becomes an action of its own.
   for (const [kind, byId] of merged) {
     for (const [id, section] of byId) {
-      // A global id is in no namespace to have been dropped from one: the guard
-      // is about content that went with a dangling reference, and the key such
-      // an id is written under is nobody's.
       const owned = isNamespacedKind(kind);
       if (owned && !registry.namespace.has(kind, id)) continue;
       const namespace = owned ? (registry.namespace.ownerOf(kind, id) ?? null) : null;
@@ -853,10 +738,6 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
       }
     }
   }
-  // Every slot the vocabulary holds that no `# slot` declared. `equipment-slots:`
-  // names the ids and the declaration is optional, so the key is minted from the
-  // vocabulary and `humanizeEn` fills it — `defaultTitle`'s rule, applied where
-  // there is no section to hang a default on.
   for (const id of registrySlots(registry)) {
     if (!registry.slots.has(id)) recordBaseText(registry, 'slot', { id }, null, DEFAULT_LANGUAGE);
   }
@@ -876,11 +757,6 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   }
   for (const [kind, id, lists] of authoredResults(registry)) stampSays(registry, proseOwner(registry, languages, kind, id), lists, sayField);
   for (const dialogue of registry.dialogues.values()) stampDialogue(registry, languages, dialogue);
-  // Last, because it reads both halves: what a locale said and what the English
-  // it is translating names. A parameter nothing supplies throws at the moment
-  // the screen is drawn, so it is refused where the value is assembled instead,
-  // and a translated line the segment grammar cannot read is refused beside it
-  // for the same reason: it would otherwise throw out of the dialogue.
   const byNamespace = new Map(modules.map((module) => [module.namespace, module]));
   for (const declared of registry.locales.sections) {
     for (const { key, value } of declared.entries) {
@@ -926,9 +802,6 @@ export function loadUniverseWithDiagnostics(sources: readonly ModuleSource[]): U
   const disabled = new Set<ModuleSource>();
   const statuses = new Map<ModuleSource, ModuleStatus>();
 
-  // A switched-off source is parsed only to recover the id and pack its status
-  // reports. It contributes no diagnostic: nothing it says is loaded, so
-  // switching a broken module off is an exit from its problems, not a rename.
   for (const source of sources.filter((source) => !sourceEnabled(source))) {
     try {
       statuses.set(source, parsedModuleStatus(parseModuleSource(source), false));

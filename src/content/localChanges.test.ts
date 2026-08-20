@@ -33,9 +33,6 @@ describe('local-changes module text helpers', () => {
   });
 
   it('keeps every header line the file owns, in place, across an edit and a delete', () => {
-    // A header this caller did not write and could not reconstruct: a version
-    // it does not know, a pack it does not know, a language it would have
-    // defaulted, and all of it either side of the one declaration it shares.
     const foreign = ['# info local-changes', 'version: 3.2.1', 'pack: shared', 'dependencies:', '  base', '  extra', 'language: fr', '', '# item gem', 'title: Gem', ''].join('\n');
     const header = (text: string): string[] => text.split('\n').slice(0, 7);
 
@@ -53,9 +50,6 @@ describe('local-changes module text helpers', () => {
 
     const staged = upsertLocalSection(foreign, ['base', 'extra', 'tutorial'], '# item gem\ntitle: Gem\n');
 
-    // `? extra` and `base >= 1.2` are statements a caller holding a list of
-    // loaded ids cannot make, so they stand; `tutorial` is one only the caller
-    // knows about, so it is added plainly and nothing is dropped.
     expect(staged.text.split('\n').slice(0, 5)).toEqual(['# info local-changes', 'dependencies:', '  ? extra', '  base >= 1.2', '  tutorial']);
   });
 
@@ -76,14 +70,7 @@ describe('local-changes module text helpers', () => {
     expect(staged.text.split('\n').slice(0, 5)).toEqual(['# info local-changes', 'version: 0.0.0', 'pack: local', 'dependencies:', '  base']);
   });
 
-  // A delete is an edit to a file the author is still in, so the header stands
-  // — including a declaration this caller could not have written. Clearing is
-  // not an edit and no longer lives here at all: it reads nothing, so there is
-  // no source for it to preserve anything out of.
   it('keeps the header across a delete of the last section', () => {
-    // A header the renderer would not produce, so that "kept" and "rebuilt"
-    // are distinguishable at all — over a file this caller wrote, they are the
-    // same text and the comparison below could not tell them apart.
     const foreign = ['# info local-changes', 'version: 3.2.1', 'pack: shared', 'dependencies:', '  base', '  gone-in-this-release', '', '# item gem', 'title: Gem', ''].join('\n');
 
     const deleted = deleteLocalSection(foreign, ['base'], 'item', 'gem').text;

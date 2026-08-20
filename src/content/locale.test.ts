@@ -20,11 +20,6 @@ const SPANISH: ModuleSource = {
 const base = (): Registry => loadUniverse([{ name: 'island', text: ISLAND }]);
 const translated = (): Registry => loadUniverse([{ name: 'island', text: ISLAND }, SPANISH]);
 
-// Every field of the registry, each said to be either content — which a locale
-// must leave byte-identical — or the locale table it is loaded into. Adding a
-// field to Registry stops compiling here until somebody chooses, which is what
-// makes the equality below a claim about the whole registry rather than about
-// the fields this test happened to list.
 const FIELDS: Record<keyof Registry, 'content' | 'the locale table'> = {
   entities: 'content',
   actions: 'content',
@@ -110,7 +105,6 @@ describe('what a locale covers, and what it invents (c7)', () => {
     expect(missing).toContain('island.item.rope.title');
     expect(missing).toContain('island.entity.crab.pick-up');
     expect(missing).toContain('engine.travel.to');
-    // The two the Spanish module did translate.
     expect(missing).not.toContain('island.entity.crab.title');
     expect(missing).not.toContain('island.location.shore.examine');
   });
@@ -142,26 +136,16 @@ describe('an action is keyed on what addresses it, not on what it says', () => {
     expect(() => loadModule(clashing)).toThrow(/keys as pick-lock, which another action here already keys as/);
   });
 
-  // Reachable through a declaration, whose address is its id rather than its
-  // `title:`. An entry label and a section id are two grammars, and this is
-  // where their product is asked whether it can be a key at all.
   it('refuses an action whose address is a field of the object that owns it', () => {
     expect(() => loadModule('# action examine\ninstant\nsay: hm\n')).toThrow(/keys as examine, which is already a field of the object that owns it/);
   });
 
-  // A key segment may open with a digit, so the rule takes every address the
-  // two grammars can produce rather than narrowing it (pass 1, c8).
   it('takes an address opening with a digit, and refuses one that is no key at all', () => {
     expect(actionSlugProblem('3-card-monte', '3 card monte', new Set())).toBeUndefined();
     expect(actionSlugProblem('', '...', new Set())).toMatch(/give it a label with a letter or a digit in it/);
   });
 });
 
-// c7. A declaration owns its label, so every owner a `use:` hands it to reads
-// one key rather than minting a copy of one English string per performer. The
-// subjects are derived: `everyActionTable` is the loader's own walk, so an
-// owner kind added later is covered here without this test being edited, and
-// the shipped island is walked rather than a fixture standing in for it.
 describe('an action declared once carries one key, however many owners perform it (c7)', () => {
   const island = loadUniverse([
     {
@@ -171,8 +155,6 @@ describe('an action declared once carries one key, however many owners perform i
   ]);
   const performed = everyActionTable(island).flatMap(([kind, ownerId, actions]) => actions.filter((action) => kind !== 'action' && declaredId(action) !== undefined).map((action) => ({ kind, ownerId, action })));
 
-  // The walk above is vacuous unless the shipped content actually hands one
-  // declaration to more than one owner, which is the shape the defect was in.
   it('has shipped content that hands one declaration to several owners', () => {
     const perDeclaration = new Map<string, number>();
     for (const { action } of performed) perDeclaration.set(declaredId(action)!, (perDeclaration.get(declaredId(action)!) ?? 0) + 1);
@@ -197,9 +179,6 @@ describe('an action declared once carries one key, however many owners perform i
   });
 });
 
-// The other half of c7: the label came from the declaration all along, so
-// taking the language from the performer claimed an English string was Spanish
-// and left every player of either language with no line that could repair it.
 describe('an action crossing a language boundary keeps the language its declaration was written in (c7)', () => {
   const ENGLISH = ['# info hall', 'version: 1.0.0', '', '# action pick-lock', 'title: Pick the lock', 'instant', 'say: click'].join('\n');
   const SPANISH_USER = ['# info casa', 'version: 1.0.0', 'language: es', 'dependencies:', '  hall', '', '# entity puerta', 'title: Puerta', 'uses: hall.pick-lock'].join('\n');
@@ -218,9 +197,6 @@ describe('an action crossing a language boundary keeps the language its declarat
   });
 });
 
-// pass 1: serialize printed every title, including the one hydration generates,
-// so one trip through the contribution flow turned a Spanish module's keys into
-// authored raw ids and registryDiff called it clean.
 describe('text survives the trip a contribution makes', () => {
   const trip = (text: string, language: string): Registry => {
     const info = {
@@ -248,17 +224,12 @@ describe('text survives the trip a contribution makes', () => {
   });
 });
 
-// pass 2: the report was drawn from the entries that have text, so a module
-// writing a language nobody had translated reported nothing missing while the
-// player was shown keys on every screen.
 describe('the report covers every key the engine asks for (c7)', () => {
   const SPANISH_MODULE = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# entity puerta', 'abrir:', '  instant', '  say: se abre'].join('\n');
 
   it('reports a key no module has any text for, in every language', () => {
     const loaded = loadUniverse([{ name: 'isla', text: SPANISH_MODULE }]);
 
-    // Its entries are what it did author — the action's label and the line it
-    // speaks — in the language it declared.
     expect([...loaded.locales.base]).toEqual([
       ['isla.entity.puerta.abrir', { text: 'abrir', language: 'es' }],
       ['isla.entity.puerta.say.0', { text: 'se abre', language: 'es' }],
@@ -283,9 +254,6 @@ describe('the report covers every key the engine asks for (c7)', () => {
   });
 });
 
-// pass 3: a locale value may drop a parameter its English names, but naming one
-// nothing supplies threw at the moment a screen was drawn rather than at the
-// moment the value was written.
 describe('a translation may not name a parameter nothing supplies', () => {
   const withLocale = (value: string) => () =>
     loadUniverse([
@@ -308,9 +276,6 @@ describe('a translation may not name a parameter nothing supplies', () => {
   });
 });
 
-// pass 3: nine kinds printed their title through the gate and `# stat` printed
-// it bare, so a language: es module's stat gained an authored title on the trip
-// and registryDiff reported nothing.
 describe('no kind prints a title the loader would make for itself', () => {
   it('keeps a stat with no title of its own unentered across a round trip', () => {
     const text = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# stat ataque', 'base: 10'].join('\n');
@@ -325,9 +290,6 @@ describe('no kind prints a title the loader would make for itself', () => {
   });
 });
 
-// pass 4: the check covered one reproduction and neither neighbour — a
-// contributed `# locale en` and a key of a module writing a language nobody has
-// translated, which is every content key c5's gate leaves without English.
 describe('the parameter check reaches every locale, English included', () => {
   const ENGINE = ['# info engine-en', 'version: 1.0.0', '', '# locale en', 'engine.travel.to: Travel to {destination}'].join('\n');
   const ISLA = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting'].join('\n');
@@ -363,10 +325,6 @@ describe('the parameter check reaches every locale, English included', () => {
   });
 });
 
-// pass 5: the refusal covered the `# locale` half only, so the two places a
-// value is written were enforced differently and it was the unchecked one that
-// shipped — a legal module loaded clean and then threw out of every `view()`,
-// in its own declared language, with no locale file anywhere in the universe.
 describe('authored text may not name a parameter either', () => {
   const authoring =
     (...lines: string[]) =>
@@ -391,11 +349,6 @@ describe('authored text may not name a parameter either', () => {
   });
 });
 
-// c6. Every line the DSL speaks, in every position the grammar lets one be
-// written: a result list and each of its outcome lists, a wrapper's body, an
-// entity's handler and both hooks, an item's hooks, a location's action, a
-// droptable, a recipe, an action declaration an entity performs, and a
-// dialogue's lines, repeat, choices and effects.
 const SPOKEN_EVERYWHERE = [
   '# info deep',
   'version: 1.0.0',
@@ -472,10 +425,6 @@ const SPOKEN_EVERYWHERE = [
   '  -> Leave.',
 ].join('\n');
 
-// Found by walking the built registry for anything shaped like a line, rather
-// than by asking the pass that addresses them. A result list that pass never
-// reached fails here instead of passing by agreement with it, which is the
-// difference between a rule and a list.
 function linesIn(value: unknown, where: string, seen: Set<unknown>, found: Array<{ where: string; key: unknown }>): void {
   if (Array.isArray(value)) {
     value.forEach((each, index) => linesIn(each, `${where}[${index}]`, seen, found));
@@ -547,8 +496,6 @@ describe('every line the DSL speaks carries an address (c6)', () => {
     );
   });
 
-  // An action written once is keyed once, however many entities perform it:
-  // the guard `uses:` shove, and the words belong to the declaration.
   it('keys an action an entity performs under the declaration that wrote it', () => {
     const performed = deep()
       .entities.get('deep.guard')!
@@ -557,8 +504,6 @@ describe('every line the DSL speaks carries an address (c6)', () => {
     expect(performed.results).toEqual([{ kind: 'say', text: 'You shove.', key: 'deep.action.shove.say.0' }]);
   });
 
-  // The cost the author accepted: an index is the only address a line with no
-  // id has, so moving the lines moves what a `# locale` has to name.
   it('moves the keys when the lines under one owner are reordered', () => {
     const swapped = loadUniverse([
       {
@@ -594,9 +539,6 @@ describe('a translation of a spoken line is read by the grammar it was authored 
     expect(translated('deep.dialogue.guard-talk.greet.line.0: Bien hallado, {player.name.')).toThrow(/greet\.line\.0 is a spoken line, and unterminated fragment/);
   });
 
-  // A `say:` prints as written, so its braces are the author's punctuation and
-  // the check that refuses an unsupplied parameter has nothing to say about
-  // either half of it.
   it('leaves a brace in a say: alone in both the authored text and its translation', () => {
     const registry = translated('deep.droptable.spoils.say.0: Algo brilla {aqui}.')();
 

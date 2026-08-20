@@ -87,8 +87,6 @@ describe('load-time reference resolution', () => {
     expect(loading('rate: my attack-rate', 'rate: my attack-rat')).toThrow(/# action strike rate: names an unknown stat: attack-rat/);
   });
 
-  // Each fell through to a different silent default, so they are pinned
-  // individually rather than as one representative case.
   it.each([
     ['rate: my attack-rate', 'rate: my nope', /unknown stat: nope/],
     ['damage: my attack vs their dr', 'damage: my nope vs their dr', /unknown stat: nope/],
@@ -121,8 +119,6 @@ describe('load-time reference resolution', () => {
     expect(loading('starting', 'starting\nadjacent: beach')).toThrow(/# location den adjacent: names an unknown location: beach/);
   });
 
-  // Never read: the action asks for the correctly-spelled stat, so the override
-  // silently does nothing.
   it('rejects an actor sheet assigning a stat nobody declared', () => {
     expect(loading('stats: max-health 12, dr 2', 'stats: max-health 12, drr 2')).toThrow(/# entity training-dummy stats: names an unknown stat: drr/);
   });
@@ -132,7 +128,6 @@ describe('load-time reference resolution', () => {
     expect(() => loadModule(`${VALID}\n# recipe weave\nrate: nope\nout: 1 straw\n`)).toThrow(/# recipe weave rate: names an unknown stat: nope/);
   });
 
-  // An action's RESULTS name ids too, each with its own silent failure mode.
   it.each([
     ['xp: brawling 2', 'drain: 5 bogus', /drain: names an unknown resource: bogus/],
     ['xp: brawling 2', 'restore: 5 bogus', /restore: names an unknown resource: bogus/],
@@ -165,8 +160,6 @@ describe('load-time reference resolution', () => {
     expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: bam on them')).toThrow(/# passive spined on hit: inflict: names an unknown item: bam/);
   });
 
-  // A payload with no duration is granted at an instant already past, so it is
-  // over before anything can read it and nothing anywhere says so.
   it('refuses an inflicted payload that declares no duration', () => {
     expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: straw on them')).toThrow(/inflict: names straw, which declares no duration/);
     expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: balm on them')).not.toThrow();
@@ -185,9 +178,6 @@ describe('load-time reference resolution', () => {
   });
 });
 
-// Every case below loaded clean before the walk was completed, and failed later
-// or not at all: a gate that reads false forever, a mid-conversation crash, a
-// recipe craftable nowhere, a test that only breaks when it runs.
 describe('references the walk used to step over', () => {
   it('rejects a `has` naming no item, wherever the condition sits', () => {
     expect(loading('continuous', 'continuous\nrequires: has strawe')).toThrow(/# action strike requires: has names an unknown item: strawe/);
@@ -233,10 +223,6 @@ describe('references the walk used to step over', () => {
     expect(test('equip: strawe')).toThrow(/# test walk equip: names an unknown item: strawe/);
   });
 
-  // The half of a growth verb that names a stack still resolves; the half that
-  // names what the player is growing resolves only when it could not have been
-  // minted, which is what keeps a typo caught without making a live copy
-  // unnameable.
   it('rejects an unknown item a growth verb names, on either side', () => {
     const test = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
     expect(test('feed: hatt with straw')).toThrow(/# test walk feed: names an unknown item: hatt/);
@@ -259,8 +245,6 @@ describe('references the walk used to step over', () => {
     expect(test('refuse: apply 7 at 0,0 with strawe')).toThrow(/refuse: apply: with names an unknown item: strawe/);
   });
 
-  // A slot is no section's id, so it is checked against what items declare —
-  // the same shape as a recipe's station against what entities supply.
   it('rejects an unequip: naming a slot no item declares', () => {
     const test = (line: string) => () =>
       loadModule(`${VALID}
@@ -271,8 +255,6 @@ ${line}
     expect(test('unequip: head')).not.toThrow();
   });
 
-  // A modal name is the engine's, a layer above this one, so nothing here can
-  // say whether it exists; an unknown one is refused where the screen is raised.
   it('resolves nothing for an open-modal:, whatever screen it names', () => {
     const test = (line: string) => () =>
       loadModule(`${VALID}
@@ -290,8 +272,6 @@ ${line}
     expect(test('use: entity.training-dummy.eat')).toThrow(/# test walk use: names an unknown action-slug: entity.training-dummy.eat/);
   });
 
-  // The two-sided spelling, checked on both halves: the action by id and the
-  // target as an entity, and then that the player is able to bring it.
   it('rejects a `use: <action> on <target>` naming an unknown action or target', () => {
     const test = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
     expect(test('use: strike on training-dummy')).not.toThrow();
@@ -300,9 +280,6 @@ ${line}
     expect(() => loadModule(`${VALID.replace('uses: strike', '')}\n# test walk\nuse: strike on training-dummy\n`)).toThrow(/use: names an action the player does not use:/);
   });
 
-  // The other way a name stops meaning something between authoring and merge:
-  // `# remove` takes the object, a `-field:` edit takes one member of it, and
-  // this walk is what sees either of them.
   it('rejects a flag a -field: edit took away, and accepts the same reference without the edit', () => {
     const owned = ['# entity crab', 'flags: shy', '# entity gull', 'squawk:', '  requires: crab.shy'].join('\n');
     expect(() => loadModule(`${VALID}\n${owned}\n`)).not.toThrow();
@@ -319,8 +296,6 @@ describe('the performer declares every stat its action reads off it', () => {
     expect(loading('stats: max-health 30, attack 10, attack-rate 25', 'stats: max-health 30, attack-rate 25')).toThrow(/action "Strike": damage: reads attack, which stats: does not set/);
   });
 
-  // `their` halves are the target's business, and the target is decided by
-  // whether it carries the pool — never by a list of permitted types.
   it('asks nothing of the side the performer does not read', () => {
     expect(loading('stats: max-health 12, dr 2', 'stats: max-health 12')).not.toThrow();
   });
@@ -372,10 +347,6 @@ describe('a skill names the stat it raises', () => {
   });
 });
 
-// c2. `use:` used to be checked by a rule of its own, which read the built
-// action table and compared labels. Both halves after the verb are namespaced
-// now, so the walk that already knows a member goes away with its owner is what
-// answers, and an unknown action reads like an unknown flag.
 describe('a use: names an object and a member of it', () => {
   const walking = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
 
@@ -389,8 +360,6 @@ describe('a use: names an object and a member of it', () => {
     expect(walking('use: entity.dummy.strike')).toThrow(/names an unknown entity: dummy/);
   });
 
-  // The whole point of the member: an entity that does not bring the action
-  // cannot be told to perform it, and nothing had to read its table to say so.
   it('refuses an action of another object, however real that action is elsewhere', () => {
     expect(walking('use: entity.training-dummy.strike')).toThrow(/names an unknown action-slug: entity.training-dummy.strike/);
   });

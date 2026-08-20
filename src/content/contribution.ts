@@ -8,10 +8,6 @@ export interface ContributionIssueInput {
   contentFiles: readonly string[];
 }
 
-// What a contribution claims it was validated against. The CLI knows the files
-// it loaded; a web contributor names the universe their module targets and the
-// files are the maintainer's to supply, so both shapes are optional and the
-// absence of one is not the absence of the other.
 export interface ContributionBase {
   universe?: string;
   contentFiles: readonly string[];
@@ -31,12 +27,6 @@ interface IssueSection {
   lines: string[];
 }
 
-// GitHub renders an issue-form field label as a heading of its own, verbatim and
-// at a level the form does not choose, so a section is found by what it says
-// rather than by how it was typed. Fenced lines never open a section: the DSL
-// block is full of `# info` lines that would otherwise read as headings, and a
-// contributor quoting this very heading inside an example must not be able to
-// forge a second one.
 function issueSections(body: string): IssueSection[] {
   const sections: IssueSection[] = [];
   let current: IssueSection | undefined;
@@ -85,8 +75,6 @@ export function localModuleLoaded(sourceName: string, validation: UniverseLoadRe
 
 export function buildContributionIssueBody(input: ContributionIssueInput): string {
   const notes = input.notes?.trim() || 'No contributor notes provided.';
-  // Refused here as well as at extraction, so a contributor learns before they
-  // submit rather than after a maintainer approves something ambiguous.
   if (issueSections(notes).some((section) => section.label === DSL_HEADING)) {
     throw new Error(`contributor notes cannot contain a ${DSL_HEADING_LABEL} heading: it is the delimiter the module is read from`);
   }
@@ -110,9 +98,6 @@ export function buildContributionIssueBody(input: ContributionIssueInput): strin
   ].join('\n');
 }
 
-// Exactly one section may be the module, and a body carrying two is refused
-// rather than resolved by position: whichever one a rule picked, the other is
-// what somebody believed they were submitting.
 export function extractContributionDsl(issueBody: string): string {
   const matching = issueSections(issueBody).filter((section) => section.label === DSL_HEADING);
   if (matching.length === 0) throw new Error(`issue body has no ${DSL_HEADING_LABEL} heading`);

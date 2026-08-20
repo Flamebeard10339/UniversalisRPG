@@ -212,9 +212,6 @@ describe('loadUniverseWithDiagnostics', () => {
     expect(result.registry.locations.get('base.camp')!.adjacent).toEqual([]);
   });
 
-  // A passive is carried rather than performed, so it is rebuilt the way an item
-  // is: what a jewel placed it for outlives a payload whose stat went with the
-  // module that declared it.
   it('prunes what a passive carries, who carries it, and the position that placed it', () => {
     const addon: ModuleSource = {
       ...module('addon', '# info addon', '# stat might', '# item gem', '# passive gilded'),
@@ -252,8 +249,6 @@ describe('loadUniverseWithDiagnostics', () => {
     const spined = registry.passives.get('base.spined')!;
     expect(spined.tags.map((tag) => (tag.kind === 'stat-bonus' ? tag.statId : tag.kind))).toEqual(['base.guile']);
     expect(spined.onHit).toEqual([]);
-    // The block that named nothing absent is untouched: a hook is pruned whole
-    // and its neighbour is a different hook.
     expect(spined.whenHit).toEqual([{ kind: 'give', item: 'base.charm', amount: { min: 1, max: 1 } }]);
   });
 
@@ -315,8 +310,6 @@ describe('loadUniverseWithDiagnostics', () => {
     ]) {
       const { registry, loadedModules, diagnostics } = loadUniverseWithDiagnostics([base, ghost, walker(name, address)]);
 
-      // A section naming what was pruned is dropped, never fatal: undeclaring
-      // the member without pruning it disabled the walker instead.
       expect({ address, loadedModules, diagnostics }).toEqual({
         address,
         loadedModules: ['base', name],
@@ -349,11 +342,6 @@ describe('loadUniverseWithDiagnostics', () => {
     expect(survivor.registry.namespace.declaredKeys('action-slug')).toEqual(['item.base.dresser.search-drawer']);
     expect([...survivor.registry.tests.keys()]).toEqual(['walk.walk']);
 
-    // And the other side of the same fixture, which is what the key carrying no
-    // owner kind hid: the entity lost its action, so a `use:` aimed at the
-    // entity names nothing — even though an item of that id still answers to
-    // that address. It used to load clean and throw `engine.action.stale.action`
-    // in front of a player.
     const stranded = loadUniverseWithDiagnostics([base, ghost, walker('entity.base.dresser.search-drawer')]);
 
     expect({
@@ -476,8 +464,6 @@ describe('a module declares the language it is written in (c5)', () => {
       generated: true,
     });
     expect(es.locales.base.has('island.entity.giant-rat.title')).toBe(false);
-    // Addressable either way: the Spanish player is shown the key, which is
-    // exactly the gap a translator has to be told about (pass 2, c7).
     expect(es.locales.addressable.has('island.entity.giant-rat.title')).toBe(true);
   });
 
@@ -495,8 +481,6 @@ describe('a module declares the language it is written in (c5)', () => {
   });
 });
 
-// pass 1: `humanizeEn` also generates an action's label, and that half had no
-// gate — a Spanish module offered `Abrir Puerta` and reported nothing missing.
 describe('a generated action label is an English entry too (c5)', () => {
   const isla = (language: string) => loadUniverse([module('isla', '# info isla', 'version: 1.0.0', `language: ${language}`, '# location orilla', 'x: 0, y: 0', 'starting', 'entities:', '  puerta', '# entity puerta', 'uses: abrir-puerta', '# action abrir-puerta', 'instant', 'say: se abre')]);
 

@@ -8,8 +8,6 @@ const ref = (...path: string[]) => ({
   reference: { path },
 });
 
-// One verb, two payloads, and no ranking between them: an action is addressed
-// by a slug, which holds no space, and the two-sided form is spelled with one.
 describe('use: has two payloads and no line that is both', () => {
   it('reads a dotted address ending in a slug as the one-sided form', () => {
     expect(parseDirectiveLine('use: entity.mirror.look-in')).toEqual({
@@ -195,8 +193,6 @@ describe('open-modal: raises a screen by name', () => {
     ]);
   });
 
-  // The name belongs to the engine, so a payload no name could be is an
-  // unrecognised line rather than a screen this layer has an opinion about.
   it('reads a payload that is no name at all as no directive', () => {
     const bad = (line: string) => () => parseModule(['# test bad', line].join('\n'));
     expect(bad('open-modal: Carried Items')).toThrow(/unexpected line in # test/);
@@ -307,8 +303,6 @@ describe('the four growth verbs', () => {
     expect(() => parsed('apply: 1 with lesser-orb')).toThrow(/malformed apply: payload/);
   });
 
-  // The address a plane keys a cluster by is the address a directive writes, so
-  // a spelling `hexKey` would never have produced is refused where it is read.
   it('refuses a hex address the plane would not have written', () => {
     expect(() => parsed('apply: 1 at 01,0 with lesser-orb')).toThrow(/malformed hex address/);
     expect(() => parsed('apply: 1 at -0,0 with lesser-orb')).toThrow(/malformed hex address/);

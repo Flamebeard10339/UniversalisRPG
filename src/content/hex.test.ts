@@ -33,9 +33,6 @@ describe('the axial hex vocabulary', () => {
         expect(rotate(from, rotationOnto(from, to))).toBe(to);
       }
     }
-    // c7: slotting through a slot facing direction d carries the root's west
-    // edge onto opposite(d). An east-facing slot is therefore the identity
-    // (opposite(e) = w) and a west-facing slot a half turn (opposite(w) = e).
     expect(rotationOnto('w', opposite('e'))).toBe(0);
     expect(rotationOnto('w', opposite('w'))).toBe(3);
   });

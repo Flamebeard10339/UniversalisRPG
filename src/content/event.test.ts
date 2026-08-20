@@ -14,9 +14,6 @@ max: max-health
 
 const withEvent = (body: string): string => `${PRELUDE}\n# event moment\n${body}\n`;
 
-// The declaration each trigger needs to load, derived from the table rather
-// than listed beside it, so a trigger added to the table is covered here on the
-// line it is added.
 const wellFormed = (trigger: EventTrigger): string => withEvent(`trigger: ${trigger}${watchesAPool(trigger) ? '\nresource: health' : ''}`);
 
 describe('the closed set lives in trigger:', () => {
@@ -75,9 +72,6 @@ describe('a grant names a declared event and never an engine moment', () => {
   });
 });
 
-// A reference into a module that is not there is dropped rather than fatal —
-// that is what an optional dependency means — and a skill was the one section
-// kind the prune walk did not reach.
 const OPTIONAL = `
 # info m
 version: 1.0.0

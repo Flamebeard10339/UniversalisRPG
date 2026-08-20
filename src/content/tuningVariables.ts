@@ -6,8 +6,6 @@ export const MIN_DAMAGE = 'min-damage';
 export const CONTEST_SPREAD = 'contest-spread';
 export const DEFAULT_ACTION_DURATION = 'default-action-duration';
 
-// A tuning value nobody can mean is a load error, never a clamp: a silently
-// corrected sign is a typo that survives to be wondered about later.
 const REFUSED_BELOW: Readonly<Record<string, { least: number; why: string }>> = {
   [CONTEST_SPREAD]: {
     least: 1,

@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { loadModule } from './load';
 import { passiveRangeProblem } from './sections/passive';
 
-// c1: # passive is a section kind, its body the same tag-clause list # item
-// already uses.
 describe('# passive', () => {
   it('reads bare tags and stat-bonus payloads in one comma list', () => {
     const registry = loadModule('# stat max-health\n\n# passive hale\ntitle: Hale\nlife, +15 max-health');
@@ -33,8 +31,6 @@ describe('# passive', () => {
   });
 });
 
-// c1: a passive is held by whoever allocated it, so it answers the two moments
-// a character answers, out of the same field pair every other carrier spreads.
 describe('# passive carries the hook blocks a character modifier carries', () => {
   const SOURCE = `
 # stat attack
@@ -96,8 +92,6 @@ drain: 3 health from them
   });
 });
 
-// c2: a passive's payload may not be a range. tagClause produces a Range for
-// every +N stat, and it is the # passive schema's job to refuse it.
 describe('# passive refuses a range payload', () => {
   it('rejects +5-8 accuracy, naming the clause it rejected', () => {
     expect(() => loadModule('# stat accuracy\n\n# passive risky\n+5-8 accuracy')).toThrow(/\+5-8 accuracy is a range/);

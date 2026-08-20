@@ -10,8 +10,6 @@ const load =
   () =>
     loadModule([PASSIVES, ...lines].join('\n'));
 
-// c4: # cluster-jewel names a shape, says which edges are open, and fills
-// numbered positions with passives authored as <position> <passive> pairs.
 describe('# cluster-jewel', () => {
   it('reads a shape, open-connections and passives inline', () => {
     const registry = loadModule([PASSIVES, '# cluster-jewel keen-edge', 'shape: ring', 'open-connections: e', 'passives: 1 hale, 3 mending'].join('\n'));
@@ -57,8 +55,6 @@ describe('# cluster-jewel', () => {
   });
 });
 
-// c6: open-connections names between one and five of the five non-root
-// edges, each at most once; the west edge and a repeat are both refused.
 describe('open-connections', () => {
   it('accepts all five non-root edges at once', () => {
     const registry = loadModule([PASSIVES, '# cluster-jewel a', 'shape: point', 'open-connections: ne, nw, e, sw, se'].join('\n'));
