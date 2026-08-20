@@ -70,9 +70,6 @@ describe('the browser test harness', () => {
   it('carries the published view itself, so a field the runtime adds needs no edit here', () => {
     const held = snapshot();
 
-    // Identity, and not a comparison of fields: a projection that happened to
-    // agree today is the defect this clause exists to prevent, and only the
-    // same object cannot drift from what the runtime publishes.
     expect(testState(held).view).toBe(held.view);
   });
 
@@ -83,8 +80,6 @@ describe('the browser test harness', () => {
       ['talk:guide', 1],
       ['travel:yard', 2],
     ]);
-    // Still readable off the view, which is the half the projection used to
-    // answer and the half it kept losing.
     expect(state.view.resources[0].title).toBe('Energy');
     expect(state.view.player.name).toBe('Miri');
     expect(state.view.journey).toBeNull();
@@ -196,8 +191,6 @@ describe('the browser test harness', () => {
     const surfaces = createSurfaceRegistry();
     surfaces.register('shell', () => ({ actions: { layer: () => void channel.play('note', 'briefer than the settle') } }));
     const harness = installTestHarness(driver(snapshot(), [], channel), {}, {
-      // The settle outlasts the moment, which is the case a snapshot read gets
-      // wrong: by the time the step returns there is nothing on the screen.
       settle: async () => void expiring.splice(0).forEach((expire) => expire()),
       surfaces,
     });

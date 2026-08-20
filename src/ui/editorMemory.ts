@@ -1,29 +1,20 @@
 import { SURFACES, type SurfaceId } from './authoringSurface';
 import type { Point } from './viewport';
 
-// Where the author was, so that switching to Home and back does not change
-// what is on screen. It is a slot like any other and is written by the same
-// store the edits are in: one thing to be lost, and it is not lost.
-
 export const EDITOR_SLOT = 'editor';
 
 export interface MapWhere {
   pan: Point;
   zoom: number;
-  // The floor being looked at, and null for the one the player is standing on.
   plane: number | null;
 }
 
 export interface Editing {
   surface: SurfaceId;
-  // What the Global list is narrowed to, and null for every kind.
   kind: string | null;
-  // The section open, keyed the way the list keys one.
   open: string | null;
   cursor: number;
   scroll: number;
-  // What is in the field, which is not staged until it is sent: closing the tab
-  // mid-sentence loses the sentence otherwise, and nothing here is a command.
   draft: string | null;
   map: MapWhere;
 }
@@ -56,10 +47,6 @@ function mapWhere(value: unknown): MapWhere {
   };
 }
 
-// Field by field, and never all-or-nothing: a slot written by an older build
-// says less than this one asks for, and forgetting where the map was looking
-// because a field it never held is missing would be the whole memory lost for
-// the newest thing in it. What it cannot make sense of, it forgets.
 export function remembered(stored: string | null): Editing {
   if (stored === null) return FORGOTTEN;
   let parsed: unknown;

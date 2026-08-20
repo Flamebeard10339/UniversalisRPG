@@ -12,7 +12,6 @@ interface Part {
   type: string;
   code?: string;
   source?: string | Uint8Array;
-  // Which source files the chunk was rolled up from, as Rollup reports them.
   modules?: Record<string, unknown>;
 }
 
@@ -22,15 +21,6 @@ interface Emitted {
   from: string[];
 }
 
-// What a player's browser is actually handed. Built in memory rather than onto
-// disk: nothing is left behind for the next run to read instead of building,
-// and a dist/ someone happens to have is not what this passes or fails on.
-//
-// NODE_ENV, and not the mode, is what decides whether the build is a production
-// one — measured both ways, and a mode of production under a NODE_ENV of test
-// still emits the development bundle. The release runs this with NODE_ENV
-// unset; a test run has it set to test, so it is put back for the length of the
-// build and restored after.
 async function shipped(): Promise<Emitted[]> {
   const held = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
@@ -57,10 +47,6 @@ async function shipped(): Promise<Emitted[]> {
 
 const slashed = (path: string): string => path.replace(/\\/g, '/');
 
-// Every message a module can throw, as the parts of the literal that are not
-// interpolated. A minifier renames a binding and leaves a quoted string alone,
-// so this is the half of a name check that survives a production build — and it
-// is what a grep over dist/ found the builders by.
 function messages(text: string): string[] {
   return [...text.matchAll(/new Error\((`[^`]*`|'[^']*')/g)]
     .flatMap(([, literal]) => literal.slice(1, -1).split(/\$\{[^}]*\}/))
@@ -76,30 +62,17 @@ function sourcesUnder(directory: string): string[] {
   });
 }
 
-// Where the modules only a driving agent reaches live. The directory is the
-// whole derivation of the set — a module is agent-only because of where it is —
-// so this test and the source rule under surface.test.ts cannot disagree about
-// what the set is, and a third such module is covered from the day it is
-// written rather than from the day someone remembers to widen a list.
 export const AGENT_DIR = 'src/ui/agent';
 
 const OWNERS = sourcesUnder(resolve(here, 'agent')).map((path) => ({ path: slashed(path), text: readFileSync(path, 'utf8') }));
 
 const OWNED = new Set(OWNERS.map((module) => module.path));
 
-// A wording anything else in the tree also writes cannot say whether an
-// agent-only module reached the bundle, so it is dropped rather than reported.
-// Contained and not equal, because the shared half of a message is usually a
-// phrase inside a longer one.
 const ELSEWHERE = sourcesUnder(resolve(here, '..'))
   .filter((path) => !OWNED.has(slashed(path)))
   .map((path) => readFileSync(path, 'utf8'))
   .join('\n');
 
-// The exported names are read at run time rather than off a static import: a
-// static one would keep the modules in this test's own graph and, more to the
-// point, would be a list again. Every part of what is checked — the file, the
-// names it exports, the words only it can throw — comes off the module itself.
 const AGENT_ONLY = await Promise.all(
   OWNERS.map(async (module) => ({
     path: module.path,
@@ -108,8 +81,6 @@ const AGENT_ONLY = await Promise.all(
   })),
 );
 
-// The one name a minifier cannot rename, because it is the property the harness
-// is hung off the window by rather than a binding.
 const GLOBAL = '__test';
 
 describe('the bundle a release ships', () => {
@@ -122,10 +93,8 @@ describe('the bundle a release ships', () => {
   it('carries the content, and none of the modules only a driving agent reaches', async () => {
     const parts = await shipped();
 
-    // A build that emitted nothing would pass every absence below.
     expect(parts.map((part) => part.name)).toContain('index.html');
     expect(parts.filter((part) => part.text.includes('guide-house'))).not.toHaveLength(0);
-    // And a build that reported no modules would pass the first of them.
     expect(parts.flatMap((part) => part.from)).toContain(slashed(resolve(here, 'App.tsx')));
 
     for (const module of AGENT_ONLY) {

@@ -10,8 +10,6 @@ const GUIDE_HOUSE: Standing = { location: 'tutorial-island.guide-house', entitie
 
 const MIKI = SECTIONS.find((section) => section.kind === 'entity' && section.address === 'tutorial-island.miki')!;
 
-// What a control did, rather than what it meant to: the lines it sent, what it
-// said, whether it handed the module over, and where it left the author.
 function watching(editing: Editing, sections: readonly Section[] = SECTIONS): { controls: EditControls; sent: string[]; said: string[]; handed: number; at: Editing[] } {
   const sent: string[] = [];
   const said: string[] = [];
@@ -23,8 +21,6 @@ function watching(editing: Editing, sections: readonly Section[] = SECTIONS): { 
 
 const opened: Editing = { ...FORGOTTEN, open: sectionKey(MIKI) };
 
-// Every control there is, so a control added to the page is a control this file
-// stops compiling without a case for.
 const EXERCISED: Record<keyof EditControls, true> = {
   surface: true,
   kind: true,
@@ -121,8 +117,6 @@ describe('what the page draws, assembled once', () => {
     expect(items.length).toBeGreaterThan(0);
     expect(items.length).toBeLessThan(everything.length);
     expect([...new Set(items.map((section) => section.kind))]).toEqual(['item']);
-    // Local has no filter, so a kind set while Global was showing does not
-    // follow the author back to it.
     expect(rowsIn({ sections: SECTIONS, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'local', kind: 'item' } }).map(sectionKey)).toEqual(
       rowsIn({ sections: SECTIONS, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'local' } }).map(sectionKey),
     );

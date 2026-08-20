@@ -15,9 +15,6 @@ export interface TestResult {
   target: string;
   ok: boolean;
   state: TestState;
-  // Every moment that played since the previous step, which is what a read of
-  // the state cannot answer: a moment shorter than the settle between two steps
-  // has begun and ended by the time anything is asked.
   played: readonly Moment[];
   error?: string;
 }
@@ -32,24 +29,12 @@ export interface TestChoice {
 }
 
 export interface TestState {
-  // What the runtime published, whole and as it published it. Not a projection
-  // of it: a field the runtime starts publishing is readable the moment it is
-  // published, because there is no list here for anyone to forget to widen.
   view: PlayView;
-  // What the driver holds around the view, which the view does not carry: what
-  // the door reported about the universe this session opened over, whose
-  // session this is, the run under way, and what has been said so far.
   problems: readonly UniverseProblem[];
   dev: boolean;
   live: { label: string; active: boolean; progress: number; time: number } | null;
   transcript: LogEntry[];
-  // What the shell holds that the session does not: where the nav is standing,
-  // where the map is looking. Keyed by the component that registered it, so a
-  // component that is not mounted contributes no key rather than a stale one.
   surfaces: Record<string, unknown>;
-  // What the harness works out, beside the view and never in place of a field
-  // of it: the position each choice is dispatched by, and which of a stack of
-  // modals is the one actually being asked.
   choices: TestChoice[];
   modal: { name: string; key: string; label: string; values?: string[] } | null;
 }
@@ -70,9 +55,6 @@ interface TestHost {
   __test?: BrowserTestHarness;
 }
 
-// Where the mounted components put what they own. A surface is read through a
-// getter and not stored, because the closures a component registers belong to
-// the render that made them and the one an agent calls must be the current one.
 export interface SurfaceRegistry {
   register(name: string, read: () => TestSurface): () => void;
   actions(): string[];
@@ -80,9 +62,6 @@ export interface SurfaceRegistry {
   state(): Record<string, unknown>;
 }
 
-// A surface's action is called by the surface's name and the action's, joined:
-// two components may both own a `plane` without one of them having to know that
-// the other exists.
 const JOIN = '.';
 
 export function createSurfaceRegistry(): SurfaceRegistry {
@@ -180,8 +159,6 @@ export function installTestHarness(driver: Driver, host: TestHost = globalThis a
   const settle = options.settle ?? (() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
   const surfaces = options.surfaces ?? SURFACES;
   const state = (): TestState => testState(driver.snapshot(), surfaces.state());
-  // Where the last step read up to. Moved on by every step, taken or refused,
-  // so what one step reports is never reported again by the next.
   let cursor = driver.transient.playedSince(0).cursor;
   const since = (): readonly Moment[] => {
     const played = driver.transient.playedSince(cursor);
@@ -197,9 +174,6 @@ export function installTestHarness(driver: Driver, host: TestHost = globalThis a
     driver.answer(text(given.key, 'key'), text(given.value, 'value'));
   });
   actions.set('cancel', () => driver.cancel());
-  // The two ways out of a session that would not open. Named here rather than
-  // on a surface because they belong to the driver: a shell with no session
-  // has no component mounted that could offer them.
   actions.set('reopen', () => driver.reopen());
   actions.set('clear-local', () => driver.clearLocalChanges());
 

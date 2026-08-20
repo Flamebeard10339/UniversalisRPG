@@ -10,24 +10,12 @@ import type { PlaneGraph, Plane } from '../planeGraph';
 import { filled, type SkillPanel } from '../skillPanels';
 import type { TestSurface } from '../testSurface';
 
-// Everything here exists to be driven and nothing here is drawn, so the whole
-// module is reached by one dynamic import inside a branch the DEV constant
-// folds away. A component hands over the plain values it already holds and
-// names none of this; that is what keeps a release from carrying it.
-
-// A driving agent names a layer and a subpage the way the model does, so an
-// index it would have had to count to is never the thing it says. A name no
-// layer answers to is refused rather than clamped: an agent that asked for
-// somewhere that does not exist has to be told, where a player's drag past the
-// last layer is a gesture to hold at the edge.
 export function layerNamed(value: unknown): number {
   const at = LAYERS.findIndex((layer) => layer.id === value);
   if (at < 0) throw new Error(`no layer is named ${String(value)}`);
   return at;
 }
 
-// Within one layer, because a tab bar only ever offers the layer's own: an
-// agent reaching another layer's page would be doing something no player can.
 export function subpageNamed(layer: number, value: unknown): number {
   const held = clampIndex(layer, LAYERS.length);
   const at = LAYERS[held].subpages.findIndex((subpage) => subpage.id === value);
@@ -39,7 +27,6 @@ export interface ShellState {
   layer: LayerId;
   subpage: LabelId;
   layers: readonly LayerId[];
-  // The current layer's, which is what the tab bar is offering.
   subpages: readonly LabelId[];
 }
 
@@ -63,19 +50,12 @@ export function shellSurface(where: Where, go: (where: Where) => void): TestSurf
   };
 }
 
-// What a driving agent may hand the map, checked before anything moves. A
-// finger cannot pass a map a string or a plane it is not drawing; an agent can,
-// and being told which is a better answer than a map that has quietly gone to
-// NaN.
 export function pointFrom(value: unknown): Point {
   const { x, y } = (value ?? {}) as { x?: unknown; y?: unknown };
   if (typeof x !== 'number' || !Number.isFinite(x) || typeof y !== 'number' || !Number.isFinite(y)) throw new Error('a pan is an { x, y } of finite numbers');
   return { x, y };
 }
 
-// Clamped rather than refused, because the pinch it stands in for is clamped
-// too: asking for more zoom than there is is a legal gesture that ends at the
-// stop.
 export function zoomFrom(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error('a zoom is a finite number');
   return clampZoom(value);
@@ -91,9 +71,6 @@ export interface MapPlace {
   at: Point;
   here: boolean;
   climb: number;
-  // The position a driver dispatches to set off for it, and null where there is
-  // no way out to it — which is the whole of what the bubble's disabled state
-  // says, read as a value instead of off the markup.
   goes: number | null;
 }
 
@@ -117,15 +94,10 @@ export interface MapView {
 
 export interface MapControls {
   settle(pan: Point, zoom: number): void;
-  // Tapping a place, which is one handler and one decision: setting off for it,
-  // or standing in it at once. Whichever it is, what comes out is a line.
   go(id: string): void;
   plane(at: number): void;
   recentre(): void;
-  // Whether a drag on a place moves the place or the sheet under it.
   moving(on: boolean): void;
-  // Where a place was let go of, in the units a location declares. The same
-  // door a finger uses: what comes out of it is a `/dsl` line and nothing else.
   place(id: string, at: Point): void;
 }
 
@@ -140,9 +112,6 @@ export function mapState(map: MapView): MapState {
   };
 }
 
-// The four things the map holds that the session does not, offered by their
-// own names. Each goes through the same settling a gesture does, so a pan an
-// agent asks for and a pan a finger asks for come to rest in the same place.
 export function mapSurface(map: MapView, controls: MapControls): TestSurface {
   return {
     state: () => mapState(map),
@@ -167,11 +136,6 @@ export function mapSurface(map: MapView, controls: MapControls): TestSurface {
   };
 }
 
-// What the editing page holds that the session does not: which of the filters
-// is showing, what it is narrowed to, which section is open and what is in the
-// field. The rows are the page's own answer rather than a second reading of the
-// list, so a registration that says a row the page is not drawing is markup
-// that says it too.
 export interface EditState {
   surface: SurfaceId;
   surfaces: readonly SurfaceId[];
@@ -206,8 +170,6 @@ export function surfaceNamed(value: unknown): SurfaceId {
   return found;
 }
 
-// A row is opened by the heading it is drawn under, because an index into a
-// filtered list is not something an agent should have to count to.
 export function rowNamed(held: EditHeld, value: unknown): string {
   const found = rowsIn(held).map(sectionKey).find((key) => key === value);
   if (!found) throw new Error(`the editing page is not offering ${String(value)}`);
@@ -231,11 +193,6 @@ export function editSurface(held: EditHeld): TestSurface {
   };
 }
 
-// Where the plane put its nodes and which one is pressed, which is the whole of
-// what a focused plane holds that the view does not: the view publishes the
-// report and the edges, and turning those into points is the modal's. Pressing
-// a node is offered by name, because a point on a scaled sheet is not something
-// an agent should have to aim at.
 export function planeState(held: AgentSurfaces['plane']): PlaneState {
   return {
     instance: held.plane.instance,
@@ -249,7 +206,6 @@ export function planeState(held: AgentSurfaces['plane']): PlaneState {
 export interface PlaneState {
   instance: Answer;
   chosen: Answer | null;
-  // Whether the jewels a socket will take are the screen in front of the plane.
   picking: boolean;
   nodes: Array<{ key: Answer; at: Point; standing: string; socket: boolean; holds: boolean }>;
   edges: string[];
@@ -272,11 +228,6 @@ export function planeSurface(held: AgentSurfaces['plane']): TestSurface {
   };
 }
 
-// What each component hands over: the values it already holds and the callbacks
-// it already has, with no surface built at the call site.
-// What the skills page holds that the view does not: the levels and rings it
-// derived, and which panel is open. Opening one is offered by the skill's own
-// id, which is what the view names it by.
 export function skillsSurface(held: AgentSurfaces['skills']): TestSurface {
   return {
     state: () => ({

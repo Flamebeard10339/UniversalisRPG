@@ -9,17 +9,11 @@ import { pageStorage, REFUSING } from './agent/pageStorage';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
-// One driver over one storage, which is what a page has: `pageStorage` mints a
-// new one every call, and a reach that minted one per verb would be a driver
-// nothing could be written to.
 export function overStorage(limit?: number): ReturnType<typeof browserSlots> {
   const storage = pageStorage(limit);
   return browserSlots(() => storage);
 }
 
-// c11: the contract that pins the file-backed driver, run against this one. It
-// derives what it checks from the interface, so a verb added to `SlotDriver` is
-// a verb this adapter is held to with no edit here.
 describeSlotDriver('one localStorage key per slot', () => overStorage());
 
 describe('a slot lives under a key of its own (c11, c12)', () => {
@@ -44,8 +38,6 @@ describe('a slot lives under a key of its own (c11, c12)', () => {
     expect(driver.names().sort()).toEqual(['autosave', 'player']);
   });
 
-  // c12's other half: one origin may hold more than one build's slots, and the
-  // two do not see each other.
   it('keeps two prefixes apart under one storage', () => {
     const storage = pageStorage();
     const mine = browserSlots(() => storage, 'mine:');
@@ -59,8 +51,6 @@ describe('a slot lives under a key of its own (c11, c12)', () => {
     expect(mine.names()).toEqual(['player']);
   });
 
-  // c12: the instant comes back beside the payload rather than out of it, which
-  // is the store's rule and is what this adapter has to leave intact.
   it('stamps a payload that carries no stamp, through the browser and back', () => {
     const clock = { at: 5_000 };
     const store = slotStore(overStorage(), () => clock.at);
@@ -75,9 +65,6 @@ describe('a slot lives under a key of its own (c11, c12)', () => {
   });
 });
 
-// c13's half that belongs to the adapter: every mode it can tell apart is a
-// message rather than an exception nothing catches, and the slot is left
-// holding what it held. That the session then carries on is driver.test.ts's.
 describe('every way the browser can refuse to store is a message (c13)', () => {
   it('has a way to induce every refusal the adapter distinguishes', () => {
     expect(Object.keys(REFUSING).sort()).toEqual([...STORAGE_REFUSALS].sort());
@@ -88,8 +75,6 @@ describe('every way the browser can refuse to store is a message (c13)', () => {
       const driver = browserSlots(REFUSING[mode]());
       const wide = 'x'.repeat(256);
 
-      // A quota refuses only the write that will not fit; the others refuse
-      // every verb. Both are held to the same thing: a RuntimeError, named.
       expect(() => driver.write('player', wide)).toThrow(RuntimeError);
       expect(() => driver.write('player', wide)).toThrow(/slot player could not be written/);
 
@@ -113,10 +98,6 @@ describe('every way the browser can refuse to store is a message (c13)', () => {
   });
 });
 
-// Every module beneath src/ui that ships, and the entry point above it: a door
-// left out of the rule is a door with no rule on it. Tests are out because a
-// test is what induces the refusals above, and it does that by standing in for
-// the browser rather than by reaching one.
 function modulesUnder(directory: string, prefix: string): Array<{ file: string; text: string }> {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
@@ -126,10 +107,6 @@ function modulesUnder(directory: string, prefix: string): Array<{ file: string; 
   });
 }
 
-// The store this file is about, named once. Every other module under src/ui is
-// held to reaching storage through it, and the set is the tree rather than a
-// list, because the next surface that wants to remember something is what this
-// rule exists to catch.
 const ADAPTER = 'src/ui/browserStore.ts';
 
 const STORAGE = /\b(?:window\s*\.\s*)?(?:localStorage|sessionStorage|indexedDB)\b/;

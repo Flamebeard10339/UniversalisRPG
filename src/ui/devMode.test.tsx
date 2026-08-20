@@ -21,9 +21,6 @@ import { SHIPPED_UI } from './shell.test';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
-// How the dev strip is found in the markup: the role it carries, which nothing
-// else over the column uses. An attribute would have to spell `data-dev`, and
-// the rule above is that only one module in the tree may.
 const DEV_STRIP = 'role="status"';
 
 const pageSlots = (): SlotDriver => {
@@ -38,19 +35,12 @@ function playing(): { driver: Driver; slots: SlotDriver } {
 
 const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.map((entry) => String(entry.text));
 
-// Every command the table marks as a dev power. The set is the table's, so a
-// power added tomorrow is held to everything below on the day it is marked.
 const MARKED: readonly CommandSpec[] = COMMANDS.filter((spec) => spec.dev);
 
-// One argument each that the command acts on, so a walk over the marks is a
-// walk over what they do rather than over what they refuse.
 const ACTS_ON: Record<string, string> = { '/goto': 'tutorial-island.basement' };
 
 const lineFor = (spec: CommandSpec): string => `${spec.name}${ACTS_ON[spec.name] ? ` ${ACTS_ON[spec.name]}` : ''}`;
 
-// A world with a place on the map that no road reaches: the signpost puts
-// `isle` on the map without putting a way there, which is the state c9 is about
-// and one the shipped island has nowhere to stand in.
 const CUT_OFF: ModuleSource = {
   name: 'cut-off',
   text: [
@@ -81,7 +71,6 @@ const CUT_OFF: ModuleSource = {
   ].join('\n'),
 };
 
-// The same world, with the far place on the map and no way out to it.
 function cutOff(): Driver {
   const driver = createDriver([engineLocale(), CUT_OFF], { slots: pageSlots(), ticker: () => () => undefined });
   driver.send('use: entity.signpost.read-the-signpost');
@@ -105,15 +94,9 @@ describe('one answer gates every dev-only control (c6)', () => {
     const asDeveloper = renderToStaticMarkup(<App driver={driver} />);
 
     expect(asPlayer).not.toContain('data-dev');
-    // More than one, because a tree with a single marked surface would pass the
-    // line above for a reason that has nothing to do with the gate.
     expect([...asDeveloper.matchAll(/data-dev=/g)].length).toBeGreaterThan(1);
   });
 
-  // The banner half of the clause. Derived over the nav rather than rendered
-  // once at the opening page: what it promises is that somebody standing
-  // anywhere can read it, and a strip drawn on one page would satisfy a single
-  // render and nothing else.
   it("says whose session this is from every page there is, and says nothing while it is the player's", () => {
     const { driver } = playing();
     const everywhere = LAYERS.flatMap((layer, at) => layer.subpages.map((_, index) => toSubpage(toLayer(OPENING, at), at, index)));
@@ -130,9 +113,6 @@ describe('one answer gates every dev-only control (c6)', () => {
     }
   });
 
-  // And it is a reading of the same answer, not a second one: it is drawn
-  // through the gate, so there is no way to put it on the screen without the
-  // dev-only surfaces going on the screen with it.
   it('draws the strip through the same gate the surfaces go through', () => {
     expect(readFileSync(join(here, 'DevBanner.tsx'), 'utf8')).toContain('<DevOnly dev={dev}>');
   });
@@ -159,8 +139,6 @@ describe("the toggle is the dev slot's entry, not a second one (c7)", () => {
       for (const name of ['enterDev', 'leaveDev', 'devSnapshot', 'liveSlot', 'DEV_SLOT', 'DEV_SNAPSHOT_SLOT']) {
         expect(module.text, `${module.file} names ${name}`).not.toContain(name);
       }
-      // And sets no flag of its own: reading `snapshot.dev` is a reading, and
-      // an assignment to one would be the second copy c6 forbids.
       expect(module.text, `${module.file} assigns a dev flag`).not.toMatch(/\.dev\s*=[^=]/);
     }
   });
@@ -180,17 +158,10 @@ describe("the toggle is the dev slot's entry, not a second one (c7)", () => {
     driver.send(devLine(false));
     expect(driver.serialized()).toBe(before);
     expect(store.read(DEV_SNAPSHOT_SLOT)).toBeNull();
-    // What dev did is in the dev slot and in no other, which is the guarantee
-    // the REPL gets because it is the same call.
     expect(store.read(DEV_SLOT)).not.toBeNull();
     expect(store.read(PLAYER_SLOT)).toBeNull();
   });
 
-  // What leaving takes with it, and what it does not. The dev slot holds a
-  // game, and the local module is not one: an author's edits live in a slot no
-  // dev transition touches, so the work survives the exit that discards the
-  // session it was tested in. The editing surfaces being dev-only would be a
-  // trap if this were not true.
   it('leaves the staged edits where they were, because they are not a game', () => {
     const { driver } = playing();
     driver.send(devLine(true));
@@ -201,8 +172,6 @@ describe("the toggle is the dev slot's entry, not a second one (c7)", () => {
     driver.send(devLine(false));
 
     expect(driver.localChanges()).toBe(staged);
-    // And the session is playing them, because leaving dev restores a session
-    // that was opened over the same local module.
     expect(driver.snapshot().view.discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
   });
 });
@@ -217,9 +186,6 @@ describe('every dev power is a line the shared command table parses (c8)', () =>
     const repl = newContext(session, view(session));
 
     for (const spec of MARKED) {
-      // The GUI reaches it through the one dispatch, and the CLI reaches it
-      // with no gate at all — which is what keeps every `# test` going through
-      // `play-cli` unchanged (c11).
       const before = said(driver).length;
       driver.send(lineFor(spec));
       expect(said(driver).slice(before).some((line) => line.includes('dev power')), spec.name).toBe(false);
@@ -240,7 +206,6 @@ describe('tapping a place has one handler and one decision (c9)', () => {
     const driver = cutOff();
     driver.send(devLine(true));
     const far = 'isle';
-    // Nothing the player could tap: there is no way out to it from here.
     expect(driver.snapshot().view.choices.some((choice) => choice.leadsTo === far)).toBe(false);
     expect(tappedPlace(false, far, null)).toBeNull();
 
@@ -248,8 +213,6 @@ describe('tapping a place has one handler and one decision (c9)', () => {
 
     const after = driver.snapshot().view;
     expect(after.location.id).toBe(far);
-    // Discovery is spread, which is what standing somewhere does — asked of the
-    // engine's own report rather than of a flag this test knows the name of.
     expect(after.discovered.map((place) => place.id)).toContain(far);
     for (const road of after.choices.flatMap((choice) => (choice.leadsTo ? [choice.leadsTo] : []))) {
       expect(after.discovered.map((place) => place.id), road).toContain(road);
@@ -278,15 +241,10 @@ describe('there is one time multiplier (c10)', () => {
 
     driver.send(speedLine('4'));
     expect(driver.snapshot().speed).toBe(4);
-    // And the console reaches the same field, so the two are indistinguishable
-    // afterwards.
     driver.send('/speed 2.5');
     expect(driver.snapshot().speed).toBe(2.5);
   });
 
-  // What a multiplier may be is the command's question and not this layer's:
-  // the field hands over what was typed, and a refusal comes back from the one
-  // place that decides — with the dial where it was.
   it('hands over what was typed and lets the command refuse it', () => {
     const { driver } = playing();
     driver.send(devLine(true));
@@ -320,7 +278,6 @@ describe('with dev off, nothing changes (c11)', () => {
       expect(last, spec.name).toContain('dev power');
     }
 
-    // Nothing moved, and no dev slot was made by refusing one.
     expect(driver.serialized()).toBe(before);
     expect(slotStore(slots, () => 0).list()).not.toContain(DEV_SLOT);
     expect(slotStore(slots, () => 0).list()).not.toContain(DEV_SNAPSHOT_SLOT);

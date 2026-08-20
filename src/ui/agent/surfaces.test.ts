@@ -14,8 +14,6 @@ const place = (id: string, x: number, y: number, z: number, ...adjacent: string[
   adjacent: adjacent.map((to) => ({ to, open: true })),
 });
 
-// A house with a floor above and a cellar below, both stacked on the same x and
-// y as the hall, and a beach one unit east of it.
 const HOUSE: Place[] = [
   place('hall', 0, 0, 0, 'landing', 'cellar', 'beach'),
   place('landing', 0, 0, 1, 'hall'),
@@ -71,8 +69,6 @@ describe('the shell as a driving agent reaches it', () => {
   });
 });
 
-// Every control the map offers, doing nothing: a case names the one it is about
-// and a control added to the map is a control this stops compiling without.
 const INERT: MapControls = {
   settle: () => undefined,
   plane: () => undefined,

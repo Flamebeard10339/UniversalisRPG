@@ -4,9 +4,6 @@ import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { createDriver } from './driver';
 import { SHIPPED_SOURCES } from './shippedContent';
 
-// What content/ holds, under the one exclusion the bundle makes. Derived rather
-// than listed, because a listed answer is a second manifest and the glob is the
-// first: the pair drifted the moment a second module was authored.
 const authored = readdirSync('content')
   .filter((name) => name.endsWith('.dsl'))
   .map((name) => name.replace(/\.dsl$/, ''))
