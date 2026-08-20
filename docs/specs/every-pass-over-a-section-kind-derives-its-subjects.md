@@ -47,12 +47,18 @@ Proof:
   under a second one. A kind that parses and is then silently dropped by any of the three is a
   compile error.
   proof: `vitest scripts/exhaustive.test.ts`
-- [c5] **Nothing observable changes.** Every module under `content/` parses to a registry
+- [c5] **A union TypeScript narrows is a union the rule asks about.** `discriminantOf` accepts a
+  discriminant whenever every constituent declares a string literal at that property, which is
+  the checker's own test, rather than only when all of those literals differ. The subject set is
+  what the compiler treats as discriminated; a rule stricter than the checker drops unions
+  silently, and its failure mode is a clean report rather than a false alarm.
+  proof: `vitest scripts/exhaustive.test.ts`
+- [c6] **Nothing observable changes.** Every module under `content/` parses to a registry
   deep-equal to the one it parsed to at the merge base and prints to byte-identical text, and the
   suite is green. This branch moves declarations and narrows types; it decides nothing
   differently.
   proof: `npm test`
-- [c6] `npm run tasks -- merge-ready` passes before the spec is marked done.
+- [c7] `npm run tasks -- merge-ready` passes before the spec is marked done.
   proof: `npm run tasks -- merge-ready`
 
 ## Goal
@@ -73,7 +79,13 @@ one merges means reimplementing a derived proof that already exists and is mutat
 
 **Extends** the spine at `src/content/module.ts`, which already derives `SECTION_KINDS` from
 `PARSERS` and is the only place that knows what a kind is. **Extends** `scripts/exhaustive.test.ts`
-by feeding it three more switches rather than by changing it.
+by feeding it three more switches — and repairs its subject test, which pass 1 of that branch's
+own audit graded `unmet`: `discriminantOf` accepts a discriminant only when every constituent's
+literal is *distinct*, so `CommandOutput` — where `PlayerMessage` and `ToolMessage` both declare
+`kind: 'message'` — is not a subject at all, and `scripts/play-cli.ts:255` and
+`src/ui/transcript.ts:85` switch on it unguarded while TypeScript narrows both without complaint.
+That is c5, and it is this spec's to close because it is the same defect in miniature: a rule
+whose subjects are narrower than it claims reports clean over what it cannot see.
 
 **Adds** one capability: a per-kind row, and the check that keeps every question about a kind in
 it. **Retires** four lists — `NAMESPACED_KINDS`, `GLOBAL_SECTION_KINDS`, `ACTION_OWNER_KINDS`,
