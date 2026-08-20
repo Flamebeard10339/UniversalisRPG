@@ -132,8 +132,6 @@ describe('putting one node back in the middle', () => {
     expect(panOnto({ x: 0, y: 0 }, BOX, 2)).toEqual({ x: 400, y: 200 });
   });
 
-  // The property that makes it a recentring rather than a guess: whatever pan
-  // the sheet was left at, asking for a node puts that node in the middle.
   it('lands the node in the middle from wherever the sheet had got to', () => {
     const node = { x: 320, y: 40 };
     const zoom = 1.5;

@@ -9,10 +9,6 @@ import { planeGraph } from './planeGraph';
 import { panelFor, type Choice } from './planePanel';
 import { SHIPPED_SOURCES } from './shippedContent';
 
-// The plane a player reaches the way a player reaches it: the smith's chest,
-// the inventory screen, the sword in it, and the verb that grows one. Every
-// line is a screen being answered, which is what the shipped
-// `growing-through-the-inventory-screen` test walks too.
 const OPENING = [
   'load: growing-a-heartwood-blade-start',
   'use: entity.smiths-chest.open',
@@ -27,8 +23,6 @@ function opened(...more: string[]): Driver {
   return driver;
 }
 
-// The blade the shipped walk finishes with: three clusters, points spent in all
-// of them, and passives that actually pay.
 function grown(): Driver {
   const driver = createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
   for (const line of ['load: growing-a-heartwood-blade-end', 'open-modal: carried-items', 'submit-modal: item=1', 'submit-modal: verb=grow']) driver.send(line);
@@ -41,8 +35,6 @@ const choicesOf = (view: PlayView): readonly Choice[] => askedOption(view.modals
 
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'", '&#39;': "'" };
 
-// Every run of text the markup would put in front of a player, the way the
-// shell's other render rules read one.
 function readable(html: string): string[] {
   return html
     .replace(/aria-label="([^"]*)"/g, '\n$1\n')
@@ -52,9 +44,6 @@ function readable(html: string): string[] {
     .filter((run) => run !== '');
 }
 
-// A hexagon, as the plane spells one wherever it spells one: two whole numbers
-// with a comma between them. It is the coordinate the whole plane is keyed by,
-// and the thing this screen exists to stop a player having to read.
 const A_HEXAGON = /-?\d+\s*,\s*-?\d+/;
 
 describe('the plane a player drags', () => {
@@ -126,8 +115,6 @@ describe('what the panel says about the node that was pressed', () => {
     const graph = planeGraph(plane);
     const positions = plane.clusters.flatMap((cluster) => cluster.positions);
 
-    // A blade that has been grown pays something somewhere, or the rule below
-    // is being checked against a plane of empty lists.
     expect(positions.some((position) => position.payloads.length > 0)).toBe(true);
     for (const position of positions) {
       expect(panelFor(graph, position.node, choicesOf(view)).node!.payloads, position.node).toEqual(position.payloads);
@@ -145,8 +132,6 @@ describe('a socket with nothing through it', () => {
 
     expect(panel.jewels.length).toBeGreaterThan(0);
     for (const jewel of panel.jewels) expect(jewel.subject).toBeDefined();
-    // The move that fills it is never offered as the allocate beside it: one
-    // brings a copy and the other spends a point.
     expect(panel.acts).toBeNull();
   });
 

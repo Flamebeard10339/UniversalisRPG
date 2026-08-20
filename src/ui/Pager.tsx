@@ -12,29 +12,11 @@ interface Drag {
   release: () => void;
 }
 
-// The strip is as wide as its panes and is moved by whole panes, so a percent
-// translate is one pane and the pane width never has to be measured.
-//
-// A 2D translate, not a translate3d, and no `will-change`: either of those puts
-// the strip on its own compositor layer, and a layer is rastered once and then
-// moved as a picture — so every line of narration and every label on a choice
-// was drawn at whatever the layer happened to be rastered at and went soft. The
-// map learned this first and says so in the same words.
+// translate, never translate3d, and no `will-change`: a promoted layer is rastered once and the text on it goes soft.
 const restingAt = (index: number): string => `translate(${-index * 100}%, 0)`;
 
-// Panes side by side, moved under the finger and settled on release.
-//
-// Driven by mouse and touch events rather than by pointer events, which is the
-// whole reason this works over the narration column. A pointer stream is
-// cancellable, and a browser cancels it the moment it decides a scrollable
-// element under the finger is being scrolled — so the two panes with a
-// scrolling child were the two a drag kept dying on while the header above
-// them dragged perfectly. A mouse stream is never cancelled, and a touch move
-// can be refused, which is what stops the scroll instead of losing to it.
-//
-// The transform is written straight to the node rather than held in state: a
-// dragging finger produces a move event a frame, and the narration column has
-// no reason to re-render sixty times a second to answer one.
+// Mouse and touch events rather than pointer events: a browser cancels a pointer stream as soon as it
+// decides a scrollable element under the finger is scrolling, and a touch move can be refused instead.
 export function Pager({ index, onIndex, panes }: { index: number; onIndex: (index: number) => void; panes: ReactNode[] }): JSX.Element {
   const strip = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
@@ -52,8 +34,6 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
     if (strip.current) strip.current.style.transition = 'none';
   };
 
-  // True once the drag is this pager's, which is when a touch move has to be
-  // refused so the column beneath it does not scroll as well.
   const moveTo = (x: number, y: number, at: number): boolean => {
     const dragging = drag.current;
     if (!dragging) return false;
@@ -102,8 +82,6 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
         const move = (native: TouchEvent): void => {
           const touch = native.touches[0];
           if (!touch) return;
-          // Refusing the move is what keeps the browser from scrolling the
-          // column as well, and what keeps it from taking the gesture.
           if (moveTo(touch.clientX, touch.clientY, native.timeStamp) && native.cancelable) native.preventDefault();
         };
         const up = (native: TouchEvent): void => end(native.timeStamp, false);
@@ -117,7 +95,6 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
           window.removeEventListener('touchcancel', cancel);
         });
       }}
-      // A drag that ended over a choice is not a choice being made.
       onClickCapture={(event) => {
         if (!dragged.current) return;
         dragged.current = false;

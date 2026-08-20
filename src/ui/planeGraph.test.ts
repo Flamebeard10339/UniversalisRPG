@@ -12,11 +12,6 @@ const step = (hex: string, direction: Direction): string => {
   return hexKey({ q: at.q + NEIGHBOR_DELTA[direction].q, r: at.r + NEIGHBOR_DELTA[direction].r });
 };
 
-// A cluster of one shape, published the way the engine publishes one: every
-// position numbered, every position told which neighbouring hexes its edges
-// face, and a socket on every edge. Built from the catalogue rather than
-// written down, so a shape added to the catalogue is laid out by these tests
-// without anyone adding it here.
 function clusterOf(shape: Shape, hex: string, over: Partial<Cluster> = {}): Cluster {
   return {
     hex,
@@ -50,8 +45,6 @@ function clusterOf(shape: Shape, hex: string, over: Partial<Cluster> = {}): Clus
   };
 }
 
-// The edges the engine would publish for such a cluster: the shape's own
-// adjacency, and each socket onto the position its edge lands on.
 function linksOf(shape: Shape, hex: string): Plane['links'] {
   const links = shape.adjacency.map(([one, other]) => ({ from: `${hex}/${one}`, to: `${hex}/${other}` }));
   return [...links, ...DIRECTIONS.map((direction) => ({ from: `${hex}/${direction}`, to: `${hex}/${shape.edges[direction]}` }))];
@@ -73,11 +66,6 @@ function planeOf(shape: Shape, hex = '0,0'): Plane {
   };
 }
 
-// How much room every pair of nodes leaves beyond what the two of them take up.
-// A node is drawn at the touch floor and a socket is that square on its point,
-// so what each reaches is its own and the pair is judged on the sum — which is
-// what keeps this a rule about the layout rather than about one shape someone
-// measured.
 function clearances(nodes: ReturnType<typeof planeGraph>['nodes']): { tightest: number; between: string } {
   let tightest = Number.POSITIVE_INFINITY;
   let between = '';
@@ -156,8 +144,6 @@ describe('where a node goes inside its cluster', () => {
     const east = graph.nodes.find((node) => node.key === '0,0/4')!;
     const socket = graph.nodes.find((node) => node.key === '0,0/e')!;
 
-    // Position 4 is the one the east edge lands on, so it lies between the
-    // middle of the cluster and the socket on that edge.
     expect(east.at.y).toBeCloseTo(0, 6);
     expect(east.at.x).toBeGreaterThan(0);
     expect(socket.at.x).toBeGreaterThan(east.at.x);
@@ -195,8 +181,6 @@ describe('where a node goes inside its cluster', () => {
 
       expect(spanBetween(middle, inner.at)).toBeLessThan(spanBetween(middle, out.at));
       expect(spanBetween(middle, inner.at)).toBeGreaterThan(0);
-      // On the same line out of the middle, which is what makes it a ring
-      // inside a ring rather than a second ring turned by half a step.
       expect(out.at.x * inner.at.y - out.at.y * inner.at.x).toBeCloseTo(0, 3);
     }
   });
@@ -205,9 +189,6 @@ describe('where a node goes inside its cluster', () => {
 describe('two clusters either side of one edge', () => {
   const ring = shapeNamed('ring');
 
-  // The plane a slotted jewel makes: the origin, a cluster east of it that
-  // entered through the origin's east socket, and both of them publishing a
-  // socket on the edge they share.
   function joined(): Plane {
     const plane = planeOf(ring);
     const beyond = clusterOf(ring, '1,0', { entry: { hex: '0,0', direction: 'e' } });
@@ -227,7 +208,6 @@ describe('two clusters either side of one edge', () => {
     const onEdge = graph.nodes.filter((node) => node.socket && Math.abs(node.at.x - HEX_SPAN / 2) < 1e-6 && Math.abs(node.at.y) < 1e-6);
 
     expect(onEdge).toHaveLength(1);
-    // The one a point was spent on, so pressing it offers what it can do.
     expect(onEdge[0].key).toBe('0,0/e');
     expect(onEdge[0].standing).toBe('allocated');
   });
@@ -236,8 +216,6 @@ describe('two clusters either side of one edge', () => {
     const graph = planeGraph(joined());
     const touching = graph.edges.filter((edge) => spanBetween(edge.from, { x: HEX_SPAN / 2, y: 0 }) < 1e-6 || spanBetween(edge.to, { x: HEX_SPAN / 2, y: 0 }) < 1e-6);
 
-    // The east position of the origin, the west position of the cluster beyond,
-    // and the root the slot let in — which is the same west position, so two.
     expect(touching.length).toBe(2);
     expect(graph.nodes.every((node) => node.key !== '1,0/w')).toBe(true);
   });

@@ -1,12 +1,7 @@
 import { useRef } from 'react';
 
-// Reports how far it has been dragged from where it was taken hold of. What
-// that means for the surface is the caller's, which is what keeps this from
-// needing to know what is above or below it.
-//
-// Mouse and touch rather than pointer events, for the reason Pager.tsx carries:
-// the column above this handle scrolls, and a scroller takes a pointer stream
-// away.
+// Mouse and touch events rather than pointer events: the column above this handle scrolls, and a
+// browser cancels a pointer stream as soon as it decides a scroller under the finger has the gesture.
 export function Splitter({ onGrab, onDrag }: { onGrab: () => void; onDrag: (dy: number) => void }): JSX.Element {
   const from = useRef<number | null>(null);
   const release = useRef<() => void>(() => undefined);

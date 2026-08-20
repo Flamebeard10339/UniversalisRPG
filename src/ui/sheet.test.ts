@@ -5,14 +5,11 @@ import { asLocalized } from '../runtime/localizedFixture';
 import type { CountedRow, PlayStatus } from '../runtime/session';
 import { carried, contributionText, counted, worn } from './sheet';
 
-// A row's ids and counts belong to no language, so what they are read through is
-// what every other surface reads them through.
 const localizer = localizerFor(loadInEnglish(''), 'en');
 
 type CarriedRow = PlayStatus['carried'][number];
 type WornSlot = PlayStatus['equipment'][number];
 
-// A slot the world declares, and what the page calls one standing empty.
 const slot = (id: string, title: string): WornSlot => ({ slot: id, title: asLocalized(title), item: null, name: null });
 
 const EMPTY = asLocalized('Empty');
@@ -37,8 +34,6 @@ const plane = (over: Partial<Plane> = {}): Plane => ({
 
 type Contribution = PlayStatus['planes'][number]['contributions'][number];
 
-// One stat, keyed and named, so a row that spelled the id reads differently
-// from one that spelled the title.
 const STAT = { statId: 'mod.attack', statTitle: asLocalized('Attack') };
 
 const flat = (amount: number): Contribution => ({ ...STAT, added: { min: amount, max: amount }, increased: 0 });
@@ -59,8 +54,6 @@ describe('the counted rows the engine publishes, as a sheet draws them', () => {
     ]);
   });
 
-  // c9, c10: a row is called what the engine published it as, and sorts under
-  // that, so the id it was keyed under never reaches the page.
   it('names a row by the title the engine published on it', () => {
     expect(counted([number('base.guile', 'Guile', 3), number('base.attack', 'Attack', 7)], localizer)).toEqual([
       { id: 'base.attack', name: 'Attack', value: '7' },
@@ -137,9 +130,6 @@ describe('what the player is wearing, as rows', () => {
     ]);
   });
 
-  // c18: a grown copy is legible on the page it is listed on, and c21 makes this
-  // the only page a worn one is listed on — so the summary that tells two of
-  // them apart has to be here rather than only on the carried page.
   it('states a worn grown copy’s contribution beneath its name', () => {
     const rows = [row({ id: '1', name: asLocalized('Modified Blade'), grown: true, worn: { slot: 'mainhand', title: asLocalized('Main Hand') } })];
     const published = plane({ instance: '1', contributions: [flat(15)] });
@@ -157,18 +147,12 @@ describe('what the player is wearing, as rows', () => {
   it('draws a slot with nothing in it as a slot, and gives it nothing to open', () => {
     const rows = [row({ id: '1', name: asLocalized('Blade'), worn: { slot: 'mainhand', title: asLocalized('Main Hand') } })];
 
-    // A character wearing one thing has every other slot still, because a slot
-    // is somewhere to put something and not a thing the player happens to have.
     expect(worn([slot('mainhand', 'Main Hand'), slot('back', 'Back')], rows, [], localizer, EMPTY)).toEqual([
       { name: 'Back', value: 'Empty' },
       { id: '1', name: 'Main Hand', value: 'Blade' },
     ]);
   });
 
-  // c21: one copy, one page. The engine says which side a row is on and this
-  // page is the one that draws the worn side, so the carried page draws the rest.
-  // The two rows are of one item and are two copies, so the ids differ and the
-  // press each page sends reaches the copy that page drew.
   it('leaves the worn rows to this page and off the one that lists what is carried', () => {
     const rows = [
       row({ id: 'blade', name: asLocalized('Blade'), count: 2 }),

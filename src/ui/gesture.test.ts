@@ -86,7 +86,6 @@ describe('how fast the drag was going', () => {
 
   it('measures over the window, so a 1000Hz pointer is not a flick for reporting often', () => {
     let motion = motionFrom(0, 0);
-    // 120px in 240ms is 0.5px/ms, whatever rate the samples arrive at.
     for (let at = 1; at <= 240; at++) motion = sampleVelocity(motion, at * 0.5, at);
 
     expect(motion.velocity).toBeCloseTo(0.5, 2);

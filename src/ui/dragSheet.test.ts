@@ -7,8 +7,6 @@ import { ZOOM_MAX, ZOOM_MIN, type Point } from './viewport';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
-// The sheet, as the file it is. Everything below is a rule about what may name
-// what this one names.
 const SHEET = 'src/ui/DragSheet.tsx';
 
 function modulesUnder(directory: string, prefix: string): Array<{ file: string; text: string }> {
@@ -22,24 +20,12 @@ function modulesUnder(directory: string, prefix: string): Array<{ file: string; 
 
 const SOURCES = modulesUnder(here, 'src/ui');
 
-// Whoever draws on the sheet, derived rather than listed: a surface written
-// next month is held to this without anyone adding it here.
 const RIDERS = SOURCES.filter((source) => source.file !== SHEET && /from '\.\/DragSheet'/.test(source.text));
 
-// A gesture, in the two forms a component could write one: React's own handler
-// props, and the window listeners a drag has to keep going after the finger
-// leaves the element it started on.
 const A_GESTURE = [/onMouseDown\b/, /onTouchStart\b/, /onTouchMove\b/, /onWheel\b/, /onPointer(?:Down|Move|Up)\b/, /addEventListener\(\s*'(?:mousemove|mouseup|touchmove|touchstart|touchend|touchcancel|wheel)'/];
 
-// The other half of what a second implementation would look like: a rider
-// working out for itself where the sheet may be dragged to.
 const A_CLAMP = [/\bclampPan\b/, /\bsettled\b/, /\bzoomByWheel\b/, /\bpanAfterZoom\b/, /\bspanBetween\b/, /\bmidpoint\b/];
 
-// What the sheet is held to holding, so neither refusal above is vacuous.
-// `clampPan` is not among them: `settled` is the door onto it, and a sheet
-// reaching past that door would be the second implementation this file exists
-// to refuse. The gestures are the three devices a phone and a desk between them
-// have, plus the window listener a drag survives on.
 const THE_GESTURE = [/onMouseDown\b/, /onTouchStart\b/, /onWheel\b/, /addEventListener\(\s*'touchmove'/];
 const THE_CLAMP = A_CLAMP.filter((each) => !/clampPan/.test(each.source));
 
@@ -69,16 +55,10 @@ describe('the sheet every pannable surface is drawn on', () => {
   });
 });
 
-// A pointer as the handlers read one. The two effects a press has on the DOM —
-// stopping the event reaching the sheet, and capturing the pointer — are
-// recorded rather than performed, because they are the wiring and what is under
-// test is the decision.
 function pressing(x: number, y: number): { clientX: number; clientY: number; stopPropagation(): void; pointerId: number; currentTarget: { setPointerCapture(id: number): void } } {
   return { clientX: x, clientY: y, stopPropagation: () => undefined, pointerId: 1, currentTarget: { setPointerCapture: () => undefined } };
 }
 
-// What one press did: what the sheet was told to draw, and what it was told to
-// report when the gesture ended.
 function carrying(zoom = 1): { grip: Grip; held: { current: { id: string; from: Point } | null }; drawn: Array<Carried | null>; rested: Array<Carried | null> } {
   const held: { current: { id: string; from: Point } | null } = { current: null };
   const drawn: Array<Carried | null> = [];
@@ -96,8 +76,6 @@ describe('picking a thing up off the sheet and putting it down', () => {
     press(carried.grip, pressing(100, 100));
     move(carried.grip, pressing(140, 80));
 
-    // Halved, because the sheet is drawn at twice the size: what the finger
-    // moved on the screen is half that much of the sheet.
     expect(carried.drawn).toEqual([{ id: 'hall', by: { x: 0, y: 0 } }, { id: 'hall', by: { x: 20, y: -10 } }]);
   });
 
@@ -111,8 +89,6 @@ describe('picking a thing up off the sheet and putting it down', () => {
     expect(carried.held.current).toBeNull();
   });
 
-  // The whole of what a tap is: a press that ended where it started. Reporting
-  // one would stage a section edit restating coordinates nothing moved.
   it('reports nothing for a press that went nowhere, and nothing for one inside the slop', () => {
     for (const [x, y] of [[0, 0], [3, 0], [0, -4], [4, 4]]) {
       const carried = carrying();
@@ -123,10 +99,6 @@ describe('picking a thing up off the sheet and putting it down', () => {
     }
   });
 
-  // The same slop the pan is held to, measured on the screen rather than on the
-  // sheet, and at both ends of the zoom the sheet allows. Zoomed in, five
-  // pixels of finger is less of the sheet and still a tap; zoomed out it is
-  // more of the sheet and still a tap, which is the half a single zoom hides.
   for (const zoom of [ZOOM_MIN, 1, ZOOM_MAX]) {
     it(`measures the slop where the finger is and not where the sheet is, at ×${zoom}`, () => {
       const near = carrying(zoom);
@@ -152,7 +124,6 @@ describe('picking a thing up off the sheet and putting it down', () => {
     carried.grip.onPointerCancel(pressing(90, 90) as never);
 
     expect(carried.rested).toEqual([null]);
-    // The sheet can be panned again: a grip left held stands off every press.
     expect(carried.held.current).toBeNull();
   });
 

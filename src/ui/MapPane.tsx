@@ -12,21 +12,10 @@ import { tappedPlace } from './devMode';
 import { bounds, panOnto, tapTarget, type Point } from './viewport';
 import type { Words } from './words';
 
-// The map draws its own working out — the box a pan is held against — for
-// whoever is building the map. Read once, off the address, because a debug
-// surface that can be reached from inside the game is a debug surface that has
-// to be designed.
 const DEBUGGING = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
 
-// A place under the finger is drawn where the finger has taken it and is not
-// there yet: the registry learns about it once, on release, through the same
-// door a typed edit takes. A live drag that wrote coordinates as it went would
-// be a second path, unvalidated for the length of the gesture, and a refused
-// edit would be a state the map was already drawn in.
 const NOT_CARRIED: Point = { x: 0, y: 0 };
 
-// One place on the sheet. Its own component because the arrival it plays is
-// asked for through the channel, and a channel is reached by a hook.
 function Bubble({
   node,
   arrived,
@@ -43,21 +32,14 @@ function Bubble({
   walking: 'going' | 'crossing' | undefined;
   scale: number;
   held: (element: HTMLButtonElement | null) => void;
-  // What tapping this place does, and nothing when tapping it does nothing.
   go: (() => void) | null;
   dragged: () => boolean;
-  // Where the finger has carried it since it was picked up, in sheet pixels.
   carried: Point;
-  // Null when places are not being moved, which is what makes a press a tap.
   grip: Grip | null;
 }): JSX.Element {
   const spot = spotOf(node);
   const flash = useMoment('arrival', arrived, node.place.id);
 
-  // What the bubble looks like either way, and what is inside it. A control
-  // names on its own tag the action that drives it, and a tag cannot say
-  // "choose, unless places are being moved" — so the two behaviours are two
-  // controls over one appearance rather than one control that lies in a mode.
   const look = {
     ref: held,
     'data-place': node.place.id,
@@ -72,8 +54,6 @@ function Bubble({
 
   const inside = (
     <>
-      {/* Inside the control, so what it covers is what the control answers, and
-          sized against the zoom the sheet is drawn at. */}
       <span data-tap-target className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: tapTarget(scale), height: tapTarget(scale) }} />
       <span className="block max-w-[8rem] truncate">{node.place.title}</span>
     </>
@@ -137,9 +117,7 @@ export function MapPane({
   arrivals: readonly string[];
   generation: number;
   words: Words;
-  // Whose session this is, which is the whole of what the tap below decides on.
   dev: boolean;
-  // The map's slice of the one list, which is what a drag stages an edit out of.
   sections: readonly Section[];
   where: MapWhere;
   onWhere: (where: MapWhere) => void;
@@ -150,21 +128,13 @@ export function MapPane({
   const [plane, setPlane] = useState<number | null>(where.plane);
   const [moving, setMoving] = useState(false);
 
-  // A place with no way out to it is somewhere the player cannot set off for
-  // now, and the map says so by not being tappable rather than by saying why.
   const { plane: at, here, sheet, travels } = drawnFor(view, plane);
   const spots = sheet.nodes.map(spotOf);
   const hold = useSheetHold(spots, bubbles, JSON.stringify(sheet.nodes.map((node) => node.place.title)), where, (id, by) => letGo(id, by));
 
-  // The walk under way, as the engine published it, with the place the player
-  // is standing in at the head so a road on it is a pair of neighbours.
   const walk = walkLine(here, view.journey);
   const going = walk[walk.length - 1];
 
-  // Back to where the player is standing, on the floor they are standing on, at
-  // rest. The one control on the map that undoes a gesture rather than making
-  // one: a player who has wandered off across three z-layers has no other way
-  // back to themselves.
   const recentre = (): void => {
     const floor = view.discovered.find((place) => place.id === here)?.z ?? null;
     const drawn = drawnFor(view, floor);
@@ -173,9 +143,6 @@ export function MapPane({
     hold.settle(standing ? panOnto(spotOf(standing), bounds(drawn.sheet.nodes.map(spotOf)), 1) : { x: 0, y: 0 }, 1);
   };
 
-  // The one handler a tap on a place goes through, whichever of the two things
-  // it turns out to do. Both spell a line, so there is one route into the
-  // session from this page and the decision is made once (c9).
   const lineFor = (id: string): string | null => tappedPlace(dev, id, travels.get(id) ?? null);
 
   const go = (id: string): void => {
@@ -192,15 +159,8 @@ export function MapPane({
     if (node) answering(droppedAt(sections, node, carried), answer);
   }
 
-  // The one value the map both draws and hands over, assembled here and not
-  // twice. A registration that says a floor the map is not drawing is markup
-  // that says it too, so what a driving agent is told is what a player sees or
-  // a render test fails.
   const map = { plane: at, zoom: hold.zoom, pan: hold.pan, sheet, travels, moving };
 
-  // Where the map is looking, kept where the edits are so that reopening the
-  // page opens it here. Reported rather than written from inside the gesture,
-  // because the sheet comes to rest on every frame and a slot does not.
   useEffect(() => {
     onWhere({ pan: hold.pan, zoom: hold.zoom, plane });
   }, [hold.pan.x, hold.pan.y, hold.zoom, plane]);
@@ -227,8 +187,6 @@ export function MapPane({
           >
             {words('recentre')}
           </button>
-          {/* Moving places is a mode, because a drag on a place and a drag on
-              the sheet are the same gesture and only one of them can be it. */}
           <DevOnly dev={dev}>
           <button
             data-drive="map.moving"
@@ -243,9 +201,6 @@ export function MapPane({
           </button>
           </DevOnly>
           {map.sheet.planes.length > 1 ? (
-            // The floors, named by the number the author gave them. A word for
-            // up or down would be this layer writing prose; the number is the
-            // content's.
             <div className="absolute right-3 top-3 flex flex-col overflow-hidden rounded-xl border border-border bg-surface">
               {[...map.sheet.planes].reverse().map((floor) => (
                 <button
@@ -276,7 +231,6 @@ export function MapPane({
           key={`${node.place.id}-${arrivals.includes(node.place.id) ? generation : 0}`}
           node={node}
           arrived={arrivals.includes(node.place.id)}
-          // Where the walk ends, somewhere it still has to cross, or neither.
           walking={node.place.id === going ? 'going' : walk.includes(node.place.id) && !node.here ? 'crossing' : undefined}
           go={lineFor(node.place.id) === null ? null : () => go(node.place.id)}
           scale={map.zoom}

@@ -10,16 +10,6 @@ interface Drag {
   release: () => void;
 }
 
-// The layers as one tall column, moved behind a window one layer high.
-//
-// The banners are inside the column rather than pinned around it, which is what
-// makes each of them one strip and not two: crossing a boundary slides the
-// banner from the bottom of the window to the top of it, and the same node ends
-// the layer above and begins the layer below.
-//
-// Only the banners take a drag. A vertical drag anywhere else belongs to
-// whatever is scrolling under the finger, and the narration column is the thing
-// this surface exists to let the player read.
 export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onLayer: (layer: number) => void; banners: ReactNode[]; bodies: ReactNode[] }): JSX.Element {
   const frame = useRef<HTMLDivElement>(null);
   const column = useRef<HTMLDivElement>(null);
@@ -31,12 +21,9 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
 
   const offsets = layerOffsets(bands);
   const heights = bodyHeights(bands);
-  // 2D and unpromoted, for the reason the pager gives: a layer is rastered
-  // once and then moved as a picture, and the text on it goes soft.
+  // translate, never translate3d: a promoted layer is rastered once and the text on it goes soft.
   const restingAt = (at: number): string => `translate(0, ${-offsets[at]}px)`;
 
-  // The column is sized from what the banners actually measured, so a banner
-  // that grows a line of entities moves the layers rather than being clipped.
   useLayoutEffect(() => {
     const node = frame.current;
     if (!node) return;
@@ -95,10 +82,6 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
           </div>,
           ...(at < banners.length
             ? [
-                // A button, so the boundary is crossed by a tap with no gesture
-                // in it; the drag is the same control answering a longer press.
-                // Its accessible name is whatever the engine published inside
-                // it, which is the only thing a banner is allowed to say.
                 <button
                   key={`banner-${at}`}
                   data-drive="shell.layer"
