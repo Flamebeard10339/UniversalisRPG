@@ -1,7 +1,8 @@
 import { ENGINE_ROOTS } from '../grammar/condition';
 import { formatDependency, formatVersion, satisfies } from '../grammar/dependency';
 import { ModuleInfo, infoSchema } from './info';
-import { ModuleSection, SECTION_KINDS, parseModule } from './module';
+import { ModuleSection, parseModule } from './module';
+import { SECTION_KINDS } from './sectionKind';
 import { DslError } from '../grammar/parser';
 import { Authored, hydrateSection } from '../grammar/section';
 

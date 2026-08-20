@@ -1,7 +1,7 @@
 import { formatDependency, type Dependency } from '../grammar/dependency';
 import { DslError } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
-import { SECTION_KINDS } from './module';
+import { isSectionKind } from './sectionKind';
 import { parseModuleSource } from './universe';
 
 export const LOCAL_CHANGES_MODULE_ID = 'local-changes';
@@ -81,7 +81,7 @@ function parseLocalSection(sectionSource: string): LocalSection {
   if (sections.length !== 1) throw new DslError(`expected exactly one DSL section, got ${sections.length}`);
   const section = sections[0];
   if (section.kind === MANAGED_INFO) throw new DslError(`# info is managed by the local-changes file`);
-  if (!SECTION_KINDS.includes(section.kind)) throw new DslError(`unknown section kind: ${section.kind}`);
+  if (!isSectionKind(section.kind)) throw new DslError(`unknown section kind: ${section.kind}`);
   return section;
 }
 

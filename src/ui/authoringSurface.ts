@@ -1,5 +1,5 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
-import { GLOBAL_SECTION_KINDS, NAMESPACED_KINDS, qualify } from '../content/namespace';
+import { NAMESPACED_KINDS, qualify } from '../content/namespace';
 import type { ModuleSource } from '../content/universe';
 import { DslError } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
@@ -39,7 +39,7 @@ const HEADER_KIND = 'info';
 const normalized = (text: string): string => text.replace(/\r\n?/g, '\n');
 
 const addressOf = (module: string, kind: string, id: string): string =>
-  module === LOCAL_CHANGES_MODULE_ID || GLOBAL_SECTION_KINDS.includes(kind) || !NAMESPACED_KINDS.includes(kind) ? id : qualify(module, id);
+  module === LOCAL_CHANGES_MODULE_ID || !NAMESPACED_KINDS.includes(kind) ? id : qualify(module, id);
 
 // Every section one module holds. A module that will not split into sections
 // contributes none rather than stopping the survey: the load path has already

@@ -22,7 +22,7 @@ import { Recipe, recipeSkillValue } from './recipe';
 import { Registry } from './registry';
 import type { ModuleDiagnostic, UniverseLoadResult } from './registry';
 import { registryDiff } from './registryDiff';
-import { GLOBAL_SECTION_KINDS } from './namespace';
+import { GLOBAL_SECTION_KINDS } from './sectionKind';
 import type { ModuleSource, ParsedModule } from './universe';
 import { Slot } from './slot';
 import { Resource } from './resource';

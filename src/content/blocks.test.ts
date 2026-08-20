@@ -1,7 +1,8 @@
 import { readFileSync, readdirSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
-import { SECTION_KINDS, parseModule, parserFor, schemaFor } from './module';
+import { parseModule, parserFor, schemaFor } from './module';
+import { SECTION_KINDS } from './sectionKind';
 import { parseSaveSection } from './saveSection';
 import { parseAnySection } from '../grammar/section';
 import { answersForItsBlocks, splitSections } from '../grammar/structure';
@@ -141,7 +142,7 @@ describe('an indented block under a line whose reader never asked for one', () =
   // reach it, because the probe needs a body the parser accepts and a new kind
   // can be excused for having none.
   it('is demanded by every kind the loader can parse, whoever wrote its parser', () => {
-    const checked = [...SECTION_KINDS];
+    const checked: readonly string[] = SECTION_KINDS;
     // Held against the corpus route rather than against itself: every kind the
     // walk above reached, or excused, has to be one of the subjects here.
     const reached = new Set([...probes.map((probe) => probe.kind), ...UNPROBED_BY_CONTENT.map((entry) => entry.kind)]);

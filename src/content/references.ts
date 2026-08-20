@@ -3,7 +3,8 @@ import { Recipe } from './recipe';
 import { Registry } from './registry';
 import { Dialogue } from './dialogue';
 import { Directive, Test } from './test';
-import { isActionOwnerKind, NAMESPACED_KINDS } from './namespace';
+import { NAMESPACED_KINDS } from './namespace';
+import { isActionOwnerKind } from './sectionKind';
 import { INFLICT_SITE, Visit, visitSection } from './referenceSites';
 
 // Resolution qualifies a name; it cannot prove the name still points at

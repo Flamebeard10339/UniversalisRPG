@@ -39,7 +39,7 @@ describe('probe: what the loader says', () => {
   });
 
   it('counts a kind that carries no references, so a variable-only module does not read as empty', () => {
-    expect(text([{ name: 'v', text: '# info v\nversion: 1.0.0\n\n# variable travel-seconds-per-unit\nvalue: 5\n' }])).toMatch(/variables 1/);
+    expect(text([{ name: 'v', text: '# info v\nversion: 1.0.0\n\n# variable travel-seconds-per-unit\nvalue: 5\n' }])).toMatch(/variable 1/);
   });
 });
 
@@ -75,24 +75,24 @@ describe('probe: --show', () => {
     }
   });
 
-  it('shows the kinds that have no section kind of their own, under the name the summary counts them by', () => {
+  // The kinds that used to be showable only under their registry map's name.
+  // `variable` was the natural wrong guess when the two vocabularies were
+  // separate; the row gives every registry map a kind, so there is one
+  // vocabulary now and the guess is the right spelling.
+  it('shows a kind the reference walk finds nothing in, under its own name', () => {
     const source = { name: 'v', text: '# info v\nversion: 1.0.0\n\n# variable travel-seconds-per-unit\nvalue: 5\n' };
-    const summary = text([source]);
-    expect(summary).toContain('variables 1');
-    const shown = report([source], { show: ['variables.travel-seconds-per-unit'], roundTrip: false });
+    expect(text([source])).toContain('variable 1');
+    const shown = report([source], { show: ['variable.travel-seconds-per-unit'], roundTrip: false });
     expect(shown.ok).toBe(true);
     expect(shown.lines.join('\n')).toContain('"value": 5');
   });
 
-  // Two vocabularies — authoring kinds and registry map names — printed as one
-  // undifferentiated row is what made `variable` the natural wrong guess.
-  it('refuses an unknown name and lists the two vocabularies separately', () => {
+  it('refuses an unknown name and lists the one vocabulary there is', () => {
     const result = report([BASE], { show: ['widget.base.rat'], roundTrip: false });
     expect(result.ok).toBe(false);
     const lines = result.lines.join('\n');
     expect(lines).toContain('names nothing the registry holds');
     expect(lines).toMatch(/section kinds: .*\bentity\b/);
-    expect(lines).toMatch(/registry maps: .*\bvariables\b/);
     for (const [kind] of CONTENT_SECTION_MAPS) expect(lines).toContain(kind);
   });
 
@@ -257,7 +257,7 @@ describe('probe: stdin carrying several documents', () => {
   it('names a document with an id the loader accepts, so a variant that loads says so', () => {
     const documents = splitDocuments('stdin', '# variable a\nvalue: 1\n---\n# variable b\nvalue: 2\n');
     const report = probe(documents, { show: [], roundTrip: false, each: true });
-    expect(report.lines).toEqual(['stdin-1: loads — variables 1', 'stdin-2: loads — variables 1']);
+    expect(report.lines).toEqual(['stdin-1: loads — variable 1', 'stdin-2: loads — variable 1']);
   });
 });
 

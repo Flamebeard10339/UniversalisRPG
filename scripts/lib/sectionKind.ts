@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import { SECTION_KINDS } from '../../src/content/module';
+import { SECTION_KINDS } from '../../src/content/sectionKind';
 import { programOverShippedModules, relativeTo, repoRoot } from './shippedProgram';
 
 // A declaration that answers a question about section kinds. Its subjects are

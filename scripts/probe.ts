@@ -3,7 +3,6 @@ import path from 'node:path';
 import { formatVersion } from '../src/grammar/dependency';
 import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
-import { registryDiffMaps } from '../src/content/registryDiff';
 import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from '../src/content/serialize';
 import { type ModuleSource, type ParsedModule } from '../src/content/universe';
 
@@ -25,8 +24,11 @@ export interface ProbeReport {
   ok: boolean;
 }
 
-const KINDLESS_MAPS = registryDiffMaps().filter((map) => !CONTENT_SECTION_MAPS.some(([, named]) => named === map));
-const SHOWABLE = new Map<string, keyof Registry>([...CONTENT_SECTION_MAPS.map(([kind, map]) => [kind, map] as const), ...KINDLESS_MAPS.map((map) => [map as string, map] as const)]);
+// One vocabulary, because the row gives every registry map a kind to be named
+// by. `--show variables.x` used to be the spelling for the four maps no section
+// kind claimed, and `variable` was the natural wrong guess; it is now the right
+// one.
+const SHOWABLE = new Map<string, keyof Registry>(CONTENT_SECTION_MAPS);
 
 export const DOCUMENT_SEPARATOR = '---';
 
@@ -90,10 +92,6 @@ function counts(registry: Registry): string {
     const size = (registry[map] as ReadonlyMap<string, unknown>).size;
     if (size > 0) parts.push(`${kind} ${size}`);
   }
-  for (const map of KINDLESS_MAPS) {
-    const size = (registry[map] as ReadonlyMap<string, unknown>).size;
-    if (size > 0) parts.push(`${map} ${size}`);
-  }
   return parts.length > 0 ? parts.join(', ') : 'nothing';
 }
 
@@ -105,7 +103,7 @@ function showRecord(registry: Registry, spec: string): { lines: string[]; ok: bo
   const map = SHOWABLE.get(kind);
   if (map === undefined) {
     const kinds = CONTENT_SECTION_MAPS.map(([each]) => each).join(', ');
-    return { lines: [`${spec}: ${kind} names nothing the registry holds.`, `  section kinds: ${kinds}`, `  registry maps: ${KINDLESS_MAPS.join(', ')}`], ok: false };
+    return { lines: [`${spec}: ${kind} names nothing the registry holds.`, `  section kinds: ${kinds}`], ok: false };
   }
   const records = registry[map] as ReadonlyMap<string, unknown>;
   const record = records.get(id);

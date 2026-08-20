@@ -1,4 +1,5 @@
 import { Action } from '../grammar/action';
+import { SECTION_KIND, SECTION_KINDS, type SectionKind } from './sectionKind';
 import { ClusterJewel } from './clusterJewel';
 import { Dialogue } from './dialogue';
 import { DropTable } from './dropTable';
@@ -60,27 +61,19 @@ export interface Registry {
   locales: Locales;
 }
 
-// Each DSL section kind beside the registry map that holds it. `recipeActions`
-// and `dialoguesByOwner` are indexes over maps already listed, and `flag`,
-// `variable` and `save` carry no references to anything, so the pairs here are
-// every section a reference can be authored inside.
-export const CONTENT_SECTION_MAPS: readonly (readonly [string, keyof Registry])[] = [
-  ['entity', 'entities'],
-  ['action', 'actions'],
-  ['event', 'events'],
-  ['faction', 'factions'],
-  ['location', 'locations'],
-  ['item', 'items'],
-  ['passive', 'passives'],
-  ['cluster-jewel', 'clusterJewels'],
-  ['stat', 'stats'],
-  ['skill', 'skills'],
-  ['recipe', 'recipes'],
-  ['resource', 'resources'],
-  ['droptable', 'dropTables'],
-  ['dialogue', 'dialogues'],
-  ['test', 'tests'],
-];
+// Each section kind beside the registry map that holds it, read off the row.
+// The row spells a map as a string because it imports nothing; this is where
+// that string is held to being a map the registry actually has, so a row naming
+// one it does not have fails to compile here. Every kind that builds an object
+// is included, including the four the reference walk finds nothing in: a map is
+// a map, and asking a flag whether it names anything costs one visit that
+// returns.
+export const CONTENT_SECTION_MAPS: readonly (readonly [SectionKind, keyof Registry])[] = SECTION_KINDS.flatMap((kind) => {
+  const map = SECTION_KIND[kind].map;
+  return map === null ? [] : [[kind, map] as const];
+});
+
+export const registryMapOf = (kind: SectionKind): keyof Registry | null => SECTION_KIND[kind].map;
 
 export type ModuleLoadStage = 'parse' | 'order' | 'resolve' | 'merge' | 'build' | 'validate';
 

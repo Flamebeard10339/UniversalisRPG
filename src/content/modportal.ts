@@ -1,4 +1,4 @@
-import { GLOBAL_SECTION_KINDS } from './namespace';
+import { GLOBAL_SECTION_KINDS } from './sectionKind';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import { contributionBase, extractContributionDsl } from './contribution';
 import type { ContributionBase } from './contribution';
@@ -101,14 +101,16 @@ function cloned<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function rewriteHydratedSection(kind: string, value: { id: string }, from: string, to: string): { id: string } {
-  const next = cloned(value);
-  next.id = renamedId(next.id, from, to);
-  if (kind === 'entity') {
-    const entity = next as typeof next & { stats?: Record<string, unknown> };
-    if (entity.stats) entity.stats = Object.fromEntries(Object.entries(entity.stats).map(([statId, range]) => [renamedId(statId, from, to), range]));
+// A save is addressed by the key it hangs under and carries no `id` field, so
+// the field is rewritten where there is one and the key is rewritten either
+// way by the caller.
+function rewriteHydratedSection(kind: string, key: string, value: object, from: string, to: string): object {
+  const next = cloned(value) as { id?: string; stats?: Record<string, unknown> };
+  if (typeof next.id === 'string') next.id = renamedId(next.id, from, to);
+  if (kind === 'entity' && next.stats) {
+    next.stats = Object.fromEntries(Object.entries(next.stats).map(([statId, range]) => [renamedId(statId, from, to), range]));
   }
-  visitSection(kind, next, `# ${kind} ${value.id}`, (_kind, id) => renamedId(id, from, to));
+  visitSection(kind, next, `# ${kind} ${key}`, (_kind, id) => renamedId(id, from, to));
   return next;
 }
 
@@ -118,41 +120,25 @@ function localGlobalIds(parsed: ReturnType<typeof parseModuleSource>, moduleId: 
     .map((section) => renamedId((section.value as { id: string }).id, LOCAL_CHANGES_MODULE_ID, moduleId));
 }
 
-// Every section the rename has to reach, derived rather than restated: a kind
-// listed for the loader and forgotten here would keep its `local-changes.` id,
-// be dropped by serialize's own-module filter, and leave every reference that
-// WAS renamed pointing at a section the published mod no longer contains.
-// `flag`, `variable` and `slot` are the three the loader's partition leaves out
-// because they hold no references of their own; `save` is renamed separately
-// below. A global id carries no module prefix, so renaming a variable or a slot
-// finds nothing to rename and is listed for the day one of them does.
-const RENAMED_SECTION_MAPS: readonly (readonly [string, keyof Registry])[] = [
-  ...CONTENT_SECTION_MAPS,
-  ['flag', 'flags'],
-  ['variable', 'variables'],
-  ['slot', 'slots'],
-];
-
+// Every map the rename has to reach is every map a kind lands in, which the row
+// already answers. A kind listed for the loader and forgotten here would keep
+// its `local-changes.` id, be dropped by serialize's own-module filter, and
+// leave every reference that WAS renamed pointing at a section the published mod
+// no longer contains — so the list is the row's and not a second one. A global
+// id carries no module prefix, so renaming a variable or a slot finds nothing to
+// rename, and it costs a pass to be ready for the day one of them does.
 function renamedRegistry(loaded: Registry, moduleId: string): Registry {
   const registry = { ...loaded };
-  for (const [kind, mapName] of RENAMED_SECTION_MAPS) {
-    const sourceMap = loaded[mapName] as ReadonlyMap<string, { id: string }>;
+  for (const [kind, mapName] of CONTENT_SECTION_MAPS) {
+    const sourceMap = loaded[mapName] as ReadonlyMap<string, object>;
     const next = new Map(sourceMap);
     for (const [id, value] of sourceMap) {
       if (!id.startsWith(`${LOCAL_CHANGES_MODULE_ID}.`)) continue;
       next.delete(id);
-      const rewritten = rewriteHydratedSection(kind, value, LOCAL_CHANGES_MODULE_ID, moduleId);
-      next.set(rewritten.id, rewritten);
+      next.set(renamedId(id, LOCAL_CHANGES_MODULE_ID, moduleId), rewriteHydratedSection(kind, id, value, LOCAL_CHANGES_MODULE_ID, moduleId));
     }
-    (registry[mapName] as Map<string, { id: string }>) = next;
+    (registry[mapName] as Map<string, object>) = next;
   }
-  const saves = new Map(loaded.saves);
-  for (const [id, save] of loaded.saves) {
-    if (!id.startsWith(`${LOCAL_CHANGES_MODULE_ID}.`)) continue;
-    saves.delete(id);
-    saves.set(renamedId(id, LOCAL_CHANGES_MODULE_ID, moduleId), cloned(save));
-  }
-  registry.saves = saves;
   return registry;
 }
 

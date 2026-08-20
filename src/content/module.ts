@@ -1,4 +1,5 @@
 import { parseActionSection } from './action';
+import type { SchemaKind, SectionKind } from './sectionKind';
 import { clusterJewelSchema } from './clusterJewel';
 import { parseDialogue } from './dialogue';
 import { parseDropTable } from './dropTable';
@@ -9,7 +10,6 @@ import { flagSchema } from './flag';
 import { infoSchema } from './info';
 import { itemSchema } from './item';
 import { parseLocaleSection } from './locale';
-import type { SchemaKind } from './sectionKind';
 import { locationSchema } from './location';
 import { passiveSchema } from './passive';
 import { DslError } from '../grammar/parser';
@@ -25,9 +25,9 @@ import { RawSection, sectionParser, splitSections } from '../grammar/structure';
 import { parseTest } from './test';
 import { variableSchema } from './variable';
 
-// Every kind whose grammar is key/value, beside the schema that reads it.
-// Total over `SCHEMA_KINDS` rather than keyed by `string`, so a kind named
-// there and given no schema here does not compile.
+// Every kind whose grammar is key/value, beside the schema that reads it. Total
+// over the kinds the row says have a schema, so a kind answering `schema: true`
+// and given none here does not compile, and neither does the reverse.
 export const SCHEMAS = {
   info: infoSchema,
   item: itemSchema,
@@ -46,16 +46,16 @@ export const SCHEMAS = {
   'cluster-jewel': clusterJewelSchema,
 } satisfies Record<SchemaKind, AnySchema>;
 
-export type { SchemaKind };
-
 // The runtime lookup, where a kind is whatever a module wrote and may be
 // bespoke or nothing at all. The union above is for the exhaustiveness checks
 // that read it; this is for asking.
 export const schemaFor = (kind: string): AnySchema | undefined => (SCHEMAS as Record<string, AnySchema | undefined>)[kind];
 
+type SectionParser = (section: RawSection) => object;
+
 // A few kinds have a grammar too far from key/value to fit the generic engine
 // and bring their own parser. They merge on their own terms too — see mergeSection.
-const BESPOKE: Record<string, (section: RawSection) => object> = {
+const BESPOKE = {
   action: parseActionSection,
   dialogue: parseDialogue,
   droptable: parseDropTable,
@@ -63,29 +63,28 @@ const BESPOKE: Record<string, (section: RawSection) => object> = {
   save: parseSaveSection,
   remove: parseRemoval,
   locale: parseLocaleSection,
-};
+} satisfies Record<Exclude<SectionKind, SchemaKind>, SectionParser>;
 
-const PARSERS: Record<string, (section: RawSection) => object> = {
-  ...Object.fromEntries(Object.entries(SCHEMAS).map(([kind, schema]) => [kind, sectionParser((section: RawSection) => parseAnySection(section, schema))])),
-  ...BESPOKE,
-};
+const SCHEMA_PARSERS = Object.fromEntries(Object.entries(SCHEMAS).map(([kind, schema]) => [kind, sectionParser((section: RawSection) => parseAnySection(section, schema))])) as Record<SchemaKind, SectionParser>;
+
+const PARSERS = { ...SCHEMA_PARSERS, ...BESPOKE } satisfies Record<SectionKind, SectionParser>;
 
 // The table as something to ask questions of. `blocks.test.ts` asks whether
 // every kind's parser answers for the blocks it was handed, which is what
 // keeps that from being eight hand-written wraps nobody checks.
-export const parserFor = (kind: string): ((section: RawSection) => object) | undefined => PARSERS[kind];
+export const parserFor = (kind: string): SectionParser | undefined => (PARSERS as Record<string, SectionParser | undefined>)[kind];
 
-export const SECTION_KINDS: readonly string[] = Object.keys(PARSERS);
+export type { SchemaKind, SectionKind };
 
-export interface ModuleSection {
-  kind: string;
-  value: object;
-}
+// A parsed section, discriminated by its kind. What a parser returns is an
+// object either way; what the union buys is that a switch on `kind` is a switch
+// TypeScript narrows, so a pass over the set is total or does not compile.
+export type ModuleSection = { [K in SectionKind]: { kind: K; value: object } }[SectionKind];
 
 export function parseModule(source: string): ModuleSection[] {
   return splitSections(source).map((section) => {
-    const parse = PARSERS[section.kind];
+    const parse = parserFor(section.kind);
     if (!parse) throw new DslError(`unknown section kind: ${section.kind}`, section.span);
-    return { kind: section.kind, value: parse(section) };
+    return { kind: section.kind, value: parse(section) } as ModuleSection;
   });
 }

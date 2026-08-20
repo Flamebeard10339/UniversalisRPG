@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { kindTablesIn, report, type KindTable } from './lib/sectionKind';
+import { kindTablesIn, report, untotalledKindTables, type KindTable } from './lib/sectionKind';
 import { programOverSource, repoRoot } from './lib/shippedProgram';
-import { SECTION_KINDS } from '../src/content/module';
+import { SECTION_KIND, SECTION_KINDS } from '../src/content/sectionKind';
 
 // The rule's own subjects are the kinds the spine declares, so the fixtures
 // below borrow real ones rather than inventing names the rule would ignore.
@@ -49,5 +49,20 @@ describe('a question about a section kind is asked of the row', () => {
   it('names every kind the spine declares in what it reports', () => {
     expect(report([]).join('\n')).toContain(SECTION_KINDS.join(', '));
     expect(report([]).join('\n')).toContain(`${SECTION_KINDS.length} section kinds`);
+  });
+});
+
+describe('the tree has no per-kind fact outside the row', () => {
+  // c1, as an assertion rather than the report it landed as. `npm run
+  // section-kinds` prints the same derivation for a reader; this is the gate.
+  it('finds no list of kinds and no table a kind can be added behind', () => {
+    expect(untotalledKindTables().map((table) => `${table.where} ${table.name}: ${table.why}`)).toEqual([]);
+  });
+
+  // Without this the clause above passes over an empty tree, which is what a
+  // walk that stopped finding files would look like.
+  it('had a spine with kinds in it, and a row that answers for all of them', () => {
+    expect(SECTION_KINDS.length).toBeGreaterThan(15);
+    expect(Object.keys(SECTION_KIND).sort()).toEqual([...SECTION_KINDS].sort());
   });
 });

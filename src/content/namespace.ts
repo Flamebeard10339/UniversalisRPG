@@ -1,4 +1,5 @@
 import { DslError } from '../grammar/parser';
+import { OWNED_SECTION_KINDS } from './sectionKind';
 
 // The kinds whose ids are objects a module owns. `capability` and `variable`
 // are deliberately absent: a station is a contract between modules that never
@@ -10,20 +11,15 @@ import { DslError } from '../grammar/parser';
 // some entity's own block of that name.
 export const ACTION_MEMBER = 'action-slug';
 
-// The kinds that own one, which are the kinds a player is offered an action
-// from and so the kinds a `use:` leads with.
-export const ACTION_OWNER_KINDS = ['entity', 'location', 'item'] as const;
+// One node of one dialogue, whose visits the engine counts.
+export const DIALOGUE_NODE = 'node';
 
-export type ActionOwnerKind = (typeof ACTION_OWNER_KINDS)[number];
+// The kinds a module owns ids under that are not sections. Both hang under an
+// object rather than standing beside one, which is why the section kind row
+// cannot answer for them and this is not a per-kind fact held beside it.
+const MEMBER_KINDS: readonly string[] = [DIALOGUE_NODE, ACTION_MEMBER];
 
-export const isActionOwnerKind = (kind: string): kind is ActionOwnerKind => (ACTION_OWNER_KINDS as readonly string[]).includes(kind);
-
-// The section kinds whose ids belong to nobody, which is the same list read from
-// the other end: a module declares one but owns none, so serialize's own-module
-// filter cannot find it and the caller says which it declared.
-export const GLOBAL_SECTION_KINDS: readonly string[] = ['variable', 'slot'];
-
-export const NAMESPACED_KINDS: readonly string[] = ['stat', 'skill', 'item', 'entity', 'action', 'event', 'faction', 'location', 'recipe', 'resource', 'droptable', 'dialogue', 'test', 'save', 'flag', 'node', 'passive', 'cluster-jewel', ACTION_MEMBER];
+export const NAMESPACED_KINDS: readonly string[] = [...OWNED_SECTION_KINDS, ...MEMBER_KINDS];
 
 // A namespace is a prefix of segments; a module without one contributes none,
 // which is the empty case of the same rule rather than an exception to it.

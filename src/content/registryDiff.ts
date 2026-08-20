@@ -4,7 +4,7 @@ import { CONTENT_SECTION_MAPS, Registry } from './registry';
 // Asked for rather than held. This module is inside the cycle `serialize.ts`
 // closes now that the round trip lives there, so a binding read at load time
 // is a binding whose own module has not run yet.
-export const registryDiffMaps = (): readonly (keyof Registry)[] => [...CONTENT_SECTION_MAPS.map(([, map]) => map), 'flags', 'variables', 'slots', 'saves'];
+export const registryDiffMaps = (): readonly (keyof Registry)[] => CONTENT_SECTION_MAPS.map(([, map]) => map);
 
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable);

@@ -35,9 +35,10 @@ import { getShape } from './shapes';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
 import { mergeSection } from './merge';
 import { ModuleSection } from './module';
+import { isActionOwnerKind, isSectionKind, SectionKind } from './sectionKind';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
-import { ACTION_MEMBER, isActionOwnerKind, memberKey, Namespace, NAMESPACED_KINDS } from './namespace';
+import { ACTION_MEMBER, memberKey, Namespace, NAMESPACED_KINDS } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
 import {
   CONTENT_SECTION_MAPS,
@@ -467,11 +468,10 @@ function applySection(registry: Registry, section: ModuleSection, context: Hydra
   }
 }
 
-interface OwnedSection {
-  kind: string;
-  value: object;
-  module: ParsedModule;
-}
+// A parsed section and the module the merge attributed it to. It is a
+// `ModuleSection` and not a copy of one, so that handing it to a pass over the
+// kinds hands over the discrimination too.
+type OwnedSection = ModuleSection & { module: ParsedModule };
 
 interface BuildFailure {
   module: ParsedModule;
@@ -1024,7 +1024,7 @@ const wouldDeclare = (kind: string, value: MemberOwner): Member[] => declareMemb
 
 const memberIdentity = (member: Member): string => `${member.kind}\0${member.key}`;
 
-function reconcileMembers(namespace: Namespace, merged: Map<string, Map<string, OwnedSection>>, declared: ReadonlyMap<string, Member[]>): void {
+function reconcileMembers(namespace: Namespace, merged: Map<SectionKind, Map<string, OwnedSection>>, declared: ReadonlyMap<string, Member[]>): void {
   const survivingAcrossEveryKind = new Set<string>();
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
@@ -1046,7 +1046,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   // Two phases, because merging must happen on the authored form: a hydrated
   // object has every field filled in with defaults, so overlaying one would
   // silently reset everything the patch did not mention.
-  const merged = new Map<string, Map<string, OwnedSection>>();
+  const merged = new Map<SectionKind, Map<string, OwnedSection>>();
   const declaredMembers = new Map<string, Member[]>();
   const owners = new Map<string, ParsedModule>();
   const namespace = registry.namespace;
@@ -1080,7 +1080,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
           if (section.kind === 'remove') {
             const { kind, target, id } = section.value as Removal;
             if (!owns(kind)) continue;
-            if (!merged.get(kind)?.delete(target)) throw new DslError(`# remove ${id} names nothing that is loaded`);
+            if (!isSectionKind(kind) || !merged.get(kind)?.delete(target)) throw new DslError(`# remove ${id} names nothing that is loaded`);
             owners.delete(ownerKey(kind, target));
             // Undeclared here rather than during resolution, so that what a name
             // resolves to stays independent of load order while the namespace and
@@ -1126,7 +1126,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
       try {
-        applySection(registry, { kind, value: section.value }, { language: languages.get(registry.namespace.ownerOf(kind, (section.value as { id: string }).id) ?? null) ?? DEFAULT_LANGUAGE });
+        applySection(registry, section, { language: languages.get(registry.namespace.ownerOf(kind, (section.value as { id: string }).id) ?? null) ?? DEFAULT_LANGUAGE });
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
         return { failure: { module: section.module, stage: 'build', error } };
