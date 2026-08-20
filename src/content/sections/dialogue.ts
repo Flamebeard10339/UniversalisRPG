@@ -1,14 +1,12 @@
 import { ActionResult, parseResultLine, resultLines, startsResult } from '../../grammar/actionResult';
-import { Condition, condition, printReference, Reference } from '../../grammar/condition';
+import { Condition, condition } from '../../grammar/condition';
 import { Cursor, DslError, parseWhole } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
+import { parseSegments, printSegments, TextSegment } from '../../grammar/segment';
 import { indentLines, RawLine, takeBlock } from '../../grammar/structure';
-import { REFERENCE } from '../../grammar/values';
 import { overlay } from '../merge';
 import { section } from './define';
 import { condition as visitCondition, put, results, segments, type Visit } from '../refs';
-
-export type TextSegment = { kind: 'literal'; text: string } | { kind: 'interpolate'; reference: Reference } | { kind: 'conditional'; condition: Condition; text: string };
 
 // A line a dialogue speaks, and the address a `# locale` reaches its words by.
 // The key is stamped by the load path, which is the first place that knows both
@@ -48,65 +46,6 @@ const WHEN = /^when:[ \t]*(?<cond>.+)$/;
 const AGAIN = /^again:[ \t]?(?<text>.*)$/;
 const GOTO = /^goto[ \t]+(?<target>[a-z][a-z0-9-]*)$/;
 const CHOICE = /^->[ \t]+(?<text>.*?)(?:[ \t]+\(when[ \t]+(?<cond>[^)]+)\))?[ \t]*$/;
-
-function parseFragment(raw: string, base: number): TextSegment {
-  const colon = raw.indexOf(':');
-  if (colon === -1) {
-    const match = REFERENCE.exec(raw);
-    if (!match || match[0] !== raw)
-      throw new DslError(`malformed interpolation: {${raw}}`, {
-        start: base,
-        end: base + raw.length,
-      });
-    return { kind: 'interpolate', reference: { path: raw.split('.') } };
-  }
-  const parsedCondition = parseWhole(condition, raw.slice(0, colon), base, 'a conditional fragment');
-  return {
-    kind: 'conditional',
-    condition: parsedCondition,
-    text: raw.slice(colon + 1).replace(/^[ \t]/, ''),
-  };
-}
-
-// Exported because a `# locale` translates a spoken line into the same grammar
-// it was authored in, so the words a translator wrote are read back by the
-// reader that read the author's.
-export function parseSegments(text: string, base: number): TextSegment[] {
-  const segments: TextSegment[] = [];
-  let literalStart = 0;
-  let i = 0;
-  while (i < text.length) {
-    if (text[i] !== '{') {
-      i++;
-      continue;
-    }
-    if (i > literalStart) segments.push({ kind: 'literal', text: text.slice(literalStart, i) });
-    const close = text.indexOf('}', i + 1);
-    if (close === -1)
-      throw new DslError(`unterminated fragment: ${text.slice(i)}`, {
-        start: base + i,
-        end: base + text.length,
-      });
-    segments.push(parseFragment(text.slice(i + 1, close), base + i + 1));
-    i = close + 1;
-    literalStart = i;
-  }
-  if (literalStart < text.length) segments.push({ kind: 'literal', text: text.slice(literalStart) });
-  return segments;
-}
-
-// Exported because the load path records a spoken line's authored words as the
-// entry a `# locale` translates, and what it records has to be the same
-// spelling a translator will read back and write beside.
-export function printSegments(values: readonly TextSegment[] | undefined): string {
-  return (values ?? [])
-    .map((segment) => {
-      if (segment.kind === 'literal') return segment.text;
-      if (segment.kind === 'interpolate') return `{${printReference(segment.reference)}}`;
-      return `{${condition.print(segment.condition)}: ${segment.text}}`;
-    })
-    .join('');
-}
 
 function parseChoice(source: RawLine): Choice {
   const match = CHOICE.exec(source.text)?.groups;

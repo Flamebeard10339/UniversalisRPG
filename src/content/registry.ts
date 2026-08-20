@@ -67,10 +67,6 @@ export interface UniverseLoadResult {
   disabledModules: string[];
 }
 
-// What addresses a compiled craft, on the same terms a travel is addressed: an
-// id, because the label is display text no surface draws.
-export const CRAFT_ADDRESS = 'craft';
-
 export function formatModuleDiagnostic(value: ModuleDiagnostic): string {
   const at = value.line === undefined ? value.sourceName : `${value.sourceName}:${value.line}:${value.column}`;
   return `${at} [${value.moduleId}] ${value.stage}: ${value.message}`;

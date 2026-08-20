@@ -1,27 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import { condition } from '../grammar/condition';
-import { Action, entitySchema } from './sections/entity';
-import { itemSchema } from './sections/item';
-import { locationSchema } from './sections/location';
+import { Action, entity } from './sections/entity';
+import { item } from './sections/item';
+import { location } from './sections/location';
 import { loadModule, loadUniverse } from './load';
-import { SCHEMAS, parseModule, schemaFor } from './sections';
-import { sectionKinds } from './sections';
+import { Section, parseModule, sections } from './sections';
 import { Cursor, DslError, Parser, parseWhole } from '../grammar/parser';
 import { ListParser } from '../grammar/list';
 import { point } from '../grammar/range';
-import { SectionSchema, hydrateSection, isPositionalField, parseSection } from '../grammar/section';
-import { skillSchema } from './sections/skill';
-import { statSchema } from './sections/stat';
+import { Authored, DEFAULT_CONTEXT, HydrateContext, SectionSchema, hydrateSection, isPositionalField } from '../grammar/section';
+import { skill } from './sections/skill';
+import { stat } from './sections/stat';
 import { RawLine, splitSections } from '../grammar/structure';
-import { variableSchema } from './sections/variable';
+import { variable } from './sections/variable';
 import { tagClause } from '../grammar/tagClause';
 import { text } from '../grammar/values';
 
-function parseOne<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(source: string, schema: SectionSchema<H, F, E>) {
-  const sections = splitSections(source);
-  expect(sections).toHaveLength(1);
-  return parseSection(sections[0], schema);
+// A kind reads and hydrates its own sections, so a test naming `# item` goes
+// through the same door the loader does.
+function parseOne<V extends { id: string }, M extends Record<string, unknown>>(source: string, kind: Section<V, M>): Authored<V> {
+  const found = splitSections(source);
+  expect(found).toHaveLength(1);
+  return kind.parse(found[0]) as Authored<V>;
 }
+
+const hydrate = <V extends { id: string }, M extends Record<string, unknown>>(kind: Section<V, M>, authored: Authored<V>, context: HydrateContext = DEFAULT_CONTEXT): V => kind.build(authored, context);
 
 const ref = (...path: string[]) => ({
   kind: 'reference' as const,
@@ -35,7 +38,7 @@ const interpolate = (...path: string[]) => ({
 
 describe('items and tag clauses', () => {
   it('parses a bare-clause list, keeping duration and stat-bonus shapes', () => {
-    const shrimp = parseOne('# item cooked-shrimp\nexamine: A simple meal.\nfood, +3 regeneration, 60s', itemSchema);
+    const shrimp = parseOne('# item cooked-shrimp\nexamine: A simple meal.\nfood, +3 regeneration, 60s', item);
     expect(shrimp.examine).toBe('A simple meal.');
     expect(shrimp.tags).toEqual([
       { kind: 'keyword', value: 'food' },
@@ -52,7 +55,7 @@ describe('items and tag clauses', () => {
   // The two counters a `per` can name, spelled apart on the clause so no reader
   // has to guess which namespace an id came from.
   it('parses a counter-scaled stat bonus beside the flat and percent forms', () => {
-    const blade = parseOne('# item blade\n+4-7 attack, +2 attack per rage, +10% attack per rage, +1% attack per stack of vigor', itemSchema);
+    const blade = parseOne('# item blade\n+4-7 attack, +2 attack per rage, +10% attack per rage, +1% attack per stack of vigor', item);
     expect(blade.tags).toEqual([
       {
         kind: 'stat-bonus',
@@ -113,7 +116,7 @@ describe('items and tag clauses', () => {
   });
 
   it('rejects a labelled tags: with a message naming it as a bare field, not a tag-clause parse error', () => {
-    expect(() => parseOne('# item cooked-shrimp\nexamine: A simple meal.\ntags: food', itemSchema)).toThrow("item field tags must be written bare, without a 'tags:' label");
+    expect(() => parseOne('# item cooked-shrimp\nexamine: A simple meal.\ntags: food', item)).toThrow("item field tags must be written bare, without a 'tags:' label");
   });
 });
 
@@ -128,7 +131,7 @@ describe('the two carriers of a hook', () => {
   };
 
   it('reads on hit: on an entity as a hook rather than as an action or an on <event>: handler', () => {
-    const berserker = parseOne(['# entity berserker', 'uses: melee-combat', 'on hit:', '  restore: 1 rage', '  1 in 20:', '    drain: 4 health from them', 'when hit: drain: 2 health from them', 'on death: say: It falls.'].join('\n'), entitySchema);
+    const berserker = parseOne(['# entity berserker', 'uses: melee-combat', 'on hit:', '  restore: 1 rage', '  1 in 20:', '    drain: 4 health from them', 'when hit: drain: 2 health from them', 'on death: say: It falls.'].join('\n'), entity);
     expect(berserker.onHit).toEqual([
       { kind: 'pool', resource: 'rage', delta: point(1) },
       {
@@ -158,7 +161,7 @@ describe('the two carriers of a hook', () => {
   });
 
   it('reads both on an item, whose labelled blocks were actions until now', () => {
-    const blade = parseOne(['# item venomous-blade', 'slot: mainhand', '+4-7 attack', 'on hit: 1 in 4: drain: 3 health from them', 'when hit: drain: 2 health from them', 'swing: say: You swing it.'].join('\n'), itemSchema);
+    const blade = parseOne(['# item venomous-blade', 'slot: mainhand', '+4-7 attack', 'on hit: 1 in 4: drain: 3 health from them', 'when hit: drain: 2 health from them', 'swing: say: You swing it.'].join('\n'), item);
     expect(blade.onHit).toEqual([
       {
         kind: 'chance',
@@ -179,15 +182,15 @@ describe('the two carriers of a hook', () => {
   });
 
   it('refuses a hook on a section that carries no character modifier', () => {
-    expect(() => parseOne('# location camp\nx: 0, y: 0\non hit: drain: 2 health from them', locationSchema)).toThrow('write it on the `# entity` or `# item` that carries it');
+    expect(() => parseOne('# location camp\nx: 0, y: 0\non hit: drain: 2 health from them', location)).toThrow('write it on the `# entity` or `# item` that carries it');
   });
 
   it('refuses each defined more than once, the way any field of a section is', () => {
-    expect(() => parseOne('# entity rat\non hit: restore: 1 rage\non hit: restore: 2 rage', entitySchema)).toThrow('entity field on hit is defined more than once');
+    expect(() => parseOne('# entity rat\non hit: restore: 1 rage\non hit: restore: 2 rage', entity)).toThrow('entity field on hit is defined more than once');
   });
 
   it('names the field an author was one letter from, rather than reading the typo as an action', () => {
-    expect(() => parseOne('# item blade\non hi: restore: 1 rage', itemSchema)).toThrow('unknown item field: on hi, one letter from on hit');
+    expect(() => parseOne('# item blade\non hi: restore: 1 rage', item)).toThrow('unknown item field: on hi, one letter from on hit');
   });
 
   // A hook is a list field, so the section engine accepts `+`/`-` on it and
@@ -278,9 +281,9 @@ describe('comments', () => {
   });
 
   it('accepts CRLF line endings', () => {
-    const sections = parseModule('# item gold\r\nexamine: Small bright coins.\r\n# stat vigor\r\nbase: 3');
-    expect(sections.map((section) => section.kind)).toEqual(['item', 'stat']);
-    expect(sections[0].value).toMatchObject({
+    const parsed = parseModule('# item gold\r\nexamine: Small bright coins.\r\n# stat vigor\r\nbase: 3');
+    expect(parsed.map((section) => section.kind)).toEqual(['item', 'stat']);
+    expect(parsed[0].value).toMatchObject({
       id: 'gold',
       examine: 'Small bright coins.',
     });
@@ -289,36 +292,36 @@ describe('comments', () => {
 
 describe('stat and skill', () => {
   it('leaves stat base and title absent, defaulting them in hydration', () => {
-    const stat = parseOne('# stat attack', statSchema);
-    expect(stat).toEqual({ id: 'attack' });
-    const hydrated = hydrateSection(stat, statSchema);
+    const attack = parseOne('# stat attack', stat);
+    expect(attack).toEqual({ id: 'attack' });
+    const hydrated = hydrate(stat, attack);
     expect(hydrated.title).toBe('Attack');
     expect(hydrated.base).toEqual(point(0));
   });
 
   it('leaves a gathering skill stat-id undefined, since it has no default', () => {
-    const skill = parseOne('# skill mining', skillSchema);
-    expect(skill['stat-id']).toBeUndefined();
-    expect(hydrateSection(skill, skillSchema).title).toBe('Mining');
+    const mining = parseOne('# skill mining', skill);
+    expect(mining['stat-id']).toBeUndefined();
+    expect(hydrate(skill, mining).title).toBe('Mining');
   });
 });
 
 describe('variable', () => {
   it('parses a decimal value', () => {
-    const variable = parseOne('# variable travel-seconds-per-unit\nvalue: 5', variableSchema);
-    expect(variable).toEqual({ id: 'travel-seconds-per-unit', value: 5 });
+    const perUnit = parseOne('# variable travel-seconds-per-unit\nvalue: 5', variable);
+    expect(perUnit).toEqual({ id: 'travel-seconds-per-unit', value: 5 });
   });
 
   it('leaves an omitted value absent so the consumer applies its own fallback', () => {
-    const variable = parseOne('# variable travel-seconds-per-unit', variableSchema);
-    expect(variable.value).toBeUndefined();
-    expect(hydrateSection(variable, variableSchema).value).toBeUndefined();
+    const perUnit = parseOne('# variable travel-seconds-per-unit', variable);
+    expect(perUnit.value).toBeUndefined();
+    expect(hydrate(variable, perUnit).value).toBeUndefined();
   });
 });
 
 describe('location: schema-aware line parsing', () => {
   it('parses several fields from one line', () => {
-    const loft = parseOne('# location loft\nx: 0, y: 0, z: 1\nentities: stairs-down, 3 window', locationSchema);
+    const loft = parseOne('# location loft\nx: 0, y: 0, z: 1\nentities: stairs-down, 3 window', location);
     expect(loft).toEqual({
       id: 'loft',
       x: 0,
@@ -329,23 +332,23 @@ describe('location: schema-aware line parsing', () => {
   });
 
   it('keeps commas inside a free-text field while splitting a coordinate line', () => {
-    const beach = parseOne("# location beach\nx: 1, y: 0\nexamine: Wow, isn't this place empty?", locationSchema);
+    const beach = parseOne("# location beach\nx: 1, y: 0\nexamine: Wow, isn't this place empty?", location);
     expect(beach.x).toBe(1);
     expect(beach.y).toBe(0);
     expect(beach.examine).toBe("Wow, isn't this place empty?");
   });
 
   it('parses adjacency inline and as a block, with edge conditions', () => {
-    const inline = parseOne('# location beach\nx: 1, y: 0\nadjacent: guide-house, bridge', locationSchema);
+    const inline = parseOne('# location beach\nx: 1, y: 0\nadjacent: guide-house, bridge', location);
     expect(inline.adjacent).toEqual([{ target: 'guide-house' }, { target: 'bridge' }]);
 
-    const block = parseOne('# location bridge\nx: 2, y: 0\nadjacent:\n  beach\n  bank while bridge-open', locationSchema);
+    const block = parseOne('# location bridge\nx: 2, y: 0\nadjacent:\n  beach\n  bank while bridge-open', location);
     expect(block.adjacent).toEqual([{ target: 'beach' }, { target: 'bank', condition: ref('bridge-open') }]);
   });
 
   it('parses the full corpus guide-house end to end, including the starting flag', () => {
     const source = ['# location guide-house', 'x: 0, y: 0', 'starting', 'adjacent:', '  beach while front-door.unlocked', 'entities:', '  miki, stairs-up, front-door, dresser, bookshelf, painting, mirror'].join('\n');
-    expect(parseOne(source, locationSchema)).toEqual({
+    expect(parseOne(source, location)).toEqual({
       id: 'guide-house',
       x: 0,
       y: 0,
@@ -356,63 +359,63 @@ describe('location: schema-aware line parsing', () => {
   });
 
   it('defaults an absent starting flag to false on hydration', () => {
-    const plain = parseOne('# location plain-room\nx: 1, y: 0', locationSchema);
+    const plain = parseOne('# location plain-room\nx: 1, y: 0', location);
     expect(plain.starting).toBeUndefined();
-    expect(hydrateSection(plain, locationSchema).starting).toBe(false);
+    expect(hydrate(location, plain).starting).toBe(false);
   });
 });
 
 describe('parser guards', () => {
   it('makes a free-text field line-terminal (M1)', () => {
-    const beach = parseOne('# location beach\nx: 1, y: 0\ntitle: Sunny, warm, x: 9', locationSchema);
+    const beach = parseOne('# location beach\nx: 1, y: 0\ntitle: Sunny, warm, x: 9', location);
     expect(beach.title).toBe('Sunny, warm, x: 9');
     expect(beach.x).toBe(1);
   });
 
   it('parses a relative position and rejects defining position two ways (M2)', () => {
-    const dock = parseOne('# location dock\neast of bridge', locationSchema);
+    const dock = parseOne('# location dock\neast of bridge', location);
     expect(dock.relative).toEqual({ direction: 'east', of: 'bridge' });
     expect(dock.x).toBeUndefined();
-    expect(() => parseOne('# location dock\nx: 0, y: 0\neast of bridge', locationSchema)).toThrow(/cannot both be set/);
+    expect(() => parseOne('# location dock\nx: 0, y: 0\neast of bridge', location)).toThrow(/cannot both be set/);
   });
 
   // Both halves used to load with the block dropped and nothing said, which is
   // what the result readers each carry their own copy of this rule to prevent.
   it('rejects a key written inline and as a block, rather than keeping the inline half', () => {
-    expect(() => parseOne('# entity rat\nstats: vigor 3\n  attack 4', entitySchema)).toThrow('entity field stats is written inline and as a block; give it one');
-    expect(() => parseOne('# item blade\non hit: restore: 1 rage\n  restore: 5 rage', itemSchema)).toThrow('item field on hit is written inline and as a block; give it one');
+    expect(() => parseOne('# entity rat\nstats: vigor 3\n  attack 4', entity)).toThrow('entity field stats is written inline and as a block; give it one');
+    expect(() => parseOne('# item blade\non hit: restore: 1 rage\n  restore: 5 rage', item)).toThrow('item field on hit is written inline and as a block; give it one');
     // The labelled-block route, two lines down from the declared-field one and
     // the same silence.
-    expect(() => parseOne('# entity rat\nswing: say: a\n  say: b', entitySchema)).toThrow('entity swing: is written inline and as a block; give it one');
+    expect(() => parseOne('# entity rat\nswing: say: a\n  say: b', entity)).toThrow('entity swing: is written inline and as a block; give it one');
   });
 
   // The block hangs off the whole line, so only the key that ends the line could
   // have taken it. Asking `is anything left on this line` instead refuses a
   // comma list whose last key is the one with the block.
   it('leaves a comma line whose last key takes the block alone', () => {
-    const camp = parseOne('# location camp\ny: 0, x: 1, adjacent:\n  grove', locationSchema);
+    const camp = parseOne('# location camp\ny: 0, x: 1, adjacent:\n  grove', location);
     expect(camp).toMatchObject({ x: 1, y: 0, adjacent: [{ target: 'grove' }] });
   });
 
   it('rejects a field defined twice', () => {
-    expect(() => parseOne('# location dock\nx: 0\nx: 1', locationSchema)).toThrow(/defined more than once/);
+    expect(() => parseOne('# location dock\nx: 0\nx: 1', location)).toThrow(/defined more than once/);
   });
 
   it('treats an empty value as unspecified — indistinguishable from absent (L7)', () => {
-    const loc = parseOne('# location void\nx: \ny: 0', locationSchema);
+    const loc = parseOne('# location void\nx: \ny: 0', location);
     expect(loc.x).toBeUndefined();
     expect(loc.y).toBe(0);
-    expect(hydrateSection(loc, locationSchema).x).toBe(0);
+    expect(hydrate(location, loc).x).toBe(0);
 
-    const empty = parseOne('# location void\nx: 0\nentities:', locationSchema);
-    const absent = parseOne('# location void\nx: 0', locationSchema);
+    const empty = parseOne('# location void\nx: 0\nentities:', location);
+    const absent = parseOne('# location void\nx: 0', location);
     expect(empty).toEqual(absent);
   });
 });
 
 describe('entity actions', () => {
   it('parses an inline action and a space-labelled block action', () => {
-    const stairs = parseOne('# entity stairs-up\ntitle: Stairs\nascend: relocate: guide-house-upstairs, say: You climb the stairs.', entitySchema);
+    const stairs = parseOne('# entity stairs-up\ntitle: Stairs\nascend: relocate: guide-house-upstairs, say: You climb the stairs.', entity);
     expect(stairs.blocks).toEqual([
       {
         label: 'ascend',
@@ -423,7 +426,7 @@ describe('entity actions', () => {
       },
     ]);
 
-    const window = parseOne(['# entity window', 'look through:', '  discover: beach', '  say: Through the window, a bridge.'].join('\n'), entitySchema);
+    const window = parseOne(['# entity window', 'look through:', '  discover: beach', '  say: Through the window, a bridge.'].join('\n'), entity);
     expect(window.blocks).toEqual([
       {
         label: 'look through',
@@ -437,7 +440,7 @@ describe('entity actions', () => {
 
   it('parses every result verb, accepting both set forms', () => {
     const source = ['# entity chest', 'loot:', '  set drawers-open', '  unset: sealed', '  give: 12 coins', '  take: 5 cooked-shrimp', '  xp: thieving 4', '  open modal: name-editor'].join('\n');
-    expect(parseOne(source, entitySchema).blocks?.[0].results).toEqual([
+    expect(parseOne(source, entity).blocks?.[0].results).toEqual([
       { kind: 'set', variable: 'drawers-open' },
       { kind: 'unset', variable: 'sealed' },
       { kind: 'give', item: 'coins', amount: point(12) },
@@ -449,16 +452,16 @@ describe('entity actions', () => {
 
   it('parses add: with and without an explicit amount, defaulting to 1', () => {
     const source = ['# entity chest', 'loot:', '  add: rats-killed', '  add: coins-found 5'].join('\n');
-    expect(parseOne(source, entitySchema).blocks?.[0].results).toEqual([
+    expect(parseOne(source, entity).blocks?.[0].results).toEqual([
       { kind: 'add', variable: 'rats-killed', amount: 1 },
       { kind: 'add', variable: 'coins-found', amount: 5 },
     ]);
   });
 
   it('defaults an entity title from its id and hydrates empty actions', () => {
-    const miki = parseOne('# entity miki\nexamine: A tall man.', entitySchema);
+    const miki = parseOne('# entity miki\nexamine: A tall man.', entity);
     expect(miki.blocks).toBeUndefined();
-    const hydrated = hydrateSection(miki, entitySchema);
+    const hydrated = hydrate(entity, miki);
     expect(hydrated.title).toBe('Miki');
     expect(hydrated.blocks).toEqual([]);
   });
@@ -467,7 +470,7 @@ describe('entity actions', () => {
 describe('entity action modifiers', () => {
   it('parses requires, hidden if, bare tags and on success, treating require as requires', () => {
     const source = ['# entity front-door', 'pick lock:', '  requires: lockpick', '  hidden if: unlocked', '  instant', '  xp: thieving 4', '  on success:', '    set: unlocked', '    say: The lock clicks.'].join('\n');
-    const door = parseOne(source, entitySchema);
+    const door = parseOne(source, entity);
     expect(door.blocks).toEqual([
       {
         label: 'pick lock',
@@ -482,13 +485,13 @@ describe('entity action modifiers', () => {
         ],
       },
     ]);
-    expect(parseOne(source.replace('requires: lockpick', 'require: lockpick'), entitySchema)).toEqual(door);
+    expect(parseOne(source.replace('requires: lockpick', 'require: lockpick'), entity)).toEqual(door);
   });
 
   it('rejects requires, hidden if, and on success each defined more than once', () => {
-    expect(() => parseOne('# entity chest\nopen:\n  requires: a\n  require: b\n  say: hi', entitySchema)).toThrow(/requires is defined more than once/);
-    expect(() => parseOne('# entity chest\nopen:\n  hidden if: a\n  hidden if: b\n  say: hi', entitySchema)).toThrow(/hidden if is defined more than once/);
-    expect(() => parseOne('# entity chest\nopen:\n  on success:\n    say: a\n  on success:\n    say: b', entitySchema)).toThrow(/on success is defined more than once/);
+    expect(() => parseOne('# entity chest\nopen:\n  requires: a\n  require: b\n  say: hi', entity)).toThrow(/requires is defined more than once/);
+    expect(() => parseOne('# entity chest\nopen:\n  hidden if: a\n  hidden if: b\n  say: hi', entity)).toThrow(/hidden if is defined more than once/);
+    expect(() => parseOne('# entity chest\nopen:\n  on success:\n    say: a\n  on success:\n    say: b', entity)).toThrow(/on success is defined more than once/);
   });
 
   // Every action field, not the handful that happened to have a test: the guard
@@ -506,16 +509,16 @@ describe('entity action modifiers', () => {
     ['depletes: health', 'depletes'],
     ['attempts: 3', 'attempts'],
   ])('rejects %s written twice', (line, written) => {
-    expect(parseOne(`# entity chest\nopen:\n  ${line}\n  say: hi`, entitySchema).blocks).toHaveLength(1);
-    expect(() => parseOne(`# entity chest\nopen:\n  ${line}\n  ${line}\n  say: hi`, entitySchema)).toThrow(`action "open": ${written} is defined more than once`);
+    expect(parseOne(`# entity chest\nopen:\n  ${line}\n  say: hi`, entity).blocks).toHaveLength(1);
+    expect(() => parseOne(`# entity chest\nopen:\n  ${line}\n  ${line}\n  say: hi`, entity)).toThrow(`action "open": ${written} is defined more than once`);
   });
 
   it('no longer accepts a health: field, which the implicit target pool replaced', () => {
-    expect(() => parseOne('# entity chest\nopen:\n  health: 3\n  say: hi', entitySchema)).toThrow(/unrecognized tag clause/);
+    expect(() => parseOne('# entity chest\nopen:\n  health: 3\n  say: hi', entity)).toThrow(/unrecognized tag clause/);
   });
 
   it('parses on failure inline and as a block, and rejects it defined more than once', () => {
-    const inline = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure: say: Not enough shrimp.', entitySchema);
+    const inline = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure: say: Not enough shrimp.', entity);
     expect(inline.blocks).toEqual([
       {
         label: 'open',
@@ -524,17 +527,17 @@ describe('entity action modifiers', () => {
       },
     ]);
 
-    const block = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure:\n    say: Not enough shrimp.\n    set: chest-jammed', entitySchema);
+    const block = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure:\n    say: Not enough shrimp.\n    set: chest-jammed', entity);
     expect((block.blocks?.[0] as Action).onFailure).toEqual([
       { kind: 'say', text: 'Not enough shrimp.' },
       { kind: 'set', variable: 'chest-jammed' },
     ]);
 
-    expect(() => parseOne('# entity chest\nopen:\n  on failure:\n    say: a\n  on failure:\n    say: b', entitySchema)).toThrow(/on failure is defined more than once/);
+    expect(() => parseOne('# entity chest\nopen:\n  on failure:\n    say: a\n  on failure:\n    say: b', entity)).toThrow(/on failure is defined more than once/);
   });
 
   it('surfaces result-related errors for malformed results, not tag errors', () => {
-    expect(() => parseOne('# entity chest\nopen:\n  give:', entitySchema)).toThrow(/expected an id/);
+    expect(() => parseOne('# entity chest\nopen:\n  give:', entity)).toThrow(/expected an id/);
   });
 });
 
@@ -542,7 +545,7 @@ describe('entity action modifiers', () => {
 // table is the pair, and every combination it has no meaning for is a load
 // error rather than a silent default the runtime has to guess at.
 describe('action kinds and their cadence', () => {
-  const parseAction = (...lines: string[]) => parseOne(['# entity forge', 'work:', ...lines.map((line) => `  ${line}`)].join('\n'), entitySchema).blocks![0] as Action;
+  const parseAction = (...lines: string[]) => parseOne(['# entity forge', 'work:', ...lines.map((line) => `  ${line}`)].join('\n'), entity).blocks![0] as Action;
 
   it('makes an untagged action a duration, and lifts the two written kinds off their tags', () => {
     expect(parseAction('say: hi').kind).toBeUndefined();
@@ -766,11 +769,11 @@ describe('condition grammar', () => {
 });
 
 describe('the authored / derived boundary', () => {
-  const gold = () => parseOne('# item gold\nexamine: Small bright coins.\ncurrency', itemSchema);
+  const gold = () => parseOne('# item gold\nexamine: Small bright coins.\ncurrency', item);
 
   it('leaves an unauthored title absent, defaulting it only in hydration', () => {
     expect(gold().title).toBeUndefined();
-    expect(hydrateSection(gold(), itemSchema).title).toBe('Gold');
+    expect(hydrate(item, gold()).title).toBe('Gold');
   });
 
   // Over a schema of its own, because no shipped kind reads one default from
@@ -789,24 +792,16 @@ describe('the authored / derived boundary', () => {
   });
 
   it('leaves an unauthored examine absent rather than inventing an English sentence for it', () => {
-    expect(hydrateSection(parseOne('# item mystery-box', itemSchema), itemSchema).examine).toBeUndefined();
+    expect(hydrate(item, parseOne('# item mystery-box', item)).examine).toBeUndefined();
   });
 
   it('reads a default against the language its module declared', () => {
-    expect(
-      hydrateSection(parseOne('# item mystery-box', itemSchema), itemSchema, {
-        language: 'es',
-      }).title,
-    ).toBe('mystery-box');
-    expect(
-      hydrateSection(parseOne('# item mystery-box', itemSchema), itemSchema, {
-        language: 'en',
-      }).title,
-    ).toBe('Mystery Box');
+    expect(hydrate(item, parseOne('# item mystery-box', item), { language: 'es' }).title).toBe('mystery-box');
+    expect(hydrate(item, parseOne('# item mystery-box', item), { language: 'en' }).title).toBe('Mystery Box');
   });
 
   it('lets an authored field win over its default', () => {
-    expect(hydrateSection(gold(), itemSchema).examine).toBe('Small bright coins.');
+    expect(hydrate(item, gold()).examine).toBe('Small bright coins.');
   });
 
   it('throws a DslError on a circular default instead of looping forever', () => {
@@ -910,15 +905,15 @@ describe('a value that reads as a mistake is refused rather than reinterpreted',
 
 describe('a field name that is one letter off is a typo, not an action label', () => {
   it('refuses the near-miss and names the field it read as intended', () => {
-    expect(() => parseOne('# location den\nflag: say: oops', locationSchema)).toThrow(/unknown location field: flag, one letter from flags/);
-    expect(() => parseOne('# location den\nexamin: say: oops', locationSchema)).toThrow(/one letter from examine/);
-    expect(() => parseOne('# location den\nentites: shrine', locationSchema)).toThrow(/one letter from entities/);
-    expect(() => parseOne('# location den\nstartin: say: oops', locationSchema)).toThrow(/one letter from starting/);
-    expect(() => parseOne('# location den\n-flag: ', locationSchema)).toThrow(/one letter from flags/);
+    expect(() => parseOne('# location den\nflag: say: oops', location)).toThrow(/unknown location field: flag, one letter from flags/);
+    expect(() => parseOne('# location den\nexamin: say: oops', location)).toThrow(/one letter from examine/);
+    expect(() => parseOne('# location den\nentites: shrine', location)).toThrow(/one letter from entities/);
+    expect(() => parseOne('# location den\nstartin: say: oops', location)).toThrow(/one letter from starting/);
+    expect(() => parseOne('# location den\n-flag: ', location)).toThrow(/one letter from flags/);
   });
 
   it('leaves an action label that is merely short or unfamiliar alone', () => {
-    const den = parseOne('# location den\neat: say: You eat.\npick lock: say: Click.\nrest: say: You rest.', locationSchema);
+    const den = parseOne('# location den\neat: say: You eat.\npick lock: say: Click.\nrest: say: You rest.', location);
     expect(den.actions?.map((action) => action.label)).toEqual(['eat', 'pick lock', 'rest']);
   });
 });
@@ -941,18 +936,18 @@ interface WalkableField {
 // the walk shares the engine's own answers about which fields exist, what they
 // are written as, and which have no keyword form at all.
 function schemaFields(): WalkableField[] {
-  return Object.keys(SCHEMAS)
-    .map((kind) => schemaFor(kind)!)
-    .flatMap((schema) =>
-      Object.entries(schema.fields).map(([name, field]) => ({
-        kind: schema.kind,
-        name,
-        keyword: field.keyword ?? name,
-        parser: field.parser as object,
-        positional: isPositionalField(schema, name),
-        sectionTakesClauses: schema.clauses !== undefined,
-      })),
-    );
+  return sections().flatMap((each) => {
+    const schema = each.schema;
+    if (schema === undefined) return [];
+    return Object.entries(schema.fields).map(([name, field]) => ({
+      kind: schema.kind,
+      name,
+      keyword: field.keyword ?? name,
+      parser: field.parser as object,
+      positional: isPositionalField(schema, name),
+      sectionTakesClauses: schema.clauses !== undefined,
+    }));
+  });
 }
 
 const fieldName = (field: WalkableField): string => `${field.kind}.${field.name}`;
@@ -1002,17 +997,6 @@ const OPS = ['', '+', '-'];
 describe('a field that takes a block reads one exactly where it reads the same text inline', () => {
   const fields = schemaFields();
   const blockCapable = fields.filter(takesABlock);
-
-  // The walk reaches its fields through `SCHEMAS`; this reaches them through
-  // `sectionKinds()`, which is keyed off the parser table rather than the schema
-  // table. Narrowing either route alone stops the two agreeing, which is what
-  // pass 2 measured missing — the subjects derived, but nothing held the set
-  // they derived to, and it could shrink without a word.
-  it('walks every field of every kind the loader parses through a schema', () => {
-    const declared = [...sectionKinds()].flatMap((kind) => Object.keys(schemaFor(kind)?.fields ?? {}).map((name) => `${kind}.${name}`));
-    expect(fields.map(fieldName).sort()).toEqual(declared.sort());
-    expect(declared.length).toBeGreaterThan(0);
-  });
 
   it('derives its subjects by the predicate the section engine decides a block by', () => {
     const addressable = fields.filter((field) => !field.positional);
@@ -1087,20 +1071,20 @@ ${field.keyword}:
 });
 
 describe('a block-form line carrying more than its parser read', () => {
-  const location =
+  const bay =
     (...lines: string[]) =>
     () =>
       parseModule(['# location bay', ...lines].join('\n'));
 
   it('refuses the leftover the loader used to drop, on each field the finding measured', () => {
-    expect(location('entities:', '  miki oven')).toThrow(/unexpected content after a list item: "oven"/);
-    expect(location('flags:', '  alert typo')).toThrow(/unexpected content after a list item: "typo"/);
-    expect(location('adjacent:', '  beach whille unlocked')).toThrow(/unexpected content after a list item: "whille unlocked"/);
+    expect(bay('entities:', '  miki oven')).toThrow(/unexpected content after a list item: "oven"/);
+    expect(bay('flags:', '  alert typo')).toThrow(/unexpected content after a list item: "typo"/);
+    expect(bay('adjacent:', '  beach whille unlocked')).toThrow(/unexpected content after a list item: "whille unlocked"/);
     expect(() => parseModule('# action brawl\non success:\n  xp: brawling 2.5')).toThrow(/unexpected content after a result: "\.5"/);
   });
 
   it('refuses a while one letter off rather than dropping the condition it gates', () => {
-    expect(location('adjacent:', '  beach while unlocked')).not.toThrow();
-    expect(location('adjacent:', '  beach whille unlocked')).toThrow(DslError);
+    expect(bay('adjacent:', '  beach while unlocked')).not.toThrow();
+    expect(bay('adjacent:', '  beach whille unlocked')).toThrow(DslError);
   });
 });

@@ -1,7 +1,6 @@
-import {condition, printReference} from '../grammar/condition';
+import {condition} from '../grammar/condition';
 import {dependency, version as versionParser, Version} from '../grammar/dependency';
 import {indentLines} from '../grammar/structure';
-import {TextSegment} from './sections/dialogue';
 import {Registry} from './registry';
 import type {ModuleDiagnostic, UniverseLoadResult} from './registry';
 import {registryDiff} from './registryDiff';
@@ -21,19 +20,6 @@ export interface SerializeModuleOptions {
   // The ids of the global sections this module declared. A global id belongs to
   // nobody, so `inModule` cannot find one and the caller says which it wrote.
   globals?: readonly string[];
-}
-
-// Exported because the load path records a spoken line's authored words as the
-// entry a `# locale` translates, and what it records has to be the same
-// spelling a translator will read back and write beside.
-export function printSegments(values: readonly TextSegment[] | undefined): string {
-  return (values ?? [])
-    .map((segment) => {
-      if (segment.kind === 'literal') return segment.text;
-      if (segment.kind === 'interpolate') return `{${printReference(segment.reference)}}`;
-      return `{${condition.print(segment.condition)}: ${segment.text}}`;
-    })
-    .join('');
 }
 
 // The verb, then whatever that verb's own line carries after its colon — the

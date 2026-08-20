@@ -5,9 +5,12 @@ import { Parser } from '../../grammar/parser';
 import { point } from '../../grammar/range';
 import { decimal, humanizeEn, id, number, numberOrStat, produced, Produced, Quantified, quantified, text } from '../../grammar/values';
 import { put, quantified as quantifiedItems, type Loose } from '../refs';
-import { CRAFT_ADDRESS } from '../registry';
 import { ActionDeclaration } from './action';
 import { section } from './define';
+
+// What addresses a compiled craft, on the same terms a travel is addressed: an
+// id, because the label is display text no surface draws.
+export const CRAFT_ADDRESS = 'craft';
 
 export interface Recipe {
   id: string;

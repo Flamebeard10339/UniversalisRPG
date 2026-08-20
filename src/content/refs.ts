@@ -1,4 +1,4 @@
-import type { TextSegment } from './sections/dialogue';
+import type { TextSegment } from '../grammar/segment';
 import { Action, Sided } from '../grammar/action';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { Condition, isEngineRoot, Reference, VISITS, visitedNode } from '../grammar/condition';

@@ -128,3 +128,19 @@ export const isNamespacedKind = (kind: string): boolean => ownedSectionKinds().i
 // Whether a name is one of the fields a kind writes prose into, which is what
 // tells a locale key's field segment from an id that happens to look like one.
 export const isProseField = (slug: string): boolean => sections().some((each) => each.text.includes(slug));
+
+// An address the path grammar cannot spell, or that collides with a field of
+// the object that owns it, is neither a key nor a member — and two actions
+// reaching one address are one name with two meanings, which is the same fault
+// said about a pair. A segment may begin with a digit, so `3 Card Monte`
+// addresses fine; what has no address is a label with neither a letter nor a
+// digit in it.
+//
+// Asked here because the collision it refuses is with a field some section kind
+// declares, and the list of those kinds is what this module holds.
+export function actionSlugProblem(slug: string, label: string, taken: ReadonlySet<string>): string | undefined {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return `action ${JSON.stringify(label)} has no address: it keys as ${JSON.stringify(slug)}, so give it a label with a letter or a digit in it`;
+  if (isProseField(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which is already a field of the object that owns it`;
+  if (taken.has(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which another action here already keys as`;
+  return undefined;
+}

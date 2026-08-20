@@ -1,5 +1,5 @@
 import { Condition, PLAYER, Reference, TIME, visitedNode } from '../grammar/condition';
-import { TextSegment } from '../content/sections/dialogue';
+import { TextSegment } from '../grammar/segment';
 import { GameState } from './state';
 import { msToSeconds } from './units';
 import { heldCount } from './itemInstance';

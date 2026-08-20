@@ -2,10 +2,9 @@ import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { declaredId } from './sections/entity';
 import { actionAddress } from './sections/action';
-import { actionSlug, actionSlugProblem, localeKey, missingTranslations, TEXT_FIELDS, unmatchedLocaleKeys } from './locale';
-import { SCHEMAS } from './sections';
-import { text } from '../grammar/values';
-import { contentSectionMaps, everyActionTable, type Registry } from './registry';
+import { actionSlug, localeKey, missingTranslations, unmatchedLocaleKeys } from './locale';
+import { actionSlugProblem, contentSectionMaps } from './sections';
+import { everyActionTable, mapOf, type Registry } from './registry';
 import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './load';
 import { sameValue } from './registryDiff';
 import { roundTripModule } from './serialize';
@@ -118,41 +117,6 @@ describe('what a locale covers, and what it invents (c7)', () => {
 
   it('counts a base string as covered by the language its own module declared', () => {
     expect(missingTranslations(base().locales, 'en').every((key) => key.startsWith('engine.'))).toBe(true);
-  });
-});
-
-// c1's rule, applied to the one list that was still hand-kept: which of a
-// kind's fields are words. The subjects are the schemas themselves, so a field
-// added to any kind is judged here without this test being edited, and a kind
-// added to `SCHEMAS` fails to compile against `TEXT_FIELDS` before it ever
-// reaches this walk.
-describe('every field a section parses as text is words, or is written down as not', () => {
-  // A `text` field that is not words. Both are genuine, and neither is a title
-  // going untranslated: a `language:` says which language the rest is in, and a
-  // recipe's `say:` is a spoken line keyed by its owner and its index (c6).
-  const NOT_WORDS = ['info.language', 'recipe.say'];
-
-  const parsedAsText = Object.entries(SCHEMAS).flatMap(([kind, schema]) =>
-    Object.entries(schema.fields)
-      .filter(([, spec]) => (spec as { parser: unknown }).parser === text)
-      .map(([field]) => `${kind}.${field}`),
-  );
-
-  it('finds text fields to judge at all, on more than one kind', () => {
-    expect(parsedAsText.length).toBeGreaterThan(5);
-    expect(new Set(parsedAsText.map((each) => each.split('.')[0])).size).toBeGreaterThan(1);
-  });
-
-  it('leaves none unaccounted for', () => {
-    const keyed = new Set(Object.entries(TEXT_FIELDS).flatMap(([kind, fields]) => fields.map((field) => `${kind}.${field}`)));
-
-    expect(parsedAsText.filter((each) => !keyed.has(each) && !NOT_WORDS.includes(each))).toEqual([]);
-  });
-
-  // The other direction, so the exception list cannot quietly grow to cover a
-  // field that was removed or renamed and stop meaning anything.
-  it('keeps no exception for a field no schema declares', () => {
-    expect(NOT_WORDS.filter((each) => !parsedAsText.includes(each))).toEqual([]);
   });
 });
 
@@ -531,7 +495,7 @@ function linesIn(value: unknown, where: string, seen: Set<unknown>, found: Array
 function spokenLines(registry: Registry): Array<{ where: string; key: unknown }> {
   const found: Array<{ where: string; key: unknown }> = [];
   const seen = new Set<unknown>();
-  for (const [, field] of contentSectionMaps()) linesIn(registry[field], field, seen, found);
+  for (const [, field] of contentSectionMaps()) linesIn(mapOf(registry, field), field, seen, found);
   linesIn(registry.recipeActions, 'recipeActions', seen, found);
   return found;
 }
