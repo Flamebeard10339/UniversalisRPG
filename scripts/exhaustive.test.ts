@@ -15,15 +15,22 @@ function programOverShippedModules(): ts.Program {
   return ts.createProgram(shippedModules().map((file) => path.resolve(root, file)), { ...parsed.options, noEmit: true });
 }
 
-// A union is discriminated when one property is a distinct string literal on
-// every constituent. Asking the checker rather than reading the source is what
-// makes a union declared next month a subject of this rule without an edit.
-function discriminantOf(checker: ts.TypeChecker, type: ts.Type): string | null {
+// A union is discriminated at a property when every constituent declares a
+// string literal there. That is the checker's own test for narrowing a switch,
+// and it is deliberately weaker than requiring the literals to differ:
+// `CommandOutput` spells `kind: 'message'` twice, TypeScript narrows it anyway,
+// and a rule that asked for distinctness reported clean over both switches on
+// it. Asking the checker rather than reading the source is what makes a union
+// declared next month a subject of this rule without an edit.
+//
+// `named` is the property the switch actually reads, when it reads one. The
+// checker narrows on the property switched, so that is the property to ask
+// about; searching for some other one can only find a discriminant nobody
+// dispatched on.
+function discriminantOf(checker: ts.TypeChecker, type: ts.Type, named: string | null): string | null {
   if (!type.isUnion() || type.types.length < 2) return null;
-  for (const name of checker.getPropertiesOfType(type.types[0]).map((property) => property.name)) {
-    const spellings = literalsOf(checker, type, name);
-    if (spellings !== null && new Set(spellings).size === type.types.length) return name;
-  }
+  const candidates = named === null ? checker.getPropertiesOfType(type.types[0]).map((property) => property.name) : [named];
+  for (const name of candidates) if (literalsOf(checker, type, name) !== null) return name;
   return null;
 }
 
@@ -110,10 +117,9 @@ function consumerAt(checker: ts.TypeChecker, file: ts.SourceFile, node: ts.Switc
   const access = ts.isPropertyAccessExpression(node.expression) ? node.expression : null;
   const subject = access === null ? node.expression : access.expression;
   const type = checker.getTypeAtLocation(subject);
-  const discriminant = discriminantOf(checker, type);
+  const discriminant = discriminantOf(checker, type, access === null ? null : access.name.text);
   if (discriminant === null) return null;
-  if (access !== null && access.name.text !== discriminant) return null;
-  const members = literalsOf(checker, type, discriminant) ?? [];
+  const members = [...new Set(literalsOf(checker, type, discriminant) ?? [])];
   const handled: string[] = [];
   let guarded = false;
   let delegating = false;
@@ -134,6 +140,21 @@ function consumerAt(checker: ts.TypeChecker, file: ts.SourceFile, node: ts.Switc
     guarded,
     delegating,
   };
+}
+
+// One source, compiled alone, analysed by the same walk the tree gets. Every
+// red-green case below is a fixture where the right answer is known, which is
+// the only way a rule about what the checker sees can be watched failing.
+function consumersInFixture(name: string, source: string): Consumer[] {
+  const host = ts.createCompilerHost({ strict: true });
+  const original = host.getSourceFile.bind(host);
+  host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) =>
+    fileName === name ? ts.createSourceFile(fileName, source, languageVersion, true) : original(fileName, languageVersion, onError, shouldCreate);
+  host.fileExists = (fileName) => fileName === name || ts.sys.fileExists(fileName);
+  host.readFile = (fileName) => (fileName === name ? source : ts.sys.readFile(fileName));
+  const built = ts.createProgram([name], { strict: true, noEmit: true, skipLibCheck: true }, host);
+  const relative = name.replace(`${root}/`, '');
+  return consumersIn(built, (each) => each === relative);
 }
 
 const program = programOverShippedModules();
@@ -234,18 +255,7 @@ describe('the delegation exemption discriminates', () => {
     `}`,
   ].join('\n');
 
-  const name = `${root}/delegation-fixture.ts`;
-
-  function analysed(): Consumer[] {
-    const host = ts.createCompilerHost({ strict: true });
-    const original = host.getSourceFile.bind(host);
-    host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) =>
-      fileName === name ? ts.createSourceFile(fileName, FIXTURE, languageVersion, true) : original(fileName, languageVersion, onError, shouldCreate);
-    host.fileExists = (fileName) => fileName === name || ts.sys.fileExists(fileName);
-    host.readFile = (fileName) => (fileName === name ? FIXTURE : ts.sys.readFile(fileName));
-    const built = ts.createProgram([name], { strict: true, noEmit: true, skipLibCheck: true }, host);
-    return consumersIn(built, (relative) => relative === 'delegation-fixture.ts');
-  }
+  const analysed = (): Consumer[] => consumersInFixture(`${root}/delegation-fixture.ts`, FIXTURE);
 
   // In source order: the total consumer, the one that dispatches to it, the
   // one that answers for itself.
@@ -263,5 +273,48 @@ describe('the delegation exemption discriminates', () => {
     const [, , absorbing] = analysed();
     expect(absorbing.delegating).toBe(false);
     expect(absorbing.guarded).toBe(false);
+  });
+});
+
+describe('the subject set is what the checker narrows', () => {
+  // A union that spells one literal twice at its discriminant is a union
+  // TypeScript narrows, so it is a union this rule has to ask about.
+  // `CommandOutput` is the measured case: `PlayerMessage` and `ToolMessage`
+  // both declare `kind: 'message'`, and for as long as the rule asked for
+  // distinct literals it reported clean over two unguarded switches on it.
+  const REPEATED = [
+    `type M = { kind: 'a'; words: 'said'; a: number } | { kind: 'a'; words: 'noted'; b: number } | { kind: 'b'; c: number };`,
+    `export function read(value: M): number {`,
+    `  switch (value.kind) {`,
+    `    case 'a': return 1;`,
+    `    case 'b': return value.c;`,
+    `    default: { const unreached: never = value; return unreached; }`,
+    `  }`,
+    `}`,
+  ].join('\n');
+
+  it('reads a union that spells one literal twice as discriminated on it', () => {
+    const [consumer] = consumersInFixture(`${root}/repeated-fixture.ts`, REPEATED);
+    expect(consumer.discriminant).toBe('kind');
+    expect(consumer.members).toBe(2);
+    expect(consumer.missing).toEqual([]);
+    expect(consumer.guarded).toBe(true);
+  });
+
+  // The other side of the same question. A property the checker cannot narrow
+  // on is not a discriminant, and a rule looser than the checker would demand
+  // totality over a set no switch can exhaust.
+  const OPEN = [
+    `type N = { kind: 'a'; label: string } | { kind: 'b'; label: 'fixed' };`,
+    `export function read(value: N): number {`,
+    `  switch (value.label) {`,
+    `    case 'fixed': return 1;`,
+    `    default: return 0;`,
+    `  }`,
+    `}`,
+  ].join('\n');
+
+  it('reads a property that is not a literal on every constituent as no discriminant', () => {
+    expect(consumersInFixture(`${root}/open-fixture.ts`, OPEN)).toEqual([]);
   });
 });

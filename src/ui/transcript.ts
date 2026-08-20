@@ -98,6 +98,10 @@ function fromOutput(output: CommandOutput, cursor: Cursor): Written[] {
     case 'status':
     case 'choices':
       return [];
+    default: {
+      const unreached: never = output;
+      return unreached;
+    }
   }
 }
 

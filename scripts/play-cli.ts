@@ -271,6 +271,10 @@ export function formatOutput(output: CommandOutput, localizer: Localizer): ReplL
       return output.lines.map((line) => note(line));
     case 'authored':
       return output.blocks.flatMap((block) => [note(''), ...block.map((line) => note(line))]);
+    default: {
+      const unreached: never = output;
+      return unreached;
+    }
   }
 }
 
