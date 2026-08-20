@@ -14,19 +14,19 @@ const run = async (source: string): Promise<unknown> => {
 
 // The two sizes three sessions actually needed: calling one exported
 // function on a handful of inputs, and building a view over data the real
-// store cannot contain.
+// tree does not contain.
 describe('inspect', () => {
   it('evaluates an expression against the repository\'s own module resolution', async () => {
-    expect(await run("(await load('scripts/tasks/render.ts')).wrapText('a b c d', 3)")).toEqual(['a b', 'c d']);
+    expect(await run("(await load('scripts/lib/layers.ts')).layerOf('src/runtime/session.ts')")).toBe('runtime');
   });
 
   it('runs a body of statements and prints what it returns', async () => {
-    expect(await run("const { packGreedy } = await load('scripts/tasks/render.ts');\nreturn packGreedy(['aa', 'bb', 'cc'], '-', 5);")).toEqual(['aa-bb', 'cc']);
+    expect(await run("const { stripComments } = await load('scripts/lib/stripComments.ts');\nreturn stripComments('a // b\\nc');")).toEqual(['a ', 'c']);
   });
 
   it('resolves a specifier against the repo root, not against the caller\'s directory', async () => {
-    const module = (await load('scripts/lib/taskStore.ts')) as { DEFAULT_STORE_PATH: string };
-    expect(module.DEFAULT_STORE_PATH).toBe('docs/tasks.jsonl');
+    const module = (await load('scripts/lib/modportalCache.ts')) as { DEFAULT_MODPORTAL_CACHE: string };
+    expect(module.DEFAULT_MODPORTAL_CACHE).toBe('content/modportal.local');
   });
 
   it('says the source is neither an expression nor a body rather than throwing at the caller', () => {
@@ -35,19 +35,15 @@ describe('inspect', () => {
   });
 
   // The second of the two sizes three sessions actually needed, and the one
-  // that sent them to a throwaway file: a `scripts/` view over records the
-  // real store cannot contain.
-  it('renders a scripts/ view over records the real store does not contain', async () => {
-    const lines = (await run([
-      "const { renderRoadmap } = await load('scripts/tasks/roadmapCmd.ts');",
-      "const { roadmapView } = await load('scripts/lib/roadmap.ts');",
-      "const base = { title: 'x', kind: 'task', state: 'open', severity: null, system: null, spec: null, clause: null, discharges: [], requires: [], files: [], writes: [], grant: null, produces: [], deliverable: null, evidence: null, source: null, reason: null, closed: null, closedCommit: null, claimed: null, claimedBy: null, extra: null };",
-      "const gates = Array.from({ length: 20 }, (_, i) => ({ ...base, id: `gate-${i}` }));",
-      "const members = Array.from({ length: 20 }, (_, i) => ({ ...base, id: `member-${i}`, spec: 'synthetic', requires: gates.map((g) => g.id) }));",
-      'return renderRoadmap(roadmapView([...members, ...gates], () => null));',
+  // that sent them to a throwaway file: a `scripts/` view over a tree the
+  // real repository does not hold.
+  it('renders a scripts/ view over files the real tree does not contain', async () => {
+    const swept = (await run([
+      "const { sweptFiles } = await load('scripts/lib/layers.ts');",
+      "const tracked = ['src/runtime/a.ts', 'docs/b.md', 'src/ui/c.tsx', 'scripts/d.ts'];",
+      'return sweptFiles(tracked, () => true);',
     ].join('\n'))) as string[];
-    expect(lines[0]).toContain('40 live records');
-    expect(lines.join('\n')).toContain('DECIDED — 1 spec(s)');
+    expect(swept).toEqual(['src/runtime/a.ts', 'src/ui/c.tsx', 'scripts/d.ts']);
   });
 
   // The whole point of the command over a scratch `.ts` in the worktree, and
@@ -60,12 +56,12 @@ describe('inspect', () => {
     const dirty = (): string =>
       spawnSync('git', ['status', '--porcelain'], { cwd: repoRoot, encoding: 'utf8' }).stdout;
     const before = dirty();
-    const result = spawnSync(process.execPath, [tsxCli, path.join(repoRoot, 'scripts/inspect.ts'), "(await load('scripts/tasks/render.ts')).wrapText('a b c d', 3)"], {
+    const result = spawnSync(process.execPath, [tsxCli, path.join(repoRoot, 'scripts/inspect.ts'), "(await load('scripts/lib/layers.ts')).layerOf('src/grammar/lex.ts')"], {
       cwd: repoRoot,
       encoding: 'utf8',
     });
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("[ 'a b', 'c d' ]");
+    expect(result.stdout).toContain('grammar');
     expect(dirty()).toBe(before);
   });
 

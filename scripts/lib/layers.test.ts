@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { checkLayers, layerCheckOutput, layerOf, importedPaths, MODULE_EXTENSIONS, OUTSIDE_STACK, ROOTS, runLayerCheck, SOURCE_TREES, sweptFiles, pointsUpward, unlayeredFiles } from './layers';
+import { checkLayers, covers, layerCheckOutput, layerOf, importedPaths, MODULE_EXTENSIONS, OUTSIDE_STACK, ROOTS, runLayerCheck, SOURCE_TREES, sweptFiles, pointsUpward, unlayeredFiles } from './layers';
 import { trackedFiles } from './sourceFiles';
-import { covers } from './systems';
 
 const from = (source: string): string[] => importedPaths('src/content/registry.ts', source);
 

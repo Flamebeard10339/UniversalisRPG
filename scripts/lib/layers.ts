@@ -3,7 +3,11 @@ import { join } from 'node:path';
 import { findCycles, type Cycle } from './acyclic';
 import { posix, trackedFiles } from './sourceFiles';
 import { stripComments } from './stripComments';
-import { covers } from './systems';
+
+// Whether a declared root claims a file: a `*.ext` root matches only files
+// with that extension at the repository root, and any other root matches
+// itself and everything beneath it.
+export const covers = (path: string, file: string): boolean => (path.startsWith('*.') ? file.endsWith(path.slice(1)) && !file.includes('/') : file === path || file.startsWith(`${path}/`));
 
 export const LAYERS = ['grammar', 'content', 'runtime', 'ui', 'scripts'] as const;
 export type Layer = (typeof LAYERS)[number];

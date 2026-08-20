@@ -21,11 +21,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      # Full history: audit-status walks back to each system's lastAudit SHA,
-      # which a shallow clone does not contain.
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -34,36 +30,3 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
       - run: npm run layer-check
-      - run: npm run audit-status
-        if: matrix.os == 'ubuntu-latest'
-      # Replaces `tasks check`, which failed on any inconsistency in the task
-      # store. `doctor` reports those and fails on one condition only: a store
-      # line that will not parse — a committed merge marker, which is a real
-      # breakage and not a disagreement about the work. Platform-independent,
-      # so one leg, where `check` ran on both.
-      - run: npm run tasks -- doctor
-        if: matrix.os == 'ubuntu-latest'
-      # The gate that used to run here printed the spec's outstanding issues on
-      # the PR page — no recorded audit pass, a clause unmet or ungraded, a
-      # member neither done nor declined — and turned the check red. Removing
-      # the refusal was the point; removing the *report* with it was not, and
-      # for one branch a reviewer had to think to run a local command to learn
-      # anything about spec standing at all.
-      #
-      # These two are reads. They answer, they exit 0, and they cannot redden a
-      # check. Neither `|| true` nor `continue-on-error` is present, and that is
-      # the point: a read that exits non-zero has broken c1, and suppressing it
-      # here would hide the one thing this step can prove. A branch name that
-      # matches no spec is answered, not refused — the fix that made that true
-      # is what makes this step safe to run unguarded.
-      #
-      # --branch explicitly: a PR builds a detached merge ref, so inferring the
-      # spec from the checked-out branch name would infer from "HEAD".
-      - run: npm run tasks -- spec show "$SPEC_BRANCH" --branch "$SPEC_BRANCH"
-        if: matrix.os == 'ubuntu-latest'
-        env:
-          SPEC_BRANCH: ${{ github.head_ref || github.ref_name }}
-      - run: npm run tasks -- plan --branch "$SPEC_BRANCH"
-        if: matrix.os == 'ubuntu-latest'
-        env:
-          SPEC_BRANCH: ${{ github.head_ref || github.ref_name }}
