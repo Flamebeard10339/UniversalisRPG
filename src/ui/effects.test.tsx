@@ -67,7 +67,7 @@ describe('the suite runs a React effect', () => {
 // untested set being a sentence in a commit message that was born short by two.
 const EXERCISED: readonly string[] = ['transient.ts'];
 
-const NOT_EXERCISED: readonly string[] = ['testSurface.ts', 'App.tsx', 'DragSheet.tsx', 'EditPane.tsx', 'Home.tsx', 'MapPane.tsx', 'Pager.tsx', 'PlaneModal.tsx', 'VStack.tsx'];
+const NOT_EXERCISED: readonly string[] = ['useTestSurface.ts', 'App.tsx', 'DragSheet.tsx', 'EditPane.tsx', 'Home.tsx', 'MapPane.tsx', 'Pager.tsx', 'PlaneModal.tsx', 'VStack.tsx'];
 
 describe('what the layer still does not run', () => {
   const here = path.join(process.cwd(), 'src', 'ui');
