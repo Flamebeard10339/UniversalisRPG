@@ -24,8 +24,6 @@ function store(files: Record<string, string>): FileStore & { writes: { file: str
 
 const mutation = (over: Partial<Mutation> = {}): Mutation => ({ name: 'c1', file: 'a.ts', find: 'entityTypeBase(merged, section)', replace: 'undefined', ...over });
 
-// Identities in the shape vitest prints them, since that is what the verdict
-// is attributed to and what the confirmation run derives its scope from.
 const failingTests = (count: number, file = 'one.test.ts'): string[] => Array.from({ length: count }, (_, index) => `${file} > the suite > t${index + 1}`);
 
 const tallyIn = (file: string, failed: number, total: number): TestRun => ({ failed, passed: total - failed, total, filesFailed: 0, failures: failingTests(failed, file), raw: `Tests ${failed} failed | ${total - failed} passed (${total})` });
@@ -40,9 +38,6 @@ const baseline = (totals: Record<string, number>, failed = 0): BaselineFor => (t
 const killing = () => tally(3, 20);
 const surviving = () => tally(0, 20);
 
-// Named failures rather than a count of them, for everything the attribution
-// itself is about: which test is failing is the whole question there, and a
-// generated t1..tN says nothing a reader can follow.
 const runOf = (failures: string[], total = 20): TestRun => ({ failed: failures.length, passed: total - failures.length, total, filesFailed: 0, failures, raw: `Tests ${failures.length} failed | ${total - failures.length} passed (${total})` });
 const baselineOf = (failures: string[], total = 20): Baseline => ({ failed: failures.length, total, ran: total, failures });
 
@@ -54,8 +49,6 @@ describe('mutate: restoring the file', () => {
   });
 
   it('restores work that is not in git, because it never asks git for the original', () => {
-    // The technique this replaces used `git checkout --`, which restores HEAD
-    // rather than the file: uncommitted edits in the mutated file were lost.
     const uncommitted = `${ORIGINAL}// an edit no commit holds\n`;
     const files = store({ 'a.ts': uncommitted });
     runMutations([mutation()], files, killing);
@@ -188,8 +181,6 @@ describe('mutate: the verdict', () => {
   });
 
   it('will not call a suite that never ran either killed or survived', () => {
-    // A mutation that does not build makes vitest collect nothing. Reading that
-    // as KILLED would credit the suite for a failure it never produced.
     const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => noTests);
     expect(report.results[0].verdict).toBe('ERROR');
     expect(report.results[0].detail).toMatch(/no tests/i);
@@ -220,8 +211,6 @@ describe('mutate: proving the restore', () => {
     expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing).unrestored).toEqual([]);
   });
 
-  // The byte-compare alone cannot see this: the content is correct, and only the
-  // failure of the write says the file may not be settled on disk.
   it('reports a restore that threw even though the bytes did land', () => {
     const files = store({ 'a.ts': ORIGINAL });
     const flushedThenFailed: FileStore = {
@@ -237,8 +226,6 @@ describe('mutate: proving the restore', () => {
     expect(report.ok).toBe(false);
   });
 
-  // A restore that throws must not become the exception that escapes the loop:
-  // that would abandon the remaining mutations and skip this proof entirely.
   it('survives a restore write that throws, still runs the rest, and still reports', () => {
     const files = store({ 'a.ts': ORIGINAL, 'b.ts': 'other' });
     let restores = 0;
@@ -257,9 +244,6 @@ describe('mutate: proving the restore', () => {
 });
 
 describe('mutate: what the run left behind', () => {
-  // The restore proof covers the mutation targets and nothing else. A file a
-  // test writes while running under a mutant is in neither `touched` nor the
-  // captured originals, so only comparing the tree's paths can see it.
   it('a file the tree gained while a mutant was on disk is named in the report', () => {
     const files = store({ 'a.ts': ORIGINAL });
     const report = runMutations(
@@ -328,8 +312,6 @@ describe('mutate: the output tail', () => {
 });
 
 describe('mutate: applying the text', () => {
-  // The whole reason this is split/join and not String.replace, whose
-  // replacement argument reads `$&`, `` $` ``, `$'` and `$1` as instructions.
   it('treats a replacement containing $ sequences as literal text', () => {
     expect(applyTo('const x = HERE;', { find: 'HERE', replace: "$& $` $' $1 $$" })).toBe("const x = $& $` $' $1 $$;");
   });
@@ -386,8 +368,6 @@ describe('mutate: whose journal it is', () => {
     expect(journalVerdict({ pid: 7, startedAt: recent.startedAt }, 7, live, now)).toBe('recover');
   });
 
-  // Otherwise a recycled pid wedges every later run behind a permanent "busy",
-  // and the only escape is deleting a file the error does not name.
   it('recovers from a live pid that has held the journal implausibly long, which is pid reuse', () => {
     expect(journalVerdict({ pid: 4242, startedAt: '2026-08-01T00:00:00Z' }, 1, live, now)).toBe('recover');
   });
@@ -410,8 +390,6 @@ describe('mutate: deciding whether a pid is alive', () => {
     expect(pidIsAlive(1, throwing('ESRCH'))).toBe(false);
   });
 
-  // A process owned by another user is the most alive a pid can be. Reading
-  // EPERM as dead would recover a journal a live run is still holding.
   it('is alive on EPERM, which means it exists and is not ours', () => {
     expect(pidIsAlive(1, throwing('EPERM'))).toBe(true);
   });
@@ -428,8 +406,6 @@ describe('mutate: reading a journal off disk', () => {
     expect(readJournal(whole)).toEqual({ root: '/repo', pid: 7, startedAt: 'now', head: null, files: { 'a.ts': 'x' } });
   });
 
-  // The wedge: a run killed mid-write left a half journal, and every later run
-  // died on it before reading the manifest, recovering, or restoring anything.
   it('returns null for a truncated journal rather than throwing', () => {
     expect(readJournal(whole.slice(0, 40))).toBeNull();
     expect(readJournal('')).toBeNull();
@@ -480,11 +456,7 @@ describe('mutate: recovering an interrupted run', () => {
     expect(recovery.refused).toEqual(['gone.ts']);
   });
 
-  // Journal keys are data this process never validated, and recovery runs before
-  // anything else. Without this, containment guards only the manifest.
   it('refuses a journal key that escapes the tree, and writes nothing for it', () => {
-    // The escaping file must exist and differ, or the guard is indistinguishable
-    // from the read simply failing.
     const files = store({ 'a.ts': 'MUTATED', '../outside.ts': 'SOMEONE ELSE\'S FILE' });
     const recovery = recoverFrom({ '../outside.ts': 'journal bytes', 'a.ts': ORIGINAL }, files, (file) => !escapesRoot(path.resolve('/repo'), file));
     expect(recovery.restored).toEqual(['a.ts']);
@@ -493,11 +465,6 @@ describe('mutate: recovering an interrupted run', () => {
     expect(files.read('../outside.ts')).toBe('SOMEONE ELSE\'S FILE');
   });
 
-  // A refused manifest is now the ordinary first outcome of the manifest
-  // `audit-prompt` generates, and it leaves a journal holding bytes nothing
-  // mutated. Restoring those over a tree that has since moved reverted 89
-  // lines of a committed file in a clean tree, twice, with one stderr line to
-  // say so.
   it('refuses to restore a journal captured at another commit, and says what it holds instead', () => {
     expect(recoveryStanding({ head: 'a'.repeat(40) }, 'a'.repeat(40))).toEqual({ kind: 'recover' });
 
@@ -507,17 +474,12 @@ describe('mutate: recovering an interrupted run', () => {
   });
 
   it('treats a journal that records no commit, and a checkout git cannot answer for, as stale', () => {
-    // A journal written before the field existed says nothing about the tree
-    // it came from, which is the same standing as not being able to ask.
     expect(recoveryStanding({ head: null }, 'a'.repeat(40)).kind).toBe('stale');
     expect(recoveryStanding({ head: 'a'.repeat(40) }, null).kind).toBe('stale');
     expect(readJournal(JSON.stringify({ root: '/repo', pid: 7, startedAt: 'now', files: {} }))?.head).toBeNull();
   });
 });
 
-// The journal existed only while the tree might be mutated, and was removed on
-// the success path alone. Restoring and forgetting are one act now, so every
-// exit between taking the lock and the report does both.
 describe('mutate: putting the tree back on the way out', () => {
   it('puts every captured file back and reports nothing left to keep a journal for', () => {
     const disk = new Map([['a.ts', 'MUTATED'], ['b.ts', ORIGINAL]]);
@@ -536,8 +498,6 @@ describe('mutate: putting the tree back on the way out', () => {
     expect(failed).toEqual(['gone.ts']);
   });
 
-  // A refused manifest mutates nothing, so every captured file already matches
-  // and there is nothing for a journal to hold.
   it('writes nothing and keeps nothing when no file was mutated, which is what a refused run leaves', () => {
     const writes: string[] = [];
     expect(putBackAll(new Map([['a.ts', ORIGINAL]]), () => ORIGINAL, (file) => writes.push(file))).toEqual([]);
@@ -548,9 +508,6 @@ describe('mutate: putting the tree back on the way out', () => {
 describe('mutate: escalating a narrow survivor', () => {
   const narrow = { tests: ['one.test.ts'] };
 
-  // A file-scope SURVIVED says only that those files missed it. Re-running just
-  // the survivors is also what makes a narrow scope affordable: the mutations
-  // that die never pay for the whole suite.
   it('re-runs a scoped survivor against the whole suite, and reports both scopes', () => {
     const asked: (readonly string[] | undefined)[] = [];
     const report = runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
@@ -637,8 +594,6 @@ describe('mutate: naming a single test', () => {
   });
 
   it('a manifest naming a test that does not exist is refused before anything is written', () => {
-    // The run itself cannot tell: -t matching nothing skips every test and
-    // reads as a clean SURVIVED. The baseline is where nothing having run shows.
     const files = store({ 'a.ts': ORIGINAL });
     const report = runMutations([mutation(named)], files, killing, () => ({ failed: 0, total: 20, ran: 0, failures: [] }));
     expect(report.results).toEqual([]);
@@ -678,9 +633,6 @@ describe('mutate: naming a single test', () => {
 });
 
 describe('mutate: taking the baseline on an unmutated tree', () => {
-  // A baseline measured with the mutant on disk is not a baseline, it is a
-  // second reading of the same thing — and the shortfall it exists to expose is
-  // exactly what it then suppresses.
   const watchTree = (files: { read(file: string): string }) => {
     const seen: { at: string; sawMutant: boolean }[] = [];
     return {
@@ -729,9 +681,6 @@ describe('mutate: taking the baseline on an unmutated tree', () => {
 });
 
 describe('mutate: a file that failed to collect', () => {
-  // vitest counts a collection failure on `Test Files` and not in `Tests`, so
-  // the tests that did collect would otherwise read as a clean sweep of a suite
-  // that never assembled — a SURVIVED for a mutation that did not build.
   it('is an error, not a verdict, when files failed and no test did', () => {
     const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(0, 30, 1));
     expect(report.results[0].verdict).toBe('ERROR');
@@ -752,8 +701,6 @@ describe('mutate: a file that failed to collect', () => {
 });
 
 describe('mutate: a tree that was already red', () => {
-  // Escalation pushes every survivor into the full suite, where any unrelated
-  // failing test lives. Comparing against zero would call them all KILLED.
   it('does not credit a mutation for failures the baseline already had', () => {
     const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(2, 100), baseline({ 'whole suite': 100 }, 2));
     expect(report.results[0].verdict).toBe('SURVIVED');
@@ -783,8 +730,6 @@ describe('mutate: attributing a verdict to a test', () => {
     expect(formatReport(report)).toContain(`killed by ${WATCHER}`);
   });
 
-  // The count is the same on both sides here, which is every reason a count
-  // cannot answer this: one test stopped failing and another started.
   it('kills on a different test failing, even when the same number of them failed', () => {
     const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([WATCHER]), () => baselineOf(['x.test.ts > the suite > something else']));
     expect(report.results[0].verdict).toBe('KILLED');
@@ -808,8 +753,6 @@ describe('mutate: attributing a verdict to a test', () => {
     expect(parseFailedTests(output)).toEqual(['scripts/a.test.ts > outer > fails on purpose', 'scripts/b.test.ts > outer > parametrised 2']);
   });
 
-  // With projects configured, vitest qualifies every FAIL line with the
-  // project's name — the form this repo's own two-project config prints.
   it('reads a name behind the |project| prefix, and still takes a prefixed never-collected file for none', () => {
     const output = [' FAIL  |tools| scripts/a.test.ts [ scripts/a.test.ts ]', ' FAIL  |tools| scripts/a.test.ts > outer > fails on purpose', ' FAIL  |app| src/b.test.tsx > outer > renders'].join('\n');
     expect(parseFailedTests(output)).toEqual(['scripts/a.test.ts > outer > fails on purpose', 'src/b.test.tsx > outer > renders']);
@@ -823,8 +766,6 @@ describe('mutate: attributing a verdict to a test', () => {
     expect(() => tallyOf({ stdout: '      Tests  2 failed | 1 passed (3)\n', stderr: ' FAIL  a.test.ts > s > only one of them\n' })).toThrow(/named 1 of them/);
   });
 
-  // A suite whose hook threw is named without a test under it while its tests
-  // are counted as skipped, so more names than failures is ordinary output.
   it('accepts more names than failures, which is what a broken hook prints', () => {
     const run = tallyOf({ stdout: '      Tests  1 failed | 2 skipped (3)\n', stderr: ' FAIL  a.test.ts > the suite\n FAIL  a.test.ts > other > victim\n' });
     expect(run.failures).toEqual(['a.test.ts > the suite', 'a.test.ts > other > victim']);
@@ -835,8 +776,6 @@ describe('mutate: a kill that has to happen twice', () => {
   const CONTENDED = 'slow.test.ts > the suite > tips over under contention';
   const narrow = { tests: ['one.test.ts'] };
 
-  // The defect this whole mechanism is for: the ladder sends a survivor to the
-  // whole suite, which is exactly the scope a contention-driven failure needs.
   it('will not let a failure that only happens under the whole suite become proof', () => {
     const asked: (readonly string[] | undefined)[] = [];
     const report = runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
@@ -857,8 +796,6 @@ describe('mutate: a kill that has to happen twice', () => {
     expect(report.results[0].confirmedAt).toBe('slow.test.ts');
   });
 
-  // Same tree, same mutant, same scope, twice — which is the check nobody was
-  // asked to run by hand and which is how this defect was found at all.
   it('measures a narrow kill at its own scope a second time before reporting it', () => {
     const scopes: string[] = [];
     const report = runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
@@ -952,8 +889,6 @@ describe('mutate: the baseline', () => {
     expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 950)).results[0].shortfall).toBeUndefined();
   });
 
-  // A SURVIVED measured without a baseline is a weaker claim than one measured
-  // with, and the report is what gets pasted into an audit.
   it('says on the row when a scope had no baseline, rather than looking like a clean measurement', () => {
     const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving);
     expect(report.results[0].unmeasured).toBe(true);
@@ -973,9 +908,6 @@ describe('mutate: the baseline', () => {
   });
 });
 
-// The refusal that cost three separate sessions two rounds each. All three
-// misses were invisible in the manifest and obvious beside the file's own
-// line, which the checker already had open.
 describe('mutate: a find that missed', () => {
   const file = "export const SEPARATOR = '---';\nconst indented = value;\n";
 
@@ -1017,9 +949,6 @@ describe('mutate: a find that missed', () => {
   });
 });
 
-// Resolved the way node resolves it. The join onto the repo root named a file
-// a worktree does not have, and every mutation there errored with a stack
-// instead of the run saying once that it could not start.
 describe('mutate: finding the test runner', () => {
   it('resolves the vitest CLI this checkout would actually run', () => {
     const resolved = resolveVitest();
@@ -1042,8 +971,6 @@ describe('mutate: reading vitest back', () => {
     expect(parseVitestTally('Tests  2 failed | 3 passed | 1 skipped (6)')).toEqual({ failed: 2, passed: 3, total: 6, filesFailed: 0 });
   });
 
-  // What a -t miss looks like: the file collected, the count is whole, and not
-  // one test ran. failed + passed is what tells this apart from a real run.
   it('reads an all-skipped tally as zero run, keeping the total', () => {
     expect(parseVitestTally(' Test Files  1 skipped (1)\n      Tests  113 skipped (113)\n')).toEqual({ failed: 0, passed: 0, total: 113, filesFailed: 0 });
   });
@@ -1056,8 +983,6 @@ describe('mutate: reading vitest back', () => {
     expect(parseVitestTally('command not found')).toBeNull();
   });
 
-  // Not the same answer as "no tests ran". Collapsing them would let a garbled
-  // run read as a clean zero, and the `no tests` branch would be dead code.
   it('returns null for a Tests line it cannot read a count out of', () => {
     expect(parseVitestTally('Tests  something went very wrong')).toBeNull();
   });
@@ -1075,8 +1000,6 @@ describe('mutate: which stream the tally comes from', () => {
   const SUMMARY = ' Test Files  2 passed (2)\n      Tests  1 failed | 1 passed (2)\n';
   const DETAIL = ' FAIL  a.test.ts > the suite > the one that failed\n';
 
-  // The pass-1 HIGH, now reachable. Reading stdout+stderr and taking the last
-  // match let a test's own output decide the verdict.
   it('ignores a tally-shaped line a failing test printed to stderr', () => {
     const run = tallyOf({ stdout: SUMMARY, stderr: `${DETAIL}Tests  0 failed | 999 passed (999)\n` });
     expect(run.failed).toBe(1);

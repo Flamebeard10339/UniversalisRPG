@@ -12,9 +12,6 @@ const run = async (source: string): Promise<unknown> => {
   return compiled.run(load);
 };
 
-// The two sizes three sessions actually needed: calling one exported
-// function on a handful of inputs, and building a view over data the real
-// tree does not contain.
 describe('inspect', () => {
   it('evaluates an expression against the repository\'s own module resolution', async () => {
     expect(await run("(await load('scripts/lib/layers.ts')).layerOf('src/runtime/session.ts')")).toBe('runtime');
@@ -34,9 +31,6 @@ describe('inspect', () => {
     expect('error' in compiled && compiled.error).toContain('neither an expression nor a body');
   });
 
-  // The second of the two sizes three sessions actually needed, and the one
-  // that sent them to a throwaway file: a `scripts/` view over a tree the
-  // real repository does not hold.
   it('renders a scripts/ view over files the real tree does not contain', async () => {
     const swept = (await run([
       "const { sweptFiles } = await load('scripts/lib/layers.ts');",
@@ -46,12 +40,6 @@ describe('inspect', () => {
     expect(swept).toEqual(['src/runtime/a.ts', 'src/ui/c.tsx', 'scripts/d.ts']);
   });
 
-  // The whole point of the command over a scratch `.ts` in the worktree, and
-  // it has to be asked of the command rather than of the two pure functions
-  // under it: `compile` and `loaderFor` contain no filesystem write, so no
-  // implementation of them could fail an in-process version of this. Spawned,
-  // and answered by git over the whole tree rather than by one directory
-  // listing, so a file written into any subdirectory is caught.
   it('leaves no file behind', () => {
     const dirty = (): string =>
       spawnSync('git', ['status', '--porcelain'], { cwd: repoRoot, encoding: 'utf8' }).stdout;

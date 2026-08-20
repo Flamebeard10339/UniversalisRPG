@@ -130,9 +130,6 @@ describe('c1: the body, and nothing else', () => {
 
     const report = migrate(files(['content/tutorial-island.dsl', behind]), nothingMoved);
 
-    // Counted off the file rather than written down: every stamped save is
-    // rewritten and nothing else is, which a shipped save added later must not
-    // be able to turn into a failing arithmetic fact.
     const stamped = shipped.split(`{"version":${SAVE_VERSION},`).length - 1;
     expect(report.lines.filter((line) => line.includes(`version ${BEHIND} rewritten`))).toHaveLength(stamped);
     expect(report.files[0].text).toBe(shipped);

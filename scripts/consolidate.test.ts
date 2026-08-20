@@ -33,19 +33,12 @@ describe('a consolidation writes each section into the file that declared its id
     expect(written(result, 'base')).toBe(BASE.replace('# item rope\ntitle: Rope', '# item rope\ntitle: Cord'));
   });
 
-  // Byte equality over the whole file rather than over the sections nobody
-  // touched: a comment, a blank line and an ordering are all things only this
-  // can see, and all three are what splicing exists to keep.
   it('leaves every other byte alone, down to a restage that says what the file already said', () => {
     const result = consolidate(base(), local('# item base.rope', 'title: Rope'));
     expect(writable(result)).toBe(true);
     expect(written(result, 'base')).toBe(BASE);
   });
 
-  // A CRLF checkout is a real configuration — .gitattributes pins LF in the
-  // index and the CI matrix runs Windows — and a staged section is always LF,
-  // because `listLocalSections` normalises it. Splicing one in without matching
-  // the file would rewrite that file's own convention one section at a time.
   it.each([
     ['a CRLF file', true],
     ['an LF file', false],
@@ -65,9 +58,6 @@ describe('a consolidation writes each section into the file that declared its id
     expect(written(result, 'base')).toBe(BASE.replace('# item bell\ntitle: Bell\n\n', ''));
   });
 
-  // Two spans in one file, the earlier one growing. Applied in the order they
-  // were found, the second edit's offsets would already have moved and the
-  // splice would land inside somebody else's section.
   it('places two sections into one file without either moving the other', () => {
     const result = consolidate(base(), local('# item base.rope', 'title: A Considerably Longer Rope', '', '# item base.bell', 'title: Chime'));
     expect(writable(result)).toBe(true);
@@ -82,9 +72,6 @@ describe('a consolidation writes each section into the file that declared its id
     expect(localSectionHeadings(result.local)).toEqual(['# item gem']);
   });
 
-  // A global id belongs to nobody, so two files may spell the same one. Placing
-  // it by guess is the one repair c1 forbids, and there is no other evidence to
-  // decide it on.
   it('refuses a section two files both declare, rather than choosing one', () => {
     const other: ModuleSource = { name: 'other', text: '# info other\nversion: 1.0.0\ndependencies:\n  base\n\n# variable pace\nvalue: 2\n' };
     const withVariable = { name: 'base', text: `${BASE}\n# variable pace\nvalue: 1\n` };
@@ -103,10 +90,6 @@ describe('a consolidation writes each section into the file that declared its id
 });
 
 describe('a consolidation that would change the universe writes nothing', () => {
-  // The staged section replaces the whole section it goes home to, so a patch
-  // that names one field of many arrives at the file having dropped the rest.
-  // It is a real edit, it loads, and only the diff can tell it apart from one
-  // that consolidates cleanly.
   it('names the difference a partial patch would make, and keeps every byte', () => {
     const result = consolidate(base(), local('# location base.camp', 'x: 0, y: 0'));
     expect(result.differences).toEqual(['  locations: changed base.camp']);
@@ -123,9 +106,6 @@ describe('a consolidation that would change the universe writes nothing', () => 
   });
 });
 
-// The shipped tree, copied so the run is real: the CLI reads and writes files,
-// and c3's "no file is written" is a claim about bytes on disk that an
-// in-memory result cannot make.
 const shippedNames = (): string[] => readdirSync('content').filter((name) => name.endsWith('.dsl') && name !== `${LOCAL_CHANGES_MODULE_ID}.dsl`);
 
 interface Tree {
@@ -160,9 +140,6 @@ function consolidateTree(tree: Tree): void {
   }
 }
 
-// The edit an author would make: a whole `# item` section, typed at `/dsl` in a
-// live session over the shipped content, staged through the same command table
-// the REPL and the GUI both go through.
 const STAGED = '/dsl item tutorial-island.lockpick examine: A bent sliver of metal, freshly filed. | thieving-tool';
 
 function stage(tree: Tree, line: string): void {
@@ -179,10 +156,7 @@ function stage(tree: Tree, line: string): void {
   expect(result.output.filter((each) => each.kind === 'message' && each.tone === 'error')).toEqual([]);
 }
 
-// The copy is made and removed by hooks rather than in the describe body and an
-// `it`, because a name-filtered run — which is every run `mutate` makes — skips
-// the `it` that would have cleaned up while the body has already copied the
-// tree. Forty leaked copies of content/ were how that read from outside.
+// Copy and cleanup belong in hooks: a `-t` filtered run still runs these, and skips the `it` bodies.
 describe('the round trip is closed, on the content that ships', () => {
   let tree: Tree;
   let staged: Registry;
@@ -220,10 +194,6 @@ describe('the round trip is closed, on the content that ships', () => {
   });
 });
 
-// A visible module and a dependency the file it goes home to does not declare:
-// what resolves in the local module's namespace need not resolve in the target's,
-// and this is the only refusal registryDiff cannot also reach — the spliced tree
-// never loads, so there is no second registry to diff against.
 describe('a consolidation whose result does not load writes nothing either', () => {
   const CHESTED = ['# info base', 'version: 1.0.0', '', '# item rope', 'title: Rope', '', '# entity chest', 'title: Chest', 'open:', '  give: rope', '', '# location camp', 'x: 0, y: 0', 'starting', 'entities: chest', ''].join('\n');
   const extra: ModuleSource = { name: 'extra', text: ['# info extra', 'version: 1.0.0', 'dependencies:', '  base', '', '# item ribbon', 'title: Ribbon', ''].join('\n') };

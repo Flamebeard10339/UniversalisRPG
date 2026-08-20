@@ -252,8 +252,6 @@ describe('modportal CLI', () => {
   });
 });
 
-// The one real process in this file, kept under the c5 named-handful rule:
-// only a spawn can prove the direct-execution guard hands argv to run().
 describe('the CLI entry, as a real process', () => {
   it('prints usage and exits 1 when invoked with no arguments', () => {
     const result = spawnSync(process.execPath, [tsxCli, script], { cwd: repoRoot, encoding: 'utf8' });

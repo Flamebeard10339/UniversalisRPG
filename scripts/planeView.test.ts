@@ -5,12 +5,8 @@ import { asLocalized } from '../src/runtime/localizedFixture';
 import { ClusterReport, PayloadReport, PlaneReport, PositionReport, SlotReport } from '../src/runtime/planeReport';
 import { formatPlane } from './planeView';
 
-// The engine's own English, which is where every word below now comes from: the
-// file under test spells none of them (c5).
 const localizer = localizerFor(loadInEnglish(''), 'en');
 
-// One stat, keyed and named, so a row that spelled the id instead of the title
-// reads differently from one that spelled the title.
 const STAT = { statId: 'mod.attack', statTitle: asLocalized('Attack') };
 
 const flat = (amount: number, scale = 1, statTitle = STAT.statTitle): PayloadReport => ({ statId: STAT.statId, statTitle, effective: { percent: false, amount: { min: amount, max: amount } }, scale });
@@ -122,9 +118,6 @@ describe('formatPlane', () => {
     expect(shown(plane({ clusters: [cluster({ positions: [empty] })] }))).toContain('Spent  Position 1  (empty)');
   });
 
-  // c17: the screen this is drawn above publishes each of these as an option a
-  // number answers, so spelling the directive out beside it is the noise the
-  // whole surface exists to retire. c4 is untouched — the line stays typeable.
   it('spells no directive beside a node the next point could go to', () => {
     const ready = cluster({ hex: '1,-1', positions: [position({ position: 6, standing: 'available' })], slots: [slot({ direction: 'ne', standing: 'available' })] });
     const waiting = cluster({ hex: '1,0', slots: [slot({ direction: 'se', standing: 'allocated' })] });
@@ -163,8 +156,6 @@ describe('formatPlane', () => {
     ]);
   });
 
-  // c16: the copy is named the one way every surface names a carried thing, and
-  // the ids the verbs take are the frame's business rather than the heading's.
   it('heads a plane with the name the engine published and no id at all', () => {
     expect(formatPlane(plane({ name: asLocalized('Modified Blade') }), false, null, localizer)[0]).toContain('Modified Blade —');
     expect(formatPlane(plane({ name: asLocalized('Modified Blade') }), false, null, localizer)[0]).not.toContain('mod.blade');

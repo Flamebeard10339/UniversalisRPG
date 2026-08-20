@@ -10,28 +10,16 @@ import { serializeSession, startSession, view, type PlayView } from '../src/runt
 import { shippedModules } from './lib/layers';
 import { formatResult, printed, type ReplLine } from './play-cli';
 
-// Every module this repository ships, tests excluded, drawn from the same
-// enumeration the layer rule sweeps. The rules below used to walk `src` and
-// stop, which is one of the two drivers: an `as Localized` cast and a whole
-// engine sentence in `scripts/` both survived the suite.
 const modules = shippedModules();
 
 const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// A pattern as TypeScript would spell it: the literal parts verbatim, and a
-// template hole wherever the pattern names a parameter. Anchored on the quotes,
-// because an engine sentence surviving in TypeScript is a whole string —
-// matching a fragment of one flags `slot: ${a} at ${b}` for a heading that
-// reads `{plane} at {hex}`, and a parameterless pattern like `Item` would
-// otherwise match every occurrence of the word.
 const asTemplate = (pattern: string): RegExp => {
   const parts = pattern.split(/\{[a-z-]+\}/).map(escaped);
   return parts.length === 1 ? new RegExp(String.raw`(['"\`])${parts[0]}\1`, 'g') : new RegExp('`' + parts.join(String.raw`\$\{[^}]+\}`) + '`', 'g');
 };
 
 describe('no word of the engine is spelled in the source of either driver (c1, c2)', () => {
-  // A sweep that found one tree, or none, leaves every assertion below green
-  // over nothing — which is the state this file was written to end.
   it('sweeps every tree the layer rule knows about', () => {
     expect(modules).toContain('src/runtime/localized.ts');
     expect(modules).toContain('src/ui/App.tsx');
@@ -39,9 +27,6 @@ describe('no word of the engine is spelled in the source of either driver (c1, c
     expect(modules.filter((file) => /\.test\.tsx?$/.test(file))).toEqual([]);
   });
 
-  // `asLocalized` is the one cast that makes a Localized without a localizer.
-  // It is a fixture; a shipped module importing it would be a hole in the type
-  // this whole branch stands on.
   it('reaches the fixture that mints a Localized from no localizer only from a test', () => {
     const importers = modules.filter((file) => !file.endsWith('localizedFixture.ts') && readFileSync(file, 'utf8').includes('localizedFixture'));
 
@@ -55,14 +40,6 @@ describe('no word of the engine is spelled in the source of either driver (c1, c
   });
 
   it('leaves no engine sentence behind in TypeScript', () => {
-    // Only the patterns that have a word of their own. One that is nothing
-    // but parameters and punctuation — `{item} ({slot})`, `{index}) {choice}` —
-    // is no sentence to leave behind, and its shape is common enough in
-    // TypeScript that matching it reports ordinary templates that say nothing:
-    // `{resource}: {meter}` names five composed lines under src/content and
-    // src/grammar that carry no engine text at all. `hasWords` is the same
-    // predicate translationSurvival.test.ts asks with, so the two agree on what
-    // a pattern with words is.
     const patterns = [...(loadInEnglish('').locales.declared.get(BASE_LANGUAGE)?.entries() ?? [])].filter(([, value]) => hasWords(value));
     const offenders = modules.flatMap((file) => {
       const text = readFileSync(file, 'utf8');
@@ -73,26 +50,14 @@ describe('no word of the engine is spelled in the source of either driver (c1, c
   });
 });
 
-// The shipped island under a translation of itself, so the same session can be
-// played twice in words that share nothing. What survives the change of
-// language is what no locale produced: an id, a coordinate, or English a driver
-// spelled for itself.
 const sources = [{ name: 'engine-en', text: readFileSync('content/engine-en.dsl', 'utf8') }, { name: 'tutorial-island', text: readFileSync('content/tutorial-island.dsl', 'utf8') }];
 const registry = loadUniverse([...sources, translationOf(loadUniverse(sources))]);
 
 const RUN = /[A-Za-z][A-Za-z0-9._-]*/g;
 const runsOf = (text: string): string[] => text.match(RUN) ?? [];
 
-// What the engine said, and what it left standing. Built by reading one view
-// twice — the same state in two languages — so which of a published value's
-// fields are words and which are ids is answered by the engine's own behaviour
-// rather than by a list somebody keeps.
 interface Vocabulary {
-  // A token the engine itself spelled inside words it produced: the `e` in a
-  // published `allocate: slot e`. A driver echoing one is echoing the engine.
   readonly spelled: Set<string>;
-  // An id the engine published, against the words it published beside it on
-  // that same row. This is c10's sentence, read off the surface.
   readonly beside: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
@@ -131,9 +96,6 @@ function vocabulary(base: PlayView, other: PlayView): Vocabulary {
   return { spelled, beside };
 }
 
-// A hexagon's bearing is a coordinate spelled with letters — `ne` sits beside
-// `1,0` in the same report and is the same kind of thing, the token a growth
-// verb takes rather than a record anybody could translate.
 const BEARINGS: readonly string[] = DIRECTIONS;
 
 interface Drawn {
@@ -155,14 +117,8 @@ function play(language: string, script: readonly string[]): Drawn[] {
   return script.map((line) => ({ line, player: playerText(formatResult(runLine(ctx, line), localizer)), view: ctx.view }));
 }
 
-// The three table entries whose names are shapes rather than words, given one
-// line each of that shape — the same reading `drift.test.ts` takes of the same
-// table, so a command added tomorrow is drawn here on the day it exists.
 const SHAPED: Record<string, string> = { '<N>': '1', '<enter>': '', '<directive>': 'go to the door' };
 
-// Every line the shared table takes, and then the two screens a table entry
-// alone never opens: the carried screen and the plane it puts in hand, walked
-// by the answers `drift.test.ts` walks it by.
 const SCRIPT: readonly string[] = [
   ...COMMANDS.flatMap((spec) => {
     const bare = SHAPED[spec.name] ?? spec.name;
@@ -188,11 +144,6 @@ describe('what the REPL puts on the terminal (c10)', () => {
   const base = play(BASE_LANGUAGE, SCRIPT);
   const other = play(TRANSLATED_LANGUAGE, SCRIPT);
 
-  // Every run of letters a player line carries that the change of language left
-  // standing, against the four things that may leave one standing: a bearing, a
-  // token the engine spelled into its own words, the player's own line quoted
-  // back at them, and c10's permission — an id drawn beside the words the
-  // engine published on its row.
   function unaccounted(at: number): string[] {
     const words = vocabulary(base[at].view, other[at].view);
     const drawn = new Set(other[at].player.flatMap(runsOf));
@@ -209,8 +160,6 @@ describe('what the REPL puts on the terminal (c10)', () => {
     expect(base.flatMap((_, at) => unaccounted(at))).toEqual([]);
   });
 
-  // A walk that drew nothing, or that never reached a screen, satisfies the
-  // clause above by having looked at nothing.
   it('reaches enough of the terminal for that to mean anything', () => {
     const everything = base.flatMap((drawn) => drawn.player);
 
@@ -220,9 +169,6 @@ describe('what the REPL puts on the terminal (c10)', () => {
     expect(base.some((drawn) => drawn.view.modals.length > 0)).toBe(true);
   });
 
-  // The permission the walk grants, said out loud: an id is drawn where the
-  // engine published words for it and the driver drew those too. Without this
-  // the clause above could be satisfied by drawing no id at all.
   it('grants that permission to a place drawn beside its own name', () => {
     const at = base.findIndex((drawn) => drawn.player.some((line) => line.includes('tutorial-island.guide-house')));
     const words = vocabulary(base[at].view, other[at].view);

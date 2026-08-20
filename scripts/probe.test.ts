@@ -76,10 +76,6 @@ describe('probe: --show', () => {
     }
   });
 
-  // The kinds that used to be showable only under their registry map's name.
-  // `variable` was the natural wrong guess when the two vocabularies were
-  // separate; the row gives every registry map a kind, so there is one
-  // vocabulary now and the guess is the right spelling.
   it('shows a kind the reference walk finds nothing in, under its own name', () => {
     const source = { name: 'v', text: '# info v\nversion: 1.0.0\n\n# variable travel-seconds-per-unit\nvalue: 5\n' };
     expect(text([source])).toContain('variable 1');
@@ -134,9 +130,6 @@ describe('probe: --round-trip', () => {
     expect(result.lines.join('\n')).not.toContain('variables: missing');
   });
 
-  // Both patch fixtures below own no ids of their own, so a serialization that
-  // silently covered only some of the universe would be invisible through them.
-  // This one owns content, so dropping it from the set loses that content.
   it('serializes every module, not the first', () => {
     const owning = patch('# item ribbon', 'title: Ribbon', '', '# item lantern', 'title: Lantern');
     const result = report([BASE, owning], { show: [], roundTrip: true });
@@ -157,26 +150,18 @@ describe('probe: --round-trip', () => {
   });
 
   it('says a source with no # info cannot be round-tripped, rather than reporting it as dropped', () => {
-    // Its ids are root ids, so the serializer's namespace filter matches
-    // nothing. Calling that a difference would read as a serializer defect.
     const result = report([{ name: 'snippet', text: '# item rock\ntitle: Rock\n' }], { show: [], roundTrip: true });
     expect(result.lines.join('\n')).toContain('no # info');
     expect(result.lines.join('\n')).not.toContain('items: missing');
     expect(result.ok).toBe(true);
   });
 
-  // The question the universe form cannot answer, and the reason it did not have
-  // to be a trade: a patch module owns none of the ids it edits, so serializing
-  // it alone drops them. This is the live contribution-system H1.
   it('asks the per-module question under --round-trip=module, and reports what publishing one alone would lose', () => {
     const result = report([BASE, patch('# item base.bread', 'title: Toast')], { show: [], roundTrip: true, roundTripMode: 'module' });
     expect(result.ok).toBe(false);
     expect(result.lines.join('\n')).toContain('items: changed base.bread');
   });
 
-  // 7b16910 fixed exactly this for the universe form; the module form is a
-  // second path and the guard has to be on both. A check that could not run is
-  // not a check that failed.
   it('does not blame the serializer for a source with no # info, in module mode either', () => {
     const result = report([{ name: 'snippet', text: '# item rock\ntitle: Rock\n' }], { show: [], roundTrip: true, roundTripMode: 'module' });
     expect(result.lines.join('\n')).toContain('no # info');
@@ -251,10 +236,6 @@ describe('probe: stdin carrying several documents', () => {
     expect(splitDocuments('stdin', '---\n# info a\nversion: 1.0.0\n---\n').map((each) => each.name)).toEqual(['stdin-2']);
   });
 
-  // What the survey exists to answer: which variants load. A document with no
-  // `# info` takes its module id from its source name, so `stdin[3]` made
-  // every such variant report a refusal about its own name and nothing about
-  // the DSL under test.
   it('names a document with an id the loader accepts, so a variant that loads says so', () => {
     const documents = splitDocuments('stdin', '# variable a\nvalue: 1\n---\n# variable b\nvalue: 2\n');
     const report = probe(documents, { show: [], roundTrip: false, each: true });
@@ -295,8 +276,6 @@ describe('probe: arguments', () => {
   });
 
   it('refuses --each beside --show or --round-trip rather than dropping them', () => {
-    // A survey has no single universe to look in, so answering --show against
-    // it would be answering a different question than the one asked.
     expect(() => parseProbeArgs(['a.dsl', '--each', '--show', 'entity.a'])).toThrow(/--each/);
     expect(() => parseProbeArgs(['a.dsl', '--each', '--round-trip'])).toThrow(/--each/);
   });
