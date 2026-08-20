@@ -5,8 +5,6 @@ import { describe, expect, it } from 'vitest';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
-// The channel, as the file it is: every rule below is about what may name what
-// this one names.
 const CHANNEL = 'src/ui/transient.ts';
 
 function modulesUnder(directory: string, prefix: string): Array<{ file: string; text: string }> {
@@ -24,43 +22,18 @@ const ELSEWHERE = SOURCES.filter((source) => source.file !== CHANNEL);
 
 const STYLESHEET = readFileSync(resolve(here, '..', 'index.css'), 'utf8');
 
-// The stylesheet is the ground truth for what the shell can play: a keyframe
-// exists because someone wrote one, and the channel is where the name of it has
-// to be answered. Read off the CSS rather than off the channel's own table, so
-// a keyframe added and never routed fails rather than passing unmentioned.
 const KEYFRAMES = [...STYLESHEET.matchAll(/@keyframes\s+([\w-]+)/g)].map(([, name]) => name);
 
-// A module holding a node may write a moment onto it — the settle is written
-// onto a strip a finger has just let go of, and no other module can reach that
-// strip — so what the rule refuses is the literal, not the assignment. What is
-// written has to have come from the channel. `none` is the one literal that is
-// not a moment: it is a moment being taken back off.
 const WRITES_A_LITERAL_MOMENT = /style\.(?:transition|animation)\s*=\s*(['"`])(?!none\1)/;
 
-// The other half, which does not depend on reaching a node at all: a duration
-// with an easing beside it is an animation however it gets onto the page, and a
-// style object naming a transition property is one being declared. A Tailwind
-// `transition-*` utility is neither — it says how a value is drawn as it
-// changes, which is what press feedback is and what no agent can miss.
 const DECLARES_A_MOMENT = /cubic-bezier\(|\b\d+(?:\.\d+)?m?s\b[^'"`]*\b(?:ease|linear|steps)\b|\b(?:transitionProperty|animationName|animationDuration)\s*:/;
 
-// Every string a module writes, of any quoting. A class name reaches a node
-// from inside one of these and nowhere else, where the same word outside one is
-// an ordinary local — `arrived` is both a moment and what App.tsx calls the
-// places that have just turned up.
 const QUOTED = /'[^'\n]*'|"[^"\n]*"|`[^`]*`/g;
 
-// Comments first, because this codebase writes prose and prose has apostrophes
-// in it: "the map's own working out" opens a string literal that a scanner
-// then runs to the next apostrophe, swallowing whatever code is in between.
 const COMMENTED = /\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
 
 function strings(text: string): string[] {
   text = text.replace(COMMENTED, ' ');
-  // Interpolations dropped: what a template writes is its literal parts, and
-  // what it interpolates is code that has already been read as code. A class
-  // list is very often `${asked} the-rest`, and the name inside the braces is
-  // the local the channel handed back.
   return [...text.matchAll(QUOTED)].map((match) => match[0].slice(1, -1).replace(/\$\{[^}]*\}/g, ' '));
 }
 
@@ -95,7 +68,6 @@ describe('the channel every moment is played through', () => {
       expect(source.text, `${source.file} declares a moment of its own`).not.toMatch(DECLARES_A_MOMENT);
     }
 
-    // Both rules matching nothing anywhere would pass every module above.
     const channel = SOURCES.find((source) => source.file === CHANNEL)!;
     expect(channel.text).toMatch(DECLARES_A_MOMENT);
     expect(`node.style.transition = 'transform 220ms ease'`).toMatch(WRITES_A_LITERAL_MOMENT);

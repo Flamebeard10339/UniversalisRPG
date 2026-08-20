@@ -27,17 +27,12 @@ const pageSlots = (): SlotDriver => {
   return browserSlots(() => storage);
 };
 
-// The one region a fault is drawn in, and every control inside it. Read off the
-// markup rather than off a component's props, because what c4 is about is what
-// reaches a screen.
 function alerting(html: string): { drawn: boolean; drivers: string[] } {
   const region = /<div role="alert"[\s\S]*?<\/div>\s*<\/div>/.exec(html);
   if (!region) return { drawn: false, drivers: [] };
   return { drawn: true, drivers: [...region[0].matchAll(/<button[^>]*data-drive="([^"]*)"/g)].map(([, driver]) => driver) };
 }
 
-// Every cell of the door's own family, opened the way a browser opens one, so
-// that what is drawn is asked of the same states the door is proved over.
 function openedOver(cell: { base: readonly ModuleSource[]; local: string }): Driver {
   const slots = pageSlots();
   if (cell.local !== '') slotStore(slots, () => 0).write(LOCAL_CHANGES_MODULE_ID, cell.local);
@@ -46,18 +41,9 @@ function openedOver(cell: { base: readonly ModuleSource[]; local: string }): Dri
 
 const problemsOf = (message: string): UniverseProblem[] => [{ modules: [LOCAL_CHANGES_MODULE_ID], words: 'tool', message }];
 
-// The whole shell rather than the banner alone, so that what is asserted is
-// what a reader gets: a decision the driver made and a component wired to
-// something else reaches nobody, and the region is found the same way either way.
 const banner = (driver: Driver): { drawn: boolean; drivers: string[] } => alerting(renderToStaticMarkup(<App driver={driver} />));
 
 describe('a problem is never drawn as text with nothing beside it (c3, c7)', () => {
-  // What reaches the screen, against what the fixture broke. Neither side of
-  // this is the expression that decides the controls: `clearingReaches` is a
-  // fact about the module the fixture broke and the part of it clearing
-  // rewrites, and the other side is the markup. Comparing the drawn set against
-  // the function that computed it is what let the same withdrawal survive here
-  // twice.
   it('draws exactly the remedies the report has, for every state the door can leave', () => {
     expect(OPENING_CELLS.length).toBeGreaterThan(6);
     let offered = 0;
@@ -66,28 +52,21 @@ describe('a problem is never drawn as text with nothing beside it (c3, c7)', () 
       const drawn = banner(openedOver(cell));
 
       expect(drawn.drawn, cell.where).toBe(true);
-      // The clause's own sentence: something to do, always, and it is the
-      // control that asks nothing of the author.
       expect(drawn.drivers, cell.where).toContain('reopen');
       expect(drawn.drivers.includes('clear-local'), cell.where).toBe(clearingReaches(cell));
       if (clearingReaches(cell)) offered += 1;
     }
 
-    // Drawn nowhere, or drawn everywhere, would satisfy every line above.
     expect(offered).toBeGreaterThan(0);
     expect(offered).toBeLessThan(OPENING_CELLS.length);
   });
 
-  // A remedy no state draws would be a control nobody can reach; the pair of
-  // checks is what holds the markup and the decision to the same set.
   it('draws every remedy there is, across the states there are', () => {
     const drawn = new Set(OPENING_CELLS.flatMap((cell) => banner(openedOver(cell)).drivers));
 
     expect(drawn).toEqual(new Set(REMEDIES));
   });
 
-  // c3's screen half: what the door said is what the reader is given, rather
-  // than a sentence this layer wrote about it.
   it('says what the door said, and nothing it did not', () => {
     const problems = problemsOf('the door said this');
     const html = renderToStaticMarkup(<FaultBanner problems={problems} remedies={REMEDIES} words={words} onRemedy={() => undefined} />);
@@ -95,14 +74,10 @@ describe('a problem is never drawn as text with nothing beside it (c3, c7)', () 
     expect(html).toContain('the door said this');
   });
 
-  // And the shell puts it where a page cannot be used to leave it: over the
-  // column, so it stands whether or not the session is the game.
   it('draws it over the whole shell, over a game and over the stand-in alike', () => {
     const withGame = openedOver({ base: SHIPPED_SOURCES, local: brokenLocal() });
     const standingIn = openedOver({ base: [{ name: 'empty', text: '# info empty\nversion: 0.0.0\npack: test\n' }], local: '' });
 
-    // Both have a session, which is the point of the door; what differs is
-    // whether it is the game, and where the player stands is what says so.
     expect(standingIn.snapshot().view.location.id).not.toBe(withGame.snapshot().view.location.id);
     for (const driver of [withGame, standingIn]) {
       const drawn = alerting(renderToStaticMarkup(<App driver={driver} />));
@@ -116,15 +91,12 @@ describe('a problem is never drawn as text with nothing beside it (c3, c7)', () 
   });
 });
 
-// A staged edit, then the file changed under it — which is the route into the
-// state, and the reason the text is written into the store rather than typed.
 function brokenLocal(): string {
   const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots(), ticker: () => () => undefined });
   driver.send('/dsl location tutorial-island.guide-house x: 7, y: 7');
   return (driver.localChanges() ?? '').replace('x: 7, y: 7', 'x: sideways');
 }
 
-// Every module under src/ui that ships, which is what the rule below is about.
 function shippedModules(directory: string, prefix: string): Array<{ file: string; text: string }> {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
@@ -146,10 +118,6 @@ describe('taking a remedy changes the state it was taken from (c7)', () => {
     expect(driver.snapshot().problems).toEqual([]);
   });
 
-  // What opening again actually does: read the store and run the load over it.
-  // A module somebody repaired in another tab is the case that reaches — the
-  // store is shared and the base sources are not, so this is the whole of what
-  // the shell can do about a problem without the page going away.
   it('runs the load again over the store as it stands now', () => {
     const slots = pageSlots();
     const store = slotStore(slots, () => 0);
@@ -157,7 +125,6 @@ describe('taking a remedy changes the state it was taken from (c7)', () => {
     const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
     expect(driver.snapshot().problems.flatMap((problem) => problem.modules)).toEqual([LOCAL_CHANGES_MODULE_ID]);
 
-    // Another writer over the same store, which is what a second tab is.
     store.write(LOCAL_CHANGES_MODULE_ID, brokenLocal().replace('x: sideways', 'x: 7, y: 7'));
     driver.reopen();
 
@@ -165,17 +132,6 @@ describe('taking a remedy changes the state it was taken from (c7)', () => {
     expect(driver.snapshot().view.discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
   });
 
-  // A problem no local module is named in, where clearing an author's work
-  // would help nothing. `reopen` re-runs the load over the same source objects,
-  // and in a browser those are `SHIPPED_SOURCES` — `import.meta.glob` with
-  // `eager`, so their text is inlined at build time and cannot change while the
-  // page is up. A shipped module somebody repaired is therefore reached by
-  // loading the page again and by nothing else, which is what that control does.
-  //
-  // A driver handed sources whose text later changes does pick them up; that is
-  // true of this function and false of the app, so it is not what is asserted
-  // here. What is asserted is the wiring, and how it behaves in a browser is
-  // the author's to look at — this suite mounts nothing.
   it('offers the remedy that loads the page again, which is the only thing that re-reads a shipped module', () => {
     const driver = openedOver({ base: [{ name: 'torn', text: '# info torn\nversion: 0.0.0\npack: test\n\n# item\n' }], local: '' });
 
@@ -183,9 +139,6 @@ describe('taking a remedy changes the state it was taken from (c7)', () => {
     expect(driver.snapshot().remedies).toEqual(['reopen']);
   });
 
-  // Both answers, because only one of them is ever taken here: the suite runs
-  // in node and would otherwise grade the shipped branch by reading App.tsx for
-  // a string, which passes with the call in a comment.
   it("means loading the page again on a page, and the driver's own re-open where there is none", () => {
     expect([retrying(true), retrying(false)]).toEqual(['reload', 'reopen']);
     expect(readFileSync(join(here, 'App.tsx'), 'utf8')).toContain('window.location.reload()');

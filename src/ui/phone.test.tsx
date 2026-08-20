@@ -32,9 +32,6 @@ const SOURCES = [
   { file: 'src/index.css', text: readFileSync(resolve(here, '..', 'index.css'), 'utf8') },
 ];
 
-// A pointer that is not a finger, and a key. Each is something a phone does not
-// have, so an affordance that answers only to one of them is an affordance the
-// player this layout is designed for cannot reach.
 const NOT_A_FINGER = [/onMouse(?:Enter|Over|Leave|Out)\b/, /onContextMenu\b/, /onDoubleClick\b/, /onKey(?:Down|Up|Press)\b/, /\bhover:/, /:hover\b/, /group-hover/];
 
 const markup = (): string => renderToStaticMarkup(<App driver={createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined })} />);
@@ -50,8 +47,6 @@ describe('the layout a phone is held to', () => {
   });
 
   it('clips the shell to the window, so nothing can push the page sideways', () => {
-    // The root is the whole of the guarantee: a child wider than the window is
-    // cut off by it rather than carried by a scrollbar the page grows.
     const root = markup().match(/^<div class="([^"]*)"/);
 
     expect(root, 'the shell has no root element').not.toBeNull();
@@ -73,9 +68,6 @@ describe('the layout a phone is held to', () => {
     }
   });
 
-  // Thumb reach, in the two forms that hold without a layout engine: the bar
-  // is the last thing in the shell, and the narration is never given more than
-  // half the surface it shares with the choices.
   it('puts the tab bar below everything else in the shell', () => {
     const html = markup();
 
