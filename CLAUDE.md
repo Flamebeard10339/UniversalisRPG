@@ -12,7 +12,11 @@ copy does not exist. A derived proof beats a listed one: if a rule says *every*,
 its proof should derive its own subjects rather than enumerate them.
 
 Make commits after each logical chunk. `git add <explicit paths>`, never
-`git add -A` — more than one worker may share this checkout.
+`git add -A`. When more than one worker shares this checkout, note that staging
+explicit paths is **not** enough isolation: the index is shared too, so a commit
+takes whatever anyone else has staged. It has happened here three times in one
+session. If you are one of several, either work in your own worktree or expect
+your files to land under someone else's message.
 
 # The DSL
 
