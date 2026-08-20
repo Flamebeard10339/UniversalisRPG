@@ -9,7 +9,7 @@ export type ResourceDisplay = 'full' | 'minimal';
 export interface Resource {
   id: string;
   title: string;
-  // One NET signed rate: regeneration and drain are the same stat.
+  // Signed and net: regeneration and drain are one stat, not two fields.
   rate?: string;
   max: string;
   start?: number;

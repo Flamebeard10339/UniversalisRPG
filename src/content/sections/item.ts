@@ -46,12 +46,8 @@ export const clusterEffectValue: Parser<ClusterEffect> = {
 
 export const DEFAULT_MAX_LEVEL = 99;
 
-// You grow what you can wear: a base is spelled `slot:` and nothing else.
 export const isBase = (item: Item): boolean => item.slot !== undefined;
 
-// `cluster-jewel:` makes the item a jewel and `cluster-effect:` an orb; `slot:`
-// and `origin-cluster:` make it a base. An item claiming a base role alongside
-// a jewel or orb role would be consumed by the growth it can undergo.
 function roleProblem(item: Item): string | undefined {
   if (item.clusterJewel !== undefined && (isBase(item) || item.originCluster !== undefined)) {
     return `cluster-jewel: makes ${item.id} a jewel, which is exclusive with the ${isBase(item) ? 'slot:' : 'origin-cluster:'} that makes it a base`;
@@ -100,8 +96,6 @@ export const item = section<Item, never, 'actions'>()({
     put(held, 'originCluster', 'cluster-jewel', `${where} origin-cluster:`, visit);
     if (held.clusterEffect) put(held.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
   },
-  // An item is a carrier: the thing stays in the bag when a clause, an action or
-  // a hook it wrote names something that went.
   prune: (value, at, where) => {
     const tags = pruneTags(value.tags, where, at);
     const kept = pruneActions(value.actions, where, at);

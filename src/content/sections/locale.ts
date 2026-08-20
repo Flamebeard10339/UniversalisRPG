@@ -3,7 +3,6 @@ import { hasBlock, RawSection, sectionParser } from '../../grammar/structure';
 import { section } from './define';
 
 export interface LocaleSection {
-  // The language tag the section heads, which is the section's id.
   id: string;
   entries: Array<{ key: string; value: string }>;
 }
@@ -25,9 +24,6 @@ export const parseLocaleSection = sectionParser((section: RawSection): LocaleSec
   return { id: section.id, entries };
 });
 
-// The words themselves live in `../locale`, the store every kind's text is read
-// through; what is here is the section that carries them in. Its key is the
-// language tag, so the heading is printed from the context and not the value.
 export const locale = section<LocaleSection>()({
   kind: 'locale',
   ids: 'none',

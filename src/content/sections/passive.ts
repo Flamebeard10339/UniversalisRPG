@@ -19,9 +19,6 @@ function formatRangeClause(statId: string, amount: Range): string {
   return `${sign}${Math.abs(amount.min)}-${Math.abs(amount.max)} ${statId}`;
 }
 
-// A passive is always on: there is no moment at which a range could roll, and
-// rolling once at allocation would put a per-position number in every saved
-// instance rather than nothing.
 export function passiveRangeProblem(passive: Passive): string | undefined {
   for (const tag of passive.tags) {
     if (tag.kind === 'stat-bonus' && !tag.percent && tag.amount.min !== tag.amount.max) {
@@ -49,8 +46,6 @@ export const passive = section<Passive>()({
     visitTags(held.tags, where, visit);
     hooks(held, where, visit);
   },
-  // A passive is a carrier like an item is: what a jewel placed it for survives
-  // a payload whose stat went.
   prune: (value, at, where) => {
     const tags = pruneTags(value.tags, where, at);
     const onHit = pruneHook(value.onHit, `${where} on hit:`, at);

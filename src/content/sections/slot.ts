@@ -1,8 +1,7 @@
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
-// The vocabulary of slots is the union of every `equipment-slots:`, so this
-// declaration is optional and supplies only the words.
+// A `# slot` is optional — the vocabulary is the union of every `equipment-slots:`, and this only supplies display words.
 export interface Slot {
   id: string;
   title: string;

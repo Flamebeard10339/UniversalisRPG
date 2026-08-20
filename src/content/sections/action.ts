@@ -8,30 +8,15 @@ import type { Namespace } from '../namespace';
 import { visitAction } from '../refs';
 import { section } from './define';
 
-// An action written once and named by everything that performs it. Its `label`
-// is its title, which is what an inline action's label already is, so both forms
-// hold the same shape and nothing downstream asks which one it came from.
 export interface ActionDeclaration extends Action {
   id: string;
 }
 
-// What an action is addressed by, everywhere one is named: under its owner in
-// the namespace, in a `use:`, in a choice id and in a save. A declaration is
-// addressed by the id it was written under, so its `title:` is display and
-// moves freely; an inline block has no id but the label it is headed with, so a
-// slug of that label is the only address there is.
 export function actionAddress(action: Action): string {
   const id = declaredId(action);
   return id === undefined ? actionSlug(action.label) : lastSegment(id);
 }
 
-// Where an action's display words are written, which is not where every
-// performer of it stands: a `# action` owns the label it was declared with, and
-// an entity's overload cannot retitle it because `overlayAction` drops `label`,
-// so a `use:` never authors words. One declaration is therefore one key however
-// many owners bring it, and the language those words are in is the declaring
-// module's rather than the performer's. An inline block has no declaration and
-// is owned by the object it was written under.
 export interface ActionTextOwner {
   namespace: string | null;
   kind: string;
@@ -70,16 +55,12 @@ export const action = section<ActionDeclaration>()({
       label,
       ...generated,
     } as ActionDeclaration;
-    // A declaration is whole where an entity's overload of it is a fragment, so
-    // this is where the rules about a whole action are asked.
     const problem = assembledActionProblem(declared);
     if (problem) throw new DslError(`# action ${raw.id}: ${actionProblem(label, problem)}`, raw.span);
     return declared;
   },
   print: (declared, { moduleId }) => {
     const [, ...body] = actionLines(declared);
-    // A generated label is `humanizeEn` of the id, which the loader makes again;
-    // printing it would make the placeholder authored on the next load.
     const title = declared.generatedLabel ? [] : [`title: ${declared.label}`];
     return [`# action ${moduleLocalId(moduleId, declared.id)}`, ...title, ...body.map((line) => line.replace(/^ {2}/, ''))];
   },

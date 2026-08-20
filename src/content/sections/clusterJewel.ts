@@ -32,8 +32,6 @@ export const positionValue: Parser<[number, string]> = {
   examples: ['0 keen-eye', '3 tough-hide'],
 };
 
-// Two pairs naming one position is authoring a shape wrong rather than patching
-// one, so the duplicate is refused instead of letting the later assignment win.
 function hydratePositions(parsed: unknown): Record<number, string> {
   const pairs = parsed as [number, string][];
   const positions: Record<number, string> = {};
@@ -94,10 +92,6 @@ export const clusterJewel = section<ClusterJewel>()({
       printed: 'unless-default',
     },
   },
-  // Reading `positions` is where a position filled twice is raised, and
-  // `getShape` throws its own list of the shapes that exist. Both are already
-  // the words an author reads, so they are answered as this kind's problem
-  // rather than leaving without the section that carried them.
   validate: (value) => {
     try {
       return clusterJewelProblem(value, getShape(value.shape));
@@ -111,7 +105,6 @@ export const clusterJewel = section<ClusterJewel>()({
       assignment[1] = visit('passive', assignment[1], `${where} passives:`);
     }
   },
-  // A position whose passive is gone is an empty position, not a broken jewel.
   prune: (value, at, where) => {
     const filled = Object.entries(value.positions).filter(([, passiveId]) => !at.gone('passive', passiveId, `${where} passives:`));
     if (filled.length === Object.keys(value.positions).length) return value;

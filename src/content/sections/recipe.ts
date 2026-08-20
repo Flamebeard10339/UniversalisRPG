@@ -8,17 +8,12 @@ import { put, quantified as quantifiedItems, type Loose } from '../refs';
 import { ActionDeclaration } from './action';
 import { section } from './define';
 
-// What addresses a compiled craft, on the same terms a travel is addressed: an
-// id, because the label is display text no surface draws.
 export const CRAFT_ADDRESS = 'craft';
 
 export interface Recipe {
   id: string;
-  // Absent means craftable anywhere.
   requiresCapability?: string;
   in: Quantified[];
-  // Produced, so a fletching craft can yield 5-10 arrows; `in` is consumed and
-  // stays a count, because `inputLimit` must be able to divide by it.
   out: Produced[];
   skill?: { skill: string; amount: number };
   say?: string;
@@ -39,10 +34,6 @@ export const recipeSkillValue: Parser<{ skill: string; amount: number }> = {
   examples: ['smithing 5'],
 };
 
-// Compiled to an Action so a craft runs through the same resolve() machinery as
-// any other single-attempt fight. Whatever was authored is carried through
-// unexamined, so the table that judges an authored action judges this one
-// rather than a recipe-shaped copy of it.
 function recipeAction(recipe: Recipe): ActionDeclaration {
   const takes: ActionResult[] = recipe.in.map((q) => ({
     kind: 'take',
@@ -72,7 +63,6 @@ function recipeAction(recipe: Recipe): ActionDeclaration {
     kind: 'rate' in cadence || 'time' in cadence ? 'continuous' : 'instant',
     results,
     ...cadence,
-    // One-sided: a craft has one participant, so neither half names a side.
     ...(recipe.accuracy
       ? {
           accuracy: {
@@ -84,8 +74,6 @@ function recipeAction(recipe: Recipe): ActionDeclaration {
   };
 
   if (recipe.accuracy) {
-    // The fail path consumes the SAME inputs as success, so inputLimit still
-    // bounds a repeating burn-capable craft.
     action.attempts = 1;
     const burnt: ActionResult[] = recipe.burnt.map((q) => ({
       kind: 'give',

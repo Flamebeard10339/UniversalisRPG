@@ -15,14 +15,8 @@ export type Directive =
   | { kind: 'talk'; entity: string }
   | { kind: 'choose'; text: string }
   | { kind: 'use'; obj: string; objId: string; actionId: string }
-  // The two-sided spelling, beside the form it does not replace: an action
-  // brought by the player and applied to what it names.
   | { kind: 'use-on'; action: string; target: string }
   | { kind: 'travel'; location: string }
-  // Standing somewhere at once, which is what a walk arrives at with the walk
-  // taken out of it. Beside `travel:` rather than a flag on it: one crosses the
-  // roads and spends the time, the other does neither, and a line a session
-  // records has to say which of the two happened.
   | { kind: 'goto'; location: string }
   | { kind: 'craft'; recipe: string }
   | {
@@ -36,10 +30,6 @@ export type Directive =
   | { kind: 'wait'; seconds: number }
   | { kind: 'equip'; item: string }
   | { kind: 'unequip'; slot: string }
-  // The four ways an item grows, one verb each rather than one verb reading
-  // what the consumed item declares: allocation consumes nothing, and the
-  // three that do consume take different addresses, so a single verb would
-  // have to decide which of its arguments were required after parsing them.
   | { kind: 'feed'; target: string; food: string }
   | {
       kind: 'slot';
@@ -50,14 +40,7 @@ export type Directive =
     }
   | { kind: 'allocate'; target: string; node: PlaneNode }
   | { kind: 'apply'; target: string; hex: Hex; effect: string }
-  // A growth refused is the outcome under test, so it is written rather than
-  // inferred from a state that did not move. Only growth verbs may be wrapped:
-  // their refusal is a value the one door returns, where every other verb
-  // pushes a sentence into the log and leaves nothing to invert.
   | { kind: 'refuse'; inner: GrowthDirective }
-  // Raising a screen and answering one of its options, so a route through a
-  // modal is a recorded line rather than a driver's private gesture. The name
-  // is the engine's, not a section's, which is why nothing below resolves it.
   | { kind: 'open-modal'; modal: string }
   | { kind: 'submit-modal'; key: string; value: string };
 
@@ -68,7 +51,6 @@ export interface Test {
   directives: Directive[];
 }
 
-// Factored out so `begin:` can take the same payload with the verb inline.
 const PATH = '[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*';
 const SLUG = '[a-z0-9][a-z0-9-]*';
 const USE_PAYLOAD = `(?<obj>[a-z][a-z0-9-]*)\\.(?<objId>${PATH})\\.(?<actionId>${SLUG})`;
@@ -95,9 +77,6 @@ const EXPECT = new RegExp(`^expect:[ \\t]*(?<id>${PATH})$`);
 const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
 const CANCEL = /^cancel$/;
 const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
-// What the player carries is named either by an item id or by the id minting
-// gave one grown copy, and a minted id is a bare number, so the two spellings
-// never overlap and no site has to be told which one it was handed.
 const CARRIED = `(?:${PATH}|[0-9]+)`;
 const HEX = '-?\\d+,-?\\d+';
 const DIRECTION = [...DIRECTIONS].sort((a, b) => b.length - a.length).join('|');
@@ -105,8 +84,6 @@ const DIRECTION = [...DIRECTIONS].sort((a, b) => b.length - a.length).join('|');
 const EQUIP = new RegExp(`^equip:[ \\t]*(?<item>${CARRIED})$`);
 const UNEQUIP = new RegExp(`^unequip:[ \\t]*(?<slot>${PATH})$`);
 
-// Factored out so `refuse:` takes the same payloads with the verb inline, the
-// way `begin:` already does.
 const GROWTH_PAYLOAD = {
   feed: `(?<target>${CARRIED})[ \\t]+with[ \\t]+(?<food>${PATH})`,
   slot: `(?<target>${CARRIED})[ \\t]+at[ \\t]+(?<hex>${HEX})[ \\t]+(?<direction>${DIRECTION})[ \\t]+with[ \\t]+(?<jewel>${PATH})`,
@@ -136,11 +113,6 @@ export function isGrowthDirective(value: Directive): value is GrowthDirective {
 
 export type UseDirective = Extract<Directive, { kind: 'use' }>;
 
-// The one shape a `use:` payload takes, whether an author writes it as a
-// directive or the runtime offers it as a choice id: the kind, the object under
-// it, and the action's address under that. Written and read back here, so the
-// two are the same string by construction rather than by two regexes that
-// happen to agree.
 export const usePayload = (value: UseDirective): string => `${value.obj}.${value.objId}.${value.actionId}`;
 
 export function parseUsePayload(payload: string): UseDirective | null {
@@ -189,8 +161,6 @@ function parseGrowth(verb: GrowthVerb, pattern: Map<GrowthVerb, RegExp>, payload
 }
 const OPEN_MODAL = new RegExp(`^open-modal:[ \\t]*(?<name>${PATH})$`);
 const SUBMIT_MODAL_VERB = /^submit-modal:/;
-// One pair per line, the value running to the end of it, so an answer may hold
-// the spaces and punctuation a dialogue line is written with.
 const SUBMIT_MODAL = /^submit-modal:[ \t]*(?<key>[a-z][a-z0-9-]*)=(?<value>.*)$/;
 
 function parseBegin(text: string, verb: string, rest: string): Directive {
@@ -217,7 +187,6 @@ function parseBegin(text: string, verb: string, rest: string): Directive {
   throw new DslError(`unknown begin: verb (expected use, travel, or craft): ${text}`);
 }
 
-// The sole parser for directive lines, shared by the section below and the CLI.
 export function parseDirectiveLine(text: string): Directive | null {
   const run = RUN.exec(text)?.groups;
   if (run) return { kind: 'run', test: run.id };
@@ -228,8 +197,6 @@ export function parseDirectiveLine(text: string): Directive | null {
   const choose = CHOOSE.exec(text)?.groups;
   if (choose) return { kind: 'choose', text: choose.text };
 
-  // The two readings are disjoint rather than ranked: an action is addressed by
-  // a slug, which holds no space, and the two-sided form is spelled with one.
   const use = USE.exec(text)?.groups;
   if (use)
     return {
@@ -301,8 +268,6 @@ export function parseDirectiveLine(text: string): Directive | null {
   return null;
 }
 
-// The verb, then whatever that verb's own line carries after its colon — the
-// shape `begin:` and `refuse:` both take their inner directive in.
 function inlined(inner: Directive, verb = inner.kind): string {
   return `${verb} ${printDirective(inner).replace(/^[a-z-]+:[ \t]*/, '')}`;
 }
@@ -386,8 +351,6 @@ export const test = section<Test>()({
   },
 });
 
-// Exported because a directive also arrives typed at the CLI, where the names
-// are as short as an author's and want the same resolution.
 export function visitDirective(value: Directive, where: string, visit: Visit): void {
   switch (value.kind) {
     case 'run':
@@ -416,9 +379,6 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       visitDirective(value.inner, `${where} begin:`, visit);
       return;
     case 'use': {
-      // `obj` names the kind, so the object it addresses is resolved as one,
-      // and the action after it is that object's member — resolved second,
-      // because the key it hangs under is the one the object settled on.
       if (!isActionOwnerKind(value.obj)) return;
       put(value, 'objId', value.obj, `${where} use:`, visit);
       value.actionId = lastSegment(visit(ACTION_MEMBER, memberKey(ACTION_MEMBER, value.obj, value.objId, value.actionId), `${where} use:`));
@@ -431,8 +391,6 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'equip':
       putCarried(value, 'item', `${where} equip:`, visit);
       return;
-    // A growth verb's target is what is grown; whatever it consumes comes off a
-    // stack and is always an item id.
     case 'feed':
       putCarried(value, 'target', `${where} feed:`, visit);
       put(value, 'food', 'item', `${where} feed: with`, visit);
@@ -451,12 +409,6 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'refuse':
       visitDirective(value.inner, `${where} refuse:`, visit);
       return;
-    // `unequip:` names a slot, `open-modal:` a screen the engine defines and
-    // `submit-modal:` an option key, none of which is a section's id, so they
-    // resolve nothing here; a slot is checked against what items declare by
-    // validateTestReferences, and a screen only the layer above can name is
-    // refused where it is raised. `choose:` names an offered option by its
-    // position, `cancel:` and `wait:` name nothing at all.
     case 'unequip':
     case 'open-modal':
     case 'submit-modal':

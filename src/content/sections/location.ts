@@ -8,8 +8,6 @@ import { actions, condition as visitCondition, pruneActions, put, type Loose } f
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
-// The one flag every location owns without declaring it, because the engine
-// sets it the first time the player arrives.
 export const DISCOVERED = 'discovered';
 
 export type Direction = 'north' | 'south' | 'east' | 'west' | 'up' | 'down';
@@ -24,8 +22,7 @@ export interface Edge {
   condition?: Condition;
 }
 
-// How many of a type stand here. Absent is one, so every line that shipped
-// before counts existed reads the same.
+// An absent count is one.
 export interface Population {
   count?: number;
   entity: string;
@@ -45,7 +42,6 @@ export interface Location {
   flags: string[];
   starting: boolean;
   relative?: Relative;
-  // Actions the location itself can do, as opposed to something standing in it.
   actions: Action[];
 }
 
@@ -158,14 +154,8 @@ const SCHEMA: SectionSchema<Location, 'starting', 'actions'> = {
   entries: { into: 'actions', body: actionBody },
 };
 
-// No entry can be labelled `x:`, `y:` or `z:`, because all three are claimed as
-// fields before the label dispatch is reached.
 const COORDINATE = /^[xyz]: /;
 
-// Three fields, one line: `x: 0, y: 0, z: 0` is what the language writes, and a
-// walk that gives each field a line of its own cannot say that. A `relative:`
-// placement writes that line instead and never beside it — the two are
-// exclusive, so a section carrying both would not parse back.
 const printLocation = (value: Location, context: PrintContext): readonly string[] => {
   const lines = printSection(value, SCHEMA as unknown as AnySchema, context, actionLines);
   const [heading, ...rest] = lines.filter((line) => !COORDINATE.test(line));
@@ -190,8 +180,6 @@ export const location = section<Location, 'starting', 'actions'>()({
     if (held.relative) put(held.relative as Relative, 'of', 'location', `${where} relative`, visit);
     actions(held.actions, where, visit);
   },
-  // An occupant, an edge or an action that went is one line off the map; a
-  // `relative:` placement is the one reference the place itself stands on.
   prune: (value, at, where) => {
     if (value.relative && at.gone('location', value.relative.of, `${where} relative`)) return null;
     const entities = value.entities.filter((entry) => !at.gone('entity', entry.entity, `${where} entities:`));

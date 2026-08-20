@@ -5,9 +5,6 @@ import { put } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
-// The closed set of moments a name may be bound to, each beside whether it
-// watches a pool. The arity sits in the table because it is a property of the
-// moment, and it is what decides whether `resource:` belongs on a declaration.
 export const EVENT_TRIGGERS = {
   'on empty': 'pool',
   'on full': 'pool',
@@ -25,8 +22,6 @@ export const TRIGGER_NAMES: readonly EventTrigger[] = Object.keys(EVENT_TRIGGERS
 
 export const watchesAPool = (trigger: EventTrigger): boolean => EVENT_TRIGGERS[trigger] === 'pool';
 
-// Asked of the assembled event, because a later module may be what supplies the
-// `resource:` line.
 export function triggerArityProblem(event: GameEvent): string | undefined {
   if (watchesAPool(event.trigger)) {
     return event.resource ? undefined : `trigger: ${event.trigger} watches a pool, so it needs a resource: naming which one`;
@@ -55,10 +50,6 @@ const triggerValue: Parser<EventTrigger> = {
   examples: [...TRIGGER_NAMES],
 };
 
-// An entity answers an event by writing `on <its name>:`, and a hook has
-// claimed some of those labels. Refused where the name is bound, because the
-// entity that would have handled it never sees a problem — it gets a hook, and
-// the event goes unhandled with nothing to say so.
 function answeredByAHook(event: GameEvent): string | undefined {
   const answered = event.id.split('.').pop()!;
   if (!HOOK_LABELS.includes(`on ${answered}`)) return undefined;

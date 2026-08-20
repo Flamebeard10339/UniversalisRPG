@@ -7,8 +7,6 @@ export interface Removal {
   target: string;
 }
 
-// Merge-by-omission cannot express removal — there is no partial section that
-// means "this is gone" — so exactly one keyword survives inference.
 export const remove = section<Removal>()({
   kind: 'remove',
   ids: 'none',

@@ -3,8 +3,6 @@ import { moduleLocalId } from '../../grammar/section';
 import { RawSection, sectionParser } from '../../grammar/structure';
 import { section } from './define';
 
-// A recorded state, which carries no id: `saves` keys on the one the section
-// was headed with, and the printer reads that key back off its context.
 export interface ParsedSave {
   version: number;
   diff: Record<string, unknown>;
@@ -14,13 +12,9 @@ export interface SaveSection extends ParsedSave {
   id: string;
 }
 
-// Exported because a recorded state is read back outside the load path too — a
-// migration script and the runtime's own round trip both hand one line of JSON
-// to the same reader an author's `# save` goes through.
 export const parseSaveSection = sectionParser((raw: RawSection): SaveSection => {
   if (!raw.id) throw new DslError('# save requires an id', raw.span);
 
-  // The body is one line of JSON; the grammar has no multi-line support.
   const written = raw.body.map((line) => line.text).join('');
   let parsed: unknown;
   try {

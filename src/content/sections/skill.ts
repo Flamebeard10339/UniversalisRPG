@@ -32,8 +32,6 @@ export const skill = section<Skill>()({
     put(value, 'stat-id', 'stat', `${where} stat-id:`, visit);
     for (const grant of listMembers<SkillGrant>(value.grants)) put(grant, 'event', 'event', `${where} gain`, visit);
   },
-  // A grant is one line and goes alone, but `per-level:` needs a `stat-id:` to
-  // raise, so a skill that outlived its stat is one the build would refuse.
   prune: (value, at, where) => {
     const statId = value['stat-id'];
     if (statId !== undefined && at.gone('stat', statId, `${where} stat-id:`)) return null;

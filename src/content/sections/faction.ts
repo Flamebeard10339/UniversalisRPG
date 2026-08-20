@@ -16,6 +16,4 @@ export const faction = section<Faction>()({
   },
 });
 
-// The faction an entity that names none belongs to, which is why almost nothing
-// needs the line: rats do not fight rats.
 export const WORLD_FACTION = 'world';

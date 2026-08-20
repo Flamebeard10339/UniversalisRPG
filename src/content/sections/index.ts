@@ -28,13 +28,7 @@ import { stat } from './stat';
 import { test } from './test';
 import { variable } from './variable';
 
-// Every section kind there is, and the order a module prints them in. This list
-// is the only place a kind is declared: the parser table, the registry's maps,
-// the build, the printer, the reference walk and the locale's text fields are
-// all read off it, so adding a kind is this line and the file it names.
-// Read on demand and never at import: a kind's file may reach a module that
-// reaches this one, and a list assembled while one of its members is still
-// loading holds an undefined. Nothing here runs until something asks.
+// A thunk, not a const: a kind's file may reach this module, and a list built while one member is still loading holds an undefined.
 const declared = () => [stat, skill, item, passive, clusterJewel, faction, event, action, entity, location, recipe, resource, droptable, dialogue, flag, slot, variable, locale, save, test, info, remove] as const;
 
 export type AnySection = ReturnType<typeof declared>[number];
@@ -60,17 +54,12 @@ function required(kind: string, span?: Span): Section {
   return found;
 }
 
-// A parsed section, discriminated by its kind. What a parser returns is an
-// object either way; what the union buys is that a switch on `kind` narrows.
 export type ModuleSection = {
   [K in SectionKind]: { kind: K; value: object };
 }[SectionKind];
 
 export const sectionOf = (kind: SectionKind, value: object): ModuleSection => ({ kind, value }) as ModuleSection;
 
-// Every map the registry holds, derived from the kinds that fill them. A map
-// cannot go missing and cannot hold the wrong type, because neither is written
-// anywhere: both come from the kind's own declaration of where its values land.
 type MapsOf<S> = S extends Section<infer _V, infer M> ? { [K in keyof M]: Map<string, M[K]> } : never;
 type Intersect<U> = (U extends unknown ? (each: U) => void : never) extends (each: infer I) => void ? I : never;
 export type SectionMaps = Intersect<MapsOf<AnySection>>;
@@ -106,11 +95,8 @@ export { isActionOwnerKind } from './define';
 
 export const registryMapOf = (kind: string): string | null => sectionFor(kind)?.map ?? null;
 
-// Each kind beside the map that holds what it builds, for a pass that walks
-// every built object without knowing which kinds there are.
 export const contentSectionMaps = (): readonly (readonly [SectionKind, string])[] => sections().flatMap((each) => (each.map === null ? [] : [[each.kind, each.map] as const]));
 
-// The prose fields each kind authors, in the order a locale lists them.
 export const textFieldsOf = (kind: string): readonly string[] | undefined => sectionFor(kind)?.text;
 
 export type { Section, PrintContext, Maps };
@@ -119,25 +105,10 @@ export function parseModule(source: string): ModuleSection[] {
   return splitSections(source).map(parseSectionOf);
 }
 
-// Which ids a module owns: the kinds whose sections declare one, plus the two
-// that hang under an object rather than beside it. Asked here because both
-// halves are read off the list, and the module that holds the member kinds is
-// one a section file reaches.
 export const isNamespacedKind = (kind: string): boolean => ownedSectionKinds().includes(kind as SectionKind) || MEMBER_KINDS.includes(kind);
 
-// Whether a name is one of the fields a kind writes prose into, which is what
-// tells a locale key's field segment from an id that happens to look like one.
 export const isProseField = (slug: string): boolean => sections().some((each) => each.text.includes(slug));
 
-// An address the path grammar cannot spell, or that collides with a field of
-// the object that owns it, is neither a key nor a member — and two actions
-// reaching one address are one name with two meanings, which is the same fault
-// said about a pair. A segment may begin with a digit, so `3 Card Monte`
-// addresses fine; what has no address is a label with neither a letter nor a
-// digit in it.
-//
-// Asked here because the collision it refuses is with a field some section kind
-// declares, and the list of those kinds is what this module holds.
 export function actionSlugProblem(slug: string, label: string, taken: ReadonlySet<string>): string | undefined {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return `action ${JSON.stringify(label)} has no address: it keys as ${JSON.stringify(slug)}, so give it a label with a letter or a digit in it`;
   if (isProseField(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which is already a field of the object that owns it`;

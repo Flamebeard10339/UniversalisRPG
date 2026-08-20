@@ -8,9 +8,6 @@ import { overlay } from '../merge';
 import { section } from './define';
 import { condition as visitCondition, put, results, segments, type Visit } from '../refs';
 
-// A line a dialogue speaks, and the address a `# locale` reaches its words by.
-// The key is stamped by the load path, which is the first place that knows both
-// the node the line sits in and how many lines of its kind came before it.
 export interface Spoken {
   segments: TextSegment[];
   key?: string;
@@ -97,9 +94,6 @@ function parseNode(name: string, source: RawLine): DialogueNode {
   return node;
 }
 
-// A dialogue is addressed one node at a time, which is what keeps a one-line fix
-// a two-line module. Steps within a node carry no ids to address them by, so a
-// respecified node replaces them wholesale.
 function mergeNodes(into: Dialogue, from: Dialogue): Dialogue {
   const nodes = [...into.nodes];
   for (const node of from.nodes) {

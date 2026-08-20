@@ -4,8 +4,6 @@ import { moduleLocalId } from '../../grammar/section';
 import { results } from '../refs';
 import { section } from './define';
 
-// A named result list, and nothing else. Composition already layers a drop; a
-// section is what lets five monsters name the same one.
 export interface DropTable {
   id: string;
   results: ActionResult[];
