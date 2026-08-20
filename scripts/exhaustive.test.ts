@@ -1,19 +1,8 @@
-import path from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { shippedModules } from './lib/layers';
+import { programOverShippedModules, programOverSource, relativeTo, repoRoot } from './lib/shippedProgram';
 
-// The subject set is the same enumeration the layer rule sweeps, tests taken
-// out. A rule about the code this repository ships that walks a tree of its
-// own reaches whichever driver that tree happens to hold and no other.
-const root = process.cwd().replace(/\\/g, '/');
-
-function programOverShippedModules(): ts.Program {
-  const configPath = ts.findConfigFile(root, ts.sys.fileExists, 'tsconfig.json');
-  if (configPath === undefined) throw new Error('no tsconfig.json at the repository root');
-  const parsed = ts.parseJsonConfigFileContent(ts.readConfigFile(configPath, ts.sys.readFile).config, ts.sys, root);
-  return ts.createProgram(shippedModules().map((file) => path.resolve(root, file)), { ...parsed.options, noEmit: true });
-}
+const root = repoRoot;
 
 // A union is discriminated at a property when every constituent declares a
 // string literal there. That is the checker's own test for narrowing a switch,
@@ -99,7 +88,7 @@ function consumersIn(program: ts.Program, include: (relative: string) => boolean
   const found: Consumer[] = [];
   for (const file of program.getSourceFiles()) {
     if (file.isDeclarationFile) continue;
-    const relative = file.fileName.replace(`${root}/`, '');
+    const relative = relativeTo(root, file.fileName);
     if (!include(relative)) continue;
     const visit = (node: ts.Node): void => {
       if (ts.isSwitchStatement(node)) {
@@ -146,15 +135,8 @@ function consumerAt(checker: ts.TypeChecker, file: ts.SourceFile, node: ts.Switc
 // red-green case below is a fixture where the right answer is known, which is
 // the only way a rule about what the checker sees can be watched failing.
 function consumersInFixture(name: string, source: string): Consumer[] {
-  const host = ts.createCompilerHost({ strict: true });
-  const original = host.getSourceFile.bind(host);
-  host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) =>
-    fileName === name ? ts.createSourceFile(fileName, source, languageVersion, true) : original(fileName, languageVersion, onError, shouldCreate);
-  host.fileExists = (fileName) => fileName === name || ts.sys.fileExists(fileName);
-  host.readFile = (fileName) => (fileName === name ? source : ts.sys.readFile(fileName));
-  const built = ts.createProgram([name], { strict: true, noEmit: true, skipLibCheck: true }, host);
-  const relative = name.replace(`${root}/`, '');
-  return consumersIn(built, (each) => each === relative);
+  const relative = relativeTo(root, name);
+  return consumersIn(programOverSource(name, source), (each) => each === relative);
 }
 
 const program = programOverShippedModules();
@@ -201,13 +183,7 @@ describe('the guard bites', () => {
 
   function errorsIn(source: string): string[] {
     const name = `${root}/exhaustive-fixture.ts`;
-    const host = ts.createCompilerHost({ strict: true });
-    const original = host.getSourceFile.bind(host);
-    host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) =>
-      fileName === name ? ts.createSourceFile(fileName, source, languageVersion, true) : original(fileName, languageVersion, onError, shouldCreate);
-    host.fileExists = (fileName) => fileName === name || ts.sys.fileExists(fileName);
-    host.readFile = (fileName) => (fileName === name ? source : ts.sys.readFile(fileName));
-    const built = ts.createProgram([name], { strict: true, noEmit: true, skipLibCheck: true }, host);
+    const built = programOverSource(name, source);
     return built
       .getSemanticDiagnostics(built.getSourceFile(name))
       .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, ' '));

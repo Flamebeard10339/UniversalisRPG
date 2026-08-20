@@ -269,6 +269,13 @@
             "content/combat-expansion.dsl"
           ],
           "note": "produced by archetype-mods"
+        },
+        {
+          "name": "the section kind row",
+          "paths": [
+            "src/content/sectionKind.ts"
+          ],
+          "note": "produced by every-pass-over-a-section-kind-derives-its-subjects: one row per section kind, holding every per-kind fact, keyed Record<SectionKind, ...> so a kind added tomorrow must answer each question"
         }
       ]
     },
@@ -1367,8 +1374,10 @@
         "scripts/lib/acyclic.ts",
         "scripts/lib/layers.test.ts",
         "scripts/lib/layers.ts",
+        "scripts/lib/sectionKind.ts",
         "scripts/lib/sessionTiming.test.ts",
         "scripts/lib/sessionTiming.ts",
+        "scripts/lib/shippedProgram.ts",
         "scripts/lib/slotFile.test.ts",
         "scripts/lib/slotFile.ts",
         "scripts/lib/sourceFiles.ts",
@@ -1386,6 +1395,8 @@
         "scripts/printedWords.test.ts",
         "scripts/probe.test.ts",
         "scripts/probe.ts",
+        "scripts/section-kinds.ts",
+        "scripts/sectionKind.test.ts",
         "scripts/session-timing.test.ts",
         "scripts/session-timing.ts"
       ],
