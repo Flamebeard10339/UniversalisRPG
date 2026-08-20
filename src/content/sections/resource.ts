@@ -1,7 +1,8 @@
+import { DslError, Parser } from '../../grammar/parser';
+import { decimal, id } from '../../grammar/values';
+import { put } from '../refs';
+import { section } from './define';
 import { TITLE_FIELD } from './info';
-import { DslError, Parser } from '../grammar/parser';
-import { SectionSchema } from '../grammar/section';
-import { id, decimal } from '../grammar/values';
 
 export type ResourceDisplay = 'full' | 'minimal';
 
@@ -30,8 +31,11 @@ const displayValue: Parser<ResourceDisplay> = {
   examples: [...RESOURCE_DISPLAYS],
 };
 
-export const resourceSchema: SectionSchema<Resource> = {
+export const resource = section<Resource>()({
   kind: 'resource',
+  ids: 'owned',
+  map: 'resources',
+  text: ['title'],
   fields: {
     title: TITLE_FIELD,
     rate: { parser: id },
@@ -39,4 +43,9 @@ export const resourceSchema: SectionSchema<Resource> = {
     start: { parser: decimal },
     display: { parser: displayValue, default: () => 'full', printed: 'always' },
   },
-};
+  validate: (value) => (value.max ? undefined : 'requires a max: stat'),
+  visit: (value, where, visit) => {
+    put(value, 'max', 'stat', `${where} max:`, visit);
+    put(value, 'rate', 'stat', `${where} rate:`, visit);
+  },
+});
