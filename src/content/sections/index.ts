@@ -1,5 +1,5 @@
 import { HydrateContext } from '../../grammar/section';
-import { DslError } from '../../grammar/parser';
+import { DslError, Span } from '../../grammar/parser';
 import { RawSection, splitSections } from '../../grammar/structure';
 import { Visit } from '../refs';
 import { MEMBER_KINDS } from '../namespace';
@@ -54,9 +54,9 @@ export const sectionFor = (kind: string): Section | undefined => table().get(kin
 
 export const isSectionKind = (kind: string): kind is SectionKind => table().has(kind);
 
-function required(kind: string): Section {
+function required(kind: string, span?: Span): Section {
   const found = table().get(kind);
-  if (!found) throw new DslError(`unknown section kind: ${kind}`);
+  if (!found) throw new DslError(`unknown section kind: ${kind}`, span);
   return found;
 }
 
@@ -77,7 +77,7 @@ export type SectionMaps = Intersect<MapsOf<AnySection>>;
 
 export const mapNames = (): readonly string[] => [...new Set(sections().flatMap((each) => Object.keys(each.maps)))];
 
-export const parseSectionOf = (raw: RawSection): ModuleSection => sectionOf(raw.kind as SectionKind, required(raw.kind).parse(raw));
+export const parseSectionOf = (raw: RawSection): ModuleSection => sectionOf(raw.kind as SectionKind, required(raw.kind, raw.span).parse(raw));
 
 export const mergeSection = (kind: string, into: object | undefined, from: object): object => required(kind).merge(into, from);
 

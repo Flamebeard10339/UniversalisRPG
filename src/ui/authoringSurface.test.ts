@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { contentSectionMaps, sectionKinds } from '../content/sections';
+import { contentSectionMaps, sectionFor, sectionKinds } from '../content/sections';
 import { mapOf } from '../content/registry';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { COMMANDS } from '../runtime/command';
@@ -54,9 +54,11 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
   }
 
   it('offers a section of every kind the load path can parse', () => {
-    expect(sectionKinds().length).toBeGreaterThan(Object.keys(sectionKinds()).length);
+    // Including the kinds the key/value engine does not read: a surface that
+    // offered only the schema kinds would pass a walk over the schemas alone.
+    expect(sectionKinds().filter((kind) => sectionFor(kind)!.schema === undefined)).not.toHaveLength(0);
 
-    for (const kind of [...Object.keys(sectionKinds()), ...sectionKinds()]) {
+    for (const kind of sectionKinds()) {
       expect(surfacesOffering(madeUp(kind), GUIDE_HOUSE), kind).toHaveLength(1);
     }
   });
@@ -182,7 +184,7 @@ describe('no surface goes around the one load-and-adopt path (c2)', () => {
   });
 });
 
-const ADDRESSABLE_KINDS = Object.keys(sectionKinds()).filter((kind) => kind !== 'info');
+const ADDRESSABLE_KINDS = sectionKinds().filter((kind) => kind !== 'info');
 
 const asModule = (name: string, sections: readonly string[]): { name: string; text: string } => ({
   name,
