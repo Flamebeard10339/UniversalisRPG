@@ -307,3 +307,139 @@ makes that checkable rather than asserted.
 - The 29 concept overlaps `audit-status` reports are not all in this spec's family, and which of them
   this branch retires is not predictable before stage 2 lands. They are not clauses here and must not
   become them mid-branch — a finding cannot create work.
+
+## Audit passes
+
+### Pass 1 — 2026-08-20
+
+- base: `ba96a5bfb249c05299a52350be81fe51c65760db`
+- head: `139176bb9f7b7c95f155748d523472a9020ef12c`
+- proof 1: unmet — Two shipped switches over a discriminated union carry no never assignment and are
+invisible to the sweep: scripts/play-cli.ts:255 and src/ui/transcript.ts:85, both switching on
+CommandOutput. The cause is in the subject derivation, not in the tree. discriminantOf
+(scripts/exhaustive.test.ts:26) accepts a property as the discriminant only when
+`new Set(spellings).size === type.types.length` — every constituent must carry a *distinct*
+literal. CommandOutput is eight constituents in which PlayerMessage and ToolMessage both declare
+kind: 'message' (src/runtime/command.ts:64, :77) and help/source/authored all declare
+words: 'tool', so neither candidate property is distinct across all eight and discriminantOf
+returns null. TypeScript itself narrows this union on `output.kind` without complaint, so the
+clause's own words — "asking the type checker which switched-on types are discriminated" — are
+not what the code does: it reimplements a stricter test than the checker's. Re-runnable: relax
+that one line to `spellings.length === type.types.length` and the clause's own test
+'every switch carries a default that assigns its scrutinee to never' fails, printing exactly
+those two rows and no others. Measured 2026-08-19 at 139176b. Everything else about c1 is sound
+and mutation-proved — removing the real never guard at src/runtime/effects.ts:331 is KILLED by
+that test, disabling the switch walk is KILLED by 'the walk had subjects', blinding NEVER_GUARD
+and forcing the delegation exemption true are both KILLED by 'reads a default that answers for
+itself as absorbing'. The commissioning survey of "20 such switches" was short by two for the
+same reason the sweep is.
+- proof 2: met — scripts/exhaustive.test.ts 'the guard bites' compiles a three-member fixture through
+ts.createProgram twice: handling all three yields no semantic diagnostics, handling two yields a
+diagnostic containing 'never'. Mutation, 2026-08-19 at 139176b: replacing the fixture's
+`default: { const never: never = value; return never; }` with `default: { return 0; }` is KILLED
+by scripts/exhaustive.test.ts > the guard bites > refuses a switch that handles all but one,
+re-run at its own file with the mutation still applied and failing there too. The proof is a
+compile rather than an assertion, which is what the spec's Decisions section argued for.
+- proof 3: unmet — First sentence met, second sentence not begun, and the goal does not hold without it.
+Parser<T> (src/grammar/parser.ts:4) now requires print and examples, 30 sites across 15 files
+implement both, and no implementation stubs either — grep over src and scripts finds no
+`examples: []`, no print returning '' and no print that throws. isCodec requiring all three is
+mutation-proved: reducing it to a parse check is KILLED by src/grammar/codec.test.ts > the law
+itself > is not satisfied by a value that only parses. But "no field spelling, no separator, no
+unit suffix appears as a literal anywhere in src/content/serialize.ts, whose per-kind printers
+are replaced by one walk over the collected grammar" is false at 139176b: serialize.ts is 495
+lines and still emits roughly 45 field spellings as string literals — `requires:`, `hidden if:`,
+`time:`, `rate:`, `accuracy:`, `damage:`, `depletes:`, `attempts:` at :90-:103, `examine:`,
+`slot:`, `cluster-jewel:`, `origin-cluster:`, `cluster-effect:`, `item-experience:`,
+`max-level:`, `shape:`, `open-connections:`, `passives:`, `mod-slots:`, `respawn after:`,
+`stats:`, `skills:`, `equipment-slots:`, `uses:`, `faction:`, `allies:`, `x:`/`y:`/`z:`,
+`station:`, `skill:`, `say:`, `evasion:`, `max:`, `start:`, `display:`, `when:`, `again:`,
+`version:`, `pack:`, `language:`, `base:`, `value:` and the nineteen per-kind loops that hold
+them. Not graded deferred: the goal is that a fact gaining a member breaks a build, and renaming
+a keyword in a schema today still prints a line the parser will refuse, with nothing between the
+two moments saying so. The spec's own Decisions section records this and names the next step —
+collect each per-kind printer onto SectionSchema.print, required so a schema without one does not
+compile — which is byte-identical by construction and separately gradeable.
+- proof 4: met — src/grammar/codec.ts derives the subjects from the collection three ways:
+exportedCodecs over an eager glob of src/grammar/*.ts (codec.test.ts), the same over
+src/content/*.ts, and reachableCodecs over every field of every schema in SCHEMAS
+(roundTrip.test.ts:23), each following a list parser to its element by object identity. Neither
+directory has a subdirectory, so the two globs are the whole population that layer-check allows a
+Parser to live in. roundTripFailures returns a failure for a parser with no examples rather than
+skipping it. Five mutations, 2026-08-19 at 139176b, each KILLED by its own named test re-run at
+its own file: (a) making an empty examples list return [] is KILLED by 'reports a parser carrying
+no examples rather than passing it'; (b) dropping the printed === example comparison is KILLED by
+'reports a parser whose print does not return what was parsed'; (c) stopping the walk at a list
+wrapper is KILLED by 'follows a list parser to its element, so a wrapper cannot hide one'; (d)
+reducing isCodec to a parse check is KILLED by 'is not satisfied by a value that only parses'; (e)
+restoring the skillGrant bug — `cursor.take(/[^,\n]*/)` back to `/[^\n]*/` at
+src/grammar/skillGrant.ts:25 — is KILLED by src/content/roundTrip.test.ts > 'reaches the parsers
+only a schema names, and finds each one round-tripping'. (e) is the whole argument for the shape:
+skillGrant.test.ts is untouched by this branch and authors no comma case, content/*.dsl authors no
+second grant on one line, and the only thing that catches it is list()'s derived
+`element.examples.join(', ')` reaching skillGrant through skillSchema.fields.grants. The fix is
+real and the failure is on the parse side, so it is a bug the corpus round trip could not have
+found.
+- proof 5: unmet — Stage 3 was not begun and the spec says so. src/runtime/addresses.test.ts does not
+exist, so the clause's proof target names no file in this checkout and audit-prompt omitted it
+from the manifest. parseOwnerRef (src/runtime/actions.ts:79-82) still recovers an owner's kind and
+id with indexOf('.') and two slices, and still returns two silently wrong halves for a reference
+with no dot; src/runtime/encounter.ts:138-140 repeats the same three lines inline;
+src/runtime/actions.ts:31 still recovers a journey's ends with objId.split(TRAVEL_PAIR); and
+src/runtime/state.ts:24 still recovers an actor's template by splitting on '#'. No {kind, id},
+{origin, dest} or {template, copy} carrier exists anywhere under src/runtime. Not graded deferred:
+the goal — the load path is the only place a fact about the language is decided — is exactly what
+these sites contradict, and parseOwnerRef's dotless case is a live silent-corruption path feeding
+findActionOwner, findActiveAction and the save pruner.
+- proof 6: unmet — No branded type exists. grep for `__brand`, `declare const brand` and `Brand<` over
+src/runtime and src/content at 139176b returns nothing, and ActiveAction.ownerRef,
+Seat.ownerRef (src/runtime/encounter.ts:16, :22) and BoundarySource.ownerRef
+(src/runtime/forwardProgress.ts:6) are all plain `string`. The template-literal assemblies the
+clause exists to stop are still writable and still written: `action.${id}` at encounter.ts:94 and
+runtime.ts:565, `${source.ownerRef}.${source.actionSlug}` at forwardProgress.ts:23,
+`${active.ownerRef}.${active.actionSlug}` at runtime.ts:235 and :378. The clause's proof is
+`npx tsc --noEmit`, which passes at 139176b — vacuously, since there is no brand for it to
+enforce. A command proof that cannot distinguish done from not-begun is why this is graded from
+the tree rather than from the gate.
+- proof 7: met — Verified independently of the branch's own tests, 2026-08-19. Printed the whole
+shipped corpus through roundTripUniverse at ba96a5b and again at 139176b (git checkout of
+src/scripts/content at each, restored after; git status clean at 139176b afterwards) and diffed:
+identical, 51661 bytes, and equal to src/content/printedCorpus.fixture.txt, so the fixture really
+is the base's bytes and not a regeneration. Dumped the loaded registry over content/*.dsl at both
+commits as canonicalised JSON (Maps and Sets sorted, keys sorted) and diffed: identical, 275334
+bytes. So both halves of the clause hold in fact. The byte half is also mutation-proved: making
+duration.print emit `1m0s` where it emitted `1m` (src/grammar/values.ts:78) — a drift a
+*regenerated* fixture could not see, because parse accepts both and the round trip still closes —
+is KILLED by src/content/roundTrip.test.ts > 'prints every shipped module to the bytes it printed
+to at the branch base'. Caveat filed as a finding rather than graded here: the test named for the
+registry half compares two loads through HEAD's parser and cannot fail for a parse change that
+prints identically (DEFAULT_MAX_LEVEL 99 -> 98 SURVIVED it and was killed only by an unrelated
+file three scopes out). The fixture is a snapshot that is compared against and nothing derives
+from it; what it catches is print drift and print/parse disagreement, and what it cannot catch is
+a semantic parse change invisible in the bytes.
+- proof 8: met — src/ui/effects.test.tsx runs under `// @vitest-environment jsdom` with jsdom added to
+package.json, mounts a component through createRoot inside React's act, and asserts that
+useMoment's effect reached the transient channel — chosen over a probe component so that real
+src/ui code runs. The census below it reads src/ui off the tree and matches every module declaring
+a use(Layout)?Effect against EXERCISED + NOT_EXERCISED, so an unclassified one fails. Two
+mutations, 2026-08-19 at 139176b, each KILLED by its own named test re-run at its own file:
+gating useMoment's channel.play behind an impossible kind (src/ui/transient.ts:158) is KILLED by
+'runs an effect declared by a src/ui hook, and the effect reaches the channel'; replacing the
+useEffect regex filter that derives the census with a filter that accepts everything
+(effects.test.tsx:78) is KILLED by 'every module declaring an effect is classified'. Two gaps
+filed as findings rather than graded: the census reads src/ui one level deep so a subdirectory
+module is not a subject, and nothing checks that a name in EXERCISED has a mounting test, so the
+promotion from one list to the other is unverified.
+- proof 9: unmet — npm run tasks -- merge-ready at 139176b: tsc ok, npm test ok, layer-check ok, doctor
+ok (28 warnings, which do not fail the leg), bytes ok, tree ok, base ok — and audit-status FAIL
+exit=1, plus four spec/clauses legs red. audit-status fails because five files this branch adds
+belong to no system in docs/audits/systems.json: scripts/exhaustive.test.ts,
+src/content/printedCorpus.fixture.txt, src/grammar/codec.ts, src/grammar/codec.test.ts and
+src/ui/effects.test.tsx. Membership is a partition and that is the one condition audit-status
+fails on. Two of the four red spec legs belong to a second spec,
+the-cost-of-a-change-is-known-before-it-is-made, which this branch declared with an open member
+and no implementation. Separately: one full npm test run reported 1 failed of 3780 —
+scripts/tasks/auditPrompt.test.ts 'audit-prompt prints a ready-to-use auditor prompt for a spec'
+timed out at 5000ms with the file itself taking 44218ms — and the same file alone then passed 69
+of 69; recorded as occurrence 21 of npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s
+rather than as a defect of this branch.
