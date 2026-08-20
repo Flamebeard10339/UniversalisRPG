@@ -3,13 +3,6 @@ import { fillPercent } from './format';
 import { Meter } from './Meter';
 import { FILL_TRANSITION } from './transient';
 
-// A run, above the choices it did not withdraw. Everything on it is the run's
-// own report: the label the engine gave the action, its progress, and whatever
-// it is whittling down. The stop control is a glyph rather than a word for the
-// same reason the modal's submit is — a word here would be prose this layer
-// wrote, and no engine value produced it. Its accessible name is the engine's
-// label for what it stops, for the same reason: a driver may name a control
-// after the thing it acts on, and may not invent a word for the acting.
 export function LiveSheet({ progress, onCancel }: { progress: LiveProgress; onCancel: () => void }): JSX.Element {
   return (
     <div className="flex flex-col gap-3 p-3">

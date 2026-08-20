@@ -5,19 +5,8 @@ import { draftIn, kindsIn, openedIn, rowsIn, sectionKey, type EditHeld } from '.
 import { useTestSurface } from './useTestSurface';
 import type { Words } from './words';
 
-// Two of the three filters over the one list — the third is the map, drawn
-// where the locations already say they are. Nothing here reaches the registry:
-// every control turns what is on screen into a line the shared table parses and
-// hands it to the container's dispatch, which is the whole of what a control on
-// this page can do.
-
-// What the Global filter is set to when it is narrowing to nothing.
 const OPEN_TO_ALL = '';
 
-// The editing surfaces are the dev slot's, and the console is not: every
-// command the shared table defines has been reachable from this page since
-// `gui-rebuild`, and taking that away would be this branch changing what a
-// player can do. What is gated is the staging above it (c6).
 export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: boolean; onSend: (line: string) => void; words: Words }): JSX.Element {
   const list = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -28,10 +17,6 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
 
   useTestSurface('edit', held);
 
-  // Where the list was left and where the cursor was, put back once the thing
-  // they are positions in is drawn. Once each: after that the scroller and the
-  // caret are the author's, and putting them back again would take the page
-  // away from whoever is using it.
   useEffect(() => {
     if (list.current) list.current.scrollTop = editing.scroll;
   }, []);
@@ -75,8 +60,6 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
             ))}
           </select>
         ) : null}
-        {/* The whole module rather than the section open, so it is reachable
-            with nothing open: this hands over what the store holds. */}
         <button
           data-drive="edit.copy"
           type="button"

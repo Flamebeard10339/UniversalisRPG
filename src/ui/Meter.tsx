@@ -1,8 +1,6 @@
 import { fillPercent, tidy } from './format';
 import { FILL_TRANSITION } from './transient';
 
-// A named bar with an optional readout. Whatever is being whittled down — a
-// resource on the header, a foe in a run — reads the same way.
 export function Meter({ title, current, max, readout }: { title: string; current: number; max: number; readout: boolean }): JSX.Element {
   return (
     <div className="flex items-center gap-2">

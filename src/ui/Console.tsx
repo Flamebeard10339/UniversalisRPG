@@ -2,10 +2,6 @@ import { useState } from 'react';
 import { typed } from './consoleLine';
 import type { Words } from './words';
 
-// The line the REPL takes, typed on a phone. Whatever is written goes straight
-// to the container's dispatch, so every command the shared table defines is
-// reachable from the GUI and none of them is named here. What comes back is
-// engine output like any other and lands in the log on Home.
 export function Console({ onSend, words }: { onSend: (line: string) => void; words: Words }): JSX.Element {
   const [line, setLine] = useState('');
 

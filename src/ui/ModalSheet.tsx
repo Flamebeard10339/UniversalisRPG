@@ -4,21 +4,6 @@ import { useMoment } from './transient';
 
 type Option = PlayView['modals'][number]['options'][number];
 
-// Everything this file draws comes off the option the engine is asking for, so
-// a modal it has never heard of is answerable on the same path as one it has.
-// What the shell hands over is drawn above the question and never read here,
-// which is what keeps that true of a screen with a subject as well as options.
-// The arrow is the driver's own glyph, the way a terminal owns its prompt, and
-// it answers to the option's own label rather than to a word for submitting.
-//
-// The card is keyed on the option rather than the sheet, so the question that
-// replaces an answered one rises where a shell keying the whole sheet would
-// re-mount everything above it too.
-//
-// Clicking the ground the card sits on answers what the screen published as the
-// way out of itself; a screen that published none is handed no dismissal and
-// stays where it is (c19). Only the ground itself, never anything drawn on it,
-// so reading the subject or pressing the question is not leaving.
 export function ModalSheet({ option, onAnswer, onDismiss, children }: { option: Option; onAnswer: (key: string, value: string) => void; onDismiss?: () => void; children?: ReactNode }): JSX.Element {
   const [typed, setTyped] = useState('');
   const darkened = useMoment('darken', true, option.key);

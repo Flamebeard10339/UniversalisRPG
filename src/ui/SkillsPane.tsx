@@ -8,13 +8,6 @@ import { useMoment } from './transient';
 import type { Crossings } from './levelling';
 import type { Words } from './words';
 
-// The character's skills, one panel each: the level inside the ring that fills
-// toward the next one. Everything drawn is derived from the total the view
-// publishes, so the page holds no number of its own.
-
-// The ring, drawn in a box of forty. Its circumference is what a dash pattern
-// is measured in, so the fraction the level has covered is a length and not a
-// second unit.
 const RING_RADIUS = 17;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 
@@ -52,10 +45,6 @@ export function SkillsPane({ view, first, crossed, words }: { view: PlayView; fi
   useTestSurface('skills', { panels, opened, greeted: [...crossed.greeted], controls: { open: setOpened } });
 
   return (
-    // The page and what it opens over it, in that order. `absolute` and not
-    // `fixed`: the pages ride on a strip this shell moves with a transform, and
-    // a fixed child of a transformed element is positioned against that element
-    // rather than against the window — which puts it a page's width off screen.
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="unbarred min-h-0 flex-1 overflow-y-auto px-4 py-3">
         <div className="mx-auto grid max-w-2xl grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-3">

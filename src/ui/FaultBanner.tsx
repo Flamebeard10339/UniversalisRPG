@@ -2,12 +2,6 @@ import type { UniverseProblem } from '../runtime/openUniverse';
 import type { Remedy } from './driver';
 import type { Words } from './words';
 
-// Drawn over whatever the shell managed to open, because the state it is about
-// is one the pages below cannot be used to leave: an author whose local module
-// stopped the session opening cannot edit their way out of it, since editing
-// needs the session that failed. Every remedy the driver came back with is a
-// control here, so a problem reaches a screen with something to do beside it or
-// it does not reach one at all.
 export function FaultBanner({ problems, remedies, words, onRemedy }: { problems: readonly UniverseProblem[]; remedies: readonly Remedy[]; words: Words; onRemedy: (remedy: Remedy) => void }): JSX.Element {
   return (
     <div role="alert" className="flex shrink-0 flex-col gap-2 border-b border-border bg-surface-raised px-3 py-2">

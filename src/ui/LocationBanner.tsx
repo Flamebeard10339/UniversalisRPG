@@ -2,8 +2,6 @@ import type { PlayView } from '../runtime/session';
 import { formatClock } from './format';
 import { useMoment } from './transient';
 
-// The boundary between the map and the play surface: where the player is, read
-// downward from Home and upward from the Map.
 export function LocationBanner({ view, flash }: { view: PlayView; flash: boolean }): JSX.Element {
   const arrived = useMoment('arrival', flash, view.location.id);
 

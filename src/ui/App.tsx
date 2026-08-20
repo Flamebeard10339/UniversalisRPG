@@ -34,11 +34,6 @@ import { wordsOf } from './words';
 import { TransientProvider } from './transient';
 import { VStack } from './VStack';
 
-// What the world just gave up, and a count of how many times it has. The count
-// is what re-keys the flash: the same place discovered again after a load is a
-// new acknowledgement, and a React key that never changes plays no animation.
-// The opening view seeds the comparison, so the places a session starts knowing
-// do not all arrive at once on the first frame.
 function useArrivals(discovered: readonly Place[]): { arrivals: readonly string[]; generation: number } {
   const seen = useRef(discovered);
   const [found, setFound] = useState<{ arrivals: readonly string[]; generation: number }>({ arrivals: [], generation: 0 });
@@ -52,15 +47,8 @@ function useArrivals(discovered: readonly Place[]): { arrivals: readonly string[
   return found;
 }
 
-// How often the lines at the top are looked at. Fine enough that the half
-// second between two of them is measured rather than rounded to, and coarse
-// enough that a screen with nothing to say costs no timer at all.
 const NOTE_TICK_MS = 100;
 
-// What the world just gave, as lines. The engine publishes what a skill has and
-// what the player is carrying, never what either just got, so both are the
-// difference between two views — which is also why this is held here, above
-// every page, rather than on whichever page happens to be about one of them.
 function useXpNotes(view: PlayView, clock: () => number): readonly Note[] {
   const rows = view.xp;
   const carried = view.carried;
@@ -74,8 +62,6 @@ function useXpNotes(view: PlayView, clock: () => number): readonly Note[] {
     if (gains.length + arrivals.length > 0) setQueue((held) => poured(heard(held, gains, arrivals, clock()), clock()));
   }, [rows, carried]);
 
-  // A line waiting on the spacing has to reach the screen without anything else
-  // happening, and one already shown has to leave the same way.
   const settled = queue.waiting.length === 0 && queue.shown.length === 0;
   useEffect(() => {
     if (settled) return;
@@ -86,8 +72,6 @@ function useXpNotes(view: PlayView, clock: () => number): readonly Note[] {
   return queue.shown;
 }
 
-// Which skills have gone up a level and not been looked at. Noticed wherever
-// the player is standing, and settled by the page itself being opened.
 function useCrossings(rows: PlayView['xp'], onSkills: boolean): Crossings {
   const seen = useRef(rows);
   const [held, setHeld] = useState(nothingCrossed);
@@ -105,15 +89,8 @@ function useCrossings(rows: PlayView['xp'], onSkills: boolean): Crossings {
   return held;
 }
 
-// How long the shell waits before writing down where the author is. A pan
-// settles the sheet on every frame and a slot is not a thing to write sixty
-// times a second; short enough that a reload after a pause loses nothing, which
-// is what c10 asks and the whole of what it asks about the cadence. A staged
-// edit does not wait on this — it goes through the driver as it is staged.
 export const REMEMBER_AFTER_MS = 400;
 
-// What the author is looking at, kept in the store the edits are in. Read once,
-// because it is where a page opens and not a thing the store goes on deciding.
 function useEditing(driver: Driver, after: number): [Editing, (next: Editing) => void] {
   const [editing, setEditing] = useState<Editing>(() => remembered(driver.editorMemory.read()));
 
@@ -125,18 +102,10 @@ function useEditing(driver: Driver, after: number): [Editing, (next: Editing) =>
   return [editing, setEditing];
 }
 
-// What "try again" can mean, which depends on where the shell is standing. A
-// page can re-read everything, base sources included, only by loading again —
-// they are inlined at build time, so a shipped file somebody fixed is reached
-// by that and by nothing the driver can do. Where there is no page, there is
-// nothing to reload and the driver's own re-open is the whole of it.
 export type Retry = 'reload' | 'reopen';
 
 export const retrying = (onAPage: boolean): Retry => (onAPage ? 'reload' : 'reopen');
 
-// The decision above, wired. The `window` call is the one line here no test
-// reaches: the suite mounts nothing and runs in node, so how a page behaves
-// when it reloads is the author's to look at.
 function tryAgain(driver: Driver): void {
   if (retrying(typeof window !== 'undefined') === 'reopen') {
     driver.reopen();
@@ -145,8 +114,6 @@ function tryAgain(driver: Driver): void {
   window.location.reload();
 }
 
-// Where the player is, as the view publishes it: what the Local surface is
-// narrowed to is a fact read off the session rather than one worked out here.
 const standingIn = (view: PlayView): Standing => ({ location: view.location.id, entities: view.entities.map((entity) => entity.id) });
 
 export function App({
@@ -164,43 +131,20 @@ export function App({
   const [where, setWhere] = useState(opening);
   const [editing, setEditing] = useEditing(driver, remembering);
   const view = snapshot.view;
-  // Whose session this is, asked of the driver once and read from there by
-  // every surface that is dev-only. No component below holds a second copy,
-  // exactly as none holds a copy of whether the session opened (c6).
   const dev = snapshot.dev;
-  // Read every render rather than held: `/dsl` adopts a new registry, and the
-  // language being played is the session's rather than the shell's (c3).
   const localizer = driver.localizer();
   const words = wordsOf(localizer);
   const asking = askedOption(view.modals);
-  // Drawn because the engine says one is in hand, never because the shell
-  // recognised the screen holding it: the focus is a published field and the
-  // screen's name is not a thing this layer can read. A screen with a plane in
-  // hand is drawn as that plane rather than as a list of its values, so the
-  // option sheet is what every other screen gets.
   const plane = view.focus ? (view.planes.find((each) => each.instance === view.focus?.instance) ?? null) : null;
   const { arrivals, generation } = useArrivals(view.discovered);
   const rows = view.xp;
   const notes = useXpNotes(view, clock);
-  // Where the session's own reading of how fast experience arrives is measured
-  // from. The engine keeps no such field: a rate is a fact about the play.
   const opened = useRef<XpMark | null>(null);
   if (opened.current === null) opened.current = markOf(view);
 
-  // The one answer a gesture away from the open screen makes: the value that
-  // screen published as the way out of itself, or nothing where it published
-  // none (c19). Both gestures this shell has go through it, so a click on the
-  // sheet's ground and a move to another page say the same thing and neither
-  // has a way out the other has not got.
   const leaving = dismissal(view.modals);
   const leave = leaving ? () => driver.answer(leaving.key, leaving.value) : undefined;
 
-  // Assembled once and both drawn from and handed over, the way the map's is:
-  // where the nav is standing is one value, and there is no second statement of
-  // it for a registration to get wrong. Every handler goes through the one `go`,
-  // and passes it a function, because what they read has to be the latest state
-  // and not the render's — the seam is about what is drawn, and a nav that lost
-  // a tap to batching would be a real defect bought for a test.
   const go = (next: Where | ((held: Where) => Where)): void => {
     leave?.();
     setWhere(next);
@@ -208,12 +152,6 @@ export function App({
   const shell = { where, go };
   const crossed = useCrossings(rows, LAYERS[where.layer].subpages[subpageOf(where)].id === 'skills');
 
-  // The one list, rebuilt when the module an author is editing changes and not
-  // on every frame: splitting every shipped module into sections is the whole
-  // survey, and what makes it move is a staged edit landing.
-  // Read off the store once per snapshot rather than once per render: the store
-  // moves when the driver publishes and at no other time, and where the map is
-  // looking moves far more often than that.
   const sections = useMemo(
     () => addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }]),
     [snapshot],
@@ -228,9 +166,6 @@ export function App({
         send: driver.send,
         note: driver.note,
         move: setEditing,
-        // The bytes the store holds, handed to the author. Offered rather than
-        // relied on: a browser that refuses the clipboard has still printed
-        // them, which is the same command and the same bytes.
         hand: () => {
           const text = driver.localChanges();
           if (text !== null && typeof navigator !== 'undefined') void navigator.clipboard?.writeText(text);
@@ -265,9 +200,6 @@ export function App({
     }
     if (subpage.id === 'stats') return <Ledger entries={counted(view.stats, localizer)} />;
     if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
-    // Both sides of what the player has are rows that act, because c21 puts a
-    // worn copy on this page and nowhere else and the verbs it offers are
-    // reachable from nowhere else either.
     if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} onOpen={driver.open} />;
     return <Ledger entries={carried(view.carried, view.planes, localizer)} onOpen={driver.open} />;
   };
@@ -285,9 +217,6 @@ export function App({
     <TransientProvider value={driver.transient}>
       <div className="flex h-[100dvh] select-none flex-col overflow-hidden bg-background text-text">
         <main className="relative flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
-          {/* Both above the column rather than on a page: one is about a state
-              where there may be no page worth opening, and the other is true of
-              the session wherever the player happens to be standing. */}
           <DevBanner dev={dev} words={words} />
           {snapshot.problems.length > 0 ? (
             <FaultBanner problems={snapshot.problems} remedies={snapshot.remedies} words={words} onRemedy={(remedy) => (remedy === 'clear-local' ? driver.clearLocalChanges() : tryAgain(driver))} />
@@ -296,9 +225,6 @@ export function App({
             layer={shell.where.layer}
             onLayer={(layer) => go((held) => toLayer(held, layer))}
             banners={[
-              // Re-keyed on a discovery, so the banner that is the handle to the
-              // Map plays the same arrival the Map's own row does. That is the
-              // acknowledgement a player standing on Home gets.
               <LocationBanner key={`location-${generation}`} view={view} flash={generation > 0} />,
               <StatusBanner key="status" view={view} stirring={stirring(crossed)} />,
             ]}

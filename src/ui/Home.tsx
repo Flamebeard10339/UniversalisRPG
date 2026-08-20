@@ -24,28 +24,19 @@ const KIND_CLASS: Record<LogKind, string> = {
   detail: 'pl-3 text-sm text-text-subtle',
 };
 
-// Whose words a line is, as the shell draws it: the tool's are set in the
-// monospace the DSL is written in and dimmed, so a parser diagnostic does not
-// read as something the world said. The distinction is the entry's own, carried
-// from the arm the command layer split it on.
 const WORDS_CLASS: Record<LogEntry['words'], string> = { player: '', tool: 'font-mono text-text-muted' };
 
-// A line mounts once, so the flash marks exactly the text that just arrived.
 function Line({ entry }: { entry: LogEntry }): JSX.Element {
   const tone = entry.kind === 'message' ? TONE_CLASS[entry.tone] : '';
   const arrived = useMoment('arrival', true, String(entry.id));
   return (
     <p className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 leading-relaxed ${WORDS_CLASS[entry.words]} ${KIND_CLASS[entry.kind]} ${tone}`}>
-      {/* How many times in a row, ahead of the words rather than after them, so
-          a run that is still growing counts up in one place a reader can find. */}
       {entry.repeats > 1 ? <span className="tabular-nums text-text-subtle">{`(${entry.repeats}) `}</span> : null}
       {entry.text}
     </p>
   );
 }
 
-// Grouped under whatever offers them, so an offer with an owner and one without
-// read as the same shape: a row of buttons under a name, or a row on its own.
 function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: (position: number) => void }): JSX.Element {
   return (
     <div className="flex flex-col gap-3 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-1">
@@ -83,9 +74,6 @@ export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapsho
   const held = useRef(SPLIT_DEFAULT);
   const entries = snapshot.transcript.entries;
 
-  // After every render, not only after a new line: the column changes height
-  // when the player moves the split, and a scroll position taken before that
-  // leaves the newest line under the fold.
   useEffect(() => {
     const scroller = column.current;
     if (scroller && following.current) scroller.scrollTop = scroller.scrollHeight;
@@ -116,13 +104,7 @@ export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapsho
               onGrab={() => void (held.current = split)}
               onDrag={(dy) => setSplit(splitFrom(held.current, dy, surface.current?.clientHeight ?? 0))}
             />
-            {/* The sheet keeps the height the player gave it and scrolls inside
-                it, so a room offering five actions and one offering two do not
-                move everything else on the way past. */}
             <div className="flex min-h-0 flex-col border-t border-border bg-surface-raised" style={{ flexGrow: 1 - split, flexBasis: 0 }}>
-              {/* A run sits above the choices rather than in place of them, and
-                  outside the scroller, so the control that stops it is reachable
-                  however far down the list the player has gone. */}
               {live ? (
                 <div className="shrink-0 border-b border-border">
                   <LiveSheet progress={live} onCancel={onCancel} />

@@ -1,8 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { TransientChannel } from './transient';
 
-// Renders whatever the channel is carrying. It has no way to ask what a note
-// was about, which is what keeps the channel general.
 export function FloatingText({ channel }: { channel: TransientChannel }): JSX.Element {
   const notes = useSyncExternalStore(channel.subscribe, channel.notes, channel.notes);
 

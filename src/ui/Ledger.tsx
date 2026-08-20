@@ -1,18 +1,5 @@
 import type { Entry } from './sheet';
 
-// A published dictionary, drawn as rows. Stats, skills, equipment and what the
-// player is carrying are four of these and differ only in what the engine put
-// in them, so the sheet is one component and four readings of the view.
-//
-// A row opens something where the shell has something for it to open, and the
-// sheet is passive either way: it holds no selection and knows nothing about
-// what opening one leads to.
-//
-// What opens it is the whole row rather than the term on its left. The two
-// halves of a row are the engine's two fields and not two things to press: on
-// the equipment page the left half is the slot and the right is the thing worn
-// in it, so a press that only counted on the left missed the name the player
-// was aiming at.
 export function Ledger({ entries, onOpen }: { entries: readonly Entry[]; onOpen?: (id: string) => void }): JSX.Element {
   return (
     <div className="unbarred min-h-0 flex-1 overflow-y-auto px-4 py-3">
