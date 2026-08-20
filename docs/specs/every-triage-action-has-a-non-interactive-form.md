@@ -1,0 +1,403 @@
+# every-triage-action-has-a-non-interactive-form
+
+## Deliverable
+
+`tasks triage` walks five actions — promote, defer, decline, redirect, ask. Read against the CLI,
+the coverage is not the two-of-five the record estimated:
+
+| action | non-interactive form today |
+| ------ | -------------------------- |
+| promote | `tasks promote <id>... --spec <slug>` |
+| decline | `tasks decline <id>... --reason` |
+| defer | **none** |
+| ask | **none** |
+| redirect | `tasks edit --deliverable` reaches the field, but files an `edit` event where the TUI files a `triage` one — the same effect by a different operation, so `tasks log --op triage` cannot see it |
+
+An orchestrator cannot drive a TUI, so today it can promote and decline and nothing else. Under the
+endurance goal the missing one that matters is **ask**. It records a question against a finding and
+leaves it unreviewed, which is how a batch of judgements reaches the author *with the question
+attached*. Handing over forty unreviewed findings and no questions is not the same thing: it makes
+the author re-derive what each one needs from them, one at a time, which is exactly the exhaustion
+this round exists to remove. The action the orchestrator most needs is the one it cannot perform.
+
+The durable part of this branch is not two new verbs. It is that completeness becomes checkable.
+The five actions are an if/else chain inside `cmdTriage`, so a sixth added later would be TUI-only
+again and nothing would say so — this defect would simply recur under a new name. So the actions
+become a table both routes drive, and a test iterates it. That is the same shape `dsl-kind-prints-
+fields` uses for `SECTION_KINDS`, and the same reason: a set that must stay complete needs something
+that fails when it does not.
+
+Proof:
+
+- [c1] The five triage actions are one table, and both routes dispatch from it. `cmdTriage` renders
+  its menu and performs its actions from that table rather than from a literal if/else chain, so an
+  action cannot exist on one route and not the other.
+  proof: vitest scripts/tasks/triage.test.ts
+- [c2] A test iterates the table and asserts every action has a non-interactive route. A sixth action
+  added later fails that test rather than quietly becoming TUI-only, which is the clause that stops
+  this defect recurring rather than the ones that fix today's instance of it.
+  proof: vitest scripts/tasks/triage.test.ts
+- [c3] `defer` has a non-interactive form: state `open`, spec `null` — the inverse of promote — over
+  one or more ids, recording the same `triage` event with the same wording the walk records.
+  proof: vitest scripts/tasks/triage.test.ts
+- [c4] `ask` has a non-interactive form. It appends the dated question to the record's `evidence`
+  where the next agent reads it, leaves the record `unreviewed` so the queue keeps offering it, and
+  records the same `triage` event — the three properties that make it a handback rather than an edit.
+  proof: vitest scripts/tasks/triage.test.ts
+- [c5] `redirect`'s non-interactive form is the same *operation* as the walk's, not merely the same
+  effect. Both file a `triage` event, so `tasks log --op triage` shows a redirect however it was
+  made, and the audit trail does not depend on which route a reviewer happened to take.
+  proof: vitest scripts/tasks/triage.test.ts
+- [c6] The interactive walk is unchanged. Same keys, same order, same prompts, same
+  persist-immediately behaviour on every action — a reviewer who has learned the TUI does not
+  relearn it, and the refactor is provably behaviour-preserving on the route that already worked.
+  proof: vitest scripts/tasks/triage.test.ts
+
+## Decisions
+
+- **A table, not two more verbs.** Adding `defer` and `ask` alone closes today's gap and leaves the
+  next one open: the gap exists because there is no place where the set of actions is written down
+  once. Making the set data is what c2 can then check, and it is the difference between fixing an
+  instance and retiring the class.
+- **`ask` is the load-bearing action, and its three properties are all required.** The question lands
+  on the record rather than only in the log, because the next agent reads the record. The record
+  stays `unreviewed`, because the queue is what re-offers it. And it files a `triage` event, because
+  that is what makes a run's questions countable. Any two of the three would look like it works.
+- **New top-level verbs, beside `promote` and `decline`.** Not flags on `triage`. The two actions
+  that already have batch forms are top-level verbs, and someone looking for the batch form of a
+  third action looks where the first two are.
+- **The TUI stays.** It is the right interface for a human working a queue, and nothing here is an
+  argument against it — only against it being the *only* route. c6 exists so that this is provable
+  rather than asserted.
+- **This is the mechanism of the endurance goal, not a convenience.** The record filed it as a hard
+  blocker on cost-shaped reasoning. The stronger reason is that without `ask`, a batched review
+  degrades into a pile of findings with no questions attached, and the author pays the re-derivation
+  cost this whole round is meant to remove.
+
+## Open questions
+
+- Whether `ask` takes one question across several ids or one question per id. The walk asks per
+  record; a batch may want both, and the shape is the worker's call once the table exists.
+- Whether the table lives in `triage.ts` or beside the record verbs in `records.ts`. Both routes
+  import from wherever it lands; the layering is the worker's to judge against the existing split.
+
+## Audit passes
+
+### Pass 1 — 2026-08-06
+
+- base: `a49a9b614c6cff533de973d9bceb9d18c4d42e94`
+- head: `6eb10e324fd7946214160f08dc6f634de9d57ba6`
+- proof 1: met — Both the menu (`TRIAGE_ACTIONS.map(...).join(...)`, triage.ts:144) and the dispatch
+(`TRIAGE_ACTIONS.find((candidate) => candidate.key === answer)`, triage.ts:150) read from the same
+TRIAGE_ACTIONS array (triage.ts:95-101) rather than a literal if/else chain -- confirmed by reading
+the diff against the pre-refactor if/else (a49a9b6..621b1d5). Mutation-verified: inverting the match
+(`candidate.key === answer` -> `!==`, manifest entry c1-dispatch-invert) was KILLED at its own named
+test (triage.test.ts "triage promotes, defers and declines findings, saving after every decision"),
+1 failed of 17, no escalation to the file or whole suite needed.
+- proof 2: met — triage.test.ts's "every action in the table names a `tasks` verb that actually exists,
+so a table entry with no route fails here" iterates TRIAGE_ACTIONS and runs `tasks <verb> --help`
+per entry. Verified by doing exactly what the audit brief asked rather than reading the test: added
+a sixth entry `{ key: 'z', label: 'zonk', verb: 'nonexistent-verb', run: runAsk }` to the table
+(manifest entry c2-sixth-action-no-route) and confirmed this exact test catches it -- KILLED, 1
+failed of 17, at its own named-test scope, no escalation needed.
+- proof 3: met — cmdDefer (records.ts:820-836) sets state 'open'/spec null and files the identical note
+string 'deferred: opened outside every spec' that the walk's runDefer uses (triage.ts:48-52) -- same
+literal string in both files. Mutation-verified: changing the non-interactive wording to 'deferred:
+moved outside every spec' (manifest entry c3-defer-wording-drift) was KILLED at its own named test
+("tasks defer opens a record outside every spec..."), 1 failed of 17, no escalation. Also verified by
+direct execution: cmdDefer refuses a declined id with "it does not reopen closed ones" and, given a
+batch of two ids where one is declined, leaves the other (valid) id completely untouched -- the same
+all-or-nothing convention cmdPromote already uses. Calling defer twice on an already-open record
+succeeds both times (idempotent) and logs two separate, identically-worded triage events.
+- proof 4: unmet — Two of the three properties are solid and mutation-verified: appending (not replacing)
+evidence -- mutating the assignment from append to outright replacement (manifest entry
+c4-ask-overwrites-evidence) was KILLED at its own named test ("tasks ask records the question on the
+finding..."), 1 failed of 17, no escalation -- and a second `tasks ask` call on the same id correctly
+appends a second dated block rather than overwriting the first (verified by direct execution). The
+triage-event property also holds (see c5's evidence; the recordEvents call is shared). But the third
+property -- "leaves the record unreviewed so the queue keeps offering it" -- is not enforced and does
+not hold in general. cmdAsk (records.ts:865-884) never reads or checks task.state, unlike cmdDefer and
+cmdPromote which explicitly refuse to run on anything but an unreviewed-or-open record. Reproduced
+directly: add a finding, decline it with a reason, then ask a question against that same now-declined
+id. The ask command exits 0, appends the question to evidence, and files a triage event -- but showing
+the record afterward still reports state 'declined', not 'unreviewed'. unreviewedQueue will never re-offer
+this record, directly contradicting the clause's literal promise, and the caller receives no warning
+or error. This is not a hypothetical: an orchestrator batch-asking across ids it has not itself just
+pulled from the unreviewed queue (a stale id, a racing second run, an id typo that happens to resolve)
+hits this silently. `tasks redirect` has the identical missing guard, but c5 does not depend on state
+so it is unaffected; only c4's own claim is broken by it. See the filed HIGH finding for the fix.
+- proof 5: met — cmdRedirect (records.ts:839-858) files `recordEvents(config, 'triage', ...)`, matching
+the walk's runRedirect (triage.ts:66-76); `tasks log --op edit` never shows the id afterward and
+`tasks log --op triage` does, exactly as the existing test asserts. Mutation-verified independently:
+changing the op from 'triage' to 'edit' (manifest entry c5-redirect-files-edit-not-triage) was KILLED
+at its own named test ("tasks redirect is the same operation as the walk's redirect..."), 1 failed of
+17, no escalation. Also confirmed the property is state-independent (unlike c4): redirecting a
+declined record's deliverable still files a `triage` event, not an `edit` one, by direct execution.
+- proof 6: unmet — Three of the four named properties are solidly proven. Same keys and same
+persist-immediately behaviour: mutation entries c1-dispatch-invert and c6-walk-drops-persist (the
+latter deletes the common `saveStoreAndWarn`+`recordEvents` call on the walk's decision path) were
+both KILLED at the same named test ("triage promotes, defers and declines findings, saving after
+every decision"), 1 failed of 17 each, no escalation -- plus the existing tests already drive the
+walk with literal keystrokes ('1','2','3','4','a') independent of the table's own content. Same
+prompts: proven by the existing hardcoded-string test ("triage prompts read exactly as before the
+table refactor"), which asserts the literal "reason: ", "replacement deliverable: ", "question: "
+text, not anything derived from the table. But "same order" has zero coverage anywhere in the suite.
+The only order-touching test ("the menu is rendered from the action table") computes its expected
+string from TRIAGE_ACTIONS itself (`TRIAGE_ACTIONS.map((action) => ...).join(...)`), making it
+tautological -- it can never fail from a reorder, because it is checking the table against itself.
+Confirmed by mutation entry c6-menu-order-scrambled: swapped the array positions of the promote and
+redirect entries (keys and verbs left untouched) and ran it with no `tests` scope at all, i.e.
+directly against the whole 1673-test suite: SURVIVED, 0 failed of 1673. The shipped order does
+currently match the pre-refactor order (confirmed by reading the diff), so there is no live
+regression today, but the clause's own claim to be "provably behaviour-preserving" does not hold for
+this one property -- nothing in the suite, up to and including the whole suite, would catch a future
+silent reorder. See the filed MEDIUM finding for the fix.
+
+### Pass 2 — 2026-08-06
+
+- base: `a49a9b614c6cff533de973d9bceb9d18c4d42e94`
+- head: `1b43f4c7cf51c44a49923894933a474ace0d9174`
+- proof 1: met — Re-verified with a fresh mutation run against the current head (1b43f4c): the menu
+render (triage.ts:144) and dispatch (triage.ts:150) both still read TRIAGE_ACTIONS rather than a
+literal if/else chain. Manifest entry c1-dispatch-invert (flipping the dispatch match from equals
+to not-equals) was KILLED at its own named test scope, 8 failed of 19, no escalation. This clause's
+code is unchanged by this diff range's fix commits; only records.ts and triage.test.ts moved.
+- proof 2: met — Re-verified: manifest entry c2-sixth-action-no-route (appending a table entry naming a
+verb that does not exist as a tasks command) was KILLED at its own named test scope, 2 failed of 19,
+no escalation. The completeness test in triage.test.ts still iterates TRIAGE_ACTIONS and runs each
+verb's help. Unchanged by this diff range.
+- proof 3: met — Re-verified: manifest entry c3-defer-wording-drift (changing cmdDefer's filed note text
+by one word) was KILLED at its own named test scope, 1 failed of 19, no escalation. cmdDefer's guard
+now reads through the shared isReviewable helper instead of its old inline check, a mechanical
+change with no behaviour difference confirmed by direct execution: deferring an unreviewed or
+already-open record still succeeds, and deferring a declined one is still refused with the same
+wording.
+- proof 4: unmet — The fix (289868e) narrowed but did not close pass 1's finding. It added isReviewable,
+which admits state unreviewed or open, and cmdAsk now refuses any other state. That closes the fully
+terminal cases (declined, done, in-progress) the pass 1 reproduction used. But the queue the clause's
+own text names, unreviewedQueue in taskStore.ts, filters strictly on state equals unreviewed; it does
+not surface open records at all. isReviewable's boundary and the queue's boundary disagree on exactly
+one state, and ask is reachable there. Reproduced directly on the current head: added a finding
+(state unreviewed by default), deferred it (state becomes open, spec null), then invoked the
+non-interactive ask command against that same now-open id with a question text. It exits zero, prints
+a message saying it stays open until the question is answered, and appends the question to evidence
+as designed. Showing the record afterward reports state open, not unreviewed. Running triage
+immediately after reports "no unreviewed findings" — the record is never re-offered. This is not a
+declined or otherwise closed record; it passed the new guard cleanly and still breaks the clause's
+literal promise, because cmdAsk never sets task.state itself, it only ever preserves whatever state
+was already there. The command's own long-lived help text corroborates this rather than contradicts
+it: running the ask command's help flag still prints the original, more honest wording — "leaving it
+in whatever state it was, unreviewed ordinarily, so the queue keeps offering it" — a string this
+branch left untouched in commands.ts even while records.ts's own comment above cmdAsk was rewritten
+this round to flatly assert "the record stays unreviewed", which is the overclaim. Mutation
+confirms the tests cannot see this: manifest entry c4-ask-guard-removed-entirely (deleting the whole
+isReviewable check from cmdAsk) was KILLED at named-test scope by the existing "refuses a closed
+record" test, which only ever exercises a declined id, and manifest entry c4-ask-overwrites-evidence
+was KILLED too. Both prove real properties, but neither test's fixture ever starts a task in the open
+state, so nothing in the suite can currently fail on this path: the fixture is already unreviewed
+before ask runs, so "leaves it unreviewed" holds trivially by non-interference, whether or not the
+code would correctly re-open a non-unreviewed record. redirect has the identical structural gap
+(isReviewable admits open) but is unaffected because c5 does not depend on state; only ask's own
+promise is broken by it.
+- proof 5: met — Re-verified: manifest entry c5-redirect-files-edit-not-triage (changing the recorded op
+from triage to edit) was KILLED at its own named test scope, 1 failed of 19, no escalation. cmdRedirect
+now also refuses non-reviewable ids via isReviewable, matching pass 1's finding; this does not affect
+c5 since the operation-identity promise does not depend on starting state, confirmed by direct
+execution: redirecting an open (deferred) record still files a triage event, not an edit one.
+- proof 6: unmet — The order sub-property pass 1 flagged is now genuinely fixed: the menu test asserts a
+literal golden string independent of TRIAGE_ACTIONS, confirmed two ways. First, hand-editing
+TRIAGE_ACTIONS to swap the promote and defer entries and running the named test directly fails it
+(expected "[1] promote   [2] defer ..." not found, actual shows "[2] defer   [1] promote ..."), and
+the change was reverted afterward. Second, manifest entry c6-menu-order-scrambled (the same swap, via
+mutate) was KILLED at named-test scope, 1 failed of 19. The golden string itself is the right one: it
+matches byte for byte what commit 621b1d5's parent printed before the table refactor (git show of
+the pre-refactor triage.ts confirms the same literal "[1] promote   [2] defer   [3] decline   [4]
+redirect   [a] ask   [s] skip   [q] save and quit" line), so it pins the actually-prior behaviour, not
+an arbitrary string. Same keys and same prompts remain proven as pass 1 found (unchanged this round).
+But a new gap surfaced on the fourth property, persist-immediately, which this round's fix did not
+touch: manifest entry c6-redirect-drops-immediate-persist, deleting runRedirect's own
+saveStoreAndWarn plus recordEvents call (triage.ts, inside runRedirect), SURVIVED the entire suite —
+0 failed of 1675, escalating past the named test and the whole triage.test.ts file with nothing
+catching it. The reason is a masked fixture: every redirect-exercising test in the suite chains a
+second decision (typically promote) onto the same task in the same session, and that second
+decision's own common-path save persists the already-mutated in-memory deliverable field regardless
+of whether redirect saved anything itself. No test drives a redirect immediately followed by quit
+with no further decision. By contrast, ask's own inline save is genuinely covered: manifest entry
+c6-ask-drops-immediate-persist was KILLED at named-test scope, because its one test ends the session
+right after asking, with nothing else to mask a lost save. The walk's common path (promote, defer,
+decline) is covered too: manifest entry c6-walk-drops-persist was KILLED, 4 failed of 19. So three of
+four actions on this property are provably covered and one, redirect, is not — the clause's own
+standard, "provably behaviour-preserving," is not met for that one property, even though reading the
+code shows the behaviour itself is currently correct.
+
+### Pass 3 — 2026-08-06
+
+- base: `a49a9b614c6cff533de973d9bceb9d18c4d42e94`
+- head: `cb8e3d1dd489f341e81b8088c28e7a6f9afd1fbf`
+- proof 1: met — Re-verified against the current head (cb8e3d1). Dispatch (triage.ts, TRIAGE_ACTIONS.find
+matching candidate.key === answer) and the menu render still both read TRIAGE_ACTIONS rather than a
+literal if/else chain; this pass's commits (c0c1cd9, 04b8661) touched only records.ts and
+triage.test.ts, not triage.ts's table or dispatch. Mutation entry c1-dispatch-invert (flipping the
+match to !==) was KILLED at its own named test scope ("triage promotes, defers and declines
+findings, saving after every decision"), 1 failed of 21, no escalation. This pass also routed
+cmdPromote's own separate non-interactive guard (in records.ts) through the shared isReviewable
+helper; that is a different code path entirely from this clause's table/dispatch and does not
+touch c1.
+- proof 2: met — Re-verified: the completeness test in triage.test.ts still iterates TRIAGE_ACTIONS and
+runs `tasks <verb> --help` per entry. Mutation entry c2-sixth-action-no-route (appending a table
+entry naming a verb that does not exist as a command) was KILLED at its own named test scope, 1
+failed of 21, no escalation. Unchanged by this pass's commits.
+- proof 3: met — Re-verified: mutation entry c3-defer-wording-drift (changing cmdDefer's filed note text
+by one word) was KILLED at its own named test scope, 1 failed of 21, no escalation. cmdDefer's guard
+now reads through isReviewable instead of its old duplicated inline check (a mechanical change with
+no behaviour difference): deferring an unreviewed or already-open record still succeeds and deferring
+a declined one is still refused with unchanged wording, confirmed by direct execution.
+- proof 4: unmet — The specific defect chains from pass 1 and pass 2 are now genuinely closed. Ask's own
+guard checks task.state !== 'unreviewed' exactly, matching unreviewedQueue's own filter (state ===
+'unreviewed') byte for byte -- that is the one function every path to the review queue actually goes
+through (cmdTriage's walk, and unreviewedFiledBy which backs both `tasks list --spec` and `tasks
+next`'s filed-findings note). Mutation entry c4-ask-guard-removed-entirely (deleting the boundary
+check outright) was KILLED at named-test scope, 2 failed of 21, no escalation -- both the
+refuses-a-closed-record test and the refuses-an-open-record test independently caught it, so this is
+not one test riding on the other. Redirect shares the wider isReviewable (unreviewed-or-open)
+boundary rather than ask's narrower one; audited under c4's own promise rather than assumed safe,
+this is fine in practice because redirect never writes task.state at all -- confirmed by direct
+execution: asking a record then redirecting it while it is still unreviewed leaves it unreviewed,
+question intact, still offered by the queue.
+But the promise this clause makes is not just about ask's own guard -- it is that a question, once
+landed, keeps the record offered by the queue. Nothing in the rest of the command set honours that.
+Reproduced directly, three ways, on the current head: (1) `tasks ask <id>` followed by `tasks defer
+<id>` -- defer's isReviewable guard admits the still-unreviewed record, moves it to open/spec null,
+exits 0 printing only "deferred <id>", and `tasks show <id>` afterward still displays the "triage
+asked" text sitting in evidence with no reviewer ever pointed at it again; `tasks list --state
+unreviewed` no longer lists the id. (2) `tasks ask <id>` followed by `tasks promote <id> --spec
+<slug>` -- identical outcome, state moves to open/spec, same silent loss. (3) `tasks ask <id>`
+followed by `tasks decline <id> --reason ...`, or by `tasks start <id> --actor ...`, or by `tasks
+done <id>` -- all three have no isReviewable guard at all (pre-existing, unrelated to this branch)
+and produce the same result. None of the five prints a warning, refuses, or asks for confirmation;
+the caller has no signal that a live, unanswered question was just orphaned. Points (1) and (2) are
+the more serious ones, because promote and defer are two of this exact spec's own five actions, not
+some unrelated pre-existing command -- and this is precisely the scenario the branch's own recorded
+decision worried about ("an orchestrator batch-asking across ids it has not itself just pulled from
+the unreviewed queue"), except the vector is not a stale or racing id, it is the ordinary next step
+of an orchestrator's own batch: nothing in the data model distinguishes an asked-and-waiting record
+from any other unreviewed one, since evidence is free text and state carries no such marker. See the
+filed HIGH finding for the fix.
+- proof 5: met — Re-verified: mutation entry c5-redirect-files-edit-not-triage (changing the recorded op
+from triage to edit) was KILLED at its own named test scope, 1 failed of 21, no escalation. cmdRedirect
+now also refuses a non-reviewable id via isReviewable (closing pass 1's original redirect finding);
+this does not affect c5 since the operation-identity promise does not depend on starting state,
+confirmed by direct execution: redirecting an open (deferred) record still files a triage event, not
+an edit one.
+- proof 6: met — Pass 2's own open gap is closed and mutation-verified, and re-auditing all five actions
+independently finds nothing further. Same keys/order: the golden-string menu test (added pass 2,
+untouched this pass) asserts a literal string derived from nothing in TRIAGE_ACTIONS; mutation entry
+c6-menu-order-scrambled (swapping the promote and redirect rows' positions, keys and verbs
+untouched) was KILLED at its own named test scope, 1 failed of 21. Same prompts: the hardcoded-string
+test (reason: , replacement deliverable: , question: ) is unchanged this pass, read and confirmed
+directly. Persist-immediately, checked per action rather than assumed from one green test: promote,
+defer and decline share exactly one save+record call on cmdTriage's common decision path (triage.ts,
+after action.run() returns a decision) -- mutation entry c6-walk-drops-persist (deleting that shared
+call) was KILLED at its own named test scope ("triage promotes, defers and declines findings, saving
+after every decision"), 1 failed of 21. Because this is the literal same line of code backing all
+three actions, there is no room for the masking pattern pass 2 found on redirect -- deleting it
+breaks all three simultaneously, which is what the test measures, not one action's chained save
+covering for another's absence. Redirect and ask each carry their own separate inline save, so each
+needed its own isolated proof rather than one riding on a later chained decision. This pass added
+that isolation for redirect ("triage redirect alone -- with no later decision -- persists the
+deliverable and files the triage event by itself", quitting immediately after the redirect with
+nothing else touching the store) and mutation entry c6-redirect-drops-immediate-persist (deleting
+runRedirect's own saveStoreAndWarn+recordEvents call) was KILLED at that exact named test, 1 failed
+of 21 -- closing the pass 2 finding. Ask's isolation predates this pass (its one test also ends the
+session immediately after asking, with only one item in the queue) and was re-verified independently
+this pass: mutation entry c6-ask-drops-immediate-persist (deleting runAsk's own save+record call) was
+also KILLED at its own named test scope, 1 failed of 21. All nine mutations run this pass (c1, c2,
+c3, c4, c5, c6-order, c6-walk, c6-redirect, c6-ask) KILLED at their own named-test scope with zero
+escalation to file or whole-suite level.
+
+### Pass 4 — 2026-08-06
+
+- base: `a49a9b614c6cff533de973d9bceb9d18c4d42e94`
+- head: `d8cb54785a340922946f3275c15c7b04b4bff2a5`
+- proof 1: met — Independent re-verification against the current head (d8cb547, unchanged since pass 3): the
+menu render and the dispatch in triage.ts both still read the TRIAGE_ACTIONS table rather than a literal
+if/else chain. This pass's own manifest (nine clause mutations plus a split c4 entry, ten total, written
+fresh rather than reused from an earlier pass) flipped the dispatch's equality check to an inequality and
+ran it through mutate; it was KILLED at its own named test, "triage promotes, defers and declines
+findings, saving after every decision," one of twenty one tests failing, with no escalation to the file
+or the whole suite. cmdPromote was rerouted through the shared isReviewable helper in an earlier round,
+but that change lives entirely inside records.ts and never touches triage.ts's table or dispatch, so it
+does not bear on this clause. Confirmed by reading the diff between the two commits directly as well as
+by the mutation result.
+- proof 2: met — Re-verified: the completeness test in triage.test.ts still iterates TRIAGE_ACTIONS and runs
+each entry's verb with a help flag, failing if any verb is not a real command. This pass's own mutation
+appended a sixth table entry naming a verb that does not exist as a tasks command; it was KILLED at its
+own named test, "every action in the table names a tasks verb that actually exists, so a table entry
+with no route fails here," one of twenty one tests failing, no escalation. Unchanged by any commit since
+pass 1.
+- proof 3: met — Re-verified: cmdDefer still sets state open and spec null and files the same wording the
+walk's runDefer uses. This pass's own mutation changed one word of the filed note text; it was KILLED at
+its own named test, "tasks defer opens a record outside every spec, the inverse of promote, filing the
+same wording the walk records," one of twenty one tests failing, no escalation. cmdDefer's guard now
+routes through the shared isReviewable helper rather than a duplicated inline check, confirmed by reading
+the diff to be behaviourally identical to the original inline condition (unreviewed or open admitted,
+everything else refused) — a mechanical refactor, not a semantic change, so nothing about defer's own
+promise moved.
+- proof 4: met — Agreeing with the orchestrator's ruling, on my own reading rather than by deference to it.
+The clause's three verbs (appends, leaves, records) all take ask itself as their grammatical subject —
+the clause is a description of what the ask command does, not a promise about what every other command
+in the store must not do to a record ask has touched. Re-read against that boundary, all three properties
+hold and are independently provable. I verified all three directly, from a fresh scratch store outside
+the repo's own tracked one so nothing here touched real data: adding a finding leaves it unreviewed by
+construction, then asking a question against it appended the dated question below the existing evidence
+text rather than replacing it (confirmed by reading the record back with show, where the original evidence
+sentence and the new question both appear); the record's own state field read unreviewed both immediately
+before and immediately after the ask, because cmdAsk's body never assigns task.state anywhere, so the
+property holds by construction and not by accident; and the event log's triage-scoped view listed the ask
+by its filed note text while the edit-scoped view listed nothing for that id, confirming the same op the
+walk records. Mutation-verified independently on this pass's own fresh manifest: deleting cmdAsk's guard
+entirely was KILLED across two of the file's tests at once (the closed-record refusal and the open-record
+refusal), two of twenty one failing with no escalation past the file; overwriting rather than appending
+the evidence assignment was KILLED at its own named test, one of twenty one failing, no escalation.
+Now the disagreement question, considered directly rather than assumed away: is the clause's purpose
+clause, the record stays unreviewed so the queue keeps offering it, secretly a promise that spans every
+other command in the store, not just ask's own body? I considered this seriously because the pass 3
+finding is real and I reproduced it myself on the same scratch store: asking a question against an
+unreviewed id, then deferring that same id, moves it to open with spec null, exits cleanly, and the
+question text is left sitting in evidence while the unreviewed listing no longer shows the id at all —
+nothing warns that a live question was just stranded. But I read this as a defect in defer (and promote,
+and the three pre-existing verbs decline, start and done), not in ask. The store carries no field that
+marks a record as waiting on an answered question; evidence is free text, and state carries no such
+marker. Closing the gap means teaching five verbs — three of which (decline, start, done) predate this
+spec entirely and were never part of its diff or its writes grant — to recognise and refuse or warn about
+a condition the data model does not yet represent. That is real work, correctly filed as its own high
+severity finding rather than folded into this clause by a fourth unmet verdict that would not change what
+ask's own code does. Grading c4 unmet a fourth time on the strength of a defect entirely inside promote
+and defer's bodies would be grading the deliverable's motivating goal rather than the clause's own text,
+which is exactly the scope-creep this repository's own clause-16 convention (a pass 2 finding is not
+something the spec already promised) warns against in the adjacent case. I do not believe this branch
+should merge with that high finding left unaddressed indefinitely, since it sits squarely inside the
+orchestrator batch workflow this spec exists to serve, but the mechanism for that is a human triage
+decision on the separately filed finding, not a fifth pass grading the same three properties unmet again.
+- proof 5: met — Re-verified: cmdRedirect still files a triage event rather than an edit one. This pass's own
+mutation changed the recorded op from triage to edit; it was KILLED at its own named test, "tasks
+redirect is the same operation as the walk's redirect: it files a triage event, not an edit one," one of
+twenty one tests failing, no escalation. Confirmed independently by direct execution on the scratch
+store: redirecting a record left it out of the edit-scoped log view and present in the triage-scoped one.
+This property does not depend on starting state, so ask's narrower unreviewed-only guard versus
+redirect's wider unreviewed-or-open one (via isReviewable) has no bearing on it.
+- proof 6: met — Re-audited all four sub-properties this pass rather than trusting pass 3's closure. Same
+keys and same prompts: the golden-string menu test and the hardcoded-prompt-string test are both
+unchanged since pass 2 and still assert literal text rather than deriving it from TRIAGE_ACTIONS, read
+directly. Same order: this pass's own mutation swapped the table positions of the promote and redirect
+entries, keys and verbs left untouched; KILLED at the golden-string test, one of twenty one failing, no
+escalation. Persist-immediately, checked as three separate properties rather than one green test: the
+shared save-and-record call on cmdTriage's common decision path (covering promote, defer and decline)
+was deleted by this pass's own mutation and KILLED at "triage promotes, defers and declines findings,
+saving after every decision," one of twenty one failing; runRedirect's own inline save, deleted, was
+KILLED at "triage redirect alone, with no later decision, persists the deliverable and files the triage
+event by itself," one of twenty one failing; runAsk's own inline save, deleted, was KILLED at "triage a
+records a question on the finding and leaves it unreviewed," one of twenty one failing. All four
+sub-mutations died at their own named-test scope with zero escalation, on a manifest built fresh for
+this pass rather than reused, so the isolation pass 3 added for redirect is confirmed to still hold and
+was not itself a fluke of that pass's particular manifest ordering.

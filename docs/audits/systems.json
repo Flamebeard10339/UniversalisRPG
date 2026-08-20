@@ -1,0 +1,1532 @@
+{
+  "unowned": {
+    "note": "Deliberately chargeable to no system: prose, audit records, and the repo-wide manifests that change for every system's reasons and none of their own. Everything else must be owned, and audit-status fails when a tracked file is neither.",
+    "paths": [
+      "*.md",
+      ".claude/launch.json",
+      ".gitignore",
+      ".planning",
+      "docs",
+      "package-lock.json",
+      "package.json",
+      "tsconfig.json"
+    ]
+  },
+  "systems": [
+    {
+      "name": "DSL load path",
+      "paths": [
+        "content/combat-expansion.dsl",
+        "content/engine-en.dsl",
+        "content/tutorial-island.dsl",
+        "src/content/action.ts",
+        "src/content/blocks.test.ts",
+        "src/content/clusterJewel.test.ts",
+        "src/content/clusterJewel.ts",
+        "src/content/dialogue.ts",
+        "src/content/dropTable.test.ts",
+        "src/content/dropTable.ts",
+        "src/content/engineLocale.ts",
+        "src/content/entity.ts",
+        "src/content/event.test.ts",
+        "src/content/event.ts",
+        "src/content/faction.ts",
+        "src/content/flag.ts",
+        "src/content/flags.test.ts",
+        "src/content/hex.test.ts",
+        "src/content/hex.ts",
+        "src/content/info.ts",
+        "src/content/instanceId.ts",
+        "src/content/item.test.ts",
+        "src/content/item.ts",
+        "src/content/load.ts",
+        "src/content/locale.test.ts",
+        "src/content/locale.ts",
+        "src/content/location.ts",
+        "src/content/merge.test.ts",
+        "src/content/merge.ts",
+        "src/content/module.ts",
+        "src/content/namespace.ts",
+        "src/content/parse.test.ts",
+        "src/content/passive.test.ts",
+        "src/content/passive.ts",
+        "src/content/printedCorpus.fixture.txt",
+        "src/content/recipe.ts",
+        "src/content/referenceSites.ts",
+        "src/content/references.test.ts",
+        "src/content/references.ts",
+        "src/content/registry.ts",
+        "src/content/removal.ts",
+        "src/content/resolve.test.ts",
+        "src/content/resolve.ts",
+        "src/content/resource.ts",
+        "src/content/saveSection.ts",
+        "src/content/sectionKind.ts",
+        "src/content/shapes.test.ts",
+        "src/content/shapes.ts",
+        "src/content/skill.ts",
+        "src/content/slot.test.ts",
+        "src/content/slot.ts",
+        "src/content/stat.ts",
+        "src/content/test.test.ts",
+        "src/content/test.ts",
+        "src/content/translation.ts",
+        "src/content/tuningVariables.ts",
+        "src/content/typed.ts",
+        "src/content/universe.test.ts",
+        "src/content/universe.ts",
+        "src/content/variable.ts",
+        "src/grammar/action.test.ts",
+        "src/grammar/action.ts",
+        "src/grammar/actionResult.ts",
+        "src/grammar/codec.test.ts",
+        "src/grammar/codec.ts",
+        "src/grammar/condition.ts",
+        "src/grammar/dependency.ts",
+        "src/grammar/hook.ts",
+        "src/grammar/list.test.ts",
+        "src/grammar/list.ts",
+        "src/grammar/parser.ts",
+        "src/grammar/range.test.ts",
+        "src/grammar/range.ts",
+        "src/grammar/section.ts",
+        "src/grammar/skillGrant.test.ts",
+        "src/grammar/skillGrant.ts",
+        "src/grammar/structure.ts",
+        "src/grammar/tagClause.ts",
+        "src/grammar/values.ts"
+      ],
+      "covers": [
+        "src/content"
+      ],
+      "lastAudit": "f8c8c8d",
+      "lastAuditDoc": "docs/audits/dsl-load-path-2026-07-30-pass2.md",
+      "note": "Pass 2 (2026-07-30) audited the half no previous pass had: content/, the shipped DSL. Its one in-window commit changed two lines of a # save fixture, and that fixture is H1 \u2014 integration.test.ts runs every shipped # test from a bare createGameState(), so the whole tutorial route plays with the health pool never initialised, on empty: can never fire (setPoolLevel needs current > 0), and miki-route-end pins health at 0. The same test against a live session fails 21000 vs 0, so /test and CI disagree about it; this is also the root cause of Runtime M1, which measured the symptom. M1: the route skips node skills, so 4 of 8 dialogue nodes and both equipment items are unreached and the stat-bonus system has no shipped coverage. M2 is a fourth reproduction of pass 1's open H1, on dependencies: \u2014 block form silently drops the version constraint. Pass 1 (dsl-load-path-2026-07-30.md) is the loader audit and every one of its findings is still open; read it for the loader, this one for the content. Earlier history is in dsl-modules-2026-07-29-reconciled.md. The contribution system's files under src/content are owned by it and read by this one, which is what `covers` now says outright rather than leaving to a directory grant that also conferred ownership.",
+      "concepts": [
+        {
+          "name": "the parser",
+          "paths": [
+            "src/grammar/parser.ts"
+          ],
+          "note": "Named 'the parser' throughout docs/audits/dsl-load-path-*.md; CLAUDE.md calls src/grammar the text-to-syntax half of this system."
+        },
+        {
+          "name": "the section field engine",
+          "paths": [
+            "src/grammar/action.ts",
+            "src/grammar/section.ts"
+          ],
+          "note": "Named by dsl-load-path-2026-07-28-m2, which verified action.ts holds a second, laxer copy of it \u2014 hence the second path."
+        },
+        {
+          "name": "action parsing",
+          "paths": [
+            "src/grammar/action.ts"
+          ],
+          "note": "The action clause grammar. dsl-load-path-2026-07-28-m2 records that this file also carries a copy of the section field engine, which is why two concepts claim it."
+        },
+        {
+          "name": "reference validation",
+          "paths": [
+            "src/content/referenceSites.ts",
+            "src/content/references.ts"
+          ],
+          "note": "Named 'reference validation' by dsl-load-path-2026-07-28-h2 and game-engine-2026-07-27-pass2-m1, both of which measured how much of the class it covers."
+        },
+        {
+          "name": "the registry",
+          "paths": [
+            "src/content/registry.ts",
+            "src/content/load.ts",
+            "src/content/universe.ts"
+          ],
+          "note": "CLAUDE.md defines this system's second half as syntax to registry, including load-time reference resolution. runtime-has-an-order-because-it-has-no-cycles split the two: registry.ts declares what a registry is and what can be asked of one, load.ts builds one from sources."
+        },
+        {
+          "name": "droptable system",
+          "paths": [
+            "src/content/dropTable.ts",
+            "src/grammar/actionResult.ts"
+          ],
+          "note": "produced by droptables"
+        },
+        {
+          "name": "two-sided action grammar",
+          "paths": [
+            "src/grammar/action.ts"
+          ],
+          "note": "produced by combat-grammar-sides-and-attempts"
+        },
+        {
+          "name": "combat hook grammar",
+          "paths": [
+            "src/grammar/hook.ts"
+          ],
+          "note": "produced by combat-hook-grammar"
+        },
+        {
+          "name": "cluster shape catalogue",
+          "paths": [
+            "src/content/hex.ts",
+            "src/content/shapes.ts"
+          ],
+          "note": "produced by cluster-shape-catalogue: axial hex direction vocabulary and the closed catalogue of cluster-jewel shapes (point, spindle, ring, wheel, double-ring)"
+        },
+        {
+          "name": "cluster jewel authoring",
+          "paths": [
+            "src/content/passive.ts",
+            "src/content/clusterJewel.ts"
+          ],
+          "note": "produced by cluster-jewel-sections: the # passive and # cluster-jewel section kinds, their load-time validation, and the item fields that reach a cluster jewel from a droppable item"
+        },
+        {
+          "name": "minted instance id shape",
+          "paths": [
+            "src/content/instanceId.ts"
+          ],
+          "note": "produced by cluster-directives: what a runtime-minted instance id looks like, so a reference site can tell one from an authored item id"
+        },
+        {
+          "name": "the directive grammar",
+          "paths": [
+            "src/content/test.ts"
+          ],
+          "note": "the one parser turning a directive line into the Directive union, for # test sections and the REPL alike; cluster-directives added the five growth spellings (feed:, slot:, allocate:, apply:, refuse:) to it rather than a surface of their own"
+        },
+        {
+          "name": "cluster jewel content",
+          "paths": [
+            "content/tutorial-island.dsl"
+          ],
+          "note": "produced by cluster-content"
+        },
+        {
+          "name": "base and jewel roles are exclusive",
+          "paths": [
+            "src/content/item.ts"
+          ],
+          "note": "produced by items-mods-and-crafting-pass1-a-base-s-own-origin-cluster-an: isBase says an item is a base iff it declares slot:, and itemRoleProblem refuses at load an item claiming both roles. Registered over item.ts alone -- the runtime half lives in basePlane and belongs to Runtime's existing item cluster plane concept"
+        },
+        {
+          "name": "module language declaration",
+          "paths": [
+            "src/content/info.ts"
+          ],
+          "note": "produced by modules-declare-their-language-and-humanize-becomes-english-"
+        },
+        {
+          "name": "locale section",
+          "paths": [
+            "src/content/locale.ts",
+            "content/engine-en.dsl",
+            "src/content/engineLocale.ts"
+          ],
+          "note": "produced by the-locale-section-and-its-missing-key-report"
+        },
+        {
+          "name": "a universe with every word replaced",
+          "paths": [
+            "src/content/translation.ts"
+          ],
+          "note": "produced by a-recording-survives-translation; a # locale module built from a loaded registry that gives every engine pattern and every content title different words, in the base language and in one nothing ships"
+        },
+        {
+          "name": "the engine's refusal vocabulary",
+          "paths": [
+            "content/engine-en.dsl",
+            "src/content/locale.ts"
+          ],
+          "note": "produced by every-engine-sentence-is-keyed; every refusal, stale reason and plane repair the engine says on its own behalf, as keys in the closed union with an English pattern beside each"
+        },
+        {
+          "name": "action slug members",
+          "paths": [
+            "src/content/resolve.ts",
+            "src/content/namespace.ts",
+            "src/content/action.ts"
+          ],
+          "note": "produced by action-labels-as-members"
+        },
+        {
+          "name": "a slot's words",
+          "paths": [
+            "src/content/slot.ts"
+          ],
+          "note": "produced by an-equipment-slot-is-a-word-with-no-key-so-no-locale-can-rea: # slot <id> with a title:, optional, and global rather than namespaced for capability's reason. The vocabulary stays equipment-slots: and the key is minted from it, so a slot nobody declared still has words. Registered over slot.ts alone because the pass that mints the key lives in registry.ts, already claimed by 'the registry'"
+        },
+        {
+          "name": "a passive carries the hook blocks",
+          "paths": [
+            "src/content/passive.ts",
+            "src/content/passive.test.ts"
+          ],
+          "note": "produced by archetype-mods"
+        },
+        {
+          "name": "three archetypes as cluster jewels",
+          "paths": [
+            "content/combat-expansion.dsl"
+          ],
+          "note": "produced by archetype-mods"
+        },
+        {
+          "name": "the section kind row",
+          "paths": [
+            "src/content/sectionKind.ts"
+          ],
+          "note": "produced by every-pass-over-a-section-kind-derives-its-subjects: one row per section kind, holding every per-kind fact, keyed Record<SectionKind, ...> so a kind added tomorrow must answer each question"
+        }
+      ]
+    },
+    {
+      "name": "Runtime",
+      "paths": [
+        "src/runtime/actionEnd.ts",
+        "src/runtime/actions.ts",
+        "src/runtime/buffs.test.ts",
+        "src/runtime/buffs.ts",
+        "src/runtime/cadence.test.ts",
+        "src/runtime/carried.ts",
+        "src/runtime/carriedItem.test.ts",
+        "src/runtime/carriedName.test.ts",
+        "src/runtime/carriedName.ts",
+        "src/runtime/carriedScreen.test.ts",
+        "src/runtime/carriedScreen.ts",
+        "src/runtime/clusterEffect.test.ts",
+        "src/runtime/clusterEffect.ts",
+        "src/runtime/clusterPlane.test.ts",
+        "src/runtime/clusterPlane.ts",
+        "src/runtime/command.test.ts",
+        "src/runtime/command.ts",
+        "src/runtime/conditions.ts",
+        "src/runtime/contest.test.ts",
+        "src/runtime/dialogue-runtime.ts",
+        "src/runtime/dropTable.test.ts",
+        "src/runtime/effects.test.ts",
+        "src/runtime/effects.ts",
+        "src/runtime/encounter.test.ts",
+        "src/runtime/encounter.ts",
+        "src/runtime/enemy-pool.test.ts",
+        "src/runtime/equipment.test.ts",
+        "src/runtime/equipment.ts",
+        "src/runtime/error.ts",
+        "src/runtime/fight.test.ts",
+        "src/runtime/forwardProgress.ts",
+        "src/runtime/growth.test.ts",
+        "src/runtime/growth.ts",
+        "src/runtime/hooks.test.ts",
+        "src/runtime/hooks.ts",
+        "src/runtime/instances.test.ts",
+        "src/runtime/instances.ts",
+        "src/runtime/integration.test.ts",
+        "src/runtime/itemContribution.test.ts",
+        "src/runtime/itemContribution.ts",
+        "src/runtime/itemInstance.test.ts",
+        "src/runtime/itemInstance.ts",
+        "src/runtime/journey.test.ts",
+        "src/runtime/journey.ts",
+        "src/runtime/localized.test.ts",
+        "src/runtime/localized.ts",
+        "src/runtime/localizedFixture.ts",
+        "src/runtime/location.test.ts",
+        "src/runtime/modalOption.ts",
+        "src/runtime/modalStack.ts",
+        "src/runtime/modals.test.ts",
+        "src/runtime/modals.ts",
+        "src/runtime/moments.test.ts",
+        "src/runtime/openUniverse.test.ts",
+        "src/runtime/openUniverse.ts",
+        "src/runtime/openUniverseFixture.ts",
+        "src/runtime/planeReport.test.ts",
+        "src/runtime/planeReport.ts",
+        "src/runtime/planeScreen.test.ts",
+        "src/runtime/planeScreen.ts",
+        "src/runtime/population.ts",
+        "src/runtime/pruning.ts",
+        "src/runtime/published.test.ts",
+        "src/runtime/recipe.test.ts",
+        "src/runtime/resolve.test.ts",
+        "src/runtime/resource.test.ts",
+        "src/runtime/rng.test.ts",
+        "src/runtime/rng.ts",
+        "src/runtime/roster.ts",
+        "src/runtime/runtime.test.ts",
+        "src/runtime/runtime.ts",
+        "src/runtime/said.ts",
+        "src/runtime/save.test.ts",
+        "src/runtime/save.ts",
+        "src/runtime/saveSlots.test.ts",
+        "src/runtime/saveSlots.ts",
+        "src/runtime/sayFixture.ts",
+        "src/runtime/session.test.ts",
+        "src/runtime/session.ts",
+        "src/runtime/skillGrants.test.ts",
+        "src/runtime/skillGrants.ts",
+        "src/runtime/skills.test.ts",
+        "src/runtime/skills.ts",
+        "src/runtime/stat.test.ts",
+        "src/runtime/state.ts",
+        "src/runtime/stats.ts",
+        "src/runtime/stopping.test.ts",
+        "src/runtime/store.test.ts",
+        "src/runtime/store.ts",
+        "src/runtime/storeContract.ts",
+        "src/runtime/time.test.ts",
+        "src/runtime/translationSurvival.test.ts",
+        "src/runtime/tuning.ts",
+        "src/runtime/units.ts"
+      ],
+      "lastAudit": "d7c6493",
+      "lastAuditDoc": "docs/audits/runtime-2026-07-30.md",
+      "note": "The 2026-07-30 pass verified the integer conversion's core claim \u2014 875 split points across a sign-changing rate all agree with the one-shot resolve, and every write into state.resources/time/progress is closed under the integer scale \u2014 and found H1: checkSave gives the three object-shaped save fields (activeAction, player, activeBuffs) no check past isObject, so a body whose ids are all real but whose cadences is absent crashes loadSave with a raw TypeError from inside the validator that exists to prevent it. Its mediums are all about what the window did not measure: the shipped # test regressions pass with every pool off by 1000x (mutation-verified, because the one save fixture pins health at 0, the value a scale change fixes), ability: 2.5 deals 2.5 down the healthless path and 2.0 down the target: path, and rng is the one GameState number left as isNumber so a fractional cursor collapses onto a fixed stream. Pass-1 L4 and L6 stay open and BLOCKED on the action.health/target: unification; M2 is fresh measured evidence for it. Pass-2 L1 and pass-1 L2 closed 2026-07-29. Counter restarts at the restructure; pre-move commits are not attributable per layer.",
+      "concepts": [
+        {
+          "name": "saves",
+          "paths": [
+            "src/runtime/save.ts"
+          ],
+          "note": "runtime-2026-07-30-h1 is about checkSave and loadSave in this file."
+        },
+        {
+          "name": "the session entry point",
+          "paths": [
+            "src/runtime/session.ts"
+          ],
+          "note": "CLAUDE.md: session.ts is the entry point everything above plays through."
+        },
+        {
+          "name": "the random cursor",
+          "paths": [
+            "src/runtime/rng.ts"
+          ],
+          "note": "runtime-2026-07-30 records rng as the one GameState number left as isNumber, so a fractional cursor collapses onto a fixed stream."
+        },
+        {
+          "name": "the resolve loop's forward-progress invariant",
+          "paths": [
+            "src/runtime/forwardProgress.ts"
+          ],
+          "note": "produced by resolve-forward-progress-guard: what a segment boundary is, that it is never before the current instant, and how many consecutive non-advancing segments resolve() tolerates before it reports a stall"
+        },
+        {
+          "name": "result application",
+          "paths": [
+            "src/runtime/effects.ts"
+          ],
+          "note": "produced by result-application-seam: applyResults takes the actor a result applies to, and every applied result is offered to the observers the segment carries"
+        },
+        {
+          "name": "modal system",
+          "paths": [
+            "src/runtime/modals.ts"
+          ],
+          "note": "produced by first-class-modals: the stack, the published name+options shape, and the one open and close"
+        },
+        {
+          "name": "object instancing",
+          "paths": [
+            "src/runtime/instances.ts"
+          ],
+          "note": "produced by instanced-objects: the one instance table, its ids, its payload kinds and its prune"
+        },
+        {
+          "name": "skill level curve",
+          "paths": [
+            "src/runtime/skills.ts",
+            "src/runtime/stats.ts"
+          ],
+          "note": "produced by skill-levels-xp-events"
+        },
+        {
+          "name": "the play command surface",
+          "paths": [
+            "src/runtime/command.ts"
+          ],
+          "note": "produced by the-command-set-lives-below-the-ui-layer"
+        },
+        {
+          "name": "multi-leg travel",
+          "paths": [
+            "src/runtime/journey.ts"
+          ],
+          "note": "produced by travel-reaches-anywhere-the-roads-do"
+        },
+        {
+          "name": "item cluster plane",
+          "paths": [
+            "src/runtime/clusterPlane.ts"
+          ],
+          "note": "produced by cluster-plane-runtime: the hex plane state model and every rule over it -- placement, determined rotation, one cluster to a hex with blocking, adjacency-gated allocation, and the c21 repair"
+        },
+        {
+          "name": "lazy item instancing",
+          "paths": [
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by cluster-plane-runtime: a stacked item leaves its stack and becomes an instanced-objects payload at the first thing recorded about it, and every verb that grows one routes through growItem"
+        },
+        {
+          "name": "instanced item equipping",
+          "paths": [
+            "src/runtime/equipment.ts"
+          ],
+          "note": "produced by a-grown-item-cannot-be-worn-equipped-holds-item-ids-and-stat: an equipped slot holds either spelling, an item id or a live instance id, and equip() reads the slot off the item behind either"
+        },
+        {
+          "name": "cluster effect scaling",
+          "paths": [
+            "src/runtime/clusterEffect.ts"
+          ],
+          "note": "produced by cluster-effect-fold: applying an effect to a placed cluster, the additive pool it joins, and the scaled payloads a grown item's plane hands statRange"
+        },
+        {
+          "name": "published item plane",
+          "paths": [
+            "src/runtime/planeReport.ts",
+            "src/runtime/planeReport.test.ts"
+          ],
+          "note": "produced by cluster-plane-view: a grown item's plane as data a driver renders \u2014 standings, effective payloads read through positionPayloads, and the hex/direction address each verb takes"
+        },
+        {
+          "name": "carried item count",
+          "paths": [
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by growing-an-item-revokes-every-has-gate-recipe-and-cost-that-"
+        },
+        {
+          "name": "combat hook firing",
+          "paths": [
+            "src/runtime/hooks.ts"
+          ],
+          "note": "produced by combat-hook-firing"
+        },
+        {
+          "name": "item stat contribution",
+          "paths": [
+            "src/runtime/itemContribution.ts",
+            "src/runtime/itemContribution.test.ts"
+          ],
+          "note": "produced by item-contribution-fold: what one carried item is worth per stat, its own tags and its plane's allocated payloads folded once and scaled by the cluster effects on them, plus scaledAmount, the one multiplication of a BonusAmount. planeReport publishes it and statRange spends it."
+        },
+        {
+          "name": "destroying a carried item",
+          "paths": [
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by destroy-a-carried-item: destroyItem is the one verb that ends a carried copy, and the only one that ends a plane"
+        },
+        {
+          "name": "the inventory screen",
+          "paths": [
+            "src/runtime/carriedScreen.ts",
+            "src/runtime/carriedScreen.test.ts"
+          ],
+          "note": "produced by inventory-frame"
+        },
+        {
+          "name": "the plane screen",
+          "paths": [
+            "src/runtime/planeScreen.ts",
+            "src/runtime/planeScreen.test.ts"
+          ],
+          "note": "produced by plane-frame: the item-plane ModalFrame member, its listed values as growth directives with what the frame holds prefilled, its refusal, and its return to the inventory frame"
+        },
+        {
+          "name": "the growth dispatch",
+          "paths": [
+            "src/runtime/growth.ts",
+            "src/runtime/growth.test.ts"
+          ],
+          "note": "produced by plane-frame: which of the four growth verbs a directive names, reached from a parsed directive or from a line through the one parser, below every caller"
+        },
+        {
+          "name": "the name of a carried thing",
+          "paths": [
+            "src/runtime/carriedName.ts"
+          ],
+          "note": "produced by one-name-for-a-carried-thing-on-every-surface: the one function every screen reads to name a stack or a grown copy (c16), and the seam reimplement-localization routes"
+        },
+        {
+          "name": "the carried and worn partition",
+          "paths": [
+            "src/runtime/equipment.ts",
+            "src/runtime/itemInstance.ts"
+          ],
+          "note": "produced by carried-and-worn-are-disjoint: equip() takes the copy off the carried side as it fills the slot and unequip() puts it back, and itemCopies is the one read that says where every copy of an item is - carriedCount for what an inventory row states, heldCount for what a gate asks"
+        },
+        {
+          "name": "buff engine",
+          "paths": [
+            "src/runtime/buffs.ts"
+          ],
+          "note": "produced by buffs-generalized"
+        },
+        {
+          "name": "localized text type",
+          "paths": [
+            "src/runtime/localized.ts"
+          ],
+          "note": "produced by reimplement-localization"
+        },
+        {
+          "name": "the translation-survival gate",
+          "paths": [
+            "src/runtime/translationSurvival.test.ts"
+          ],
+          "note": "produced by a-recording-survives-translation; c5's gate, replaying every shipped # test over that universe in both languages and naming the ones that do not survive yet"
+        },
+        {
+          "name": "the name of an instance with no key",
+          "paths": [
+            "src/runtime/carriedName.ts"
+          ],
+          "note": "produced by an-instance-is-named-from-its-template; where the played language has no title for the template, a grown copy is named <template>#<ordinal> rather than the template's key, because a locale addresses only a template"
+        },
+        {
+          "name": "a sentence the engine has not said yet",
+          "paths": [
+            "src/runtime/said.ts",
+            "src/runtime/sayFixture.ts"
+          ],
+          "note": "produced by a-plane-frame-carries-a-key-not-a-sentence; a Said is an engine key and the parameters it takes, unrendered, so a growth refusal can be stored, replayed and read in whichever language loads it"
+        },
+        {
+          "name": "the modal answer wire",
+          "paths": [
+            "src/runtime/modals.ts",
+            "src/runtime/carriedScreen.ts"
+          ],
+          "note": "produced by every-modal-answer-is-an-id; every ModalChoice.value is an id \u2014 a content id, an instance ordinal, a slot, a hexagon, a dialogue option's index within its node, or one the engine owns spelled as an id \u2014 and the words beside it are the pair's other half"
+        },
+        {
+          "name": "the derived brand rule",
+          "paths": [
+            "src/runtime/published.test.ts",
+            "src/runtime/localized.ts"
+          ],
+          "note": "produced by the-published-surface-declares-what-is-words-and-what-is-an-"
+        },
+        {
+          "name": "a command message says whose words it is",
+          "paths": [
+            "src/runtime/command.ts"
+          ],
+          "note": "produced by the-command-layer-and-the-plane-refuse-in-keys \u2014 CommandOutput's message arm is PlayerMessage (a Localized from a key, moving with the played language) or ToolMessage (the authoring tool's own English), discriminated at runtime by words: 'player' | 'tool'. PlayerMessage is a published.test.ts root, so the brand cannot be dropped silently."
+        },
+        {
+          "name": "a declared payload granted to a party",
+          "paths": [
+            "src/runtime/effects.ts",
+            "src/runtime/buffs.ts"
+          ],
+          "note": "produced by archetype-mods"
+        },
+        {
+          "name": "a passive on the modifier walk",
+          "paths": [
+            "src/runtime/stats.ts"
+          ],
+          "note": "produced by archetype-mods"
+        },
+        {
+          "name": "skill xp grants",
+          "paths": [
+            "src/runtime/skillGrants.ts"
+          ],
+          "note": "produced by xp-from-events: which skills a fired event trains, and what one moment is worth to each. The line itself is parsed in src/grammar/skillGrant.ts, which the DSL load path owns."
+        },
+        {
+          "name": "named slot store",
+          "paths": [
+            "src/runtime/store.ts",
+            "src/runtime/store.test.ts"
+          ],
+          "note": "produced by auto-save-export-and-load: read, write, remove and list named opaque text, stamped with when the slot was written, over a driver that supplies the bytes"
+        },
+        {
+          "name": "save slot policy",
+          "paths": [
+            "src/runtime/saveSlots.ts",
+            "src/runtime/saveSlots.test.ts"
+          ],
+          "note": "produced by auto-save-export-and-load: which slot a session writes, whether the autosave cadence has elapsed, the dev slot pair, and the report a surface renders instead of tracking its own copy"
+        },
+        {
+          "name": "the slot driver contract",
+          "paths": [
+            "src/runtime/storeContract.ts"
+          ],
+          "note": "produced by the-gui-authors-through-the-same-door: one set of cases every SlotDriver is held to"
+        },
+        {
+          "name": "the one door a universe is opened through",
+          "paths": [
+            "src/runtime/openUniverse.ts",
+            "src/runtime/openUniverseFixture.ts"
+          ],
+          "note": "produced by opening-a-universe-answers-rather-than-raises"
+        }
+      ]
+    },
+    {
+      "name": "Contribution system",
+      "paths": [
+        ".github/ISSUE_TEMPLATE/content-contribution.yml",
+        "scripts/consolidate.test.ts",
+        "scripts/consolidate.ts",
+        "scripts/lib/modportalCache.ts",
+        "scripts/modportal.test.ts",
+        "scripts/modportal.ts",
+        "scripts/publish-local-changes.test.ts",
+        "scripts/publish-local-changes.ts",
+        "scripts/squash-local-changes.test.ts",
+        "scripts/squash-local-changes.ts",
+        "src/content/contribution.test.ts",
+        "src/content/contribution.ts",
+        "src/content/issueForm.test.ts",
+        "src/content/localChanges.test.ts",
+        "src/content/localChanges.ts",
+        "src/content/modportal.test.ts",
+        "src/content/modportal.ts",
+        "src/content/registryDiff.test.ts",
+        "src/content/registryDiff.ts",
+        "src/content/roundTrip.test.ts",
+        "src/content/serialize.test.ts",
+        "src/content/serialize.ts"
+      ],
+      "lastAudit": "f8c8c8d",
+      "lastAuditDoc": "docs/audits/contribution-system-2026-07-30.md",
+      "note": "The 2026-07-30 pass verified R1, R3 and R4 closed \u2014 enable stages and proves before writing, sync admits incrementally so one bad mod cannot withhold the portal, extraction finds the shipped form's label by what it says \u2014 and found H1: bd77f26's canonicalisation serialises a module, and serializeRegistryModule filters by inModule, so every edit to base content and every # remove is silently dropped. A contribution that adds a path between two base locations is stored as a bare # info, loads clean, and is reported enabled. The fix is written in a sibling file: squash-local-changes.ts:125 does the same serialize-then-reload and refuses on registryDiff, and c9c88e1 promoted registryDiff into the content layer one commit before bd77f26 declined to use it. Its mediums are all 'the rule is enforced at one granularity and not the next one down': the publisher refuses a DSL heading in the notes but not an unbalanced fence (M2), two dsl fences under one heading resolve by position although the comment says two delimiters are refused (M3), and the manifest records what each contribution claimed as its base but not what the portal itself was proved against, so enable/sources can answer against a different universe than sync (M1). L1 is why H1 is green: every materialize test builds an additive contribution and asserts substrings. Earlier baseline is contribution-system-2026-07-29-reconciled.md. The editor and the validation/merge engine are still unbuilt.",
+      "concepts": [
+        {
+          "name": "local changes",
+          "paths": [
+            "scripts/publish-local-changes.ts",
+            "scripts/squash-local-changes.ts",
+            "src/content/localChanges.ts"
+          ],
+          "note": "Named 'Local Changes' eleven times across docs/audits/contribution-system-*.md."
+        },
+        {
+          "name": "mod portal",
+          "paths": [
+            "scripts/lib/modportalCache.ts",
+            "scripts/modportal.ts",
+            "src/content/modportal.ts"
+          ],
+          "note": "Named 'mod portal' in docs/audits/contribution-system-2026-07-30.md, whose H1 and M1 are both about it."
+        },
+        {
+          "name": "the serializer",
+          "paths": [
+            "src/content/serialize.ts"
+          ],
+          "note": "Named 'the serializer' six times in docs/audits/contribution-system-*.md; contribution-system-2026-07-30-h1 is about what it drops."
+        },
+        {
+          "name": "registry diff",
+          "paths": [
+            "src/content/registryDiff.ts"
+          ],
+          "note": "Named 'registry diff' by contribution-system-2026-07-30-h1, which points at it as the fix already written in a sibling file."
+        },
+        {
+          "name": "issue form",
+          "paths": [
+            ".github/ISSUE_TEMPLATE/content-contribution.yml"
+          ],
+          "note": "Named 'issue form' four times in docs/audits/contribution-system-*.md."
+        },
+        {
+          "name": "edit consolidation",
+          "paths": [
+            "scripts/consolidate.ts",
+            "scripts/consolidate.test.ts"
+          ],
+          "note": "produced by an-edit-goes-home-to-its-source-file"
+        }
+      ]
+    },
+    {
+      "name": "User interface",
+      "paths": [
+        "index.html",
+        "postcss.config.js",
+        "public/changelog.txt",
+        "public/favicon.svg",
+        "scripts/drift.test.ts",
+        "src/index.css",
+        "src/main.tsx",
+        "src/ui/App.tsx",
+        "src/ui/Console.tsx",
+        "src/ui/DevBanner.tsx",
+        "src/ui/DevOnly.tsx",
+        "src/ui/DragSheet.tsx",
+        "src/ui/EditPane.tsx",
+        "src/ui/FaultBanner.tsx",
+        "src/ui/FloatingText.tsx",
+        "src/ui/Home.tsx",
+        "src/ui/Ledger.tsx",
+        "src/ui/LiveSheet.tsx",
+        "src/ui/LocationBanner.tsx",
+        "src/ui/MapPane.tsx",
+        "src/ui/Meter.tsx",
+        "src/ui/ModalSheet.tsx",
+        "src/ui/Pager.tsx",
+        "src/ui/PlaneModal.tsx",
+        "src/ui/SettingsPane.tsx",
+        "src/ui/SkillsPane.tsx",
+        "src/ui/Splitter.tsx",
+        "src/ui/StatusBanner.tsx",
+        "src/ui/TabBar.tsx",
+        "src/ui/VStack.tsx",
+        "src/ui/XpOverlay.tsx",
+        "src/ui/agent/pageStorage.ts",
+        "src/ui/agent/surfaces.test.ts",
+        "src/ui/agent/surfaces.ts",
+        "src/ui/agent/testHarness.test.ts",
+        "src/ui/agent/testHarness.ts",
+        "src/ui/asking.test.ts",
+        "src/ui/asking.ts",
+        "src/ui/authoringSurface.test.ts",
+        "src/ui/authoringSurface.ts",
+        "src/ui/browserStore.test.ts",
+        "src/ui/browserStore.ts",
+        "src/ui/bundle.test.ts",
+        "src/ui/choices.test.ts",
+        "src/ui/choices.ts",
+        "src/ui/consoleLine.test.ts",
+        "src/ui/consoleLine.ts",
+        "src/ui/devMode.test.tsx",
+        "src/ui/devMode.ts",
+        "src/ui/discovery.test.ts",
+        "src/ui/discovery.ts",
+        "src/ui/dragSheet.test.ts",
+        "src/ui/driver.test.ts",
+        "src/ui/driver.ts",
+        "src/ui/editControls.test.ts",
+        "src/ui/editControls.ts",
+        "src/ui/editorMemory.test.tsx",
+        "src/ui/editorMemory.ts",
+        "src/ui/effects.test.tsx",
+        "src/ui/format.test.ts",
+        "src/ui/format.ts",
+        "src/ui/gesture.test.ts",
+        "src/ui/gesture.ts",
+        "src/ui/labels.ts",
+        "src/ui/layers.test.ts",
+        "src/ui/levelling.test.ts",
+        "src/ui/levelling.ts",
+        "src/ui/mapEdit.test.ts",
+        "src/ui/mapEdit.ts",
+        "src/ui/moments.test.ts",
+        "src/ui/nav.test.ts",
+        "src/ui/nav.ts",
+        "src/ui/pageZoom.test.ts",
+        "src/ui/pages.test.ts",
+        "src/ui/phone.test.tsx",
+        "src/ui/planeGraph.test.ts",
+        "src/ui/planeGraph.ts",
+        "src/ui/planeModal.test.tsx",
+        "src/ui/planePanel.ts",
+        "src/ui/published.test.ts",
+        "src/ui/render.test.tsx",
+        "src/ui/sheet.test.ts",
+        "src/ui/sheet.ts",
+        "src/ui/shell.test.tsx",
+        "src/ui/shippedContent.test.ts",
+        "src/ui/shippedContent.ts",
+        "src/ui/skillPanels.test.ts",
+        "src/ui/skillPanels.ts",
+        "src/ui/surface.test.ts",
+        "src/ui/testSurface.ts",
+        "src/ui/transcript.test.ts",
+        "src/ui/transcript.ts",
+        "src/ui/transient.test.ts",
+        "src/ui/transient.ts",
+        "src/ui/useTestSurface.ts",
+        "src/ui/viewport.test.ts",
+        "src/ui/viewport.ts",
+        "src/ui/words.ts",
+        "src/ui/xpNotes.test.ts",
+        "src/ui/xpNotes.ts",
+        "src/vite-env.d.ts",
+        "tailwind.config.js"
+      ],
+      "lastAudit": "f8c8c8d",
+      "lastAuditDoc": "docs/audits/user-interface-2026-07-30.md",
+      "note": "src/ui exists as of the-gui-shell-and-the-play-surface: a session container over the play surface, a chat-log Home with the action sheet, a five-tab nav, a modal rendered from the published option, and the shipped DSL bundled by the build. That branch's audit pass is recorded against the spec \u2014 `npm run tasks -- spec show gui-rebuild` \u2014 and the system sweep below predates it. The 2026-07-30 pass verified 060dd3e closed UI-H1 (the attic exclude), UI-M1 (270 to 70 lines of CSS), UI-M2 (public/content/) and UI-M3 (twelve unimported dependencies, reactflow included), and that 73a73f3's partition closed the 2026-07-28 orphan list. M1 is the one file of that sweep left standing: public/changelog.txt has no reader by the same grep that condemned public/content/, ships to itch.io and into the APK, and advertises the deleted legacy GUI's features under version 0.1.0. Of its lows, L1 (14 unused colour properties) and L2 (a Tailwind glob sweeping three layers below this one) are closed by that branch \u2014 the palette is answered by use and the glob is narrowed to src/ui and src/main.tsx; L3 (a theme-color hand-copied from the stylesheet) is still open.",
+      "concepts": [
+        {
+          "name": "the GUI's session container",
+          "paths": [
+            "src/ui/driver.ts"
+          ],
+          "note": "produced by the-gui-shell-and-the-play-surface; the one context every GUI dispatch goes through, and what gui-rebuild c1 replays against"
+        },
+        {
+          "name": "bundled shipped content",
+          "paths": [
+            "src/ui/shippedContent.ts"
+          ],
+          "note": "produced by the-gui-shell-and-the-play-surface for gui-rebuild c8; the route the DSL takes to the browser, in place of the public/content/ an audit deleted"
+        },
+        {
+          "name": "one channel every played moment is begun on",
+          "paths": [
+            "src/ui/transient.ts",
+            "src/ui/FloatingText.tsx"
+          ],
+          "note": "was \"transient text over the play surface\", produced by the-gui-shell-and-the-play-surface for gui-rebuild c10; widened by moments-play-through-one-channel for an-agent-needs-no-screenshot c3, which made a text note one kind of moment on it rather than the only thing it carries. Taken over rather than duplicated: a second channel beside it would be the report that one of them does two jobs"
+        },
+        {
+          "name": "the GUI shell",
+          "paths": [
+            "src/main.tsx",
+            "src/ui/App.tsx",
+            "src/ui/Home.tsx",
+            "src/ui/ModalSheet.tsx",
+            "src/ui/transcript.ts",
+            "src/ui/format.ts",
+            "src/ui/gesture.ts",
+            "src/ui/Pager.tsx",
+            "src/ui/Splitter.tsx",
+            "src/ui/choices.ts"
+          ],
+          "note": "produced by the-gui-shell-and-the-play-surface; the chat-log surface and the action sheet. The nav it shipped with was a five-tab one and is now a separate concept, because the-nav-becomes-three-vertical-layers-around-home made it a thing with its own model rather than a strip along the bottom of this one"
+        },
+        {
+          "name": "the map and the character sheet",
+          "paths": [
+            "src/ui/MapPane.tsx",
+            "src/ui/discovery.ts",
+            "src/ui/Ledger.tsx",
+            "src/ui/sheet.ts"
+          ],
+          "note": "produced by the-map-and-character-tabs for gui-rebuild c7 and rebuilt by the-map-draws-the-world-where-it-is: the discovered places drawn where they are, one z-plane at a time with whatever is adjacent to the player off it, panned within its own bounds, tapped to set off; and the four published dictionaries as rows. Both read the play surface only. the-view-publishes-the-map-a-driver-draws put the titles and the adjacency on the view, and the-view-publishes-where-a-place-is-and-whether-its-roads-ar put the coordinates, the passability and leadsTo there"
+        },
+        {
+          "name": "the GUI's real-time clock",
+          "paths": [
+            "src/ui/LiveSheet.tsx"
+          ],
+          "note": "produced by the-gui-runs-in-real-time for gui-rebuild c5; the run the command surface armed, rendered as the player sees it. The ticker that feeds it elapsed milliseconds moved down to src/runtime/command.ts on pass 3, so both drivers read one cadence and one elapsed rule rather than two that happen to agree"
+        },
+        {
+          "name": "the two-dimensional nav",
+          "paths": [
+            "src/ui/nav.ts",
+            "src/ui/VStack.tsx",
+            "src/ui/TabBar.tsx",
+            "src/ui/LocationBanner.tsx",
+            "src/ui/StatusBanner.tsx"
+          ],
+          "note": "produced by the-nav-becomes-three-vertical-layers-around-home for gui-rebuild c6: three vertical layers joined by two shared banners that are also the handles, and a bottom bar carrying the current layer's pages. the-map-and-character-tabs fills the Map and Character bodies it leaves empty"
+        },
+        {
+          "name": "browser test harness",
+          "paths": [
+            "src/ui/agent/surfaces.ts",
+            "src/main.tsx",
+            "src/ui/agent/testHarness.ts",
+            "src/ui/testSurface.ts",
+            "src/ui/useTestSurface.ts"
+          ],
+          "note": "produced by the-agent-harness-returns-to-the-gui and finished by gui-rebuild-clause-9; dev-only window.__test batching the session's own actions and, since c9, the actions each component registers for what only it holds \u2014 the nav's layer and page, the map's pan, zoom and floor \u2014 through the useTestSurface hook in src/ui/useTestSurface.ts, which takes the plain values a component already holds and builds the surface from them in src/ui/agent/surfaces.ts. Installed from the entry point behind the DEV constant a production build folds away, and both the registry and the builders are reached only by imports inside that branch, which is what keeps them out of the shipped bundle. Since an-agent-needs-no-screenshot c6 the set is derived from src/ui/agent/ and from nothing else, so bundle.test.ts and surface.test.ts read one directory rather than two predicates that disagreed"
+        },
+        {
+          "name": "the GUI",
+          "paths": [
+            "src/ui/App.tsx",
+            "src/ui/driver.ts",
+            "src/main.tsx"
+          ],
+          "note": "produced by gui-rebuild: the play surface's second driver, its session container and its shell"
+        },
+        {
+          "name": "the agent-only module boundary",
+          "paths": [
+            "src/ui/agent/testHarness.ts",
+            "src/ui/agent/surfaces.ts",
+            "src/ui/bundle.test.ts",
+            "src/ui/surface.test.ts"
+          ],
+          "note": "produced by agent-only-is-a-directory-both-guards-read for an-agent-needs-no-screenshot c6: src/ui/agent/ is the whole derivation of which modules exist only to be driven, read by bundle.test.ts against the release module graph and by surface.test.ts against the tree, so the two cannot disagree about what the set is"
+        },
+        {
+          "name": "a control declares which harness action drives it",
+          "paths": [
+            "src/ui/surface.test.ts"
+          ],
+          "note": "produced by a-control-names-its-driver-on-its-own-tag for an-agent-needs-no-screenshot c2: every button, input, select and textarea under src/ui carries data-drive naming the action, or none: with a reason; the rule reads the set off the tree with the control scanner and checks the name against what installTestHarness plus the surface builders actually offer"
+        },
+        {
+          "name": "the plane pane",
+          "paths": [
+            "src/ui/PlaneModal.tsx",
+            "src/ui/planeGraph.ts",
+            "src/ui/planePanel.ts"
+          ],
+          "note": "produced by gui-draws-the-focused-plane and taken over by the-plane-is-a-graph-the-player-drags: the focused plane, off PlayStatus.focus and never off a screen's name (c9/c10). It was rows under hexagon headings in src/ui/plane.ts and src/ui/PlanePane.tsx and is now the graph the report already publishes, drawn on the map's own sheet. Repointed rather than left beside a second concept: two surfaces drawing one report is two places to change when the report changes"
+        },
+        {
+          "name": "what leaving a screen answers",
+          "paths": [
+            "src/ui/asking.ts"
+          ],
+          "note": "produced by a-row-acts-in-one-click-and-clicking-away-leaves-the-screen for crafting-modal c19: one decision taken off published fields alone - what a gesture away from the open screen answers, which is the leaving value the Modal itself publishes and nothing where it publishes none. Both gestures the GUI shell has, a click on the sheet's ground and a move to another page, go through it. The concept was registered with a second half, the row that owned its own question, and revert-the-inline-row-question-and-five-bugs-the-author-foun struck it with c20: src/ui/Question.tsx went back inside ModalSheet, which is the one thing drawing an option again"
+        },
+        {
+          "name": "the shell's keyed vocabulary",
+          "paths": [
+            "src/ui/labels.ts",
+            "src/ui/words.ts"
+          ],
+          "note": "produced by both-drivers-read-their-own-words-from-the-localizer: the table of engine keys the shell names its own words by, and the one door a component reads them through"
+        },
+        {
+          "name": "a pannable sheet both the map and the plane are drawn on",
+          "paths": [
+            "src/ui/viewport.ts",
+            "src/ui/DragSheet.tsx"
+          ],
+          "note": "produced by the-plane-is-a-graph-the-player-drags: the pan, zoom and clamp arithmetic and the one component holding the gesture, moved out from under the map so the plane rides the same sheet"
+        },
+        {
+          "name": "the skills page and the experience a player sees arrive",
+          "paths": [
+            "src/ui/SkillsPane.tsx",
+            "src/ui/skillPanels.ts",
+            "src/ui/XpOverlay.tsx",
+            "src/ui/xpNotes.ts",
+            "src/ui/levelling.ts"
+          ],
+          "note": "produced by skills-are-a-page-and-xp-is-felt: the level inside its ring, and the lines that count up as experience and things arrive"
+        },
+        {
+          "name": "authoring surfaces",
+          "paths": [
+            "src/ui/authoringSurface.ts",
+            "src/ui/editControls.ts",
+            "src/ui/EditPane.tsx",
+            "src/ui/mapEdit.ts",
+            "src/ui/editorMemory.ts"
+          ],
+          "note": "produced by the-gui-authors-through-the-same-door"
+        },
+        {
+          "name": "localStorage persistence",
+          "paths": [
+            "src/ui/browserStore.ts",
+            "src/ui/agent/pageStorage.ts"
+          ],
+          "note": "produced by the-gui-authors-through-the-same-door"
+        },
+        {
+          "name": "the way out of a session that would not open",
+          "paths": [
+            "src/ui/FaultBanner.tsx"
+          ],
+          "note": "The banner reads the door's report: a problem names the modules it is against and remediesFor turns that list into the controls drawn. Rewritten by opening-a-universe-answers-rather-than-raises, which retired the design this used to describe - a fault carrying where in the code it came from."
+        },
+        {
+          "name": "the dev gate",
+          "paths": [
+            "src/ui/devMode.ts",
+            "src/ui/DevOnly.tsx",
+            "src/ui/SettingsPane.tsx"
+          ],
+          "note": "produced by the-shell-draws-what-the-session-answers: whether a power is dev-only is a mark on the command table, and DevOnly is the one place that mark is drawn"
+        },
+        {
+          "name": "the published view is never a maybe",
+          "paths": [
+            "src/ui/published.test.ts"
+          ],
+          "note": "produced by the-shell-is-never-handed-a-missing-view and re-cut after each of its two audits: what the driver publishes admits no absence, and nothing that drives it asks whether a view is there. The type half is a derivation and is closed. It folds '| null', '| undefined' and '?:' into one question over DriverSnapshot's, Driver's and TestState's own keys, looks through a method to what it yields, carries a positive control so a derivation that quietly stopped naming anything reddens the tsc already in CI, and names the fields that may honestly be absent in a pair of checks that cannot go stale in either direction. The scan half asks the type checker what a subject can hold and the grammar what counts as asking, over src/ui and scripts, so a renamed binding, a formatter-wrapped ternary and 'view?: PlayView' all fail where eight regexes over text let them through -- but it is a NAMED GRAMMAR AND NOT A CLOSED SET, and pass 2 measured twelve ordinary spellings outside it. Three shapes escape: a position where presence decides something that the grammar does not name (switch/case, '??=', a destructuring default, a default parameter, Object.is); the nothing put back where the walk does not descend (inside a type argument, a type-parameter constraint or a cast); and a runtime assertion such as expect(<it>).not.toBeNull(), whose subject is an argument to a library call. The edge is stated in full in src/ui/published.test.ts, where the scan half is introduced. Asking the checker about every condition position is the closed answer to the first shape and not to the third, and is deferred to its own spec. What keeps this a boundary rather than a hole is the type half: a nullable cannot be published at all, so what escapes is a reader writing a check that cannot be false, never a type that lies."
+        }
+      ]
+    },
+    {
+      "name": "Task system",
+      "paths": [
+        "scripts/lib/architecture.test.ts",
+        "scripts/lib/architecture.ts",
+        "scripts/lib/auditImport.test.ts",
+        "scripts/lib/auditImport.ts",
+        "scripts/lib/bytes.test.ts",
+        "scripts/lib/bytes.ts",
+        "scripts/lib/commitContract.test.ts",
+        "scripts/lib/commitContract.ts",
+        "scripts/lib/eventLog.test.ts",
+        "scripts/lib/eventLog.ts",
+        "scripts/lib/git.test.ts",
+        "scripts/lib/git.ts",
+        "scripts/lib/orderIndependence.test.ts",
+        "scripts/lib/planCheck.test.ts",
+        "scripts/lib/planCheck.ts",
+        "scripts/lib/producers.test.ts",
+        "scripts/lib/producers.ts",
+        "scripts/lib/realGitRepo.ts",
+        "scripts/lib/roadmap.test.ts",
+        "scripts/lib/roadmap.ts",
+        "scripts/lib/specDoc.test.ts",
+        "scripts/lib/specDoc.ts",
+        "scripts/lib/systems.test.ts",
+        "scripts/lib/systems.ts",
+        "scripts/lib/taskStore.test.ts",
+        "scripts/lib/taskStore.ts",
+        "scripts/tasks.test.ts",
+        "scripts/tasks.ts",
+        "scripts/tasks/architectureCmds.test.ts",
+        "scripts/tasks/architectureCmds.ts",
+        "scripts/tasks/audit.test.ts",
+        "scripts/tasks/audit.ts",
+        "scripts/tasks/auditPrompt.test.ts",
+        "scripts/tasks/auditPrompt.ts",
+        "scripts/tasks/briefLessons.test.ts",
+        "scripts/tasks/briefLessons.ts",
+        "scripts/tasks/cli.ts",
+        "scripts/tasks/cliFixtures.test.ts",
+        "scripts/tasks/cliFixtures.ts",
+        "scripts/tasks/commands.ts",
+        "scripts/tasks/context.ts",
+        "scripts/tasks/doctor.test.ts",
+        "scripts/tasks/doctor.ts",
+        "scripts/tasks/friction.test.ts",
+        "scripts/tasks/friction.ts",
+        "scripts/tasks/handoff.test.ts",
+        "scripts/tasks/handoff.ts",
+        "scripts/tasks/mergeReady.test.ts",
+        "scripts/tasks/mergeReady.ts",
+        "scripts/tasks/orchestratePrompt.test.ts",
+        "scripts/tasks/orchestratePrompt.ts",
+        "scripts/tasks/planPrompt.test.ts",
+        "scripts/tasks/planPrompt.ts",
+        "scripts/tasks/prompt.ts",
+        "scripts/tasks/realGitFixture.ts",
+        "scripts/tasks/records.test.ts",
+        "scripts/tasks/records.ts",
+        "scripts/tasks/render.test.ts",
+        "scripts/tasks/render.ts",
+        "scripts/tasks/resolveIds.ts",
+        "scripts/tasks/roadmapCmd.test.ts",
+        "scripts/tasks/roadmapCmd.ts",
+        "scripts/tasks/specCmds.test.ts",
+        "scripts/tasks/specCmds.ts",
+        "scripts/tasks/triage.test.ts",
+        "scripts/tasks/triage.ts",
+        "scripts/tasks/workPrompt.test.ts",
+        "scripts/tasks/workPrompt.ts"
+      ],
+      "lastAudit": "7508489ac3e345b32dbf51fe796bfabdf2e09e57",
+      "lastAuditDoc": "docs/audits/task-system-2026-08-08.md",
+      "note": "Frozen as of the 2026-08-08 sweep: no further work on the tracker until the MVP is complete. What remains is filed and ordered in docs/tasks.jsonl, and docs/audits/task-system-2026-08-08.md is the diagnosis it was frozen against.",
+      "concepts": [
+        {
+          "name": "atomic store write",
+          "paths": [
+            "scripts/lib/taskStore.ts"
+          ],
+          "note": "produced by store-writes-atomically: saveStore stages and renames, and refuses a write over a store that moved since this process read it"
+        },
+        {
+          "name": "blocking question",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/records.ts"
+          ],
+          "note": "produced by a-record-carries-its-fault-and-a-question-blocks-only-what-d"
+        },
+        {
+          "name": "clause deferral",
+          "paths": [
+            "scripts/lib/specDoc.ts",
+            "scripts/tasks/audit.ts",
+            "scripts/tasks/auditPrompt.ts"
+          ],
+          "note": "produced by a-clause-can-be-deferred-and-a-spec-can-carry-its-goal: its wording is the pass-file skeleton (auditPrompt.ts) and its behaviour is the interactive walk (audit.ts)"
+        },
+        {
+          "name": "decider routing",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/handoff.ts",
+            "scripts/tasks/workPrompt.ts"
+          ],
+          "note": "produced by a-question-s-decider-changes-what-the-tooling-does-with-it: awaitsADecider, and the three routes that read it \u2014 work-prompt briefs an answer instead of an implementation, the member queue does not dispatch one, and start refuses to claim one"
+        },
+        {
+          "name": "decline trigger",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/records.ts"
+          ],
+          "note": "produced by decline-trigger-is-write-only: Task.trigger plus tasks list --triggered, a queue for a decline's revisit condition"
+        },
+        {
+          "name": "derived architecture view",
+          "paths": [
+            "scripts/lib/architecture.ts"
+          ],
+          "note": "Produced by arch-derived-view, closed; the claim is recorded on that task."
+        },
+        {
+          "name": "file-level system ownership",
+          "paths": [
+            "scripts/lib/systems.ts",
+            "scripts/lib/systems.test.ts"
+          ],
+          "note": "produced by every-system-owns-its-files-by-name: System.paths is exact files and checkManifest refuses a directory there, System.covers holds the directories that widen an audit window and confer nothing, and orphanedFiles reads ownership only"
+        },
+        {
+          "name": "friction recurrence",
+          "paths": [
+            "scripts/lib/eventLog.ts",
+            "scripts/tasks/records.ts"
+          ],
+          "note": "produced by a-recurrence-is-appended-and-filing-shows-what-already-claim: the recur op and tasks recur, an occurrence appended against a filed friction with its own note; the count is read back off the occurrences and nothing is stored"
+        },
+        {
+          "name": "generated auditor brief",
+          "paths": [
+            "scripts/tasks/auditPrompt.ts"
+          ],
+          "note": "produced by brief-arrives-with-answers"
+        },
+        {
+          "name": "generated planner brief",
+          "paths": [
+            "scripts/tasks/planPrompt.ts"
+          ],
+          "note": "produced by plan-prompt-brief: symmetric with the generated worker brief and auditor brief, tasks plan-prompt runs step 1's survey (tasks where) over named paths instead of listing commands"
+        },
+        {
+          "name": "git facts as data",
+          "paths": [
+            "scripts/lib/git.ts"
+          ],
+          "note": "produced by the-git-seam-is-the-only-way-the-task-system-reads-git"
+        },
+        {
+          "name": "lesson handle",
+          "paths": [
+            "scripts/tasks/briefLessons.ts"
+          ],
+          "note": "produced by a-lesson-has-a-handle-that-survives-rewording-it"
+        },
+        {
+          "name": "mergeable task store",
+          "paths": [
+            "scripts/lib/taskStore.ts"
+          ],
+          "note": "produced by the-task-store-survives-parallel-branches: id-sorted saveStore plus a seq field carrying creation order, so parallel branches merge per-record instead of colliding on tail-append"
+        },
+        {
+          "name": "non-interactive triage",
+          "paths": [
+            "scripts/tasks/commands.ts",
+            "scripts/tasks/records.ts",
+            "scripts/tasks/triage.ts"
+          ],
+          "note": "produced by every-triage-action-has-a-non-interactive-form: tasks defer/redirect/ask, and the TRIAGE_ACTIONS table cmdTriage dispatches from"
+        },
+        {
+          "name": "orchestrator brief",
+          "paths": [
+            "scripts/tasks/briefLessons.ts",
+            "scripts/tasks/orchestratePrompt.ts"
+          ],
+          "note": "produced by briefs-carry-the-lessons"
+        },
+        {
+          "name": "plan report",
+          "paths": [
+            "scripts/lib/planCheck.ts"
+          ],
+          "note": "Produced by coord-plan, closed; the claim is recorded on that task."
+        },
+        {
+          "name": "prior art by path",
+          "paths": [
+            "scripts/lib/producers.ts"
+          ],
+          "note": "produced by prior-art-by-path; the path-keyed index, distinct from the name-keyed produces query sharing this file"
+        },
+        {
+          "name": "process friction channel",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/friction.ts"
+          ],
+          "note": "produced by one-query-over-the-channel-and-the-second-place-retired: tasks friction over the store's fault and breaches fields and the log's recur and checked events, plus tasks checked; .planning/agent-feedback/tool-friction.md is retired and no generated brief names a second place"
+        },
+        {
+          "name": "proof target resolution",
+          "paths": [
+            "scripts/tasks/auditPrompt.ts"
+          ],
+          "note": "produced by targets-resolve-across-files"
+        },
+        {
+          "name": "record fault",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/audit.ts",
+            "scripts/tasks/records.ts"
+          ],
+          "note": "produced by a-record-carries-its-fault-and-a-question-blocks-only-what-d"
+        },
+        {
+          "name": "roadmap view",
+          "paths": [
+            "scripts/lib/roadmap.ts"
+          ],
+          "note": "produced by roadmap-view; the deferred-backlog frontier tasks next cannot answer"
+        },
+        {
+          "name": "ruling query",
+          "paths": [
+            "scripts/lib/producers.ts",
+            "scripts/tasks/architectureCmds.ts"
+          ],
+          "note": "produced by survey-cannot-see-rulings: reads a closed record's reason and event-log decisions for the queried path or its basename, distinct from the writes/files claim query"
+        },
+        {
+          "name": "spec documents",
+          "paths": [
+            "scripts/lib/specDoc.ts"
+          ],
+          "note": "The clause and audit-pass machinery; testing-procedure-2026-07-30-pass2-m3 is about its writers."
+        },
+        {
+          "name": "spec ownership inference",
+          "paths": [
+            "scripts/tasks/mergeReady.ts"
+          ],
+          "note": "produced by a-branch-knows-which-spec-it-owes"
+        },
+        {
+          "name": "store removal record",
+          "paths": [
+            "scripts/lib/eventLog.ts",
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/context.ts",
+            "scripts/tasks/doctor.ts",
+            "scripts/tasks/records.ts"
+          ],
+          "note": "produced by a-record-cannot-leave-the-store-unrecorded: the remove op and tasks remove, saveStore refusing an undeclared drop, and reconcile over the log against the store with the coverage it does not have"
+        },
+        {
+          "name": "the commit contract",
+          "paths": [
+            "scripts/lib/commitContract.ts"
+          ],
+          "note": "Named 'the commit contract' three times across docs/audits/testing-procedure-*.md."
+        },
+        {
+          "name": "the event log",
+          "paths": [
+            "scripts/lib/eventLog.ts"
+          ],
+          "note": "Named 'the event log' three times across docs/audits/testing-procedure-*.md."
+        },
+        {
+          "name": "the systems manifest",
+          "paths": [
+            "scripts/lib/systems.ts"
+          ],
+          "note": "testing-procedure-2026-07-30-pass2-m6 is about this concept having had two readers and two type declarations; arch-ownership-seam produced its ownership rule and concept schema here."
+        },
+        {
+          "name": "the task record",
+          "paths": [
+            "scripts/lib/taskStore.ts"
+          ],
+          "note": "coord-fields produced 'writes grant' and 'produces claim', both fields of the record this file defines."
+        },
+        {
+          "name": "whole-store produces query",
+          "paths": [
+            "scripts/lib/producers.ts"
+          ],
+          "note": "Produced by arch-query-commands; the claim is recorded on that task."
+        }
+      ]
+    },
+    {
+      "name": "Testing procedure",
+      "paths": [
+        ".claude/hooks/block-main-git-writes.sh",
+        ".claude/hooks/commit-msg",
+        ".claude/hooks/lib/git-write-dirs.js",
+        ".claude/hooks/lib/hook-field.js",
+        ".claude/settings.json",
+        ".github/workflows/test.yml",
+        "scripts/audit-status.ts",
+        "scripts/exhaustive.test.ts",
+        "scripts/inspect.test.ts",
+        "scripts/inspect.ts",
+        "scripts/layer-check.ts",
+        "scripts/lib/acyclic.test.ts",
+        "scripts/lib/acyclic.ts",
+        "scripts/lib/exhaustive.ts",
+        "scripts/lib/layers.test.ts",
+        "scripts/lib/layers.ts",
+        "scripts/lib/sectionKind.ts",
+        "scripts/lib/sessionTiming.test.ts",
+        "scripts/lib/sessionTiming.ts",
+        "scripts/lib/shippedProgram.ts",
+        "scripts/lib/slotFile.test.ts",
+        "scripts/lib/slotFile.ts",
+        "scripts/lib/sourceFiles.ts",
+        "scripts/lib/stripComments.test.ts",
+        "scripts/lib/stripComments.ts",
+        "scripts/lib/tsxCli.ts",
+        "scripts/migrate-saves.test.ts",
+        "scripts/migrate-saves.ts",
+        "scripts/mutate.test.ts",
+        "scripts/mutate.ts",
+        "scripts/planeView.test.ts",
+        "scripts/planeView.ts",
+        "scripts/play-cli.test.ts",
+        "scripts/play-cli.ts",
+        "scripts/printedWords.test.ts",
+        "scripts/probe.test.ts",
+        "scripts/probe.ts",
+        "scripts/section-kinds.ts",
+        "scripts/sectionKind.test.ts",
+        "scripts/session-timing.test.ts",
+        "scripts/session-timing.ts"
+      ],
+      "lastAudit": "4631baa",
+      "lastAuditDoc": "docs/audits/testing-procedure-2026-07-30.md",
+      "note": "The 2026-07-30 pass verified the 2026-07-28 closures and found H1: /test runs a # test against the LIVE session state, so it rewinds the player and makes /create-valid-test emit a test that fails on its own first replay \u2014 reproduced end to end. Its mediums are one theme, gates claiming more than they check: an unresolvable lastAudit aborts the whole ledger before any verdict, the doc gate or the partition check, and 7676c09's hook reads that crash as silence (M1); layer-check never reads any file directly under src/, in either direction (M2); /create-test is the one authoring command that bypasses the /dsl machinery that would validate and persist it (M3). Owns .claude/hooks (2026-07-28 M5). Its scripts coverage names every file it implements, one by one: the scripts/lib directory grant that used to double-charge the contribution system's modportalCache.ts is gone, which is L4 closed. Eleven of this window's sixteen commits reached it only through scripts/play-cli.ts, which is a downstream consumer of every layer beneath it; the coverage is still earned, since nobody else audits that file and H1 and M3 are both in it. runTest and # test parsing live under src/ and are covered by the DSL load path and Runtime as well. Since then this system gained scripts/probe.ts and scripts/mutate.ts, audited three times at branch level (not a system sweep, so lastAudit is unmoved): testing-procedure-2026-08-03-probe-tooling.md, -pass2.md and -pass3.md. Each pass found HIGHs in the code the previous pass's fixes had just written, and the recurring shape was a decision placed where no test could reach it \u2014 inside main(), or behind a test that asserted on a callback's output rather than its argument. Nine pass-3 mediums and lows are open and unreviewed; the branch merged with only its HIGHs closed, by decision.",
+      "concepts": [
+        {
+          "name": "the layer rule",
+          "paths": [
+            "scripts/layer-check.ts",
+            "scripts/lib/acyclic.ts",
+            "scripts/lib/layers.ts"
+          ],
+          "note": "testing-procedure-2026-07-30-m2 is about what layer-check does and does not read. runtime-has-an-order-because-it-has-no-cycles added the acyclicity half, as the same gate deriving its own subjects."
+        },
+        {
+          "name": "the play CLI",
+          "paths": [
+            "scripts/play-cli.ts"
+          ],
+          "note": "testing-procedure-2026-07-30-h1 is about /test running against live session state in this file."
+        },
+        {
+          "name": "repo-resolved expression evaluation",
+          "paths": [
+            "scripts/inspect.ts"
+          ],
+          "note": "produced by repo-resolved-evaluation; what npm run probe is for the DSL load path, for everything else"
+        },
+        {
+          "name": "save fixture migration",
+          "paths": [
+            "scripts/migrate-saves.ts"
+          ],
+          "note": "produced by save-fixture-migration; the one-shot shape rewrite of every # save fixture at a SAVE_VERSION bump, retired by save-migration-system's ladder"
+        },
+        {
+          "name": "cluster plane view",
+          "paths": [
+            "scripts/planeView.ts",
+            "scripts/planeView.test.ts"
+          ],
+          "note": "produced by cluster-plane-view: the /inventory rendering of a grown item's plane, its standings and the verb line each row invites"
+        },
+        {
+          "name": "file-backed slot driver",
+          "paths": [
+            "scripts/lib/slotFile.ts",
+            "scripts/lib/slotFile.test.ts"
+          ],
+          "note": "produced by auto-save-export-and-load: one file per slot under one directory, which is the store play-cli supplies to the command table; the slot-name guard is what its test proves"
+        },
+        {
+          "name": "import acyclicity",
+          "paths": [
+            "scripts/lib/acyclic.ts",
+            "scripts/lib/layers.ts"
+          ],
+          "note": "produced by src-holds-no-import-cycle-and-layer-check-keeps-it-that-way"
+        }
+      ]
+    },
+    {
+      "name": "Build & deployment",
+      "paths": [
+        ".gitattributes",
+        ".github/workflows/publish.yml",
+        "android/.gitignore",
+        "android/app/.gitignore",
+        "android/app/build.gradle",
+        "android/app/capacitor.build.gradle",
+        "android/app/proguard-rules.pro",
+        "android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java",
+        "android/app/src/main/AndroidManifest.xml",
+        "android/app/src/main/java/org/universalis/rpg/MainActivity.java",
+        "android/app/src/main/res/drawable-land-hdpi/splash.png",
+        "android/app/src/main/res/drawable-land-mdpi/splash.png",
+        "android/app/src/main/res/drawable-land-xhdpi/splash.png",
+        "android/app/src/main/res/drawable-land-xxhdpi/splash.png",
+        "android/app/src/main/res/drawable-land-xxxhdpi/splash.png",
+        "android/app/src/main/res/drawable-port-hdpi/splash.png",
+        "android/app/src/main/res/drawable-port-mdpi/splash.png",
+        "android/app/src/main/res/drawable-port-xhdpi/splash.png",
+        "android/app/src/main/res/drawable-port-xxhdpi/splash.png",
+        "android/app/src/main/res/drawable-port-xxxhdpi/splash.png",
+        "android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml",
+        "android/app/src/main/res/drawable/ic_launcher_background.xml",
+        "android/app/src/main/res/drawable/splash.png",
+        "android/app/src/main/res/layout/activity_main.xml",
+        "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+        "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+        "android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+        "android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png",
+        "android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png",
+        "android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+        "android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
+        "android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png",
+        "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+        "android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png",
+        "android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png",
+        "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+        "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png",
+        "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png",
+        "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+        "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+        "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png",
+        "android/app/src/main/res/values/ic_launcher_background.xml",
+        "android/app/src/main/res/values/strings.xml",
+        "android/app/src/main/res/values/styles.xml",
+        "android/app/src/main/res/xml/file_paths.xml",
+        "android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java",
+        "android/build.gradle",
+        "android/capacitor.settings.gradle",
+        "android/gradle.properties",
+        "android/gradle/wrapper/gradle-wrapper.jar",
+        "android/gradle/wrapper/gradle-wrapper.properties",
+        "android/gradlew",
+        "android/gradlew.bat",
+        "android/settings.gradle",
+        "android/variables.gradle",
+        "capacitor.config.ts",
+        "run-web.cmd",
+        "vite.config.ts"
+      ],
+      "lastAudit": "f8c8c8d",
+      "lastAuditDoc": "docs/audits/build-deployment-2026-07-30.md",
+      "note": "The 2026-07-30 pass verified BD-H1 (base is './' and the built HTML proves it), BD-M2/M3 (every action pinned by commit, least-privilege permissions), BD-L1 (versionCode/versionName derived from package.json) and BD-L3/L4 closed, and found H1: capacitor.config.ts reads NODE_ENV, npm run build sets it inside the Vite process only, and cap sync is the next process in the chain \u2014 so the signed release APK is built in dev configuration, pointing its WebView at http://10.0.2.2:5173 with cleartext on. Reproduced under the exact environment publish.yml provides. BD-H2 stays open and wants the same release-readiness gate. Mediums: the two publish jobs have no needs: between them so a tag can half-publish, and neither runs the test suite, because test.yml fires on branches and pull_request and a tag push matches neither; and pinning stops at the actions, not at what Gradle resolves in the job holding SIGNING_KEY. L1 records that .gitattributes and test.yml justify each other with a claim the same commit made false \u2014 with eol=lf in the index both runners check out identical bytes, and the real CRLF guard is integration.test.ts. M1 of 2026-07-28 stays fixed: package.json and tsconfig.json are not members, which is why this window is two commits rather than twelve.",
+      "concepts": []
+    }
+  ]
+}
