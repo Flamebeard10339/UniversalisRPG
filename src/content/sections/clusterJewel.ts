@@ -111,4 +111,10 @@ export const clusterJewel = section<ClusterJewel>()({
       assignment[1] = visit('passive', assignment[1], `${where} passives:`);
     }
   },
+  // A position whose passive is gone is an empty position, not a broken jewel.
+  prune: (value, at, where) => {
+    const filled = Object.entries(value.positions).filter(([, passiveId]) => !at.gone('passive', passiveId, `${where} passives:`));
+    if (filled.length === Object.keys(value.positions).length) return value;
+    return { ...value, positions: Object.fromEntries(filled.map(([position, passiveId]) => [Number(position), passiveId])) };
+  },
 });

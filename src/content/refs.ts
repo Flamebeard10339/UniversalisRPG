@@ -17,6 +17,16 @@ export type ReferenceKind = string;
 // key; validation hands it back and throws if it names nothing.
 export type Visit = (kind: ReferenceKind, id: string, where: string) => string;
 
+// What a kind's `prune` may ask about the universe that survived a module going
+// absent. The two questions differ in what they cost: `intact` runs a walk and
+// reports whether every reference it made is still loaded, `gone` answers about
+// one named reference without walking anything.
+export interface Pruning {
+  intact(walk: () => void): boolean;
+  gone(kind: ReferenceKind, id: string, where: string): boolean;
+  visit: Visit;
+}
+
 export type Loose = Record<string, unknown>;
 
 // Hydrated fields are defined without a setter, so an unchanged id must not be
@@ -96,10 +106,6 @@ export function condition(value: Condition | undefined, where: string, visit: Vi
       void unreached;
     }
   }
-}
-
-export function visitResults(list: ActionResult[] | undefined, where: string, visit: Visit): void {
-  results(list, where, visit);
 }
 
 export function results(list: ActionResult[] | undefined, where: string, visit: Visit): void {
@@ -222,8 +228,13 @@ export function actions(list: unknown, where: string, visit: Visit): void {
   for (const action of listMembers<Action>(list)) visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit);
 }
 
-// Every place the grammar can carry a reference to a named object, in one
-// traversal, so that resolving one and validating one cannot drift apart. Taken
-// as the discriminated union rather than as a kind and a value, so that a kind
-// this walk has no answer for is a compile error and not a section whose
-// references nobody looked at.
+// What a carrier keeps of the three things more than one kind carries. Each
+// prunes at the granularity the grammar gives it: an action and a clause are
+// each one line an author wrote, and a hook is a result list rather than a
+// labelled block, so a dangling reference inside one costs the whole hook.
+export const pruneActions = (list: readonly Action[], where: string, at: Pruning): Action[] =>
+  list.filter((action) => at.intact(() => visitAction(action, `${where} action ${JSON.stringify(action.label)}`, at.visit)));
+
+export const pruneTags = (list: readonly TagClause[], where: string, at: Pruning): TagClause[] => list.filter((tag) => at.intact(() => visitTags([tag], where, at.visit)));
+
+export const pruneHook = (hook: ActionResult[], where: string, at: Pruning): ActionResult[] => (at.intact(() => results(hook, where, at.visit)) ? hook : []);

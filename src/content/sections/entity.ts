@@ -7,7 +7,7 @@ import { DslError, Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
 import { EntryBody, listMembers } from '../../grammar/section';
 import { duration, id, text } from '../../grammar/values';
-import { condition as visitCondition, hooks, put, results, strings, visitAction, type Loose, type Visit } from '../refs';
+import { condition as visitCondition, hooks, pruneHook, put, results, strings, visitAction, type Loose, type Pruning, type Visit } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -183,7 +183,36 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     blocks(held.blocks, where, visit);
     hooks(held, where, visit);
   },
+  // A sheet is a roster of independent lines, so an entity outlives any one of
+  // them going: the rat that can no longer swing still stands there.
+  prune: (value, at, where) => {
+    const stats = Object.fromEntries(Object.entries(value.stats).filter(([statId]) => !at.gone('stat', statId, `${where} stats:`)));
+    const blocks = pruneBlocks(value.blocks, where, at);
+    const uses = value.uses.filter((used) => !at.gone('action', used, `${where} uses:`));
+    const faction = value.faction.filter((named) => !at.gone('faction', named, `${where} faction:`));
+    const allies = value.allies.filter((entry) => !at.gone('entity', entry.entity, `${where} allies:`));
+    const passives = value.passives.filter((named) => !at.gone('passive', named, `${where} passives:`));
+    const skills = value.skills.filter((named) => !at.gone('skill', named, `${where} skills:`));
+    const onHit = pruneHook(value.onHit, `${where} on hit:`, at);
+    const whenHit = pruneHook(value.whenHit, `${where} when hit:`, at);
+    const kept =
+      Object.keys(stats).length === Object.keys(value.stats).length &&
+      blocks.length === value.blocks.length &&
+      uses.length === value.uses.length &&
+      faction.length === value.faction.length &&
+      allies.length === value.allies.length &&
+      passives.length === value.passives.length &&
+      skills.length === value.skills.length &&
+      onHit === value.onHit &&
+      whenHit === value.whenHit;
+    return kept ? value : { ...value, stats, blocks, uses, faction, allies, passives, skills, onHit, whenHit };
+  },
 });
+
+// A handler's event name is a reference the label carries, so a block survives
+// only if what it names survives — the same rule its results already follow.
+const pruneBlocks = (list: readonly EntityBlock[], where: string, at: Pruning): EntityBlock[] =>
+  list.filter((block) => at.intact(() => (isHandlerBlock(block) ? at.visit('event', block.event, `${where} ${block.label}:`) : visitAction(block, `${where} action ${JSON.stringify(block.label)}`, at.visit))));
 
 // An entity's labelled blocks. A handler's event name is the reference its label
 // carries, and it is rewritten in place so `on death:` resolves the way `uses:`

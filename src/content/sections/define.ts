@@ -2,7 +2,7 @@ import { actionLines } from '../../grammar/action';
 import { DslError } from '../../grammar/parser';
 import { RawSection, sectionParser } from '../../grammar/structure';
 import { AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, parseAnySection, printSection } from '../../grammar/section';
-import { Visit } from '../refs';
+import { Pruning, Visit } from '../refs';
 import { mergeFields } from '../merge';
 
 export type { PrintContext };
@@ -44,6 +44,9 @@ export interface Section<V extends { id: string } = { id: string }, M extends Re
   build(authored: object, context: HydrateContext): V;
   print(value: V, context: PrintContext): readonly string[];
   visit(value: V, where: string, visit: Visit): void;
+  // What is left of a value once a reference it makes has gone: `null` drops the
+  // section, the same object means untouched, a new object replaces it.
+  prune(value: V, at: Pruning, where: string): V | null;
 }
 
 interface Common<V extends { id: string }> {
@@ -55,6 +58,9 @@ interface Common<V extends { id: string }> {
   // kind's own invariants live beside its fields rather than in the loader.
   validate?: (value: V) => string | undefined;
   visit?: (value: V, where: string, visit: Visit) => void;
+  // How much of this kind a dangling reference costs. Declared only by the kinds
+  // that survive one; saying nothing means the section goes with it.
+  prune?: (value: V, at: Pruning, where: string) => V | null;
   merge?: (into: object | undefined, from: object) => object;
   print?: (value: V, context: PrintContext) => readonly string[];
 }
@@ -93,7 +99,8 @@ export const section =
       maps?: Lands<V, Filled>;
     },
   ): Section<V, Filled> => {
-    const { kind, ids, map, maps, nestsActions = false, text = [], validate, visit, merge, print } = spec;
+    const { kind, ids, map, maps, nestsActions = false, text = [], validate, visit, merge, print, prune } = spec;
+    const walk = visit ?? ((): void => {});
     const schema = 'fields' in spec ? ({ ...spec, kind } as unknown as AnySchema) : undefined;
     if (nestsActions) ACTION_OWNERS.add(kind);
   // A kind declares its fields or it brings a parser; neither is a kind that
@@ -118,6 +125,7 @@ export const section =
       merge: merge ?? ((into, from) => (schema ? mergeFields((into as Record<string, unknown>) ?? { id: (from as V).id }, from as Record<string, unknown>, schema) : (into ?? from))),
       build: schema ? (authored, context) => built(hydrateSection(authored as Authored<V>, schema as unknown as SectionSchema<V, F, E>, context) as V) : (authored) => built(authored as V),
       print: print ?? (schema ? (value, context) => printSection(value, schema, context, actionLines) : () => notContent(kind)),
-      visit: visit ?? (() => {}),
+      visit: walk,
+      prune: prune ?? ((value, at, where) => (at.intact(() => walk(value, where, at.visit)) ? value : null)),
     } as Section<V, Filled>;
   };

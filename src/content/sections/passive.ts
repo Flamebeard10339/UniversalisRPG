@@ -3,7 +3,7 @@ import { list } from '../../grammar/list';
 import { Range } from '../../grammar/range';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { text } from '../../grammar/values';
-import { hooks, visitTags, type Loose } from '../refs';
+import { hooks, pruneHook, pruneTags, visitTags, type Loose } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -48,5 +48,13 @@ export const passive = section<Passive>()({
     const held = value as unknown as Loose;
     visitTags(held.tags, where, visit);
     hooks(held, where, visit);
+  },
+  // A passive is a carrier like an item is: what a jewel placed it for survives
+  // a payload whose stat went.
+  prune: (value, at, where) => {
+    const tags = pruneTags(value.tags, where, at);
+    const onHit = pruneHook(value.onHit, `${where} on hit:`, at);
+    const whenHit = pruneHook(value.whenHit, `${where} when hit:`, at);
+    return tags.length === value.tags.length && onHit === value.onHit && whenHit === value.whenHit ? value : { ...value, tags, onHit, whenHit };
   },
 });

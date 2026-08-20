@@ -4,7 +4,7 @@ import { list } from '../../grammar/list';
 import { Cursor, DslError, Parser } from '../../grammar/parser';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { id, number, text } from '../../grammar/values';
-import { actions, hooks, put, visitTags, type Loose } from '../refs';
+import { actions, hooks, pruneActions, pruneHook, pruneTags, put, visitTags, type Loose } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -99,5 +99,14 @@ export const item = section<Item, never, 'actions'>()({
     put(held, 'clusterJewel', 'cluster-jewel', `${where} cluster-jewel:`, visit);
     put(held, 'originCluster', 'cluster-jewel', `${where} origin-cluster:`, visit);
     if (held.clusterEffect) put(held.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
+  },
+  // An item is a carrier: the thing stays in the bag when a clause, an action or
+  // a hook it wrote names something that went.
+  prune: (value, at, where) => {
+    const tags = pruneTags(value.tags, where, at);
+    const kept = pruneActions(value.actions, where, at);
+    const onHit = pruneHook(value.onHit, `${where} on hit:`, at);
+    const whenHit = pruneHook(value.whenHit, `${where} when hit:`, at);
+    return tags.length === value.tags.length && kept.length === value.actions.length && onHit === value.onHit && whenHit === value.whenHit ? value : { ...value, tags, actions: kept, onHit, whenHit };
   },
 });

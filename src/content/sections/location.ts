@@ -4,7 +4,7 @@ import { list } from '../../grammar/list';
 import { DslError, Parser } from '../../grammar/parser';
 import { AnySchema, PrintContext, SectionSchema, listMembers, printSection } from '../../grammar/section';
 import { id, number, text } from '../../grammar/values';
-import { actions, condition as visitCondition, put, type Loose } from '../refs';
+import { actions, condition as visitCondition, pruneActions, put, type Loose } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -189,5 +189,14 @@ export const location = section<Location, 'starting', 'actions'>()({
     }
     if (held.relative) put(held.relative as Relative, 'of', 'location', `${where} relative`, visit);
     actions(held.actions, where, visit);
+  },
+  // An occupant, an edge or an action that went is one line off the map; a
+  // `relative:` placement is the one reference the place itself stands on.
+  prune: (value, at, where) => {
+    if (value.relative && at.gone('location', value.relative.of, `${where} relative`)) return null;
+    const entities = value.entities.filter((entry) => !at.gone('entity', entry.entity, `${where} entities:`));
+    const adjacent = value.adjacent.filter((edge) => !at.gone('location', edge.target, `${where} adjacent:`) && at.intact(() => visitCondition(edge.condition, `${where} adjacent: ${edge.target} while`, at.visit)));
+    const kept = pruneActions(value.actions, where, at);
+    return entities.length === value.entities.length && adjacent.length === value.adjacent.length && kept.length === value.actions.length ? value : { ...value, entities, adjacent, actions: kept };
   },
 });

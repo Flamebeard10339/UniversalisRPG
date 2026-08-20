@@ -5,19 +5,19 @@ import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
 import { actionAddress, actionTextKey, actionTextOwner } from './sections/action';
-import { Entity, EntityBlock, Handler, isHandlerBlock } from './sections/entity';
+import { Entity, Handler, isHandlerBlock } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
 import { actionSlugProblem, textFieldsOf } from './sections';
 import { recursivelyResolveRelativeCoordinates } from './sections/location';
-import { type Maps, buildSection, sectionFor, contentSectionMaps, isActionOwnerKind, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind, visitSection } from './sections';
+import { type Maps, buildSection, sectionFor, contentSectionMaps, isActionOwnerKind, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind } from './sections';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
 import { ACTION_MEMBER, memberKey, Namespace, } from './namespace';
 import { isNamespacedKind } from './sections';
 import { emptyMaps, mapOf, everyActionTable, ModuleDiagnostic, ModuleLoadStage, ModuleStatus, PLAYER_ENTITY, Registry, UniverseLoadResult, WORLD_BIT } from './registry';
 import { registryCapabilities, registrySlots, validateDialogueReferences, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
-import { ReferenceKind, Visit, visitAction, visitResults, visitTags } from './refs';
+import { Pruning, ReferenceKind, Visit } from './refs';
 import { Removal } from './sections/remove';
 import { actionAddresses, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
@@ -322,27 +322,13 @@ function validateActionTable(kind: string, id: string, owner: ActionOwner): void
   }
 }
 
-function pruneActions(actions: Action[], where: string, visit: Visit): Action[] {
-  return actions.filter((action) => referencesLoaded(() => visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit)));
-}
-
-// A hook is a result list rather than a labelled block, so a dangling reference
-// inside one costs the whole hook — the verdict pruneBlocks reaches per block.
-function pruneHook(hook: ActionResult[], where: string, visit: Visit): ActionResult[] {
-  return referencesLoaded(() => visitResults(hook, where, visit)) ? hook : [];
-}
-
-// A handler's event name is a reference the label carries, so a block survives
-// only if what it names survives — the same rule its results already follow.
-function pruneBlocks(blocks: EntityBlock[], where: string, visit: Visit): EntityBlock[] {
-  return blocks.filter((block) => referencesLoaded(() => (isHandlerBlock(block) ? visit('event', block.event, `${where} ${block.label}:`) : visitAction(block, `${where} action ${JSON.stringify(block.label)}`, visit))));
-}
-
 // The registry and the namespace must describe the same surviving universe:
 // drop one without the other and a save is pruned against content that is
-// present, or a reference resolves to content that is gone.
-function dropContent(registry: Registry, kind: string, id: string, pruned: Set<string>, maps: readonly { delete(id: string): boolean }[]): void {
-  for (const map of maps) map.delete(id);
+// present, or a reference resolves to content that is gone. Every map the kind
+// fills, because a kind that lands its values in two is cleaned out of both
+// without anyone here remembering which those are.
+function dropContent(registry: Registry, kind: string, id: string, pruned: Set<string>): void {
+  for (const name of Object.keys(sectionFor(kind)?.maps ?? {})) mapOf(registry, name).delete(id);
   registry.namespace.undeclare(kind, id);
   pruned.add(ownerKey(kind, id));
 }
@@ -365,212 +351,58 @@ function pruneStrandedActionMembers(registry: Registry, pruned: Set<string>): bo
   let dropped = false;
   for (const key of registry.namespace.declaredKeys(ACTION_MEMBER)) {
     if (surviving.has(key)) continue;
-    dropContent(registry, ACTION_MEMBER, key, pruned, []);
+    dropContent(registry, ACTION_MEMBER, key, pruned);
     dropped = true;
   }
   return dropped;
 }
 
+// Every map a kind fills beyond the one its values are read back out of,
+// refilled from the survivors. A secondary map is keyed on something other than
+// the id — a dialogue's owner is the standing case — so what it should hold
+// after a prune can only be recovered by landing the survivors again.
+function rebuildSecondaryMaps(registry: Registry): void {
+  for (const [kind, primary] of contentSectionMaps()) {
+    const survivors = [...(mapOf(registry, primary) as ReadonlyMap<string, { id: string }>).values()];
+    for (const [name, lands] of Object.entries(sectionFor(kind)!.maps)) {
+      if (name === primary) continue;
+      const map = mapOf(registry, name);
+      map.clear();
+      for (const value of survivors) for (const [key, held] of lands(value)) map.set(key, held as { id?: string });
+    }
+  }
+}
+
+// Content that reaches what an absent optional module was to have declared, and
+// the reference walk of every kind, asked until the answer stops changing:
+// dropping one object is what makes the next reference dangle.
 function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: ReadonlySet<string>): void {
   const pruned = new Set<string>();
   for (;;) {
     let changed = false;
     const visit = danglingVisit(danglingRoots, pruned);
+    const at: Pruning = {
+      intact: referencesLoaded,
+      gone: (kind, id, where) => !referencesLoaded(() => visit(kind, id, where)),
+      visit,
+    };
 
-    for (const [id, action] of registry.actions) {
-      if (referencesLoaded(() => visitAction(action, `# action ${id}`, visit))) continue;
-      dropContent(registry, 'action', id, pruned, [registry.actions]);
-      changed = true;
-    }
-
-    for (const [id, event] of registry.events) {
-      if (referencesLoaded(() => visitSection({ kind: 'event', value: { ...event } }, `# event ${id}`, visit))) continue;
-      dropContent(registry, 'event', id, pruned, [registry.events]);
-      changed = true;
-    }
-
-    for (const [id, entity] of registry.entities) {
-      const stats = Object.fromEntries(Object.entries(entity.stats).filter(([statId]) => referencesLoaded(() => visit('stat', statId, `# entity ${id} stats:`))));
-      const blocks = pruneBlocks(entity.blocks, `# entity ${id}`, visit);
-      const uses = entity.uses.filter((used) => referencesLoaded(() => visit('action', used, `# entity ${id} uses:`)));
-      const faction = entity.faction.filter((named) => referencesLoaded(() => visit('faction', named, `# entity ${id} faction:`)));
-      const allies = entity.allies.filter((entry) => referencesLoaded(() => visit('entity', entry.entity, `# entity ${id} allies:`)));
-      const passives = entity.passives.filter((named) => referencesLoaded(() => visit('passive', named, `# entity ${id} passives:`)));
-      const skills = entity.skills.filter((named) => referencesLoaded(() => visit('skill', named, `# entity ${id} skills:`)));
-      const onHit = pruneHook(entity.onHit, `# entity ${id} on hit:`, visit);
-      const whenHit = pruneHook(entity.whenHit, `# entity ${id} when hit:`, visit);
-      if (
-        Object.keys(stats).length !== Object.keys(entity.stats).length ||
-        blocks.length !== entity.blocks.length ||
-        uses.length !== entity.uses.length ||
-        faction.length !== entity.faction.length ||
-        allies.length !== entity.allies.length ||
-        passives.length !== entity.passives.length ||
-        skills.length !== entity.skills.length ||
-        onHit !== entity.onHit ||
-        whenHit !== entity.whenHit
-      ) {
-        registry.entities.set(id, {
-          ...entity,
-          stats,
-          blocks,
-          uses,
-          faction,
-          allies,
-          passives,
-          skills,
-          onHit,
-          whenHit,
-        });
+    for (const [kind, primary] of contentSectionMaps()) {
+      const owner = sectionFor(kind)!;
+      const map = mapOf(registry, primary) as Map<string, { id: string }>;
+      for (const [id, value] of map) {
+        const survivor = owner.prune(value, at, `# ${kind} ${id}`);
+        if (survivor === value) continue;
+        if (survivor === null) dropContent(registry, kind, id, pruned);
+        else map.set(id, survivor);
         changed = true;
       }
-    }
-
-    // Rebuilt where a grant's event went with an absent module, and dropped
-    // where the stat it raises did: `per-level:` needs a `stat-id:` to raise,
-    // so a skill that outlived its stat is one the build would refuse anyway.
-    for (const [id, skill] of registry.skills) {
-      const statId = skill['stat-id'];
-      if (statId !== undefined && !referencesLoaded(() => visit('stat', statId, `# skill ${id} stat-id:`))) {
-        dropContent(registry, 'skill', id, pruned, [registry.skills]);
-        changed = true;
-        continue;
-      }
-      const grants = skill.grants.filter((grant) => referencesLoaded(() => visit('event', grant.event, `# skill ${id} gain`)));
-      if (grants.length !== skill.grants.length) {
-        registry.skills.set(id, { ...skill, grants });
-        changed = true;
-      }
-    }
-
-    // A passive is a carrier like an item is, so it is rebuilt rather than
-    // dropped: what a jewel placed it for survives a payload whose stat went.
-    for (const [id, passive] of registry.passives) {
-      const tags = passive.tags.filter((tag) => referencesLoaded(() => visitTags([tag], `# passive ${id}`, visit)));
-      const onHit = pruneHook(passive.onHit, `# passive ${id} on hit:`, visit);
-      const whenHit = pruneHook(passive.whenHit, `# passive ${id} when hit:`, visit);
-      if (tags.length !== passive.tags.length || onHit !== passive.onHit || whenHit !== passive.whenHit) {
-        registry.passives.set(id, { ...passive, tags, onHit, whenHit });
-        changed = true;
-      }
-    }
-
-    // A cluster jewel names passives by position, and a position whose passive
-    // is gone is an empty position rather than a broken jewel.
-    for (const [id, jewel] of registry.clusterJewels) {
-      const entries = Object.entries(jewel.positions).filter(([, passiveId]) => referencesLoaded(() => visit('passive', passiveId, `# cluster-jewel ${id} passives:`)));
-      if (entries.length !== Object.keys(jewel.positions).length) {
-        registry.clusterJewels.set(id, {
-          ...jewel,
-          positions: Object.fromEntries(entries.map(([position, passiveId]) => [Number(position), passiveId])),
-        });
-        changed = true;
-      }
-    }
-
-    for (const [id, item] of registry.items) {
-      // Through the shared walk, so a clause that grows a second reference —
-      // `per` did — is pruned by the rule that resolves it rather than by a copy.
-      const tags = item.tags.filter((tag) => referencesLoaded(() => visitTags([tag], `# item ${id}`, visit)));
-      const actions = pruneActions(item.actions, `# item ${id}`, visit);
-      const onHit = pruneHook(item.onHit, `# item ${id} on hit:`, visit);
-      const whenHit = pruneHook(item.whenHit, `# item ${id} when hit:`, visit);
-      if (tags.length !== item.tags.length || actions.length !== item.actions.length || onHit !== item.onHit || whenHit !== item.whenHit) {
-        registry.items.set(id, { ...item, tags, actions, onHit, whenHit });
-        changed = true;
-      }
-    }
-
-    for (const [id, location] of registry.locations) {
-      if (location.relative && (namesDanglingRoot('location', location.relative.of, danglingRoots) || referencePruned('location', location.relative.of, pruned))) {
-        dropContent(registry, 'location', id, pruned, [registry.locations]);
-        changed = true;
-        continue;
-      }
-      const entities = location.entities.filter((entry) => !namesDanglingRoot('entity', entry.entity, danglingRoots) && !referencePruned('entity', entry.entity, pruned));
-      const adjacent = location.adjacent.filter(
-        (edge) =>
-          !namesDanglingRoot('location', edge.target, danglingRoots) &&
-          !referencePruned('location', edge.target, pruned) &&
-          referencesLoaded(() =>
-            visitSection(
-              {
-                kind: 'location',
-                value: {
-                  ...location,
-                  entities: [],
-                  adjacent: [{ ...edge }],
-                  relative: undefined,
-                  actions: [],
-                },
-              },
-              `# location ${id}`,
-              visit,
-            ),
-          ),
-      );
-      const actions = pruneActions(location.actions, `# location ${id}`, visit);
-      if (entities.length !== location.entities.length || adjacent.length !== location.adjacent.length || actions.length !== location.actions.length) {
-        registry.locations.set(id, {
-          ...location,
-          entities,
-          adjacent,
-          actions,
-        });
-        changed = true;
-      }
-    }
-
-    for (const [id, recipe] of registry.recipes) {
-      if (referencesLoaded(() => visitSection({ kind: 'recipe', value: { ...recipe } }, `# recipe ${id}`, visit))) continue;
-      dropContent(registry, 'recipe', id, pruned, [registry.recipes, registry.recipeActions]);
-      changed = true;
-    }
-
-    for (const [id, resource] of registry.resources) {
-      if (referencesLoaded(() => visitSection({ kind: 'resource', value: { ...resource } }, `# resource ${id}`, visit))) continue;
-      dropContent(registry, 'resource', id, pruned, [registry.resources]);
-      changed = true;
-    }
-
-    for (const [id, table] of registry.dropTables) {
-      if (referencesLoaded(() => visitSection({ kind: 'droptable', value: { ...table } }, `# droptable ${id}`, visit))) continue;
-      dropContent(registry, 'droptable', id, pruned, [registry.dropTables]);
-      changed = true;
-    }
-
-    for (const [id, dialogue] of registry.dialogues) {
-      if (
-        referencesLoaded(() =>
-          visitSection(
-            {
-              kind: 'dialogue',
-              value: {
-                ...dialogue,
-                nodes: dialogue.nodes.map((node) => ({ ...node })),
-              },
-            },
-            `# dialogue ${id}`,
-            visit,
-          ),
-        )
-      )
-        continue;
-      dropContent(registry, 'dialogue', id, pruned, [registry.dialogues]);
-      changed = true;
-    }
-
-    for (const [id, test] of registry.tests) {
-      if (referencesLoaded(() => visitSection({ kind: 'test', value: { ...test } }, `# test ${id}`, visit))) continue;
-      dropContent(registry, 'test', id, pruned, [registry.tests]);
-      changed = true;
     }
 
     if (pruneStrandedActionMembers(registry, pruned)) changed = true;
 
     if (!changed) {
-      registry.dialoguesByOwner.clear();
-      for (const dialogue of registry.dialogues.values()) if (dialogue.owner) registry.dialoguesByOwner.set(dialogue.owner, dialogue);
+      rebuildSecondaryMaps(registry);
       return;
     }
   }
