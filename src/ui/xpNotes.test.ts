@@ -9,8 +9,6 @@ type Carried = PlayView['carried'][number];
 
 const named = (id: string): string => id[0].toUpperCase() + id.slice(1);
 
-// A published skill row. What the lines read is the total alone, so the level
-// beside it is whatever the curve says and is never looked at here.
 const row = (id: string, value: number): Row => {
   const level = skillLevel(value);
   const foot = xpForLevel(level);
@@ -23,14 +21,12 @@ const gain = (id: string, amount: number): Gain => ({ id, title: asLocalized(nam
 
 const arrival = (id: string, count: number): Arrival => ({ id, name: asLocalized(named(id)), count });
 
-// One turn of the shell's clock: what happened, taken in and then said.
 const told = (queue: NoteQueue, gains: readonly Gain[], arrivals: readonly Arrival[], now: number): NoteQueue => poured(heard(queue, gains, arrivals, now), now);
 
 const tick = (queue: NoteQueue, now: number): NoteQueue => poured(queue, now);
 
 const spell = (title: unknown): string => title as string;
 
-// Every line on the screen, as a player reads it.
 const said = (queue: NoteQueue): string[] =>
   queue.shown.map((note) =>
     note.kind === 'item'
@@ -176,9 +172,6 @@ describe('where a line stands', () => {
     for (const at of [0, NOTE_SPACING_MS, NOTE_SPACING_MS * 2]) queue = tick(queue, at);
     const places = new Map(queue.shown.map((note) => [note.id, note.slot]));
 
-    // The first has been on screen a whole lifetime and has gone; the two under
-    // it are exactly where they were, which is what a stack closing its gap
-    // would not have done.
     const after = tick(queue, NOTE_LIFETIME_MS);
 
     expect(queue.shown).toHaveLength(3);

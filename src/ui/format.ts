@@ -1,5 +1,3 @@
-// Simulated seconds as a clock face. Numbers only: a unit word would be this
-// layer's prose, and the engine publishes no unit.
 export function formatClock(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds));
   const pad = (value: number): string => String(value).padStart(2, '0');
@@ -16,8 +14,6 @@ export function tidy(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-// A bonus reads as what it does to the number it lands on, so the sign is
-// always there and a gain is not left to look like a total.
 export function signed(value: number): string {
   return value < 0 ? tidy(value) : `+${tidy(value)}`;
 }

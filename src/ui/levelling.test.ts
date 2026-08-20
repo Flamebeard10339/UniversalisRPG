@@ -6,9 +6,6 @@ import { crossings, looked, nothingCrossed, noticed, stirring } from './levellin
 
 type Row = PlayView['xp'][number];
 
-// A published skill row, built through the curve the engine publishes it
-// through, so a fixture and a running session cannot disagree about which level
-// a total is.
 const row = (id: string, value: number): Row => {
   const level = skillLevel(value);
   const foot = xpForLevel(level);

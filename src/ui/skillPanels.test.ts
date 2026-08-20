@@ -6,9 +6,6 @@ import { filled, panelOf, perHour, skillPanels, untilNext, type XpMark } from '.
 
 type Row = PlayView['xp'][number];
 
-// A published skill row, built through the curve the engine publishes it
-// through. The page does not read the curve — that is why these fields exist —
-// so a fixture that spelled its own would be checking the fixture.
 const row = (id: string, value: number): Row => {
   const level = skillLevel(value);
   const foot = xpForLevel(level);
@@ -22,8 +19,6 @@ describe('one skill, read off what the engine published', () => {
     for (const total of [0, 1, 999, 1000, 5432, 250_000]) {
       expect(panelOf(row('thieving', total)).level).toBe(skillLevel(total));
     }
-    // Whatever the engine says, even where no curve would have said it: the
-    // page states the answer and never checks it.
     expect(panelOf({ id: 'thieving', title: asLocalized('Thieving'), value: 5, level: 99, earned: 2, span: 8 })).toMatchObject({ level: 99, into: 2, span: 8, toNext: 6 });
   });
 

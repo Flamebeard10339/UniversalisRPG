@@ -1,13 +1,5 @@
 import type { EngineKey } from '../content/locale';
 
-// Every word the shell puts on the screen that no engine value produced, as one
-// id-to-key table. A component may name a control after the engine value it
-// acts on and may invent nothing, so this is the whole of the driver's own
-// vocabulary and the only module under src/ui naming a word a player reads.
-//
-// It names them rather than spelling them (c3): the English behind each key is
-// `content/engine-en.dsl`'s, which is where a translator reaches it, and a
-// component gets the words back through `wordsOf` in the language being played.
 export const LABELS = {
   map: 'engine.shell.map',
   edit: 'engine.shell.edit',
@@ -36,13 +28,8 @@ export const LABELS = {
   locked: 'engine.shell.locked',
   dead: 'engine.shell.dead',
   free: 'engine.shell.free',
-  // The two that take what they are about: a node is drawn under its number or
-  // its direction, and a language that puts the number first can say so.
   position: 'engine.shell.node.position',
   slot: 'engine.shell.node.slot',
-  // The editing surfaces and their controls. `local` and `global` name two of
-  // the three filters over the one list; the third is the map, which already
-  // has a word.
   local: 'engine.shell.local',
   global: 'engine.shell.global',
   'every-kind': 'engine.shell.every-kind',
@@ -51,8 +38,6 @@ export const LABELS = {
   unstage: 'engine.shell.unstage',
   copy: 'engine.shell.copy',
   place: 'engine.shell.place',
-  // The dev slot's own surfaces, and the two ways out of a session that would
-  // not open.
   dev: 'engine.shell.dev',
   speed: 'engine.shell.speed',
   clear: 'engine.shell.clear',

@@ -82,8 +82,6 @@ describe('the narration column', () => {
 
     const transcript = told(emptyTranscript(), 435);
 
-    // One line, keeping the id and the place it first took, so nothing above it
-    // moves and the acknowledgement it played is not played 434 times more.
     expect(transcript.entries).toEqual([{ id: 1, words: 'player', kind: 'message', tone: 'plain', text: 'a chestnut pops', repeats: 435 }]);
     expect(transcript.nextId).toBe(2);
   });
@@ -113,9 +111,6 @@ describe('the narration column', () => {
     ]);
   });
 
-  // The finding this branch closed: the discriminant existed on the arm and
-  // stopped one function short of the screen, so a shell had no way to tell an
-  // authoring diagnostic from something the world said.
   it('says whose words each line is, so a shell can draw the tool apart from the player', () => {
     const transcript = appendOutputs(emptyTranscript(), [
       { kind: 'message', words: 'tool', tone: 'error', text: 'local changes did not load.', detail: ['first'] },

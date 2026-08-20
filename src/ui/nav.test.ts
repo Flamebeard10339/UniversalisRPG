@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { LABELS } from './labels';
 import { across, bodyHeights, BOUNDARIES, HOME_LAYER, LAYERS, layerOffsets, layerSpan, OPENING, subpageOf, toLayer, toSubpage } from './nav';
 
-// A phone's worth of room and two banners of different heights, because two
-// equal ones would let an arithmetic mistake that swaps them pass.
 const BANDS = { height: 700, banners: [60, 40] };
 
 describe('the layers', () => {

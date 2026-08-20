@@ -4,24 +4,15 @@ import type { PlayView } from '../runtime/session';
 
 export type LogKind = 'said' | 'place' | 'describe' | 'message' | 'detail';
 
-// What the engine said, in the language being played. Every one of these came
-// from a key, which is what a driver may show a player.
 export interface PlayerLine {
   readonly id: number;
   readonly words: 'player';
   readonly kind: LogKind;
   readonly tone: MessageTone;
   readonly text: Localized;
-  // How many times in a row the column has been told this. A skill worked at
-  // for a minute says the same sentence a hundred times, and a hundred copies
-  // of it is a column with nothing else left in it.
   readonly repeats: number;
 }
 
-// What the authoring tool said to whoever is driving it: a parser diagnostic, a
-// staged section, the command table. `text` is a plain string because a
-// `DslError` is `src/grammar`'s and a load diagnostic is `src/content`'s, both
-// below the layer that declares the brand.
 export interface ToolLine {
   readonly id: number;
   readonly words: 'tool';
@@ -31,13 +22,8 @@ export interface ToolLine {
   readonly repeats: number;
 }
 
-// The discriminant `CommandOutput`'s message arm carries, kept to the screen
-// rather than dropped one function short of it: a shell that cannot ask whose
-// words an entry is cannot grey a diagnostic, hide one, or refuse to show one.
 export type LogEntry = PlayerLine | ToolLine;
 
-// The column, plus the two things deciding whether a view repeats itself: the
-// place the last entry left the player in, and the places already described.
 export interface Transcript {
   entries: readonly LogEntry[];
   nextId: number;
@@ -79,8 +65,6 @@ function fromView(current: PlayView, reread: boolean, cursor: Cursor): Written[]
   return written;
 }
 
-// A status, an inventory or a choice list is a re-read of what the surrounding
-// shell shows continuously, so it says nothing the column has to keep.
 function fromOutput(output: CommandOutput, cursor: Cursor): Written[] {
   switch (output.kind) {
     case 'message':
@@ -105,9 +89,6 @@ function fromOutput(output: CommandOutput, cursor: Cursor): Written[] {
   }
 }
 
-// The same line again, by everything about it a reader could tell apart. Whose
-// words it is counts: a diagnostic that reads like something the world said is
-// still not the same line.
 const isRepeat = (held: LogEntry, line: Written): boolean =>
   held.words === line.words && held.kind === line.kind && held.tone === line.tone && held.text === line.text;
 
@@ -116,9 +97,6 @@ export function appendOutputs(transcript: Transcript, outputs: readonly CommandO
   const written = outputs.flatMap((output) => fromOutput(output, cursor));
   if (written.length === 0) return transcript;
 
-  // A line the column has just been told again is counted rather than written
-  // out: it keeps its place and its id, so nothing above it moves and the
-  // acknowledgement it played when it first arrived is not played again.
   let nextId = transcript.nextId;
   const entries: LogEntry[] = [...transcript.entries];
   for (const line of written) {

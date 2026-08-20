@@ -64,10 +64,7 @@ describe('the channel every moment is played through', () => {
     expect(channel.play('arrival', 'guide-house')).toBe('arrived');
     expect(channel.play('rise')).toBe('risen');
     expect(channel.play('darken')).toBe('darkened');
-    // A settle is written onto a node rather than named as a class, so what it
-    // hands back is a transition and the only place that string is written.
     expect(channel.play('settle')).toMatch(/^transform \d+ms /);
-    // A note is drawn by the channel itself, so its node needs nothing.
     expect(channel.play('note', 'text')).toBe('');
   });
 

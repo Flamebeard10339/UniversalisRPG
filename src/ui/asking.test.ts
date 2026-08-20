@@ -5,10 +5,6 @@ import { SAVE_VERSION } from '../runtime/save';
 import { applyDirective, startSession, submitModal, view, type PlaySession, type PlayView } from '../runtime/session';
 import { dismissal } from './asking';
 
-// Driven off real published views rather than hand-built ones: what this
-// decision is worth is entirely in reading fields the engine actually fills,
-// and a fixture typed here could agree with the rule while disagreeing with the
-// engine.
 const MODULE = `
 # location camp
 x: 0, y: 0
@@ -66,9 +62,6 @@ describe('what a click away from a screen answers', () => {
     expect(dismissal(view(session).modals)).toEqual({ key: 'plane', value: 'back' });
   });
 
-  // The gesture is the same answer the prompt types, so it takes the screen
-  // where answering takes it and never anywhere else: the inventory closes and
-  // the plane goes back to the inventory (c11, c19).
   it('leaves the screen where answering it leaves it', () => {
     const session = onBlade();
     submitModal(session, { verb: 'grow' });
@@ -92,9 +85,6 @@ describe('what a click away from a screen answers', () => {
     expect(dismissal(talking.modals)).toBeNull();
   });
 
-  // The screen the player is looking at is the top one, so a way out is the top
-  // one's and never whatever is covered by it — read in both directions, since a
-  // stack whose screens agree cannot tell which one was asked.
   it('belongs to the covering screen and not to the one underneath it', () => {
     const covering = stocked();
     applyDirective(covering, { kind: 'open-modal', modal: 'character-creation' });
@@ -110,9 +100,6 @@ describe('what a click away from a screen answers', () => {
     expect(dismissal(view(covered).modals)).toBeNull();
   });
 
-  // A screen may name a way out that the question in front of the player does
-  // not offer, and a click that answered it would be answering a value the
-  // engine is not listing.
   it('is nothing where the question being asked does not list it', () => {
     const asked: PlayView['modals'] = [{ name: 'held', leaving: 'close', options: [{ key: 'item', label: asLocalized('Item'), values: [{ value: 'blade', shown: asLocalized('Blade x1') }] }] }];
 

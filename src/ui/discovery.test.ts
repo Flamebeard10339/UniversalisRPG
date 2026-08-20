@@ -12,8 +12,6 @@ const place = (id: string, x: number, y: number, z: number, ...adjacent: string[
   adjacent: adjacent.map((to) => ({ to, open: true })),
 });
 
-// A house with a floor above and a cellar below, both stacked on the same x and
-// y as the hall, and a beach one unit east of it.
 const HOUSE: Place[] = [
   place('hall', 0, 0, 0, 'landing', 'cellar', 'beach'),
   place('landing', 0, 0, 1, 'hall'),
@@ -32,7 +30,6 @@ describe('one plane of the map', () => {
   });
 
   it('draws a place off the plane only when the player could step to it from here', () => {
-    // Both are at z 1: the landing is adjacent to the hall and the attic is not.
     const withAttic = [...HOUSE, place('attic', 5, 5, 1, 'landing')];
 
     const ids = sheetAt(withAttic, 'hall', 0).nodes.map((node) => node.place.id);
@@ -43,8 +40,6 @@ describe('one plane of the map', () => {
   });
 
   it('draws a place the view is offering a walk to, however far off the shown plane it stands', () => {
-    // Neither on the plane being looked at nor a step from where the player is:
-    // the offer is the whole of what puts the attic on the sheet.
     const withAttic = [...HOUSE, place('attic', 5, 5, 1, 'landing')];
     const walk: PlayView['choices'][number] = { id: 'travel:attic', kind: 'travel', label: asLocalized('Travel to Attic'), leadsTo: 'attic', legs: 2 };
 
@@ -63,8 +58,6 @@ describe('one plane of the map', () => {
     const sheet = sheetAt(HOUSE, 'hall', 0);
     const at = (id: string): { x: number; y: number } => sheet.nodes.find((node) => node.place.id === id)!.at;
 
-    // All three are authored at (0, 0), which is why the hall would otherwise
-    // have two places hidden underneath it.
     expect(at('hall')).toEqual({ x: 0, y: 0 });
     expect(at('landing')).toEqual({ x: CLIMB_NUDGE, y: -CLIMB_NUDGE });
     expect(at('cellar')).toEqual({ x: -CLIMB_NUDGE, y: CLIMB_NUDGE });
@@ -95,8 +88,6 @@ describe('one plane of the map', () => {
   it('leaves out a road to somewhere this plane is not drawing', () => {
     const roads = sheetAt(HOUSE, 'beach', 0).roads.flatMap((road) => [road.from.place.id, road.to.place.id]);
 
-    // Standing on the beach, the landing and cellar are two rooms away and off
-    // the plane, so neither they nor the roads to them are drawn.
     expect(roads).not.toContain('landing');
     expect(roads).not.toContain('cellar');
   });
@@ -143,9 +134,6 @@ describe('where a place is drawn', () => {
     expect(drawnAt(place('spire', 0, 0, 3), 0)).toEqual({ x: 3 * CLIMB_NUDGE, y: -3 * CLIMB_NUDGE });
   });
 
-  // The author's report: standing in the hall and looking at the floor above,
-  // the hall is one floor down and the cellar is two, and a nudge that read
-  // only which way drew the hall underneath the cellar.
   it('draws no two places of a sheet on the same point, from any plane the sheet offers', () => {
     for (const plane of sheetAt(HOUSE, 'hall', 0).planes) {
       const points = sheetAt(HOUSE, 'hall', plane).nodes.map((node) => `${node.at.x},${node.at.y}`);
