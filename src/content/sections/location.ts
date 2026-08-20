@@ -1,10 +1,12 @@
+import { Action, actionBody, actionLines } from '../../grammar/action';
+import { Condition, condition } from '../../grammar/condition';
+import { list } from '../../grammar/list';
+import { DslError, Parser } from '../../grammar/parser';
+import { AnySchema, PrintContext, SectionSchema, listMembers, printSection } from '../../grammar/section';
+import { id, number, text } from '../../grammar/values';
+import { actions, condition as visitCondition, put, type Loose } from '../refs';
+import { section } from './define';
 import { TITLE_FIELD } from './info';
-import { Action, actionBody } from '../grammar/action';
-import { Condition, condition } from '../grammar/condition';
-import { list } from '../grammar/list';
-import { DslError, Parser } from '../grammar/parser';
-import { SectionSchema } from '../grammar/section';
-import { id, number, text } from '../grammar/values';
 
 // The one flag every location owns without declaring it, because the engine
 // sets it the first time the player arrives.
@@ -128,20 +130,21 @@ export function recursivelyResolveRelativeCoordinates(locations: Map<string, Loc
   }
 }
 
-export const locationSchema: SectionSchema<Location, 'starting', 'actions'> = {
+const SCHEMA: SectionSchema<Location, 'starting', 'actions'> = {
   kind: 'location',
   fields: {
+    relative: { parser: relativeValue },
     x: { parser: number, default: () => 0 },
     y: { parser: number, default: () => 0 },
     z: { parser: number, default: () => 0 },
     title: TITLE_FIELD,
     examine: { parser: text },
-    entities: { parser: list(populationValue), default: () => [] },
-    adjacent: { parser: list(edgeValue), default: () => [] },
-    flags: { parser: list(id), default: () => [] },
-    relative: { parser: relativeValue },
+    entities: { parser: list(populationValue), default: () => [], block: true },
+    adjacent: { parser: list(edgeValue), default: () => [], block: true },
+    flags: { parser: list(id), default: () => [], block: true },
   },
   keywords: ['starting'],
+  keywordsAfter: 'examine',
   bare: 'relative',
   exclusive: [
     ['x', 'y', 'z'],
@@ -149,3 +152,37 @@ export const locationSchema: SectionSchema<Location, 'starting', 'actions'> = {
   ],
   entries: { into: 'actions', body: actionBody },
 };
+
+// No entry can be labelled `x:`, `y:` or `z:`, because all three are claimed as
+// fields before the label dispatch is reached.
+const COORDINATE = /^[xyz]: /;
+
+// Three fields, one line: `x: 0, y: 0, z: 0` is what the language writes, and a
+// walk that gives each field a line of its own cannot say that. A `relative:`
+// placement writes that line instead and never beside it — the two are
+// exclusive, so a section carrying both would not parse back.
+const printLocation = (value: Location, context: PrintContext): readonly string[] => {
+  const lines = printSection(value, SCHEMA as unknown as AnySchema, context, actionLines);
+  const [heading, ...rest] = lines.filter((line) => !COORDINATE.test(line));
+  if (value.relative) return [heading!, ...rest];
+  return [heading!, lines.filter((line) => COORDINATE.test(line)).join(', '), ...rest];
+};
+
+export const location = section<Location, 'starting', 'actions'>()({
+  ...SCHEMA,
+  ids: 'owned',
+  map: 'locations',
+  nestsActions: true,
+  text: ['title', 'examine'],
+  print: printLocation,
+  visit: (value, where, visit) => {
+    const held = value as unknown as Loose;
+    for (const entry of listMembers<Population>(held.entities)) put(entry, 'entity', 'entity', `${where} entities:`, visit);
+    for (const edge of listMembers<Edge>(held.adjacent)) {
+      put(edge, 'target', 'location', `${where} adjacent:`, visit);
+      visitCondition(edge.condition, `${where} adjacent: ${edge.target} while`, visit);
+    }
+    if (held.relative) put(held.relative as Relative, 'of', 'location', `${where} relative`, visit);
+    actions(held.actions, where, visit);
+  },
+});

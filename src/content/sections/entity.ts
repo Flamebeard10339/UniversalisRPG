@@ -1,15 +1,17 @@
+import { Action, actionBody } from '../../grammar/action';
+import { ActionResult, resultBlock, resultList } from '../../grammar/actionResult';
+import { Condition, condition } from '../../grammar/condition';
+import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
+import { list } from '../../grammar/list';
+import { DslError, Parser } from '../../grammar/parser';
+import { Range, range } from '../../grammar/range';
+import { EntryBody, listMembers } from '../../grammar/section';
+import { duration, id, text } from '../../grammar/values';
+import { blocks, condition as visitCondition, hooks, put, strings, type Loose } from '../refs';
+import { section } from './define';
 import { TITLE_FIELD } from './info';
-import { Action, actionBody } from '../grammar/action';
-import { ActionResult, resultBlock, resultList } from '../grammar/actionResult';
-import { Condition, condition } from '../grammar/condition';
-import { HOOK_FIELDS, HookCarrier } from '../grammar/hook';
-import { list } from '../grammar/list';
-import { DslError, Parser } from '../grammar/parser';
-import { Range, range } from '../grammar/range';
-import { EntryBody, SectionSchema } from '../grammar/section';
-import { duration, id, text } from '../grammar/values';
 
-export type { Action } from '../grammar/action';
+export type { Action } from '../../grammar/action';
 
 // The id an action was declared under, present on the ones an entity performs
 // through `uses:` and absent on the one-offs it writes inline.
@@ -49,9 +51,6 @@ export interface AuthoredEntity extends HookCarrier {
   // Replaces the global `# stat` default per name, for this entity alone.
   stats: Record<string, Range>;
   skills: string[];
-  // The passives this entity carries innately, declared once and referenced,
-  // so an enemy authored with one and a plane position holding it are the same
-  // declaration rather than two copies of a body.
   passives: string[];
   equipmentSlots: string[];
   flags: string[];
@@ -117,12 +116,14 @@ const entityBlock: EntryBody = {
   },
 };
 
-export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'> = {
+export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   kind: 'entity',
-  // Declaration order is print order, which is the whole of why these are in
-  // the order they are in. Reading does not care — a field is reached by its
-  // keyword — so this list is free to say the one thing a reader of a printed
-  // section sees.
+  ids: 'owned',
+  // `actions` and `handlers` are what `blocks` becomes once `uses:` can be read
+  // against the actions it names, which is after every section is in.
+  maps: { entities: (value: AuthoredEntity): readonly (readonly [string, Entity])[] => [[value.id, { ...value, actions: [], handlers: [] }]] },
+  nestsActions: true,
+  text: ['title', 'examine'],
   fields: {
     title: TITLE_FIELD,
     examine: { parser: text },
@@ -142,11 +143,25 @@ export const entitySchema: SectionSchema<AuthoredEntity, 'aggressive', 'blocks'>
     faction: { parser: list(id), default: () => [] },
     allies: { parser: list(allyValue), default: () => [] },
     flags: { parser: list(id), default: () => [], block: true },
-    // Claimed as fields, so `on hit:` is a hook before the label dispatch below
+    // Claimed as fields, so `on hit:` is a hook before the label dispatch above
     // can read it as an `on <event>:` handler.
     ...HOOK_FIELDS,
   },
   keywords: ['aggressive'],
   keywordsAfter: 'examine',
   entries: { into: 'blocks', body: entityBlock },
-};
+  visit: (value, where, visit) => {
+    const held = value as unknown as Loose;
+    // A stat sheet is authored as a list of assignments; the stat id leading
+    // each one is the reference.
+    for (const assignment of listMembers<[string, unknown]>(held.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
+    strings(held, 'uses', 'action', `${where} uses:`, visit);
+    strings(held, 'faction', 'faction', `${where} faction:`, visit);
+    strings(held, 'skills', 'skill', `${where} skills:`, visit);
+    strings(held, 'passives', 'passive', `${where} passives:`, visit);
+    for (const entry of listMembers<Ally>(held.allies)) put(entry, 'entity', 'entity', `${where} allies:`, visit);
+    visitCondition(held.hiddenIf as Condition | undefined, `${where} hidden if:`, visit);
+    blocks(held.blocks, where, visit);
+    hooks(held, where, visit);
+  },
+});
