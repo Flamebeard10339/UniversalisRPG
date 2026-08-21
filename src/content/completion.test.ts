@@ -257,6 +257,15 @@ describe('a hole with a grammar of its own', () => {
     expect(filling('# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n  give: |')?.shapes).toBeUndefined();
   });
 
+  it('stands in the shape the engine read the whole line as, where it read one', () => {
+    expect(filling('# location tutorial-island.beach\ncontemplat|e:')?.hole).toBe('action');
+  });
+
+  it('names the id a letter away, since a name nobody declares is more often a slip than a plan', () => {
+    const { text, cursor } = at('# location tutorial-island.beach\nentities: tutorial-island.giant-rt|');
+    expect(offeringAt(text, cursor, KNOWN).undeclared).toEqual([{ kind: 'entity', id: 'tutorial-island.giant-rt', meant: 'tutorial-island.giant-rat' }]);
+  });
+
   it('says nothing of a hole that holds one thing, which its own name has already said', () => {
     expect(filling('# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n  xp: |')?.shapes).toBeUndefined();
   });

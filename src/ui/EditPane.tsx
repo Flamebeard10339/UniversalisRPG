@@ -236,7 +236,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                         </div>
                       ))}
                   {offering.refused === null ? null : <div className="break-words text-danger">{offering.refused}</div>}
-                  {offering.undeclared.length === 0 ? null : <div className="break-words text-warning">{`${offering.undeclared.map((each) => `${each.id} as a # ${each.kind}`).join(', ')} ${words('undeclared')}`}</div>}
+                  {offering.undeclared.length === 0 ? null : <div className="break-words text-warning">{`${offering.undeclared.map((each) => `${each.id} as a # ${each.kind}${each.meant === undefined ? '' : `, one letter from ${each.meant}`}`).join(', ')} ${words('undeclared')}`}</div>}
                 </div>
                 {gathered(offering.offers).map((family, at) => (
                   <div key={family.name ?? `${at}`} className="pt-1">

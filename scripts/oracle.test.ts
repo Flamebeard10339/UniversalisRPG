@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { offeringAt } from '../src/content/completion';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 import { literalOf } from '../src/content/completion';
-import { treeOf } from './oracle';
+import { offeringLines, treeOf } from './oracle';
 
 const REFERS = /…indented under it, what `(?<form>.+)` holds$/;
 
@@ -39,5 +39,20 @@ describe('the grammar tree', () => {
   it('holds the fields of a kind whose grammar it writes itself', () => {
     expect(sectionFor('droptable')!.schema).toBeUndefined();
     expect(treeOf('droptable').join('\n')).toContain('one of');
+  });
+});
+
+describe('a draft read back', () => {
+  const KNOWN = [
+    { kind: 'flag', address: 'tutorial-island.quest-given' },
+    { kind: 'location', address: 'tutorial-island.beach' },
+  ];
+
+  it('writes an answer out where it is first met and points back at it after', () => {
+    const draft = ['# location tutorial-island.beach', 'adjacent: tutorial-island.beach while quest-given', 'adjacent: tutorial-island.beach while quest-given'].join('\n');
+    const read = offeringLines(draft, KNOWN);
+
+    expect(read.filter((line) => line.trim() === 'has <count> <item>')).toHaveLength(1);
+    expect(read.filter((line) => line.trim().endsWith(', as above')).length).toBeGreaterThan(0);
   });
 });

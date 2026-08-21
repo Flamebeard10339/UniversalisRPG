@@ -1,7 +1,7 @@
 import { align, bare, exampleOf, holesIn, standingIn, valueIn, type Alignment, type Hole } from '../grammar/form';
 import type { ListParser } from '../grammar/list';
 import { DslError, parseWhole, type Parser, type Written } from '../grammar/parser';
-import { isPositionalField } from '../grammar/section';
+import { isPositionalField, typoOf } from '../grammar/section';
 import { indentLines, splitSections } from '../grammar/structure';
 import { Section, sectionFor, sectionKinds, sections } from './sections';
 import { reachableCodecs } from '../grammar/codec';
@@ -44,6 +44,8 @@ export function fillingWords(filling: Filling): string {
 export interface Undeclared {
   kind: string;
   id: string;
+  // A declared id of that kind one letter away, since a name nobody declares is far more often a slip than a plan.
+  meant?: string;
 }
 
 export interface Offering {
@@ -202,7 +204,11 @@ function namedIn(written: string): { kind: string; id: string }[] {
 // The ids a line names that no module in the universe declares. A thing written before the thing it names is normal, so this is a remark rather than a refusal.
 function undeclaredIn(written: string, known: readonly Addressed[]): Undeclared[] {
   const held = new Map<string, Undeclared>();
-  for (const each of namedIn(written)) if (!declares(known, each.kind, each.id)) held.set(`${each.kind} ${each.id}`, each);
+  for (const each of namedIn(written)) {
+    if (declares(known, each.kind, each.id)) continue;
+    const meant = typoOf(each.id, known.filter((one) => one.kind === each.kind).map((one) => one.address));
+    held.set(`${each.kind} ${each.id}`, meant === undefined ? each : { ...each, meant });
+  }
   return [...held.values()];
 }
 
@@ -438,11 +444,13 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     ...(continuing || under !== '' ? [] : lines).map((line) => shapeOf(line, '', typed)),
     ...(named.parser === null ? [] : named.parser.forms).map((form) => shapeOf({ form, example: exampleOf(form, named.parser!.examples) ?? form }, under, left, alongside)),
   ];
+  const line = text.slice(lineStart, lineEnd);
+  const reads = readAs(here.lines, line.trim());
   const shown = narrowed(reading(shapes));
-  const stood = standing(shown);
+  // Where the engine has already read the whole line as one shape, the cursor stands in that shape. Two shapes the line has spelt nothing of are otherwise told apart by which was declared first, which is no answer at all.
+  const stood = standing(shown.filter((each) => each.shape.form === reads)) ?? standing(shown);
   const filling = stood === undefined ? undefined : fillingHole(stood);
 
-  const line = text.slice(lineStart, lineEnd);
   // A line that opens a block and is handed over without one is refused for holding nothing, so the block's own first line goes under it.
   const body = stood?.shape.opens === undefined ? [] : indentLines([stood.shape.opens], indent + 2);
   const spliced = (stood: string): string => around(heading, above, `${text.slice(lineStart, from)}${stood}${text.slice(to, lineEnd)}`, body);
@@ -452,7 +460,6 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const kinds = kindsStanding(around(heading, above, `${text.slice(lineStart, at - token.length)}${PROBE}${text.slice(past, lineEnd)}`));
   if (kinds.size === 0) for (const each of holds) kinds.add(each);
 
-  const reads = readAs(here.lines, line.trim());
   // A shape the line has spelt out but not finished is being written, not broken; anything else is handed to the engine, whose word on it is the only honest one.
   const refused =
     line.trim() === '' || (stood !== undefined && !stood.read.complete && stood.read.spelt > 0)

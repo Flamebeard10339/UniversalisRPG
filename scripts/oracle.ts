@@ -18,6 +18,7 @@ const usage = [
   '            placeholder in turn — what may stand there and what is declared',
   '',
   'Ids come from the shipped corpus, so what this prints is what the page shows.',
+  'An answer given once is pointed back at rather than written out again.',
 ].join('\n');
 
 const shipped = (): Addressed[] =>
@@ -95,6 +96,7 @@ const RULES: readonly string[] = [
   `${PART}a line marked like this names a part of the kind and is not written`,
   `${PART}a keyword whose shape trails off in \`, …\` takes a list, and may instead hold it one value to a line, indented under the bare \`keyword:\``,
   `${PART}an \`e.g.\` shows one line of that shape written out; the ids in it stand for ids and are not ids anything declares`,
+  `${PART}an id may be written whole, as \`tutorial-island.bread\`, or by the name its own module gave it, as \`bread\``,
 ];
 
 export function treeOf(kind: string): string[] {
@@ -109,7 +111,7 @@ export function treeOf(kind: string): string[] {
 const NAMED = 24;
 
 // The page names a kind where the cursor stands and lists what an author has begun to type of it; a file has typed the whole of it already, so the oracle lists everything of that kind the world declares.
-const namesAt = (text: string, cursor: number, known: readonly Addressed[]): string | undefined => {
+const namesAt = (text: string, cursor: number, known: readonly Addressed[], already: Set<string>): string | undefined => {
   const offering = offeringAt(text, cursor, known);
   if (offering.filling === null) return undefined;
   // A hole that holds a whole line of its own — a `<result>` — names nothing itself, but the line in it does, and that is what an author standing there is choosing.
@@ -117,7 +119,13 @@ const namesAt = (text: string, cursor: number, known: readonly Addressed[]): str
   const held = offering.filling.shapes === undefined ? [] : offering.filling.shapes.map((shape) => `      ${shape}`);
   const named = kind === undefined ? [] : known.filter((each) => each.kind === kind).map((each) => each.address).sort();
   const listed = kind === undefined ? [] : [`      declared: ${named.length === 0 ? 'none anywhere' : `${named.slice(0, NAMED).join(', ')}${named.length > NAMED ? `, … and ${named.length - NAMED} more, ${named.length} in all` : ''}`}`];
-  return [`    ${fillingWords({ ...offering.filling, ...(kind === undefined ? {} : { kind }) })}`, ...held, ...listed].join('\n');
+  const words = `    ${fillingWords({ ...offering.filling, ...(kind === undefined ? {} : { kind }) })}`;
+  // The shapes a hole takes and the ids of a kind are the same answer wherever they are asked for, and a draft asks on every line. They are written out where they are first met and pointed back at after.
+  const key = [kind, ...(offering.filling.shapes ?? [])].join('|');
+  if (held.length === 0 && listed.length === 0) return words;
+  if (already.has(key)) return `${words}, as above`;
+  already.add(key);
+  return [words, ...held, ...listed].join('\n');
 };
 
 // A page moves its cursor and the offering follows it; a file does not, so the oracle walks the cursor to each placeholder in turn and reports what stands there.
@@ -129,6 +137,7 @@ const holesOf = (offering: { reads: string | null; filling: { form: string } | n
 
 export function offeringLines(text: string, known: readonly Addressed[]): string[] {
   const out: string[] = [];
+  const already = new Set<string>();
   const draft = text.split('\n');
   // A blank line before the next heading is the end of a section, not a place an author is about to write, and the whole grammar of the kind above it is nothing they asked for.
   const writing = (after: number): boolean => draft.slice(after + 1).find((line) => line.trim() !== '')?.startsWith('#') !== true;
@@ -142,11 +151,11 @@ export function offeringLines(text: string, known: readonly Addressed[]): string
     out.push(`${line || '·'}`);
     out.push(`    in ${offering.where.join(' › ')}, reads as ${reads ?? '?'}${note === undefined ? '' : `   — ${note}`}`);
     if (offering.refused !== null) out.push(`    REFUSED, the engine will not read this line: ${offering.refused}`);
-    if (offering.undeclared.length > 0) out.push(`    nothing declares these yet, which is only a remark if you mean to declare them: ${offering.undeclared.map((each) => `${each.id} as a # ${each.kind}`).join(', ')}`);
+    if (offering.undeclared.length > 0) out.push(`    nothing declares these yet, which is only a remark if you mean to declare them: ${offering.undeclared.map((each) => `${each.id} as a # ${each.kind}${each.meant === undefined ? '' : `, one letter from ${each.meant}`}`).join(', ')}`);
     const seen = new Set<string>();
     for (const hole of holesOf(offering, line)) {
-      const said = namesAt(text, opening + hole.end, known);
-      if (said !== undefined && !seen.has(said)) out.push(said);
+      const said = namesAt(text, opening + hole.end, known, already);
+      if (said !== undefined && !seen.has(said)) out.push(...said.split('\n'));
       if (said !== undefined) seen.add(said);
     }
     if (line.trim() === '' && writing(index)) {

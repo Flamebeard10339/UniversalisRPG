@@ -160,7 +160,7 @@ function withinOneEdit(a: string, b: string): boolean {
 
 const SHORTEST_TYPO = 3;
 
-function typoOf(key: string, known: readonly string[]): string | undefined {
+export function typoOf(key: string, known: readonly string[]): string | undefined {
   if (key.length < SHORTEST_TYPO) return undefined;
   return known.find((field) => withinOneEdit(field, key));
 }
