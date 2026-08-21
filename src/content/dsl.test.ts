@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
+import { align } from '../grammar/form';
 import type { Written } from '../grammar/parser';
 import { text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
@@ -77,6 +78,8 @@ describe('every section kind', () => {
         const opened = held === undefined ? [] : indentLines([held[0]!.example], 2 * (under.length + 1));
         const written = [`# ${kind} probe`, ...under.map((each, deep) => indentLines([each], 2 * deep)[0]!), ...indentLines([line.example], 2 * under.length), ...opened].join('\n');
         expect(() => owner.parse(splitSections(written)[0]!), written).not.toThrow();
+        // The shape shown and the line shown are the same claim written twice, and a reader who cannot read one off the other has been told nothing.
+        expect(align(line.form, line.example)?.complete, `# ${kind}: ${JSON.stringify(line.form)} does not read ${JSON.stringify(line.example)}`).toBe(true);
         checked += 1;
         if (held !== undefined) walk(held, [...under, line.example]);
       }

@@ -196,6 +196,8 @@ export const said = (...parts: (string | undefined)[]): string | undefined => {
   return held.length === 0 ? undefined : held.join(' — ');
 };
 
+// Asking the engine costs a parse, and a page asks again at every keystroke; what it is asked about changes as an author moves, so the answers are kept but not hoarded.
+const RECALL = 2000;
 const recalled = new Map<string, string | undefined>();
 
 // What a line names beyond what its own placeholders say: the kind the engine reads at each hole, asked by standing a probe there in the line's own example. A hole already called after its kind has nothing to add.
@@ -206,6 +208,7 @@ export function saysKind(under: string, indent: number, written: Written): strin
     .map((hole) => ({ hole, kind: only(kindsStanding([under, `${' '.repeat(indent)}${standingIn(written.example, hole, PROBE)}`].join('\n'))) }))
     .filter((each): each is { hole: Hole; kind: string } => each.kind !== undefined && !each.hole.name.split(' ').includes(each.kind));
   const said = named.length === 0 ? undefined : `names ${[...new Set(named.map((each) => `a # ${each.kind}`))].join(' and ')}`;
+  if (recalled.size >= RECALL) recalled.clear();
   recalled.set(key, said);
   return said;
 }
