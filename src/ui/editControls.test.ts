@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addressable, NOWHERE, searching, searchHint, STATES, type Section, type Standing } from './authoringSurface';
-import { draftIn, editControls, kindsIn, openedIn, rowsIn, sectionKey, type EditActs, type EditControls } from './editControls';
+import { draftIn, editControls, kindsIn, openedIn, rowsIn, sectionKey, TONES, tonesIn, type EditActs, type EditControls } from './editControls';
 import { FORGOTTEN, type Editing } from './editorMemory';
 import { SHIPPED_SOURCES } from './shippedContent';
 
@@ -267,5 +267,31 @@ describe('narrowing the list by what is true of a section', () => {
 
   it('says every state the box takes in the box itself', () => {
     for (const state of Object.keys(STATES)) expect(searchHint('narrow it:')).toContain(`is:${state}`);
+  });
+});
+
+describe('what a row in the list wears', () => {
+  const toneOf = (state: string): string => TONES.find(([named]) => named === state)![1];
+
+  const row = (text: string, staged: boolean): Section => ({ kind: 'entity', address: 'ghost', text, module: 'probe', staged });
+
+  const STANDS = ['# entity ghost', 'title: Ghost'].join('\n');
+  const REFUSED = [STANDS, 'respawn after: 30s'].join('\n');
+
+  it('leaves bare a section the engine takes and nobody has touched', () => {
+    expect(tonesIn([row(STANDS, false)]).get('entity ghost')).toBeUndefined();
+  });
+
+  it('marks one an author has staged', () => {
+    expect(tonesIn([row(STANDS, true)]).get('entity ghost')).toBe(toneOf('changed'));
+  });
+
+  it('marks one the engine will not take, whether or not it was staged', () => {
+    expect(tonesIn([row(REFUSED, false)]).get('entity ghost')).toBe(toneOf('amiss'));
+    expect(tonesIn([row(REFUSED, true)]).get('entity ghost')).toBe(toneOf('amiss'));
+  });
+
+  it('wears only states the search asks for, so a colour and an is: term are one question', () => {
+    expect(TONES.map(([state]) => state).filter((state) => STATES[state] === undefined)).toEqual([]);
   });
 });

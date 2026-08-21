@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { searching, searchHint } from './authoringSurface';
-import { amissWith, draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
+import { amissWith, draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, tonesIn, type EditHeld } from './editControls';
 import { pathOf } from './grammarPath';
 import { splitFrom } from './gesture';
 import { gathered, shownIn } from './offerGroups';
@@ -19,6 +19,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
   const taken = useRef(false);
   const { sections, standing, places, editing, controls } = held;
   const rows = rowsIn(held);
+  const tones = useMemo(() => tonesIn(sections), [sections]);
   const open = openedIn(sections, editing);
   const search = searching(editing.query);
   const offering = offeringIn(held);
@@ -139,11 +140,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
               data-opened={sectionKey(section) === editing.open ? 'yes' : undefined}
               onClick={() => controls.open(sectionKey(section) === editing.open ? null : sectionKey(section))}
               className={`rounded-xl border px-3 py-2 text-left font-mono text-xs ${
-                sectionKey(section) === editing.open
-                  ? 'border-accent bg-accent-strong text-accent-text'
-                  : section.staged
-                    ? 'border-warning bg-panel text-warning'
-                    : 'border-border bg-panel'
+                sectionKey(section) === editing.open ? 'border-accent bg-accent-strong text-accent-text' : (tones.get(sectionKey(section)) ?? 'border-border bg-panel')
               }`}
             >
               {`# ${section.kind} ${section.address}`}

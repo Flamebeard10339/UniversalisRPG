@@ -1,6 +1,6 @@
 import { amissIn, applied, offeringAt, type Addressed, type Amiss, type Offering } from '../content/completion';
 import type { PlayView } from '../runtime/session';
-import { deleteLine, emptied, kindsOffered, offeredBy, openingLine, removeLine, searching, SHOW_LINE, stage, type Section, type Standing, type SurfaceId } from './authoringSurface';
+import { deleteLine, emptied, kindsOffered, offeredBy, openingLine, removeLine, searching, SHOW_LINE, stage, STATES, type Section, type Standing, type SurfaceId } from './authoringSurface';
 import { gotoLine } from './devMode';
 import { stepIn, stepOut, typed } from './editIndent';
 import type { Editing } from './editorMemory';
@@ -47,6 +47,22 @@ export const rowsIn = (held: Pick<EditHeld, 'sections' | 'standing' | 'editing'>
   const kind = held.editing.surface === 'global' ? held.editing.kind : null;
   const search = searching(held.editing.query, offered);
   return offered.filter((section) => (kind === null || section.kind === kind) && search.holds(section));
+};
+
+// What a row wears before it is opened, which is the state the search would find it under, so a colour and an `is:` term are one question asked twice rather than two answers to keep in step. The engine's word comes first: a change it will not take is not a change yet.
+export const TONES: readonly (readonly [string, string])[] = [
+  ['amiss', 'border-danger bg-panel text-danger'],
+  ['changed', 'border-warning bg-panel text-warning'],
+];
+
+export const tonesIn = (sections: readonly Section[]): Map<string, string> => {
+  const asked = TONES.map(([state, tone]) => [STATES[state]!(sections), tone] as const);
+  return new Map(
+    sections.flatMap((section) => {
+      const tone = asked.find(([holds]) => holds(section))?.[1];
+      return tone === undefined ? [] : [[sectionKey(section), tone] as const];
+    }),
+  );
 };
 
 export const kindsIn = (held: Pick<EditHeld, 'sections' | 'standing' | 'editing'>): string[] => kindsOffered(offeredBy(held.sections, held.standing, held.editing.surface));
