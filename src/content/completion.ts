@@ -398,9 +398,12 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     filling: filled === undefined ? null : { form: filled.form, hole: filled.hole, ...(only(holds) === undefined ? (filled.like === undefined ? {} : { like: filled.like }) : { kind: only(holds)! }) },
     refused,
     undeclared: undeclaredIn(around(heading, above, line), known),
+    // A shape whose words are the ones already written would put back what it replaced, and an author who has written them is being offered nothing.
     offers: deduped([
       ...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token),
-      ...shown.map(({ shape }) => offerFor(shape.form, shape.family, said(shape.note, saysKind(beneath(heading, above), indent, { form: `${shape.under}${shape.form}`, example: `${shape.under}${shape.example}` })))),
+      ...shown
+        .map(({ shape }) => offerFor(shape.form, shape.family, said(shape.note, saysKind(beneath(heading, above), indent, { form: `${shape.under}${shape.form}`, example: `${shape.under}${shape.example}` }))))
+        .filter((offer) => offer.insert !== text.slice(from, to)),
       ...(continuing || under !== '' ? [] : lines).flatMap((line) => namedOffers(line, known, typed)),
     ]),
   };

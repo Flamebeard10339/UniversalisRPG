@@ -216,7 +216,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                 </button>
               </div>
             </div>
-            {offering.offers.length > 0 ? (
+            {offering.where.length > 0 ? (
               <div data-drive="edit.offers" aria-label={words('grammar')} className="packed w-2/5 max-w-[16rem] shrink-0 overflow-y-auto rounded-xl border border-border bg-panel py-1 font-mono text-[11px] leading-tight">
                 <div className="border-b border-border px-2 pb-1 text-text-subtle">
                   <div className="break-words">{offering.where.join(' › ')}</div>

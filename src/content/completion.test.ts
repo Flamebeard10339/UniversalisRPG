@@ -177,7 +177,12 @@ describe('a half-written line', () => {
   });
 
   it('shows only the shapes whose words it has spelt out', () => {
-    expect(shapes(`${under}  xp: |`)).toEqual(['xp: <skill> <amount>']);
+    expect(shapes(`${under}  x|`)).toEqual(['xp: <skill> <amount>']);
+  });
+
+  it('stops offering a shape once its words are the ones written, which would put back what it replaced', () => {
+    expect(shapes(`${under}  xp: |`)).toEqual([]);
+    expect(taken(`${under}  xp: |`).filling?.form).toBe('xp: <skill> <amount>');
   });
 
   it('remarks on an id nothing declares, however deep in a block it sits', () => {
