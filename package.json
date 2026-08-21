@@ -16,6 +16,7 @@
     "play": "tsx scripts/play-cli.ts",
     "probe": "tsx scripts/probe.ts",
     "oracle": "tsx scripts/oracle.ts",
+    "notes": "tsx scripts/notes.ts",
     "inspect": "tsx scripts/inspect.ts",
     "mutate": "tsx scripts/mutate.ts",
     "migrate-saves": "tsx scripts/migrate-saves.ts",

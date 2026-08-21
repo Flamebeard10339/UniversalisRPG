@@ -7,6 +7,8 @@ import { everyActionTable } from '../content/registry';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { ENGINE_KEYS } from '../content/locale';
 import { loadUniverse } from '../content/load';
+import { NOTE_MARK } from '../grammar/note';
+import { everyKey, englishOf } from '../content/translation';
 import { itemExamine, localizerFor, type Localized } from './localized';
 import { initialState, pruneStateForRegistry } from './save';
 
@@ -165,5 +167,36 @@ describe('one line translates an action for every owner that performs it (c7)', 
     for (const { kind, ownerId, action } of performed) {
       expect(say.actionLabel(kind, ownerId, action)).toBe(`ES ${declaredId(action)}`);
     }
+  });
+});
+
+describe('a note an author left is dropped from every line the game says', () => {
+  const marked = (text: string): string => `${text} ${NOTE_MARK} the writer has not been here yet`;
+
+  it('drops it from a field, a spoken line and a translation alike, and leaves no space where it stood', () => {
+    const source = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# entity miki', `title: ${marked('Miki')}`, `examine: ${marked('A weathered guide.')}`, '', '# dialogue chat', 'owner = miki', 'node greet:', `  ${marked('A traveller, out here?')}`].join('\n');
+    const localizer = localizerFor(loadInEnglish(source), 'en');
+
+    expect(localizer.title('entity', 'island.miki')).toBe('Miki');
+    expect(localizer.content('entity', 'island.miki', 'examine')).toBe('A weathered guide.');
+    expect(localizer.spoken('island.dialogue.chat.greet.line.0')).toBe('A traveller, out here?');
+  });
+
+  it('leaves the line standing where the mark carries no words, which is all a rough line says', () => {
+    const localizer = localizerFor(loadInEnglish(['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', `# item rope`, `title: Rope ${NOTE_MARK}`].join('\n')), 'en');
+
+    expect(localizer.title('item', 'island.rope')).toBe('Rope');
+  });
+
+  // The subjects are every key the engine can say, taken from the registry, so a kind or a field added next month is proved here with no edit.
+  it('drops it from every key the shipped corpus can address, whatever shape that prose has', () => {
+    const shipped = [{ name: 'engine-en', text: readFileSync('content/engine-en.dsl', 'utf8') }, { name: 'tutorial-island', text: readFileSync('content/tutorial-island.dsl', 'utf8') }];
+    const plain = loadUniverse(shipped);
+    const keys = everyKey(plain.locales);
+    const notes = { name: 'noted', text: ['# info noted', 'version: 1.0.0', '', '# locale en', ...keys.map((key) => `${key}: ${marked(englishOf(plain.locales, key))}`)].join('\n') };
+    const spoken = localizerFor(loadUniverse([...shipped, notes]), 'en');
+
+    expect(keys.length).toBeGreaterThan(100);
+    expect(keys.filter((key) => spoken.spoken(key) !== englishOf(plain.locales, key))).toEqual([]);
   });
 });

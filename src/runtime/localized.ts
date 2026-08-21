@@ -5,6 +5,7 @@ import { EngineKey, localeKey, Locales } from '../content/locale';
 import { parseSegments, TextSegment } from '../grammar/segment';
 import { Registry } from '../content/registry';
 import { articleEn } from '../grammar/values';
+import { withoutNote } from '../grammar/note';
 
 declare const LOCALIZED: unique symbol;
 
@@ -26,11 +27,12 @@ function substitute(pattern: string, key: string, params: Params): string {
   });
 }
 
+// Every player-facing string the engine says is resolved here, which is why a note an author left in one is dropped here and nowhere else.
 function pattern(locales: Locales, language: string, key: string): string | undefined {
   const declared = locales.declared.get(language)?.get(key);
-  if (declared !== undefined) return declared;
+  if (declared !== undefined) return withoutNote(declared);
   const base = locales.base.get(key);
-  return base?.language === language ? base.text : undefined;
+  return base?.language === language ? withoutNote(base.text) : undefined;
 }
 
 export interface Localizer {

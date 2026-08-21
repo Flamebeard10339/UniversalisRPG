@@ -93,6 +93,7 @@ Tools, none of which are gates:
 - `npm run probe -- <source>... [--show <kind>.<id>] [--round-trip] [--each]` — ask the load path a question without building a runner
 - `npm run oracle [-- <kind>... | --at <draft.dsl>]` — print the grammar the editing page offers, as a tree per kind or line by line through a draft
 - `npm run inspect -- "<expression>"` — evaluate against the repo's own module resolution, leaving no file behind
+- `npm run notes [-- <source>...]` — list every `@@@` the corpus holds: writing that is standing in for better writing, and what an author asked for that the engine cannot do
 - `npm run mutate -- <manifest.json>` — break a named line, run the tests it names, report what the suite failed to notice
 
 **A UI feature is tested by the author, not by the agent.** Build it, hand it
