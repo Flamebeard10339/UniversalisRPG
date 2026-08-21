@@ -116,7 +116,7 @@ const namesAt = (text: string, cursor: number, known: readonly Addressed[]): str
   const kind = offering.filling.kind ?? [...new Set(offering.offers.flatMap((offer) => (offer.kind === undefined ? [] : [offer.kind])))][0];
   const held = offering.filling.shapes === undefined ? [] : offering.filling.shapes.map((shape) => `      ${shape}`);
   const named = kind === undefined ? [] : known.filter((each) => each.kind === kind).map((each) => each.address).sort();
-  const listed = kind === undefined ? [] : [`      declared: ${named.length === 0 ? 'nothing yet' : `${named.slice(0, NAMED).join(', ')}${named.length > NAMED ? `, … and ${named.length - NAMED} more, ${named.length} in all` : ''}`}`];
+  const listed = kind === undefined ? [] : [`      declared: ${named.length === 0 ? 'none anywhere' : `${named.slice(0, NAMED).join(', ')}${named.length > NAMED ? `, … and ${named.length - NAMED} more, ${named.length} in all` : ''}`}`];
   return [`    ${fillingWords({ ...offering.filling, ...(kind === undefined ? {} : { kind }) })}`, ...held, ...listed].join('\n');
 };
 
