@@ -3,7 +3,7 @@ import { asLocalized } from '../../runtime/localizedFixture';
 import { layerNamed, mapState, mapSurface, pointFrom, shellState, shellSurface, subpageNamed, zoomFrom, type MapControls } from './surfaces';
 import { CLIMB_NUDGE, sheetAt, type Place } from '../discovery';
 import { ZOOM_MAX, ZOOM_MIN, type Point } from '../viewport';
-import { HOME_LAYER, LAYERS, OPENING, toLayer } from '../nav';
+import { HOME_LAYER, LAYERS, OPENING, toLayer, type Where } from '../nav';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -24,7 +24,7 @@ const HOUSE: Place[] = [
 
 describe('the shell as a driving agent reaches it', () => {
   it('publishes where it is standing by the names the model uses, not by an index', () => {
-    expect(shellState(OPENING)).toEqual({
+    expect(shellState(OPENING, true)).toEqual({
       layer: 'home',
       subpage: 'home',
       layers: ['map', 'home', 'character'],
@@ -33,39 +33,41 @@ describe('the shell as a driving agent reaches it', () => {
   });
 
   it('says which pages are on offer, which is the layer being stood on and no other', () => {
-    const character = shellState(toLayer(OPENING, LAYERS.findIndex((layer) => layer.id === 'character')));
+    const character = shellState(toLayer(OPENING, LAYERS.findIndex((layer) => layer.id === 'character')), true);
 
     expect(character.subpages).toEqual(['stats', 'skills', 'equipment', 'inventory']);
   });
 
   it('moves the layer by name', () => {
     let moved = OPENING;
-    shellSurface(OPENING, (where) => void (moved = where)).actions!.layer('map');
+    shellSurface(OPENING, true, (where: Where) => void (moved = where)).actions!.layer('map');
 
-    expect(shellState(moved).layer).toBe('map');
+    expect(shellState(moved, true).layer).toBe('map');
   });
 
   it('moves the page of the layer being stood on, by name', () => {
     let moved = OPENING;
-    shellSurface(OPENING, (where) => void (moved = where)).actions!.subpage('settings');
+    shellSurface(OPENING, true, (where: Where) => void (moved = where)).actions!.subpage('settings');
 
-    expect(shellState(moved)).toMatchObject({ layer: 'home', subpage: 'settings' });
+    expect(shellState(moved, true)).toMatchObject({ layer: 'home', subpage: 'settings' });
   });
 
   it('refuses a name nothing answers to rather than clamping to a neighbour', () => {
     expect(() => layerNamed('nowhere')).toThrow('no layer is named nowhere');
     expect(() => layerNamed(1)).toThrow('no layer is named 1');
-    expect(() => subpageNamed(HOME_LAYER, 'inventory')).toThrow('home has no subpage named inventory');
+    expect(() => subpageNamed(HOME_LAYER, true, 'inventory')).toThrow('home has no subpage named inventory');
+    expect(() => subpageNamed(HOME_LAYER, false, 'edit')).toThrow('home has no subpage named edit');
+    expect(subpageNamed(HOME_LAYER, true, 'edit')).toBe('edit');
   });
 
   it('remembers a page it was moved to, so re-entering the layer comes back to it', () => {
     const character = LAYERS.findIndex((layer) => layer.id === 'character');
     let moved = toLayer(OPENING, character);
-    const surface = shellSurface(moved, (where) => void (moved = where));
+    const surface = shellSurface(moved, true, (where: Where) => void (moved = where));
     surface.actions!.subpage('inventory');
     const left = toLayer(moved, HOME_LAYER);
 
-    expect(shellState(toLayer(left, character)).subpage).toBe('inventory');
+    expect(shellState(toLayer(left, character), true).subpage).toBe('inventory');
   });
 });
 

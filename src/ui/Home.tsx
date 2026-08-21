@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { MessageTone } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { groupOffers } from './choices';
+import { Console } from './Console';
 import type { DriverSnapshot } from './driver';
 import { SPLIT_DEFAULT, splitFrom } from './gesture';
 import { LiveSheet } from './LiveSheet';
 import { Splitter } from './Splitter';
 import type { LogEntry, LogKind } from './transcript';
 import { useMoment } from './transient';
+import type { Words } from './words';
 
 const TONE_CLASS: Record<MessageTone, string> = {
   plain: 'text-text',
@@ -64,7 +66,19 @@ function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: 
 
 const NEAR_BOTTOM_PX = 32;
 
-export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapshot; onChoose: (position: number) => void; onCancel: () => void }): JSX.Element {
+export function Home({
+  snapshot,
+  words,
+  onChoose,
+  onCancel,
+  onSend,
+}: {
+  snapshot: DriverSnapshot;
+  words: Words;
+  onChoose: (position: number) => void;
+  onCancel: () => void;
+  onSend: (line: string) => void;
+}): JSX.Element {
   const view = snapshot.view;
   const live = snapshot.live;
   const surface = useRef<HTMLDivElement>(null);
@@ -117,6 +131,8 @@ export function Home({ snapshot, onChoose, onCancel }: { snapshot: DriverSnapsho
           </>
         ) : null}
       </div>
+
+      <Console onSend={onSend} words={words} />
     </>
   );
 }

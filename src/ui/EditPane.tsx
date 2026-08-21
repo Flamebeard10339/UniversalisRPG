@@ -1,6 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { Console } from './Console';
-import { DevOnly } from './DevOnly';
 import { searching } from './authoringSurface';
 import { draftIn, kindsIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
 import { useTestSurface } from './useTestSurface';
@@ -8,7 +6,7 @@ import type { Words } from './words';
 
 const OPEN_TO_ALL = '';
 
-export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: boolean; onSend: (line: string) => void; words: Words }): JSX.Element {
+export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX.Element {
   const list = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const restored = useRef(false);
@@ -31,7 +29,6 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <DevOnly dev={dev}>
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface-raised px-3 py-2">
         {(['local', 'global'] as const).map((surface) => (
           <button
@@ -167,9 +164,6 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
           </div>
         </div>
       ) : null}
-      </DevOnly>
-
-      <Console onSend={onSend} words={words} />
     </div>
   );
 }

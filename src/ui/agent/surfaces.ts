@@ -5,7 +5,7 @@ import { draftIn, kindsIn, rowsIn, sectionKey, type EditHeld } from '../editCont
 import { clampZoom, type Point } from '../viewport';
 import { clampIndex } from '../gesture';
 import type { LabelId } from '../labels';
-import { LAYERS, subpageOf, toLayer, toSubpage, type LayerId, type Where } from '../nav';
+import { LAYERS, pageOf, shownIn, toLayer, toSubpage, type LayerId, type Where } from '../nav';
 import type { PlaneGraph, Plane } from '../planeGraph';
 import { filled, type SkillPanel } from '../skillPanels';
 import type { TestSurface } from '../testSurface';
@@ -16,11 +16,11 @@ export function layerNamed(value: unknown): number {
   return at;
 }
 
-export function subpageNamed(layer: number, value: unknown): number {
+export function subpageNamed(layer: number, dev: boolean, value: unknown): LabelId {
   const held = clampIndex(layer, LAYERS.length);
-  const at = LAYERS[held].subpages.findIndex((subpage) => subpage.id === value);
-  if (at < 0) throw new Error(`${LAYERS[held].id} has no subpage named ${String(value)}`);
-  return at;
+  const found = shownIn(LAYERS[held], dev).find((subpage) => subpage.id === value);
+  if (!found) throw new Error(`${LAYERS[held].id} has no subpage named ${String(value)}`);
+  return found.id;
 }
 
 export interface ShellState {
@@ -30,22 +30,23 @@ export interface ShellState {
   subpages: readonly LabelId[];
 }
 
-export function shellState(where: Where): ShellState {
+export function shellState(where: Where, dev: boolean): ShellState {
   const layer = LAYERS[where.layer];
+  const shown = shownIn(layer, dev);
   return {
     layer: layer.id,
-    subpage: layer.subpages[subpageOf(where)].id,
+    subpage: shown[pageOf(where, where.layer, dev)].id,
     layers: LAYERS.map((each) => each.id),
-    subpages: layer.subpages.map((subpage) => subpage.id),
+    subpages: shown.map((subpage) => subpage.id),
   };
 }
 
-export function shellSurface(where: Where, go: (where: Where) => void): TestSurface {
+export function shellSurface(where: Where, dev: boolean, go: (where: Where) => void): TestSurface {
   return {
-    state: () => shellState(where),
+    state: () => shellState(where, dev),
     actions: {
       layer: (value) => go(toLayer(where, layerNamed(value))),
-      subpage: (value) => go(toSubpage(where, where.layer, subpageNamed(where.layer, value))),
+      subpage: (value) => go(toSubpage(where, where.layer, subpageNamed(where.layer, dev, value))),
     },
   };
 }
@@ -261,7 +262,7 @@ export function skillNamed(panels: readonly SkillPanel[], value: unknown): Answe
 }
 
 export interface AgentSurfaces {
-  shell: { where: Where; go: (where: Where) => void };
+  shell: { where: Where; dev: boolean; go: (where: Where) => void };
   map: { map: MapView; controls: MapControls };
   skills: { panels: readonly SkillPanel[]; opened: Answer | null; greeted: readonly Answer[]; controls: { open(id: Answer | null): void } };
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
@@ -269,7 +270,7 @@ export interface AgentSurfaces {
 }
 
 export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurfaces[K]) => TestSurface } = {
-  shell: ({ where, go }) => shellSurface(where, go),
+  shell: ({ where, dev, go }) => shellSurface(where, dev, go),
   map: ({ map, controls }) => mapSurface(map, controls),
   plane: (held) => planeSurface(held),
   skills: (held) => skillsSurface(held),

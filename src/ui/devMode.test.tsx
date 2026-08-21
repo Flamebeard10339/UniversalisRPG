@@ -99,7 +99,7 @@ describe('one answer gates every dev-only control (c6)', () => {
 
   it("says whose session this is from every page there is, and says nothing while it is the player's", () => {
     const { driver } = playing();
-    const everywhere = LAYERS.flatMap((layer, at) => layer.subpages.map((_, index) => toSubpage(toLayer(OPENING, at), at, index)));
+    const everywhere = LAYERS.flatMap((layer, at) => layer.subpages.map((subpage) => toSubpage(toLayer(OPENING, at), at, subpage.id)));
     expect(everywhere.length).toBeGreaterThan(4);
 
     for (const where of everywhere) {
@@ -111,6 +111,28 @@ describe('one answer gates every dev-only control (c6)', () => {
     for (const where of everywhere) {
       expect(renderToStaticMarkup(<App driver={driver} opening={where} />), `${LAYERS[where.layer].id}`).toContain(DEV_STRIP);
     }
+  });
+
+  it('keeps the editing page out of the tab bar until the session is a developer', () => {
+    const { driver } = playing();
+
+    const asPlayer = renderToStaticMarkup(<App driver={driver} />);
+    driver.send(devLine(true));
+    const asDeveloper = renderToStaticMarkup(<App driver={driver} />);
+
+    expect(asPlayer).not.toContain('data-subpage="edit"');
+    expect(asPlayer).toContain('data-subpage="settings"');
+    expect(asDeveloper).toContain('data-subpage="edit"');
+  });
+
+  it('leaves the command line where the session is played, so the mode takes no line away', () => {
+    const { driver } = playing();
+    const asPlayer = renderToStaticMarkup(<App driver={driver} />);
+
+    driver.send('/look');
+
+    expect(asPlayer).toContain('data-drive="send"');
+    expect(said(driver).some((line) => line.includes('dev power'))).toBe(false);
   });
 
   it('draws the strip through the same gate the surfaces go through', () => {

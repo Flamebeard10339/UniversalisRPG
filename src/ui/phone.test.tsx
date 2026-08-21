@@ -8,7 +8,7 @@ import { localizerFor } from '../runtime/localized';
 import { App } from './App';
 import { createDriver } from './driver';
 import { SPLIT_DEFAULT } from './gesture';
-import { BOUNDARIES, LAYERS } from './nav';
+import { BOUNDARIES, LAYERS, shownIn } from './nav';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { TabBar } from './TabBar';
 import { wordsOf } from './words';
@@ -62,7 +62,9 @@ describe('the layout a phone is held to', () => {
 
   it('gives every subpage of every layer a control that is tapped rather than swiped', () => {
     for (const layer of LAYERS) {
-      const bar = renderToStaticMarkup(<TabBar tabs={layer.subpages} active={layer.opens} onSelect={() => undefined} words={shellWord} />);
+      const bar = renderToStaticMarkup(
+        <TabBar tabs={layer.subpages} active={layer.subpages.findIndex((subpage) => subpage.id === layer.opens)} onSelect={() => undefined} words={shellWord} />,
+      );
 
       expect(attributes(bar, 'data-subpage'), layer.id).toEqual(layer.subpages.map((subpage) => subpage.id));
     }
@@ -82,6 +84,6 @@ describe('the layout a phone is held to', () => {
   it('draws the tab bar of the layer the player is standing on, and not the whole app', () => {
     const opening = LAYERS.find((layer) => layer.id === 'home')!;
 
-    expect(attributes(markup(), 'data-subpage')).toEqual(opening.subpages.map((subpage) => subpage.id));
+    expect(attributes(markup(), 'data-subpage')).toEqual(shownIn(opening, false).map((subpage) => subpage.id));
   });
 });

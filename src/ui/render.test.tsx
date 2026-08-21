@@ -24,6 +24,7 @@ import { SHIPPED_SOURCES } from './shippedContent';
 import { LABELS, type LabelId } from './labels';
 import { wordsOf } from './words';
 import { HOME_LAYER, LAYERS, OPENING, toLayer, toSubpage } from './nav';
+import { Pager } from './Pager';
 
 const MAPPING = { sections: [], where: FORGOTTEN.map, onWhere: () => undefined, onSend: () => undefined, onNote: () => undefined, dev: false };
 
@@ -499,9 +500,7 @@ describe('what the shell puts on the screen', () => {
     const running = RATES[RATES.length - 2];
     driver.send(devLine(true));
     driver.send(speedLine(String(running)));
-    const settings = LAYERS[HOME_LAYER].subpages.findIndex((subpage) => subpage.id === 'settings');
-
-    const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, settings)} />);
+    const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, 'settings')} />);
     const drawn = [...html.matchAll(/data-rate="(\d+)"(?:[^>]*?(data-running))?/g)];
 
     expect(driver.snapshot().speed).toBe(running);
@@ -599,8 +598,7 @@ describe('what the shell puts on the screen', () => {
       const driver = createDriver([SURVEYED], { ticker: noTicks });
       driver.choose(position(driver, LOOK_OUT));
       const view = driver.snapshot().view;
-      const skills = LAYERS[2].subpages.findIndex((subpage) => subpage.id === 'skills');
-      const where = toSubpage(toLayer(OPENING, 2), 2, skills);
+      const where = toSubpage(toLayer(OPENING, 2), 2, 'skills');
 
       const drawn = skillPanels(renderToStaticMarkup(<App driver={driver} opening={where} />));
 
@@ -654,9 +652,7 @@ describe('what the editing page says about a section', () => {
     const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
     driver.send(devLine(true));
     driver.send('/dsl entity tutorial-island.miki title: Miki');
-    const edit = LAYERS[HOME_LAYER].subpages.findIndex((subpage) => subpage.id === 'edit');
-
-    const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, edit)} />);
+    const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, 'edit')} />);
     const staged = rowClass(html, 'entity tutorial-island.miki');
     const shipped = rowClass(html, 'entity tutorial-island.oven');
 
@@ -664,5 +660,28 @@ describe('what the editing page says about a section', () => {
     expect(staged).not.toBe(shipped);
     expect(staged).not.toContain('italic');
     expect(staged).toContain('warning');
+  });
+});
+
+describe('what a screen wider than it is tall gets', () => {
+  const strip = (columns: number): string =>
+    renderToStaticMarkup(
+      <Pager
+        index={0}
+        columns={columns}
+        onIndex={() => undefined}
+        panes={[<span key="a">first</span>, <span key="b">second</span>, <span key="c">third</span>]}
+      />,
+    );
+
+  it('gives each pane the share of the strip its column is worth', () => {
+    expect([...strip(1).matchAll(/width:100%/g)]).toHaveLength(3);
+    expect([...strip(2).matchAll(/width:50%/g)]).toHaveLength(3);
+  });
+
+  it('draws every pane either way, so the one beside the open page is already there to read', () => {
+    for (const columns of [1, 2]) {
+      for (const pane of ['first', 'second', 'third']) expect(strip(columns), `${columns} columns`).toContain(pane);
+    }
   });
 });

@@ -5,32 +5,33 @@ export type LayerId = 'map' | 'home' | 'character';
 
 export interface Subpage {
   id: LabelId;
+  dev?: true;
 }
 
 export interface Layer {
   id: LayerId;
   subpages: readonly Subpage[];
-  opens: number;
+  opens: LabelId;
 }
 
 export const LAYERS: readonly Layer[] = [
   {
     id: 'map',
-    opens: 0,
+    opens: 'map',
     subpages: [{ id: 'map' }],
   },
   {
     id: 'home',
-    opens: 1,
+    opens: 'home',
     subpages: [
-      { id: 'edit' },
+      { id: 'edit', dev: true },
       { id: 'home' },
       { id: 'settings' },
     ],
   },
   {
     id: 'character',
-    opens: 0,
+    opens: 'stats',
     subpages: [
       { id: 'stats' },
       { id: 'skills' },
@@ -46,22 +47,30 @@ export const BOUNDARIES = LAYERS.length - 1;
 
 export interface Where {
   layer: number;
-  subpage: readonly number[];
+  subpage: readonly LabelId[];
 }
 
 export const OPENING: Where = { layer: HOME_LAYER, subpage: LAYERS.map((layer) => layer.opens) };
 
-export const subpageOf = (where: Where): number => where.subpage[where.layer];
+export const shownIn = (layer: Layer, dev: boolean): readonly Subpage[] => layer.subpages.filter((subpage) => dev || subpage.dev !== true);
+
+export const subpageOf = (where: Where): LabelId => where.subpage[where.layer];
 
 export function toLayer(where: Where, layer: number): Where {
   return { ...where, layer: clampIndex(layer, LAYERS.length) };
 }
 
-export function toSubpage(where: Where, layer: number, at: number): Where {
+export function toSubpage(where: Where, layer: number, id: LabelId): Where {
   const held = clampIndex(layer, LAYERS.length);
   const subpage = [...where.subpage];
-  subpage[held] = clampIndex(at, LAYERS[held].subpages.length);
+  subpage[held] = LAYERS[held].subpages.some((each) => each.id === id) ? id : LAYERS[held].opens;
   return { ...where, subpage };
+}
+
+export function pageOf(where: Where, layer: number, dev: boolean): number {
+  const shown = shownIn(LAYERS[layer], dev);
+  const at = shown.findIndex((subpage) => subpage.id === where.subpage[layer]);
+  return clampIndex(at < 0 ? shown.findIndex((subpage) => subpage.id === LAYERS[layer].opens) : at, shown.length);
 }
 
 export function across(layer: number, boundary: number): number {

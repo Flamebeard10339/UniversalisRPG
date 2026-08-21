@@ -5,6 +5,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it } from 'vitest';
 import { createTransientChannel, TransientProvider, useMoment } from './transient';
+import { SIDE_BY_SIDE, useWide } from './wide';
 
 function mounted(element: JSX.Element): () => void {
   const host = document.createElement('div');
@@ -49,7 +50,40 @@ describe('the suite runs a React effect', () => {
   });
 });
 
-const EXERCISED: readonly string[] = ['transient.ts'];
+const EXERCISED: readonly string[] = ['transient.ts', 'wide.ts'];
+
+describe('the shell notices a screen wider than it is tall', () => {
+  it('reads the query when it mounts and again whenever the query changes', () => {
+    const listeners: Array<() => void> = [];
+    const asked: string[] = [];
+    let matches = false;
+    (window as unknown as { matchMedia: unknown }).matchMedia = (query: string) => {
+      asked.push(query);
+      return {
+        get matches() {
+          return matches;
+        },
+        addEventListener: (_kind: string, run: () => void) => void listeners.push(run),
+        removeEventListener: () => undefined,
+      };
+    };
+    let seen: boolean | null = null;
+    function Host(): JSX.Element {
+      seen = useWide();
+      return <span />;
+    }
+
+    const unmount = mounted(<Host />);
+    expect(asked).toEqual([SIDE_BY_SIDE]);
+    expect(seen).toBe(false);
+
+    matches = true;
+    act(() => listeners.forEach((run) => run()));
+
+    expect(seen).toBe(true);
+    unmount();
+  });
+});
 
 const NOT_EXERCISED: readonly string[] = ['useTestSurface.ts', 'App.tsx', 'DragSheet.tsx', 'EditPane.tsx', 'Home.tsx', 'MapPane.tsx', 'Pager.tsx', 'PlaneModal.tsx', 'VStack.tsx'];
 

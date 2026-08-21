@@ -23,13 +23,15 @@ import { SkillsPane } from './SkillsPane';
 import { XpOverlay } from './XpOverlay';
 import { arrivalsBetween, emptyQueue, gainsBetween, heard, poured, type Note } from './xpNotes';
 import { ModalSheet } from './ModalSheet';
-import { LAYERS, OPENING, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
+import { LAYERS, OPENING, pageOf, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
 import { PlaneModal } from './PlaneModal';
 import { carried, counted, worn } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
 import { useTestSurface } from './useTestSurface';
+import { useWide } from './wide';
+import { columnsIn } from './gesture';
 import { wordsOf } from './words';
 import { TransientProvider } from './transient';
 import { VStack } from './VStack';
@@ -150,7 +152,7 @@ export function App({
     setWhere(next);
   };
   const shell = { where, go };
-  const crossed = useCrossings(rows, LAYERS[where.layer].subpages[subpageOf(where)].id === 'skills');
+  const crossed = useCrossings(rows, subpageOf(where) === 'skills');
 
   const sections = useMemo(
     () => addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }]),
@@ -175,12 +177,13 @@ export function App({
     ),
   };
 
-  useTestSurface('shell', shell);
+  useTestSurface('shell', { ...shell, dev });
+  const wide = useWide();
 
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
-      if (subpage.id === 'home') return <Home snapshot={snapshot} onChoose={driver.choose} onCancel={driver.cancel} />;
-      if (subpage.id === 'edit') return <EditPane held={held} dev={dev} onSend={driver.send} words={words} />;
+      if (subpage.id === 'home') return <Home snapshot={snapshot} words={words} onChoose={driver.choose} onCancel={driver.cancel} onSend={driver.send} />;
+      if (subpage.id === 'edit') return <EditPane held={held} words={words} />;
       return subpage.id === 'settings' ? <SettingsPane dev={dev} speed={snapshot.speed} words={words} onSend={driver.send} /> : null;
     }
     if (layer.id === 'map') {
@@ -205,14 +208,20 @@ export function App({
     return <Ledger entries={carried(view.carried, view.planes, localizer)} onOpen={driver.open} />;
   };
 
-  const bodies = LAYERS.map((layer, at) => (
-    <Pager
-      key={layer.id}
-      index={shell.where.subpage[at]}
-      onIndex={(index) => go((held) => toSubpage(held, at, index))}
-      panes={layer.subpages.map((subpage) => pane(layer, subpage))}
-    />
-  ));
+  const bodies = LAYERS.map((layer, at) => {
+    const shown = shownIn(layer, dev);
+    return (
+      <Pager
+        key={layer.id}
+        index={pageOf(shell.where, at, dev)}
+        columns={columnsIn(wide, shown.length)}
+        onIndex={(index) => go((held) => toSubpage(held, at, shown[index].id))}
+        panes={shown.map((subpage) => pane(layer, subpage))}
+      />
+    );
+  });
+
+  const tabs = shownIn(LAYERS[shell.where.layer], dev);
 
   return (
     <TransientProvider value={driver.transient}>
@@ -234,7 +243,7 @@ export function App({
           <FloatingText channel={driver.transient} />
           <XpOverlay notes={notes} />
         </main>
-        <TabBar words={words} tabs={LAYERS[shell.where.layer].subpages} active={subpageOf(shell.where)} onSelect={(index) => go((held) => toSubpage(held, held.layer, index))} />
+        <TabBar words={words} tabs={tabs} active={pageOf(shell.where, shell.where.layer, dev)} onSelect={(index) => go((held) => toSubpage(held, held.layer, tabs[index].id))} />
         {asking && plane ? <PlaneModal plane={plane} option={asking} words={words} onAnswer={driver.answer} /> : null}
         {asking && !plane ? <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave} /> : null}
       </div>

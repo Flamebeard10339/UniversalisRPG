@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
-import { dragAxis, heldStill, landingIndex, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, wasDragged, type Axis, type Motion } from './gesture';
+import { dragAxis, heldStill, landingIndex, motionFrom, pagerOffset, pagesIn, releaseVelocity, sampleVelocity, wasDragged, type Axis, type Motion } from './gesture';
 import { useMomentPlayer } from './transient';
 
 interface Drag {
@@ -13,11 +13,12 @@ interface Drag {
 }
 
 // translate, never translate3d, and no `will-change`: a promoted layer is rastered once and the text on it goes soft.
-const restingAt = (index: number): string => `translate(${-index * 100}%, 0)`;
+const restingAt = (index: number, columns: number): string => `translate(${(-index * 100) / columns}%, 0)`;
 
 // Mouse and touch events rather than pointer events: a browser cancels a pointer stream as soon as it
 // decides a scrollable element under the finger is scrolling, and a touch move can be refused instead.
-export function Pager({ index, onIndex, panes }: { index: number; onIndex: (index: number) => void; panes: ReactNode[] }): JSX.Element {
+export function Pager({ index, onIndex, panes, columns = 1 }: { index: number; onIndex: (index: number) => void; panes: ReactNode[]; columns?: number }): JSX.Element {
+  const pages = pagesIn(panes.length, columns);
   const strip = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const dragged = useRef(false);
@@ -25,8 +26,8 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
 
   useLayoutEffect(() => {
     const node = strip.current;
-    if (node) node.style.transform = restingAt(index);
-  }, [index]);
+    if (node) node.style.transform = restingAt(index, columns);
+  }, [index, columns]);
 
   const begin = (x: number, y: number, at: number, width: number, release: () => void): void => {
     dragged.current = false;
@@ -43,7 +44,7 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
 
     dragging.dx = dx;
     dragging.motion = sampleVelocity(dragging.motion, x, at);
-    if (strip.current) strip.current.style.transform = `translate(calc(${-index * 100}% + ${pagerOffset(dx, index, panes.length)}px), 0)`;
+    if (strip.current) strip.current.style.transform = `translate(calc(${(-index * 100) / columns}% + ${pagerOffset(dx, index, pages)}px), 0)`;
     return true;
   };
 
@@ -55,9 +56,9 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
     if (!dragging || dragging.axis !== 'x' || !node) return;
 
     dragged.current = wasDragged(dragging.dx);
-    const landing = landingIndex({ dx: dragging.dx, width: dragging.width, velocity: releaseVelocity(dragging.motion, at), taken }, index, panes.length);
+    const landing = landingIndex({ dx: dragging.dx, width: dragging.width, velocity: releaseVelocity(dragging.motion, at), taken }, index, pages);
     node.style.transition = settle();
-    node.style.transform = restingAt(landing);
+    node.style.transform = restingAt(landing, columns);
     if (landing !== index) onIndex(landing);
   };
 
@@ -71,7 +72,7 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
         const up = (native: MouseEvent): void => end(native.timeStamp, false);
         window.addEventListener('mousemove', move);
         window.addEventListener('mouseup', up);
-        begin(event.clientX, event.clientY, event.timeStamp, event.currentTarget.clientWidth, () => {
+        begin(event.clientX, event.clientY, event.timeStamp, event.currentTarget.clientWidth / columns, () => {
           window.removeEventListener('mousemove', move);
           window.removeEventListener('mouseup', up);
         });
@@ -89,7 +90,7 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
         window.addEventListener('touchmove', move, { passive: false });
         window.addEventListener('touchend', up);
         window.addEventListener('touchcancel', cancel);
-        begin(first.clientX, first.clientY, event.timeStamp, event.currentTarget.clientWidth, () => {
+        begin(first.clientX, first.clientY, event.timeStamp, event.currentTarget.clientWidth / columns, () => {
           window.removeEventListener('touchmove', move);
           window.removeEventListener('touchend', up);
           window.removeEventListener('touchcancel', cancel);
@@ -104,7 +105,7 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
     >
       <div ref={strip} className="flex h-full w-full">
         {panes.map((pane, at) => (
-          <div key={at} className="flex h-full min-h-0 w-full shrink-0 flex-col">
+          <div key={at} className="flex h-full min-h-0 shrink-0 flex-col" style={{ width: `${100 / columns}%` }}>
             {pane}
           </div>
         ))}

@@ -81,3 +81,9 @@ export function heldStill(target: EventTarget | null): boolean {
   const node = target as { closest?: (selector: string) => unknown } | null;
   return typeof node?.closest === 'function' && node.closest(STILL) !== null;
 }
+
+export const COLUMNS_MAX = 2;
+
+export const columnsIn = (wide: boolean, panes: number): number => (wide ? Math.max(1, Math.min(COLUMNS_MAX, panes)) : 1);
+
+export const pagesIn = (panes: number, columns: number): number => Math.max(1, panes - columns + 1);

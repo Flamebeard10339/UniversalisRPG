@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   AXIS_SLOP_PX,
   clampIndex,
+  columnsIn,
+  COLUMNS_MAX,
   dragAxis,
   EDGE_RESISTANCE,
   heldStill,
@@ -10,6 +12,7 @@ import {
   landingIndex,
   motionFrom,
   pagerOffset,
+  pagesIn,
   releaseVelocity,
   sampleVelocity,
   settleStep,
@@ -169,5 +172,24 @@ describe('an element that keeps a drag to itself', () => {
     expect(named).toContain('textarea');
     expect(named).toContain('select');
     expect(named).toContain('[data-still]');
+  });
+});
+
+describe('two pages standing side by side', () => {
+  it('draws one column on a screen taller than it is wide and two on a wider one', () => {
+    expect(columnsIn(false, 4)).toBe(1);
+    expect(columnsIn(true, 4)).toBe(COLUMNS_MAX);
+  });
+
+  it('never draws more columns than the layer has pages to fill them', () => {
+    expect(columnsIn(true, 1)).toBe(1);
+    expect(columnsIn(true, 0)).toBe(1);
+  });
+
+  it('loses a resting place for every extra column, and keeps at least one', () => {
+    expect(pagesIn(4, 1)).toBe(4);
+    expect(pagesIn(4, 2)).toBe(3);
+    expect(pagesIn(2, 2)).toBe(1);
+    expect(pagesIn(1, 2)).toBe(1);
   });
 });

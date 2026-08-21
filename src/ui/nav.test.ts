@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LABELS } from './labels';
-import { across, bodyHeights, BOUNDARIES, HOME_LAYER, LAYERS, layerOffsets, layerSpan, OPENING, subpageOf, toLayer, toSubpage } from './nav';
+import { across, bodyHeights, BOUNDARIES, HOME_LAYER, LAYERS, layerOffsets, layerSpan, OPENING, pageOf, shownIn, subpageOf, toLayer, toSubpage } from './nav';
 
 const BANDS = { height: 700, banners: [60, 40] };
 
@@ -63,6 +63,8 @@ describe('where each layer rests', () => {
   });
 });
 
+const CHARACTER = LAYERS.findIndex((layer) => layer.id === 'character');
+
 describe('the page each layer was left on', () => {
   it('opens each layer where that layer says it opens', () => {
     expect(OPENING.subpage).toEqual(LAYERS.map((layer) => layer.opens));
@@ -70,35 +72,66 @@ describe('the page each layer was left on', () => {
   });
 
   it('comes back to the page a layer was left on rather than to where it starts', () => {
-    const character = LAYERS.findIndex((layer) => layer.id === 'character');
-    const last = LAYERS[character].subpages.length - 1;
+    const last = LAYERS[CHARACTER].subpages[LAYERS[CHARACTER].subpages.length - 1].id;
 
-    const left = toSubpage(toLayer(OPENING, character), character, last);
-    const back = toLayer(toLayer(left, HOME_LAYER), character);
+    const left = toSubpage(toLayer(OPENING, CHARACTER), CHARACTER, last);
+    const back = toLayer(toLayer(left, HOME_LAYER), CHARACTER);
 
     expect(subpageOf(back)).toBe(last);
   });
 
   it('remembers each layer separately, so one page is never mistaken for another', () => {
-    const character = LAYERS.findIndex((layer) => layer.id === 'character');
-    const moved = toSubpage(toSubpage(OPENING, character, 2), HOME_LAYER, 0);
+    const moved = toSubpage(toSubpage(OPENING, CHARACTER, 'equipment'), HOME_LAYER, 'edit');
 
-    expect(subpageOf(toLayer(moved, character))).toBe(2);
-    expect(subpageOf(toLayer(moved, HOME_LAYER))).toBe(0);
+    expect(subpageOf(toLayer(moved, CHARACTER))).toBe('equipment');
+    expect(subpageOf(toLayer(moved, HOME_LAYER))).toBe('edit');
   });
 
   it('moves a page without moving the layer the player is standing on', () => {
-    const character = LAYERS.findIndex((layer) => layer.id === 'character');
-    const moved = toSubpage(OPENING, character, 2);
+    const moved = toSubpage(OPENING, CHARACTER, 'equipment');
 
     expect(moved.layer).toBe(OPENING.layer);
     expect(subpageOf(moved)).toBe(subpageOf(OPENING));
-    expect(moved.subpage[character]).toBe(2);
+    expect(moved.subpage[CHARACTER]).toBe('equipment');
   });
 
-  it('stops at each end of a layer rather than running past it', () => {
-    expect(toSubpage(OPENING, HOME_LAYER, -1).subpage[HOME_LAYER]).toBe(0);
-    expect(toSubpage(OPENING, HOME_LAYER, 9).subpage[HOME_LAYER]).toBe(LAYERS[HOME_LAYER].subpages.length - 1);
+  it('falls back to where a layer opens rather than to a page that layer has not got', () => {
+    expect(toSubpage(OPENING, HOME_LAYER, 'inventory').subpage[HOME_LAYER]).toBe(LAYERS[HOME_LAYER].opens);
+    expect(toSubpage(OPENING, CHARACTER, 'edit').subpage[CHARACTER]).toBe(LAYERS[CHARACTER].opens);
+  });
+});
+
+describe('the pages a session is allowed to see', () => {
+  it('keeps a dev-only page out of the tab bar until the session is a developer', () => {
+    const home = LAYERS[HOME_LAYER];
+
+    expect(shownIn(home, true).map((subpage) => subpage.id)).toEqual(home.subpages.map((subpage) => subpage.id));
+    expect(shownIn(home, false).map((subpage) => subpage.id)).toEqual(home.subpages.filter((subpage) => !subpage.dev).map((subpage) => subpage.id));
+    expect(shownIn(home, false).length).toBeLessThan(home.subpages.length);
+  });
+
+  it('declares at least one dev-only page and never opens a layer on one', () => {
+    expect(LAYERS.flatMap((layer) => layer.subpages.filter((subpage) => subpage.dev)).length).toBeGreaterThan(0);
+
+    for (const layer of LAYERS) {
+      expect(shownIn(layer, false).length, layer.id).toBeGreaterThan(0);
+      expect(shownIn(layer, false).map((subpage) => subpage.id), layer.id).toContain(layer.opens);
+    }
+  });
+
+  it('leaves the author on the page they were on when the mode is turned on or off', () => {
+    const settings = toSubpage(OPENING, HOME_LAYER, 'settings');
+
+    expect(shownIn(LAYERS[HOME_LAYER], true)[pageOf(settings, HOME_LAYER, true)].id).toBe('settings');
+    expect(shownIn(LAYERS[HOME_LAYER], false)[pageOf(settings, HOME_LAYER, false)].id).toBe('settings');
+  });
+
+  it('shows where a layer opens when the page it was left on is one the session cannot see', () => {
+    const editing = toSubpage(OPENING, HOME_LAYER, 'edit');
+
+    expect(shownIn(LAYERS[HOME_LAYER], true)[pageOf(editing, HOME_LAYER, true)].id).toBe('edit');
+    expect(shownIn(LAYERS[HOME_LAYER], false)[pageOf(editing, HOME_LAYER, false)].id).toBe(LAYERS[HOME_LAYER].opens);
+    expect(subpageOf(editing)).toBe('edit');
   });
 });
 
@@ -106,13 +139,13 @@ describe('what the nav owes the rest of the shell', () => {
   it('lands Settings and Edit beside Home, which is where the spec leaves them', () => {
     expect(LAYERS[HOME_LAYER].subpages.map((subpage) => subpage.id)).toContain('settings');
     expect(LAYERS[HOME_LAYER].subpages.map((subpage) => subpage.id)).toContain('edit');
-    expect(LAYERS[HOME_LAYER].subpages[LAYERS[HOME_LAYER].opens].id).toBe('home');
+    expect(LAYERS[HOME_LAYER].opens).toBe('home');
   });
 
   it('gives every layer a page to be on and every page a word to be called', () => {
     for (const layer of LAYERS) {
       expect(layer.subpages.length).toBeGreaterThan(0);
-      expect(layer.opens).toBeLessThan(layer.subpages.length);
+      expect(layer.subpages.map((subpage) => subpage.id)).toContain(layer.opens);
       for (const subpage of layer.subpages) expect(LABELS[subpage.id]).toBeTruthy();
     }
   });
