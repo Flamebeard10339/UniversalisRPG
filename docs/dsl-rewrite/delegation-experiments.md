@@ -561,3 +561,24 @@ The probe agent also reported the checkout switching branches underneath it and
 declined to "restore" what it found, snapshotting the SHA it was asked about
 instead. That is the correct call and it is worth knowing an agent will make it.
 
+
+## 2026-08-21 — five blind authoring trials over the oracle
+
+| # | agent | dispatch | tokens | tools | wall | steering | what came back |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 86 | Haiku (cold spawn) x2, concurrent | **Author a section knowing nothing but `npm run oracle`.** Forbidden: `src/`, `content/`, `docs/`, any `.dsl`, every other script. One `# entity` with a chance, a gate, a table and a party-facing inflict; one `# location` + `# droptable` with a gated action. Both were told to report every point of confusion as *what I typed / what it said / what it should have said*, numbered, and were told vague praise was useless. | 64.9k / 80.5k | 32 / 41 | 307s / 382s | **high**: the tool under test was the only source, and the deliverable was a numbered critique rather than the file | Both converged, independently, on the one thing I had not seen: a page moves its cursor and the offering follows, but a **file does not**, so every placeholder that was not last on its line was dark. Between them they also found three forms that lied about what the parser reads. The critique was worth more than the drafts. |
+| 87 | Haiku (cold spawn) x2, concurrent | Same rules, harder targets: an `# item` hook nesting contest / `credit:` / chance, and an `# action` extending a shipped location. | 42.6k / 54.5k | 16 / 16 | 141s / 155s | same | Both clean on the first serious pass — the fixes from row 86 held. One found a block-attribution bug (`opened` picked by longest literal prefix, so every wrapper but `if` was reported as `<chance> in <of>:`); the other found the grammar tree printing `+ <amount>` for a form with no space in it, and wrote `+ 2`. |
+| 88 | Sonnet (cold spawn) | Same rules, the bespoke-grammar kinds: nested `one of:`, a branching `# dialogue`, `when hit:`, a `# test`. Asked to rate the tool 1–10 as complete documentation and to quote the offending output. | 80.3k | 31 | 339s | same, plus a rating and a quote requirement | Rated 6/10 and quoted its way to three real defects, one of which was mine: I edited the repo **while the trial was live** and it hit a TDZ crash for part of its run. It also reasoned from a mis-read line to a false conclusion about id qualification — a wrong report that pointed at a true defect underneath it. |
+
+**What rows 86–88 say together.** Blind trials on a documentation tool are cheap
+and they find what the author cannot: four of the five agents independently
+reported the same structural gap, and none of them reported the thing I had
+spent the previous hour polishing. Requiring the critique in the fixed shape
+*what I typed / what it said / what it should have said* is what made the
+reports actionable — the free-form "single most helpful change" answers were
+consistently the weakest part of each report and twice asked for a new mode
+where an existing one needed fixing. Their recommendations do not compress on
+their own; five separate complaints across two agents collapsed into one feature.
+
+Do not edit the repository while a trial is running. Row 88 spent tool calls and
+a numbered finding on a bug that existed for four minutes.
