@@ -73,15 +73,16 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   const written = (value: string): string => (positional ? value : `${keyword}: ${value}`);
   const needs = schema.needs?.[name];
   const block = positional ? undefined : blockOf(parser);
+  const family = { family: positional ? 'written bare' : 'its own fields' };
   return [
-    { form: written(form), example: written(example), ...(needs === undefined ? {} : { needs }) },
-    ...(block === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, block, ...(needs === undefined ? {} : { needs }) }]),
+    { form: written(form), example: written(example), ...family, ...(needs === undefined ? {} : { needs }) },
+    ...(block === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, ...family, block, ...(needs === undefined ? {} : { needs }) }]),
   ];
 };
 
 const schemaGrammar = (schema: AnySchema): readonly Written[] => [
   ...Object.entries(schema.fields).flatMap(([name, spec]) => fieldLines(schema, name, spec)),
-  ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, ...(schema.needs?.[word] === undefined ? {} : { needs: schema.needs![word]! }) })),
+  ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, family: 'a flag it carries', ...(schema.needs?.[word] === undefined ? {} : { needs: schema.needs![word]! }) })),
   ...(schema.entries?.body.grammar ?? []),
 ];
 

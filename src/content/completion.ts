@@ -1,3 +1,4 @@
+import { formPattern } from '../grammar/codec';
 import type { ListParser } from '../grammar/list';
 import type { Parser, Written } from '../grammar/parser';
 import { DEFAULT_CONTEXT, isPositionalField } from '../grammar/section';
@@ -12,16 +13,19 @@ export interface Addressed {
 export interface Offer {
   form: string;
   insert: string;
+  family?: string;
   kind?: string;
 }
 
 export interface Offering {
   from: number;
   to: number;
+  where: readonly string[];
+  reads: string | null;
   offers: readonly Offer[];
 }
 
-const NOTHING: Offering = { from: 0, to: 0, offers: [] };
+const NOTHING: Offering = { from: 0, to: 0, where: [], reads: null, offers: [] };
 
 const HEADING = /^#[ \t]*(?<kind>[a-z][a-z0-9-]*)?(?<gap>[ \t]+)?(?<id>[a-z0-9.-]*)?/;
 const INDENT = /^[ \t]*/;
@@ -82,14 +86,28 @@ function enclosing(text: string, lineStart: number, indent: number): Enclosing[]
   return held;
 }
 
-function linesAt(owner: Section, text: string, lineStart: number, indent: number): readonly Written[] {
+function linesAt(owner: Section, text: string, lineStart: number, indent: number): { lines: readonly Written[]; where: string[] } {
   let lines = owner.grammar;
+  const where = [`# ${owner.kind}`];
   for (const above of enclosing(text, lineStart, indent)) {
     const found = opened(lines, above.text);
-    if (found === undefined) return [];
+    if (found === undefined) return { lines: [], where };
+    where.push(found.form);
     lines = found.block!();
   }
-  return lines;
+  return { lines, where };
+}
+
+// What the engine makes of the line as it stands: the shape it fits that spells out the most of itself.
+function readAs(lines: readonly Written[], line: string): string | null {
+  let best: string | null = null;
+  let longest = -1;
+  for (const written of lines) {
+    if (!formPattern(written.form).test(line) || literalOf(written.form).length <= longest) continue;
+    best = written.form;
+    longest = literalOf(written.form).length;
+  }
+  return best;
 }
 
 const opens = (line: string): string | undefined => HEADING.exec(line)?.groups?.kind;
@@ -153,7 +171,7 @@ const shows = (form: string, typed: string): boolean => {
   return typed === '' || literal.startsWith(typed) || (literal !== '' && typed.startsWith(literal));
 };
 
-const offerFor = (form: string): Offer => ({ form, insert: literalOf(form) === '' ? form : literalOf(form) });
+const offerFor = (form: string, family?: string): Offer => ({ form, insert: literalOf(form) === '' ? form : literalOf(form), ...(family === undefined ? {} : { family }) });
 
 function deduped(offers: readonly Offer[]): Offer[] {
   const held = new Map<string, Offer>();
@@ -169,15 +187,19 @@ function headingOffering(text: string, at: number, before: string, lineEnd: numb
     return {
       from: at - kind.length,
       to: at + LEADING_ID.exec(text.slice(at, lineEnd))![0].length,
-      offers: sectionKinds()
+      where: ['# <kind>'],
+      reads: kind === '' ? null : '# <kind>',
+        offers: sectionKinds()
         .filter((each) => each.startsWith(kind))
-        .map((each) => ({ form: each, insert: `${each} ` })),
+        .map((each) => ({ form: each, insert: `${each} `, family: 'a kind' })),
     };
   }
   const typed = groups.id ?? '';
   return {
     from: at - typed.length,
     to: lineEnd,
+    where: [`# ${kind}`],
+    reads: typed === '' ? null : `# ${kind} <id>`,
     offers: addressOffers(known, new Set(kind === '' ? [] : [kind]), '', typed),
   };
 }
@@ -209,14 +231,19 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const values = named.parser === null ? [] : named.parser.forms.map((form) => (continuing || named.key === null ? form : `${named.key}: ${form}`));
   // Read the section around the line being written, which is the half of it that stands whole while this one is still being typed.
   const held = readSection(`${text.slice(0, lineStart)}${text.slice(lineEnd)}`)?.authored;
-  const lines = continuing ? [] : linesAt(owner, text, lineStart, indent).filter((written) => written.needs === undefined || held === undefined || held[written.needs] !== undefined);
+  const here = linesAt(owner, text, lineStart, indent);
+  const alongside = named.key === null ? 'one more value' : (here.lines.find((written) => literalOf(written.form).trimEnd() === `${named.key}:`)?.family ?? 'what it takes');
+  const lines = here.lines.filter((written) => written.needs === undefined || held === undefined || held[written.needs] !== undefined);
 
   return {
     from,
     to,
+    where: here.where,
+    reads: readAs(here.lines, text.slice(lineStart, lineEnd).trim()),
     offers: deduped([
       ...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token),
-      ...[...lines.map((written) => written.form), ...values].filter((form) => shows(form, typed)).map(offerFor),
+      ...(continuing ? [] : lines).filter((written) => shows(written.form, typed)).map((written) => offerFor(written.form, written.family)),
+      ...values.filter((form) => shows(form, typed)).map((form) => offerFor(form, alongside)),
     ]),
   };
 }

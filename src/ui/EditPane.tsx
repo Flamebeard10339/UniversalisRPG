@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { searching } from './authoringSurface';
 import { draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
 import { splitFrom } from './gesture';
-import { grouped, shownIn } from './offerGroups';
+import { gathered, shownIn } from './offerGroups';
 import { Splitter } from './Splitter';
 import { useTestSurface } from './useTestSurface';
 import type { Words } from './words';
@@ -217,28 +217,37 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
               </div>
             </div>
             {offering.offers.length > 0 ? (
-              <div data-drive="edit.offers" aria-label={words('grammar')} className="w-2/5 max-w-[16rem] shrink-0 overflow-y-auto rounded-xl border border-border bg-panel">
-                {grouped(offering.offers).map((group, at) => (
-                  <div key={group.head ?? `${at}`} className="border-b border-border last:border-b-0">
-                    {group.head === null ? null : <div className="px-2 font-mono text-[11px] leading-tight text-text">{group.head}</div>}
-                    {group.offers.map((offer) => (
-                      <button
-                        key={offer.form}
-                        data-drive="edit.take"
-                        type="button"
-                        data-offer={offer.form}
-                        data-kind={offer.kind}
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          taken.current = true;
-                          controls.take(offer.form);
-                        }}
-                        className={`block w-full whitespace-pre-wrap break-words px-2 text-left font-mono text-[11px] leading-tight ${group.head === null ? '' : 'pl-4'} ${
-                          offer.kind === undefined ? 'text-text-subtle' : 'text-accent'
-                        }`}
-                      >
-                        {shownIn(group, offer)}
-                      </button>
+              <div data-drive="edit.offers" aria-label={words('grammar')} className="packed w-2/5 max-w-[16rem] shrink-0 overflow-y-auto rounded-xl border border-border bg-panel py-1 font-mono text-[11px] leading-tight">
+                <div className="border-b border-border px-2 pb-1 text-text-subtle">
+                  <div className="break-words">{offering.where.join(' › ')}</div>
+                  <div className="break-words text-accent">{offering.reads ?? words('unread')}</div>
+                </div>
+                {gathered(offering.offers).map((family, at) => (
+                  <div key={family.name ?? `${at}`} className="pt-1">
+                    {family.name === null ? null : <div className="px-2 text-text">{family.name}</div>}
+                    {family.groups.map((group, index) => (
+                      <div key={group.head ?? `${index}`}>
+                        {group.head === null ? null : <div className="px-2 pl-3 text-text-subtle">{group.head}</div>}
+                        {group.offers.map((offer) => (
+                          <button
+                            key={offer.form}
+                            data-drive="edit.take"
+                            type="button"
+                            data-offer={offer.form}
+                            data-kind={offer.kind}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              taken.current = true;
+                              controls.take(offer.form);
+                            }}
+                            className={`block w-full whitespace-pre-wrap break-words px-2 text-left font-mono text-[11px] leading-tight ${group.head === null ? 'pl-3' : 'pl-5'} ${
+                              offer.kind === undefined ? 'text-text-subtle' : 'text-accent'
+                            }`}
+                          >
+                            {shownIn(group, offer)}
+                          </button>
+                        ))}
+                      </div>
                     ))}
                   </div>
                 ))}

@@ -27,7 +27,7 @@ const shipped = (): Addressed[] =>
 export function treeLines(lines: readonly Written[], deep = 0, seen: ReadonlySet<string> = new Set()): string[] {
   return lines.flatMap((line) => {
     const needs = line.needs === undefined ? '' : `   (only with ${line.needs}:)`;
-    const head = `${'  '.repeat(deep + 1)}${line.form}${needs}`;
+    const head = `${'  '.repeat(deep + 1)}${line.form}${needs}${line.family === undefined ? '' : `   [${line.family}]`}`;
     if (line.block === undefined || seen.has(line.form)) return [head + (line.block === undefined ? '' : '   …as above')];
     return [head, ...treeLines(line.block(), deep + 1, new Set([...seen, line.form]))];
   });
@@ -48,8 +48,14 @@ export function offeringLines(text: string, known: readonly Addressed[]): string
     const ids = offering.offers.filter((offer) => offer.kind !== undefined);
     const shapes = offering.offers.filter((offer) => offer.kind === undefined);
     out.push(`${line || '·'}`);
+    out.push(`    in ${offering.where.join(' › ')}, reads as ${offering.reads ?? '?'}`);
     out.push(`    ${shapes.length} shapes, ${ids.length} ids`);
-    for (const offer of shapes) out.push(`      ${offer.form}`);
+    let family: string | undefined;
+    for (const offer of shapes) {
+      if (offer.family !== family) out.push(`      ${offer.family ?? '—'}`);
+      family = offer.family;
+      out.push(`        ${offer.form}`);
+    }
     if (ids.length > 0) out.push(`      ids: ${ids.slice(0, 6).map((offer) => offer.form).join(', ')}${ids.length > 6 ? `, … ${ids.length - 6} more` : ''}`);
     at += 1;
   }

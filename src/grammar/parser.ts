@@ -10,6 +10,7 @@ export interface Parser<T> {
 export interface Written {
   form: string;
   example: string;
+  family?: string;
   needs?: string;
   block?: () => readonly Written[];
 }

@@ -155,6 +155,7 @@ engine.shell.global: World
 engine.shell.every-kind: Every kind
 engine.shell.section: Section
 engine.shell.grammar: Grammar
+engine.shell.unread: nothing yet
 engine.shell.step-in: →
 engine.shell.step-out: ←
 engine.shell.new: New

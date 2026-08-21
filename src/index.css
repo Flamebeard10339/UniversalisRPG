@@ -60,6 +60,14 @@ textarea {
   min-width: 44px;
 }
 
+/* The grammar list is a reference an author reads down, not a control a player
+   taps, and it is only drawn on the developer's editing page. It packs to the
+   line height so more of the language fits on one screen. */
+.packed button {
+  min-height: 0;
+  min-width: 0;
+}
+
 /* A scroller with no bar drawn on it. A phone draws none until the finger
    moves; a desktop draws one permanently and steals the width it sits in,
    which is the layout the author sees and the player never will. */

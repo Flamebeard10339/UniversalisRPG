@@ -125,6 +125,7 @@ const ACTION_FIELDS: readonly {
   value: ActionValue;
   form: string;
   example: string;
+  family: string;
 }[] = [
   {
     written: 'requires',
@@ -133,6 +134,7 @@ const ACTION_FIELDS: readonly {
     value: conditionValue,
     form: '<condition>',
     example: 'has-key',
+    family: 'offered when',
   },
   {
     written: 'hidden if',
@@ -141,35 +143,37 @@ const ACTION_FIELDS: readonly {
     value: conditionValue,
     form: '<condition>',
     example: 'found-key',
+    family: 'offered when',
   },
   {
     written: 'on success',
     label: /on success:[ \t]*/,
     name: 'onSuccess',
     value: resultsValue,
-    form: '<results>',
+    form: '<result>, …',
     example: 'give: plank',
+    family: 'and afterwards',
   },
   {
     written: 'on failure',
     label: /on failure:[ \t]*/,
     name: 'onFailure',
     value: resultsValue,
-    form: '<results>',
+    form: '<result>, …',
     example: 'say: nothing gives',
+    family: 'and afterwards',
   },
   {
     written: 'on unfinished',
     label: /on unfinished:[ \t]*/,
     name: 'onUnfinished',
     value: resultsValue,
-    form: '<results>',
+    form: '<result>, …',
     example: 'say: you break off',
+    family: 'and afterwards',
   },
-  { written: 'time', label: /time:[ \t]*/, name: 'time', value: seconds, form: '<seconds>',
-    example: '3' },
-  { written: 'rate', label: /rate:[ \t]*/, name: 'rate', value: perMinute, form: '<per minute>',
-    example: '12' },
+  { written: 'time', label: /time:[ \t]*/, name: 'time', value: seconds, form: '<seconds>', example: '3', family: 'how long it takes' },
+  { written: 'rate', label: /rate:[ \t]*/, name: 'rate', value: perMinute, form: '<per minute>', example: '12', family: 'how long it takes' },
   {
     written: 'accuracy',
     label: /accuracy:[ \t]*/,
@@ -177,6 +181,7 @@ const ACTION_FIELDS: readonly {
     value: contestValue('accuracy'),
     form: '[my ]<stat> vs [their ]<stat>',
     example: 'accuracy vs evasion',
+    family: 'what it is contested on',
   },
   {
     written: 'damage',
@@ -185,6 +190,7 @@ const ACTION_FIELDS: readonly {
     value: contestValue('damage'),
     form: '[my ]<stat> vs [their ]<stat>',
     example: 'attack vs defence',
+    family: 'what it is contested on',
   },
   {
     written: 'depletes',
@@ -193,6 +199,7 @@ const ACTION_FIELDS: readonly {
     value: sidedValue('depletes'),
     form: '[their ]<resource>',
     example: 'their health',
+    family: 'what it is contested on',
   },
   {
     written: 'attempts',
@@ -201,6 +208,7 @@ const ACTION_FIELDS: readonly {
     value: positiveCount('attempts'),
     form: '<count>',
     example: '3',
+    family: 'how long it takes',
   },
 ];
 
@@ -347,20 +355,20 @@ const STANDING_KINDS = TAGGED_ACTION_KINDS.filter((kind) => actionTableProblem({
 
 const actionFieldLines = (): readonly Written[] =>
   ACTION_FIELDS.flatMap((field) => [
-    { form: `${field.written}: ${field.form}`, example: `${field.written}: ${field.example}` },
-    ...(field.value === resultsValue ? [{ form: `${field.written}:`, example: `${field.written}:`, block: resultGrammar }] : []),
+    { form: `${field.written}: ${field.form}`, example: `${field.written}: ${field.example}`, family: field.family },
+    ...(field.value === resultsValue ? [{ form: `${field.written}:`, example: `${field.written}:`, family: field.family, block: resultGrammar }] : []),
   ]);
 
 export const actionLinesWritten = (): readonly Written[] => [
   ...actionFieldLines(),
-  ...STANDING_KINDS.map((kind) => ({ form: kind, example: kind })),
+  ...STANDING_KINDS.map((kind) => ({ form: kind, example: kind, family: 'how long it takes' })),
   ...resultGrammar(),
 ];
 
 export const actionBody: EntryBody = {
   grammar: [
-    { form: '<action>: <results>', example: 'chop-wood: give: log' },
-    { form: '<action>:', example: 'chop-wood:', block: actionLinesWritten },
+    { form: '<action>: <result>, …', example: 'chop-wood: give: log', family: 'an action' },
+    { form: '<action>:', example: 'chop-wood:', family: 'an action', block: actionLinesWritten },
   ],
   parse: (cursor, label) => {
     refuseHookLabel(label, {

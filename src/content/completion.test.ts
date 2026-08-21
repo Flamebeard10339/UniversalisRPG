@@ -97,7 +97,7 @@ describe('a field', () => {
 
 describe('an indented line', () => {
   it('is offered the grammar of the block it sits in', () => {
-    expect(offered('# location tutorial-island.beach\nchop-wood:\n  |')).toContain('on success: <results>');
+    expect(offered('# location tutorial-island.beach\nchop-wood:\n  |')).toContain('on success: <result>, …');
   });
 
   it('reaches the ids a result names', () => {

@@ -456,21 +456,26 @@ export const actionResult: Parser<ActionResult> = {
   examples: LEAF_EXAMPLES,
 };
 
+const ROW = 'one of these';
+
 const ROWS: readonly Written[] = [
-  { form: '<weight>x: <result>', example: '3x: give: plank' },
-  { form: '<weight>x: nothing', example: '5x: nothing' },
-  { form: '<weight>x[ if <condition>]:', example: '3x if has-key:', block: () => resultGrammar() },
+  { form: '<weight>x: <result>', example: '3x: give: plank', family: ROW },
+  { form: '<weight>x: nothing', example: '5x: nothing', family: ROW },
+  { form: '<weight>x[ if <condition>]:', example: '3x if has-key:', family: ROW, block: () => resultGrammar() },
 ];
+
+export const HAPPENS = 'what happens';
+export const SOMETIMES = 'only sometimes';
 
 const WRAPPERS: readonly Written[] = [
-  { form: 'if <condition>:', example: 'if has-key:', block: () => resultGrammar() },
-  { form: '<chance> in <of>:', example: '3 in 10:', block: () => resultGrammar() },
-  { form: '[my ]<stat> vs [their ]<stat>:', example: 'attack vs defence:', block: () => resultGrammar() },
-  { form: 'credit:', example: 'credit:', block: () => resultGrammar() },
-  { form: 'one of:', example: 'one of:', block: () => ROWS },
+  { form: 'if <condition>:', example: 'if has-key:', family: SOMETIMES, block: () => resultGrammar() },
+  { form: '<chance> in <of>:', example: '3 in 10:', family: SOMETIMES, block: () => resultGrammar() },
+  { form: '[my ]<stat> vs [their ]<stat>:', example: 'attack vs defence:', family: SOMETIMES, block: () => resultGrammar() },
+  { form: 'one of:', example: 'one of:', family: SOMETIMES, block: () => ROWS },
+  { form: 'credit:', example: 'credit:', family: SOMETIMES, block: () => resultGrammar() },
 ];
 
-export const resultGrammar = (): readonly Written[] => [...writtenFrom(actionResult), ...WRAPPERS];
+export const resultGrammar = (): readonly Written[] => [...writtenFrom(actionResult).map((line) => ({ ...line, family: HAPPENS })), ...WRAPPERS];
 
 const RESULT_LIST_EXAMPLES: readonly string[] = [...LEAF_EXAMPLES, 'set: found-key, add: gold 5'];
 const RESULT_LIST_FORMS: readonly string[] = ['<result>, …', ...LEAF_FORMS];

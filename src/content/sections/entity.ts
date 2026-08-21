@@ -92,7 +92,7 @@ export const handlerEvent = (label: string): string | undefined => HANDLER_LABEL
 export const isHandlerBlock = (block: EntityBlock): block is HandlerBlock => 'event' in block;
 
 const entityBlock: EntryBody = {
-  grammar: [...actionBody.grammar, { form: 'on <event>:', example: 'on death:', block: resultGrammar }],
+  grammar: [...actionBody.grammar, { form: 'on <event>:', example: 'on death:', family: 'an event handler', block: resultGrammar }],
   parse(cursor, label) {
     const event = handlerEvent(label);
     return event === undefined ? actionBody.parse(cursor, label) : { event, results: resultList.parse(cursor) };
