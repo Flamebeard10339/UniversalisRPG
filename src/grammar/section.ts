@@ -31,9 +31,20 @@ export interface MappedField<T, Self> extends FieldPrinting {
   keyword?: string;
 }
 
+export interface BlockExamples {
+  opens: readonly string[];
+  lines: readonly string[];
+}
+
+export interface Examples {
+  lines: readonly string[];
+  block?: BlockExamples;
+}
+
 export interface EntryBody {
   parse(cursor: Cursor, label: string): object;
   parseBlock(lines: RawLine[], label: string): object;
+  examples: BlockExamples;
 }
 
 export interface SectionSchema<H extends { id: string }, Flags extends keyof H = never, Entries extends keyof H = never> {
@@ -65,7 +76,7 @@ export interface AnySchema {
   bare?: string;
   keywords?: readonly string[];
   keywordsAfter?: string;
-  entries?: { into: string };
+  entries?: { into: string; body: EntryBody };
 }
 
 const isListParser = (parser: unknown): boolean => typeof parser === 'object' && parser !== null && 'element' in parser;

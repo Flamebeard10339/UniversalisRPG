@@ -1,8 +1,8 @@
 import { actionLines } from '../../grammar/action';
 import { ActionResult } from '../../grammar/actionResult';
-import { DslError } from '../../grammar/parser';
+import { DslError, Parser } from '../../grammar/parser';
 import { RawSection, sectionParser } from '../../grammar/structure';
-import { AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, parseAnySection, printSection } from '../../grammar/section';
+import { AnyField, AnySchema, Authored, Examples, HydrateContext, PrintContext, SectionSchema, hydrateSection, isPositionalField, parseAnySection, printSection } from '../../grammar/section';
 import { Pruning, Visit } from '../refs';
 import { mergeFields } from '../merge';
 
@@ -24,6 +24,7 @@ export interface Section<V extends { id: string } = { id: string }, M extends Re
   maps: Lands<V, M>;
   nestsActions: boolean;
   flags: readonly string[];
+  examples: Examples;
   says?: (value: V) => ActionResult[][];
   text: readonly string[];
   schema?: AnySchema;
@@ -56,7 +57,23 @@ type Schematic<V extends { id: string }, F extends keyof V, E extends keyof V> =
 interface Bespoke<V extends { id: string }> extends Common<V> {
   parse: (raw: RawSection) => V;
   print: (value: V, context: PrintContext) => readonly string[];
+  examples: Examples;
 }
+
+const fieldExample = (schema: AnySchema, name: string, spec: AnyField): string[] => {
+  const written = (spec.parser as Parser<unknown>).examples[0];
+  if (written === undefined || spec.generated) return [];
+  return [isPositionalField(schema, name) ? written : `${spec.keyword ?? name}: ${written}`];
+};
+
+const schemaExamples = (schema: AnySchema): Examples => ({
+  lines: [
+    ...Object.entries(schema.fields).flatMap(([name, spec]) => fieldExample(schema, name, spec)),
+    ...(schema.keywords ?? []),
+    ...(schema.entries?.body.examples.opens ?? []),
+  ],
+  block: schema.entries?.body.examples,
+});
 
 const ACTION_OWNERS = new Set<string>();
 
@@ -91,6 +108,7 @@ export const section =
       maps: (maps ?? (map === undefined ? {} : { [map]: (value: V) => [[value.id, value] as const] })) as Lands<V, Filled>,
       nestsActions,
       flags,
+      examples: schema ? schemaExamples(schema) : (spec as Bespoke<V>).examples,
       says,
       text,
       schema,

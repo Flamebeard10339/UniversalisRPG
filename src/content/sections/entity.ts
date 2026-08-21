@@ -90,6 +90,10 @@ export const handlerEvent = (label: string): string | undefined => HANDLER_LABEL
 export const isHandlerBlock = (block: EntityBlock): block is HandlerBlock => 'event' in block;
 
 const entityBlock: EntryBody = {
+  examples: {
+    opens: [...actionBody.examples.opens, 'on death:'],
+    lines: actionBody.examples.lines,
+  },
   parse(cursor, label) {
     const event = handlerEvent(label);
     return event === undefined ? actionBody.parse(cursor, label) : { event, results: resultList.parse(cursor) };

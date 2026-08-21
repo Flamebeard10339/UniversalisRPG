@@ -331,6 +331,33 @@ export const test = section<Test>()({
   kind: 'test',
   ids: 'owned',
   map: 'tests',
+  examples: {
+    lines: [
+      'run: opening',
+      'talk: guide',
+      'choose: Tell me more',
+      'use: item.rusty-sword.swing',
+      'use: chop on oak',
+      'travel: camp',
+      'goto: camp',
+      'craft: plank',
+      'begin: travel camp',
+      'assert: has-key',
+      'expect: after-intro',
+      'load: after-intro',
+      'cancel',
+      'wait: 1',
+      'equip: rusty-sword',
+      'unequip: main-hand',
+      'feed: cluster-jewel with fervour',
+      'slot: cluster-jewel at 0,0 ne with small-jewel',
+      'allocate: cluster-jewel at 0,0 position 1',
+      'apply: cluster-jewel at 0,0 with polish',
+      'refuse: feed cluster-jewel with fervour',
+      'open-modal: name-yourself',
+      'submit-modal: name=Ash',
+    ],
+  },
   parse: (raw) => {
     if (!raw.id) throw new DslError('# test requires an id', raw.span);
     const directives: Directive[] = [];

@@ -1,4 +1,4 @@
-import { ActionResult, parseResultLine, resultLines, startsResult } from '../../grammar/actionResult';
+import { ActionResult, actionResult, parseResultLine, resultLines, startsResult } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
 import { Cursor, DslError, parseWhole } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
@@ -135,6 +135,13 @@ export const dialogue = section<Dialogue>()({
   maps: {
     dialogues: (value) => [[value.id, value]],
     dialoguesByOwner: (value) => (value.owner === undefined ? [] : [[value.owner, value]]),
+  },
+  examples: {
+    lines: ['owner = guide', 'node greet:'],
+    block: {
+      opens: ['node greet:'],
+      lines: ['when: has-key', 'once', 'sticky', 'again: We have spoken already.', 'goto farewell', '-> Tell me more', '-> Tell me more (when has-key)', 'A traveller, out here?', ...actionResult.examples],
+    },
   },
   parse: (raw) => {
     if (!raw.id) throw new DslError('# dialogue requires an id', raw.span);

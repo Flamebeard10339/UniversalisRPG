@@ -27,6 +27,7 @@ export const parseLocaleSection = sectionParser((section: RawSection): LocaleSec
 export const locale = section<LocaleSection>()({
   kind: 'locale',
   ids: 'none',
+  examples: { lines: ['engine.shell.stage: Stage'] },
   parse: parseLocaleSection,
   print: (declared, { id }) => [`# locale ${id}`, ...declared.entries.map((entry) => `${entry.key}: ${entry.value}`)],
 });

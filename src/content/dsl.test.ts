@@ -61,6 +61,20 @@ describe('every section kind', () => {
     }
   });
 
+  it.each(sections().map((each) => each.kind))('%s offers example lines that parse where they are offered', (kind) => {
+    const owner = sectionFor(kind)!;
+    const parses = (lines: readonly string[]): void => {
+      const written = [`# ${kind} probe`, ...lines].join('\n');
+      expect(() => owner.parse(splitSections(written)[0]!), written).not.toThrow();
+    };
+    for (const line of owner.examples.lines) parses([line]);
+    const block = owner.examples.block;
+    if (block === undefined) return;
+    expect(block.opens.length).toBeGreaterThan(0);
+    for (const opens of block.opens) parses([opens]);
+    for (const line of block.lines) parses([block.opens[0]!, ...indentLines([line])]);
+  });
+
   it('is read by parsers that print back what they parsed', () => {
     const codecs = reachableCodecs(sections().flatMap((section) => Object.entries(section.schema?.fields ?? {}).map(([field, spec]) => [`${section.kind}.${field}`, spec.parser] as const)));
     expect(codecs.size).toBeGreaterThan(20);

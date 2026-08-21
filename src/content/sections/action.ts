@@ -44,6 +44,7 @@ export const action = section<ActionDeclaration>()({
   kind: 'action',
   ids: 'owned',
   map: 'actions',
+  examples: { lines: ['title: Chop Wood', ...actionBody.examples.lines] },
   parse: (raw) => {
     if (!raw.id) throw new DslError('# action requires an id', raw.span);
     const titles = raw.body.filter((line) => TITLE.test(line.text));

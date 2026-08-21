@@ -36,6 +36,7 @@ export const save = section<SaveSection>()({
   maps: {
     saves: (value): readonly (readonly [string, ParsedSave])[] => [[value.id, { version: value.version, diff: value.diff }]],
   },
+  examples: { lines: ['{"version": 1}'] },
   parse: parseSaveSection,
   print: (value, { moduleId, id }) => [`# save ${moduleLocalId(moduleId, id)}`, JSON.stringify({ version: value.version, ...value.diff })],
 });

@@ -123,62 +123,72 @@ const ACTION_FIELDS: readonly {
   label: RegExp;
   name: keyof Omit<Action, 'label' | 'results'>;
   value: ActionValue;
+  example: string;
 }[] = [
   {
     written: 'requires',
     label: /(?:requires|require):[ \t]*/,
     name: 'requires',
     value: conditionValue,
+    example: 'has-key',
   },
   {
     written: 'hidden if',
     label: /hidden if:[ \t]*/,
     name: 'hiddenIf',
     value: conditionValue,
+    example: 'found-key',
   },
   {
     written: 'on success',
     label: /on success:[ \t]*/,
     name: 'onSuccess',
     value: resultsValue,
+    example: 'give: plank',
   },
   {
     written: 'on failure',
     label: /on failure:[ \t]*/,
     name: 'onFailure',
     value: resultsValue,
+    example: 'say: nothing gives',
   },
   {
     written: 'on unfinished',
     label: /on unfinished:[ \t]*/,
     name: 'onUnfinished',
     value: resultsValue,
+    example: 'say: you break off',
   },
-  { written: 'time', label: /time:[ \t]*/, name: 'time', value: seconds },
-  { written: 'rate', label: /rate:[ \t]*/, name: 'rate', value: perMinute },
+  { written: 'time', label: /time:[ \t]*/, name: 'time', value: seconds, example: '3' },
+  { written: 'rate', label: /rate:[ \t]*/, name: 'rate', value: perMinute, example: '12' },
   {
     written: 'accuracy',
     label: /accuracy:[ \t]*/,
     name: 'accuracy',
     value: contestValue('accuracy'),
+    example: 'accuracy vs evasion',
   },
   {
     written: 'damage',
     label: /damage:[ \t]*/,
     name: 'damage',
     value: contestValue('damage'),
+    example: 'attack vs defence',
   },
   {
     written: 'depletes',
     label: /depletes:[ \t]*/,
     name: 'depletes',
     value: sidedValue('depletes'),
+    example: 'their health',
   },
   {
     written: 'attempts',
     label: /attempts:[ \t]*/,
     name: 'attempts',
     value: positiveCount('attempts'),
+    example: '3',
   },
 ];
 
@@ -322,6 +332,10 @@ function refuseHookLabel(label: string, span: Span | undefined): void {
 }
 
 export const actionBody: EntryBody = {
+  examples: {
+    opens: ['chop-wood:', 'chop-wood: give: log'],
+    lines: [...ACTION_FIELDS.map((field) => `${field.written}: ${field.example}`), ...TAGGED_ACTION_KINDS.filter((kind) => actionTableProblem({ label: '', kind, results: [] }) === undefined), ...resultList.examples],
+  },
   parse: (cursor, label) => {
     refuseHookLabel(label, {
       start: cursor.abs(cursor.pos),
