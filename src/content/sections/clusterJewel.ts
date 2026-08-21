@@ -29,6 +29,7 @@ export const positionValue: Parser<[number, string]> = {
     return [position, id.parse(cursor)];
   },
   print: ([position, passive]) => `${number.print(position)} ${id.print(passive)}`,
+  forms: ['<position> <passive>'],
   examples: ['0 keen-eye', '3 tough-hide'],
 };
 

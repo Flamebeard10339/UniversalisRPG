@@ -1,5 +1,6 @@
+import type { ListParser } from '../grammar/list';
 import type { Parser } from '../grammar/parser';
-import { DEFAULT_CONTEXT, isPositionalField } from '../grammar/section';
+import { DEFAULT_CONTEXT, Lines, isPositionalField, noLines } from '../grammar/section';
 import { splitSections } from '../grammar/structure';
 import { Section, sectionFor, sectionKinds } from './sections';
 
@@ -9,8 +10,8 @@ export interface Addressed {
 }
 
 export interface Offer {
+  form: string;
   insert: string;
-  label: string;
   kind?: string;
 }
 
@@ -27,6 +28,7 @@ const INDENT = /^[ \t]*/;
 const CLAUSE = /(?:^|,)[ \t]*(?=[^,]*$)/;
 const TRAILING_ID = /[a-z0-9.-]*$/;
 const LEADING_ID = /^[a-z0-9.-]*/;
+const PLACEHOLDER = /[<[]/;
 
 const PROBE = 'zzprobezz';
 
@@ -37,6 +39,20 @@ export function namesFrom(address: string, typed: string): boolean {
   }
   return false;
 }
+
+// Everything a form spells out before its first placeholder is what an author can be handed; a form that opens with one is handed over whole, to edit in place.
+const literalOf = (form: string): string => {
+  const at = form.search(PLACEHOLDER);
+  return at < 0 ? form : form.slice(0, at);
+};
+
+const lineOffers = (lines: Lines, typed: string): Offer[] =>
+  lines.forms
+    .filter((form) => {
+      const literal = literalOf(form);
+      return typed === '' || literal.startsWith(typed) || (literal !== '' && typed.startsWith(literal));
+    })
+    .map((form) => ({ form, insert: literalOf(form) === '' ? form : literalOf(form) }));
 
 const opens = (line: string): string | undefined => HEADING.exec(line)?.groups?.kind;
 
@@ -67,23 +83,26 @@ function referencedKinds(text: string, from: number, to: number): Set<string> {
 const addressOffers = (known: readonly Addressed[], kinds: ReadonlySet<string>, before: string, typed: string): Offer[] =>
   known
     .filter((each) => kinds.has(each.kind) && namesFrom(each.address, typed))
-    .map((each) => ({ insert: `${before}${each.address}`, label: each.address, kind: each.kind }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .map((each) => ({ form: each.address, insert: `${before}${each.address}`, kind: each.kind }))
+    .sort((a, b) => a.form.localeCompare(b.form));
 
 const KEYED = /^(?<key>[a-z][a-z0-9 -]*?):[ \t]*/;
 
-function fieldNamed(owner: Section, written: string): { key: string | null; examples: readonly string[] } {
+const oneOf = (parser: Parser<unknown>): Parser<unknown> => ('element' in parser ? (parser as ListParser<unknown>).element : parser);
+
+function fieldNamed(owner: Section, written: string, alone: boolean): { key: string | null; parser: Parser<unknown> | null } {
   const schema = owner.schema;
-  if (schema === undefined) return { key: null, examples: [] };
+  if (schema === undefined) return { key: null, parser: null };
   const key = KEYED.exec(written)?.groups?.key;
   const found = Object.entries(schema.fields).find(([name, spec]) => (key === undefined ? name === schema.clauses : !isPositionalField(schema, name) && (spec.keyword ?? name) === key));
-  if (found === undefined) return { key: null, examples: [] };
-  return { key: key ?? null, examples: (found[1].parser as Parser<unknown>).examples };
+  if (found === undefined) return { key: null, parser: null };
+  const parser = found[1].parser as Parser<unknown>;
+  return { key: key ?? null, parser: alone ? oneOf(parser) : parser };
 }
 
 function deduped(offers: readonly Offer[]): Offer[] {
   const held = new Map<string, Offer>();
-  for (const offer of offers) if (!held.has(offer.insert)) held.set(offer.insert, offer);
+  for (const offer of offers) if (!held.has(offer.form)) held.set(offer.form, offer);
   return [...held.values()];
 }
 
@@ -97,7 +116,7 @@ function headingOffering(text: string, at: number, before: string, lineEnd: numb
       to: at + LEADING_ID.exec(text.slice(at, lineEnd))![0].length,
       offers: sectionKinds()
         .filter((each) => each.startsWith(kind))
-        .map((each) => ({ insert: `${each} `, label: each })),
+        .map((each) => ({ form: each, insert: `${each} ` })),
     };
   }
   const typed = groups.id ?? '';
@@ -131,19 +150,19 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const token = TRAILING_ID.exec(typed)![0];
   const kinds = referencedKinds(text, at - token.length, at + LEADING_ID.exec(tail)![0].length);
   const continuing = opening !== null && opening[0].startsWith(',');
-  const named = fieldNamed(owner, continuing ? text.slice(lineStart + indent, from) : typed);
-  const written = owner.examples;
-  const lines = continuing
-    ? named.examples
-    : [...(indent === 0 ? written.lines : (written.block?.lines ?? [])), ...named.examples.map((example) => (named.key === null ? example : `${named.key}: ${example}`))];
+  const named = fieldNamed(owner, continuing ? text.slice(lineStart + indent, from) : typed, continuing);
+  const element = named.parser === null ? noLines : { forms: named.parser.forms, examples: named.parser.examples };
+  const written = continuing
+    ? element
+    : {
+        forms: [...(indent === 0 ? owner.grammar.lines.forms : (owner.grammar.block?.lines.forms ?? [])), ...element.forms.map((form) => (named.key === null ? form : `${named.key}: ${form}`))],
+        examples: [],
+      };
 
   return {
     from,
     to,
-    offers: deduped([
-      ...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token),
-      ...lines.filter((line) => line.startsWith(typed)).map((line) => ({ insert: line, label: line })),
-    ]),
+    offers: deduped([...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token), ...lineOffers(written, typed)]),
   };
 }
 

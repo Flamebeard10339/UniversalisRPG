@@ -119,6 +119,7 @@ export const tagClause: Parser<TagClause> = {
       }
     }
   },
+  forms: ['<keyword>', '<duration>', '+<amount> <stat>', '-<amount> <stat>', '+<percent>% <stat>', '-<percent>% <stat>', '+<amount> <stat> per <resource>', '+<amount> <stat> per stack of <item>'],
   examples: ['sharp', '30s', '2m', '1m30s', '+4-7 attack', '-2 defence', '+25% max-health', '-10% max-health', '+1 attack per mana', '+2 attack per stack of fervour'],
 };
 
@@ -132,5 +133,6 @@ export const bonusAmount: Parser<BonusAmount> = {
     return parseAmount(groups, raw, span);
   },
   print: printAmount,
+  forms: ['+<number>', '-<number>', '+<percent>%', '+<least>-<most>'],
   examples: ['+1', '-3', '+25%', '-10%', '+4-7', '-3-6'],
 };

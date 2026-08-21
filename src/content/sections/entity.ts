@@ -6,7 +6,7 @@ import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
 import { DslError, Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
-import { EntryBody, listMembers } from '../../grammar/section';
+import { bothLines, EntryBody, listMembers } from '../../grammar/section';
 import { duration, id, text } from '../../grammar/values';
 import { condition as visitCondition, hooks, pruneHook, put, results, strings, visitAction, type Loose, type Pruning, type Visit } from '../refs';
 import { section } from './define';
@@ -64,6 +64,7 @@ export const statAssignmentValue: Parser<[string, Range]> = {
     return [statId, range.parse(cursor)];
   },
   print: ([statId, value]) => `${id.print(statId)} ${range.print(value)}`,
+  forms: ['<stat> <amount>'],
   examples: ['attack 4', 'attack 4-7'],
 };
 
@@ -80,6 +81,7 @@ export const allyValue: Parser<Ally> = {
     return { count: Number(count), entity: id.parse(cursor) };
   },
   print: (value) => (value.count === undefined ? value.entity : `${value.count} ${id.print(value.entity)}`),
+  forms: ['<entity>', '<count> <entity>'],
   examples: ['bandit', '2 bandit'],
 };
 
@@ -90,9 +92,9 @@ export const handlerEvent = (label: string): string | undefined => HANDLER_LABEL
 export const isHandlerBlock = (block: EntityBlock): block is HandlerBlock => 'event' in block;
 
 const entityBlock: EntryBody = {
-  examples: {
-    opens: [...actionBody.examples.opens, 'on death:'],
-    lines: actionBody.examples.lines,
+  grammar: {
+    opens: bothLines([actionBody.grammar.opens, { forms: ['on <event>:'], examples: ['on death:'] }]),
+    lines: actionBody.grammar.lines,
   },
   parse(cursor, label) {
     const event = handlerEvent(label);

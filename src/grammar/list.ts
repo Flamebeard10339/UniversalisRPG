@@ -19,12 +19,14 @@ export function list<E>(element: Parser<E>): ListParser<E> {
 
   const print = (values: readonly E[]): string => values.map((value) => element.print(value)).join(', ');
   const examples = [...element.examples, element.examples.join(', ')];
-  const line: Parser<E[]> = { parse: parseInline, print, examples };
+  const forms = element.forms.map((form) => `${form}, …`);
+  const line: Parser<E[]> = { parse: parseInline, print, forms, examples };
 
   return {
     element,
     parse: parseInline,
     print,
+    forms,
     examples,
     parseBlock: (lines) => lines.flatMap((raw) => parseWhole(line, raw.text, raw.span.start, 'a list item')),
     printBlock: (values) => values.map((value) => element.print(value)),

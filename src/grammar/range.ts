@@ -51,5 +51,6 @@ export const range: Parser<Range> = {
     return { min, max };
   },
   print: (value) => (isPoint(value) ? String(value.min) : `${value.min}-${value.max}`),
+  forms: ['<number>', '<least>-<most>'],
   examples: ['5', '4-7', '-3', '1.5', '0.5-2', '-3--1'],
 };

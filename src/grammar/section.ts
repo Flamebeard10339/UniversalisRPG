@@ -31,20 +31,29 @@ export interface MappedField<T, Self> extends FieldPrinting {
   keyword?: string;
 }
 
-export interface BlockExamples {
-  opens: readonly string[];
-  lines: readonly string[];
+export interface Lines {
+  forms: readonly string[];
+  examples: readonly string[];
 }
 
-export interface Examples {
-  lines: readonly string[];
-  block?: BlockExamples;
+export interface BlockLines {
+  opens: Lines;
+  lines: Lines;
 }
+
+export interface Grammar {
+  lines: Lines;
+  block?: BlockLines;
+}
+
+export const noLines: Lines = { forms: [], examples: [] };
+
+export const bothLines = (parts: readonly Lines[]): Lines => ({ forms: parts.flatMap((part) => part.forms), examples: parts.flatMap((part) => part.examples) });
 
 export interface EntryBody {
   parse(cursor: Cursor, label: string): object;
   parseBlock(lines: RawLine[], label: string): object;
-  examples: BlockExamples;
+  grammar: BlockLines;
 }
 
 export interface SectionSchema<H extends { id: string }, Flags extends keyof H = never, Entries extends keyof H = never> {

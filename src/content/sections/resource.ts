@@ -28,6 +28,7 @@ const displayValue: Parser<ResourceDisplay> = {
     return raw as ResourceDisplay;
   },
   print: (value) => value,
+  forms: [...RESOURCE_DISPLAYS],
   examples: [...RESOURCE_DISPLAYS],
 };
 

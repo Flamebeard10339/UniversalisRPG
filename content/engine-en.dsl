@@ -154,6 +154,7 @@ engine.shell.local: Here
 engine.shell.global: World
 engine.shell.every-kind: Every kind
 engine.shell.section: Section
+engine.shell.grammar: Grammar
 engine.shell.new: New
 engine.shell.search: Search
 engine.shell.search-hint: all terms must match, e.g. tutorial sword

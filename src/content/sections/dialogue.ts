@@ -1,7 +1,7 @@
 import { ActionResult, actionResult, parseResultLine, resultLines, startsResult } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
 import { Cursor, DslError, parseWhole } from '../../grammar/parser';
-import { moduleLocalId } from '../../grammar/section';
+import { bothLines, moduleLocalId } from '../../grammar/section';
 import { parseSegments, printSegments, TextSegment } from '../../grammar/segment';
 import { indentLines, RawLine, takeBlock } from '../../grammar/structure';
 import { overlay } from '../merge';
@@ -136,11 +136,17 @@ export const dialogue = section<Dialogue>()({
     dialogues: (value) => [[value.id, value]],
     dialoguesByOwner: (value) => (value.owner === undefined ? [] : [[value.owner, value]]),
   },
-  examples: {
-    lines: ['owner = guide', 'node greet:'],
+  grammar: {
+    lines: { forms: ['owner = <entity>', 'node <name>:'], examples: ['owner = guide', 'node greet:'] },
     block: {
-      opens: ['node greet:'],
-      lines: ['when: has-key', 'once', 'sticky', 'again: We have spoken already.', 'goto farewell', '-> Tell me more', '-> Tell me more (when has-key)', 'A traveller, out here?', ...actionResult.examples],
+      opens: { forms: ['node <name>:'], examples: ['node greet:'] },
+      lines: bothLines([
+        {
+          forms: ['when: <condition>', 'once', 'sticky', 'again: <text>', 'goto <node>', '-> <text>', '-> <text> (when <condition>)', '<what is said>'],
+          examples: ['when: has-key', 'once', 'sticky', 'again: We have spoken already.', 'goto farewell', '-> Tell me more', '-> Tell me more (when has-key)', 'A traveller, out here?'],
+        },
+        { forms: actionResult.forms, examples: actionResult.examples },
+      ]),
     },
   },
   parse: (raw) => {

@@ -1,9 +1,9 @@
-import { ActionResult, parseResultLine, resultLines, resultList, spansLines, startsResult } from './actionResult';
+import { ActionResult, parseResultLine, resultLines, resultList, spansLines, startsResult, WRAPPER_LINES } from './actionResult';
 import { Condition, condition } from './condition';
 import { HOOK_FIELD_REFUSALS, hookLabelProblem } from './hook';
 import { list } from './list';
 import { Cursor, DslError, requireEnd, Span } from './parser';
-import { EntryBody } from './section';
+import { bothLines, EntryBody } from './section';
 import { RawLine, hasBlock, indentLines, takeBlock } from './structure';
 import { TagClause, tagClause } from './tagClause';
 import { decimal, DECIMAL, id, refuseRange } from './values';
@@ -123,6 +123,7 @@ const ACTION_FIELDS: readonly {
   label: RegExp;
   name: keyof Omit<Action, 'label' | 'results'>;
   value: ActionValue;
+  form: string;
   example: string;
 }[] = [
   {
@@ -130,6 +131,7 @@ const ACTION_FIELDS: readonly {
     label: /(?:requires|require):[ \t]*/,
     name: 'requires',
     value: conditionValue,
+    form: '<condition>',
     example: 'has-key',
   },
   {
@@ -137,6 +139,7 @@ const ACTION_FIELDS: readonly {
     label: /hidden if:[ \t]*/,
     name: 'hiddenIf',
     value: conditionValue,
+    form: '<condition>',
     example: 'found-key',
   },
   {
@@ -144,6 +147,7 @@ const ACTION_FIELDS: readonly {
     label: /on success:[ \t]*/,
     name: 'onSuccess',
     value: resultsValue,
+    form: '<results>',
     example: 'give: plank',
   },
   {
@@ -151,6 +155,7 @@ const ACTION_FIELDS: readonly {
     label: /on failure:[ \t]*/,
     name: 'onFailure',
     value: resultsValue,
+    form: '<results>',
     example: 'say: nothing gives',
   },
   {
@@ -158,15 +163,19 @@ const ACTION_FIELDS: readonly {
     label: /on unfinished:[ \t]*/,
     name: 'onUnfinished',
     value: resultsValue,
+    form: '<results>',
     example: 'say: you break off',
   },
-  { written: 'time', label: /time:[ \t]*/, name: 'time', value: seconds, example: '3' },
-  { written: 'rate', label: /rate:[ \t]*/, name: 'rate', value: perMinute, example: '12' },
+  { written: 'time', label: /time:[ \t]*/, name: 'time', value: seconds, form: '<seconds>',
+    example: '3' },
+  { written: 'rate', label: /rate:[ \t]*/, name: 'rate', value: perMinute, form: '<per minute>',
+    example: '12' },
   {
     written: 'accuracy',
     label: /accuracy:[ \t]*/,
     name: 'accuracy',
     value: contestValue('accuracy'),
+    form: '[my ]<stat> vs [their ]<stat>',
     example: 'accuracy vs evasion',
   },
   {
@@ -174,6 +183,7 @@ const ACTION_FIELDS: readonly {
     label: /damage:[ \t]*/,
     name: 'damage',
     value: contestValue('damage'),
+    form: '[my ]<stat> vs [their ]<stat>',
     example: 'attack vs defence',
   },
   {
@@ -181,6 +191,7 @@ const ACTION_FIELDS: readonly {
     label: /depletes:[ \t]*/,
     name: 'depletes',
     value: sidedValue('depletes'),
+    form: '[their ]<resource>',
     example: 'their health',
   },
   {
@@ -188,6 +199,7 @@ const ACTION_FIELDS: readonly {
     label: /attempts:[ \t]*/,
     name: 'attempts',
     value: positiveCount('attempts'),
+    form: '<count>',
     example: '3',
   },
 ];
@@ -331,10 +343,17 @@ function refuseHookLabel(label: string, span: Span | undefined): void {
   if (problem !== undefined) throw new DslError(problem, span);
 }
 
+const STANDING_KINDS = TAGGED_ACTION_KINDS.filter((kind) => actionTableProblem({ label: '', kind, results: [] }) === undefined);
+
 export const actionBody: EntryBody = {
-  examples: {
-    opens: ['chop-wood:', 'chop-wood: give: log'],
-    lines: [...ACTION_FIELDS.map((field) => `${field.written}: ${field.example}`), ...TAGGED_ACTION_KINDS.filter((kind) => actionTableProblem({ label: '', kind, results: [] }) === undefined), ...resultList.examples],
+  grammar: {
+    opens: { forms: ['<action>:', '<action>: <results>'], examples: ['chop-wood:', 'chop-wood: give: log'] },
+    lines: bothLines([
+      { forms: ACTION_FIELDS.map((field) => `${field.written}: ${field.form}`), examples: ACTION_FIELDS.map((field) => `${field.written}: ${field.example}`) },
+      { forms: STANDING_KINDS, examples: STANDING_KINDS },
+      { forms: resultList.forms, examples: resultList.examples },
+      WRAPPER_LINES,
+    ]),
   },
   parse: (cursor, label) => {
     refuseHookLabel(label, {

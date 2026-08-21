@@ -14,6 +14,7 @@ export function refuseRange(cursor: Cursor, complaint: string): void {
 export const text: Parser<string> = {
   parse: (cursor) => cursor.take(/[^\n]*/) ?? '',
   print: (value) => value,
+  forms: ['<text>'],
   examples: ['Rusty Sword', 'a line that runs to the end'],
 };
 
@@ -29,6 +30,7 @@ export const number: Parser<number> = {
     return Number(raw);
   },
   print: (value) => String(value),
+  forms: ['<number>'],
   examples: ['0', '5', '-3'],
 };
 
@@ -45,6 +47,7 @@ export const decimal: Parser<number> = {
     return Number(raw);
   },
   print: (value) => String(value),
+  forms: ['<number>'],
   examples: ['0', '5', '1.5', '-2.25'],
 };
 
@@ -54,6 +57,7 @@ export const numberOrStat: Parser<number | string> = {
     return raw === null ? id.parse(cursor) : Number(raw);
   },
   print: (value) => (typeof value === 'string' ? value : String(value)),
+  forms: ['<number>', '<stat>'],
   examples: ['3', '1.5', 'attack-speed'],
 };
 
@@ -79,6 +83,7 @@ export const duration: Parser<number> = {
     const left = seconds - minutes * SECONDS_PER_MINUTE;
     return minutes > 0 ? `${minutes}m${left}s` : `${left}s`;
   },
+  forms: ['<seconds>s', '<minutes>m', '<minutes>m<seconds>s'],
   examples: ['30s', '2m', '1m30s'],
 };
 
@@ -95,6 +100,7 @@ export const id: Parser<string> = {
     return raw;
   },
   print: (value) => value,
+  forms: ['<id>', '<module>.<id>'],
   examples: ['rusty-sword', 'forest.clearing'],
 };
 
@@ -165,6 +171,7 @@ export const quantified: Parser<Quantified> = {
     return { item, amount: Number(raw) };
   },
   print: (value) => (value.amount === undefined ? value.item : `${number.print(value.amount)} ${id.print(value.item)}`),
+  forms: ['<item>', '<count> <item>'],
   examples: ['plank', '3 plank'],
 };
 
@@ -180,5 +187,6 @@ export const produced: Parser<Produced> = {
     };
   },
   print: (value) => (value.amount === undefined ? value.item : `${range.print(value.amount)} ${id.print(value.item)}`),
+  forms: ['<item>', '<count> <item>', '<least>-<most> <item>'],
   examples: ['arrow', '5 arrow', '5-10 arrow'],
 };

@@ -14,7 +14,7 @@ export interface EditControls {
   add(): void;
   text(draft: string, at: number): void;
   cursor(at: number): void;
-  take(insert: string): void;
+  take(form: string): void;
   scroll(at: number): void;
   split(at: number): void;
   stage(): void;
@@ -69,9 +69,9 @@ export function editControls(held: { sections: readonly Section[]; editing: Edit
     },
     text: (text, at) => act.move({ ...editing, draft: text, cursor: at }),
     cursor: (at) => act.move({ ...editing, cursor: at }),
-    take: (insert) => {
+    take: (form) => {
       const offering = offeringIn(held);
-      const offer = offering.offers.find((each) => each.insert === insert);
+      const offer = offering.offers.find((each) => each.form === form);
       if (offer === undefined) return;
       const taken = applied(draftIn(sections, editing), offering, offer);
       act.move({ ...editing, draft: taken.text, cursor: taken.cursor });

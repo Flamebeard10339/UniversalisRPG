@@ -32,6 +32,7 @@ export const recipeSkillValue: Parser<{ skill: string; amount: number }> = {
     return { skill, amount: number.parse(cursor) };
   },
   print: (value) => `${id.print(value.skill)} ${number.print(value.amount)}`,
+  forms: ['<skill> <level>'],
   examples: ['smithing 5'],
 };
 

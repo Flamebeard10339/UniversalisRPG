@@ -1,6 +1,6 @@
-import { ActionResult, actionResult, resultBlock, resultLines } from '../../grammar/actionResult';
+import { ActionResult, actionResult, resultBlock, resultLines, WRAPPER_LINES } from '../../grammar/actionResult';
 import { DslError } from '../../grammar/parser';
-import { moduleLocalId } from '../../grammar/section';
+import { bothLines, moduleLocalId } from '../../grammar/section';
 import { results } from '../refs';
 import { section } from './define';
 
@@ -14,7 +14,7 @@ export const droptable = section<DropTable>()({
   kind: 'droptable',
   ids: 'owned',
   map: 'dropTables',
-  examples: { lines: actionResult.examples },
+  grammar: { lines: bothLines([{ forms: actionResult.forms, examples: actionResult.examples }, WRAPPER_LINES]) },
   parse: (raw) => {
     if (!raw.id) throw new DslError('# droptable requires an id', raw.span);
     const rows = resultBlock(raw.body);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Parser } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
 import { applied, offeringAt, type Addressed } from './completion';
 import { sectionFor, sections } from './sections';
@@ -19,14 +20,14 @@ const at = (written: string): { text: string; cursor: number } => {
 
 const offered = (written: string): string[] => {
   const { text, cursor } = at(written);
-  return offeringAt(text, cursor, KNOWN).offers.map((offer) => offer.label);
+  return offeringAt(text, cursor, KNOWN).offers.map((offer) => offer.form);
 };
 
-const inserted = (written: string, label: string): string => {
+const inserted = (written: string, form: string): string => {
   const { text, cursor } = at(written);
   const offering = offeringAt(text, cursor, KNOWN);
-  const offer = offering.offers.find((each) => each.label === label);
-  if (offer === undefined) throw new Error(`nothing offered called ${label}, only ${offering.offers.map((each) => each.label).join(', ')}`);
+  const offer = offering.offers.find((each) => each.form === form);
+  if (offer === undefined) throw new Error(`nothing shaped ${form} is offered, only ${offering.offers.map((each) => each.form).join(', ')}`);
   return applied(text, offering, offer).text;
 };
 
@@ -54,7 +55,7 @@ describe('a namespace', () => {
   });
 
   it('is reached by naming what a module calls its own', () => {
-    expect(offered('# location tutorial-island.beach\nadjacent: guide-|')).toEqual(['tutorial-island.guide-house']);
+    expect(offered('# location tutorial-island.beach\nadjacent: guide-|')[0]).toBe('tutorial-island.guide-house');
   });
 
   it('qualifies what it inserts', () => {
@@ -63,8 +64,12 @@ describe('a namespace', () => {
 });
 
 describe('a field', () => {
-  it('is offered by its keyword and its own first example', () => {
-    expect(offered('# location tutorial-island.beach\nadj|')).toEqual(['adjacent: clearing']);
+  it('shows the shape it takes rather than a value someone once wrote', () => {
+    expect(offered('# location tutorial-island.beach\nadj|')).toEqual(['adjacent: <location>, …']);
+  });
+
+  it('hands over what its form spells out, and stops where the author must choose', () => {
+    expect(inserted('# location tutorial-island.beach\nadj|', 'adjacent: <location>, …')).toBe('# location tutorial-island.beach\nadjacent: ');
   });
 
   it('opens onto the ids it references, which the kind alone knows', () => {
@@ -72,18 +77,18 @@ describe('a field', () => {
     expect(offered('# location tutorial-island.beach\nentities: |')).not.toContain('tutorial-island.beach');
   });
 
-  it('offers every shape its parser reads', () => {
-    expect(offered('# location tutorial-island.beach\nadjacent: |')).toContain('adjacent: clearing while has-key');
+  it('keeps showing every shape its parser reads while a value is written', () => {
+    expect(offered('# location tutorial-island.beach\nadjacent: guide-|')).toContain('adjacent: <location> while <condition>, …');
   });
 
-  it('drops its keyword after a comma, where a second value goes', () => {
-    expect(offered('# location tutorial-island.beach\nadjacent: beach, |')).toContain('clearing while has-key');
+  it('drops its keyword and its list after a comma, where one more value goes', () => {
+    expect(offered('# location tutorial-island.beach\nadjacent: beach, |')).toContain('<location> while <condition>');
   });
 });
 
 describe('an indented line', () => {
   it('is offered the grammar of the block it sits in', () => {
-    expect(offered('# location tutorial-island.beach\nchop-wood:\n  |')).toContain('on success: give: plank');
+    expect(offered('# location tutorial-island.beach\nchop-wood:\n  |')).toContain('on success: <results>');
   });
 
   it('reaches the ids a result names', () => {
@@ -91,7 +96,7 @@ describe('an indented line', () => {
   });
 
   it('is offered nothing of the section body it is nested under', () => {
-    expect(offered('# location tutorial-island.beach\nchop-wood:\n  |')).not.toContain('adjacent: clearing');
+    expect(offered('# location tutorial-island.beach\nchop-wood:\n  |')).not.toContain('adjacent: <location>, …');
   });
 });
 
@@ -104,12 +109,27 @@ describe('an offering', () => {
     expect(offered('# nonsense probe\n|')).toEqual([]);
   });
 
-  it.each(sections().map((each) => each.kind))('%s leaves a section that still parses wherever it is taken', (kind) => {
+  it.each(sections().map((each) => each.kind))('%s shows only what it declares, and writes in only what it shows', (kind) => {
     const opening = `# ${kind} probe\n`;
     const offering = offeringAt(opening, opening.length, KNOWN);
+    const owner = sectionFor(kind)!;
+    const declared = [...owner.grammar.lines.forms, ...Object.values(owner.schema?.fields ?? {}).flatMap((spec) => (spec.parser as Parser<unknown>).forms)];
     for (const offer of offering.offers) {
-      const written = applied(opening, offering, offer).text;
-      expect(() => sectionFor(kind)!.parse(splitSections(written)[0]!), written).not.toThrow();
+      expect(declared, `# ${kind} offers ${offer.form}`).toContain(offer.form);
+      expect(offer.form.startsWith(offer.insert), `# ${kind} writes in ${JSON.stringify(offer.insert)} for ${offer.form}`).toBe(true);
+      expect(applied(opening, offering, offer).text).toBe(opening + offer.insert);
+    }
+  });
+
+  it.each(sections().map((each) => each.kind))('%s takes an id it names without unsettling the section around it', (kind) => {
+    const owner = sectionFor(kind)!;
+    for (const example of owner.grammar.lines.examples) {
+      const opening = `# ${kind} probe\n${example}`;
+      const offering = offeringAt(opening, opening.length, KNOWN);
+      for (const offer of offering.offers.filter((each) => each.kind !== undefined)) {
+        const written = applied(opening, offering, offer).text;
+        expect(() => owner.parse(splitSections(written)[0]!), written).not.toThrow();
+      }
     }
   });
 });

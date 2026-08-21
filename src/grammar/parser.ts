@@ -1,6 +1,8 @@
+// A form is what an author is shown: literal text, `<a placeholder>`, `[an optional part]`, and a trailing `, …` for a list.
 export interface Parser<T> {
   parse(cursor: Cursor): T;
   print(value: T): string;
+  forms: readonly string[];
   examples: readonly string[];
 }
 

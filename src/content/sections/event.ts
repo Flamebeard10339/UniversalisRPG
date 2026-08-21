@@ -47,6 +47,7 @@ const triggerValue: Parser<EventTrigger> = {
     return normalized as EventTrigger;
   },
   print: (value) => value,
+  forms: [...TRIGGER_NAMES],
   examples: [...TRIGGER_NAMES],
 };
 

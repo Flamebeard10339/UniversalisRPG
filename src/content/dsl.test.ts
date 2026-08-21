@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { collectionFailures, reachableCodecs } from '../grammar/codec';
+import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
 import { text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
@@ -61,23 +61,37 @@ describe('every section kind', () => {
     }
   });
 
-  it.each(sections().map((each) => each.kind))('%s offers example lines that parse where they are offered', (kind) => {
+  it.each(sections().map((each) => each.kind))('%s writes out example lines that parse where they are offered', (kind) => {
     const owner = sectionFor(kind)!;
     const parses = (lines: readonly string[]): void => {
       const written = [`# ${kind} probe`, ...lines].join('\n');
       expect(() => owner.parse(splitSections(written)[0]!), written).not.toThrow();
     };
-    for (const line of owner.examples.lines) parses([line]);
-    const block = owner.examples.block;
+    for (const line of owner.grammar.lines.examples) parses(line.split('\n'));
+    const block = owner.grammar.block;
     if (block === undefined) return;
-    expect(block.opens.length).toBeGreaterThan(0);
-    for (const opens of block.opens) parses([opens]);
-    for (const line of block.lines) parses([block.opens[0]!, ...indentLines([line])]);
+    expect(block.opens.examples.length).toBeGreaterThan(0);
+    for (const opens of block.opens.examples) parses(opens.split('\n'));
+    for (const line of block.lines.examples) parses([block.opens.examples[0]!, ...indentLines(line.split('\n'))]);
+  });
+
+  it.each(sections().map((each) => each.kind))('%s shows a form for every line it writes out, and writes out one for every form', (kind) => {
+    const owner = sectionFor(kind)!;
+    const block = owner.grammar.block;
+    const shown = [
+      ['lines', owner.grammar.lines],
+      ...(block === undefined ? [] : ([['block opens', block.opens], ['block lines', block.lines]] as const)),
+    ] as const;
+    for (const [where, lines] of shown) {
+      if (lines.forms.length === 0 && lines.examples.length === 0) continue;
+      expect(formFailures(`# ${kind} ${where}`, lines.forms, lines.examples)).toEqual([]);
+    }
   });
 
   it('is read by parsers that print back what they parsed', () => {
     const codecs = reachableCodecs(sections().flatMap((section) => Object.entries(section.schema?.fields ?? {}).map(([field, spec]) => [`${section.kind}.${field}`, spec.parser] as const)));
     expect(codecs.size).toBeGreaterThan(20);
     expect(collectionFailures(codecs)).toEqual([]);
+    expect(shapeFailures(codecs)).toEqual([]);
   });
 });

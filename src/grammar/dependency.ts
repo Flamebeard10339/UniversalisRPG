@@ -31,6 +31,7 @@ export const version: Parser<Version> = {
     return raw.split('.').map(Number);
   },
   print: (value) => formatVersion(value),
+  forms: ['<major>', '<major>.<minor>', '<major>.<minor>.<patch>'],
   examples: ['1', '0.1', '1.0.0'],
 };
 
@@ -85,5 +86,6 @@ export const dependency: Parser<Dependency> = {
     return { prefix, module, operator, version: version.parse(cursor) };
   },
   print: (value) => formatDependency(value),
+  forms: ['<module>', '! <module>', '~ <module>', '? <module>', '+ <module>', '<module> <comparison> <version>'],
   examples: ['core', '! oldmod', '~ other', '? extras', '+ nice', '? extras >= 1.2.0', 'core = 2.0.0'],
 };

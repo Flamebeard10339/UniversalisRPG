@@ -19,6 +19,33 @@ export function reachableCodecs(roots: Iterable<readonly [string, unknown]>): Ma
 
 export const exportedCodecs = (modules: Record<string, object>): Map<Parser<unknown>, string> => reachableCodecs(Object.entries(modules).flatMap(([path, module]) => Object.entries(module).map(([name, value]) => [`${path}#${name}`, value] as const)));
 
+const PART = /(<[a-z][a-z0-9 -]*>|\[|\]|, …$)/;
+const PLACEHOLDER = /^<[a-z][a-z0-9 -]*>$/;
+
+const quoted = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+export const formPattern = (form: string): RegExp =>
+  new RegExp(
+    `^${form
+      .split(PART)
+      .map((part) => (part === '[' ? '(?:' : part === ']' ? ')?' : part === ', …' ? '(?:, .+?)*' : PLACEHOLDER.test(part) ? '.+?' : quoted(part)))
+      .join('')}$`,
+    's',
+  );
+
+export function formFailures(name: string, forms: readonly string[], examples: readonly string[]): string[] {
+  if (forms.length === 0) return [`${name} shows no form`];
+  const patterns = forms.map(formPattern);
+  const problems = [
+    ...examples.filter((example) => !patterns.some((pattern) => pattern.test(example))).map((example) => `${name}: ${JSON.stringify(example)} is none of the shapes ${forms.join(' | ')}`),
+    ...forms.filter((_, at) => !examples.some((example) => patterns[at]!.test(example))).map((form) => `${name}: the shape ${JSON.stringify(form)} is shown with nothing that has it`),
+  ];
+  if (examples[0] !== undefined && !patterns[0]!.test(examples[0])) problems.push(`${name}: ${JSON.stringify(examples[0])} leads with a shape other than ${JSON.stringify(forms[0])}`);
+  return problems;
+}
+
+export const shapeFailures = (codecs: Map<Parser<unknown>, string>): string[] => [...codecs].flatMap(([parser, name]) => formFailures(name, parser.forms, parser.examples));
+
 export function roundTripFailures(name: string, parser: Parser<unknown>): string[] {
   if (parser.examples.length === 0) return [`${name} carries no examples`];
   return parser.examples.flatMap((example) => {

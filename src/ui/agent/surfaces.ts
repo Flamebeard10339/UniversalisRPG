@@ -183,7 +183,7 @@ export function editState(held: EditHeld): EditState {
     open: held.editing.open,
     draft: draftIn(held.sections, held.editing),
     cursor: held.editing.cursor,
-    offers: offeringIn(held).offers.map((offer) => offer.insert),
+    offers: offeringIn(held).offers.map((offer) => offer.form),
     scroll: held.editing.scroll,
     split: held.editing.split,
     standing: held.standing,
@@ -192,9 +192,9 @@ export function editState(held: EditHeld): EditState {
 }
 
 export function offerNamed(held: EditHeld, value: unknown): string {
-  const found = offeringIn(held).offers.find((offer) => offer.insert === value);
-  if (found === undefined) throw new Error(`the grammar offers nothing to write called ${String(value)}`);
-  return found.insert;
+  const found = offeringIn(held).offers.find((offer) => offer.form === value);
+  if (found === undefined) throw new Error(`the grammar offers nothing shaped ${String(value)}`);
+  return found.form;
 }
 
 export function surfaceNamed(value: unknown): SurfaceId {

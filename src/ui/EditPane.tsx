@@ -153,61 +153,63 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
             onGrab={() => void (grabbed.current = editing.split)}
             onDrag={(dy) => controls.split(splitFrom(grabbed.current, dy, surface.current?.clientHeight ?? 0))}
           />
-          <div className="relative flex min-h-0 flex-col border-t border-border bg-surface-raised p-3" style={{ flexGrow: 1 - editing.split, flexBasis: 0 }}>
+          <div className="flex min-h-0 flex-row gap-2 border-t border-border bg-surface-raised p-3" style={{ flexGrow: 1 - editing.split, flexBasis: 0 }}>
+            <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+              <textarea
+                ref={field}
+                data-drive="edit.text"
+                aria-label={words('section')}
+                value={draftIn(sections, editing)}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                onChange={(event) => controls.text(event.target.value, event.target.selectionStart)}
+                onSelect={(event) => controls.cursor(event.currentTarget.selectionStart)}
+                className="min-h-0 flex-1 resize-none select-text rounded-xl border border-border bg-panel px-3 pb-14 pt-2 font-mono text-xs text-text outline-none focus:border-accent"
+              />
+              <div className="absolute bottom-2 right-2 flex gap-2">
+                <button
+                  data-drive="edit.unstage"
+                  type="button"
+                  disabled={open === null || !open.staged}
+                  onClick={controls.unstage}
+                  className="rounded-xl border border-border bg-surface px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97] disabled:opacity-50"
+                >
+                  {words('unstage')}
+                </button>
+                <button
+                  data-drive="edit.stage"
+                  type="button"
+                  onClick={controls.stage}
+                  className="rounded-xl bg-accent px-3 text-xs font-medium text-accent-text transition-transform duration-75 active:scale-[0.97]"
+                >
+                  {words('stage')}
+                </button>
+              </div>
+            </div>
             {offering.offers.length > 0 ? (
-              <div data-drive="edit.offers" className="unbarred mb-2 flex shrink-0 gap-1 overflow-x-auto">
+              <div data-drive="edit.offers" aria-label={words('grammar')} className="w-2/5 max-w-[16rem] shrink-0 overflow-y-auto rounded-xl border border-border bg-panel">
                 {offering.offers.map((offer) => (
                   <button
-                    key={offer.insert}
+                    key={offer.form}
                     data-drive="edit.take"
                     type="button"
-                    data-offer={offer.insert}
+                    data-offer={offer.form}
                     data-kind={offer.kind}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
                       taken.current = true;
-                      controls.take(offer.insert);
+                      controls.take(offer.form);
                     }}
-                    className={`shrink-0 whitespace-nowrap rounded-xl border px-2 font-mono text-xs ${
-                      offer.kind === undefined ? 'border-border bg-panel text-text-subtle' : 'border-accent bg-panel text-accent'
+                    className={`block w-full whitespace-pre-wrap break-words border-b border-border px-2 text-left font-mono text-[11px] leading-tight last:border-b-0 ${
+                      offer.kind === undefined ? 'text-text-subtle' : 'text-accent'
                     }`}
                   >
-                    {offer.label}
+                    {offer.form}
                   </button>
                 ))}
               </div>
             ) : null}
-            <textarea
-              ref={field}
-              data-drive="edit.text"
-              aria-label={words('section')}
-              value={draftIn(sections, editing)}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
-              onChange={(event) => controls.text(event.target.value, event.target.selectionStart)}
-              onSelect={(event) => controls.cursor(event.currentTarget.selectionStart)}
-              className="min-h-0 flex-1 resize-none select-text rounded-xl border border-border bg-panel px-3 pb-14 pt-2 font-mono text-xs text-text outline-none focus:border-accent"
-            />
-            <div className="absolute bottom-5 right-5 flex gap-2">
-              <button
-                data-drive="edit.unstage"
-                type="button"
-                disabled={open === null || !open.staged}
-                onClick={controls.unstage}
-                className="rounded-xl border border-border bg-surface px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97] disabled:opacity-50"
-              >
-                {words('unstage')}
-              </button>
-              <button
-                data-drive="edit.stage"
-                type="button"
-                onClick={controls.stage}
-                className="rounded-xl bg-accent px-3 text-xs font-medium text-accent-text transition-transform duration-75 active:scale-[0.97]"
-              >
-                {words('stage')}
-              </button>
-            </div>
           </div>
         </>
       ) : null}

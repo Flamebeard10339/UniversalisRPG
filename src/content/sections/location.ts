@@ -56,6 +56,7 @@ export const populationValue: Parser<Population> = {
     return { count: Number(count), entity: id.parse(cursor) };
   },
   print: (value) => (value.count === undefined ? value.entity : `${value.count} ${id.print(value.entity)}`),
+  forms: ['<entity>', '<count> <entity>'],
   examples: ['rat', '3 rat'],
 };
 
@@ -68,6 +69,7 @@ export const edgeValue: Parser<Edge> = {
     return { target };
   },
   print: (value) => (value.condition === undefined ? value.target : `${value.target} while ${condition.print(value.condition)}`),
+  forms: ['<location>', '<location> while <condition>'],
   examples: ['clearing', 'clearing while has-key'],
 };
 
@@ -89,6 +91,7 @@ export const relativeValue: Parser<Relative> = {
     return { direction: direction as Direction, of: id.parse(cursor) };
   },
   print: (value) => `${value.direction} of ${id.print(value.of)}`,
+  forms: ['<direction> of <location>'],
   examples: ['north of clearing', 'down of shaft'],
 };
 

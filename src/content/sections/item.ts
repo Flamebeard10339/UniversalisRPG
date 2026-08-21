@@ -42,6 +42,7 @@ export const clusterEffectValue: Parser<ClusterEffect> = {
     };
   },
   print: (value) => `${value.percent < 0 ? '-' : '+'}${Math.abs(value.percent)}% ${value.statId}`,
+  forms: ['+<percent>% <stat>', '-<percent>% <stat>'],
   examples: ['+25% max-health', '-10% max-health'],
 };
 
