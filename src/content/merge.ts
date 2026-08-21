@@ -50,7 +50,7 @@ export function mergeFields(into: Fields, from: Fields, schema: AnySchema): Fiel
   for (const [key, value] of Object.entries(from)) {
     if (key === entries) merged[key] = mergeEntries((into[key] as Labelled[]) ?? [], value as Labelled[]);
     else if (isListField(schema, key) && isFieldEdits(value)) merged[key] = applyEdits(into[key], value);
-    else merged[key] = value;
+    else if (value !== undefined) merged[key] = value;
   }
   return merged;
 }

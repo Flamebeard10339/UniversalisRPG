@@ -1,7 +1,7 @@
 import { align, bare, exampleOf, holeNames, holesIn, valueIn, type Alignment } from '../grammar/form';
 import type { ListParser } from '../grammar/list';
 import { DslError, type Filled, type Parser, type Span, type Written } from '../grammar/parser';
-import { isPositionalField, typoOf } from '../grammar/section';
+import { DEFAULT_CONTEXT, isPositionalField, typoOf } from '../grammar/section';
 import { indentLines, splitSections } from '../grammar/structure';
 import { parseModule, Section, sectionFor, sectionKinds } from './sections';
 import { filledBy } from '../grammar/codec';
@@ -170,10 +170,10 @@ export const beneath = (heading: string, above: readonly Enclosing[]): string =>
 
 const around = (heading: string, above: readonly Enclosing[], line: string, opened: readonly string[] = []): string => [beneath(heading, above), line, ...opened].join('\n');
 
-// What the engine says when it is handed the whole section, which is the only honest account of whether it took. Where it says nothing the section is content, whatever any one line of it would read as pulled out of the others.
+// What the engine says when it is handed the whole section, which is the only honest account of whether it took. Where it says nothing the section is content, whatever any one line of it would read as pulled out of the others. Reading it is half of taking it: a section is built as well, since a kind refuses on what its lines say together as much as on how each one is written.
 export function refusalOf(text: string): { at: number; refused: string } | null {
   try {
-    parseModule(text);
+    for (const each of parseModule(text)) sectionFor(each.kind)?.build(each.value, DEFAULT_CONTEXT);
     return null;
   } catch (error) {
     if (!(error instanceof DslError)) throw error;

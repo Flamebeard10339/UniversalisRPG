@@ -201,7 +201,11 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         const inline = !cursor.done;
         const value = inline ? fields[name].parser.parse(cursor) : hasBlock(line) ? parseBlock(fields[name].parser, takeBlock(line), line.span) : undefined;
         if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} field ${key} is written inline and as a block; give it one`, keySpan);
-        if (value === undefined) continue;
+        // A key written with nothing after it is a line the author has begun and the engine reads no value from. It holds none, and it is still written, which is what a rule about the lines a section has is asked.
+        if (value === undefined) {
+          if (!(name in authored)) authored[name] = undefined;
+          continue;
+        }
         if (op === undefined) authored[name] = value;
         else
           ((authored[name] ??= { ops: [] }) as FieldEdits).ops.push({
@@ -263,10 +267,10 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
 // The line an author writes for a field or a keyword, which is how a message about it names it.
 const writtenAs = (schema: AnySchema, name: string): string => (schema.fields[name] === undefined ? name : `${schema.fields[name]!.keyword ?? name}:`);
 
-// A line a section wrote that stands on one it did not. What a default fills in is not written, so a need is met only by an author having written the line it names.
+// A line a section wrote that stands on one it did not. Writing the word is enough to be held to it, so a line begun and not finished is asked the same question; what a default fills in is not written, so only a line an author gave a value to answers it.
 export function unmetNeed(authored: Record<string, unknown>, schema: AnySchema): string | undefined {
   for (const [name, needed] of Object.entries(schema.needs ?? {})) {
-    if (authored[name] === undefined || authored[needed] !== undefined) continue;
+    if (!(name in authored) || authored[needed] !== undefined) continue;
     return `${writtenAs(schema, name)} needs a ${writtenAs(schema, needed)} line`;
   }
   return undefined;

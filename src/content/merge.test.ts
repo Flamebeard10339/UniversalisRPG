@@ -60,6 +60,11 @@ describe('a section applies its fields over what the id already holds', () => {
     expect(registry.items.get('base.rope')!.title).toBe('Hemp Rope');
   });
 
+  it('leaves what the id holds standing under a key the patch begins and writes nothing after', () => {
+    const item = loadUniverse([BASE, patch('# item base.rope', 'examine:')]).items.get('base.rope')!;
+    expect(item.examine).toBe('Coarse and long.');
+  });
+
   it('replaces a list field wholesale, because a bare key replaces', () => {
     const location = loadUniverse([BASE, patch('# location base.beach', 'entities: base.crab')]).locations.get('base.beach')!;
     expect(location.entities).toEqual([{ entity: 'base.crab' }]);
