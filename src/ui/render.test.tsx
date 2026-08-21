@@ -18,7 +18,7 @@ import { dismissal } from './asking';
 import { sectionKey } from './editControls';
 import { formatClock } from './format';
 import { devLine, RATES, speedLine } from './devMode';
-import { FORGOTTEN } from './editorMemory';
+import { FORGOTTEN, recorded } from './editorMemory';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { LABELS, type LabelId } from './labels';
@@ -486,13 +486,17 @@ describe('what the shell puts on the screen', () => {
     expect(held).not.toContain('data-drive="dismiss"');
   });
 
-  it('draws the command field on Edit, so every line the table takes has somewhere to be typed', () => {
+  it('draws the command field once the setting asks for it, and nothing of it until then', () => {
     const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const field = `aria-label="${shellWord('command')}"`;
 
-    const html = renderToStaticMarkup(<App driver={driver} />);
+    const closed = renderToStaticMarkup(<App driver={driver} />);
+    driver.editorMemory.write(recorded({ ...FORGOTTEN, commandLine: true }));
+    const open = renderToStaticMarkup(<App driver={driver} />);
 
-    expect(html).toContain(`aria-label="${shellWord('command')}"`);
-    expect(onScreen(readable(html), shellWord('run'))).toBe(true);
+    expect(closed).not.toContain(field);
+    expect(open).toContain(field);
+    expect(onScreen(readable(open), shellWord('run'))).toBe(true);
   });
 
   it('offers every rate on Settings and marks the one the session is running', () => {
@@ -647,6 +651,15 @@ describe('what the editing page says about a section', () => {
     const tag = new RegExp(`<button[^>]*data-section="${section}"[^>]*>`).exec(html)?.[0] ?? '';
     return /class="([^"]*)"/.exec(tag)?.[1] ?? '';
   };
+
+  it('says what the filter takes while nothing has been typed into it', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    driver.send(devLine(true));
+
+    const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, 'edit')} />);
+
+    expect(html).toContain(`placeholder="${shellWord('search-hint')}"`);
+  });
 
   it('tells a staged section from a shipped one by its colour rather than by a slant', () => {
     const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });

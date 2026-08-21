@@ -1,4 +1,5 @@
 import { SURFACES, type SurfaceId } from './authoringSurface';
+import { SPLIT_DEFAULT, splitHeld } from './gesture';
 import type { Point } from './viewport';
 
 export const EDITOR_SLOT = 'editor';
@@ -17,6 +18,8 @@ export interface Editing {
   cursor: number;
   scroll: number;
   draft: string | null;
+  split: number;
+  commandLine: boolean;
   map: MapWhere;
 }
 
@@ -28,6 +31,8 @@ export const FORGOTTEN: Editing = {
   cursor: 0,
   scroll: 0,
   draft: null,
+  split: SPLIT_DEFAULT,
+  commandLine: false,
   map: { pan: { x: 0, y: 0 }, zoom: 1, plane: null },
 };
 
@@ -67,6 +72,8 @@ export function remembered(stored: string | null): Editing {
     cursor: count(from.cursor, FORGOTTEN.cursor),
     scroll: count(from.scroll, FORGOTTEN.scroll),
     draft: text(from.draft, FORGOTTEN.draft),
+    split: splitHeld(count(from.split, FORGOTTEN.split)),
+    commandLine: from.commandLine === true,
     map: mapWhere(from.map),
   };
 }

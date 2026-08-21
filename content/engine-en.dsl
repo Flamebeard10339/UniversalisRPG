@@ -156,6 +156,8 @@ engine.shell.every-kind: Every kind
 engine.shell.section: Section
 engine.shell.new: New
 engine.shell.search: Search
+engine.shell.search-hint: all terms must match, e.g. tutorial sword
+engine.shell.command-line: Command line
 engine.shell.stage: Stage
 engine.shell.unstage: Unstage
 engine.shell.copy: Copy

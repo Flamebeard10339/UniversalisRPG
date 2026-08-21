@@ -23,7 +23,7 @@ import { SkillsPane } from './SkillsPane';
 import { XpOverlay } from './XpOverlay';
 import { arrivalsBetween, emptyQueue, gainsBetween, heard, poured, type Note } from './xpNotes';
 import { ModalSheet } from './ModalSheet';
-import { LAYERS, OPENING, pageOf, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
+import { LAYERS, OPENING, pageRested, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
 import { PlaneModal } from './PlaneModal';
 import { carried, counted, worn } from './sheet';
@@ -177,14 +177,24 @@ export function App({
     ),
   };
 
-  useTestSurface('shell', { ...shell, dev });
+  useTestSurface('shell', { ...shell, dev, commandLine: editing.commandLine, showCommandLine: (shown) => setEditing({ ...editing, commandLine: shown }) });
   const wide = useWide();
 
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
-      if (subpage.id === 'home') return <Home snapshot={snapshot} words={words} onChoose={driver.choose} onCancel={driver.cancel} onSend={driver.send} />;
+      if (subpage.id === 'home')
+        return <Home snapshot={snapshot} words={words} commandLine={editing.commandLine} onChoose={driver.choose} onCancel={driver.cancel} onSend={driver.send} />;
       if (subpage.id === 'edit') return <EditPane held={held} words={words} />;
-      return subpage.id === 'settings' ? <SettingsPane dev={dev} speed={snapshot.speed} words={words} onSend={driver.send} /> : null;
+      return subpage.id === 'settings' ? (
+        <SettingsPane
+          dev={dev}
+          speed={snapshot.speed}
+          commandLine={editing.commandLine}
+          words={words}
+          onSend={driver.send}
+          onCommandLine={(shown) => setEditing({ ...editing, commandLine: shown })}
+        />
+      ) : null;
     }
     if (layer.id === 'map') {
       return (
@@ -208,20 +218,26 @@ export function App({
     return <Ledger entries={carried(view.carried, view.planes, localizer)} onOpen={driver.open} />;
   };
 
+  const paging = (at: number): { shown: readonly Subpage[]; columns: number; page: number } => {
+    const shown = shownIn(LAYERS[at], dev);
+    const columns = columnsIn(wide, shown.length);
+    return { shown, columns, page: pageRested(shell.where, at, dev, columns) };
+  };
+
   const bodies = LAYERS.map((layer, at) => {
-    const shown = shownIn(layer, dev);
+    const { shown, columns, page } = paging(at);
     return (
       <Pager
         key={layer.id}
-        index={pageOf(shell.where, at, dev)}
-        columns={columnsIn(wide, shown.length)}
+        index={page}
+        columns={columns}
         onIndex={(index) => go((held) => toSubpage(held, at, shown[index].id))}
         panes={shown.map((subpage) => pane(layer, subpage))}
       />
     );
   });
 
-  const tabs = shownIn(LAYERS[shell.where.layer], dev);
+  const here = paging(shell.where.layer);
 
   return (
     <TransientProvider value={driver.transient}>
@@ -243,7 +259,13 @@ export function App({
           <FloatingText channel={driver.transient} />
           <XpOverlay notes={notes} />
         </main>
-        <TabBar words={words} tabs={tabs} active={pageOf(shell.where, shell.where.layer, dev)} onSelect={(index) => go((held) => toSubpage(held, held.layer, tabs[index].id))} />
+        <TabBar
+          words={words}
+          tabs={here.shown}
+          active={here.page}
+          columns={here.columns}
+          onSelect={(index) => go((held) => toSubpage(held, held.layer, here.shown[index].id))}
+        />
         {asking && plane ? <PlaneModal plane={plane} option={asking} words={words} onAnswer={driver.answer} /> : null}
         {asking && !plane ? <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave} /> : null}
       </div>

@@ -14,6 +14,7 @@ export interface EditControls {
   text(draft: string): void;
   cursor(at: number): void;
   scroll(at: number): void;
+  split(at: number): void;
   stage(): void;
   unstage(): void;
   copy(): void;
@@ -65,6 +66,7 @@ export function editControls(held: { sections: readonly Section[]; editing: Edit
     text: (text) => act.move({ ...editing, draft: text }),
     cursor: (at) => act.move({ ...editing, cursor: at }),
     scroll: (at) => act.move({ ...editing, scroll: at }),
+    split: (at) => act.move({ ...editing, split: at }),
     stage: () => {
       const section = openedIn(sections, editing);
       const draft = draftIn(sections, editing);

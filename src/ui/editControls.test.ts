@@ -30,6 +30,7 @@ const EXERCISED: Record<keyof EditControls, true> = {
   text: true,
   cursor: true,
   scroll: true,
+  split: true,
   stage: true,
   unstage: true,
   copy: true,
@@ -132,6 +133,13 @@ describe('what a control on the editing page does', () => {
 
     expect(held.sent).toEqual([]);
     expect(held.said).toHaveLength(1);
+  });
+
+  it('remembers how the page was divided between the list and the field', () => {
+    const held = watching(opened);
+    held.controls.split(0.3);
+
+    expect(held.at[0]).toMatchObject({ split: 0.3, open: opened.open });
   });
 
   it('stands the author somewhere else by the same line a tapped place sends', () => {

@@ -69,12 +69,14 @@ const NEAR_BOTTOM_PX = 32;
 export function Home({
   snapshot,
   words,
+  commandLine,
   onChoose,
   onCancel,
   onSend,
 }: {
   snapshot: DriverSnapshot;
   words: Words;
+  commandLine: boolean;
   onChoose: (position: number) => void;
   onCancel: () => void;
   onSend: (line: string) => void;
@@ -132,7 +134,7 @@ export function Home({
         ) : null}
       </div>
 
-      <Console onSend={onSend} words={words} />
+      {commandLine ? <Console onSend={onSend} words={words} /> : null}
     </>
   );
 }

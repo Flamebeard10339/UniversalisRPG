@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LABELS } from './labels';
-import { across, bodyHeights, BOUNDARIES, HOME_LAYER, LAYERS, layerOffsets, layerSpan, OPENING, pageOf, shownIn, subpageOf, toLayer, toSubpage } from './nav';
+import { across, bodyHeights, BOUNDARIES, HOME_LAYER, LAYERS, layerOffsets, layerSpan, OPENING, pageOf, pageRested, shownIn, subpageOf, toLayer, toSubpage } from './nav';
 
 const BANDS = { height: 700, banners: [60, 40] };
 
@@ -124,6 +124,16 @@ describe('the pages a session is allowed to see', () => {
 
     expect(shownIn(LAYERS[HOME_LAYER], true)[pageOf(settings, HOME_LAYER, true)].id).toBe('settings');
     expect(shownIn(LAYERS[HOME_LAYER], false)[pageOf(settings, HOME_LAYER, false)].id).toBe('settings');
+  });
+
+  it('never rests a layer past the last place its columns leave it to rest', () => {
+    const settings = toSubpage(OPENING, HOME_LAYER, 'settings');
+
+    expect(shownIn(LAYERS[HOME_LAYER], false).map((subpage) => subpage.id)).toEqual(['home', 'settings']);
+    expect(pageOf(settings, HOME_LAYER, false)).toBe(1);
+    expect(pageRested(settings, HOME_LAYER, false, 1)).toBe(1);
+    expect(pageRested(settings, HOME_LAYER, false, 2)).toBe(0);
+    expect(pageRested(settings, HOME_LAYER, true, 2)).toBe(1);
   });
 
   it('shows where a layer opens when the page it was left on is one the session cannot see', () => {

@@ -9,6 +9,7 @@ import { addressable } from './authoringSurface';
 import { sectionKey } from './editControls';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { EDITOR_SLOT, FORGOTTEN, recorded, remembered, type Editing } from './editorMemory';
+import { SPLIT_MAX, SPLIT_MIN } from './gesture';
 
 const MOVED: { [K in keyof Editing]: Editing[K] } = {
   surface: 'global',
@@ -18,6 +19,8 @@ const MOVED: { [K in keyof Editing]: Editing[K] } = {
   cursor: 42,
   scroll: 317,
   draft: '# location tutorial-island.beach\nx: 4, y: 0',
+  split: 0.3,
+  commandLine: true,
   map: { pan: { x: -120.5, y: 88 }, zoom: 2.25, plane: -1 },
 };
 
@@ -28,6 +31,12 @@ const overStorage = (): ReturnType<typeof slotStore> => slotStore(browserSlots((
 describe('where the author was survives the tab (c10)', () => {
   it('remembers nothing when nothing was written', () => {
     expect(remembered(null)).toEqual(FORGOTTEN);
+  });
+
+  it('pulls a remembered division back into the band the handle can reach', () => {
+    expect(remembered(JSON.stringify({ split: 9 })).split).toBe(SPLIT_MAX);
+    expect(remembered(JSON.stringify({ split: -1 })).split).toBe(SPLIT_MIN);
+    expect(remembered(JSON.stringify({ split: 'halfway' })).split).toBe(FORGOTTEN.split);
   });
 
   it('carries every field it holds, one at a time', () => {

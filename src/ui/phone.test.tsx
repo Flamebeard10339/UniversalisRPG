@@ -87,3 +87,15 @@ describe('the layout a phone is held to', () => {
     expect(attributes(markup(), 'data-subpage')).toEqual(shownIn(opening, false).map((subpage) => subpage.id));
   });
 });
+
+describe('the tab bar of a screen showing more than one page', () => {
+  const bar = (columns: number): string =>
+    renderToStaticMarkup(<TabBar tabs={[{ id: 'home' }, { id: 'settings' }]} active={0} columns={columns} onSelect={() => undefined} words={shellWord} />);
+
+  const lit = (html: string): string[] => [...html.matchAll(/data-subpage="([^"]*)" data-drawn="yes"/g)].map(([, id]) => id);
+
+  it('lights every tab the strip is showing, not only the one it rests on', () => {
+    expect(lit(bar(1))).toEqual(['home']);
+    expect(lit(bar(2))).toEqual(['home', 'settings']);
+  });
+});

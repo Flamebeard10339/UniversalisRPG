@@ -146,6 +146,8 @@ export const ENGINE_KEYS = [
   'engine.shell.section',
   'engine.shell.new',
   'engine.shell.search',
+  'engine.shell.search-hint',
+  'engine.shell.command-line',
   'engine.shell.stage',
   'engine.shell.unstage',
   'engine.shell.copy',

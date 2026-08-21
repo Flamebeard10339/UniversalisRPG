@@ -49,9 +49,11 @@ export const SPLIT_DEFAULT = 0.5;
 export const SPLIT_MIN = 0.15;
 export const SPLIT_MAX = 0.85;
 
+export const splitHeld = (split: number): number => Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, split));
+
 export function splitFrom(start: number, dy: number, height: number): number {
   if (height <= 0) return start;
-  return Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, start + dy / height));
+  return splitHeld(start + dy / height);
 }
 
 export const VELOCITY_WINDOW_MS = 40;

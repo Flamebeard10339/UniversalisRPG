@@ -1,4 +1,4 @@
-import { clampIndex } from './gesture';
+import { clampIndex, pagesIn } from './gesture';
 import type { LabelId } from './labels';
 
 export type LayerId = 'map' | 'home' | 'character';
@@ -72,6 +72,9 @@ export function pageOf(where: Where, layer: number, dev: boolean): number {
   const at = shown.findIndex((subpage) => subpage.id === where.subpage[layer]);
   return clampIndex(at < 0 ? shown.findIndex((subpage) => subpage.id === LAYERS[layer].opens) : at, shown.length);
 }
+
+export const pageRested = (where: Where, layer: number, dev: boolean, columns: number): number =>
+  clampIndex(pageOf(where, layer, dev), pagesIn(shownIn(LAYERS[layer], dev).length, columns));
 
 export function across(layer: number, boundary: number): number {
   return layer === boundary ? boundary + 1 : boundary;

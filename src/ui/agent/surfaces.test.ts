@@ -22,6 +22,9 @@ const HOUSE: Place[] = [
   place('cove', 2, 0, 0, 'beach'),
 ];
 
+const driving = (where: Where, go: (where: Where) => void, showCommandLine: (shown: boolean) => void = () => undefined) =>
+  shellSurface({ where, dev: true, commandLine: false, go, showCommandLine });
+
 describe('the shell as a driving agent reaches it', () => {
   it('publishes where it is standing by the names the model uses, not by an index', () => {
     expect(shellState(OPENING, true)).toEqual({
@@ -29,6 +32,7 @@ describe('the shell as a driving agent reaches it', () => {
       subpage: 'home',
       layers: ['map', 'home', 'character'],
       subpages: ['edit', 'home', 'settings'],
+      commandLine: false,
     });
   });
 
@@ -40,16 +44,25 @@ describe('the shell as a driving agent reaches it', () => {
 
   it('moves the layer by name', () => {
     let moved = OPENING;
-    shellSurface(OPENING, true, (where: Where) => void (moved = where)).actions!.layer('map');
+    driving(OPENING, (where) => void (moved = where)).actions!.layer('map');
 
     expect(shellState(moved, true).layer).toBe('map');
   });
 
   it('moves the page of the layer being stood on, by name', () => {
     let moved = OPENING;
-    shellSurface(OPENING, true, (where: Where) => void (moved = where)).actions!.subpage('settings');
+    driving(OPENING, (where) => void (moved = where)).actions!.subpage('settings');
 
     expect(shellState(moved, true)).toMatchObject({ layer: 'home', subpage: 'settings' });
+  });
+
+  it('shows and hides the command line, and publishes which it is', () => {
+    let shown = false;
+
+    driving(OPENING, () => undefined, (next) => void (shown = next)).actions!['command-line'](true);
+
+    expect(shown).toBe(true);
+    expect(shellState(OPENING, true, true).commandLine).toBe(true);
   });
 
   it('refuses a name nothing answers to rather than clamping to a neighbour', () => {
@@ -63,7 +76,7 @@ describe('the shell as a driving agent reaches it', () => {
   it('remembers a page it was moved to, so re-entering the layer comes back to it', () => {
     const character = LAYERS.findIndex((layer) => layer.id === 'character');
     let moved = toLayer(OPENING, character);
-    const surface = shellSurface(moved, true, (where: Where) => void (moved = where));
+    const surface = driving(moved, (where) => void (moved = where));
     surface.actions!.subpage('inventory');
     const left = toLayer(moved, HOME_LAYER);
 

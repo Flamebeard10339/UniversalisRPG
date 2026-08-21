@@ -36,6 +36,8 @@ export const LABELS = {
   section: 'engine.shell.section',
   new: 'engine.shell.new',
   search: 'engine.shell.search',
+  'search-hint': 'engine.shell.search-hint',
+  'command-line': 'engine.shell.command-line',
   stage: 'engine.shell.stage',
   unstage: 'engine.shell.unstage',
   copy: 'engine.shell.copy',

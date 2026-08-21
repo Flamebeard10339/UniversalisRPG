@@ -1,15 +1,19 @@
 import { useEffect, useRef } from 'react';
 import { searching } from './authoringSurface';
 import { draftIn, kindsIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
+import { splitFrom } from './gesture';
+import { Splitter } from './Splitter';
 import { useTestSurface } from './useTestSurface';
 import type { Words } from './words';
 
 const OPEN_TO_ALL = '';
 
 export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX.Element {
+  const surface = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const restored = useRef(false);
+  const grabbed = useRef(0);
   const { sections, standing, places, editing, controls } = held;
   const rows = rowsIn(held);
   const open = openedIn(sections, editing);
@@ -28,7 +32,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
   }, [open]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div ref={surface} className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface-raised px-3 py-2">
         {(['local', 'global'] as const).map((surface) => (
           <button
@@ -93,6 +97,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
         <input
           data-drive="edit.search"
           aria-label={words('search')}
+          placeholder={words('search-hint')}
           value={editing.query}
           onChange={(event) => controls.search(event.target.value)}
           spellCheck={false}
@@ -104,7 +109,12 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
         />
       </div>
 
-      <div ref={list} className="unbarred min-h-0 flex-1 overflow-y-auto px-3 py-2" onScroll={(event) => controls.scroll(event.currentTarget.scrollTop)}>
+      <div
+        ref={list}
+        className="unbarred min-h-0 overflow-y-auto px-3 py-2"
+        style={{ flexGrow: open || editing.draft !== null ? editing.split : 1, flexBasis: 0 }}
+        onScroll={(event) => controls.scroll(event.currentTarget.scrollTop)}
+      >
         <div className="flex flex-col gap-1">
           {rows.map((section) => (
             <button
@@ -129,40 +139,45 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
       </div>
 
       {open || editing.draft !== null ? (
-        <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-surface-raised p-3">
-          <textarea
-            ref={field}
-            data-drive="edit.text"
-            aria-label={words('section')}
-            value={draftIn(sections, editing)}
-            rows={8}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            onChange={(event) => controls.text(event.target.value)}
-            onSelect={(event) => controls.cursor(event.currentTarget.selectionStart)}
-            className="select-text rounded-xl border border-border bg-panel px-3 py-2 font-mono text-xs text-text outline-none focus:border-accent"
+        <>
+          <Splitter
+            onGrab={() => void (grabbed.current = editing.split)}
+            onDrag={(dy) => controls.split(splitFrom(grabbed.current, dy, surface.current?.clientHeight ?? 0))}
           />
-          <div className="flex flex-wrap gap-2">
-            <button
-              data-drive="edit.stage"
-              type="button"
-              onClick={controls.stage}
-              className="grow rounded-xl bg-accent px-3 text-sm font-medium text-accent-text transition-transform duration-75 active:scale-[0.97]"
-            >
-              {words('stage')}
-            </button>
-            <button
-              data-drive="edit.unstage"
-              type="button"
-              disabled={open === null || !open.staged}
-              onClick={controls.unstage}
-              className="grow rounded-xl border border-border bg-panel px-3 text-sm text-text-subtle transition-transform duration-75 active:scale-[0.97] disabled:opacity-50"
-            >
-              {words('unstage')}
-            </button>
+          <div className="relative flex min-h-0 flex-col border-t border-border bg-surface-raised p-3" style={{ flexGrow: 1 - editing.split, flexBasis: 0 }}>
+            <textarea
+              ref={field}
+              data-drive="edit.text"
+              aria-label={words('section')}
+              value={draftIn(sections, editing)}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              onChange={(event) => controls.text(event.target.value)}
+              onSelect={(event) => controls.cursor(event.currentTarget.selectionStart)}
+              className="min-h-0 flex-1 resize-none select-text rounded-xl border border-border bg-panel px-3 pb-14 pt-2 font-mono text-xs text-text outline-none focus:border-accent"
+            />
+            <div className="absolute bottom-5 right-5 flex gap-2">
+              <button
+                data-drive="edit.unstage"
+                type="button"
+                disabled={open === null || !open.staged}
+                onClick={controls.unstage}
+                className="rounded-xl border border-border bg-surface px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97] disabled:opacity-50"
+              >
+                {words('unstage')}
+              </button>
+              <button
+                data-drive="edit.stage"
+                type="button"
+                onClick={controls.stage}
+                className="rounded-xl bg-accent px-3 text-xs font-medium text-accent-text transition-transform duration-75 active:scale-[0.97]"
+              >
+                {words('stage')}
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       ) : null}
     </div>
   );

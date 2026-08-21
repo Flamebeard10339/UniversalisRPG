@@ -29,9 +29,10 @@ export interface ShellState {
   subpage: LabelId;
   layers: readonly LayerId[];
   subpages: readonly LabelId[];
+  commandLine: boolean;
 }
 
-export function shellState(where: Where, dev: boolean): ShellState {
+export function shellState(where: Where, dev: boolean, commandLine = false): ShellState {
   const layer = LAYERS[where.layer];
   const shown = shownIn(layer, dev);
   return {
@@ -39,15 +40,18 @@ export function shellState(where: Where, dev: boolean): ShellState {
     subpage: shown[pageOf(where, where.layer, dev)].id,
     layers: LAYERS.map((each) => each.id),
     subpages: shown.map((subpage) => subpage.id),
+    commandLine,
   };
 }
 
-export function shellSurface(where: Where, dev: boolean, go: (where: Where) => void): TestSurface {
+export function shellSurface(held: AgentSurfaces['shell']): TestSurface {
+  const { where, dev, commandLine, go, showCommandLine } = held;
   return {
-    state: () => shellState(where, dev),
+    state: () => shellState(where, dev, commandLine),
     actions: {
       layer: (value) => go(toLayer(where, layerNamed(value))),
       subpage: (value) => go(toSubpage(where, where.layer, subpageNamed(where.layer, dev, value))),
+      'command-line': (value) => showCommandLine(value === true),
     },
   };
 }
@@ -162,6 +166,7 @@ export interface EditState {
   draft: string;
   cursor: number;
   scroll: number;
+  split: number;
   standing: Standing;
   places: readonly string[];
 }
@@ -178,6 +183,7 @@ export function editState(held: EditHeld): EditState {
     draft: draftIn(held.sections, held.editing),
     cursor: held.editing.cursor,
     scroll: held.editing.scroll,
+    split: held.editing.split,
     standing: held.standing,
     places: held.places.map((place) => place.id),
   };
@@ -213,6 +219,7 @@ export function editSurface(held: EditHeld): TestSurface {
       text: (value) => held.controls.text(String(value)),
       cursor: (value) => held.controls.cursor(Number(value)),
       scroll: (value) => held.controls.scroll(Number(value)),
+      split: (value) => held.controls.split(Number(value)),
       stage: () => held.controls.stage(),
       unstage: () => held.controls.unstage(),
       copy: () => held.controls.copy(),
@@ -276,7 +283,7 @@ export function skillNamed(panels: readonly SkillPanel[], value: unknown): Answe
 }
 
 export interface AgentSurfaces {
-  shell: { where: Where; dev: boolean; go: (where: Where) => void };
+  shell: { where: Where; dev: boolean; commandLine: boolean; go: (where: Where) => void; showCommandLine: (shown: boolean) => void };
   map: { map: MapView; controls: MapControls };
   skills: { panels: readonly SkillPanel[]; opened: Answer | null; greeted: readonly Answer[]; controls: { open(id: Answer | null): void } };
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
@@ -284,7 +291,7 @@ export interface AgentSurfaces {
 }
 
 export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurfaces[K]) => TestSurface } = {
-  shell: ({ where, dev, go }) => shellSurface(where, dev, go),
+  shell: (held) => shellSurface(held),
   map: ({ map, controls }) => mapSurface(map, controls),
   plane: (held) => planeSurface(held),
   skills: (held) => skillsSurface(held),

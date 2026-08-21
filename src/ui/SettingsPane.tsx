@@ -25,12 +25,37 @@ function Rates({ speed, words, onSend }: { speed: number; words: Words; onSend: 
   );
 }
 
-export function SettingsPane({ dev, speed, words, onSend }: { dev: boolean; speed: number; words: Words; onSend: (line: string) => void }): JSX.Element {
+export function SettingsPane({
+  dev,
+  speed,
+  commandLine,
+  words,
+  onSend,
+  onCommandLine,
+}: {
+  dev: boolean;
+  speed: number;
+  commandLine: boolean;
+  words: Words;
+  onSend: (line: string) => void;
+  onCommandLine: (shown: boolean) => void;
+}): JSX.Element {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
       <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-panel px-3 py-2 text-sm text-text">
         <span>{words('dev')}</span>
         <input data-drive="send" type="checkbox" checked={dev} onChange={(event) => onSend(devLine(event.target.checked))} className="accent-accent" />
+      </label>
+
+      <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-panel px-3 py-2 text-sm text-text">
+        <span>{words('command-line')}</span>
+        <input
+          data-drive="shell.command-line"
+          type="checkbox"
+          checked={commandLine}
+          onChange={(event) => onCommandLine(event.target.checked)}
+          className="accent-accent"
+        />
       </label>
 
       <DevOnly dev={dev}>
