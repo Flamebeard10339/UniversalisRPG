@@ -71,7 +71,8 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   const written = (value: string): string => (positional ? value : `${keyword}: ${value}`);
   const needs = schema.needs?.[name];
   const block = positional ? undefined : blockOf(parser);
-  const said = { family: positional ? 'written with no keyword in front of it' : 'its own fields', ...(spec.note === undefined ? {} : { note: spec.note }), ...(needs === undefined ? {} : { needs }) };
+  // A family says what a line is for. Whether it was declared as a field, as a positional one or as a keyword is how the engine holds it, not what an author is choosing between, so a schema line joins no family unless its kind says which one it is in.
+  const said = { ...(spec.family === undefined ? {} : { family: spec.family }), ...(spec.note === undefined ? {} : { note: spec.note }), ...(needs === undefined ? {} : { needs }) };
   const shapes = paired(parser.forms, parser.examples).flatMap((example, at) => (example === undefined ? [] : [{ form: written(parser.forms[at]!), example: written(example), ...said }]));
   if (shapes.length === 0) return [];
   return [...shapes, ...(block === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, ...said, block }])];
@@ -79,7 +80,7 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
 
 const schemaGrammar = (schema: AnySchema): readonly Written[] => [
   ...Object.entries(schema.fields).flatMap(([name, spec]) => fieldLines(schema, name, spec)),
-  ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, family: 'a flag it carries', ...(schema.needs?.[word] === undefined ? {} : { needs: schema.needs![word]! }) })),
+  ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, ...(schema.needs?.[word] === undefined ? {} : { needs: schema.needs![word]! }) })),
   ...(schema.entries?.body.grammar ?? []),
 ];
 

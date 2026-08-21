@@ -13,6 +13,8 @@ export type PrintWhen = 'when-set' | 'always' | 'unless-default';
 
 export interface FieldPrinting {
   note?: string;
+  // What this line is for, said in the words an author is choosing between. Lines that share one are offered together, whether the kind declares them as fields, as keywords or in its own grammar.
+  family?: string;
   printed?: PrintWhen;
   block?: true;
   generated?: true;

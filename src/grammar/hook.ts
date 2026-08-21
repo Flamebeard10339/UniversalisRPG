@@ -6,12 +6,16 @@ export interface HookCarrier {
   whenHit: ActionResult[];
 }
 
+// A moment the carrier is written to answer, which is what a line naming an event is; that this pair is held in fields and a named event in the grammar is how the engine keeps them, not a difference an author is choosing between.
+export const HOOK_FAMILY = 'when something happens';
+
 export const HOOK_FIELDS: {
   [K in keyof HookCarrier]: Field<ActionResult[], unknown>;
 } = {
   onHit: {
     parser: hookResultList,
     keyword: 'on hit',
+    family: HOOK_FAMILY,
     note: 'when a swing of this carrier lands on someone',
     default: () => [],
     block: true,
@@ -19,6 +23,7 @@ export const HOOK_FIELDS: {
   whenHit: {
     parser: hookResultList,
     keyword: 'when hit',
+    family: HOOK_FAMILY,
     note: 'when a swing lands on this carrier',
     default: () => [],
     block: true,

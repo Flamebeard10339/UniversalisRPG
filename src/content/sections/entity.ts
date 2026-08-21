@@ -2,7 +2,7 @@ import { actionResultLists } from '../../grammar/action';
 import { Action, actionBody } from '../../grammar/action';
 import { ActionResult, resultBlock, resultGrammar, resultList } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
-import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
+import { HOOK_FAMILY, HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
 import { DslError, Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
@@ -92,7 +92,7 @@ export const handlerEvent = (label: string): string | undefined => HANDLER_LABEL
 export const isHandlerBlock = (block: EntityBlock): block is HandlerBlock => 'event' in block;
 
 const entityBlock: EntryBody = {
-  grammar: [...actionBody.grammar, { form: 'on <event>:', example: 'on death:', family: 'an event handler', names: 'event', block: resultGrammar }],
+  grammar: [...actionBody.grammar, { form: 'on <event>:', example: 'on death:', family: HOOK_FAMILY, names: 'event', block: resultGrammar }],
   parse(cursor, label) {
     const event = handlerEvent(label);
     return event === undefined ? actionBody.parse(cursor, label) : { event, results: resultList.parse(cursor) };
