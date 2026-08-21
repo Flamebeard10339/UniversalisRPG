@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Parser } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
-import { applied, fillingWords, offeringAt, type Addressed } from './completion';
+import { amissIn, applied, fillingWords, offeringAt, type Addressed, type Amiss } from './completion';
 import { sectionFor, sections } from './sections';
 
 const KNOWN: readonly Addressed[] = [
@@ -180,6 +180,26 @@ describe('a half-written line', () => {
   it('is refused once it is whole and the engine still will not have it', () => {
     expect(taken(`${under}  xp: mining 0|`).refused).toBe('an xp amount of 0 does nothing');
     expect(taken(`${under}  xpp: mining 4|`).refused).toContain('unrecognized action result');
+  });
+
+  const refused = (said: readonly Amiss[]): Amiss[] => said.filter((each) => each.refused !== null);
+
+  const OVEN = '# entity tutorial-island.oven\nroast chestnuts:\n  continuous\n  rate: cooking-rate';
+
+  it('is not refused for what a line below it supplies', () => {
+    expect(taken(OVEN.replace('  continuous', '  continuous|')).refused).toBeNull();
+    expect(refused(amissIn(OVEN, KNOWN))).toEqual([]);
+  });
+
+  it('is refused once no line below it supplies that', () => {
+    const without = OVEN.split('\n').filter((line) => !line.includes('rate:')).join('\n');
+    expect(taken(without.replace('  continuous', '  continuous|')).refused).toContain('needs a time: or rate:');
+    expect(refused(amissIn(without, KNOWN)).map((each) => each.line)).toEqual([3]);
+  });
+
+  it('lays a complaint about the whole section on the line the engine points at, and on no other', () => {
+    const said = amissIn('# action tutorial-island.swing\ntitle: Fight\nrate: my attack-rate\naccuracy: my accuracy vs their evasion', KNOWN);
+    expect(refused(said).map((each) => [each.line, each.refused!.includes('nothing to deplete')])).toEqual([[1, true]]);
   });
 
   it('shows only the shapes whose words it has spelt out', () => {

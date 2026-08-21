@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
+import { amissIn, refusalOf } from './completion';
 import { align } from '../grammar/form';
 import type { Written } from '../grammar/parser';
 import { text } from '../grammar/values';
@@ -20,6 +21,19 @@ const problems = (result: { diagnostics: { sourceName: string }[] }): string[] =
 describe('the shipped corpus', () => {
   it('loads with no diagnostics', () => {
     expect(problems(loadUniverseWithDiagnostics(CORPUS))).toEqual([]);
+  });
+
+  it('is refused by neither question the editing page asks of a section, which never disagree', () => {
+    for (const source of CORPUS) {
+      for (const section of splitSections(source.text)) {
+        if (sectionFor(section.kind) === undefined) continue;
+        const written = source.text.slice(section.span.start, section.span.end).replace(/\s+$/, '');
+        const where = `${source.name} # ${section.kind} ${section.id ?? ''}`;
+        const said = refusalOf(written);
+        expect(said, where).toBeNull();
+        expect(amissIn(written, []).some((each) => each.refused !== null), where).toBe(said !== null);
+      }
+    }
   });
 
   it('prints back to a universe that loads to the same registry', () => {

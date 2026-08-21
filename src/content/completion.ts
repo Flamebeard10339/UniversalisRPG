@@ -1,6 +1,6 @@
 import { align, bare, exampleOf, holesIn, paired, standingIn, valueIn, type Alignment, type Hole } from '../grammar/form';
 import type { ListParser } from '../grammar/list';
-import { DslError, parseWhole, type Parser, type Written } from '../grammar/parser';
+import { DslError, parseWhole, type Parser, type Span, type Written } from '../grammar/parser';
 import { isPositionalField, typoOf } from '../grammar/section';
 import { indentLines, splitSections } from '../grammar/structure';
 import { parseModule, Section, sectionFor, sectionKinds, sections } from './sections';
@@ -154,12 +154,14 @@ function readAs(lines: readonly Written[], line: string): string | null {
 
 const opens = (line: string): string | undefined => HEADING.exec(line)?.groups?.kind;
 
-function headingAbove(text: string, lineStart: number): string | undefined {
-  const above = text.slice(0, lineStart).split('\n');
-  for (let at = above.length - 1; at >= 0; at--) {
-    if (above[at]!.startsWith('#')) return above[at];
+function headingAbove(text: string, lineStart: number): { at: number; line: string } | undefined {
+  let found;
+  let at = 0;
+  for (const line of text.slice(0, lineStart).split('\n')) {
+    if (line.startsWith('#')) found = { at, line };
+    at += line.length + 1;
   }
-  return undefined;
+  return found;
 }
 
 // The heading and the blocks a line sits in, which is the half of a draft that stands whole while the line itself is still being written.
@@ -167,19 +169,24 @@ export const beneath = (heading: string, above: readonly Enclosing[]): string =>
 
 const around = (heading: string, above: readonly Enclosing[], line: string, opened: readonly string[] = []): string => [beneath(heading, above), line, ...opened].join('\n');
 
-// Where the line itself begins in what `around` builds, so a span the engine reports can be told apart from the ground the cursor has not reached.
-const openingOf = (heading: string, above: readonly Enclosing[]): number => above.reduce((sum, each) => sum + each.indent + each.text.length + 1, heading.length + 1);
-
-// What the engine says when it is handed this line where it sits, which is the only honest account of whether it took. A complaint about ground past the cursor is about what is unwritten, not about what is wrong.
-function refusalAt(owner: Section, written: string, held: readonly Written[] | undefined, indent: number, cursor: number): string | null {
-  const opened = held === undefined ? [] : indentLines([held[0]!.example], indent + 2);
+// What the engine says when it is handed the whole section, which is the only honest account of whether it took. Where it says nothing the section is content, whatever any one line of it would read as pulled out of the others.
+export function refusalOf(text: string): { at: number; refused: string } | null {
   try {
-    owner.parse(splitSections([written, ...opened].join('\n'))[0]!);
+    parseModule(text);
     return null;
   } catch (error) {
-    if (!(error instanceof DslError)) return null;
-    return error.span !== undefined && error.span.start >= cursor ? null : error.message;
+    if (!(error instanceof DslError)) throw error;
+    return { at: error.span?.start ?? 0, refused: error.message };
   }
+}
+
+// The same word, kept only where the engine lays it on this line. A line is read by the lines beside it — a pace set below it, a pool depleted three lines down — so a complaint laid elsewhere belongs to that line, and one laid past the cursor is about ground the author has not written yet.
+function refusalAt(text: string, within: Span, held: readonly Written[] | undefined, indent: number, cursor: number): string | null {
+  const said = refusalOf(text);
+  if (said === null || said.at >= cursor || said.at < within.start || said.at > within.end) return null;
+  if (held === undefined) return said.refused;
+  // A line that opens a block and is handed over without one is refused for holding nothing, so the block's own first line goes under it and says whether that was the whole of it.
+  return refusalOf(`${text.slice(0, within.end)}\n${indentLines([held[0]!.example], indent + 2).join('\n')}${text.slice(within.end)}`) === null ? null : said.refused;
 }
 
 const declares = (known: readonly Addressed[], kind: string, id: string): boolean =>
@@ -466,10 +473,11 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
 
   if (text.slice(lineStart, lineStart + 1) === '#') return headingOffering(text, at, before, lineEnd, known);
 
-  const heading = headingAbove(text, lineStart);
-  const kind = heading === undefined ? undefined : opens(heading);
+  const head = headingAbove(text, lineStart);
+  const kind = head === undefined ? undefined : opens(head.line);
   const owner = kind === undefined ? undefined : sectionFor(kind);
-  if (owner === undefined || heading === undefined) return NOTHING;
+  if (owner === undefined || head === undefined) return NOTHING;
+  const heading = head.line;
 
   const indent = INDENT.exec(before)![0].length;
   const opening = CLAUSE.exec(before.slice(indent));
@@ -515,7 +523,7 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const refused =
     line.trim() === '' || (stood !== undefined && !stood.read.complete && stood.read.spelt > 0)
       ? null
-      : refusalAt(owner, around(heading, above, line), here.lines.find((line) => line.form === reads)?.block?.(), indent, openingOf(heading, above) + at - lineStart);
+      : refusalAt(text.slice(head.at), { start: lineStart - head.at, end: lineEnd - head.at }, here.lines.find((line) => line.form === reads)?.block?.(), indent, at - head.at);
   // A shape a refused line has spelt none of is not what it is being written as; saying so would be guessing over the engine's own word.
   const filled = filling === undefined || (refused !== null && stood!.read.spelt === 0) ? undefined : filling;
   // What a hole may hold in its own words, asked of the hole rather than of the line: the same answer wherever that hole is written, and none where the shapes beside it already say it.
@@ -545,17 +553,6 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   };
 }
 
-// What the engine says when it is handed the whole section, which is whether it will be read at all. `amissIn` asks line by line instead, where a line stands without the ones beside it and a half-written one is not yet wrong.
-export function refusalOf(text: string): string | null {
-  try {
-    parseModule(text);
-    return null;
-  } catch (error) {
-    if (error instanceof DslError) return error.message;
-    throw error;
-  }
-}
-
 // Everything standing between a draft and the engine taking it, gathered so an author can work down a list rather than hunt for the line.
 export interface Amiss {
   line: number;
@@ -565,11 +562,14 @@ export interface Amiss {
 }
 
 export function amissIn(text: string, known: readonly Addressed[]): Amiss[] {
+  // The engine refuses a section once, wherever in it the fault lies, so its one word goes on the line it points at rather than on every line that would read badly without the others.
+  const said = refusalOf(text);
   const out: Amiss[] = [];
   let at = 0;
   for (const [index, written] of text.split('\n').entries()) {
-    const offering = offeringAt(text, at + written.length, known);
-    if (offering.refused !== null || offering.undeclared.length > 0) out.push({ line: index + 1, written, refused: offering.refused, undeclared: offering.undeclared });
+    const refused = said !== null && said.at >= at && said.at <= at + written.length ? said.refused : null;
+    const { undeclared } = offeringAt(text, at + written.length, known);
+    if (refused !== null || undeclared.length > 0) out.push({ line: index + 1, written, refused, undeclared });
     at += written.length + 1;
   }
   return out;
