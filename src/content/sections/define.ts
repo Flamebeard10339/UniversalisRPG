@@ -73,10 +73,10 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   const written = (value: string): string => (positional ? value : `${keyword}: ${value}`);
   const needs = schema.needs?.[name];
   const block = positional ? undefined : blockOf(parser);
-  const family = { family: positional ? 'written bare' : 'its own fields' };
+  const said = { family: positional ? 'written bare' : 'its own fields', ...(spec.note === undefined ? {} : { note: spec.note }), ...(needs === undefined ? {} : { needs }) };
   return [
-    { form: written(form), example: written(example), ...family, ...(needs === undefined ? {} : { needs }) },
-    ...(block === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, ...family, block, ...(needs === undefined ? {} : { needs }) }]),
+    { form: written(form), example: written(example), ...said },
+    ...(block === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, ...said, block }]),
   ];
 };
 

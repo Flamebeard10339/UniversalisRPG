@@ -109,6 +109,41 @@ describe('an indented line', () => {
   });
 });
 
+describe('a line as the engine takes it', () => {
+  const taken = (written: string) => {
+    const { text, cursor } = at(written);
+    return offeringAt(text, cursor, KNOWN);
+  };
+
+  it('says a field one letter out in the words the engine refuses it with', () => {
+    expect(taken('# location tutorial-island.beach\ntittle: The Beach|').refused).toBe('unknown location field: tittle, one letter from title');
+  });
+
+  it('holds its peace over a line the engine takes', () => {
+    expect(taken('# location tutorial-island.beach\ntitle: The Beach|').refused).toBeNull();
+    expect(taken('# location tutorial-island.beach\nchop-wood:|').refused).toBeNull();
+  });
+
+  it('remarks on an id nothing declares, without calling it a refusal', () => {
+    const held = taken('# location tutorial-island.beach\nentities: mine.bat|');
+    expect(held.undeclared).toEqual(['mine.bat']);
+    expect(held.refused).toBeNull();
+  });
+
+  it('says nothing of an id something does declare', () => {
+    expect(taken('# location tutorial-island.beach\nadjacent: tutorial-island.guide-house|').undeclared).toEqual([]);
+  });
+
+  it.each(sections().map((each) => each.kind))('%s refuses none of the lines it writes out', (kind) => {
+    const owner = sectionFor(kind)!;
+    for (const line of owner.grammar) {
+      const head = `# ${kind} probe\n${line.example}`;
+      const draft = line.block === undefined ? head : `${head}\n  ${line.block()[0]!.example}`;
+      expect(offeringAt(draft, head.length, KNOWN).refused, draft).toBeNull();
+    }
+  });
+});
+
 describe('an offering', () => {
   it('is empty where no kind is declared', () => {
     expect(offered('adjacent: |')).toEqual([]);

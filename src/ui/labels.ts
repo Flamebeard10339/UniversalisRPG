@@ -36,6 +36,7 @@ export const LABELS = {
   section: 'engine.shell.section',
   grammar: 'engine.shell.grammar',
   unread: 'engine.shell.unread',
+  undeclared: 'engine.shell.undeclared',
   'step-in': 'engine.shell.step-in',
   'step-out': 'engine.shell.step-out',
   new: 'engine.shell.new',

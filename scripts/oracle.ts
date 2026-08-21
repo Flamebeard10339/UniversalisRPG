@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import type { Written } from '../src/grammar/parser';
 import { offeringAt, type Addressed } from '../src/content/completion';
+import { gathered, shownIn } from '../src/ui/offerGroups';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 import { addressable } from '../src/ui/authoringSurface';
 
@@ -27,7 +28,7 @@ const shipped = (): Addressed[] =>
 export function treeLines(lines: readonly Written[], deep = 0, seen: ReadonlySet<string> = new Set()): string[] {
   return lines.flatMap((line) => {
     const needs = line.needs === undefined ? '' : `   (only with ${line.needs}:)`;
-    const head = `${'  '.repeat(deep + 1)}${line.form}${needs}${line.family === undefined ? '' : `   [${line.family}]`}`;
+    const head = `${'  '.repeat(deep + 1)}${line.form}${needs}${line.family === undefined ? '' : `   [${line.family}]`}${line.note === undefined ? '' : `   — ${line.note}`}`;
     if (line.block === undefined || seen.has(line.form)) return [head + (line.block === undefined ? '' : '   …as above')];
     return [head, ...treeLines(line.block(), deep + 1, new Set([...seen, line.form]))];
   });
@@ -49,12 +50,15 @@ export function offeringLines(text: string, known: readonly Addressed[]): string
     const shapes = offering.offers.filter((offer) => offer.kind === undefined);
     out.push(`${line || '·'}`);
     out.push(`    in ${offering.where.join(' › ')}, reads as ${offering.reads ?? '?'}`);
+    if (offering.refused !== null) out.push(`    REFUSED: ${offering.refused}`);
+    if (offering.undeclared.length > 0) out.push(`    NOT DECLARED ANYWHERE YET: ${offering.undeclared.join(', ')}`);
     out.push(`    ${shapes.length} shapes, ${ids.length} ids`);
-    let family: string | undefined;
-    for (const offer of shapes) {
-      if (offer.family !== family) out.push(`      ${offer.family ?? '—'}`);
-      family = offer.family;
-      out.push(`        ${offer.form}`);
+    for (const family of gathered(shapes)) {
+      out.push(`      ${family.name ?? '—'}`);
+      for (const group of family.groups) {
+        if (group.head !== null) out.push(`        ${group.head}${group.opens === null ? '' : ' — opens a block'}`);
+        for (const offer of group.offers) out.push(`        ${group.head === null ? '' : '  '}${shownIn(group, offer)}${offer.note === undefined ? '' : `   — ${offer.note}`}`);
+      }
     }
     if (ids.length > 0) out.push(`      ids: ${ids.slice(0, 6).map((offer) => offer.form).join(', ')}${ids.length > 6 ? `, … ${ids.length - 6} more` : ''}`);
     at += 1;

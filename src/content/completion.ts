@@ -1,8 +1,8 @@
 import { formPattern } from '../grammar/codec';
 import type { ListParser } from '../grammar/list';
-import type { Parser, Written } from '../grammar/parser';
-import { DEFAULT_CONTEXT, isPositionalField } from '../grammar/section';
-import { splitSections } from '../grammar/structure';
+import { DslError, type Parser, type Written } from '../grammar/parser';
+import { isPositionalField } from '../grammar/section';
+import { indentLines, splitSections } from '../grammar/structure';
 import { Section, sectionFor, sectionKinds } from './sections';
 
 export interface Addressed {
@@ -14,6 +14,7 @@ export interface Offer {
   form: string;
   insert: string;
   family?: string;
+  note?: string;
   kind?: string;
 }
 
@@ -22,10 +23,12 @@ export interface Offering {
   to: number;
   where: readonly string[];
   reads: string | null;
+  refused: string | null;
+  undeclared: readonly string[];
   offers: readonly Offer[];
 }
 
-const NOTHING: Offering = { from: 0, to: 0, where: [], reads: null, offers: [] };
+const NOTHING: Offering = { from: 0, to: 0, where: [], reads: null, refused: null, undeclared: [], offers: [] };
 
 const HEADING = /^#[ \t]*(?<kind>[a-z][a-z0-9-]*)?(?<gap>[ \t]+)?(?<id>[a-z0-9.-]*)?/;
 const INDENT = /^[ \t]*/;
@@ -112,12 +115,47 @@ function readAs(lines: readonly Written[], line: string): string | null {
 
 const opens = (line: string): string | undefined => HEADING.exec(line)?.groups?.kind;
 
-function kindAbove(text: string, lineStart: number): string | undefined {
+function headingAbove(text: string, lineStart: number): string | undefined {
   const above = text.slice(0, lineStart).split('\n');
   for (let at = above.length - 1; at >= 0; at--) {
-    if (above[at]!.startsWith('#')) return opens(above[at]!);
+    if (above[at]!.startsWith('#')) return above[at];
   }
   return undefined;
+}
+
+// What the engine says when it is handed this line where it sits, which is the only honest account of whether it took.
+function refusalAt(owner: Section, heading: string, above: readonly Enclosing[], line: string, held: readonly Written[] | undefined): string | null {
+  if (line.trim() === '') return null;
+  const indent = INDENT.exec(line)![0].length;
+  const opened = held === undefined ? [] : indentLines([held[0]!.example], indent + 2);
+  const written = [heading, ...above.map((each) => `${' '.repeat(each.indent)}${each.text}`), line, ...opened].join('\n');
+  try {
+    owner.parse(splitSections(written)[0]!);
+    return null;
+  } catch (error) {
+    return error instanceof DslError ? error.message : null;
+  }
+}
+
+const declares = (known: readonly Addressed[], kind: string, id: string): boolean =>
+  known.some((each) => each.kind === kind && (each.address === id || each.address.endsWith(`.${id}`) || id.endsWith(`.${each.address}`)));
+
+// The ids this line names that no module in the universe declares. A thing written before the thing it names is normal, so this is a remark rather than a refusal.
+function undeclaredOn(owner: Section, heading: string, line: string, known: readonly Addressed[]): string[] {
+  if (line.trim() === '') return [];
+  const read = readSection([heading, line.trim()].join('\n'));
+  if (read === undefined) return [];
+  const missing: string[] = [];
+  try {
+    read.owner.visit(read.authored as { id: string }, '', (kind, id) => {
+      if (!declares(known, kind, id)) missing.push(id);
+      return id;
+    });
+  } catch {
+    return [];
+  }
+  void owner;
+  return [...new Set(missing)];
 }
 
 function readSection(text: string): { owner: Section; authored: Record<string, unknown> } | undefined {
@@ -131,12 +169,20 @@ function readSection(text: string): { owner: Section; authored: Record<string, u
   }
 }
 
-function referencedKinds(text: string, from: number, to: number): Set<string> {
+const LEADING_WORD = /[a-z][a-z0-9-]*/;
+
+// An element that takes more than an id refuses a bare probe, so stand its own first example in, with the id swapped out.
+const wholeValue = (parser: Parser<unknown> | null): string | undefined => {
+  const example = parser?.examples[0];
+  return example === undefined || !LEADING_WORD.test(example) ? undefined : example.replace(LEADING_WORD, PROBE);
+};
+
+function referencedKinds(text: string, from: number, to: number, stood = PROBE): Set<string> {
   const found = new Set<string>();
-  const read = readSection(`${text.slice(0, from)}${PROBE}${text.slice(to)}`);
+  const read = readSection(`${text.slice(0, from)}${stood}${text.slice(to)}`);
   if (read === undefined) return found;
   try {
-    read.owner.visit(read.owner.build(read.authored, DEFAULT_CONTEXT), '', (kind, id) => {
+    read.owner.visit(read.authored as { id: string }, '', (kind, id) => {
       if (id === PROBE || id.endsWith(`.${PROBE}`)) found.add(kind);
       return id;
     });
@@ -184,7 +230,7 @@ const shows = (form: string, typed: string): boolean => {
   return typed === '' || literal.startsWith(typed) || (literal !== '' && typed.startsWith(literal));
 };
 
-const offerFor = (form: string, family?: string): Offer => ({ form, insert: literalOf(form) === '' ? form : literalOf(form), ...(family === undefined ? {} : { family }) });
+const offerFor = (form: string, family?: string, note?: string): Offer => ({ form, insert: literalOf(form) === '' ? form : literalOf(form), ...(family === undefined ? {} : { family }), ...(note === undefined ? {} : { note }) });
 
 function deduped(offers: readonly Offer[]): Offer[] {
   const held = new Map<string, Offer>();
@@ -202,6 +248,8 @@ function headingOffering(text: string, at: number, before: string, lineEnd: numb
       to: at + LEADING_ID.exec(text.slice(at, lineEnd))![0].length,
       where: ['# <kind>'],
       reads: kind === '' ? null : '# <kind>',
+      refused: null,
+      undeclared: [],
         offers: sectionKinds()
         .filter((each) => each.startsWith(kind))
         .map((each) => ({ form: each, insert: `${each} `, family: 'a kind' })),
@@ -213,6 +261,8 @@ function headingOffering(text: string, at: number, before: string, lineEnd: numb
     to: lineEnd,
     where: [`# ${kind}`],
     reads: typed === '' ? null : `# ${kind} <id>`,
+    refused: null,
+    undeclared: [],
     offers: addressOffers(known, new Set(kind === '' ? [] : [kind]), '', typed),
   };
 }
@@ -226,9 +276,10 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
 
   if (text.slice(lineStart, lineStart + 1) === '#') return headingOffering(text, at, before, lineEnd, known);
 
-  const kind = kindAbove(text, lineStart);
+  const heading = headingAbove(text, lineStart);
+  const kind = heading === undefined ? undefined : opens(heading);
   const owner = kind === undefined ? undefined : sectionFor(kind);
-  if (owner === undefined) return NOTHING;
+  if (owner === undefined || heading === undefined) return NOTHING;
 
   const indent = INDENT.exec(before)![0].length;
   const opening = CLAUSE.exec(before.slice(indent));
@@ -238,7 +289,8 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const to = at + (tail.indexOf(',') < 0 ? tail.length : tail.indexOf(','));
 
   const token = TRAILING_ID.exec(typed)![0];
-  const kinds = referencedKinds(text, at - token.length, at + LEADING_ID.exec(tail)![0].length);
+  const past = at + LEADING_ID.exec(tail)![0].length;
+  const kinds = referencedKinds(text, at - token.length, past);
   const continuing = opening !== null && opening[0].startsWith(',');
   const written = continuing ? text.slice(lineStart + indent, from) : typed;
   const named = fieldNamed(owner, written, true);
@@ -246,19 +298,26 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const left = continuing ? typed : typed.slice(under.length);
   const values = named.parser === null ? [] : named.parser.forms;
   // Read the section around the line being written, which is the half of it that stands whole while this one is still being typed.
+  if (kinds.size === 0 && token === '' && text.slice(past, lineEnd).trim() === '') {
+    const whole = wholeValue(named.parser);
+    if (whole !== undefined) for (const each of referencedKinds(text, at, past, whole)) kinds.add(each);
+  }
   const held = readSection(`${text.slice(0, lineStart)}${text.slice(lineEnd)}`)?.authored;
   const here = linesAt(owner, text, lineStart, indent);
   const alongside = continuing ? 'one more value' : named.key === null ? 'what goes here' : `what ${named.key}: takes`;
   const lines = here.lines.filter((written) => written.needs === undefined || held === undefined || held[written.needs] !== undefined);
 
+  const reads = readAs(here.lines, text.slice(lineStart, lineEnd).trim());
   return {
     from,
     to,
     where: here.where,
-    reads: readAs(here.lines, text.slice(lineStart, lineEnd).trim()),
+    reads,
+    refused: refusalAt(owner, heading, enclosing(text, lineStart, indent), text.slice(lineStart, lineEnd), here.lines.find((line) => line.form === reads)?.block?.()),
+    undeclared: indent === 0 ? undeclaredOn(owner, heading, text.slice(lineStart, lineEnd), known) : [],
     offers: deduped([
       ...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token),
-      ...(continuing || under !== '' ? [] : lines).flatMap((line) => [...(shows(line.form, typed) ? [offerFor(line.form, line.family)] : []), ...namedOffers(line, known, typed)]),
+      ...(continuing || under !== '' ? [] : lines).flatMap((line) => [...(shows(line.form, typed) ? [offerFor(line.form, line.family, line.note)] : []), ...namedOffers(line, known, typed)]),
       ...values.filter((form) => literalOf(form) === '' || shows(form, left)).map((form) => offerFor(form, alongside)),
     ]),
   };

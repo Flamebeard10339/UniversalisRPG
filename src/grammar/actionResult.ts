@@ -470,9 +470,9 @@ export const SOMETIMES = 'only sometimes';
 const WRAPPERS: readonly Written[] = [
   { form: 'if <condition>:', example: 'if has-key:', family: SOMETIMES, block: () => resultGrammar() },
   { form: '<chance> in <of>:', example: '3 in 10:', family: SOMETIMES, block: () => resultGrammar() },
-  { form: '[my ]<stat> vs [their ]<stat>:', example: 'attack vs defence:', family: SOMETIMES, block: () => resultGrammar() },
+  { form: '[my ]<stat> vs [their ]<stat>:', example: 'attack vs defence:', family: SOMETIMES, note: 'its block runs only when the contest is won', block: () => resultGrammar() },
   { form: 'one of:', example: 'one of:', family: SOMETIMES, block: () => ROWS },
-  { form: 'credit:', example: 'credit:', family: SOMETIMES, block: () => resultGrammar() },
+  { form: 'credit:', example: 'credit:', family: SOMETIMES, note: 'its block runs for whoever brought the action, not whoever it landed on', block: () => resultGrammar() },
 ];
 
 export const resultGrammar = (): readonly Written[] => [...writtenFrom(actionResult).map((line) => ({ ...line, family: HAPPENS })), ...WRAPPERS];

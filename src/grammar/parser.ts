@@ -12,6 +12,7 @@ export interface Written {
   example: string;
   family?: string;
   names?: string;
+  note?: string;
   needs?: string;
   block?: () => readonly Written[];
 }

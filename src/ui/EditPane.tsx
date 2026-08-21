@@ -221,6 +221,8 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                 <div className="border-b border-border px-2 pb-1 text-text-subtle">
                   <div className="break-words">{offering.where.join(' › ')}</div>
                   <div className="break-words text-accent">{offering.reads ?? words('unread')}</div>
+                  {offering.refused === null ? null : <div className="break-words text-danger">{offering.refused}</div>}
+                  {offering.undeclared.length === 0 ? null : <div className="break-words text-warning">{`${offering.undeclared.join(', ')} ${words('undeclared')}`}</div>}
                 </div>
                 {gathered(offering.offers).map((family, at) => (
                   <div key={family.name ?? `${at}`} className="pt-1">
@@ -261,6 +263,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                             }`}
                           >
                             {shownIn(group, offer)}
+                            {offer.note === undefined ? null : <span className="block text-text-subtle opacity-70">{offer.note}</span>}
                           </button>
                         ))}
                       </div>

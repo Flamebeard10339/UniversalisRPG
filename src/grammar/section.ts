@@ -12,6 +12,7 @@ export const DEFAULT_CONTEXT: HydrateContext = { language: DEFAULT_LANGUAGE };
 export type PrintWhen = 'when-set' | 'always' | 'unless-default';
 
 export interface FieldPrinting {
+  note?: string;
   printed?: PrintWhen;
   block?: true;
   generated?: true;

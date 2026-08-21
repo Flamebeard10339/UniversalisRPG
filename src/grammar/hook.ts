@@ -12,12 +12,14 @@ export const HOOK_FIELDS: {
   onHit: {
     parser: hookResultList,
     keyword: 'on hit',
+    note: 'when a swing of this carrier lands on someone',
     default: () => [],
     block: true,
   },
   whenHit: {
     parser: hookResultList,
     keyword: 'when hit',
+    note: 'when a swing lands on this carrier',
     default: () => [],
     block: true,
   },
