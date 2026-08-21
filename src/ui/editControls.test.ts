@@ -29,6 +29,7 @@ const EXERCISED: Record<keyof EditControls, true> = {
   add: true,
   text: true,
   cursor: true,
+  take: true,
   scroll: true,
   split: true,
   stage: true,
@@ -60,12 +61,12 @@ describe('what a control on the editing page does', () => {
 
   it('keeps what was typed, where the cursor was and how far the list was scrolled', () => {
     const held = watching(opened);
-    held.controls.text('# entity tutorial-island.miki\ntitle: Miki the Guide');
+    held.controls.text('# entity tutorial-island.miki\ntitle: Miki the Guide', 51);
     held.controls.cursor(12);
     held.controls.scroll(220);
 
     expect(held.at.map((each) => [each.draft, each.cursor, each.scroll])).toEqual([
-      ['# entity tutorial-island.miki\ntitle: Miki the Guide', 0, 0],
+      ['# entity tutorial-island.miki\ntitle: Miki the Guide', 51, 0],
       [null, 12, 0],
       [null, 0, 220],
     ]);

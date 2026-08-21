@@ -1,7 +1,7 @@
 import type { Answer } from '../../runtime/localized';
 import { SURFACES, type Standing, type SurfaceId } from '../authoringSurface';
 import type { Sheet } from '../discovery';
-import { draftIn, kindsIn, rowsIn, sectionKey, type EditHeld } from '../editControls';
+import { draftIn, kindsIn, offeringIn, rowsIn, sectionKey, type EditHeld } from '../editControls';
 import { modeNamed, type MapMode } from '../mapEdit';
 import { clampZoom, type Point } from '../viewport';
 import { clampIndex } from '../gesture';
@@ -165,6 +165,7 @@ export interface EditState {
   open: string | null;
   draft: string;
   cursor: number;
+  offers: readonly string[];
   scroll: number;
   split: number;
   standing: Standing;
@@ -182,11 +183,18 @@ export function editState(held: EditHeld): EditState {
     open: held.editing.open,
     draft: draftIn(held.sections, held.editing),
     cursor: held.editing.cursor,
+    offers: offeringIn(held).offers.map((offer) => offer.insert),
     scroll: held.editing.scroll,
     split: held.editing.split,
     standing: held.standing,
     places: held.places.map((place) => place.id),
   };
+}
+
+export function offerNamed(held: EditHeld, value: unknown): string {
+  const found = offeringIn(held).offers.find((offer) => offer.insert === value);
+  if (found === undefined) throw new Error(`the grammar offers nothing to write called ${String(value)}`);
+  return found.insert;
 }
 
 export function surfaceNamed(value: unknown): SurfaceId {
@@ -216,8 +224,9 @@ export function editSurface(held: EditHeld): TestSurface {
       search: (value) => held.controls.search(String(value)),
       open: (value) => held.controls.open(value === null ? null : rowNamed(held, value)),
       add: () => held.controls.add(),
-      text: (value) => held.controls.text(String(value)),
+      text: (value) => held.controls.text(String(value), String(value).length),
       cursor: (value) => held.controls.cursor(Number(value)),
+      take: (value) => held.controls.take(offerNamed(held, value)),
       scroll: (value) => held.controls.scroll(Number(value)),
       split: (value) => held.controls.split(Number(value)),
       stage: () => held.controls.stage(),

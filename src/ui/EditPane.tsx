@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { searching } from './authoringSurface';
-import { draftIn, kindsIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
+import { draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
 import { splitFrom } from './gesture';
 import { Splitter } from './Splitter';
 import { useTestSurface } from './useTestSurface';
@@ -14,10 +14,12 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
   const field = useRef<HTMLTextAreaElement>(null);
   const restored = useRef(false);
   const grabbed = useRef(0);
+  const taken = useRef(false);
   const { sections, standing, places, editing, controls } = held;
   const rows = rowsIn(held);
   const open = openedIn(sections, editing);
   const search = searching(editing.query);
+  const offering = offeringIn(held);
 
   useTestSurface('edit', held);
 
@@ -30,6 +32,13 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
     restored.current = true;
     field.current.setSelectionRange(editing.cursor, editing.cursor);
   }, [open]);
+
+  useEffect(() => {
+    if (!taken.current || !field.current) return;
+    taken.current = false;
+    field.current.focus();
+    field.current.setSelectionRange(editing.cursor, editing.cursor);
+  }, [editing.draft]);
 
   return (
     <div ref={surface} className="flex min-h-0 flex-1 flex-col">
@@ -145,6 +154,29 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
             onDrag={(dy) => controls.split(splitFrom(grabbed.current, dy, surface.current?.clientHeight ?? 0))}
           />
           <div className="relative flex min-h-0 flex-col border-t border-border bg-surface-raised p-3" style={{ flexGrow: 1 - editing.split, flexBasis: 0 }}>
+            {offering.offers.length > 0 ? (
+              <div data-drive="edit.offers" className="unbarred mb-2 flex shrink-0 gap-1 overflow-x-auto">
+                {offering.offers.map((offer) => (
+                  <button
+                    key={offer.insert}
+                    data-drive="edit.take"
+                    type="button"
+                    data-offer={offer.insert}
+                    data-kind={offer.kind}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      taken.current = true;
+                      controls.take(offer.insert);
+                    }}
+                    className={`shrink-0 whitespace-nowrap rounded-xl border px-2 font-mono text-xs ${
+                      offer.kind === undefined ? 'border-border bg-panel text-text-subtle' : 'border-accent bg-panel text-accent'
+                    }`}
+                  >
+                    {offer.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <textarea
               ref={field}
               data-drive="edit.text"
@@ -153,7 +185,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
               spellCheck={false}
               autoCapitalize="off"
               autoCorrect="off"
-              onChange={(event) => controls.text(event.target.value)}
+              onChange={(event) => controls.text(event.target.value, event.target.selectionStart)}
               onSelect={(event) => controls.cursor(event.currentTarget.selectionStart)}
               className="min-h-0 flex-1 resize-none select-text rounded-xl border border-border bg-panel px-3 pb-14 pt-2 font-mono text-xs text-text outline-none focus:border-accent"
             />

@@ -1,3 +1,4 @@
+import { applied, offeringAt, type Offering } from '../content/completion';
 import type { PlayView } from '../runtime/session';
 import { deleteLine, emptied, kindsOffered, offeredBy, openingLine, removeLine, searching, SHOW_LINE, stage, type Section, type Standing, type SurfaceId } from './authoringSurface';
 import { gotoLine } from './devMode';
@@ -11,8 +12,9 @@ export interface EditControls {
   search(query: string): void;
   open(key: string | null): void;
   add(): void;
-  text(draft: string): void;
+  text(draft: string, at: number): void;
   cursor(at: number): void;
+  take(insert: string): void;
   scroll(at: number): void;
   split(at: number): void;
   stage(): void;
@@ -50,6 +52,8 @@ export const openedIn = (sections: readonly Section[], editing: Editing): Sectio
 
 export const draftIn = (sections: readonly Section[], editing: Editing): string => editing.draft ?? openedIn(sections, editing)?.text ?? '';
 
+export const offeringIn = (held: Pick<EditHeld, 'sections' | 'editing'>): Offering => offeringAt(draftIn(held.sections, held.editing), held.editing.cursor, held.sections);
+
 export function editControls(held: { sections: readonly Section[]; editing: Editing }, act: EditActs): EditControls {
   const { sections, editing } = held;
   const shut = (): Editing => ({ ...editing, open: null, draft: null, cursor: 0 });
@@ -63,8 +67,15 @@ export function editControls(held: { sections: readonly Section[]; editing: Edit
       const opening = openingLine(editing.surface === 'global' ? editing.kind : null);
       act.move({ ...editing, open: null, draft: opening, cursor: opening.length });
     },
-    text: (text) => act.move({ ...editing, draft: text }),
+    text: (text, at) => act.move({ ...editing, draft: text, cursor: at }),
     cursor: (at) => act.move({ ...editing, cursor: at }),
+    take: (insert) => {
+      const offering = offeringIn(held);
+      const offer = offering.offers.find((each) => each.insert === insert);
+      if (offer === undefined) return;
+      const taken = applied(draftIn(sections, editing), offering, offer);
+      act.move({ ...editing, draft: taken.text, cursor: taken.cursor });
+    },
     scroll: (at) => act.move({ ...editing, scroll: at }),
     split: (at) => act.move({ ...editing, split: at }),
     stage: () => {
