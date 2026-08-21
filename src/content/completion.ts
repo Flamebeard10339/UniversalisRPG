@@ -270,6 +270,15 @@ function undeclaredIn(written: string, known: readonly Addressed[]): Undeclared[
   return [...held.values()];
 }
 
+// The section as far as the engine can read it. A draft is written a line at a time, so one line it cannot read yet must not take the rest of the section down with it and leave every question about the whole unanswerable.
+const asRead = (text: string): Record<string, unknown> | undefined => {
+  const whole = readSection(text)?.authored;
+  if (whole !== undefined) return whole;
+  const lines = text.split('\n');
+  for (const said of refusalsIn(text)) lines[said.line - 1] = '';
+  return readSection(lines.join('\n'))?.authored;
+};
+
 function readSection(text: string): { owner: Section; authored: Record<string, unknown> } | undefined {
   try {
     const raw = splitSections(text)[0];
@@ -545,7 +554,7 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const under = named.key === null || continuing ? '' : (KEYED.exec(written)?.[0] ?? '');
   const left = typed.slice(under.length);
   const above = enclosing(text, lineStart, indent);
-  const held = readSection(`${text.slice(0, lineStart)}${text.slice(lineEnd)}`)?.authored;
+  const held = asRead(`${text.slice(0, lineStart)}${text.slice(lineEnd)}`);
   const here = linesAt(owner, text, lineStart, indent);
   const alongside = continuing ? 'one more value' : named.key === null ? 'what goes here' : `what ${named.key}: takes`;
   const lines = here.lines.filter((written) => written.needs === undefined || held === undefined || held[written.needs] !== undefined);

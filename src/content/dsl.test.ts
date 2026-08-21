@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
-import { amissIn, refusalOf } from './completion';
+import { amissIn, offeringAt, refusalOf } from './completion';
 import { declaredBy } from './references';
 import { align } from '../grammar/form';
 import type { Written } from '../grammar/parser';
@@ -18,6 +18,37 @@ const CORPUS = readdirSync('content')
   .map((name) => ({ name, text: readFileSync(`content/${name}`, 'utf8') }));
 
 const problems = (result: { diagnostics: { sourceName: string }[] }): string[] => result.diagnostics.map((each) => formatModuleDiagnostic(each as never));
+
+describe('a line that only makes sense once another is written', () => {
+  // The keyword an author types for a field, which is what the grammar writes and so what an offer begins with.
+  const keywordOf = (schema: { fields: Record<string, { keyword?: string }> }, name: string): string => schema.fields[name]?.keyword ?? name;
+
+  const begins = (form: string, keyword: string): boolean => form === keyword || form.startsWith(`${keyword}:`);
+
+  const offeredOn = (draft: string): string[] => offeringAt(draft, draft.length, []).offers.map((each) => each.form);
+
+  for (const owner of sections()) {
+    const schema = owner.schema as { fields: Record<string, { keyword?: string }>; needs?: Record<string, string> } | undefined;
+    if (schema?.needs === undefined) continue;
+    for (const [name, needed] of Object.entries(schema.needs)) {
+      const keyword = keywordOf(schema, name);
+      const stands = keywordOf(schema, needed);
+      const writes = owner.grammar.find((line) => begins(line.form, stands) && line.example.length > stands.length);
+
+      it(`# ${owner.kind} offers ${keyword} only once ${stands} is written`, () => {
+        expect(writes, `nothing in the grammar of # ${owner.kind} writes ${stands}`).toBeDefined();
+        expect(offeredOn(`# ${owner.kind} probe\n`).filter((form) => begins(form, keyword))).toEqual([]);
+        const written = `# ${owner.kind} probe\n${writes!.example}\n`;
+        expect(offeredOn(written).filter((form) => begins(form, keyword)).length).toBeGreaterThan(0);
+      });
+
+      it(`# ${owner.kind} keeps ${keyword} back where a line it cannot read stands beside it`, () => {
+        const draft = `# ${owner.kind} probe\nnothing-here-is-a-field: 3\n`;
+        expect(offeredOn(draft).filter((form) => begins(form, keyword))).toEqual([]);
+      });
+    }
+  }
+});
 
 describe('the shipped corpus', () => {
   it('loads with no diagnostics', () => {

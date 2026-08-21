@@ -147,7 +147,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     ...HOOK_FIELDS,
   },
   keywords: ['aggressive'],
-  needs: { respawnAfter: 'stats', onHit: 'stats', whenHit: 'stats', aggressive: 'stats' },
+  needs: { respawnAfter: 'stats', onHit: 'stats', whenHit: 'stats', aggressive: 'stats', allies: 'stats' },
   keywordsAfter: 'examine',
   entries: { into: 'blocks', body: entityBlock },
   visit: (value, where, visit) => {
