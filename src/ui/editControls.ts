@@ -44,7 +44,7 @@ export interface EditActs {
 export const rowsIn = (held: Pick<EditHeld, 'sections' | 'standing' | 'editing'>): Section[] => {
   const offered = offeredBy(held.sections, held.standing, held.editing.surface);
   const kind = held.editing.surface === 'global' ? held.editing.kind : null;
-  const search = searching(held.editing.query);
+  const search = searching(held.editing.query, offered);
   return offered.filter((section) => (kind === null || section.kind === kind) && search.holds(section));
 };
 

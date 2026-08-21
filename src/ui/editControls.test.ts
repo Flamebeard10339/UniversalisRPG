@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addressable, NOWHERE, type Section, type Standing } from './authoringSurface';
+import { addressable, NOWHERE, searching, type Section, type Standing } from './authoringSurface';
 import { draftIn, editControls, kindsIn, openedIn, rowsIn, sectionKey, type EditActs, type EditControls } from './editControls';
 import { FORGOTTEN, type Editing } from './editorMemory';
 import { SHIPPED_SOURCES } from './shippedContent';
@@ -209,5 +209,34 @@ describe('what the page draws, assembled once', () => {
 
   it('offers nothing local where nothing is standing', () => {
     expect(rowsIn({ sections: addressed, standing: NOWHERE, editing: FORGOTTEN })).toEqual([]);
+  });
+});
+
+describe('narrowing the list by what is true of a section', () => {
+  const shipped = { kind: 'item', address: 'tutorial-island.sword', text: '# item tutorial-island.sword', module: 'tutorial-island', staged: false };
+  const mine = { kind: 'item', address: 'tutorial-island.sword', text: '# item tutorial-island.sword', module: 'local-changes', staged: true };
+  const fresh = { kind: 'item', address: 'local-changes.torch', text: '# item local-changes.torch', module: 'local-changes', staged: true };
+  const broken = { kind: 'item', address: 'local-changes.rope', text: '# item local-changes.rope\nnonsense: 3', module: 'local-changes', staged: true };
+  const all = [shipped, mine, fresh, broken];
+  const kept = (query: string): string[] => all.filter((each) => searching(query, all).holds(each)).map((each) => each.module + ' ' + each.address);
+
+  it('keeps what an author has changed', () => {
+    expect(kept('is:changed')).toEqual(['local-changes tutorial-island.sword', 'local-changes local-changes.torch', 'local-changes local-changes.rope']);
+  });
+
+  it('keeps only what stands over something shipped', () => {
+    expect(kept('is:shadowed')).toEqual(['local-changes tutorial-island.sword']);
+  });
+
+  it('keeps what the engine will not read', () => {
+    expect(kept('is:amiss')).toEqual(['local-changes local-changes.rope']);
+  });
+
+  it('narrows by a word and a state together', () => {
+    expect(kept('is:changed torch')).toEqual(['local-changes local-changes.torch']);
+  });
+
+  it('says a state nothing declares is broken, rather than reading it as a word', () => {
+    expect(searching('is:nonsense', all).broken).toBe(true);
   });
 });

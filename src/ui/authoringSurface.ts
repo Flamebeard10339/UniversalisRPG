@@ -2,6 +2,7 @@ import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { qualify } from '../content/namespace';
 import { isNamespacedKind } from '../content/sections';
 import type { ModuleSource } from '../content/universe';
+import { amissIn } from '../content/completion';
 import { DslError } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
 
@@ -115,16 +116,36 @@ const TERMS = /\S+/g;
 
 const searched = (section: Section): string => `${section.module}\n${section.text}`;
 
-export function searching(query: string): Search {
+// What is true of a section beyond the words in it, which is what an author narrows a long list by. Each is asked of the whole set, because being a copy of something is not a fact one section holds alone.
+export const STATES: Record<string, (sections: readonly Section[]) => (section: Section) => boolean> = {
+  changed: () => (section) => section.staged,
+  shadowed: (sections) => {
+    const shipped = new Set(sections.filter((each) => !each.staged).map(keyOf));
+    return (section) => section.staged && shipped.has(keyOf(section));
+  },
+  amiss: () => (section) => amissIn(section.text, []).some((each) => each.refused !== null),
+};
+
+const IS = /^is:(?<state>[a-z-]+)$/;
+
+export function searching(query: string, sections: readonly Section[] = []): Search {
   const patterns: RegExp[] = [];
+  const held: ((section: Section) => boolean)[] = [];
   for (const term of query.match(TERMS) ?? []) {
+    const state = IS.exec(term)?.groups?.state;
+    if (state !== undefined) {
+      const asked = STATES[state];
+      if (asked === undefined) return { holds: () => false, broken: true };
+      held.push(asked(sections));
+      continue;
+    }
     try {
       patterns.push(new RegExp(term, 'i'));
     } catch {
       return { holds: () => false, broken: true };
     }
   }
-  return { holds: (section) => patterns.every((pattern) => pattern.test(searched(section))), broken: false };
+  return { holds: (section) => held.every((asked) => asked(section)) && patterns.every((pattern) => pattern.test(searched(section))), broken: false };
 }
 
 export type Staged = { line: string } | { refused: string };
