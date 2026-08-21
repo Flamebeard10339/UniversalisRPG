@@ -37,7 +37,6 @@ export const LABELS = {
   grammar: 'engine.shell.grammar',
   unread: 'engine.shell.unread',
   undeclared: 'engine.shell.undeclared',
-  filling: 'engine.shell.filling',
   'step-in': 'engine.shell.step-in',
   'step-out': 'engine.shell.step-out',
   new: 'engine.shell.new',

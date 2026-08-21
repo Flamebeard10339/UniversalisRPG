@@ -157,7 +157,6 @@ engine.shell.section: Section
 engine.shell.grammar: Grammar
 engine.shell.unread: nothing yet
 engine.shell.undeclared: is not declared anywhere yet
-engine.shell.filling: like
 engine.shell.step-in: →
 engine.shell.step-out: ←
 engine.shell.new: New

@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import type { Written } from '../src/grammar/parser';
 import { align, type Hole } from '../src/grammar/form';
-import { offeringAt, said, saysKind, type Addressed } from '../src/content/completion';
+import { fillingWords, offeringAt, said, saysKind, type Addressed } from '../src/content/completion';
 import { gathered, shownIn } from '../src/ui/offerGroups';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 import { addressable } from '../src/ui/authoringSurface';
@@ -94,6 +94,7 @@ export function treeLines(lines: readonly Written[], pad: string, sitting: Sitti
 const RULES: readonly string[] = [
   `${PART}a line marked like this names a part of the kind and is not written`,
   `${PART}a keyword whose shape trails off in \`, …\` takes a list, and may instead hold it one value to a line, indented under the bare \`keyword:\``,
+  `${PART}an \`e.g.\` shows one line of that shape written out; the ids in it stand for ids and are not ids anything declares`,
 ];
 
 export function treeOf(kind: string): string[] {
@@ -109,12 +110,15 @@ const NAMED = 24;
 
 // The page names a kind where the cursor stands and lists what an author has begun to type of it; a file has typed the whole of it already, so the oracle lists everything of that kind the world declares.
 const namesAt = (text: string, cursor: number, known: readonly Addressed[]): string | undefined => {
-  const filling = offeringAt(text, cursor, known).filling;
-  if (filling === null) return undefined;
-  if (filling.kind === undefined) return `    <${filling.hole}>${filling.like === undefined ? '' : `, like ${filling.like}`}`;
-  const named = known.filter((each) => each.kind === filling.kind).map((each) => each.address).sort();
+  const offering = offeringAt(text, cursor, known);
+  if (offering.filling === null) return undefined;
+  // A hole that holds a whole line of its own — a `<result>` — names nothing itself, but the line in it does, and that is what an author standing there is choosing.
+  const kind = offering.filling.kind ?? [...new Set(offering.offers.flatMap((offer) => (offer.kind === undefined ? [] : [offer.kind])))][0];
+  const shown = `    ${fillingWords({ ...offering.filling, ...(kind === undefined ? {} : { kind }) })}`;
+  if (kind === undefined) return shown;
+  const named = known.filter((each) => each.kind === kind).map((each) => each.address).sort();
   const listed = named.length === 0 ? 'nothing declares one yet' : `${named.slice(0, NAMED).join(', ')}${named.length > NAMED ? `, … and ${named.length - NAMED} more, ${named.length} in all` : ''}`;
-  return `    <${filling.hole}> names a # ${filling.kind}: ${listed}`;
+  return `${shown}: ${listed}`;
 };
 
 // A page moves its cursor and the offering follows it; a file does not, so the oracle walks the cursor to each placeholder in turn and reports what stands there.
@@ -138,7 +142,7 @@ export function offeringLines(text: string, known: readonly Addressed[]): string
     out.push(`${line || '·'}`);
     out.push(`    in ${offering.where.join(' › ')}, reads as ${reads ?? '?'}${note === undefined ? '' : `   — ${note}`}`);
     if (offering.refused !== null) out.push(`    REFUSED, the engine will not read this line: ${offering.refused}`);
-    if (offering.undeclared.length > 0) out.push(`    nothing declares these yet, which is only a remark if you mean to declare them: ${offering.undeclared.join(', ')}`);
+    if (offering.undeclared.length > 0) out.push(`    nothing declares these yet, which is only a remark if you mean to declare them: ${offering.undeclared.map((each) => `${each.id} as a # ${each.kind}`).join(', ')}`);
     const seen = new Set<string>();
     for (const hole of holesOf(offering, line)) {
       const said = namesAt(text, opening + hole.end, known);

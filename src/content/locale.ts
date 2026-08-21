@@ -147,7 +147,6 @@ export const ENGINE_KEYS = [
   'engine.shell.grammar',
   'engine.shell.unread',
   'engine.shell.undeclared',
-  'engine.shell.filling',
   'engine.shell.step-in',
   'engine.shell.step-out',
   'engine.shell.new',

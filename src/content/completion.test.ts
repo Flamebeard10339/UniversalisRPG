@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Parser } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
-import { applied, offeringAt, type Addressed } from './completion';
+import { applied, fillingWords, offeringAt, type Addressed } from './completion';
 import { sectionFor, sections } from './sections';
 
 const KNOWN: readonly Addressed[] = [
@@ -127,7 +127,7 @@ describe('a line as the engine takes it', () => {
 
   it('remarks on an id nothing declares, without calling it a refusal', () => {
     const held = taken('# location tutorial-island.beach\nentities: mine.bat|');
-    expect(held.undeclared).toEqual(['mine.bat']);
+    expect(held.undeclared).toEqual([{ kind: 'entity', id: 'mine.bat' }]);
     expect(held.refused).toBeNull();
   });
 
@@ -153,7 +153,13 @@ describe('a half-written line', () => {
   const under = '# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n';
 
   it('is read as the shape it is on its way to being', () => {
-    expect(taken(`${under}  xp: |`).filling).toEqual({ form: 'xp: <skill> <amount>', hole: 'skill', kind: 'skill' });
+    expect(taken(`${under}  xp: |`).filling).toEqual({ form: 'xp: <skill> <amount>', hole: 'skill', like: 'mining', kind: 'skill' });
+  });
+
+  it('says what a hole holds and what it may name, and says only the one that is not the other', () => {
+    expect(fillingWords(taken(`${under}  xp: |`).filling!)).toBe('<skill> — a # skill');
+    expect(fillingWords(taken(`${under}  xp: mining |`).filling!)).toBe('<amount> — like 4-7');
+    expect(fillingWords(taken('# droptable probe\none of:\n  |').filling!)).toBe('<weight> — like 3x, or a # stat');
   });
 
   it('opens onto the ids that hole names, which the line alone cannot yet say', () => {
@@ -186,7 +192,7 @@ describe('a half-written line', () => {
   });
 
   it('remarks on an id nothing declares, however deep in a block it sits', () => {
-    expect(taken(`${under}  xp: minning 4|`).undeclared).toEqual(['minning']);
+    expect(taken(`${under}  xp: minning 4|`).undeclared).toEqual([{ kind: 'skill', id: 'minning' }]);
   });
 });
 

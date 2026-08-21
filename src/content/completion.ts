@@ -4,6 +4,7 @@ import { DslError, type Parser, type Written } from '../grammar/parser';
 import { isPositionalField } from '../grammar/section';
 import { indentLines, splitSections } from '../grammar/structure';
 import { Section, sectionFor, sectionKinds } from './sections';
+import { REFERENCE } from '../grammar/values';
 
 export interface Addressed {
   kind: string;
@@ -18,12 +19,28 @@ export interface Offer {
   kind?: string;
 }
 
-// The placeholder the cursor stands in. A hole that names something says which kind, and the ids on offer are the rest of the answer; a hole that holds a value has only what one line puts there to show.
+// The placeholder the cursor stands in, what one line of this shape puts there, and the kind of thing that may be named there where the engine names one.
 export interface Filling {
   form: string;
   hole: string;
   like?: string;
   kind?: string;
+}
+
+const BARE = new RegExp(`^${REFERENCE.source}$`);
+
+// A hole whose own line puts an id there is that kind of thing; a hole that puts something else there, as `<weight>` puts `3x`, takes an id as well, and the line it puts there is the half an author will more often want.
+export function fillingWords(filling: Filling): string {
+  const named = filling.kind === undefined ? '' : `a # ${filling.kind}`;
+  if (filling.like === undefined) return `<${filling.hole}>${named === '' ? '' : ` — ${named}`}`;
+  if (named === '' ) return `<${filling.hole}> — like ${filling.like}`;
+  return BARE.test(filling.like) ? `<${filling.hole}> — ${named}` : `<${filling.hole}> — like ${filling.like}, or ${named}`;
+}
+
+// An id a line names that nothing declares, and the kind it was looked for under, since an id that is wrong is only wrong against one of them.
+export interface Undeclared {
+  kind: string;
+  id: string;
 }
 
 export interface Offering {
@@ -33,7 +50,7 @@ export interface Offering {
   reads: string | null;
   filling: Filling | null;
   refused: string | null;
-  undeclared: readonly string[];
+  undeclared: readonly Undeclared[];
   offers: readonly Offer[];
 }
 
@@ -180,7 +197,11 @@ function namedIn(written: string): { kind: string; id: string }[] {
 }
 
 // The ids a line names that no module in the universe declares. A thing written before the thing it names is normal, so this is a remark rather than a refusal.
-const undeclaredIn = (written: string, known: readonly Addressed[]): string[] => [...new Set(namedIn(written).filter((each) => !declares(known, each.kind, each.id)).map((each) => each.id))];
+function undeclaredIn(written: string, known: readonly Addressed[]): Undeclared[] {
+  const held = new Map<string, Undeclared>();
+  for (const each of namedIn(written)) if (!declares(known, each.kind, each.id)) held.set(`${each.kind} ${each.id}`, each);
+  return [...held.values()];
+}
 
 function readSection(text: string): { owner: Section; authored: Record<string, unknown> } | undefined {
   try {
@@ -214,7 +235,8 @@ export function saysKind(under: string, indent: number, written: Written): strin
   const named = (holesIn(written.form, written.example) ?? [])
     .map((hole) => ({ hole, kind: only(kindsStanding([under, `${' '.repeat(indent)}${standingIn(written.example, hole, PROBE)}`].join('\n'))) }))
     .filter((each): each is { hole: Hole; kind: string } => each.kind !== undefined && !each.hole.name.split(' ').includes(each.kind));
-  const said = named.length === 0 ? undefined : `names ${[...new Set(named.map((each) => `a # ${each.kind}`))].join(' and ')}`;
+  // A hole whose own line puts an id there names one; a hole that puts something else there, as `<weight>` puts `3x`, takes an id as well as what it shows, and saying it names one would be a lie about the common case.
+  const said = named.length === 0 ? undefined : named.map((each) => `${BARE.test(valueIn(written.example, each.hole)) ? 'names' : 'may instead name'} a # ${each.kind}`).join(', ');
   if (recalled.size >= RECALL) recalled.clear();
   recalled.set(key, said);
   return said;
@@ -395,7 +417,7 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     to,
     where: here.where,
     reads,
-    filling: filled === undefined ? null : { form: filled.form, hole: filled.hole, ...(only(holds) === undefined ? (filled.like === undefined ? {} : { like: filled.like }) : { kind: only(holds)! }) },
+    filling: filled === undefined ? null : { form: filled.form, hole: filled.hole, ...(filled.like === undefined ? {} : { like: filled.like }), ...(only(holds) === undefined ? {} : { kind: only(holds)! }) },
     refused,
     undeclared: undeclaredIn(around(heading, above, line), known),
     // A shape whose words are the ones already written would put back what it replaced, and an author who has written them is being offered nothing.
