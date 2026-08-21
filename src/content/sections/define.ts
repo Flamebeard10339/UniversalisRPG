@@ -62,7 +62,7 @@ interface Bespoke<V extends { id: string }> extends Common<V> {
 
 const fieldExample = (schema: AnySchema, name: string, spec: AnyField): string[] => {
   const written = (spec.parser as Parser<unknown>).examples[0];
-  if (written === undefined || spec.generated) return [];
+  if (written === undefined) return [];
   return [isPositionalField(schema, name) ? written : `${spec.keyword ?? name}: ${written}`];
 };
 
