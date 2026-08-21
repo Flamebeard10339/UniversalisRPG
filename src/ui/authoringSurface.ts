@@ -2,7 +2,7 @@ import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { qualify } from '../content/namespace';
 import { isNamespacedKind } from '../content/sections';
 import type { ModuleSource } from '../content/universe';
-import { amissIn } from '../content/completion';
+import { refusalOf } from '../content/completion';
 import { DslError } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
 
@@ -123,12 +123,14 @@ export const STATES: Record<string, (sections: readonly Section[]) => (section: 
     const shipped = new Set(sections.filter((each) => !each.staged).map(keyOf));
     return (section) => section.staged && shipped.has(keyOf(section));
   },
-  amiss: () => (section) => amissIn(section.text, []).some((each) => each.refused !== null),
+  amiss: () => (section) => refusalOf(section.text) !== null,
 };
 
 const IS = /^is:(?<state>[a-z-]+)$/;
 
-export function searching(query: string, sections: readonly Section[] = []): Search {
+export const EITHER = '||';
+
+function everyTerm(query: string, sections: readonly Section[]): Search {
   const patterns: RegExp[] = [];
   const held: ((section: Section) => boolean)[] = [];
   for (const term of query.match(TERMS) ?? []) {
@@ -147,6 +149,17 @@ export function searching(query: string, sections: readonly Section[] = []): Sea
   }
   return { holds: (section) => held.every((asked) => asked(section)) && patterns.every((pattern) => pattern.test(searched(section))), broken: false };
 }
+
+// Terms beside each other narrow, and `||` widens, so two states an author wants at once are asked for the way they would be anywhere else. A side with nothing written on it asks for nothing, which is what a query still being typed has.
+export function searching(query: string, sections: readonly Section[] = []): Search {
+  const sides = query.split(EITHER).filter((side) => side.trim() !== '').map((side) => everyTerm(side, sections));
+  if (sides.some((side) => side.broken)) return { holds: () => false, broken: true };
+  if (sides.length === 0) return { holds: () => true, broken: false };
+  return { holds: (section) => sides.some((side) => side.holds(section)), broken: false };
+}
+
+// The words the box takes, said in the box itself, so a state that is declared is a state an author can find.
+export const searchHint = (words: string): string => `${words} ${Object.keys(STATES).map((state) => `is:${state}`).join(` ${EITHER} `)}`;
 
 export type Staged = { line: string } | { refused: string };
 

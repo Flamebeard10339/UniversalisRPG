@@ -161,7 +161,7 @@ engine.shell.step-in: →
 engine.shell.step-out: ←
 engine.shell.new: New
 engine.shell.search: Search
-engine.shell.search-hint: all terms must match, e.g. tutorial sword, is:changed, is:shadowed, is:amiss
+engine.shell.search-hint: all terms must match, e.g. tutorial sword; for either, write:
 engine.shell.command-line: Command line
 engine.shell.stage: Stage
 engine.shell.unstage: Unstage

@@ -3,7 +3,7 @@ import type { ListParser } from '../grammar/list';
 import { DslError, parseWhole, type Parser, type Written } from '../grammar/parser';
 import { isPositionalField, typoOf } from '../grammar/section';
 import { indentLines, splitSections } from '../grammar/structure';
-import { Section, sectionFor, sectionKinds, sections } from './sections';
+import { parseModule, Section, sectionFor, sectionKinds, sections } from './sections';
 import { reachableCodecs } from '../grammar/codec';
 import { REFERENCE } from '../grammar/values';
 
@@ -543,6 +543,17 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
       ...(continuing || under !== '' ? [] : lines).flatMap((line) => namedOffers(line, known, typed)),
     ]),
   };
+}
+
+// What the engine says when it is handed the whole section, which is whether it will be read at all. `amissIn` asks line by line instead, where a line stands without the ones beside it and a half-written one is not yet wrong.
+export function refusalOf(text: string): string | null {
+  try {
+    parseModule(text);
+    return null;
+  } catch (error) {
+    if (error instanceof DslError) return error.message;
+    throw error;
+  }
 }
 
 // Everything standing between a draft and the engine taking it, gathered so an author can work down a list rather than hunt for the line.

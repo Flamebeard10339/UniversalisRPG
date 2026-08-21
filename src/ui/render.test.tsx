@@ -7,7 +7,7 @@ import { loadUniverseWithDiagnostics } from '../content/load';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
 import { App } from './App';
-import { addressable, offeredBy } from './authoringSurface';
+import { addressable, offeredBy, searchHint } from './authoringSurface';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { PER_UNIT } from './discovery';
 import { createDriver, type Driver } from './driver';
@@ -658,7 +658,7 @@ describe('what the editing page says about a section', () => {
 
     const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, 'edit')} />);
 
-    expect(html).toContain(`placeholder="${shellWord('search-hint')}"`);
+    expect(html).toContain(`placeholder="${searchHint(shellWord('search-hint'))}"`);
   });
 
   it('tells a staged section from a shipped one by its colour rather than by a slant', () => {

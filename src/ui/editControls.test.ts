@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addressable, NOWHERE, searching, type Section, type Standing } from './authoringSurface';
+import { addressable, NOWHERE, searching, searchHint, STATES, type Section, type Standing } from './authoringSurface';
 import { draftIn, editControls, kindsIn, openedIn, rowsIn, sectionKey, type EditActs, type EditControls } from './editControls';
 import { FORGOTTEN, type Editing } from './editorMemory';
 import { SHIPPED_SOURCES } from './shippedContent';
@@ -238,5 +238,34 @@ describe('narrowing the list by what is true of a section', () => {
 
   it('says a state nothing declares is broken, rather than reading it as a word', () => {
     expect(searching('is:nonsense', all).broken).toBe(true);
+  });
+
+  it('holds nothing against a section the engine reads whole, however its lines read alone', () => {
+    const search = searching('is:amiss', addressed);
+    expect(addressed.filter((each) => search.holds(each))).toEqual([]);
+  });
+
+  it('widens to either side of ||', () => {
+    expect(kept('is:amiss || is:shadowed')).toEqual(['local-changes tutorial-island.sword', 'local-changes local-changes.rope']);
+  });
+
+  it('narrows within a side before widening across them', () => {
+    expect(kept('is:changed sword || rope')).toEqual(['local-changes tutorial-island.sword', 'local-changes local-changes.rope']);
+  });
+
+  it('leaves a single | to the pattern it is written in', () => {
+    expect(kept('torch|rope')).toEqual(['local-changes local-changes.torch', 'local-changes local-changes.rope']);
+  });
+
+  it('keeps the side already written while the other one is still being typed', () => {
+    expect(kept('torch ||')).toEqual(['local-changes local-changes.torch']);
+  });
+
+  it('is broken when either side is', () => {
+    expect(searching('is:changed || is:nonsense', all).broken).toBe(true);
+  });
+
+  it('says every state the box takes in the box itself', () => {
+    for (const state of Object.keys(STATES)) expect(searchHint('narrow it:')).toContain(`is:${state}`);
   });
 });

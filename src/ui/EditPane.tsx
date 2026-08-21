@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { fillingWords } from '../content/completion';
-import { searching } from './authoringSurface';
+import { searching, searchHint } from './authoringSurface';
 import { amissWith, draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
 import { splitFrom } from './gesture';
 import { gathered, shownIn } from './offerGroups';
@@ -109,7 +109,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
         <input
           data-drive="edit.search"
           aria-label={words('search')}
-          placeholder={words('search-hint')}
+          placeholder={searchHint(words('search-hint'))}
           value={editing.query}
           onChange={(event) => controls.search(event.target.value)}
           spellCheck={false}
