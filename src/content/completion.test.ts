@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Parser } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
-import { amissIn, applied, fillingWords, offeringAt, type Addressed, type Amiss } from './completion';
+import { amissIn, applied, fillingWords, offeringAt, refusalsIn, type Addressed, type Amiss } from './completion';
 import { sectionFor, sections } from './sections';
 
 const KNOWN: readonly Addressed[] = [
@@ -200,6 +200,28 @@ describe('a half-written line', () => {
   it('lays a complaint about the whole section on the line the engine points at, and on no other', () => {
     const said = amissIn('# action tutorial-island.swing\ntitle: Fight\nrate: my attack-rate\naccuracy: my accuracy vs their evasion', KNOWN);
     expect(refused(said).map((each) => [each.line, each.refused!.includes('nothing to deplete')])).toEqual([[1, true]]);
+  });
+
+  const THREE = '# item tutorial-island.torch\nnonsense: 3\nexamine: A torch.\nalso-nonsense: 4\nthird-nonsense: 5';
+
+  it('says every line it can clear out of its own way to reach, not only the first', () => {
+    expect(refusalsIn(THREE).map((each) => each.line)).toEqual([2, 4, 5]);
+    expect(refused(amissIn(THREE, KNOWN)).map((each) => each.line)).toEqual([2, 4, 5]);
+  });
+
+  it('says of no line what it would not say of that line alone', () => {
+    const drafts = [
+      THREE,
+      '# entity tutorial-island.oven\nroast chestnuts:\n  continuous\n  rate: cooking-rate\n  nonsense: 3\n  also-nonsense: 4',
+      '# action tutorial-island.swing\ntitle: Fight\nrate: my attack-rate\naccuracy: my accuracy vs their evasion',
+      '# entity tutorial-island.oven\nstations: oven\nstations:\n  hearth\n  nonsense: 3',
+    ];
+    for (const draft of drafts) {
+      for (const said of refusalsIn(draft)) {
+        const alone = draft.split('\n').filter((_, index) => index + 1 !== said.line).join('\n');
+        expect(refusalsIn(alone).map((each) => each.refused), `${draft} line ${said.line}`).not.toContain(said.refused);
+      }
+    }
   });
 
   it('shows only the shapes whose words it has spelt out', () => {

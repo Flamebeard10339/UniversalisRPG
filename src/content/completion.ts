@@ -180,10 +180,51 @@ export function refusalOf(text: string): { at: number; refused: string } | null 
   }
 }
 
-// The same word, kept only where the engine lays it on this line. A line is read by the lines beside it — a pace set below it, a pool depleted three lines down — so a complaint laid elsewhere belongs to that line, and one laid past the cursor is about ground the author has not written yet.
+// Where in the section the engine laid its one word, and how far into that line.
+export interface Refusal {
+  line: number;
+  column: number;
+  refused: string;
+}
+
+const lineOf = (text: string, at: number): number => text.slice(0, at).split('\n').length;
+
+const openingLineAt = (text: string, line: number): number => text.split('\n').slice(0, line - 1).reduce((sum, each) => sum + each.length + 1, 0);
+
+const emptied = (text: string, line: number): string => text.split('\n').map((each, index) => (index + 1 === line ? '' : each)).join('\n');
+
+// Whether the rest of the section hangs off this line: a heading, or a line whose block is written under it. Clearing one of those rewrites the section rather than getting it out of the way, and everything the engine then says is about the wreckage.
+function bears(text: string, line: number): boolean {
+  const lines = text.split('\n');
+  const written = lines[line - 1]!;
+  if (written.startsWith('#')) return true;
+  const indent = /^\s*/.exec(written)![0].length;
+  const under = lines.slice(line).find((each) => each.trim() !== '');
+  return under !== undefined && /^\s*/.exec(under)![0].length > indent;
+}
+
+// The engine refuses a section once and stops, so it is asked again with the line it named cleared out of its way, and again, for as long as it keeps moving down the section on lines it can be cleared of. Everything it says past that is about what the clearing left behind rather than about what the author wrote, so the list ends there — the lines it did name are the author's to fix, and asking again once they are shows whatever stood behind them.
+export function refusalsIn(text: string): Refusal[] {
+  const found: Refusal[] = [];
+  let asked = text;
+  let after = 0;
+  for (;;) {
+    const said = refusalOf(asked);
+    if (said === null) return found;
+    const line = lineOf(asked, said.at);
+    if (line <= after) return found;
+    found.push({ line, column: said.at - openingLineAt(asked, line), refused: said.refused });
+    if (bears(asked, line)) return found;
+    asked = emptied(asked, line);
+    after = line;
+  }
+}
+
+// The engine's word about the line the cursor is on, kept only where the engine lays it there. A line is read by the lines beside it — a pace set below it, a pool depleted three lines down — so a complaint laid elsewhere belongs to that line, and one laid past the cursor is about ground the author has not written yet.
 function refusalAt(text: string, within: Span, held: readonly Written[] | undefined, indent: number, cursor: number): string | null {
-  const said = refusalOf(text);
-  if (said === null || said.at >= cursor || said.at < within.start || said.at > within.end) return null;
+  const line = lineOf(text, within.start);
+  const said = refusalsIn(text).find((each) => each.line === line);
+  if (said === undefined || within.start + said.column >= cursor) return null;
   if (held === undefined) return said.refused;
   // A line that opens a block and is handed over without one is refused for holding nothing, so the block's own first line goes under it and says whether that was the whole of it.
   return refusalOf(`${text.slice(0, within.end)}\n${indentLines([held[0]!.example], indent + 2).join('\n')}${text.slice(within.end)}`) === null ? null : said.refused;
@@ -562,12 +603,11 @@ export interface Amiss {
 }
 
 export function amissIn(text: string, known: readonly Addressed[]): Amiss[] {
-  // The engine refuses a section once, wherever in it the fault lies, so its one word goes on the line it points at rather than on every line that would read badly without the others.
-  const said = refusalOf(text);
+  const said = new Map(refusalsIn(text).map((each) => [each.line, each.refused]));
   const out: Amiss[] = [];
   let at = 0;
   for (const [index, written] of text.split('\n').entries()) {
-    const refused = said !== null && said.at >= at && said.at <= at + written.length ? said.refused : null;
+    const refused = said.get(index + 1) ?? null;
     const { undeclared } = offeringAt(text, at + written.length, known);
     if (refused !== null || undeclared.length > 0) out.push({ line: index + 1, written, refused, undeclared });
     at += written.length + 1;
