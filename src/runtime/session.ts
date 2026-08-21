@@ -2,7 +2,7 @@ import { endJourney } from './actionEnd';
 import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { DISCOVERED, Location } from '../content/sections/location';
-import { actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
+import { actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { createGameState, type Journey } from './state';
 import { itemCopies, Growth, grownItems } from './itemInstance';
 import { grow } from './growth';
@@ -177,11 +177,7 @@ function fightChoices(registry: Registry, state: GameState, location: Location):
   return choices;
 }
 
-function canTalk(entityId: string, registry: Registry, state: GameState): boolean {
-  const dialogue = registry.dialoguesByOwner.get(entityId);
-  if (!dialogue) return false;
-  return dialogue.nodes.some((node) => node.when && evaluateCondition(node.when, state));
-}
+const canTalk = (entityId: string, registry: Registry, state: GameState): boolean => reachedNow(registry, state, entityId) !== null;
 
 function locationChoices(session: PlaySession): PlayChoice[] {
   const { registry } = session;

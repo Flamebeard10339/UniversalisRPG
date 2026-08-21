@@ -147,10 +147,7 @@ export const dialogue = section<Dialogue>()({
   kind: 'dialogue',
   ids: 'owned',
   validate: unknownNode,
-  maps: {
-    dialogues: (value) => [[value.id, value]],
-    dialoguesByOwner: (value) => (value.owner === undefined ? [] : [[value.owner, value]]),
-  },
+  map: 'dialogues',
   grammar: [
     { form: 'owner = <entity>', example: 'owner = guide' },
     {
@@ -185,6 +182,9 @@ export const dialogue = section<Dialogue>()({
   merge: (into, from) => (into === undefined ? from : mergeNodes(into as Dialogue, from as Dialogue)),
   visit: visitDialogue,
 });
+
+// Everything an entity says. A dialogue names its owner rather than an owner naming its dialogue, so an entity speaks with as many voices as there are dialogues pointing at it — its own, and whatever a quest or an expansion has since given it. They are read in the order they were loaded, so a module that loads later has the last word, which is what an expansion is for.
+export const spokenBy = (dialogues: ReadonlyMap<string, Dialogue>, owner: string): Dialogue[] => [...dialogues.values()].filter((each) => each.owner === owner);
 
 export function visitDialogue(value: Dialogue, where: string, visit: Visit): void {
   put(value, 'owner', 'entity', `${where} owner`, visit);

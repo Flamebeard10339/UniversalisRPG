@@ -1,6 +1,6 @@
 import { RuntimeError } from './error';
 import { evaluateCondition, renderSegments } from './conditions';
-import { Choice, Dialogue, DialogueNode, Spoken } from '../content/sections/dialogue';
+import { Choice, Dialogue, DialogueNode, Spoken, spokenBy } from '../content/sections/dialogue';
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';
@@ -67,16 +67,22 @@ function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, s
   return runSteps(dialogue, node, registry, state, 0, replay);
 }
 
-export function talk(entityId: string, registry: Registry, state: GameState): DialogueCursor | null {
-  const dialogue = registry.dialoguesByOwner.get(entityId);
-  if (!dialogue) throw new RuntimeError(`no dialogue owned by entity: ${entityId}`);
-
-  let chosen: DialogueNode | undefined;
-  for (const node of dialogue.nodes) {
-    if (node.when && evaluateCondition(node.when, state)) chosen = node;
+// The one thing this entity has to say now, out of everything anyone has given it to say. Every node an author wrote a `when:` on is a claim on this moment, and the last such claim wins — within a dialogue by the order its nodes are written, and between dialogues by the order their modules loaded.
+export function reachedNow(registry: Registry, state: GameState, entityId: string): { dialogue: Dialogue; node: DialogueNode } | null {
+  let chosen: { dialogue: Dialogue; node: DialogueNode } | null = null;
+  for (const dialogue of spokenBy(registry.dialogues, entityId)) {
+    for (const node of dialogue.nodes) if (node.when && evaluateCondition(node.when, state)) chosen = { dialogue, node };
   }
-  if (!chosen) throw new RuntimeError(`no reachable node in dialogue: ${dialogue.id}`);
-  return enterNode(dialogue, chosen, registry, state);
+  return chosen;
+}
+
+export function talk(entityId: string, registry: Registry, state: GameState): DialogueCursor | null {
+  const reached = reachedNow(registry, state, entityId);
+  if (!reached) {
+    if (spokenBy(registry.dialogues, entityId).length === 0) throw new RuntimeError(`no dialogue owned by entity: ${entityId}`);
+    throw new RuntimeError(`no reachable node in any dialogue owned by entity: ${entityId}`);
+  }
+  return enterNode(reached.dialogue, reached.node, registry, state);
 }
 
 function offered(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ choice: Choice; index: number }> {
