@@ -424,7 +424,11 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     offers: deduped([
       ...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token),
       ...shown
-        .map(({ shape }) => offerFor(shape.form, shape.family, said(shape.note, saysKind(beneath(heading, above), indent, { form: `${shape.under}${shape.form}`, example: `${shape.under}${shape.example}` }))))
+        .map(({ shape }) => {
+          // The heading already names the kind under the cursor; a shape that only names the same one has nothing left to add.
+          const names = saysKind(beneath(heading, above), indent, { form: `${shape.under}${shape.form}`, example: `${shape.under}${shape.example}` });
+          return offerFor(shape.form, shape.family, said(shape.note, names === `names a # ${only(holds)}` || names === `may instead name a # ${only(holds)}` ? undefined : names));
+        })
         .filter((offer) => offer.insert !== text.slice(from, to)),
       ...(continuing || under !== '' ? [] : lines).flatMap((line) => namedOffers(line, known, typed)),
     ]),
