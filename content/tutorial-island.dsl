@@ -122,6 +122,17 @@ title: Main Hand
 # slot offhand
 title: Off Hand
 
+// --- modals ---
+
+// The mirror raises this one; the engine draws it and writes what it is told
+// into the player.
+# modal character-creation
+screen: character-creation
+
+// What `/inv` raises, and what a # test answers with submit-modal: item=.
+# modal carried-items
+screen: carried-items
+
 // --- actions ---
 
 // The shape every combattable thing in the game shares, written once and

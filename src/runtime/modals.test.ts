@@ -7,6 +7,7 @@ import { loadUniverse } from '../content/load';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, isModalFrame, Modal, MODAL_NAMES, pruneModals, publishModal } from './modals';
 import { dialogueFrame, openModal, openModalNamed, topModal } from './modalStack';
+import { MODAL_SCREENS } from '../content/sections/modal';
 import { SAVE_VERSION } from './save';
 import { choose, createGameState, DialogueCursor, GameState, talk } from './runtime';
 import { applyResultsNow } from './effects';
@@ -266,6 +267,17 @@ describe('opening and answering', () => {
     expect(() => openModalNamed(state, 'dialogue')).toThrow(/not opened by name/);
     expect(() => applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'quest-journal' }])).toThrow(RuntimeError);
     expect(state.modals).toEqual([]);
+  });
+
+  it('opens every screen a # modal may name, and nothing a # modal may not', () => {
+    for (const screen of MODAL_SCREENS) {
+      const state = createGameState();
+      openModalNamed(state, screen);
+      expect(names(state), screen).toEqual([screen]);
+    }
+    for (const unopenable of MODAL_NAMES.filter((name) => !(MODAL_SCREENS as readonly string[]).includes(name))) {
+      expect(() => openModalNamed(createGameState(), unopenable), unopenable).toThrow(/not opened by name/);
+    }
   });
 
   it('refuses an option it does not have, a value it does not take, and an answer with nothing open', () => {

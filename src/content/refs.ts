@@ -131,11 +131,13 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
       case 'add':
         put(result, 'variable', 'flag', `${where} ${result.kind}:`, visit);
         break;
+      case 'open-modal':
+        put(result, 'modal', 'modal', `${where} open modal:`, visit);
+        break;
       case 'say':
       case 'stop':
       case 'chance':
       case 'credit':
-      case 'open-modal':
         break;
       default: {
         const unreached: never = result;
