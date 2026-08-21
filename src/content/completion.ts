@@ -1,4 +1,4 @@
-import { align, exampleOf, holesIn, matches, standingIn, valueIn, type Alignment } from '../grammar/form';
+import { align, exampleOf, holesIn, matches, standingIn, valueIn, type Alignment, type Hole } from '../grammar/form';
 import type { ListParser } from '../grammar/list';
 import { DslError, type Parser, type Written } from '../grammar/parser';
 import { isPositionalField } from '../grammar/section';
@@ -132,9 +132,10 @@ function headingAbove(text: string, lineStart: number): string | undefined {
   return undefined;
 }
 
-// The line alone under the heading and the blocks it sits in, which is the half of a draft the engine can be asked about while the rest is still being written.
-const around = (heading: string, above: readonly Enclosing[], line: string, opened: readonly string[] = []): string =>
-  [heading, ...above.map((each) => `${' '.repeat(each.indent)}${each.text}`), line, ...opened].join('\n');
+// The heading and the blocks a line sits in, which is the half of a draft that stands whole while the line itself is still being written.
+export const beneath = (heading: string, above: readonly Enclosing[]): string => [heading, ...above.map((each) => `${' '.repeat(each.indent)}${each.text}`)].join('\n');
+
+const around = (heading: string, above: readonly Enclosing[], line: string, opened: readonly string[] = []): string => [beneath(heading, above), line, ...opened].join('\n');
 
 // Where the line itself begins in what `around` builds, so a span the engine reports can be told apart from the ground the cursor has not reached.
 const openingOf = (heading: string, above: readonly Enclosing[]): number => above.reduce((sum, each) => sum + each.indent + each.text.length + 1, heading.length + 1);
@@ -186,6 +187,27 @@ function readSection(text: string): { owner: Section; authored: Record<string, u
 
 // The kinds a stand-in is read as where it was put, which is the engine's own answer to what may be named there.
 const kindsStanding = (written: string): Set<string> => new Set(namedIn(written).filter((each) => each.id === PROBE || each.id.endsWith(`.${PROBE}`)).map((each) => each.kind));
+
+const only = (kinds: ReadonlySet<string>): string | undefined => (kinds.size === 1 ? [...kinds][0] : undefined);
+
+export const said = (...parts: (string | undefined)[]): string | undefined => {
+  const held = parts.filter((part) => part !== undefined);
+  return held.length === 0 ? undefined : held.join(' — ');
+};
+
+const recalled = new Map<string, string | undefined>();
+
+// What a line names beyond what its own placeholders say: the kind the engine reads at each hole, asked by standing a probe there in the line's own example. A hole already called after its kind has nothing to add.
+export function saysKind(under: string, indent: number, written: Written): string | undefined {
+  const key = [under, indent, written.form].join(' ');
+  if (recalled.has(key)) return recalled.get(key);
+  const named = (holesIn(written.form, written.example) ?? [])
+    .map((hole) => ({ hole, kind: only(kindsStanding([under, `${' '.repeat(indent)}${standingIn(written.example, hole, PROBE)}`].join('\n'))) }))
+    .filter((each): each is { hole: Hole; kind: string } => each.kind !== undefined && !each.hole.name.split(' ').includes(each.kind));
+  const said = named.length === 0 ? undefined : [...new Set(named.map((each) => `# ${each.kind}`))].join(', ');
+  recalled.set(key, said);
+  return said;
+}
 
 const addressOffers = (known: readonly Addressed[], kinds: ReadonlySet<string>, before: string, typed: string): Offer[] =>
   known
@@ -362,7 +384,7 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     undeclared: undeclaredIn(around(heading, above, line), known),
     offers: deduped([
       ...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token),
-      ...shown.map(({ shape }) => offerFor(shape.form, shape.family, shape.note)),
+      ...shown.map(({ shape }) => offerFor(shape.form, shape.family, said(shape.note, saysKind(beneath(heading, above), indent, { form: `${shape.under}${shape.form}`, example: `${shape.under}${shape.example}` })))),
       ...(continuing || under !== '' ? [] : lines).flatMap((line) => namedOffers(line, known, typed)),
     ]),
   };

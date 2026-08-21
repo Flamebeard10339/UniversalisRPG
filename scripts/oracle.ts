@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import type { Written } from '../src/grammar/parser';
-import { offeringAt, type Addressed } from '../src/content/completion';
+import { offeringAt, said, saysKind, type Addressed } from '../src/content/completion';
 import { gathered, shownIn } from '../src/ui/offerGroups';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 import { addressable } from '../src/ui/authoringSurface';
@@ -25,19 +25,64 @@ const shipped = (): Addressed[] =>
       .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') })),
   ).map(({ kind, address }) => ({ kind, address }));
 
-export function treeLines(lines: readonly Written[], deep = 0, seen: ReadonlySet<string> = new Set()): string[] {
-  return lines.flatMap((line) => {
-    const needs = line.needs === undefined ? '' : `   (only with ${line.needs}:)`;
-    const head = `${'  '.repeat(deep + 1)}${line.form}${needs}${line.family === undefined ? '' : `   [${line.family}]`}${line.note === undefined ? '' : `   — ${line.note}`}`;
-    if (line.block === undefined || seen.has(line.form)) return [head + (line.block === undefined ? '' : '   …as above')];
-    return [head, ...treeLines(line.block(), deep + 1, new Set([...seen, line.form]))];
-  });
+const STEP = '  ';
+
+// A block is known by the lines it holds and what they name, so the one the results grammar repeats down every branch is written out once and pointed at thereafter, while two lists of bare ids that name different kinds stay apart.
+const signOf = (lines: readonly Written[], sitting: Sitting): string => lines.map((line) => `${line.form} names ${saysKind(sitting.under, sitting.indent, line) ?? 'nothing'}`).join('|');
+
+// Where a block sits in a draft, which is what the engine needs in order to be asked what the lines of it name.
+interface Sitting {
+  under: string;
+  indent: number;
 }
+
+export function treeLines(lines: readonly Written[], pad: string, sitting: Sitting, written: Map<string, string>): string[] {
+  const held = new Map(lines.map((line) => [line.form, line]));
+  const saidOf = (line: Written | undefined): string => {
+    const spoken = line === undefined ? undefined : said(line.needs === undefined ? undefined : `only once ${line.needs}: is set`, line.note, saysKind(sitting.under, sitting.indent, line));
+    return spoken === undefined ? '' : `   — ${spoken}`;
+  };
+  // A block whose lines are the values the keyword already takes inline says nothing new: it is the same list, one to a line.
+  const listed = (block: readonly Written[], beside: readonly { form: string }[]): boolean => block.every((line) => beside.some((offer) => offer.form.endsWith(`${line.form}, …`)));
+  const under = (line: Written | undefined, deeper: string, beside: readonly { form: string }[] = []): string[] => {
+    const block = line?.block?.();
+    if (block === undefined) return [];
+    if (listed(block, beside)) return [];
+    const inside: Sitting = { under: [sitting.under, `${' '.repeat(sitting.indent)}${line!.example}`].join('\n'), indent: sitting.indent + 2 };
+    const sign = signOf(block, inside);
+    const already = written.get(sign);
+    if (already !== undefined) return [`${deeper}…indented under it, what \`${already}\` holds`];
+    written.set(sign, line!.form);
+    return treeLines(block, deeper, inside, written);
+  };
+  const out: string[] = [];
+  for (const family of gathered(lines.map((line) => ({ ...line, insert: line.form })))) {
+    if (family.name !== null) out.push(`${pad}${family.name}`);
+    const at = family.name === null ? pad : pad + STEP;
+    for (const group of family.groups) {
+      const inner = group.head === null ? at : at + STEP;
+      const already = group.head === null ? '' : saidOf(held.get(group.head));
+      if (group.head !== null) out.push(`${at}${group.head}${already}`);
+      for (const offer of group.offers) {
+        const spoken = saidOf(held.get(offer.form));
+        out.push(`${inner}${shownIn(group, offer)}${spoken === already ? '' : spoken}`, ...under(held.get(offer.form), inner + STEP));
+      }
+      out.push(...under(held.get(group.head ?? ''), inner, group.offers));
+    }
+  }
+  return out;
+}
+
+// What holds of every kind, so no kind's tree has to repeat it: a `keyword:` that takes a list takes it inline or one value to a line under it, and `— # thing` says the ids that line names are of that kind.
+const RULES = 'a `keyword: <a>, <b>` may instead hold its values one to a line, indented under `keyword:`';
 
 export function treeOf(kind: string): string[] {
   const owner = sectionFor(kind);
   if (owner === undefined) return [`# ${kind} — no such kind`];
-  return [`# ${kind}`, ...treeLines(owner.grammar)];
+  const sitting = { under: `# ${kind} probe`, indent: 0 };
+  // The section's own lines are a block like any other, so a wrapper that holds them again points back at the heading rather than writing them out twice.
+  const written = new Map([[signOf(owner.grammar, sitting), `# ${kind}`]]);
+  return [`# ${kind} <id>`, `${STEP}(${RULES})`, ...treeLines(owner.grammar, STEP, sitting, written)];
 }
 
 export function offeringLines(text: string, known: readonly Addressed[]): string[] {

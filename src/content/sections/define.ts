@@ -1,4 +1,5 @@
 import { actionLines } from '../../grammar/action';
+import { exampleOf } from '../../grammar/form';
 import { ActionResult } from '../../grammar/actionResult';
 import { DslError, Parser, Written } from '../../grammar/parser';
 import { ListParser } from '../../grammar/list';
@@ -65,19 +66,18 @@ const blockOf = (parser: Parser<unknown>): (() => readonly Written[]) | undefine
 
 const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] => {
   const parser = spec.parser as Parser<unknown>;
-  const [form] = parser.forms;
-  const [example] = parser.examples;
-  if (form === undefined || example === undefined) return [];
   const keyword = spec.keyword ?? name;
   const positional = isPositionalField(schema, name);
   const written = (value: string): string => (positional ? value : `${keyword}: ${value}`);
   const needs = schema.needs?.[name];
   const block = positional ? undefined : blockOf(parser);
   const said = { family: positional ? 'written bare' : 'its own fields', ...(spec.note === undefined ? {} : { note: spec.note }), ...(needs === undefined ? {} : { needs }) };
-  return [
-    { form: written(form), example: written(example), ...said },
-    ...(block === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, ...said, block }]),
-  ];
+  const shapes = parser.forms.flatMap((form) => {
+    const example = exampleOf(form, parser.examples);
+    return example === undefined ? [] : [{ form: written(form), example: written(example), ...said }];
+  });
+  if (shapes.length === 0) return [];
+  return [...shapes, ...(block === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, ...said, block }])];
 };
 
 const schemaGrammar = (schema: AnySchema): readonly Written[] => [

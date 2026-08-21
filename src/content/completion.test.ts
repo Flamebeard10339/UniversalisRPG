@@ -71,7 +71,7 @@ describe('a namespace', () => {
 
 describe('a field', () => {
   it('shows the shape it takes rather than a value someone once wrote', () => {
-    expect(offered('# location tutorial-island.beach\nadj|')).toEqual(['adjacent: <location>, …', 'adjacent:']);
+    expect(offered('# location tutorial-island.beach\nadj|')).toEqual(['adjacent: <location>, …', 'adjacent: <location> while <condition>, …', 'adjacent:']);
   });
 
   it('offers itself bare, for the block it can be written as instead', () => {

@@ -13,12 +13,13 @@ export interface OfferFamily {
 
 const headOf = (offer: Offer): string => (offer.kind === undefined ? literalOf(offer.form).trimEnd() : '');
 
+// A keyword gathers the shapes it takes wherever they were written, the way a part gathers its keywords.
 function gather(offers: readonly Offer[]): OfferGroup[] {
   const held: { head: string; offers: Offer[] }[] = [];
   for (const offer of offers) {
     const head = headOf(offer);
-    const last = held[held.length - 1];
-    if (head !== '' && last !== undefined && last.head === head) last.offers.push(offer);
+    const last = head === '' ? undefined : held.find((group) => group.head === head);
+    if (last !== undefined) last.offers.push(offer);
     else held.push({ head, offers: [offer] });
   }
   return held.map((group) => {
