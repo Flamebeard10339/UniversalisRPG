@@ -427,19 +427,6 @@ function fieldNamed(owner: Section, written: string, alone: boolean): { key: str
   return { key: key ?? null, parser: alone ? oneOf(parser) : parser };
 }
 
-const FIRST_PLACEHOLDER = /<[^>]*>/;
-
-// A form that says which kind its placeholder names is worth one line per thing of that kind.
-const namedOffers = (written: Written, known: readonly Addressed[], typed: string): Offer[] => {
-  const literal = literalOf(written.form);
-  if (written.names === undefined || !typed.startsWith(literal)) return [];
-  const after = typed.slice(literal.length);
-  return known
-    .filter((each) => each.kind === written.names && namesFrom(each.address, after))
-    .map((each) => ({ form: written.form.replace(FIRST_PLACEHOLDER, each.address), insert: written.form.replace(FIRST_PLACEHOLDER, each.address), family: written.family, kind: each.kind }))
-    .sort((a, b) => a.form.localeCompare(b.form));
-};
-
 // One shape a line could still turn into, read against the text written under the keyword it sits after.
 interface Shape {
   form: string;
@@ -588,6 +575,8 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
       : refusalAt(text.slice(head.at), { start: lineStart - head.at, end: lineEnd - head.at }, here.lines.find((line) => line.form === reads)?.block?.(), indent, at - head.at);
   // A shape a refused line has spelt none of is not what it is being written as; saying so would be guessing over the engine's own word.
   const filled = filling === undefined || (refused !== null && stood!.read.spelt === 0) ? undefined : filling;
+  // The one shape the cursor is standing inside, which the path above the offers already names. The shapes are offered to be chosen between, so where this is the only one still standing there is nothing left to choose and the hole's own values are the answer.
+  const writing = filled === undefined ? undefined : stood!.shape.form;
   // What a hole may hold in its own words, asked of the hole rather than of the line: the same answer wherever that hole is written, and none where the shapes beside it already say it.
   // A hole its own line declares it names is filled with an id, so it has no grammar of its own to be broken into and the ids are the whole answer. Asked anyway, the search for a grammar that fits finds one by coincidence: a value parser reads `death` as a bare id, and a kind that nests actions takes `on 3 plank:` as an action called that, so nothing the engine does refuses it.
   const holdings = filled?.whole === undefined || filled.at === undefined || stood?.shape.names !== undefined ? undefined : heldIn(beneath(heading, above), indent, filled.whole, filled.at, shown.map(({ shape }) => `${shape.under}${shape.form}`), body);
@@ -604,14 +593,13 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     offers: deduped([
       // A hole broken into what it may name puts each kind under the placeholder that names it, so `<flag>` and `<item>` are told apart under an `if` rather than heaped together.
       ...(holdings === undefined ? addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token) : holdings.names.flatMap((each) => addressOffers(known, new Set([each.kind]), typed.slice(0, typed.length - token.length), token, `<${each.hole}>`))),
-      ...shown
+      ...(shown.length === 1 && shown[0]!.shape.form === writing ? [] : shown)
         .map(({ shape }) => {
           // The heading already names the kind under the cursor; a shape that only names the same one has nothing left to add.
           const names = saysKind(beneath(heading, above), indent, { form: `${shape.under}${shape.form}`, example: `${shape.under}${shape.example}` });
           return offerFor(shape.form, shape.family, said(shape.note, names === `names a # ${only(holds)}` || names === `may instead name a # ${only(holds)}` ? undefined : names));
         })
         .filter((offer) => offer.insert !== text.slice(from, to)),
-      ...(continuing || under !== '' ? [] : lines).flatMap((line) => namedOffers(line, known, typed)),
     ]),
   };
 }

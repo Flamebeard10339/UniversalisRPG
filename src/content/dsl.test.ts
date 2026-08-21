@@ -19,6 +19,27 @@ const CORPUS = readdirSync('content')
 
 const problems = (result: { diagnostics: { sourceName: string }[] }): string[] => result.diagnostics.map((each) => formatModuleDiagnostic(each as never));
 
+describe('what the page offers where the cursor stands in a hole', () => {
+  // Every line of every kind whose hole is filled with an id of a named kind, and one id of that kind to fill it with.
+  const naming = sections().flatMap((owner) =>
+    (owner.grammar as readonly { form: string; example: string; names?: string }[])
+      .filter((line) => line.names !== undefined)
+      .map((line) => ({ kind: owner.kind, line, known: [{ kind: line.names!, address: 'a-module.a-name' }] })),
+  );
+
+  const NAMED = 'a-module.a-name';
+
+  it.each(naming.map((each) => `# ${each.kind} ${each.line.form}`))('%s offers each id it may name once, wherever the author has got to in typing it', (where) => {
+    const { kind, line, known } = naming.find((each) => `# ${each.kind} ${each.line.form}` === where)!;
+    const literal = line.example.slice(0, line.example.indexOf(' ') + 1);
+    for (let typed = 0; typed <= NAMED.length; typed++) {
+      const draft = `# ${kind} probe\n${literal}${NAMED.slice(0, typed)}`;
+      const said = offeringAt(draft, draft.length, known).offers.filter((each) => each.form.includes(NAMED));
+      expect(said.map((each) => each.form), draft).toEqual([NAMED]);
+    }
+  });
+});
+
 describe('a hole a line says it names', () => {
   // Every line of every kind that declares the kind of thing it names, gathered from the grammar itself.
   const naming = sections().flatMap((owner) =>
