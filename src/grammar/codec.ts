@@ -13,6 +13,7 @@ export function reachableCodecs(roots: Iterable<readonly [string, unknown]>): Ma
     if (!isCodec(value) || found.has(value)) return;
     found.set(value, name);
     visit(`${name}.element`, (value as { element?: unknown }).element);
+    (value as Parser<unknown>).within?.forEach((held, at) => visit(`${name}.within.${at}`, held));
   };
   for (const [name, value] of roots) visit(name, value);
   return found;

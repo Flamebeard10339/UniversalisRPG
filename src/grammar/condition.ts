@@ -16,7 +16,7 @@ export const VISITS = 'visits';
 
 export const visitedNode = (path: readonly string[]): readonly string[] | null => (path.length > 1 && path[path.length - 1] === VISITS ? path.slice(0, -1) : null);
 
-export type ComparisonOperator = '>' | '<' | '>=' | '<=' | '=';
+export type ComparisonOperator = '>' | '<' | '>=' | '<=' | '=' | '!=';
 
 export type Condition =
   | { kind: 'and'; conditions: Condition[] }
@@ -31,7 +31,7 @@ export type Condition =
   | { kind: 'has'; item: string; count: number }
   | { kind: 'reference'; reference: Reference };
 
-const COMPARISON = /[ \t]*(>=|<=|>|<|=)[ \t]*/;
+const COMPARISON = /[ \t]*(>=|<=|!=|>|<|=)[ \t]*/;
 
 function parseReference(cursor: Cursor): Reference {
   const raw = cursor.take(REFERENCE);
@@ -108,9 +108,22 @@ function printCondition(value: Condition): string {
   }
 }
 
+// The operators are a closed set of words, and a set of words is a parser like any other, so what an author is shown is the set the engine reads.
+export const comparison: Parser<ComparisonOperator> = {
+  parse(cursor) {
+    const raw = cursor.take(/>=|<=|!=|>|<|=/);
+    if (raw === null) throw new DslError('expected a comparison', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+    return raw as ComparisonOperator;
+  },
+  print: (value) => value,
+  forms: ['>', '>=', '=', '!=', '<=', '<'],
+  examples: ['>', '>=', '=', '!=', '<=', '<'],
+};
+
 export const condition: Parser<Condition> = {
   parse: parseOr,
   print: printCondition,
+  within: [comparison],
   forms: ['<flag>', '<reference> <comparison> <number>', 'has <item>', 'has <count> <item>', 'not <condition>', '<condition> and <condition>', '<condition> or <condition>'],
   examples: ['has-key', 'quest.stage >= 2', 'has plank', 'has 3 plank', 'not has-key', 'has-key and not has-rope', 'has-key or has-rope', 'a and b or c'],
 };

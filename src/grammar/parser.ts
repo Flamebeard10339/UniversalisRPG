@@ -4,6 +4,8 @@ export interface Parser<T> {
   print(value: T): string;
   forms: readonly string[];
   examples: readonly string[];
+  // The parsers this one is written out of, where they are not reached through a list. What a placeholder of this parser holds is a question only they can answer.
+  within?: readonly Parser<unknown>[];
 }
 
 // One line an author may write. A `block` says what its indented lines hold, and is a thunk because a result block holds results.

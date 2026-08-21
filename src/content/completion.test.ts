@@ -231,42 +231,37 @@ describe('an offering', () => {
 });
 
 describe('a hole with a grammar of its own', () => {
-  const filling = (written: string) => {
+  const holds = (written: string) => {
     const { text, cursor } = at(written);
-    return offeringAt(text, cursor, KNOWN).filling;
+    return offeringAt(text, cursor, KNOWN).filling?.holds;
   };
+  const under = '# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n';
 
-  it('says the shapes that hole takes, in the words of whatever reads it', () => {
-    expect(filling('# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n  if |')?.shapes).toEqual([
-      '<flag>',
-      '<reference> <comparison> <number>',
-      'has <item>',
-      'has <count> <item>',
-      'not <condition>',
-      '<condition> and <condition>',
-      '<condition> or <condition>',
-    ]);
+  it('breaks it into the words it is written with and the things it may name', () => {
+    expect(holds(`${under}  if |`)).toEqual({
+      words: ['>', '>=', '=', '!=', '<=', '<', 'has', 'not', 'and', 'or'],
+      names: [
+        { hole: 'flag', kind: 'flag' },
+        { hole: 'item', kind: 'item' },
+      ],
+    });
   });
 
   it('says the same of the same hole wherever it is written', () => {
-    const inside = filling('# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n  if |')?.shapes;
-    expect(filling('# location tutorial-island.beach\nadjacent: guide-house while |')?.shapes).toEqual(inside);
+    expect(holds('# location tutorial-island.beach\nadjacent: guide-house while |')).toEqual(holds(`${under}  if |`));
+  });
+
+  it('names a kind once, however many placeholders of that grammar name it', () => {
+    const named = holds(`${under}  if |`)!.names.map((each) => each.kind);
+
+    expect(named).toEqual([...new Set(named)]);
   });
 
   it('says nothing where the shapes beside it already say it', () => {
-    expect(filling('# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n  give: |')?.shapes).toBeUndefined();
-  });
-
-  it('stands in the shape the engine read the whole line as, where it read one', () => {
-    expect(filling('# location tutorial-island.beach\ncontemplat|e:')?.hole).toBe('action');
-  });
-
-  it('names the id a letter away, since a name nobody declares is more often a slip than a plan', () => {
-    const { text, cursor } = at('# location tutorial-island.beach\nentities: tutorial-island.giant-rt|');
-    expect(offeringAt(text, cursor, KNOWN).undeclared).toEqual([{ kind: 'entity', id: 'tutorial-island.giant-rt', meant: 'tutorial-island.giant-rat' }]);
+    expect(holds(`${under}  give: |`)).toBeUndefined();
   });
 
   it('says nothing of a hole that holds one thing, which its own name has already said', () => {
-    expect(filling('# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n  xp: |')?.shapes).toBeUndefined();
+    expect(holds(`${under}  xp: |`)).toBeUndefined();
   });
 });

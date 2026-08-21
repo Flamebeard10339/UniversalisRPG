@@ -116,16 +116,28 @@ const namesAt = (text: string, cursor: number, known: readonly Addressed[], alre
   if (offering.filling === null) return undefined;
   // A hole that holds a whole line of its own — a `<result>` — names nothing itself, but the line in it does, and that is what an author standing there is choosing.
   const kind = offering.filling.kind ?? [...new Set(offering.offers.flatMap((offer) => (offer.kind === undefined ? [] : [offer.kind])))][0];
-  const held = offering.filling.shapes === undefined ? [] : offering.filling.shapes.map((shape) => `      ${shape}`);
-  const named = kind === undefined ? [] : known.filter((each) => each.kind === kind).map((each) => each.address).sort();
-  const listed = kind === undefined ? [] : [`      declared: ${named.length === 0 ? 'none anywhere' : `${named.slice(0, NAMED).join(', ')}${named.length > NAMED ? `, … and ${named.length - NAMED} more, ${named.length} in all` : ''}`}`];
+  const ids = (of: string): string => {
+    const named = known.filter((each) => each.kind === of).map((each) => each.address).sort();
+    return named.length === 0 ? 'none anywhere' : `${named.slice(0, NAMED).join(', ')}${named.length > NAMED ? `, … and ${named.length - NAMED} more, ${named.length} in all` : ''}`;
+  };
+  // A hole with a grammar of its own is broken into the words it is written with and the things it may name; a hole that only names something is that one list.
+  const holds = offering.filling.holds;
+  const under =
+    holds === undefined
+      ? kind === undefined
+        ? []
+        : [`      <${offering.filling.hole}>`, `        ${ids(kind)}`]
+      : [
+          ...(holds.words.length === 0 ? [] : ['      <operators>', `        ${holds.words.join(', ')}`]),
+          ...holds.names.flatMap((each) => [`      <${each.hole}>`, `        ${ids(each.kind)}`]),
+        ];
   const words = `    ${fillingWords({ ...offering.filling, ...(kind === undefined ? {} : { kind }) })}`;
-  // The shapes a hole takes and the ids of a kind are the same answer wherever they are asked for, and a draft asks on every line. They are written out where they are first met and pointed back at after.
-  const key = [kind, ...(offering.filling.shapes ?? [])].join('|');
-  if (held.length === 0 && listed.length === 0) return words;
+  // What a hole holds is the same answer wherever it is asked for, and a draft asks on every line. It is written out where it is first met and pointed back at after.
+  const key = [kind, ...(holds?.words ?? []), ...(holds?.names ?? []).map((each) => each.hole)].join('|');
+  if (under.length === 0) return words;
   if (already.has(key)) return `${words}, as above`;
   already.add(key);
-  return [words, ...held, ...listed].join('\n');
+  return [words, ...under].join('\n');
 };
 
 // A page moves its cursor and the offering follows it; a file does not, so the oracle walks the cursor to each placeholder in turn and reports what stands there.

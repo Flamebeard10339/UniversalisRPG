@@ -52,7 +52,7 @@ describe('a draft read back', () => {
     const draft = ['# location tutorial-island.beach', 'adjacent: tutorial-island.beach while quest-given', 'adjacent: tutorial-island.beach while quest-given'].join('\n');
     const read = offeringLines(draft, KNOWN);
 
-    expect(read.filter((line) => line.trim() === 'has <count> <item>')).toHaveLength(1);
+    expect(read.filter((line) => line.trim() === '<operators>')).toHaveLength(1);
     expect(read.filter((line) => line.trim().endsWith(', as above')).length).toBeGreaterThan(0);
   });
 });

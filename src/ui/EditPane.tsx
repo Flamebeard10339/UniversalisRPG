@@ -225,16 +225,14 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                 <div className="border-b border-border px-2 pb-1 text-text-subtle">
                   <div className="break-words">{offering.where.join(' › ')}</div>
                   <div className="break-words text-accent">{offering.reads ?? offering.filling?.form ?? words('unread')}</div>
-                  {offering.filling === null ? null : (
-                    <div className="break-words text-text">{fillingWords(offering.filling)}</div>
+                  {offering.filling === null ? null : <div className="break-words text-text">{fillingWords(offering.filling)}</div>}
+                  {offering.filling?.holds === undefined || offering.filling.holds.words.length === 0 ? null : (
+                    <>
+                      <div className="px-0 text-text">{'<operators>'}</div>
+                      <div className="break-words pl-3 text-text-subtle">{offering.filling.holds.words.join(', ')}</div>
+                    </>
                   )}
-                  {offering.filling?.shapes === undefined
-                    ? null
-                    : offering.filling.shapes.map((shape) => (
-                        <div key={shape} className="break-words pl-3 text-text-subtle">
-                          {shape}
-                        </div>
-                      ))}
+
                   {offering.refused === null ? null : <div className="break-words text-danger">{offering.refused}</div>}
                   {offering.undeclared.length === 0 ? null : <div className="break-words text-warning">{`${offering.undeclared.map((each) => `${each.id} as a # ${each.kind}${each.meant === undefined ? '' : `, one letter from ${each.meant}`}`).join(', ')} ${words('undeclared')}`}</div>}
                 </div>

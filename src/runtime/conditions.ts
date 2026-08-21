@@ -35,6 +35,8 @@ export function evaluateCondition(condition: Condition, state: GameState): boole
           return value <= condition.right;
         case '=':
           return value === condition.right;
+        case '!=':
+          return value !== condition.right;
       }
       break;
     }
