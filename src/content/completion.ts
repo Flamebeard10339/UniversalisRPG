@@ -1,4 +1,4 @@
-import { align, exampleOf, holesIn, matches, standingIn, valueIn, type Alignment, type Hole } from '../grammar/form';
+import { align, exampleOf, holesIn, standingIn, valueIn, type Alignment, type Hole } from '../grammar/form';
 import type { ListParser } from '../grammar/list';
 import { DslError, type Parser, type Written } from '../grammar/parser';
 import { isPositionalField } from '../grammar/section';
@@ -110,14 +110,15 @@ function linesAt(owner: Section, text: string, lineStart: number, indent: number
   return { lines, where };
 }
 
-// What the engine makes of the line as it stands: the shape it fits that spells out the most of itself.
+// What the engine makes of the line as it stands: the whole shape it fits that spells out the most of itself.
 function readAs(lines: readonly Written[], line: string): string | null {
   let best: string | null = null;
   let longest = -1;
   for (const written of lines) {
-    if (!matches(written.form, line) || literalOf(written.form).length <= longest) continue;
+    const read = align(written.form, line);
+    if (read === null || !read.complete || read.spelt <= longest) continue;
     best = written.form;
-    longest = literalOf(written.form).length;
+    longest = read.spelt;
   }
   return best;
 }
@@ -204,7 +205,7 @@ export function saysKind(under: string, indent: number, written: Written): strin
   const named = (holesIn(written.form, written.example) ?? [])
     .map((hole) => ({ hole, kind: only(kindsStanding([under, `${' '.repeat(indent)}${standingIn(written.example, hole, PROBE)}`].join('\n'))) }))
     .filter((each): each is { hole: Hole; kind: string } => each.kind !== undefined && !each.hole.name.split(' ').includes(each.kind));
-  const said = named.length === 0 ? undefined : [...new Set(named.map((each) => `# ${each.kind}`))].join(', ');
+  const said = named.length === 0 ? undefined : `names ${[...new Set(named.map((each) => `a # ${each.kind}`))].join(' and ')}`;
   recalled.set(key, said);
   return said;
 }
@@ -272,12 +273,13 @@ const reading = (shapes: readonly Shape[]): { shape: Shape; read: Alignment }[] 
     return read === null ? [] : [{ shape, read }];
   });
 
-// The hole an example fills where the cursor now stands, which is the only place the engine can be asked what this hole names.
-function fillingHole(found: { shape: Shape; read: Alignment }): { form: string; hole: string; like: string; probe: string } | undefined {
-  if (found.read.open === null) return undefined;
-  const holes = holesIn(found.shape.form, found.shape.example);
-  const hole = holes?.[found.read.holes.length - 1];
-  if (hole === undefined || hole.name !== found.read.open.name) return undefined;
+// Where the cursor stands. What one line of this shape puts in that hole is the only thing the engine can be asked what the hole names, and a hole the shape's own example leaves out has nothing but its name to give.
+function fillingHole(found: { shape: Shape; read: Alignment }): { form: string; hole: string; like?: string; probe?: string } | undefined {
+  const open = found.read.open;
+  if (open === null) return undefined;
+  const holes = holesIn(found.shape.form, found.shape.example) ?? [];
+  const hole = holes[found.read.holes.length - 1]?.name === open.name ? holes[found.read.holes.length - 1] : holes.find((each) => each.name === open.name);
+  if (hole === undefined) return { form: found.shape.form, hole: open.name };
   return { form: found.shape.form, hole: hole.name, like: valueIn(found.shape.example, hole), probe: `${found.shape.under}${standingIn(found.shape.example, hole, PROBE)}` };
 }
 
@@ -364,9 +366,11 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
 
   const line = text.slice(lineStart, lineEnd);
   const spliced = (stood: string): string => around(heading, above, `${text.slice(lineStart, from)}${stood}${text.slice(to, lineEnd)}`);
-  // The ids on offer are whatever kind the engine reads where the cursor stands: the token it is on, or, where that leaves too little to parse, the whole clause with one example standing in.
+  // What the hole under the cursor names is asked of the engine by standing a probe in that hole of a whole line of this shape, which is the only account of the hole rather than of whatever the token happens to be part of.
+  const holds = filling?.probe === undefined ? new Set<string>() : kindsStanding(spliced(filling.probe));
+  // The ids on offer are whatever kind the engine reads where the cursor stands: the token it is on, or, where that leaves too little to parse, the hole around it.
   const kinds = kindsStanding(around(heading, above, `${text.slice(lineStart, at - token.length)}${PROBE}${text.slice(past, lineEnd)}`));
-  if (kinds.size === 0 && filling !== undefined) for (const each of kindsStanding(spliced(filling.probe))) kinds.add(each);
+  if (kinds.size === 0) for (const each of holds) kinds.add(each);
 
   const reads = readAs(here.lines, line.trim());
   return {
@@ -374,7 +378,7 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     to,
     where: here.where,
     reads,
-    filling: filling === undefined ? null : { form: filling.form, hole: filling.hole, ...(kinds.size === 1 ? { kind: [...kinds][0]! } : { like: filling.like }) },
+    filling: filling === undefined ? null : { form: filling.form, hole: filling.hole, ...(only(holds) === undefined ? (filling.like === undefined ? {} : { like: filling.like }) : { kind: only(holds)! }) },
     // While a shape the line could still become is unfinished, the engine is being handed half a line and its complaint is about the half, not the line.
     // A shape the line has spelt out but not finished is being written, not broken; anything else is handed to the engine, whose word on it is the only honest one.
     refused:

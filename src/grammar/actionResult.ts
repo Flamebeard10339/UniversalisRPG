@@ -442,9 +442,9 @@ const LEAF_FORMS: readonly string[] = [
   'relocate: <location>',
   'discover: <location>',
   'open modal: <modal>',
-  'drain: <amount> <resource>[ from <party>]',
-  'restore: <amount> <resource>[ to <party>]',
-  'inflict: <buff item>[ on <party>]',
+  'drain: <amount> <resource>[ from <me or them>]',
+  'restore: <amount> <resource>[ to <me or them>]',
+  'inflict: <buff item>[ on <me or them>]',
   'roll: <droptable>',
   'stop',
 ];
@@ -459,18 +459,21 @@ export const actionResult: Parser<ActionResult> = {
 const ROW = 'one of these';
 
 const ROWS: readonly Written[] = [
-  { form: '<weight>x: <result>', example: '3x: give: plank', family: ROW },
-  { form: '<weight>x: nothing', example: '5x: nothing', family: ROW },
-  { form: '<weight>x[ if <condition>]:', example: '3x if has-key:', family: ROW, block: () => resultGrammar() },
+  { form: '<weight>[ if <condition>]: <result>', example: '3x: give: plank', family: ROW },
+  { form: '<weight>[ if <condition>]: nothing', example: '5x: nothing', family: ROW },
+  { form: '<weight>[ if <condition>]:', example: '3x if has-key:', family: ROW, block: () => resultGrammar() },
 ];
 
 export const HAPPENS = 'what happens';
 export const SOMETIMES = 'only sometimes';
 
+// The shapes a condition takes are the condition parser's own, so what an author is told here cannot fall behind what it accepts.
+const CONDITIONS = `a condition is ${condition.forms.join(' | ')}`;
+
 const WRAPPERS: readonly Written[] = [
-  { form: 'if <condition>:', example: 'if has-key:', family: SOMETIMES, block: () => resultGrammar() },
+  { form: 'if <condition>:', example: 'if has-key:', family: SOMETIMES, note: CONDITIONS, block: () => resultGrammar() },
   { form: '<chance> in <of>:', example: '3 in 10:', family: SOMETIMES, block: () => resultGrammar() },
-  { form: '[my ]<stat> vs [their ]<stat>:', example: 'attack vs defence:', family: SOMETIMES, note: 'its block runs only when the contest is won', block: () => resultGrammar() },
+  { form: '<stat> vs <stat>:', example: 'attack vs defence:', family: SOMETIMES, note: 'the first is read off whoever acts and the second off whoever it lands on; either may be a plain number instead, and its block runs only when the contest is won', block: () => resultGrammar() },
   { form: 'one of:', example: 'one of:', family: SOMETIMES, block: () => ROWS },
   { form: 'credit:', example: 'credit:', family: SOMETIMES, note: 'its block runs for whoever brought the action, not whoever it landed on', block: () => resultGrammar() },
 ];
@@ -481,7 +484,8 @@ const RESULT_LIST_EXAMPLES: readonly string[] = [...LEAF_EXAMPLES, 'set: found-k
 
 // `me` and `them` read only where there are two parties to tell apart, so a list reached from anywhere else refuses them and cannot show them.
 const HOOK_EXAMPLES: readonly string[] = [...RESULT_LIST_EXAMPLES, 'drain: 5 health from them', 'restore: 1-2 health to me', 'inflict: dazzled on them'];
-const RESULT_LIST_FORMS: readonly string[] = ['<result>, …', ...LEAF_FORMS];
+// A result list is one shape however many results it holds; what a single result may be is the block's business, and saying it twice is what makes a grammar unreadable.
+const RESULT_LIST_FORMS: readonly string[] = ['<result>, …'];
 
 export const resultList: ListParser<ActionResult> = {
   element: actionResult,
