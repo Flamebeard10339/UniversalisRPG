@@ -488,7 +488,6 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const kind = head === undefined ? undefined : opens(head.line);
   const owner = kind === undefined ? undefined : sectionFor(kind);
   if (owner === undefined || head === undefined) return NOTHING;
-  const heading = head.line;
 
   const indent = INDENT.exec(before)![0].length;
   const opening = CLAUSE.exec(before.slice(indent));
@@ -503,7 +502,6 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const field = fieldNamed(owner, written, true);
   const under = field.key === null || continuing ? '' : (KEYED.exec(written)?.[0] ?? '');
   const left = typed.slice(under.length);
-  const above = enclosing(text, lineStart, indent);
   const held = asRead(`${text.slice(0, lineStart)}${text.slice(lineEnd)}`);
   const here = linesAt(owner, text, lineStart, indent);
   const alongside = continuing ? 'one more value' : field.key === null ? 'what goes here' : `what ${field.key}: takes`;
@@ -548,7 +546,7 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     reads,
     filling: filled === undefined ? null : { form: filled.form, hole: filled.hole, ...(filled.like === undefined ? {} : { like: filled.like }), ...(naming === undefined ? {} : { kind: naming }), ...(holdings === undefined ? {} : { holds: holdings }) },
     refused,
-    undeclared: undeclaredIn(around(heading, above, line), known),
+    undeclared: undeclaredAt(text, lineStart, known),
     // A shape whose words are the ones already written would put back what it replaced, and an author who has written them is being offered nothing.
     offers: deduped([
       // A hole broken into what it may name puts each kind under the placeholder that names it, so `<flag>` and `<item>` are told apart under an `if` rather than heaped together.
@@ -566,6 +564,18 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   };
 }
 
+// The ids one line names that nothing in the universe declares. The page asks it of the line under the cursor and a draft asks it of every line it has, and it is the same question either way.
+export function undeclaredAt(text: string, lineStart: number, known: readonly Addressed[]): readonly Undeclared[] {
+  if (text.slice(lineStart, lineStart + 1) === '#') return [];
+  const head = headingAbove(text, lineStart);
+  const kind = head === undefined ? undefined : opens(head.line);
+  if (head === undefined || kind === undefined || sectionFor(kind) === undefined) return [];
+  const broken = text.indexOf('\n', lineStart);
+  const line = text.slice(lineStart, broken < 0 ? text.length : broken);
+  const indent = INDENT.exec(line)![0].length;
+  return undeclaredIn(around(head.line, enclosing(text, lineStart, indent), line), known);
+}
+
 // Everything standing between a draft and the engine taking it, gathered so an author can work down a list rather than hunt for the line.
 export interface Amiss {
   line: number;
@@ -580,7 +590,8 @@ export function amissIn(text: string, known: readonly Addressed[]): Amiss[] {
   let at = 0;
   for (const [index, written] of text.split('\n').entries()) {
     const refused = said.get(index + 1) ?? null;
-    const { undeclared } = offeringAt(text, at + written.length, known);
+    // The cursor's whole question is not asked here: a draft is read line by line, and asking what may be typed at the end of every one of them is the same answer over again at the cost of the whole document each time.
+    const undeclared = undeclaredAt(text, at, known);
     if (refused !== null || undeclared.length > 0) out.push({ line: index + 1, written, refused, undeclared });
     at += written.length + 1;
   }
