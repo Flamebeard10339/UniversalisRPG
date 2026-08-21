@@ -74,3 +74,10 @@ export function sampleVelocity(motion: Motion, x: number, at: number): Motion {
 export function releaseVelocity(motion: Motion, at: number): number {
   return at - motion.at > STILL_MS ? 0 : motion.velocity;
 }
+
+export const STILL = 'input, textarea, select, [data-still]';
+
+export function heldStill(target: EventTarget | null): boolean {
+  const node = target as { closest?: (selector: string) => unknown } | null;
+  return typeof node?.closest === 'function' && node.closest(STILL) !== null;
+}

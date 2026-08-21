@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
-import { dragAxis, landingIndex, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, wasDragged, type Axis, type Motion } from './gesture';
+import { dragAxis, heldStill, landingIndex, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, wasDragged, type Axis, type Motion } from './gesture';
 import { useMomentPlayer } from './transient';
 
 interface Drag {
@@ -66,7 +66,7 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
       className="relative min-h-0 flex-1 overflow-hidden"
       style={{ touchAction: 'pan-y' }}
       onMouseDown={(event) => {
-        if (event.button !== 0) return;
+        if (event.button !== 0 || heldStill(event.target)) return;
         const move = (native: MouseEvent): void => void moveTo(native.clientX, native.clientY, native.timeStamp);
         const up = (native: MouseEvent): void => end(native.timeStamp, false);
         window.addEventListener('mousemove', move);
@@ -78,7 +78,7 @@ export function Pager({ index, onIndex, panes }: { index: number; onIndex: (inde
       }}
       onTouchStart={(event) => {
         const first = event.touches[0];
-        if (!first || event.touches.length > 1) return;
+        if (!first || event.touches.length > 1 || heldStill(event.target)) return;
         const move = (native: TouchEvent): void => {
           const touch = native.touches[0];
           if (!touch) return;

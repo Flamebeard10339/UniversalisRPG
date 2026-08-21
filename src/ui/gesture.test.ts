@@ -4,6 +4,7 @@ import {
   clampIndex,
   dragAxis,
   EDGE_RESISTANCE,
+  heldStill,
   FLICK_MIN_PX,
   FLICK_PX_PER_MS,
   landingIndex,
@@ -15,6 +16,7 @@ import {
   SPLIT_MAX,
   SPLIT_MIN,
   splitFrom,
+  STILL,
   STILL_MS,
   VELOCITY_WINDOW_MS,
   wasDragged,
@@ -136,5 +138,36 @@ describe('where the player put the split', () => {
 
   it('stays where it was when there is no surface to measure against', () => {
     expect(splitFrom(0.4, 100, 0)).toBe(0.4);
+  });
+});
+
+describe('an element that keeps a drag to itself', () => {
+  const asked: string[] = [];
+  const node = (found: boolean): EventTarget =>
+    ({
+      closest: (selector: string) => {
+        asked.push(selector);
+        return found ? {} : null;
+      },
+    }) as unknown as EventTarget;
+
+  it('asks what the drag began over and everything it stands in', () => {
+    expect(heldStill(node(true))).toBe(true);
+    expect(heldStill(node(false))).toBe(false);
+    expect(asked).toEqual([STILL, STILL]);
+  });
+
+  it('is nothing at all when the drag began outside the document', () => {
+    expect(heldStill(null)).toBe(false);
+    expect(heldStill({} as EventTarget)).toBe(false);
+  });
+
+  it('holds every control text is typed into without any of them having to say so', () => {
+    const named = STILL.split(', ');
+
+    expect(named).toContain('input');
+    expect(named).toContain('textarea');
+    expect(named).toContain('select');
+    expect(named).toContain('[data-still]');
   });
 });

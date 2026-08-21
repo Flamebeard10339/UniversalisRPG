@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { heldStill } from './gesture';
 import { bounds, centreOf, clampZoom, drawnBox, midpoint, panAfterZoom, settled, spanBetween, zoomByWheel, type Box, type Point, type Size } from './viewport';
 
 interface Grab {
@@ -218,7 +219,7 @@ export function DragSheet({
         hold.settle({ x: panAfterZoom(hold.pan.x, focal.x, hold.zoom, zoom), y: panAfterZoom(hold.pan.y, focal.y, hold.zoom, zoom) }, zoom);
       }}
       onMouseDown={(event) => {
-        if (event.button !== 0 || carrying()) return;
+        if (event.button !== 0 || carrying() || heldStill(event.target)) return;
         event.stopPropagation();
         const move = (native: MouseEvent): void => movePan(fromCentre(native.clientX, native.clientY));
         window.addEventListener('mousemove', move);
@@ -230,7 +231,7 @@ export function DragSheet({
         beginPan(fromCentre(event.clientX, event.clientY));
       }}
       onTouchStart={(event) => {
-        if (event.touches.length === 0 || carrying()) return;
+        if (event.touches.length === 0 || carrying() || heldStill(event.target)) return;
         event.stopPropagation();
         const move = (native: TouchEvent): void => {
           const moved = touchPoints(native.touches);
