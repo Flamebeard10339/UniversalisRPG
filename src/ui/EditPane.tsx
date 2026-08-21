@@ -165,7 +165,10 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                 spellCheck={false}
                 autoCapitalize="off"
                 autoCorrect="off"
-                onChange={(event) => controls.text(event.target.value, event.target.selectionStart)}
+                onChange={(event) => {
+                  taken.current = true;
+                  controls.text(event.target.value, event.target.selectionStart);
+                }}
                 onSelect={(event) => controls.cursor(event.currentTarget.selectionStart)}
                 className="min-h-0 flex-1 resize-none select-text rounded-xl border border-border bg-panel px-3 pb-14 pt-2 font-mono text-xs text-text outline-none focus:border-accent"
               />

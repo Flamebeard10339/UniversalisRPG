@@ -2,7 +2,7 @@ import { applied, offeringAt, type Offering } from '../content/completion';
 import type { PlayView } from '../runtime/session';
 import { deleteLine, emptied, kindsOffered, offeredBy, openingLine, removeLine, searching, SHOW_LINE, stage, type Section, type Standing, type SurfaceId } from './authoringSurface';
 import { gotoLine } from './devMode';
-import { stepIn, stepOut } from './editIndent';
+import { stepIn, stepOut, typed } from './editIndent';
 import type { Editing } from './editorMemory';
 
 export const sectionKey = (section: Pick<Section, 'kind' | 'address'>): string => `${section.kind} ${section.address}`;
@@ -70,7 +70,10 @@ export function editControls(held: { sections: readonly Section[]; editing: Edit
       const opening = openingLine(editing.surface === 'global' ? editing.kind : null);
       act.move({ ...editing, open: null, draft: opening, cursor: opening.length });
     },
-    text: (text, at) => act.move({ ...editing, draft: text, cursor: at }),
+    text: (text, at) => {
+      const written = typed(draftIn(sections, editing), text, at);
+      act.move({ ...editing, draft: written.text, cursor: written.cursor });
+    },
     cursor: (at) => act.move({ ...editing, cursor: at }),
     take: (form) => {
       const offering = offeringIn(held);
