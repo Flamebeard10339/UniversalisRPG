@@ -16,6 +16,7 @@ import {
   NOWHERE,
   offeredBy,
   removeLine,
+  searching,
   shadowed,
   SHOW_LINE,
   stage,
@@ -36,6 +37,8 @@ const SPARE: ModuleSource = {
 };
 
 const spoken = (driver: ReturnType<typeof createDriver>): string[] => driver.snapshot().transcript.entries.map((entry) => String(entry.text));
+
+const sectionKeyOf = (section: Section): string => `${section.kind} ${section.address}`;
 
 const REGISTRY = loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry;
 
@@ -269,5 +272,41 @@ describe('a local section that shadows a base section is reported, for every kin
       { kind: 'item', address: 'shipped.lamp', modules: ['shipped'] },
       { kind: 'location', address: 'shipped.cave', modules: ['shipped'] },
     ]);
+  });
+});
+
+describe('narrowing the list to the sections being looked for', () => {
+  const kept = (query: string): Section[] => addressed.filter((section) => searching(query).holds(section));
+
+  it('holds every section back until each term matches it, so a module and a word narrow together', () => {
+    const both = kept('tutorial-island sword');
+
+    expect(both.length).toBeGreaterThan(0);
+    expect(both.map((section) => section.module)).toEqual(both.map(() => 'tutorial-island'));
+    expect(both.every((section) => /sword/i.test(section.text))).toBe(true);
+    expect(both.length).toBeLessThan(kept('tutorial-island').length);
+    expect(both.length).toBeLessThanOrEqual(kept('sword').length);
+  });
+
+  it('reads a term as a pattern rather than as the letters it is spelt with', () => {
+    expect(kept('sword|whetstone').length).toBeGreaterThan(kept('sword').length);
+    expect(kept('sw.rd').map(sectionKeyOf)).toEqual(kept('sword').map(sectionKeyOf));
+    expect(kept('SWORD').map(sectionKeyOf)).toEqual(kept('sword').map(sectionKeyOf));
+  });
+
+  it('reaches the module a section came from, which its address need not spell', () => {
+    const global = addressed.filter((section) => !section.address.includes('.'));
+
+    expect(global.length).toBeGreaterThan(0);
+    expect(kept(global[0].module)).toContain(global[0]);
+  });
+
+  it('keeps nothing and says so when a term is not a pattern at all', () => {
+    const broken = searching('sword (');
+
+    expect(broken.broken).toBe(true);
+    expect(addressed.filter((section) => broken.holds(section))).toEqual([]);
+    expect(searching('').broken).toBe(false);
+    expect(kept('   ')).toEqual(addressed);
   });
 });

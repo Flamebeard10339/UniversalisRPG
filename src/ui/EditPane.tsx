@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Console } from './Console';
 import { DevOnly } from './DevOnly';
+import { searching } from './authoringSurface';
 import { draftIn, kindsIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
 import { useTestSurface } from './useTestSurface';
 import type { Words } from './words';
@@ -14,6 +15,7 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
   const { sections, standing, places, editing, controls } = held;
   const rows = rowsIn(held);
   const open = openedIn(sections, editing);
+  const search = searching(editing.query);
 
   useTestSurface('edit', held);
 
@@ -91,6 +93,18 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
         >
           {words('copy')}
         </button>
+        <input
+          data-drive="edit.search"
+          aria-label={words('search')}
+          value={editing.query}
+          onChange={(event) => controls.search(event.target.value)}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          className={`w-full select-text rounded-xl border bg-panel px-3 font-mono text-xs text-text outline-none ${
+            search.broken ? 'border-danger' : 'border-border focus:border-accent'
+          }`}
+        />
       </div>
 
       <div ref={list} className="unbarred min-h-0 flex-1 overflow-y-auto px-3 py-2" onScroll={(event) => controls.scroll(event.currentTarget.scrollTop)}>

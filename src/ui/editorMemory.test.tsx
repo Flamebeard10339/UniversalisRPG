@@ -13,6 +13,7 @@ import { EDITOR_SLOT, FORGOTTEN, recorded, remembered, type Editing } from './ed
 const MOVED: { [K in keyof Editing]: Editing[K] } = {
   surface: 'global',
   kind: 'entity',
+  query: 'tutorial sword',
   open: 'location tutorial-island.beach',
   cursor: 42,
   scroll: 317,

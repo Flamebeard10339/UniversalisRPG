@@ -141,6 +141,7 @@ export interface EditState {
   surfaces: readonly SurfaceId[];
   kind: string | null;
   kinds: readonly string[];
+  query: string;
   rows: readonly string[];
   open: string | null;
   draft: string;
@@ -156,6 +157,7 @@ export function editState(held: EditHeld): EditState {
     surfaces: SURFACES,
     kind: held.editing.kind,
     kinds: kindsIn(held),
+    query: held.editing.query,
     rows: rowsIn(held).map(sectionKey),
     open: held.editing.open,
     draft: draftIn(held.sections, held.editing),
@@ -190,6 +192,7 @@ export function editSurface(held: EditHeld): TestSurface {
     actions: {
       surface: (value) => held.controls.surface(surfaceNamed(value)),
       kind: (value) => held.controls.kind(value === null ? null : String(value)),
+      search: (value) => held.controls.search(String(value)),
       open: (value) => held.controls.open(value === null ? null : rowNamed(held, value)),
       add: () => held.controls.add(),
       text: (value) => held.controls.text(String(value)),

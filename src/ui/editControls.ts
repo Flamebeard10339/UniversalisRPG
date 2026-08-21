@@ -1,5 +1,5 @@
 import type { PlayView } from '../runtime/session';
-import { deleteLine, emptied, kindsOffered, offeredBy, openingLine, removeLine, SHOW_LINE, stage, type Section, type Standing, type SurfaceId } from './authoringSurface';
+import { deleteLine, emptied, kindsOffered, offeredBy, openingLine, removeLine, searching, SHOW_LINE, stage, type Section, type Standing, type SurfaceId } from './authoringSurface';
 import { gotoLine } from './devMode';
 import type { Editing } from './editorMemory';
 
@@ -8,6 +8,7 @@ export const sectionKey = (section: Pick<Section, 'kind' | 'address'>): string =
 export interface EditControls {
   surface(id: SurfaceId): void;
   kind(id: string | null): void;
+  search(query: string): void;
   open(key: string | null): void;
   add(): void;
   text(draft: string): void;
@@ -37,7 +38,8 @@ export interface EditActs {
 export const rowsIn = (held: Pick<EditHeld, 'sections' | 'standing' | 'editing'>): Section[] => {
   const offered = offeredBy(held.sections, held.standing, held.editing.surface);
   const kind = held.editing.surface === 'global' ? held.editing.kind : null;
-  return kind === null ? offered : offered.filter((section) => section.kind === kind);
+  const search = searching(held.editing.query);
+  return offered.filter((section) => (kind === null || section.kind === kind) && search.holds(section));
 };
 
 export const kindsIn = (held: Pick<EditHeld, 'sections' | 'standing' | 'editing'>): string[] => kindsOffered(offeredBy(held.sections, held.standing, held.editing.surface));
@@ -54,6 +56,7 @@ export function editControls(held: { sections: readonly Section[]; editing: Edit
   return {
     surface: (surface) => act.move({ ...editing, surface, open: null, draft: null, cursor: 0, scroll: 0 }),
     kind: (kind) => act.move({ ...editing, kind, open: null, draft: null, cursor: 0 }),
+    search: (query) => act.move({ ...editing, query, scroll: 0 }),
     open: (open) => act.move({ ...editing, open, draft: null, cursor: 0 }),
     add: () => {
       const opening = openingLine(editing.surface === 'global' ? editing.kind : null);

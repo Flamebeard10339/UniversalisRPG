@@ -12,6 +12,7 @@ export interface MapWhere {
 export interface Editing {
   surface: SurfaceId;
   kind: string | null;
+  query: string;
   open: string | null;
   cursor: number;
   scroll: number;
@@ -22,6 +23,7 @@ export interface Editing {
 export const FORGOTTEN: Editing = {
   surface: 'local',
   kind: null,
+  query: '',
   open: null,
   cursor: 0,
   scroll: 0,
@@ -60,6 +62,7 @@ export function remembered(stored: string | null): Editing {
   return {
     surface: surface ?? FORGOTTEN.surface,
     kind: text(from.kind, FORGOTTEN.kind),
+    query: text(from.query, '') ?? FORGOTTEN.query,
     open: text(from.open, FORGOTTEN.open),
     cursor: count(from.cursor, FORGOTTEN.cursor),
     scroll: count(from.scroll, FORGOTTEN.scroll),

@@ -24,6 +24,7 @@ const opened: Editing = { ...FORGOTTEN, open: sectionKey(MIKI) };
 const EXERCISED: Record<keyof EditControls, true> = {
   surface: true,
   kind: true,
+  search: true,
   open: true,
   add: true,
   text: true,
@@ -160,6 +161,17 @@ describe('what the page draws, assembled once', () => {
     expect(rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'local', kind: 'item' } }).map(sectionKey)).toEqual(
       rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'local' } }).map(sectionKey),
     );
+  });
+
+  it('narrows by the kind and by what was searched for at once', () => {
+    const held = { sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'global' as const, kind: 'item' } };
+    const items = rowsIn(held);
+    const swords = rowsIn({ ...held, editing: { ...held.editing, query: 'sword' } });
+
+    expect(swords.length).toBeGreaterThan(0);
+    expect(swords.length).toBeLessThan(items.length);
+    expect(swords.every((section) => section.kind === 'item')).toBe(true);
+    expect(rowsIn({ ...held, editing: { ...held.editing, kind: null, query: 'sword' } }).length).toBeGreaterThan(swords.length);
   });
 
   it('offers the kinds the surface has something of and no others', () => {

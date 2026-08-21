@@ -106,6 +106,27 @@ export function kindsOffered(sections: readonly Section[]): string[] {
   return [...new Set(sections.map((section) => section.kind))].sort();
 }
 
+export interface Search {
+  holds(section: Section): boolean;
+  broken: boolean;
+}
+
+const TERMS = /\S+/g;
+
+const searched = (section: Section): string => `${section.module}\n${section.text}`;
+
+export function searching(query: string): Search {
+  const patterns: RegExp[] = [];
+  for (const term of query.match(TERMS) ?? []) {
+    try {
+      patterns.push(new RegExp(term, 'i'));
+    } catch {
+      return { holds: () => false, broken: true };
+    }
+  }
+  return { holds: (section) => patterns.every((pattern) => pattern.test(searched(section))), broken: false };
+}
+
 export type Staged = { line: string } | { refused: string };
 
 export const BODY_SEPARATOR = '|';

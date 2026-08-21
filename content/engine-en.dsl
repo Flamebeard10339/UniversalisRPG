@@ -155,6 +155,7 @@ engine.shell.global: World
 engine.shell.every-kind: Every kind
 engine.shell.section: Section
 engine.shell.new: New
+engine.shell.search: Search
 engine.shell.stage: Stage
 engine.shell.unstage: Unstage
 engine.shell.copy: Copy
