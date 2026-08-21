@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { fillingWords } from '../content/completion';
 import { searching } from './authoringSurface';
-import { draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
+import { amissWith, draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
 import { splitFrom } from './gesture';
 import { gathered, shownIn } from './offerGroups';
 import { Splitter } from './Splitter';
@@ -22,6 +22,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
   const open = openedIn(sections, editing);
   const search = searching(editing.query);
   const offering = offeringIn(held);
+  const amiss = amissWith(held);
 
   useTestSurface('edit', held);
 
@@ -222,6 +223,18 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
             </div>
             {offering.where.length > 0 ? (
               <div data-drive="edit.offers" aria-label={words('grammar')} className="packed w-2/5 max-w-[16rem] shrink-0 overflow-y-auto rounded-xl border border-border bg-panel py-1 font-mono text-[11px] leading-tight">
+                {amiss.length === 0 ? null : (
+                  <div data-drive="edit.amiss" className="border-b border-border px-2 pb-1">
+                    {amiss.map((each) => (
+                      <div key={each.line} className="break-words">
+                        <span className="text-text-subtle">{`${each.line}: `}</span>
+                        <span className={each.refused === null ? 'text-warning' : 'text-danger'}>
+                          {each.refused ?? each.undeclared.map((one) => `${one.id} as a # ${one.kind}${one.meant === undefined ? '' : `, one letter from ${one.meant}`}`).join(', ')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="border-b border-border px-2 pb-1 text-text-subtle">
                   <div className="break-words">{offering.where.join(' › ')}</div>
                   <div className="break-words text-accent">{offering.reads ?? offering.filling?.form ?? words('unread')}</div>

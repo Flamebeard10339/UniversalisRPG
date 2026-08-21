@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { offeringAt } from '../src/content/completion';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 import { literalOf } from '../src/content/completion';
-import { offeringLines, treeOf } from './oracle';
+import { amissLines, offeringLines, treeOf } from './oracle';
 
 const REFERS = /…indented under it, what `(?<form>.+)` holds$/;
 
@@ -47,6 +47,19 @@ describe('a draft read back', () => {
     { kind: 'flag', address: 'tutorial-island.quest-given' },
     { kind: 'location', address: 'tutorial-island.beach' },
   ];
+
+  it('says everything the engine has to say about the draft before saying anything about a line of it', () => {
+    const draft = ['# location tutorial-island.beach', 'entities: tutorial-island.giant-rt', 'xppp: 3'].join('\n');
+    const read = amissLines(draft, [{ kind: 'entity', address: 'tutorial-island.giant-rat' }]).join('\n');
+
+    expect(read).toContain('2 line(s)');
+    expect(read).toContain('one letter from tutorial-island.giant-rat');
+    expect(read).toContain('will not read this line');
+  });
+
+  it('says so where there is nothing to say', () => {
+    expect(amissLines('# location tutorial-island.beach\ntitle: The Beach', KNOWN)[0]).toContain('nothing here is refused');
+  });
 
   it('writes an answer out where it is first met and points back at it after', () => {
     const draft = ['# location tutorial-island.beach', 'adjacent: tutorial-island.beach while quest-given', 'adjacent: tutorial-island.beach while quest-given'].join('\n');

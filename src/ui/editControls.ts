@@ -1,4 +1,4 @@
-import { applied, offeringAt, type Offering } from '../content/completion';
+import { amissIn, applied, offeringAt, type Amiss, type Offering } from '../content/completion';
 import type { PlayView } from '../runtime/session';
 import { deleteLine, emptied, kindsOffered, offeredBy, openingLine, removeLine, searching, SHOW_LINE, stage, type Section, type Standing, type SurfaceId } from './authoringSurface';
 import { gotoLine } from './devMode';
@@ -56,6 +56,9 @@ export const openedIn = (sections: readonly Section[], editing: Editing): Sectio
 export const draftIn = (sections: readonly Section[], editing: Editing): string => editing.draft ?? openedIn(sections, editing)?.text ?? '';
 
 export const offeringIn = (held: Pick<EditHeld, 'sections' | 'editing'>): Offering => offeringAt(draftIn(held.sections, held.editing), held.editing.cursor, held.sections);
+
+// Everything the engine has to say about the draft as a whole, which is what stands between it and being staged, wherever in it the cursor happens to be.
+export const amissWith = (held: Pick<EditHeld, 'sections' | 'editing'>): Amiss[] => amissIn(draftIn(held.sections, held.editing), held.sections);
 
 export function editControls(held: { sections: readonly Section[]; editing: Editing }, act: EditActs): EditControls {
   const { sections, editing } = held;

@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import type { Written } from '../src/grammar/parser';
 import { align, type Hole } from '../src/grammar/form';
-import { fillingWords, offeringAt, said, saysKind, type Addressed } from '../src/content/completion';
+import { amissIn, fillingWords, offeringAt, said, saysKind, type Addressed, type Amiss } from '../src/content/completion';
 import { gathered, shownIn } from '../src/ui/offerGroups';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 import { addressable } from '../src/ui/authoringSurface';
@@ -147,6 +147,19 @@ const holesOf = (offering: { reads: string | null; filling: { form: string } | n
   return form === undefined ? [] : (align(form, line.trimStart())?.holes ?? []);
 };
 
+const wrongIn = (each: Amiss): string[] => [
+  `  line ${each.line}: ${each.written.trim() === '' ? '(blank)' : each.written.trim()}`,
+  ...(each.refused === null ? [] : [`    the engine will not read this line: ${each.refused}`]),
+  ...(each.undeclared.length === 0 ? [] : [`    nothing declares ${each.undeclared.map((one) => `${one.id} as a # ${one.kind}${one.meant === undefined ? '' : `, one letter from ${one.meant}`}`).join(', ')}`]),
+];
+
+// What stands between the draft and the engine taking it, said first and all at once, so an author works down a list rather than reading every line looking for the one that is wrong.
+export function amissLines(text: string, known: readonly Addressed[]): string[] {
+  const amiss = amissIn(text, known);
+  if (amiss.length === 0) return ['nothing here is refused and every id it names is declared', ''];
+  return [`${amiss.length} line(s) the engine has something to say about:`, ...amiss.flatMap(wrongIn), ''];
+}
+
 export function offeringLines(text: string, known: readonly Addressed[]): string[] {
   const out: string[] = [];
   const already = new Set<string>();
@@ -197,7 +210,9 @@ function main(): void {
       console.error(usage);
       process.exit(2);
     }
-    console.log(offeringLines(readFileSync(file, 'utf8').replace(/\r\n?/g, '\n'), shipped()).join('\n'));
+    const written = readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
+    const known = shipped();
+    console.log([...amissLines(written, known), ...offeringLines(written, known)].join('\n'));
     return;
   }
   const kinds = args.length > 0 ? args : sectionKinds();

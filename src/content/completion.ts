@@ -545,6 +545,25 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   };
 }
 
+// Everything standing between a draft and the engine taking it, gathered so an author can work down a list rather than hunt for the line.
+export interface Amiss {
+  line: number;
+  written: string;
+  refused: string | null;
+  undeclared: readonly Undeclared[];
+}
+
+export function amissIn(text: string, known: readonly Addressed[]): Amiss[] {
+  const out: Amiss[] = [];
+  let at = 0;
+  for (const [index, written] of text.split('\n').entries()) {
+    const offering = offeringAt(text, at + written.length, known);
+    if (offering.refused !== null || offering.undeclared.length > 0) out.push({ line: index + 1, written, refused: offering.refused, undeclared: offering.undeclared });
+    at += written.length + 1;
+  }
+  return out;
+}
+
 export const applied = (text: string, offering: Offering, offer: Offer): { text: string; cursor: number } => ({
   text: `${text.slice(0, offering.from)}${offer.insert}${text.slice(offering.to)}`,
   cursor: offering.from + offer.insert.length,
