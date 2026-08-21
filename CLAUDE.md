@@ -5,11 +5,11 @@ evidence, and clean review — not patch volume. Passing tests is necessary.
 Avoid patches that accrue technical debt.
 
 **Do not create systems that must be manually kept in sync.** This is the single
-largest and most frequent failure mode this repository has had. If you find
-yourself adding a kind to a second list, adding a field to a second table, or
-writing "remember to also update X", stop and find the shape where the second
-copy does not exist. A derived proof beats a listed one: if a rule says *every*,
-its proof should derive its own subjects rather than enumerate them.
+largest and most frequent failure mode this repository has had — 11.5% of its
+commits undo one. A derived proof beats a listed one: if a rule says *every*, its
+proof should derive its own subjects rather than enumerate them. The procedure
+for catching this before it is written, and the seven shapes it takes here, live
+in the `one-home` skill. That skill is the authority; this paragraph is why.
 
 Make commits after each logical chunk. `git add <explicit paths>`, never
 `git add -A`. When more than one worker shares this checkout, note that staging
