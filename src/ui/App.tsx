@@ -158,13 +158,15 @@ export function App({
     () => addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }]),
     [snapshot],
   );
+  const declared = useMemo(() => driver.declared(), [snapshot]);
   const held = {
     sections,
+    declared,
     standing: standingIn(view),
     places: view.locations,
     editing,
     controls: editControls(
-      { sections, editing },
+      { sections, declared, editing },
       {
         send: driver.send,
         note: driver.note,

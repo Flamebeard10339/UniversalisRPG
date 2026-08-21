@@ -1,4 +1,6 @@
 import { DslError } from '../grammar/parser';
+import type { Addressed } from './completion';
+import { CAPABILITY } from './refs';
 import { Recipe } from './sections/recipe';
 import { Registry } from './registry';
 import { Dialogue } from './sections/dialogue';
@@ -26,6 +28,12 @@ function refuseUntimedPayload(itemId: string, where: string, registry: Registry)
     throw new DslError(`${where} names ${itemId}, which declares no duration, so an instance of it would be over before anything could read it`);
   }
 }
+
+// Every name a reference written in a draft may resolve to: the namespace the engine built while loading — sections, the flags they mint, the actions nested in them, the nodes inside a dialogue — and the capabilities, which an entity opens by listing one rather than by being one.
+export const declaredBy = (registry: Registry): Addressed[] => [
+  ...registry.namespace.kinds().flatMap((kind) => registry.namespace.declaredKeys(kind).map((address) => ({ kind, address }))),
+  ...[...registryCapabilities(registry)].map((address) => ({ kind: CAPABILITY, address })),
+];
 
 export function registryCapabilities(registry: Registry): Set<string> {
   const capabilities = new Set<string>();

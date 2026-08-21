@@ -5,7 +5,7 @@ import { list } from '../../grammar/list';
 import { Parser } from '../../grammar/parser';
 import { point } from '../../grammar/range';
 import { decimal, humanizeEn, id, number, numberOrStat, produced, Produced, Quantified, quantified, text } from '../../grammar/values';
-import { put, quantified as quantifiedItems, type Loose } from '../refs';
+import { CAPABILITY, put, quantified as quantifiedItems, type Loose } from '../refs';
 import { ActionDeclaration } from './action';
 import { section } from './define';
 
@@ -126,7 +126,7 @@ export const recipe = section<Recipe>()({
     const held = value as unknown as Loose;
     for (const field of ['in', 'out', 'burnt'] as const) quantifiedItems(held[field], 'item', `${where} ${field}:`, visit);
     for (const field of ['rate', 'accuracy', 'evasion'] as const) put(held, field, 'stat', `${where} ${field}:`, visit);
-    put(held, 'requiresCapability', 'capability', `${where} station`, visit);
+    put(held, 'requiresCapability', CAPABILITY, `${where} station`, visit);
     if (held.skill) put(held.skill as Loose & { skill: string }, 'skill', 'skill', `${where} skill:`, visit);
   },
 });

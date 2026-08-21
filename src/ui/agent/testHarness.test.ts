@@ -52,6 +52,7 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     snapshot: () => current,
     transient,
     send: (line) => void calls.push(`send:${line}`),
+    declared: () => [],
     choose: (position) => void calls.push(`choose:${position}`),
     answer: (key, value) => void calls.push(`answer:${key}=${value}`),
     open: (item) => void calls.push(`open:${item}`),

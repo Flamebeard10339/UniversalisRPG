@@ -1,4 +1,6 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
+import type { Addressed } from '../content/completion';
+import { declaredBy } from '../content/references';
 import type { ModuleSource } from '../content/universe';
 import { shadowed } from './authoringSurface';
 import { devRefusal } from './devMode';
@@ -47,6 +49,7 @@ export interface Driver {
   serialized(): string;
   localChanges(): string | null;
   baseSources(): readonly ModuleSource[];
+  declared(): readonly Addressed[];
   editorMemory: { read(): string | null; write(text: string): void };
   note(text: string): void;
   reopen(): void;
@@ -226,6 +229,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       }
     },
     baseSources: () => shipped,
+    declared: () => declaredBy(context.session.registry),
     note: complain,
     reopen,
     clearLocalChanges: () => {

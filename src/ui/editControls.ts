@@ -1,4 +1,4 @@
-import { amissIn, applied, offeringAt, type Amiss, type Offering } from '../content/completion';
+import { amissIn, applied, offeringAt, type Addressed, type Amiss, type Offering } from '../content/completion';
 import type { PlayView } from '../runtime/session';
 import { deleteLine, emptied, kindsOffered, offeredBy, openingLine, removeLine, searching, SHOW_LINE, stage, type Section, type Standing, type SurfaceId } from './authoringSurface';
 import { gotoLine } from './devMode';
@@ -28,6 +28,7 @@ export interface EditControls {
 
 export interface EditHeld {
   sections: readonly Section[];
+  declared: readonly Addressed[];
   standing: Standing;
   places: PlayView['locations'];
   editing: Editing;
@@ -55,12 +56,12 @@ export const openedIn = (sections: readonly Section[], editing: Editing): Sectio
 
 export const draftIn = (sections: readonly Section[], editing: Editing): string => editing.draft ?? openedIn(sections, editing)?.text ?? '';
 
-export const offeringIn = (held: Pick<EditHeld, 'sections' | 'editing'>): Offering => offeringAt(draftIn(held.sections, held.editing), held.editing.cursor, held.sections);
+export const offeringIn = (held: Pick<EditHeld, 'sections' | 'declared' | 'editing'>): Offering => offeringAt(draftIn(held.sections, held.editing), held.editing.cursor, held.declared);
 
 // Everything the engine has to say about the draft as a whole, which is what stands between it and being staged, wherever in it the cursor happens to be.
-export const amissWith = (held: Pick<EditHeld, 'sections' | 'editing'>): Amiss[] => amissIn(draftIn(held.sections, held.editing), held.sections);
+export const amissWith = (held: Pick<EditHeld, 'sections' | 'declared' | 'editing'>): Amiss[] => amissIn(draftIn(held.sections, held.editing), held.declared);
 
-export function editControls(held: { sections: readonly Section[]; editing: Editing }, act: EditActs): EditControls {
+export function editControls(held: Pick<EditHeld, 'sections' | 'declared' | 'editing'>, act: EditActs): EditControls {
   const { sections, editing } = held;
   const shut = (): Editing => ({ ...editing, open: null, draft: null, cursor: 0 });
 

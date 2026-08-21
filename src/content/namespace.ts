@@ -58,6 +58,10 @@ export class Namespace {
     return [...(this.declared.get(kind)?.keys() ?? [])];
   }
 
+  kinds(): string[] {
+    return [...this.declared.keys()];
+  }
+
   snapshot(): string[] {
     const lines: string[] = [];
     for (const [kind, keys] of this.declared) for (const [key, namespace] of keys) lines.push(`${kind} ${key} ${namespace ?? '(root)'}`);

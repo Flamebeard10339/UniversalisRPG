@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
 import { amissIn, refusalOf } from './completion';
+import { declaredBy } from './references';
 import { align } from '../grammar/form';
 import type { Written } from '../grammar/parser';
 import { text } from '../grammar/values';
@@ -23,15 +24,20 @@ describe('the shipped corpus', () => {
     expect(problems(loadUniverseWithDiagnostics(CORPUS))).toEqual([]);
   });
 
-  it('is refused by neither question the editing page asks of a section, which never disagree', () => {
+  it('has nothing the editing page would call amiss, by either question it asks, and names no id the engine cannot place', () => {
+    const loaded = loadUniverseWithDiagnostics(CORPUS);
+    expect(problems(loaded)).toEqual([]);
+    const known = declaredBy(loaded.registry);
     for (const source of CORPUS) {
       for (const section of splitSections(source.text)) {
         if (sectionFor(section.kind) === undefined) continue;
         const written = source.text.slice(section.span.start, section.span.end).replace(/\s+$/, '');
         const where = `${source.name} # ${section.kind} ${section.id ?? ''}`;
         const said = refusalOf(written);
+        const amiss = amissIn(written, known);
         expect(said, where).toBeNull();
-        expect(amissIn(written, []).some((each) => each.refused !== null), where).toBe(said !== null);
+        expect(amiss.some((each) => each.refused !== null), where).toBe(said !== null);
+        expect(amiss.flatMap((each) => each.undeclared.map((one) => `line ${each.line}: ${one.id} as a # ${one.kind}`)), where).toEqual([]);
       }
     }
   });

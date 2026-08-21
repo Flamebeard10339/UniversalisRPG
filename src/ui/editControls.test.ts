@@ -16,7 +16,7 @@ function watching(editing: Editing, sections: readonly Section[] = addressed): {
   const at: Editing[] = [];
   let handed = 0;
   const acts: EditActs = { send: (line) => void sent.push(line), note: (text) => void said.push(text), hand: () => void (handed += 1), move: (next) => void at.push(next) };
-  return { controls: editControls({ sections, editing }, acts), sent, said, at, get handed() { return handed; } };
+  return { controls: editControls({ sections, declared: sections, editing }, acts), sent, said, at, get handed() { return handed; } };
 }
 
 const opened: Editing = { ...FORGOTTEN, open: sectionKey(MIKI) };

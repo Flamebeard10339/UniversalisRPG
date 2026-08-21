@@ -135,6 +135,19 @@ describe('a line as the engine takes it', () => {
     expect(taken('# location tutorial-island.beach\nadjacent: tutorial-island.guide-house|').undeclared).toEqual([]);
   });
 
+  const RECIPE = (station: string): string => `# recipe tutorial-island.bread\nstation: ${station}\nout: 1 tutorial-island.bread`;
+
+  it('answers for a name no section carries, where the universe declares that kind of name at all', () => {
+    const stations: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'tutorial-island.bread' }, { kind: 'capability', address: 'oven' }];
+    expect(amissIn(RECIPE('oven'), stations).flatMap((each) => each.undeclared)).toEqual([]);
+    expect(amissIn(RECIPE('forge'), stations).flatMap((each) => each.undeclared)).toEqual([{ kind: 'capability', id: 'forge' }]);
+  });
+
+  it('says nothing of a kind of name the universe declares none of, rather than calling every one of them undeclared', () => {
+    const known: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'tutorial-island.bread' }];
+    expect(amissIn(RECIPE('oven'), known).flatMap((each) => each.undeclared)).toEqual([]);
+  });
+
   it.each(sections().map((each) => each.kind))('%s refuses none of the lines it writes out', (kind) => {
     const owner = sectionFor(kind)!;
     for (const line of owner.grammar) {

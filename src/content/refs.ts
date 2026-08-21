@@ -11,6 +11,9 @@ export const INFLICT_SITE = 'inflict:';
 
 export type ReferenceKind = string;
 
+// A station: an entity opens one by listing it among the stations it offers, and a recipe names it to say where it is worked.
+export const CAPABILITY = 'capability';
+
 export type Visit = (kind: ReferenceKind, id: string, where: string) => string;
 
 export interface Pruning {

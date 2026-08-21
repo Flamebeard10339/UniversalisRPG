@@ -233,15 +233,20 @@ function refusalAt(text: string, within: Span, held: readonly Written[] | undefi
 const declares = (known: readonly Addressed[], kind: string, id: string): boolean =>
   known.some((each) => each.kind === kind && (each.address === id || each.address.endsWith(`.${id}`) || id.endsWith(`.${each.address}`)));
 
-// Every id a section names, paired with the kind the engine reads it as.
-function namedIn(written: string): { kind: string; id: string }[] {
+const resolves = (known: readonly Addressed[], kind: string, id: string): string | undefined => {
+  const matches = known.filter((each) => each.kind === kind && (each.address === id || each.address.endsWith(`.${id}`)));
+  return matches.length === 1 ? matches[0]!.address : undefined;
+};
+
+// Every id a section names, paired with the kind the engine reads it as. Each is handed back resolved, because the engine resolves an id before anything built from it is read: `use: entity.mirror.look-in` names an action under the mirror, and the mirror's whole address is half of what that action is called.
+function namedIn(written: string, known: readonly Addressed[] = []): { kind: string; id: string }[] {
   const read = readSection(written);
   if (read === undefined) return [];
   const found: { kind: string; id: string }[] = [];
   try {
     read.owner.visit(read.authored as { id: string }, '', (kind, id) => {
       found.push({ kind, id });
-      return id;
+      return resolves(known, kind, id) ?? id;
     });
   } catch {
     return [];
@@ -252,8 +257,10 @@ function namedIn(written: string): { kind: string; id: string }[] {
 // The ids a line names that no module in the universe declares. A thing written before the thing it names is normal, so this is a remark rather than a refusal.
 function undeclaredIn(written: string, known: readonly Addressed[]): Undeclared[] {
   const held = new Map<string, Undeclared>();
-  for (const each of namedIn(written)) {
-    if (declares(known, each.kind, each.id)) continue;
+  const answered = new Set(known.map((each) => each.kind));
+  for (const each of namedIn(written, known)) {
+    // A kind nothing in the universe declares is one this cannot rule on, and saying an id is undeclared because its whole kind is unheard of would be a remark about the universe rather than about the line.
+    if (!answered.has(each.kind) || declares(known, each.kind, each.id)) continue;
     const meant = typoOf(each.id, known.filter((one) => one.kind === each.kind).map((one) => one.address));
     held.set(`${each.kind} ${each.id}`, meant === undefined ? each : { ...each, meant });
   }

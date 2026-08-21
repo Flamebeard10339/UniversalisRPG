@@ -3,9 +3,10 @@ import path from 'node:path';
 import type { Written } from '../src/grammar/parser';
 import { align, type Hole } from '../src/grammar/form';
 import { amissIn, fillingWords, offeringAt, said, saysKind, type Addressed, type Amiss } from '../src/content/completion';
+import { loadUniverseWithDiagnostics } from '../src/content/load';
+import { declaredBy } from '../src/content/references';
 import { gathered, shownIn } from '../src/ui/offerGroups';
 import { sectionFor, sectionKinds } from '../src/content/sections';
-import { addressable } from '../src/ui/authoringSurface';
 
 const usage = [
   'Usage: npm run oracle -- [<kind>...]',
@@ -22,11 +23,13 @@ const usage = [
 ].join('\n');
 
 const shipped = (): Addressed[] =>
-  addressable(
-    readdirSync('content')
-      .filter((name) => name.endsWith('.dsl'))
-      .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') })),
-  ).map(({ kind, address }) => ({ kind, address }));
+  declaredBy(
+    loadUniverseWithDiagnostics(
+      readdirSync('content')
+        .filter((name) => name.endsWith('.dsl'))
+        .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') })),
+    ).registry,
+  );
 
 const STEP = '  ';
 // No line of the language begins with this, so what is written out here can be told from what an author writes.
