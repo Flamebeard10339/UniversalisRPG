@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { fillingWords } from '../content/completion';
 import { searching, searchHint } from './authoringSurface';
 import { amissWith, draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
+import { pathOf } from './grammarPath';
 import { splitFrom } from './gesture';
 import { gathered, shownIn } from './offerGroups';
 import { Splitter } from './Splitter';
@@ -23,6 +23,8 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
   const search = searching(editing.query);
   const offering = offeringIn(held);
   const amiss = amissWith(held);
+  const draft = draftIn(sections, editing);
+  const path = pathOf(offering, draft, editing.cursor, (shapes) => `${shapes} ${words('starting')}`);
 
   useTestSurface('edit', held);
 
@@ -162,7 +164,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                 ref={field}
                 data-drive="edit.text"
                 aria-label={words('section')}
-                value={draftIn(sections, editing)}
+                value={draft}
                 spellCheck={false}
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -236,9 +238,14 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                   </div>
                 )}
                 <div className="border-b border-border px-2 pb-1 text-text-subtle">
-                  <div className="break-words">{offering.where.join(' › ')}</div>
-                  <div className="break-words text-accent">{offering.reads ?? offering.filling?.form ?? words('unread')}</div>
-                  {offering.filling === null ? null : <div className="break-words text-text">{fillingWords(offering.filling)}</div>}
+                  <div className="break-words">
+                    {path.map((step, at) => (
+                      <span key={step} className={at === path.length - 1 ? 'text-accent' : undefined}>
+                        {at === 0 ? '' : ' › '}
+                        {step}
+                      </span>
+                    ))}
+                  </div>
                   {offering.filling?.holds === undefined || offering.filling.holds.words.length === 0 ? null : (
                     <>
                       <div className="px-0 text-text">{'<operators>'}</div>
