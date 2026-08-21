@@ -442,9 +442,9 @@ const LEAF_FORMS: readonly string[] = [
   'relocate: <location>',
   'discover: <location>',
   'open modal: <modal>',
-  'drain: <amount> <resource>',
-  'restore: <amount> <resource>',
-  'inflict: <buff item>',
+  'drain: <amount> <resource>[ from <party>]',
+  'restore: <amount> <resource>[ to <party>]',
+  'inflict: <buff item>[ on <party>]',
   'roll: <droptable>',
   'stop',
 ];
@@ -478,6 +478,9 @@ const WRAPPERS: readonly Written[] = [
 export const resultGrammar = (): readonly Written[] => [...writtenFrom(actionResult).map((line) => ({ ...line, family: HAPPENS })), ...WRAPPERS];
 
 const RESULT_LIST_EXAMPLES: readonly string[] = [...LEAF_EXAMPLES, 'set: found-key, add: gold 5'];
+
+// `me` and `them` read only where there are two parties to tell apart, so a list reached from anywhere else refuses them and cannot show them.
+const HOOK_EXAMPLES: readonly string[] = [...RESULT_LIST_EXAMPLES, 'drain: 5 health from them', 'restore: 1-2 health to me', 'inflict: dazzled on them'];
 const RESULT_LIST_FORMS: readonly string[] = ['<result>, …', ...LEAF_FORMS];
 
 export const resultList: ListParser<ActionResult> = {
@@ -502,7 +505,7 @@ export const hookResultList: ListParser<ActionResult> = {
   lines: resultGrammar,
   print: printResults,
   forms: RESULT_LIST_FORMS,
-  examples: RESULT_LIST_EXAMPLES,
+  examples: HOOK_EXAMPLES,
   parse: (cursor) => parseResults(cursor, null),
   parseBlock: readResultBlock,
   printBlock: (values) => values.flatMap(resultLines),

@@ -49,10 +49,10 @@ export function offeringLines(text: string, known: readonly Addressed[]): string
     const ids = offering.offers.filter((offer) => offer.kind !== undefined);
     const shapes = offering.offers.filter((offer) => offer.kind === undefined);
     out.push(`${line || '·'}`);
-    out.push(`    in ${offering.where.join(' › ')}, reads as ${offering.reads ?? '?'}`);
+    out.push(`    in ${offering.where.join(' › ')}, reads as ${offering.reads ?? offering.filling?.form ?? '?'}`);
+    if (offering.filling !== null) out.push(`    filling <${offering.filling.hole}>${offering.filling.kind === undefined ? '' : ` — # ${offering.filling.kind}`}${offering.filling.like === undefined ? '' : `, like ${offering.filling.like}`}`);
     if (offering.refused !== null) out.push(`    REFUSED: ${offering.refused}`);
     if (offering.undeclared.length > 0) out.push(`    NOT DECLARED ANYWHERE YET: ${offering.undeclared.join(', ')}`);
-    out.push(`    ${shapes.length} shapes, ${ids.length} ids`);
     for (const family of gathered(shapes)) {
       out.push(`      ${family.name ?? '—'}`);
       for (const group of family.groups) {
@@ -60,7 +60,7 @@ export function offeringLines(text: string, known: readonly Addressed[]): string
         for (const offer of group.offers) out.push(`        ${group.head === null ? '' : '  '}${shownIn(group, offer)}${offer.note === undefined ? '' : `   — ${offer.note}`}`);
       }
     }
-    if (ids.length > 0) out.push(`      ids: ${ids.slice(0, 6).map((offer) => offer.form).join(', ')}${ids.length > 6 ? `, … ${ids.length - 6} more` : ''}`);
+    for (const family of gathered(ids)) out.push(`      ${family.name ?? '—'}: ${family.groups.flatMap((group) => group.offers).slice(0, 8).map((offer) => offer.form).join(', ')}`);
     at += 1;
   }
   return out;

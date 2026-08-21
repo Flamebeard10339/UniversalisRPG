@@ -220,7 +220,10 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
               <div data-drive="edit.offers" aria-label={words('grammar')} className="packed w-2/5 max-w-[16rem] shrink-0 overflow-y-auto rounded-xl border border-border bg-panel py-1 font-mono text-[11px] leading-tight">
                 <div className="border-b border-border px-2 pb-1 text-text-subtle">
                   <div className="break-words">{offering.where.join(' › ')}</div>
-                  <div className="break-words text-accent">{offering.reads ?? words('unread')}</div>
+                  <div className="break-words text-accent">{offering.reads ?? offering.filling?.form ?? words('unread')}</div>
+                  {offering.filling === null ? null : (
+                    <div className="break-words text-text">{`<${offering.filling.hole}>${offering.filling.kind === undefined ? '' : ` — # ${offering.filling.kind}`}${offering.filling.like === undefined ? '' : `, ${words('filling')} ${offering.filling.like}`}`}</div>
+                  )}
                   {offering.refused === null ? null : <div className="break-words text-danger">{offering.refused}</div>}
                   {offering.undeclared.length === 0 ? null : <div className="break-words text-warning">{`${offering.undeclared.join(', ')} ${words('undeclared')}`}</div>}
                 </div>

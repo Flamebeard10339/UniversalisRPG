@@ -11,6 +11,7 @@ const KNOWN: readonly Addressed[] = [
   { kind: 'item', address: 'tutorial-island.rusty-sword' },
   { kind: 'entity', address: 'tutorial-island.giant-rat' },
   { kind: 'flag', address: 'tutorial-island.quest-given' },
+  { kind: 'skill', address: 'tutorial-island.mining' },
 ];
 
 const at = (written: string): { text: string; cursor: number } => {
@@ -141,6 +142,46 @@ describe('a line as the engine takes it', () => {
       const draft = line.block === undefined ? head : `${head}\n  ${line.block()[0]!.example}`;
       expect(offeringAt(draft, head.length, KNOWN).refused, draft).toBeNull();
     }
+  });
+});
+
+describe('a half-written line', () => {
+  const taken = (written: string) => {
+    const { text, cursor } = at(written);
+    return offeringAt(text, cursor, KNOWN);
+  };
+  const under = '# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n';
+
+  it('is read as the shape it is on its way to being', () => {
+    expect(taken(`${under}  xp: |`).filling).toEqual({ form: 'xp: <skill> <amount>', hole: 'skill', kind: 'skill' });
+  });
+
+  it('opens onto the ids that hole names, which the line alone cannot yet say', () => {
+    expect(offered(`${under}  xp: |`)).toContain('tutorial-island.mining');
+    expect(offered(`${under}  xp: mini|`)).toContain('tutorial-island.mining');
+  });
+
+  it('moves to the next hole once the one before it is written', () => {
+    expect(taken(`${under}  xp: mining |`).filling).toEqual({ form: 'xp: <skill> <amount>', hole: 'amount', like: '4-7' });
+  });
+
+  it('is not refused while a shape it could still become is unfinished', () => {
+    expect(taken(`${under}  xp: |`).refused).toBeNull();
+    expect(taken(`${under}  xp: a|`).refused).toBeNull();
+    expect(taken('# location tutorial-island.beach\nadjacent: |').refused).toBeNull();
+  });
+
+  it('is refused once it is whole and the engine still will not have it', () => {
+    expect(taken(`${under}  xp: mining 0|`).refused).toBe('an xp amount of 0 does nothing');
+    expect(taken(`${under}  xpp: mining 4|`).refused).toContain('unrecognized action result');
+  });
+
+  it('shows only the shapes whose words it has spelt out', () => {
+    expect(shapes(`${under}  xp: |`)).toEqual(['xp: <skill> <amount>']);
+  });
+
+  it('remarks on an id nothing declares, however deep in a block it sits', () => {
+    expect(taken(`${under}  xp: minning 4|`).undeclared).toEqual(['minning']);
   });
 });
 

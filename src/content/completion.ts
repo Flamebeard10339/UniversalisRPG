@@ -1,4 +1,4 @@
-import { formPattern } from '../grammar/codec';
+import { align, exampleOf, holesIn, matches, standingIn, valueIn, type Alignment } from '../grammar/form';
 import type { ListParser } from '../grammar/list';
 import { DslError, type Parser, type Written } from '../grammar/parser';
 import { isPositionalField } from '../grammar/section';
@@ -18,17 +18,26 @@ export interface Offer {
   kind?: string;
 }
 
+// The placeholder the cursor stands in. A hole that names something says which kind, and the ids on offer are the rest of the answer; a hole that holds a value has only what one line puts there to show.
+export interface Filling {
+  form: string;
+  hole: string;
+  like?: string;
+  kind?: string;
+}
+
 export interface Offering {
   from: number;
   to: number;
   where: readonly string[];
   reads: string | null;
+  filling: Filling | null;
   refused: string | null;
   undeclared: readonly string[];
   offers: readonly Offer[];
 }
 
-const NOTHING: Offering = { from: 0, to: 0, where: [], reads: null, refused: null, undeclared: [], offers: [] };
+const NOTHING: Offering = { from: 0, to: 0, where: [], reads: null, filling: null, refused: null, undeclared: [], offers: [] };
 
 const HEADING = /^#[ \t]*(?<kind>[a-z][a-z0-9-]*)?(?<gap>[ \t]+)?(?<id>[a-z0-9.-]*)?/;
 const INDENT = /^[ \t]*/;
@@ -106,7 +115,7 @@ function readAs(lines: readonly Written[], line: string): string | null {
   let best: string | null = null;
   let longest = -1;
   for (const written of lines) {
-    if (!formPattern(written.form).test(line) || literalOf(written.form).length <= longest) continue;
+    if (!matches(written.form, line) || literalOf(written.form).length <= longest) continue;
     best = written.form;
     longest = literalOf(written.form).length;
   }
@@ -123,40 +132,46 @@ function headingAbove(text: string, lineStart: number): string | undefined {
   return undefined;
 }
 
-// What the engine says when it is handed this line where it sits, which is the only honest account of whether it took.
-function refusalAt(owner: Section, heading: string, above: readonly Enclosing[], line: string, held: readonly Written[] | undefined): string | null {
-  if (line.trim() === '') return null;
-  const indent = INDENT.exec(line)![0].length;
+// The line alone under the heading and the blocks it sits in, which is the half of a draft the engine can be asked about while the rest is still being written.
+const around = (heading: string, above: readonly Enclosing[], line: string, opened: readonly string[] = []): string =>
+  [heading, ...above.map((each) => `${' '.repeat(each.indent)}${each.text}`), line, ...opened].join('\n');
+
+// Where the line itself begins in what `around` builds, so a span the engine reports can be told apart from the ground the cursor has not reached.
+const openingOf = (heading: string, above: readonly Enclosing[]): number => above.reduce((sum, each) => sum + each.indent + each.text.length + 1, heading.length + 1);
+
+// What the engine says when it is handed this line where it sits, which is the only honest account of whether it took. A complaint about ground past the cursor is about what is unwritten, not about what is wrong.
+function refusalAt(owner: Section, written: string, held: readonly Written[] | undefined, indent: number, cursor: number): string | null {
   const opened = held === undefined ? [] : indentLines([held[0]!.example], indent + 2);
-  const written = [heading, ...above.map((each) => `${' '.repeat(each.indent)}${each.text}`), line, ...opened].join('\n');
   try {
-    owner.parse(splitSections(written)[0]!);
+    owner.parse(splitSections([written, ...opened].join('\n'))[0]!);
     return null;
   } catch (error) {
-    return error instanceof DslError ? error.message : null;
+    if (!(error instanceof DslError)) return null;
+    return error.span !== undefined && error.span.start >= cursor ? null : error.message;
   }
 }
 
 const declares = (known: readonly Addressed[], kind: string, id: string): boolean =>
   known.some((each) => each.kind === kind && (each.address === id || each.address.endsWith(`.${id}`) || id.endsWith(`.${each.address}`)));
 
-// The ids this line names that no module in the universe declares. A thing written before the thing it names is normal, so this is a remark rather than a refusal.
-function undeclaredOn(owner: Section, heading: string, line: string, known: readonly Addressed[]): string[] {
-  if (line.trim() === '') return [];
-  const read = readSection([heading, line.trim()].join('\n'));
+// Every id a section names, paired with the kind the engine reads it as.
+function namedIn(written: string): { kind: string; id: string }[] {
+  const read = readSection(written);
   if (read === undefined) return [];
-  const missing: string[] = [];
+  const found: { kind: string; id: string }[] = [];
   try {
     read.owner.visit(read.authored as { id: string }, '', (kind, id) => {
-      if (!declares(known, kind, id)) missing.push(id);
+      found.push({ kind, id });
       return id;
     });
   } catch {
     return [];
   }
-  void owner;
-  return [...new Set(missing)];
+  return found;
 }
+
+// The ids a line names that no module in the universe declares. A thing written before the thing it names is normal, so this is a remark rather than a refusal.
+const undeclaredIn = (written: string, known: readonly Addressed[]): string[] => [...new Set(namedIn(written).filter((each) => !declares(known, each.kind, each.id)).map((each) => each.id))];
 
 function readSection(text: string): { owner: Section; authored: Record<string, unknown> } | undefined {
   try {
@@ -169,28 +184,8 @@ function readSection(text: string): { owner: Section; authored: Record<string, u
   }
 }
 
-const LEADING_WORD = /[a-z][a-z0-9-]*/;
-
-// An element that takes more than an id refuses a bare probe, so stand its own first example in, with the id swapped out.
-const wholeValue = (parser: Parser<unknown> | null): string | undefined => {
-  const example = parser?.examples[0];
-  return example === undefined || !LEADING_WORD.test(example) ? undefined : example.replace(LEADING_WORD, PROBE);
-};
-
-function referencedKinds(text: string, from: number, to: number, stood = PROBE): Set<string> {
-  const found = new Set<string>();
-  const read = readSection(`${text.slice(0, from)}${stood}${text.slice(to)}`);
-  if (read === undefined) return found;
-  try {
-    read.owner.visit(read.authored as { id: string }, '', (kind, id) => {
-      if (id === PROBE || id.endsWith(`.${PROBE}`)) found.add(kind);
-      return id;
-    });
-  } catch {
-    return found;
-  }
-  return found;
-}
+// The kinds a stand-in is read as where it was put, which is the engine's own answer to what may be named there.
+const kindsStanding = (written: string): Set<string> => new Set(namedIn(written).filter((each) => each.id === PROBE || each.id.endsWith(`.${PROBE}`)).map((each) => each.kind));
 
 const addressOffers = (known: readonly Addressed[], kinds: ReadonlySet<string>, before: string, typed: string): Offer[] =>
   known
@@ -225,10 +220,44 @@ const namedOffers = (written: Written, known: readonly Addressed[], typed: strin
     .sort((a, b) => a.form.localeCompare(b.form));
 };
 
-const shows = (form: string, typed: string): boolean => {
-  const literal = literalOf(form);
-  return typed === '' || literal.startsWith(typed) || (literal !== '' && typed.startsWith(literal));
-};
+// One shape a line could still turn into, read against the text written under the keyword it sits after.
+interface Shape {
+  form: string;
+  example: string;
+  under: string;
+  against: string;
+  family?: string;
+  note?: string;
+}
+
+const shapeOf = (written: Written, under: string, against: string, family?: string): Shape => ({ form: written.form, example: written.example, under, against, ...((family ?? written.family) === undefined ? {} : { family: family ?? written.family }), ...(written.note === undefined ? {} : { note: written.note }) });
+
+const worth = (found: Alignment): number => (found.complete ? 1000 : 0) + found.spelt;
+
+// Once a line spells out the words of some shape, the shapes it spells out nothing of are no longer what is being written.
+function narrowed(read: readonly { shape: Shape; read: Alignment }[]): { shape: Shape; read: Alignment }[] {
+  const most = Math.max(0, ...read.map((each) => each.read.spelt));
+  return read.filter((each) => each.read.spelt === most);
+}
+
+// Of the shapes the written text could still take, the one that accounts for the most of it — which is the one an author is writing.
+const standing = (read: readonly { shape: Shape; read: Alignment }[]): { shape: Shape; read: Alignment } | undefined =>
+  read.reduce<{ shape: Shape; read: Alignment } | undefined>((best, each) => (best === undefined || worth(each.read) > worth(best.read) ? each : best), undefined);
+
+const reading = (shapes: readonly Shape[]): { shape: Shape; read: Alignment }[] =>
+  shapes.flatMap((shape) => {
+    const read = align(shape.form, shape.against);
+    return read === null ? [] : [{ shape, read }];
+  });
+
+// The hole an example fills where the cursor now stands, which is the only place the engine can be asked what this hole names.
+function fillingHole(found: { shape: Shape; read: Alignment }): { form: string; hole: string; like: string; probe: string } | undefined {
+  if (found.read.open === null) return undefined;
+  const holes = holesIn(found.shape.form, found.shape.example);
+  const hole = holes?.[found.read.holes.length - 1];
+  if (hole === undefined || hole.name !== found.read.open.name) return undefined;
+  return { form: found.shape.form, hole: hole.name, like: valueIn(found.shape.example, hole), probe: `${found.shape.under}${standingIn(found.shape.example, hole, PROBE)}` };
+}
 
 const offerFor = (form: string, family?: string, note?: string): Offer => ({ form, insert: literalOf(form) === '' ? form : literalOf(form), ...(family === undefined ? {} : { family }), ...(note === undefined ? {} : { note }) });
 
@@ -248,6 +277,7 @@ function headingOffering(text: string, at: number, before: string, lineEnd: numb
       to: at + LEADING_ID.exec(text.slice(at, lineEnd))![0].length,
       where: ['# <kind>'],
       reads: kind === '' ? null : '# <kind>',
+      filling: { form: '# <kind> <id>', hole: 'kind', like: 'item' },
       refused: null,
       undeclared: [],
         offers: sectionKinds()
@@ -261,6 +291,7 @@ function headingOffering(text: string, at: number, before: string, lineEnd: numb
     to: lineEnd,
     where: [`# ${kind}`],
     reads: typed === '' ? null : `# ${kind} <id>`,
+    filling: { form: `# ${kind} <id>`, hole: 'id', like: `${kind}-of-your-own` },
     refused: null,
     undeclared: [],
     offers: addressOffers(known, new Set(kind === '' ? [] : [kind]), '', typed),
@@ -290,35 +321,49 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
 
   const token = TRAILING_ID.exec(typed)![0];
   const past = at + LEADING_ID.exec(tail)![0].length;
-  const kinds = referencedKinds(text, at - token.length, past);
   const continuing = opening !== null && opening[0].startsWith(',');
   const written = continuing ? text.slice(lineStart + indent, from) : typed;
   const named = fieldNamed(owner, written, true);
-  const under = named.key === null ? '' : (KEYED.exec(written)?.[0] ?? '');
-  const left = continuing ? typed : typed.slice(under.length);
-  const values = named.parser === null ? [] : named.parser.forms;
-  // Read the section around the line being written, which is the half of it that stands whole while this one is still being typed.
-  if (kinds.size === 0 && token === '' && text.slice(past, lineEnd).trim() === '') {
-    const whole = wholeValue(named.parser);
-    if (whole !== undefined) for (const each of referencedKinds(text, at, past, whole)) kinds.add(each);
-  }
+  const under = named.key === null || continuing ? '' : (KEYED.exec(written)?.[0] ?? '');
+  const left = typed.slice(under.length);
+  const above = enclosing(text, lineStart, indent);
   const held = readSection(`${text.slice(0, lineStart)}${text.slice(lineEnd)}`)?.authored;
   const here = linesAt(owner, text, lineStart, indent);
   const alongside = continuing ? 'one more value' : named.key === null ? 'what goes here' : `what ${named.key}: takes`;
   const lines = here.lines.filter((written) => written.needs === undefined || held === undefined || held[written.needs] !== undefined);
 
-  const reads = readAs(here.lines, text.slice(lineStart, lineEnd).trim());
+  const shapes: Shape[] = [
+    ...(continuing || under !== '' ? [] : lines).map((line) => shapeOf(line, '', typed)),
+    ...(named.parser === null ? [] : named.parser.forms).map((form) => shapeOf({ form, example: exampleOf(form, named.parser!.examples) ?? form }, under, left, alongside)),
+  ];
+  const shown = narrowed(reading(shapes));
+  const stood = standing(shown);
+  const filling = stood === undefined ? undefined : fillingHole(stood);
+
+  const line = text.slice(lineStart, lineEnd);
+  const spliced = (stood: string): string => around(heading, above, `${text.slice(lineStart, from)}${stood}${text.slice(to, lineEnd)}`);
+  // The ids on offer are whatever kind the engine reads where the cursor stands: the token it is on, or, where that leaves too little to parse, the whole clause with one example standing in.
+  const kinds = kindsStanding(around(heading, above, `${text.slice(lineStart, at - token.length)}${PROBE}${text.slice(past, lineEnd)}`));
+  if (kinds.size === 0 && filling !== undefined) for (const each of kindsStanding(spliced(filling.probe))) kinds.add(each);
+
+  const reads = readAs(here.lines, line.trim());
   return {
     from,
     to,
     where: here.where,
     reads,
-    refused: refusalAt(owner, heading, enclosing(text, lineStart, indent), text.slice(lineStart, lineEnd), here.lines.find((line) => line.form === reads)?.block?.()),
-    undeclared: indent === 0 ? undeclaredOn(owner, heading, text.slice(lineStart, lineEnd), known) : [],
+    filling: filling === undefined ? null : { form: filling.form, hole: filling.hole, ...(kinds.size === 1 ? { kind: [...kinds][0]! } : { like: filling.like }) },
+    // While a shape the line could still become is unfinished, the engine is being handed half a line and its complaint is about the half, not the line.
+    // A shape the line has spelt out but not finished is being written, not broken; anything else is handed to the engine, whose word on it is the only honest one.
+    refused:
+      line.trim() === '' || (stood !== undefined && !stood.read.complete && stood.read.spelt > 0)
+        ? null
+        : refusalAt(owner, around(heading, above, line), here.lines.find((line) => line.form === reads)?.block?.(), indent, openingOf(heading, above) + at - lineStart),
+    undeclared: undeclaredIn(around(heading, above, line), known),
     offers: deduped([
       ...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token),
-      ...(continuing || under !== '' ? [] : lines).flatMap((line) => [...(shows(line.form, typed) ? [offerFor(line.form, line.family, line.note)] : []), ...namedOffers(line, known, typed)]),
-      ...values.filter((form) => literalOf(form) === '' || shows(form, left)).map((form) => offerFor(form, alongside)),
+      ...shown.map(({ shape }) => offerFor(shape.form, shape.family, shape.note)),
+      ...(continuing || under !== '' ? [] : lines).flatMap((line) => namedOffers(line, known, typed)),
     ]),
   };
 }
