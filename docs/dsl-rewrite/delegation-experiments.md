@@ -582,3 +582,16 @@ their own; five separate complaints across two agents collapsed into one feature
 
 Do not edit the repository while a trial is running. Row 88 spent tool calls and
 a numbered finding on a bug that existed for four minutes.
+
+| # | agent | dispatch | tokens | tools | wall | steering | what came back |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 89 | Haiku (cold spawn) x2, concurrent | **Re-run the blind trial against a changed tool.** Same rules as rows 86–88, aimed at what had changed since: a compound `if` condition using two or more of its keywords, `open modal:` against the newly added kind, and a `when hit:` with a contest, a party-facing inflict, and a weighted table. Both were asked to answer *directly* whether the tool told them the keywords and valid values or whether they guessed, and to quote it. | 40.9k / 54.7k | 12 / 17 | 111s / 152s | high, plus two forced-answer questions and a quote requirement | Both drafts came back clean on the esoteric grammar — compound conditions, modals, contests, party targeting, weighted tables — which is the first time that has happened without a fix in between. Both rated 6/10 and both named the *same* thing first, unprompted: the answers repeat. One quoted the eight-line condition grammar coming back on every line that had a condition; the other counted the same thirty-six item ids printed five times. |
+
+**What row 89 says.** Forcing a direct question ("did it tell you, or did you
+guess? quote it") got sharper answers than the free-form critique did in rows
+86–88 — both agents quoted the exact output rather than describing it, and the
+quotes were what made the repetition measurable. The free-form "single most
+helpful change" answer was again the weakest part of both reports: one asked for
+a `--filter` mode and one for a listing mode, where the actual fix was to stop
+saying the same thing twice. Their diagnosis was worth more than their
+prescription, which has now held across seven trials.
