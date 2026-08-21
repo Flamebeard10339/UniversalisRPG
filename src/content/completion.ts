@@ -448,11 +448,13 @@ interface Shape {
   against: string;
   family?: string;
   note?: string;
+  // The kind of thing the line says it names, where it says so. Such a hole is filled with an id and with nothing else.
+  names?: string;
   // The first line of the block this shape opens, since a line that opens one and is handed over without it is refused for holding nothing.
   opens?: string;
 }
 
-const shapeOf = (written: Written, under: string, against: string, family?: string): Shape => ({ form: written.form, example: written.example, under, against, ...(written.block?.()[0]?.example === undefined ? {} : { opens: written.block()[0]!.example }), ...((family ?? written.family) === undefined ? {} : { family: family ?? written.family }), ...(written.note === undefined ? {} : { note: written.note }) });
+const shapeOf = (written: Written, under: string, against: string, family?: string): Shape => ({ form: written.form, example: written.example, under, against, ...(written.block?.()[0]?.example === undefined ? {} : { opens: written.block()[0]!.example }), ...((family ?? written.family) === undefined ? {} : { family: family ?? written.family }), ...(written.note === undefined ? {} : { note: written.note }), ...(written.names === undefined ? {} : { names: written.names }) });
 
 const worth = (found: Alignment): number => (found.complete ? 1000 : 0) + found.spelt;
 
@@ -587,7 +589,8 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   // A shape a refused line has spelt none of is not what it is being written as; saying so would be guessing over the engine's own word.
   const filled = filling === undefined || (refused !== null && stood!.read.spelt === 0) ? undefined : filling;
   // What a hole may hold in its own words, asked of the hole rather than of the line: the same answer wherever that hole is written, and none where the shapes beside it already say it.
-  const holdings = filled?.whole === undefined || filled.at === undefined ? undefined : heldIn(beneath(heading, above), indent, filled.whole, filled.at, shown.map(({ shape }) => `${shape.under}${shape.form}`), body);
+  // A hole its own line declares it names is filled with an id, so it has no grammar of its own to be broken into and the ids are the whole answer. Asked anyway, the search for a grammar that fits finds one by coincidence: a value parser reads `death` as a bare id, and a kind that nests actions takes `on 3 plank:` as an action called that, so nothing the engine does refuses it.
+  const holdings = filled?.whole === undefined || filled.at === undefined || stood?.shape.names !== undefined ? undefined : heldIn(beneath(heading, above), indent, filled.whole, filled.at, shown.map(({ shape }) => `${shape.under}${shape.form}`), body);
   return {
     from,
     to,

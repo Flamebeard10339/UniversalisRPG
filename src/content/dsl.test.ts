@@ -19,6 +19,25 @@ const CORPUS = readdirSync('content')
 
 const problems = (result: { diagnostics: { sourceName: string }[] }): string[] => result.diagnostics.map((each) => formatModuleDiagnostic(each as never));
 
+describe('a hole a line says it names', () => {
+  // Every line of every kind that declares the kind of thing it names, gathered from the grammar itself.
+  const naming = sections().flatMap((owner) =>
+    (owner.grammar as readonly { form: string; example: string; names?: string }[]).filter((line) => line.names !== undefined).map((line) => ({ kind: owner.kind, line })),
+  );
+
+  it('is a shape the section list actually declares', () => {
+    expect(naming.length).toBeGreaterThan(0);
+  });
+
+  it.each(naming.map((each) => `# ${each.kind} ${each.line.form}`))('%s is broken into no grammar of its own, since an id is the whole of it', (where) => {
+    const { kind, line } = naming.find((each) => `# ${each.kind} ${each.line.form}` === where)!;
+    const draft = `# ${kind} probe\n${line.example.slice(0, line.example.indexOf(' ') + 2)}`;
+    const offering = offeringAt(draft, draft.length, []);
+    expect(offering.filling?.holds, draft).toBeUndefined();
+    expect(offering.offers.map((each) => each.family).filter((each) => each?.startsWith('<')), draft).toEqual([]);
+  });
+});
+
 describe('a line that only makes sense once another is written', () => {
   // The keyword an author types for a field, which is what the grammar writes and so what an offer begins with.
   const keywordOf = (schema: { fields: Record<string, { keyword?: string }> }, name: string): string => schema.fields[name]?.keyword ?? name;
