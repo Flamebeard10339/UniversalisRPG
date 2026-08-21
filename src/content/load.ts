@@ -82,8 +82,6 @@ function summarizeDisabled(statuses: readonly ModuleStatus[]): string[] {
 }
 
 function recordBase(registry: Registry, key: string, entry: BaseEntry): void {
-  const unsupplied = unsuppliedParameters(registry.locales, key, entry.text);
-  if (unsupplied.length > 0) throw new DslError(`${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
   registry.locales.base.set(key, entry);
 }
 

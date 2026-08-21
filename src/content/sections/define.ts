@@ -8,6 +8,7 @@ import { RawSection, sectionParser } from '../../grammar/structure';
 import { AnyField, AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed } from '../../grammar/section';
 import { Loose, Pruning, Visit, put, strings } from '../refs';
 import { mergeFields } from '../merge';
+import { parametersOf } from '../../grammar/values';
 
 export type { PrintContext };
 
@@ -173,7 +174,17 @@ export const section =
       }
       return (held ?? value) as V;
     };
-    const built = (value: V, problem = validate?.(value)): V => {
+    // A prose field is said to a player as it is written: nothing stands beside it to fill a hole, so a `{…}` in one names something that will never arrive. What is spoken — a line of dialogue, a `say:` — is read as segments instead, and is not one of these.
+    const unfillable = (value: V): string | undefined => {
+      for (const field of text) {
+        const written = (value as unknown as Loose)[field];
+        if (typeof written !== 'string') continue;
+        const named = parametersOf(written);
+        if (named.length > 0) return `${field}: names ${named.map((one) => `{${one}}`).join(', ')}, which nothing supplies`;
+      }
+      return undefined;
+    };
+    const built = (value: V, problem = unfillable(value) ?? validate?.(value)): V => {
       if (problem) throw new DslError(`# ${kind} ${value.id}: ${problem}`);
       return value;
     };
@@ -192,8 +203,7 @@ export const section =
       parse: sectionParser(schema ? (raw) => parseAnySection(raw, schema) : (spec as Bespoke<V>).parse),
       merge: merge ?? ((into, from) => (schema ? mergeFields((into as Record<string, unknown>) ?? { id: (from as V).id }, from as Record<string, unknown>, schema) : (into ?? from))),
       build: schema
-        ? (authored, context) =>
-            built(hydrateSection(authored as Authored<V>, schema as unknown as SectionSchema<V, F, E>, context) as V, unmetNeed(authored as Record<string, unknown>, schema))
+        ? (authored, context) => built(hydrateSection(authored as Authored<V>, schema as unknown as SectionSchema<V, F, E>, context) as V, unmetNeed(authored as Record<string, unknown>, schema) ?? undefined)
         : (authored) => built(authored as V),
       print: print ?? (schema ? (value, context) => printSection(value, schema, context, actionLines) : () => notContent(kind)),
       visit: visited,

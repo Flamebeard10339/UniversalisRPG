@@ -309,6 +309,31 @@ describe('a line that only makes sense once another is written', () => {
   }
 });
 
+describe('a prose field of any kind', () => {
+  const AUTHORED = loadUniverseWithDiagnostics(CORPUS).parsed.flatMap((module) => module.sections);
+
+  // The subjects are every field any kind calls prose, taken from the kinds themselves and filled from what the corpus actually wrote, so a kind or a prose field declared next month is held to this with no edit. A field an author cannot write a value into — a title a kind only ever generates — says so by not keeping the value it is handed.
+  const WRITABLE = sections().flatMap((owner) =>
+    owner.text.flatMap((field) => {
+      const one = AUTHORED.find((each) => each.kind === owner.kind);
+      if (one === undefined) return [];
+      const set = (said: string): Record<string, unknown> => ({ ...(one.value as object), [field]: said });
+      const kept = (sectionFor(owner.kind)!.build(set('Plainly written.'), DEFAULT_CONTEXT) as Record<string, unknown>)[field];
+      return kept === 'Plainly written.' ? [{ kind: owner.kind, field, set }] : [];
+    }),
+  );
+
+  it('is found on most kinds there are, so nothing below is vacuous', () => {
+    expect(WRITABLE.length).toBeGreaterThan(12);
+  });
+
+  for (const { kind, field, set } of WRITABLE) {
+    it(`# ${kind} refuses a ${field}: that names a parameter, since it is said as written and nothing hands it one`, () => {
+      expect(() => sectionFor(kind)!.build(set('A {thing} of note.'), DEFAULT_CONTEXT)).toThrow(/names \{thing\}, which nothing supplies/);
+    });
+  }
+});
+
 describe('the shipped corpus', () => {
   it('loads with no diagnostics', () => {
     expect(problems(loadUniverseWithDiagnostics(CORPUS))).toEqual([]);

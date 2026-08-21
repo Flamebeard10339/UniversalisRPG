@@ -1,4 +1,7 @@
 import type {LocaleSection} from './sections/locale';
+import { parametersOf } from '../grammar/values';
+
+export { parametersOf };
 
 export const ENGINE_KEYS = [
   'engine.travel.to',
@@ -260,9 +263,6 @@ export const emptyLocales = (): Locales => ({
   declared: new Map(),
 });
 
-const PARAM = /\{([a-z][a-z0-9-]*)\}/g;
-
-export const parametersOf = (pattern: string): string[] => [...pattern.matchAll(PARAM)].map((match) => match[1]);
 
 export function unsuppliedParameters(locales: Locales, key: string, value: string): string[] {
   if (locales.prose.has(key)) return [];

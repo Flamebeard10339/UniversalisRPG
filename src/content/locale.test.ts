@@ -338,11 +338,11 @@ describe('authored text may not name a parameter either', () => {
       ]);
 
   it('refuses an authored examine that names one, naming the key and the parameter', () => {
-    expect(authoring('examine: The sign reads {open} and nothing else.')).toThrow(/isla.location.camp.examine names \{open\}, which nothing supplies/);
+    expect(authoring('examine: The sign reads {open} and nothing else.')).toThrow(/# location isla.camp: examine: names \{open\}, which nothing supplies/);
   });
 
   it('refuses an authored title that names one', () => {
-    expect(authoring('', '# item rope', 'title: Rope of {maker}')).toThrow(/isla.item.rope.title names \{maker\}/);
+    expect(authoring('', '# item rope', 'title: Rope of {maker}')).toThrow(/# item isla.rope: title: names \{maker\}/);
   });
 
   it('leaves text with no parameter in it alone', () => {
