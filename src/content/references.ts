@@ -31,8 +31,8 @@ function refuseUntimedPayload(itemId: string, where: string, registry: Registry)
 
 // Every name a reference written in a draft may resolve to: the namespace the engine built while loading — sections, the flags they mint, the actions nested in them, the nodes inside a dialogue — and the capabilities, which an entity opens by listing one rather than by being one.
 export const declaredBy = (registry: Registry): Addressed[] => [
-  ...registry.namespace.kinds().flatMap((kind) => registry.namespace.declaredKeys(kind).map((address) => ({ kind, address }))),
-  ...[...registryCapabilities(registry)].map((address) => ({ kind: CAPABILITY, address })),
+  ...registry.namespace.kinds().flatMap((kind) => registry.namespace.declaredKeys(kind).map((address) => ({ kind, address, module: registry.namespace.ownerOf(kind, address) ?? null }))),
+  ...[...registryCapabilities(registry)].map((address) => ({ kind: CAPABILITY, address, module: null })),
 ];
 
 export function registryCapabilities(registry: Registry): Set<string> {

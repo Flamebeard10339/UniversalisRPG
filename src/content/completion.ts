@@ -10,6 +10,8 @@ import { REFERENCE } from '../grammar/values';
 export interface Addressed {
   kind: string;
   address: string;
+  // The module that declared it, where one did. An id declared at the root belongs to no module and stands on its own.
+  module?: string | null;
 }
 
 export interface Offer {
@@ -18,6 +20,7 @@ export interface Offer {
   family?: string;
   note?: string;
   kind?: string;
+  module?: string | null;
 }
 
 // The placeholder the cursor stands in, what one line of this shape puts there, and the kind of thing that may be named there where the engine names one.
@@ -398,7 +401,7 @@ export function saysKind(under: string, indent: number, written: Written): strin
 const addressOffers = (known: readonly Addressed[], kinds: ReadonlySet<string>, before: string, typed: string, family?: string): Offer[] =>
   known
     .filter((each) => kinds.has(each.kind) && namesFrom(each.address, typed))
-    .map((each) => ({ form: each.address, insert: `${before}${each.address}`, kind: each.kind, ...(family === undefined ? {} : { family }) }))
+    .map((each) => ({ form: each.address, insert: `${before}${each.address}`, kind: each.kind, module: each.module ?? null, ...(family === undefined ? {} : { family }) }))
     .sort((a, b) => a.form.localeCompare(b.form));
 
 const KEYED = /^(?<key>[a-z][a-z0-9 -]*?):[ \t]*/;

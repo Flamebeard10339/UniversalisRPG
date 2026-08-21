@@ -12,8 +12,9 @@ export interface OfferFamily {
 }
 
 // A keyword can only stand apart from the shapes it takes if a space stands between them; `+<percent>%` gathered under `+` would read as though a space belonged there, and it does not.
+// An id stands under the module that declared it, which is the only thing a list of forty of them is ordered by that an author already knows.
 function headOf(offer: Offer): string {
-  if (offer.kind !== undefined) return '';
+  if (offer.kind !== undefined) return offer.module != null && offer.form.startsWith(`${offer.module}.`) ? offer.module : '';
   const head = literalOf(offer.form).trimEnd();
   return offer.form.length === head.length || offer.form[head.length] === ' ' ? head : '';
 }
@@ -45,4 +46,6 @@ export function gathered(offers: readonly Offer[]): OfferFamily[] {
   return [...held.values()].map((family) => ({ name: family.name, groups: gather(family.offers) }));
 }
 
-export const shownIn = (group: OfferGroup, offer: Offer): string => (group.head === null ? offer.form : offer.form.slice(group.head.length).trimStart());
+// What is left of a form once its head has been said above it. A keyword is parted from its shapes by a space and a module from its ids by a dot, and neither belongs to what is left.
+export const shownIn = (group: OfferGroup, offer: Offer): string =>
+  group.head === null ? offer.form : offer.form.slice(group.head.length).replace(/^[.\s]+/, '');

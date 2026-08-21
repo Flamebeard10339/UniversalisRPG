@@ -23,6 +23,24 @@ describe('what the grammar offers', () => {
     expect(only([offer('title: <text>')]).map((group) => group.head)).toEqual([null]);
   });
 
+  const id = (address: string, module: string | null, kind = 'flag'): Offer => ({ form: address, insert: address, kind, module });
+
+  it('stands ids under the module that declared them', () => {
+    const groups = only([id('tutorial-island.made-bread', 'tutorial-island'), id('combat-expansion.rage', 'combat-expansion'), id('tutorial-island.fainted', 'tutorial-island')]);
+    expect(groups.map((group) => group.head)).toEqual(['tutorial-island', null]);
+    expect(groups[0].offers.map((each) => shownIn(groups[0], each))).toEqual(['made-bread', 'fainted']);
+  });
+
+  it('leaves an id its whole address where the module is not the front of it', () => {
+    const groups = only([id('on tutorial-island.death:', 'tutorial-island', 'event'), id('on tutorial-island.dawn:', 'tutorial-island', 'event')]);
+    expect(groups.map((group) => group.head)).toEqual([null, null]);
+    expect(groups.map((group) => shownIn(group, group.offers[0]))).toEqual(['on tutorial-island.death:', 'on tutorial-island.dawn:']);
+  });
+
+  it('leaves an id declared under no module standing on its own', () => {
+    expect(only([id('health', null, 'stat'), id('mana', null, 'stat')]).map((group) => group.head)).toEqual([null, null]);
+  });
+
   it('sorts the shapes into the parts of the thing they belong to', () => {
     const families = gathered([offer('requires: <condition>', 'offered when'), offer('time: <seconds>', 'how long'), offer('give: <item>', 'what happens')]);
     expect(families.map((family) => family.name)).toEqual(['offered when', 'how long', 'what happens']);
