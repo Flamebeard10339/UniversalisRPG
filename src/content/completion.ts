@@ -383,18 +383,20 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   if (kinds.size === 0) for (const each of holds) kinds.add(each);
 
   const reads = readAs(here.lines, line.trim());
+  // A shape the line has spelt out but not finished is being written, not broken; anything else is handed to the engine, whose word on it is the only honest one.
+  const refused =
+    line.trim() === '' || (stood !== undefined && !stood.read.complete && stood.read.spelt > 0)
+      ? null
+      : refusalAt(owner, around(heading, above, line), here.lines.find((line) => line.form === reads)?.block?.(), indent, openingOf(heading, above) + at - lineStart);
+  // A shape a refused line has spelt none of is not what it is being written as; saying so would be guessing over the engine's own word.
+  const filled = filling === undefined || (refused !== null && stood!.read.spelt === 0) ? undefined : filling;
   return {
     from,
     to,
     where: here.where,
     reads,
-    filling: filling === undefined ? null : { form: filling.form, hole: filling.hole, ...(only(holds) === undefined ? (filling.like === undefined ? {} : { like: filling.like }) : { kind: only(holds)! }) },
-    // While a shape the line could still become is unfinished, the engine is being handed half a line and its complaint is about the half, not the line.
-    // A shape the line has spelt out but not finished is being written, not broken; anything else is handed to the engine, whose word on it is the only honest one.
-    refused:
-      line.trim() === '' || (stood !== undefined && !stood.read.complete && stood.read.spelt > 0)
-        ? null
-        : refusalAt(owner, around(heading, above, line), here.lines.find((line) => line.form === reads)?.block?.(), indent, openingOf(heading, above) + at - lineStart),
+    filling: filled === undefined ? null : { form: filled.form, hole: filled.hole, ...(only(holds) === undefined ? (filled.like === undefined ? {} : { like: filled.like }) : { kind: only(holds)! }) },
+    refused,
     undeclared: undeclaredIn(around(heading, above, line), known),
     offers: deduped([
       ...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token),
