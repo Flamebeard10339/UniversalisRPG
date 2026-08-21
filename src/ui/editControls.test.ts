@@ -31,6 +31,7 @@ const EXERCISED: Record<keyof EditControls, true> = {
   stage: true,
   unstage: true,
   copy: true,
+  stand: true,
 };
 
 describe('what a control on the editing page does', () => {
@@ -100,6 +101,13 @@ describe('what a control on the editing page does', () => {
     expect(shut.sent).toEqual([]);
   });
 
+  it('stands the author somewhere else by the same line a tapped place sends', () => {
+    const held = watching(FORGOTTEN);
+    held.controls.stand('tutorial-island.beach');
+
+    expect(held.sent).toEqual(['/goto tutorial-island.beach']);
+  });
+
   it('hands the module over and prints it, which is one command and one set of bytes', () => {
     const held = watching(FORGOTTEN);
     held.controls.copy();
@@ -135,6 +143,13 @@ describe('what the page draws, assembled once', () => {
     expect(draftIn(addressed, { ...opened, draft: 'typed' })).toBe('typed');
     expect(draftIn(addressed, FORGOTTEN)).toBe('');
     expect(openedIn(addressed, { ...FORGOTTEN, open: 'entity nothing.at-all' })).toBeNull();
+  });
+
+  it('offers the place being stood in beside the things standing in it', () => {
+    const rows = rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: FORGOTTEN }).map(sectionKey);
+
+    expect(rows).toContain(`location ${GUIDE_HOUSE.location}`);
+    expect(rows.filter((row) => row.startsWith('location '))).toEqual([`location ${GUIDE_HOUSE.location}`]);
   });
 
   it('offers nothing local where nothing is standing', () => {

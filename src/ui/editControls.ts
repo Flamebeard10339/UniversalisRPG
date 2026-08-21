@@ -1,4 +1,6 @@
+import type { PlayView } from '../runtime/session';
 import { deleteLine, kindsOffered, offeredBy, SHOW_LINE, stage, type Section, type Standing, type SurfaceId } from './authoringSurface';
+import { gotoLine } from './devMode';
 import type { Editing } from './editorMemory';
 
 export const sectionKey = (section: Pick<Section, 'kind' | 'address'>): string => `${section.kind} ${section.address}`;
@@ -13,11 +15,13 @@ export interface EditControls {
   stage(): void;
   unstage(): void;
   copy(): void;
+  stand(place: string): void;
 }
 
 export interface EditHeld {
   sections: readonly Section[];
   standing: Standing;
+  places: PlayView['locations'];
   editing: Editing;
   controls: EditControls;
 }
@@ -65,5 +69,6 @@ export function editControls(held: { sections: readonly Section[]; editing: Edit
       act.send(SHOW_LINE);
       act.hand();
     },
+    stand: (place) => act.send(gotoLine(place)),
   };
 }

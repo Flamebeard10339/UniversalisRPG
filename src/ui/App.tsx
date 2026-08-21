@@ -159,6 +159,7 @@ export function App({
   const held = {
     sections,
     standing: standingIn(view),
+    places: view.locations,
     editing,
     controls: editControls(
       { sections, editing },

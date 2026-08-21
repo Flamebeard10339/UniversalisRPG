@@ -90,9 +90,12 @@ export const NOWHERE: Standing = { location: '', entities: [] };
 
 const names = (published: string, address: string): boolean => published === address || published.endsWith(`.${address}`) || address.endsWith(`.${published}`);
 
+const standingIn = (section: Section, standing: Standing): boolean =>
+  section.kind === MAPPED_KIND ? names(standing.location, section.address) : standing.entities.some((entity) => names(entity, section.address));
+
 export function surfaceOf(section: Section, standing: Standing): SurfaceId {
-  if (section.kind === MAPPED_KIND) return 'map';
-  return standing.entities.some((entity) => names(entity, section.address)) ? 'local' : 'global';
+  if (standingIn(section, standing)) return 'local';
+  return section.kind === MAPPED_KIND ? 'map' : 'global';
 }
 
 export function offeredBy(sections: readonly Section[], standing: Standing, surface: SurfaceId): Section[] {

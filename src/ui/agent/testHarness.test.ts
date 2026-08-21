@@ -37,6 +37,7 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
       stats: [],
         flags: {},
       discovered: [{ id: 'start', title: asLocalized('Start'), x: 0, y: 0, z: 0, adjacent: [{ to: 'yard', open: true }] }],
+      locations: [{ id: 'start', title: asLocalized('Start') }, { id: 'yard', title: asLocalized('Yard') }],
       player: { name: 'Miri', race: 'human' },
       action: null,
       said: [],

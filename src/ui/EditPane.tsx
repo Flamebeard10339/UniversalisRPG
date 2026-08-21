@@ -11,7 +11,7 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
   const list = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const restored = useRef(false);
-  const { sections, editing, controls } = held;
+  const { sections, standing, places, editing, controls } = held;
   const rows = rowsIn(held);
   const open = openedIn(sections, editing);
 
@@ -44,6 +44,21 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
             {words(surface)}
           </button>
         ))}
+        {editing.surface === 'local' ? (
+          <select
+            data-drive="edit.stand"
+            aria-label={words('local')}
+            value={standing.location}
+            onChange={(event) => controls.stand(event.target.value)}
+            className="min-w-0 flex-1 rounded-xl border border-border bg-panel px-2 text-xs text-text"
+          >
+            {places.map((place) => (
+              <option key={place.id} value={place.id}>
+                {place.title}
+              </option>
+            ))}
+          </select>
+        ) : null}
         {editing.surface === 'global' ? (
           <select
             data-drive="edit.kind"

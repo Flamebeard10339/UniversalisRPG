@@ -77,20 +77,24 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
     expect(checked).toBeGreaterThan(50);
   });
 
-  it('draws every location on the map surface and nothing else there', () => {
+  it('draws every location on the map surface but the one being stood in', () => {
     const mapped = offeredBy(addressed, GUIDE_HOUSE, 'map');
+    const elsewhere = [...REGISTRY.locations.keys()].filter((id) => id !== GUIDE_HOUSE.location);
 
-    expect(mapped.map((section) => section.address).sort()).toEqual([...REGISTRY.locations.keys()].sort());
+    expect(elsewhere.length).toBeGreaterThan(0);
+    expect(mapped.map((section) => section.address).sort()).toEqual(elsewhere.sort());
     expect([...new Set(mapped.map((section) => section.kind))]).toEqual([MAPPED_KIND]);
+    expect(offeredBy(addressed, NOWHERE, 'map').length).toBe(mapped.length + 1);
   });
 
-  it('narrows Local to what is standing where the player is', () => {
+  it('narrows Local to where the player is standing and to what stands there with them', () => {
     const local = offeredBy(addressed, GUIDE_HOUSE, 'local');
 
-    expect([...new Set(local.map((section) => section.address))].sort()).toEqual([...GUIDE_HOUSE.entities].sort());
+    expect([...new Set(local.map((section) => section.address))].sort()).toEqual([GUIDE_HOUSE.location, ...GUIDE_HOUSE.entities].sort());
+    expect(local.filter((section) => section.kind === MAPPED_KIND).map((section) => section.address)).toEqual([GUIDE_HOUSE.location]);
     expect(local.length).toBeGreaterThan(GUIDE_HOUSE.entities.length);
     expect(offeredBy(addressed, NOWHERE, 'local')).toEqual([]);
-    expect(offeredBy(addressed, NOWHERE, 'global').length).toBe(offeredBy(addressed, GUIDE_HOUSE, 'global').length + local.length);
+    expect(offeredBy(addressed, NOWHERE, 'global').length).toBe(offeredBy(addressed, GUIDE_HOUSE, 'global').length + local.length - 1);
   });
 
   it('shadows a shipped section with the copy staged over it, rather than offering both', () => {

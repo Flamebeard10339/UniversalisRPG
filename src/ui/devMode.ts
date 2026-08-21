@@ -4,8 +4,10 @@ export const devLine = (on: boolean): string => `/dev ${on ? 'on' : 'off'}`;
 
 export const speedLine = (typed: string): string => `/speed ${typed}`;
 
+export const gotoLine = (place: string): string => `/goto ${place}`;
+
 export function tappedPlace(dev: boolean, place: string, goes: number | null): string | null {
-  if (dev) return `/goto ${place}`;
+  if (dev) return gotoLine(place);
   return goes === null ? null : String(goes);
 }
 

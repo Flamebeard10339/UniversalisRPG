@@ -147,6 +147,7 @@ export interface EditState {
   cursor: number;
   scroll: number;
   standing: Standing;
+  places: readonly string[];
 }
 
 export function editState(held: EditHeld): EditState {
@@ -161,6 +162,7 @@ export function editState(held: EditHeld): EditState {
     cursor: held.editing.cursor,
     scroll: held.editing.scroll,
     standing: held.standing,
+    places: held.places.map((place) => place.id),
   };
 }
 
@@ -176,6 +178,12 @@ export function rowNamed(held: EditHeld, value: unknown): string {
   return found;
 }
 
+export function placeNamed(held: EditHeld, value: unknown): string {
+  const found = held.places.find((place) => place.id === value);
+  if (!found) throw new Error(`no location is called ${String(value)}`);
+  return found.id;
+}
+
 export function editSurface(held: EditHeld): TestSurface {
   return {
     state: () => editState(held),
@@ -189,6 +197,7 @@ export function editSurface(held: EditHeld): TestSurface {
       stage: () => held.controls.stage(),
       unstage: () => held.controls.unstage(),
       copy: () => held.controls.copy(),
+      stand: (value) => held.controls.stand(placeNamed(held, value)),
     },
   };
 }

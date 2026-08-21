@@ -84,6 +84,7 @@ export interface PlayStatus {
   stats: CountedRow[];
   flags: AnswerTable<boolean | number>;
   discovered: Array<{ id: Answer; title: Localized; x: number; y: number; z: number; adjacent: Array<{ to: Answer; open: boolean }> }>;
+  locations: Array<{ id: Answer; title: Localized }>;
   journey: Journey | null;
   player: { name: Answer; race: Answer };
   action: PlayAction | null;
@@ -373,6 +374,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     stats: [...registry.stats.values()].map((stat) => ({ id: stat.id, title: localizer.title('stat', stat.id), value: statValue(stat.id, state, registry) })),
     flags: { ...state.flags },
     discovered: publishDiscovered(state, registry),
+    locations: [...registry.locations.values()].map((each) => ({ id: each.id, title: localizer.title('location', each.id) })),
     journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,
     player: { ...state.player },
     action: publishAction(state, registry),
