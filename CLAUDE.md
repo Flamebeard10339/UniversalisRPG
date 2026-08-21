@@ -91,6 +91,7 @@ Tools, none of which are gates:
 
 - `npm run play` — interactive REPL over a live session; `# test` scripts run with `/test`
 - `npm run probe -- <source>... [--show <kind>.<id>] [--round-trip] [--each]` — ask the load path a question without building a runner
+- `npm run oracle [-- <kind>... | --at <draft.dsl>]` — print the grammar the editing page offers, as a tree per kind or line by line through a draft
 - `npm run inspect -- "<expression>"` — evaluate against the repo's own module resolution, leaving no file behind
 - `npm run mutate -- <manifest.json>` — break a named line, run the tests it names, report what the suite failed to notice
 
