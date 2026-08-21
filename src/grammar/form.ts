@@ -127,6 +127,9 @@ export const valueIn = (example: string, hole: Hole): string => example.slice(ho
 // The example with one hole given over to a stand-in, which is how the engine is asked what that hole names.
 export const standingIn = (example: string, hole: Hole, stood: string): string => `${example.slice(0, hole.start)}${stood}${example.slice(hole.end)}`;
 
+// A form with the names of its placeholders rubbed out. Two shapes that differ only in what they call their holes are the same shape, and saying both says one thing twice.
+export const bare = (form: string): string => form.replace(/<[a-z][a-z0-9 -]*>/g, '<>');
+
 export const exampleOf = (form: string, examples: readonly string[]): string | undefined => examples.find((example) => matches(form, example));
 
 // One line to stand for each shape. A placeholder takes whatever is put in it, so an example an earlier shape has already claimed is a poor witness for a later one, and is passed over where there is another.

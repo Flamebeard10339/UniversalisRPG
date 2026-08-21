@@ -229,3 +229,35 @@ describe('an offering', () => {
     }
   });
 });
+
+describe('a hole with a grammar of its own', () => {
+  const filling = (written: string) => {
+    const { text, cursor } = at(written);
+    return offeringAt(text, cursor, KNOWN).filling;
+  };
+
+  it('says the shapes that hole takes, in the words of whatever reads it', () => {
+    expect(filling('# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n  if |')?.shapes).toEqual([
+      '<flag>',
+      '<reference> <comparison> <number>',
+      'has <item>',
+      'has <count> <item>',
+      'not <condition>',
+      '<condition> and <condition>',
+      '<condition> or <condition>',
+    ]);
+  });
+
+  it('says the same of the same hole wherever it is written', () => {
+    const inside = filling('# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n  if |')?.shapes;
+    expect(filling('# location tutorial-island.beach\nadjacent: guide-house while |')?.shapes).toEqual(inside);
+  });
+
+  it('says nothing where the shapes beside it already say it', () => {
+    expect(filling('# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n  give: |')?.shapes).toBeUndefined();
+  });
+
+  it('says nothing of a hole that holds one thing, which its own name has already said', () => {
+    expect(filling('# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n  xp: |')?.shapes).toBeUndefined();
+  });
+});

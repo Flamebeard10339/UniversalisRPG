@@ -228,6 +228,13 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                   {offering.filling === null ? null : (
                     <div className="break-words text-text">{fillingWords(offering.filling)}</div>
                   )}
+                  {offering.filling?.shapes === undefined
+                    ? null
+                    : offering.filling.shapes.map((shape) => (
+                        <div key={shape} className="break-words pl-3 text-text-subtle">
+                          {shape}
+                        </div>
+                      ))}
                   {offering.refused === null ? null : <div className="break-words text-danger">{offering.refused}</div>}
                   {offering.undeclared.length === 0 ? null : <div className="break-words text-warning">{`${offering.undeclared.map((each) => `${each.id} as a # ${each.kind}`).join(', ')} ${words('undeclared')}`}</div>}
                 </div>

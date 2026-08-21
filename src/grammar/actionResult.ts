@@ -415,8 +415,9 @@ const LEAF_EXAMPLES: readonly string[] = [
   'unset: found-key',
   'add: gold 5',
   'add: gold -3',
-  'give: 5-10 arrow',
   'give: plank',
+  'give: 5 arrow',
+  'give: 5-10 arrow',
   'take: 3 plank',
   'xp: mining 4-7',
   'relocate: camp',
@@ -467,11 +468,8 @@ const ROWS: readonly Written[] = [
 export const HAPPENS = 'what happens';
 export const SOMETIMES = 'only sometimes';
 
-// The shapes a condition takes are the condition parser's own, so what an author is told here cannot fall behind what it accepts.
-const CONDITIONS = `a condition is ${condition.forms.join(' | ')}`;
-
 const WRAPPERS: readonly Written[] = [
-  { form: 'if <condition>:', example: 'if has-key:', family: SOMETIMES, note: CONDITIONS, block: () => resultGrammar() },
+  { form: 'if <condition>:', example: 'if has-key:', family: SOMETIMES, block: () => resultGrammar() },
   { form: '<chance> in <of>:', example: '3 in 10:', family: SOMETIMES, block: () => resultGrammar() },
   { form: '<stat> vs <stat>:', example: 'attack vs defence:', family: SOMETIMES, note: 'the first is read off whoever acts and the second off whoever it lands on; either may be a plain number instead, and its block runs only when the contest is won', block: () => resultGrammar() },
   { form: 'one of:', example: 'one of:', family: SOMETIMES, block: () => ROWS },
