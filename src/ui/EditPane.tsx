@@ -227,7 +227,23 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                     {family.name === null ? null : <div className="px-2 text-text">{family.name}</div>}
                     {family.groups.map((group, index) => (
                       <div key={group.head ?? `${index}`}>
-                        {group.head === null ? null : <div className="px-2 pl-3 text-text-subtle">{group.head}</div>}
+                        {group.head === null || group.opens === null ? (
+                          group.head === null ? null : <div className="px-2 pl-3 text-text-subtle">{group.head}</div>
+                        ) : (
+                          <button
+                            data-drive="edit.take"
+                            type="button"
+                            data-offer={group.opens.form}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              taken.current = true;
+                              controls.take(group.opens!.form);
+                            }}
+                            className="block w-full whitespace-pre-wrap break-words px-2 pl-3 text-left font-mono text-[11px] leading-tight text-text-subtle"
+                          >
+                            {group.head}
+                          </button>
+                        )}
                         {group.offers.map((offer) => (
                           <button
                             key={offer.form}

@@ -72,6 +72,7 @@ describe('every section kind', () => {
       seen.add(key);
       expect(formFailures(`# ${kind} under ${under.join(' / ') || 'itself'}`, lines.map((each) => each.form), lines.map((each) => each.example))).toEqual([]);
       for (const line of lines) {
+        if (line.names !== undefined) expect(sections().map((each) => each.kind), `# ${kind} ${line.form} names`).toContain(line.names);
         const held = line.block?.();
         const opened = held === undefined ? [] : indentLines([held[0]!.example], 2 * (under.length + 1));
         const written = [`# ${kind} probe`, ...under.map((each, deep) => indentLines([each], 2 * deep)[0]!), ...indentLines([line.example], 2 * under.length), ...opened].join('\n');

@@ -2,6 +2,7 @@ import { literalOf, type Offer } from '../content/completion';
 
 export interface OfferGroup {
   head: string | null;
+  opens: Offer | null;
   offers: readonly Offer[];
 }
 
@@ -9,8 +10,6 @@ export interface OfferFamily {
   name: string | null;
   groups: readonly OfferGroup[];
 }
-
-export const AS_A_BLOCK = 'then an indented block';
 
 const headOf = (offer: Offer): string => (offer.kind === undefined ? literalOf(offer.form).trimEnd() : '');
 
@@ -22,7 +21,11 @@ function gather(offers: readonly Offer[]): OfferGroup[] {
     if (head !== '' && last !== undefined && last.head === head) last.offers.push(offer);
     else held.push({ head, offers: [offer] });
   }
-  return held.map((group) => ({ head: group.offers.length > 1 ? group.head : null, offers: group.offers }));
+  return held.map((group) => {
+    if (group.offers.length < 2) return { head: null, opens: null, offers: group.offers };
+    const opens = group.offers.find((offer) => offer.form === group.head) ?? null;
+    return { head: group.head, opens, offers: group.offers.filter((offer) => offer !== opens) };
+  });
 }
 
 export function gathered(offers: readonly Offer[]): OfferFamily[] {
@@ -36,4 +39,4 @@ export function gathered(offers: readonly Offer[]): OfferFamily[] {
   return [...held.values()].map((family) => ({ name: family.name, groups: gather(family.offers) }));
 }
 
-export const shownIn = (group: OfferGroup, offer: Offer): string => (group.head === null ? offer.form : offer.form.slice(group.head.length).trimStart() || AS_A_BLOCK);
+export const shownIn = (group: OfferGroup, offer: Offer): string => (group.head === null ? offer.form : offer.form.slice(group.head.length).trimStart());

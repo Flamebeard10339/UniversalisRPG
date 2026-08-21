@@ -86,8 +86,8 @@ describe('a field', () => {
     expect(offered('# location tutorial-island.beach\nentities: |')).not.toContain('tutorial-island.beach');
   });
 
-  it('keeps showing every shape its parser reads while a value is written', () => {
-    expect(offered('# location tutorial-island.beach\nadjacent: guide-|')).toContain('adjacent: <location> while <condition>, …');
+  it('drops the keyword once it is written, and shows what one value of it may be', () => {
+    expect(shapes('# location tutorial-island.beach\nadjacent: guide-|')).toEqual(['<location>', '<location> while <condition>']);
   });
 
   it('drops its keyword and its list after a comma, where one more value goes', () => {
@@ -122,7 +122,7 @@ describe('an offering', () => {
     const opening = `# ${kind} probe\n`;
     const offering = offeringAt(opening, opening.length, KNOWN);
     const owner = sectionFor(kind)!;
-    const declared = [...owner.grammar.map((each) => each.form), ...Object.values(owner.schema?.fields ?? {}).flatMap((spec) => (spec.parser as Parser<unknown>).forms)];
+    const declared = [...owner.grammar.map((each) => each.form), ...Object.values(owner.schema?.fields ?? {}).flatMap((spec) => [...(spec.parser as Parser<unknown>).forms, ...(((spec.parser as { element?: Parser<unknown> }).element?.forms) ?? [])])];
     for (const offer of offering.offers) {
       expect(declared, `# ${kind} offers ${offer.form}`).toContain(offer.form);
       expect(offer.form.startsWith(offer.insert), `# ${kind} writes in ${JSON.stringify(offer.insert)} for ${offer.form}`).toBe(true);

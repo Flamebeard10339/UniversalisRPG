@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Offer } from '../content/completion';
-import { AS_A_BLOCK, gathered, shownIn } from './offerGroups';
+import { gathered, shownIn } from './offerGroups';
 
 const offer = (form: string, family?: string, kind?: string): Offer => ({ form, insert: form, ...(family === undefined ? {} : { family }), ...(kind === undefined ? {} : { kind }) });
 
@@ -13,9 +13,10 @@ describe('what the grammar offers', () => {
     expect(groups[0].offers.map((each) => shownIn(groups[0], each))).toEqual(['<item>', '<count> <item>']);
   });
 
-  it('says in words that a keyword also opens a block', () => {
+  it('lifts the keyword that opens a block into the heading itself', () => {
     const groups = only([offer('stations: <id>, …'), offer('stations:')]);
-    expect(groups[0].offers.map((each) => shownIn(groups[0], each))).toEqual(['<id>, …', AS_A_BLOCK]);
+    expect(groups[0].opens?.form).toBe('stations:');
+    expect(groups[0].offers.map((each) => shownIn(groups[0], each))).toEqual(['<id>, …']);
   });
 
   it('leaves a lone shape ungathered', () => {

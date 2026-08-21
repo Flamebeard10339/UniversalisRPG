@@ -11,6 +11,7 @@ export interface Written {
   form: string;
   example: string;
   family?: string;
+  names?: string;
   needs?: string;
   block?: () => readonly Written[];
 }

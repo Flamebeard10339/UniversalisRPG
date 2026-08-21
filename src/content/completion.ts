@@ -166,6 +166,19 @@ function fieldNamed(owner: Section, written: string, alone: boolean): { key: str
   return { key: key ?? null, parser: alone ? oneOf(parser) : parser };
 }
 
+const FIRST_PLACEHOLDER = /<[^>]*>/;
+
+// A form that says which kind its placeholder names is worth one line per thing of that kind.
+const namedOffers = (written: Written, known: readonly Addressed[], typed: string): Offer[] => {
+  const literal = literalOf(written.form);
+  if (written.names === undefined || !typed.startsWith(literal)) return [];
+  const after = typed.slice(literal.length);
+  return known
+    .filter((each) => each.kind === written.names && namesFrom(each.address, after))
+    .map((each) => ({ form: written.form.replace(FIRST_PLACEHOLDER, each.address), insert: written.form.replace(FIRST_PLACEHOLDER, each.address), family: written.family, kind: each.kind }))
+    .sort((a, b) => a.form.localeCompare(b.form));
+};
+
 const shows = (form: string, typed: string): boolean => {
   const literal = literalOf(form);
   return typed === '' || literal.startsWith(typed) || (literal !== '' && typed.startsWith(literal));
@@ -227,12 +240,15 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const token = TRAILING_ID.exec(typed)![0];
   const kinds = referencedKinds(text, at - token.length, at + LEADING_ID.exec(tail)![0].length);
   const continuing = opening !== null && opening[0].startsWith(',');
-  const named = fieldNamed(owner, continuing ? text.slice(lineStart + indent, from) : typed, continuing);
-  const values = named.parser === null ? [] : named.parser.forms.map((form) => (continuing || named.key === null ? form : `${named.key}: ${form}`));
+  const written = continuing ? text.slice(lineStart + indent, from) : typed;
+  const named = fieldNamed(owner, written, true);
+  const under = named.key === null ? '' : (KEYED.exec(written)?.[0] ?? '');
+  const left = continuing ? typed : typed.slice(under.length);
+  const values = named.parser === null ? [] : named.parser.forms;
   // Read the section around the line being written, which is the half of it that stands whole while this one is still being typed.
   const held = readSection(`${text.slice(0, lineStart)}${text.slice(lineEnd)}`)?.authored;
   const here = linesAt(owner, text, lineStart, indent);
-  const alongside = named.key === null ? 'one more value' : (here.lines.find((written) => literalOf(written.form).trimEnd() === `${named.key}:`)?.family ?? 'what it takes');
+  const alongside = continuing ? 'one more value' : named.key === null ? 'what goes here' : `what ${named.key}: takes`;
   const lines = here.lines.filter((written) => written.needs === undefined || held === undefined || held[written.needs] !== undefined);
 
   return {
@@ -242,8 +258,8 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     reads: readAs(here.lines, text.slice(lineStart, lineEnd).trim()),
     offers: deduped([
       ...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token),
-      ...(continuing ? [] : lines).filter((written) => shows(written.form, typed)).map((written) => offerFor(written.form, written.family)),
-      ...values.filter((form) => shows(form, typed)).map((form) => offerFor(form, alongside)),
+      ...(continuing || under !== '' ? [] : lines).flatMap((line) => [...(shows(line.form, typed) ? [offerFor(line.form, line.family)] : []), ...namedOffers(line, known, typed)]),
+      ...values.filter((form) => literalOf(form) === '' || shows(form, left)).map((form) => offerFor(form, alongside)),
     ]),
   };
 }
