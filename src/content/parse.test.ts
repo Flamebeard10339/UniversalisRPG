@@ -186,7 +186,7 @@ describe('the two carriers of a hook', () => {
   });
 
   it('resolves a hook written as an edit, on a carrier that has none to edit yet', () => {
-    const module = '# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# entity rat\n+on hit: restore: 1 rage\n\n# item mail\n-when hit: restore: 1 rage\n';
+    const module = '# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# entity rat\nstats: attack 5\n+on hit: restore: 1 rage\n\n# item mail\n-when hit: restore: 1 rage\n';
     expect(loadModule(module).entities.get('rat')!.onHit).toEqual([{ kind: 'pool', resource: 'rage', delta: point(1) }]);
     expect(loadModule(module).items.get('mail')!.whenHit).toEqual([]);
   });
@@ -194,7 +194,7 @@ describe('the two carriers of a hook', () => {
   it('appends to the hook a patch module overlays rather than replacing it', () => {
     const base = {
       name: 'base',
-      text: '# info base\nversion: 1.0.0\n\n# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# entity rat\non hit: restore: 1 rage\n',
+      text: '# info base\nversion: 1.0.0\n\n# stat attack\nbase: 5\n\n# resource rage\nmax: attack\ndisplay: minimal\n\n# entity rat\nstats: attack 5\non hit: restore: 1 rage\n',
     };
     const patch = {
       name: 'patch',
@@ -214,7 +214,7 @@ describe('the two carriers of a hook', () => {
   it('drops the hook whose reference went away, and leaves the other standing', () => {
     const source = {
       name: 'base',
-      text: ['# info base', 'version: 1.0.0', 'dependencies:', '  ?extra', '', '# stat attack', 'base: 5', '', '# resource rage', 'max: attack', 'display: minimal', '', '# entity rat', 'on hit: roll: extra.spoils', 'when hit: restore: 1 rage'].join('\n'),
+      text: ['# info base', 'version: 1.0.0', 'dependencies:', '  ?extra', '', '# stat attack', 'base: 5', '', '# resource rage', 'max: attack', 'display: minimal', '', '# entity rat', 'stats: attack 5', 'on hit: roll: extra.spoils', 'when hit: restore: 1 rage'].join('\n'),
     };
     const rat = loadUniverse([source]).entities.get('base.rat')!;
     expect(rat.onHit).toEqual([]);

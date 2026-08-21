@@ -260,6 +260,18 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
   }
 }
 
+// The line an author writes for a field or a keyword, which is how a message about it names it.
+const writtenAs = (schema: AnySchema, name: string): string => (schema.fields[name] === undefined ? name : `${schema.fields[name]!.keyword ?? name}:`);
+
+// A line a section wrote that stands on one it did not. What a default fills in is not written, so a need is met only by an author having written the line it names.
+export function unmetNeed(authored: Record<string, unknown>, schema: AnySchema): string | undefined {
+  for (const [name, needed] of Object.entries(schema.needs ?? {})) {
+    if (authored[name] === undefined || authored[needed] !== undefined) continue;
+    return `${writtenAs(schema, name)} needs a ${writtenAs(schema, needed)} line`;
+  }
+  return undefined;
+}
+
 export function hydrateSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(authored: Authored<H>, schema: SectionSchema<H, F, E>, context: HydrateContext = DEFAULT_CONTEXT): H {
   const fields = schema.fields as unknown as AnyFields;
   const read = authored as Record<string, unknown>;

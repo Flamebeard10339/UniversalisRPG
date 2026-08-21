@@ -403,6 +403,7 @@ const SPOKEN_EVERYWHERE = [
   '',
   '# entity guard',
   'title: Guard',
+  'stats: vigor-max 10',
   'uses:',
   '  shove',
   'hail:',

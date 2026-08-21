@@ -5,7 +5,7 @@ import { ActionResult } from '../../grammar/actionResult';
 import { DslError, Parser, Written } from '../../grammar/parser';
 import { ListParser } from '../../grammar/list';
 import { RawSection, sectionParser } from '../../grammar/structure';
-import { AnyField, AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection } from '../../grammar/section';
+import { AnyField, AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed } from '../../grammar/section';
 import { Loose, Pruning, Visit, put, strings } from '../refs';
 import { mergeFields } from '../merge';
 
@@ -173,8 +173,7 @@ export const section =
       }
       return (held ?? value) as V;
     };
-    const built = (value: V): V => {
-      const problem = validate?.(value);
+    const built = (value: V, problem = validate?.(value)): V => {
       if (problem) throw new DslError(`# ${kind} ${value.id}: ${problem}`);
       return value;
     };
@@ -192,7 +191,10 @@ export const section =
       schema,
       parse: sectionParser(schema ? (raw) => parseAnySection(raw, schema) : (spec as Bespoke<V>).parse),
       merge: merge ?? ((into, from) => (schema ? mergeFields((into as Record<string, unknown>) ?? { id: (from as V).id }, from as Record<string, unknown>, schema) : (into ?? from))),
-      build: schema ? (authored, context) => built(hydrateSection(authored as Authored<V>, schema as unknown as SectionSchema<V, F, E>, context) as V) : (authored) => built(authored as V),
+      build: schema
+        ? (authored, context) =>
+            built(hydrateSection(authored as Authored<V>, schema as unknown as SectionSchema<V, F, E>, context) as V, unmetNeed(authored as Record<string, unknown>, schema))
+        : (authored) => built(authored as V),
       print: print ?? (schema ? (value, context) => printSection(value, schema, context, actionLines) : () => notContent(kind)),
       visit: visited,
       prune: (value, at, where) => {

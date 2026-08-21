@@ -297,6 +297,14 @@ describe('a line that only makes sense once another is written', () => {
         const draft = `# ${owner.kind} probe\nnothing-here-is-a-field: 3\n`;
         expect(offeredOn(draft).filter((form) => begins(form, keyword))).toEqual([]);
       });
+
+      it(`# ${owner.kind} refuses ${keyword} where ${stands} is not written`, () => {
+        const alone = owner.grammar.find((line) => begins(line.form, keyword) && line.example !== `${keyword}:`);
+        expect(alone, `nothing in the grammar of # ${owner.kind} writes ${keyword} on a line of its own`).toBeDefined();
+        const draft = `# ${owner.kind} probe\n${alone!.example}\n`;
+        const written = `${keyword}${schema.fields[name] === undefined ? '' : ':'} needs a ${stands}: line`;
+        expect(() => owner.build(owner.parse(splitSections(draft)[0]!), DEFAULT_CONTEXT), draft).toThrow(written);
+      });
     }
   }
 });
