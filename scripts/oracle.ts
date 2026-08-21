@@ -76,7 +76,13 @@ export function treeLines(lines: readonly Written[], pad: string, sitting: Sitti
         const note = spoken(offer.form) || spoken(group.head);
         apart.set(note, [...(apart.get(note) ?? []), shownIn(group, offer)]);
       }
-      for (const [note, shapes] of apart) out.push(`${pad}${group.head === null ? shapes.join(' | ') : `${group.head} ${shapes.join(' | ')}`.trimEnd()}${note}`);
+      // A shape says what may be written and a line says what it looks like written; neither on its own tells an author where the spaces go.
+      const like = (shapes: readonly string[]): string => {
+        const shown = group.offers.filter((offer) => shapes.includes(shownIn(group, offer))).map((offer) => held.get(offer.form)?.example);
+        const example = shown.find((each) => each !== undefined && /[<[]/.test(group.head === null ? shapes[0]! : `${group.head} ${shapes[0]!}`));
+        return example === undefined ? '' : `   e.g. ${example}`;
+      };
+      for (const [note, shapes] of apart) out.push(`${pad}${group.head === null ? shapes.join(' | ') : `${group.head} ${shapes.join(' | ')}`.trimEnd()}${like(shapes)}${note}`);
       for (const offer of group.offers) out.push(...under(held.get(offer.form), pad + STEP));
       out.push(...under(held.get(group.head ?? ''), pad + STEP, group.offers));
     }
@@ -87,7 +93,7 @@ export function treeLines(lines: readonly Written[], pad: string, sitting: Sitti
 // What holds of every kind, so no kind's tree has to repeat it. The tree is written at the indentation an author writes, and everything that is not a line of the language is marked.
 const RULES: readonly string[] = [
   `${PART}a line marked like this names a part of the kind and is not written`,
-  `${PART}a \`keyword: <a>, <b>\` may instead hold its values one to a line, indented under \`keyword:\``,
+  `${PART}a keyword whose shape trails off in \`, …\` takes a list, and may instead hold it one value to a line, indented under the bare \`keyword:\``,
 ];
 
 export function treeOf(kind: string): string[] {
@@ -99,7 +105,7 @@ export function treeOf(kind: string): string[] {
   return [`# ${kind} <id>`, ...RULES, ...treeLines(owner.grammar, '', sitting, written, `# ${kind}`)];
 }
 
-const NAMED = 14;
+const NAMED = 24;
 
 // The page names a kind where the cursor stands and lists what an author has begun to type of it; a file has typed the whole of it already, so the oracle lists everything of that kind the world declares.
 const namesAt = (text: string, cursor: number, known: readonly Addressed[]): string | undefined => {
@@ -107,7 +113,7 @@ const namesAt = (text: string, cursor: number, known: readonly Addressed[]): str
   if (filling === null) return undefined;
   if (filling.kind === undefined) return `    <${filling.hole}>${filling.like === undefined ? '' : `, like ${filling.like}`}`;
   const named = known.filter((each) => each.kind === filling.kind).map((each) => each.address).sort();
-  const listed = named.length === 0 ? 'nothing declares one yet' : `${named.slice(0, NAMED).join(', ')}${named.length > NAMED ? `, … ${named.length - NAMED} more` : ''}`;
+  const listed = named.length === 0 ? 'nothing declares one yet' : `${named.slice(0, NAMED).join(', ')}${named.length > NAMED ? `, … and ${named.length - NAMED} more, ${named.length} in all` : ''}`;
   return `    <${filling.hole}> names a # ${filling.kind}: ${listed}`;
 };
 
@@ -119,8 +125,11 @@ const holesOf = (offering: { reads: string | null; filling: { form: string } | n
 
 export function offeringLines(text: string, known: readonly Addressed[]): string[] {
   const out: string[] = [];
+  const draft = text.split('\n');
+  // A blank line before the next heading is the end of a section, not a place an author is about to write, and the whole grammar of the kind above it is nothing they asked for.
+  const writing = (after: number): boolean => draft.slice(after + 1).find((line) => line.trim() !== '')?.startsWith('#') !== true;
   let at = 0;
-  for (const line of text.split('\n')) {
+  for (const [index, line] of draft.entries()) {
     at += line.length;
     const offering = offeringAt(text, at, known);
     const reads = offering.reads ?? offering.filling?.form;
@@ -128,15 +137,15 @@ export function offeringLines(text: string, known: readonly Addressed[]): string
     const opening = at - line.trimStart().length;
     out.push(`${line || '·'}`);
     out.push(`    in ${offering.where.join(' › ')}, reads as ${reads ?? '?'}${note === undefined ? '' : `   — ${note}`}`);
-    if (offering.refused !== null) out.push(`    REFUSED: ${offering.refused}`);
-    if (offering.undeclared.length > 0) out.push(`    NOT DECLARED ANYWHERE YET: ${offering.undeclared.join(', ')}`);
+    if (offering.refused !== null) out.push(`    REFUSED, the engine will not read this line: ${offering.refused}`);
+    if (offering.undeclared.length > 0) out.push(`    nothing declares these yet, which is only a remark if you mean to declare them: ${offering.undeclared.join(', ')}`);
     const seen = new Set<string>();
     for (const hole of holesOf(offering, line)) {
       const said = namesAt(text, opening + hole.end, known);
       if (said !== undefined && !seen.has(said)) out.push(said);
       if (said !== undefined) seen.add(said);
     }
-    if (line.trim() === '') {
+    if (line.trim() === '' && writing(index)) {
       for (const family of gathered(offering.offers.filter((offer) => offer.kind === undefined))) {
         out.push(`      ${family.name ?? '—'}`);
         for (const group of family.groups) {

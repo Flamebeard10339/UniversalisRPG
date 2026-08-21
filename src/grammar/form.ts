@@ -128,3 +128,14 @@ export const valueIn = (example: string, hole: Hole): string => example.slice(ho
 export const standingIn = (example: string, hole: Hole, stood: string): string => `${example.slice(0, hole.start)}${stood}${example.slice(hole.end)}`;
 
 export const exampleOf = (form: string, examples: readonly string[]): string | undefined => examples.find((example) => matches(form, example));
+
+// One line to stand for each shape. A placeholder takes whatever is put in it, so an example an earlier shape has already claimed is a poor witness for a later one, and is passed over where there is another.
+export function paired(forms: readonly string[], examples: readonly string[]): (string | undefined)[] {
+  const spent = new Set<string>();
+  return forms.map((form) => {
+    const fits = examples.filter((example) => matches(form, example));
+    const shown = fits.find((example) => !spent.has(example)) ?? fits[0];
+    if (shown !== undefined) spent.add(shown);
+    return shown;
+  });
+}

@@ -62,12 +62,19 @@ export const literalOf = (form: string): string => {
   return at < 0 ? form : form.slice(0, at);
 };
 
-// The line that opened a block names the shape whose block it is: the one spelling out the longest prefix of it, or else the one that spells out nothing.
+// The line that opened a block names the shape whose block it is: the one that reads the whole of it and spells out the most of itself, or, failing that, the one whose words it begins with.
 function opened(lines: readonly Written[], line: string): Written | undefined {
   let best: Written | undefined;
+  let read = -1;
   let longest = -1;
   for (const written of lines) {
     if (written.block === undefined) continue;
+    const found = align(written.form, line);
+    if (found?.complete === true && found.spelt > read) {
+      best = written;
+      read = found.spelt;
+    }
+    if (read >= 0) continue;
     const literal = literalOf(written.form).trimEnd();
     if (literal !== '' && !line.startsWith(literal)) continue;
     if (literal.length > longest) {

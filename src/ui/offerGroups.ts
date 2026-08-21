@@ -11,7 +11,12 @@ export interface OfferFamily {
   groups: readonly OfferGroup[];
 }
 
-const headOf = (offer: Offer): string => (offer.kind === undefined ? literalOf(offer.form).trimEnd() : '');
+// A keyword can only stand apart from the shapes it takes if a space stands between them; `+<percent>%` gathered under `+` would read as though a space belonged there, and it does not.
+function headOf(offer: Offer): string {
+  if (offer.kind !== undefined) return '';
+  const head = literalOf(offer.form).trimEnd();
+  return offer.form.length === head.length || offer.form[head.length] === ' ' ? head : '';
+}
 
 // A keyword gathers the shapes it takes wherever they were written, the way a part gathers its keywords.
 function gather(offers: readonly Offer[]): OfferGroup[] {

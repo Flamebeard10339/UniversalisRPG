@@ -1,4 +1,4 @@
-import { exampleOf, matches } from './form';
+import { matches, paired } from './form';
 import { Parser, Written, parseWhole } from './parser';
 
 export function isCodec(value: unknown): value is Parser<unknown> {
@@ -32,7 +32,7 @@ export function formFailures(name: string, forms: readonly string[], examples: r
 
 export const shapeFailures = (codecs: Map<Parser<unknown>, string>): string[] => [...codecs].flatMap(([parser, name]) => formFailures(name, parser.forms, parser.examples));
 
-export const writtenFrom = (parser: Parser<unknown>): Written[] => parser.forms.map((form) => ({ form, example: exampleOf(form, parser.examples) ?? form }));
+export const writtenFrom = (parser: Parser<unknown>): Written[] => paired(parser.forms, parser.examples).map((example, at) => ({ form: parser.forms[at]!, example: example ?? parser.forms[at]! }));
 
 export function roundTripFailures(name: string, parser: Parser<unknown>): string[] {
   if (parser.examples.length === 0) return [`${name} carries no examples`];
