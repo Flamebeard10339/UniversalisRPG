@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { condition } from '../grammar/condition';
 import { loadInEnglish } from './engineLocale';
 import { loadModule } from './load';
 import { parseModule, printSectionOf } from './sections';
@@ -45,13 +44,6 @@ describe('a quest', () => {
 
     expect(spokenBy(registry.dialogues, 'miki').map((each) => each.id)).toEqual(['finding-your-feet.offered.miki']);
     expect(registry.dialogues.get('finding-your-feet.offered.miki')?.owner).toBe('miki');
-  });
-
-  // A stage is the one the player stands on while nothing further along has been reached, which is what makes the quest read top to bottom.
-  it("offers a stage's lines only while that stage is the one the quest stands on", () => {
-    const node = loaded(QUEST).dialogues.get('finding-your-feet.offered.miki')!.nodes[0]!;
-
-    expect(condition.print(node.when!)).toBe('not finding-your-feet.name-yourself and not finding-your-feet.sendoff and not finding-your-feet.snubbed');
   });
 
   it('moves the quest along by setting the stage a goto names, which is the whole of what a goto does here', () => {

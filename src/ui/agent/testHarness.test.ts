@@ -27,6 +27,7 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
       encounter: null,
       modals: [],
       journey: null,
+      journal: [],
       inventory: {},
       grown: {},
       carried: [],

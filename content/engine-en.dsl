@@ -183,6 +183,9 @@ engine.repl.modal: [{modal}] {options}
 engine.repl.modal.answered: [{modal}] (answered)
 engine.repl.modal.asking: {option}:
 engine.repl.modal.free: submit-modal: {option}=<text>
+engine.repl.journal.none: You have taken nothing on yet.
+engine.repl.journal.doing: {quest}
+engine.repl.journal.done: {quest} - done
 engine.repl.state.location: Location: {location}
 engine.repl.state.time: Elapsed simulated time: {time}s
 engine.repl.state.flags: Flags: {flags}

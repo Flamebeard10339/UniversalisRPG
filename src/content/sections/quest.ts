@@ -78,12 +78,46 @@ const names = (id: string): Condition => ({ kind: 'reference', reference: { path
 const not = (held: Condition): Condition => ({ kind: 'not', condition: held });
 const all = (held: Condition[]): Condition | undefined => (held.length === 0 ? undefined : held.length === 1 ? held[0] : { kind: 'and', conditions: held });
 
-// When a stage is the one the player is standing on: its own flag is set, and nothing it leads to has been reached yet. The first stage stands before the quest has begun, so it asks only that nothing has moved past it.
-function whileOn(quest: Quest, at: number): Condition | undefined {
+const any = (held: Condition[]): Condition | undefined => (held.length === 0 ? undefined : held.length === 1 ? held[0] : { kind: 'or', conditions: held });
+
+// When a stage has been reached: its flag is set, or a stage that leads to it on its own is reached and its `done when:` holds. The first stage is reached from the outset, which is what makes a quest readable before anything of it has happened, and is written here as no condition at all.
+function reachedWhen(quest: Quest, at: number, held: Map<number, Condition | undefined>): Condition | undefined {
+  if (at === 0) return undefined;
+  if (held.has(at)) return held.get(at);
+  held.set(at, names(flagOf(quest, quest.stages[at]!.name)));
   const stage = quest.stages[at]!;
-  const past = quest.stages.slice(at + 1).map((each) => not(names(flagOf(quest, each.name))));
-  return all(at === 0 ? past : [names(flagOf(quest, stage.name)), ...past]);
+  const byItself = quest.stages.flatMap((each, from) => {
+    if (each.goto !== stage.name || each.doneWhen === undefined) return [];
+    const before = reachedWhen(quest, from, held);
+    return [all([...(before === undefined ? [] : [before]), each.doneWhen])!];
+  });
+  const answer = any([names(flagOf(quest, stage.name)), ...byItself]);
+  held.set(at, answer);
+  return answer;
 }
+
+// When a stage is the one the player is standing on: it has been reached, it is not done, and nothing further along has been reached either.
+function whileOn(quest: Quest, at: number): Condition | undefined {
+  const held = new Map<number, Condition | undefined>();
+  const here = reachedWhen(quest, at, held);
+  const stage = quest.stages[at]!;
+  const past = quest.stages.slice(at + 1).flatMap((_, after) => {
+    const reached = reachedWhen(quest, at + 1 + after, held);
+    return reached === undefined ? [] : [not(reached)];
+  });
+  return all([...(here === undefined ? [] : [here]), ...(stage.doneWhen === undefined ? [] : [not(stage.doneWhen)]), ...past]);
+}
+
+// Where a quest stands, out of every stage it declares. Exactly one holds where the quest has begun and is not finished; the rule is the same one the lines are gated by, asked here rather than compiled into a dialogue.
+export function stageNow(quest: Quest, holds: (asked: Condition) => boolean): QuestStage | undefined {
+  return quest.stages.find((_, at) => {
+    const when = whileOn(quest, at);
+    return when === undefined || holds(when);
+  });
+}
+
+// Whether the player has anything to say about this quest yet. A quest nobody has touched is not a journal entry, and its first stage stands from the outset, so what is asked is whether any stage has actually been reached.
+export const begun = (quest: Quest, set: (flag: string) => boolean): boolean => quest.stages.some((stage) => set(flagOf(quest, stage.name)));
 
 // A goto inside a quest names a stage, so the line that takes it sets that stage's flag. Nothing else in the language moves a quest along, and nothing else needs to.
 const reaching = (quest: Quest, stage: string): ActionResult => ({ kind: 'set', variable: flagOf(quest, stage) });
@@ -92,6 +126,8 @@ function saidAt(quest: Quest, at: number, speech: QuestSpeech, reached: Conditio
   const node = speech.node;
   const stage = quest.stages[at]!;
   const gone = (target: string | undefined): ActionResult[] => (target === undefined ? [] : [reaching(quest, target)]);
+  // The first stage stands before anything has happened, so nothing has set its flag; speaking its lines is what starts the quest, and that is where the journal gets its first entry.
+  const opening = at === 0 ? [{ kind: 'effect' as const, result: reaching(quest, stage.name) }] : [];
   return {
     id: `${quest.id}.${stage.name}.${lastSegment(speech.owner)}`,
     owner: speech.owner,
@@ -99,7 +135,7 @@ function saidAt(quest: Quest, at: number, speech: QuestSpeech, reached: Conditio
       {
         ...node,
         when: all([...(reached === undefined ? [] : [reached]), ...(node.when === undefined ? [] : [node.when])]),
-        steps: node.steps.map((step) =>
+        steps: [...opening, ...node.steps].map((step) =>
           step.kind === 'goto'
             ? { kind: 'effect' as const, result: reaching(quest, step.target) }
             : step.kind === 'menu'

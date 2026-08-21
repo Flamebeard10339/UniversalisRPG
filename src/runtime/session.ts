@@ -11,6 +11,7 @@ import { actionAddress } from '../content/sections/action';
 import { parseOwnerRef, TRAVEL_PAIR } from './actions';
 import { relocateTo, spreadDiscovery } from './effects';
 import { reachable } from './journey';
+import { journal, type JournalEntry } from './journal';
 import { playerCadence } from './encounter';
 import { armedAction } from './roster';
 import { hasPool } from './stats';
@@ -86,6 +87,7 @@ export interface PlayStatus {
   discovered: Array<{ id: Answer; title: Localized; x: number; y: number; z: number; adjacent: Array<{ to: Answer; open: boolean }> }>;
   locations: Array<{ id: Answer; title: Localized }>;
   journey: Journey | null;
+  journal: JournalEntry[];
   player: { name: Answer; race: Answer };
   action: PlayAction | null;
 }
@@ -113,6 +115,8 @@ function own(session: PlaySession): SessionInternals {
 }
 
 export const sessionLocalizer = (session: PlaySession): Localizer => localizerOf(session.registry, stateOf(session));
+
+export const sessionJournal = (session: PlaySession): JournalEntry[] => journal(session.registry, stateOf(session));
 
 function stateOf(session: PlaySession): GameState {
   return own(session).state;
@@ -372,6 +376,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     discovered: publishDiscovered(state, registry),
     locations: [...registry.locations.values()].map((each) => ({ id: each.id, title: localizer.title('location', each.id) })),
     journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,
+    journal: journal(registry, state),
     player: { ...state.player },
     action: publishAction(state, registry),
   };

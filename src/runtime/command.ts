@@ -17,6 +17,7 @@ import { printDirective } from '../content/serialize';
 import { resolveCarried, resolveDirective } from '../content/typed';
 import { type ParsedSave } from '../content/sections/save';
 import { describeCondition } from './runtime';
+import { sessionJournal } from './session';
 import { wornCopySlot } from './itemInstance';
 import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal } from './modals';
@@ -734,6 +735,29 @@ export const COMMANDS: readonly CommandSpec[] = [
     run: (ctx, multiplier) => {
       ctx.live.speed = multiplier;
       return said('plain', sessionLocalizer(ctx.session).engine('engine.command.speed', { speed: multiplier }));
+    },
+  }),
+  define({
+    name: '/quests',
+    aliases: ['/journal'],
+    arg: 'none',
+    summary: 'show what you have taken on and where each of it stands',
+    parse: nothing,
+    run: (ctx) => {
+      const localizer = sessionLocalizer(ctx.session);
+      const entries = sessionJournal(ctx.session);
+      if (entries.length === 0) return { output: [message('plain', localizer.engine('engine.repl.journal.none'))], quit: false, recorded: [] };
+      return {
+        output: entries.map((entry) => ({
+          kind: 'message' as const,
+          words: 'player' as const,
+          tone: entry.complete ? ('ok' as const) : ('plain' as const),
+          text: localizer.engine(entry.complete ? 'engine.repl.journal.done' : 'engine.repl.journal.doing', { quest: entry.title }),
+          detail: [entry.log, entry.hint].filter((said): said is Localized => said !== null),
+        })),
+        quit: false,
+        recorded: [],
+      };
     },
   }),
   define({

@@ -113,6 +113,9 @@ CI runs `tsc --noEmit`, `npm test` and `npm run layer-check`.
 
 - "descriptive flavor text for an object" is **one** mechanism
 - modals are rendered unconditionally with guaranteed closing behavior
+- a `# quest` is one section: stages, what the journal reads at each, and what an
+  entity says while the quest stands there. A stage is a flag, `goto` names a
+  stage, and the quest gives its lines to entities rather than editing them
 - quest/stage conditions are runtime flag checks evaluated against live state
 - `<obj>.<objId>.<actionId>` is a first-class pattern for anything an object can do
 - item actions are not location-scoped; location and entity actions are
