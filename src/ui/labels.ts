@@ -34,6 +34,7 @@ export const LABELS = {
   global: 'engine.shell.global',
   'every-kind': 'engine.shell.every-kind',
   section: 'engine.shell.section',
+  new: 'engine.shell.new',
   stage: 'engine.shell.stage',
   unstage: 'engine.shell.unstage',
   copy: 'engine.shell.copy',

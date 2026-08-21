@@ -191,6 +191,7 @@ export function editSurface(held: EditHeld): TestSurface {
       surface: (value) => held.controls.surface(surfaceNamed(value)),
       kind: (value) => held.controls.kind(value === null ? null : String(value)),
       open: (value) => held.controls.open(value === null ? null : rowNamed(held, value)),
+      add: () => held.controls.add(),
       text: (value) => held.controls.text(String(value)),
       cursor: (value) => held.controls.cursor(Number(value)),
       scroll: (value) => held.controls.scroll(Number(value)),

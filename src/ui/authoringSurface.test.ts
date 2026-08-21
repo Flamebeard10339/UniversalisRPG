@@ -2,7 +2,9 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { engineLocale } from '../content/engineLocale';
 import { contentSectionMaps, sectionFor, sectionKinds } from '../content/sections';
+import type { ModuleSource } from '../content/universe';
 import { mapOf } from '../content/registry';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { COMMANDS } from '../runtime/command';
@@ -13,6 +15,7 @@ import {
   MAPPED_KIND,
   NOWHERE,
   offeredBy,
+  removeLine,
   shadowed,
   SHOW_LINE,
   stage,
@@ -26,6 +29,13 @@ import { SHIPPED_SOURCES } from './shippedContent';
 const here = fileURLToPath(new URL('.', import.meta.url));
 
 const addressed = addressable(SHIPPED_SOURCES);
+
+const SPARE: ModuleSource = {
+  name: 'spare',
+  text: '# info spare\nversion: 0.0.0\npack: test\n\n# location camp\nx: 0, y: 0\nstarting\n\n# item coin\ntitle: Coin\n',
+};
+
+const spoken = (driver: ReturnType<typeof createDriver>): string[] => driver.snapshot().transcript.entries.map((entry) => String(entry.text));
 
 const REGISTRY = loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry;
 
@@ -144,6 +154,28 @@ describe('every control sends a line the shared table parses (c2)', () => {
       expect(staged.map((each) => each.address), `${section.kind} ${section.address}`).toEqual([section.address]);
       expect(staged[0].text.split('\n')).toEqual(section.text.split('\n').filter((line, at) => at === 0 || line.trim() !== ''));
     }
+  });
+
+  it('takes a shipped section out of the game by the line an emptied field sends', () => {
+    const driver = createDriver([engineLocale(), SPARE], { ticker: () => () => undefined });
+
+    driver.send(removeLine({ kind: 'item', address: 'spare.coin' }));
+    const staged = driver.localChanges() ?? '';
+
+    expect(spoken(driver).filter((line) => line.includes('did not load'))).toEqual([]);
+    expect(staged).toContain('# remove item.spare.coin');
+    expect(loadUniverseWithDiagnostics([engineLocale(), SPARE, { name: 'local-changes', text: staged }]).registry.items.has('spare.coin')).toBe(false);
+  });
+
+  it('refuses to take out a section the world still names, and says what still names it', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
+    const mirror = { kind: 'entity', address: 'tutorial-island.mirror' };
+
+    driver.send(removeLine(mirror));
+
+    expect(driver.localChanges() ?? '').not.toContain('# remove');
+    expect(driver.snapshot().view.entities.map((each) => each.id)).toContain(mirror.address);
+    expect(spoken(driver).some((line) => line.includes(mirror.address) && line.includes('unknown entity'))).toBe(true);
   });
 
   it('deletes and exports by lines the same table parses', () => {

@@ -135,6 +135,12 @@ export function stage(text: string): Staged {
   return { line: `/dsl ${section.kind} ${section.id} ${body}`.trimEnd() };
 }
 
+export const emptied = (text: string): boolean => text.trim() === '';
+
+export const openingLine = (kind: string | null): string => (kind === null ? '# ' : `# ${kind} `);
+
 export const deleteLine = (section: Pick<Section, 'kind' | 'address'>): string => `/local delete ${section.kind} ${section.address}`;
+
+export const removeLine = (section: Pick<Section, 'kind' | 'address'>): string => `/dsl remove ${section.kind}.${section.address}`;
 
 export const SHOW_LINE = '/local show';

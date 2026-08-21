@@ -25,6 +25,7 @@ const EXERCISED: Record<keyof EditControls, true> = {
   surface: true,
   kind: true,
   open: true,
+  add: true,
   text: true,
   cursor: true,
   scroll: true,
@@ -99,6 +100,37 @@ describe('what a control on the editing page does', () => {
 
     expect(held.sent).toEqual([`/local delete entity ${MIKI.address}`]);
     expect(shut.sent).toEqual([]);
+  });
+
+  it('opens an empty field headed for the kind the page is filtered to', () => {
+    const local = watching(FORGOTTEN);
+    local.controls.add();
+    const kinded = watching({ ...FORGOTTEN, surface: 'global', kind: 'item' });
+    kinded.controls.add();
+
+    expect(local.at[0]).toMatchObject({ open: null, draft: '# ', cursor: 2 });
+    expect(kinded.at[0]).toMatchObject({ open: null, draft: '# item ', cursor: 7 });
+    expect(local.sent).toEqual([]);
+  });
+
+  it('takes an emptied section out rather than staging nothing over it', () => {
+    const shipped = watching({ ...opened, draft: '   \n' });
+    shipped.controls.stage();
+    const held = watching({ ...opened, draft: '' }, addressed.map((section) => (section === MIKI ? { ...section, staged: true } : section)));
+    held.controls.stage();
+
+    expect(shipped.sent).toEqual([`/dsl remove entity.${MIKI.address}`]);
+    expect(held.sent).toEqual([`/local delete entity ${MIKI.address}`]);
+    expect(held.at[0]).toMatchObject({ open: null, draft: null });
+    expect(shipped.said).toEqual([]);
+  });
+
+  it('still refuses an empty field with no section behind it', () => {
+    const held = watching({ ...FORGOTTEN, draft: '   ' });
+    held.controls.stage();
+
+    expect(held.sent).toEqual([]);
+    expect(held.said).toHaveLength(1);
   });
 
   it('stands the author somewhere else by the same line a tapped place sends', () => {

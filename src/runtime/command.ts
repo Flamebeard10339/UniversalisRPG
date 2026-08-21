@@ -328,9 +328,11 @@ function localSectionSource(section: SectionArg): string {
 }
 
 function localDiagnosticsFor(authoring: AuthoringContext, diagnostics: ReturnType<typeof loadUniverseWithDiagnostics>['diagnostics']): string[] {
-  return diagnostics
-    .filter((diagnostic) => diagnostic.sourceName === authoring.localSource.name || diagnostic.moduleId === LOCAL_CHANGES_MODULE_ID)
-    .map((diagnostic) => formatModuleDiagnostic(diagnostic));
+  const said = diagnostics.map((diagnostic) => formatModuleDiagnostic(diagnostic));
+  if (said.length === 0) return [];
+  const stood = new Set(loadUniverseWithDiagnostics([...authoring.baseSources, authoring.localSource]).diagnostics.map((diagnostic) => formatModuleDiagnostic(diagnostic)));
+  const brought = said.filter((message) => !stood.has(message));
+  return brought.length > 0 ? brought : said;
 }
 
 function adoptLocalChanges(

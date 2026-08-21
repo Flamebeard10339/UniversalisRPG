@@ -144,6 +144,7 @@ export const ENGINE_KEYS = [
   'engine.shell.global',
   'engine.shell.every-kind',
   'engine.shell.section',
+  'engine.shell.new',
   'engine.shell.stage',
   'engine.shell.unstage',
   'engine.shell.copy',

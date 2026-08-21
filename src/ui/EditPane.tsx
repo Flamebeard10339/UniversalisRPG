@@ -30,7 +30,7 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <DevOnly dev={dev}>
-      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-raised px-3 py-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface-raised px-3 py-2">
         {(['local', 'global'] as const).map((surface) => (
           <button
             key={surface}
@@ -76,10 +76,18 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
           </select>
         ) : null}
         <button
+          data-drive="edit.add"
+          type="button"
+          onClick={controls.add}
+          className="ml-auto rounded-xl border border-border bg-panel px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97]"
+        >
+          {words('new')}
+        </button>
+        <button
           data-drive="edit.copy"
           type="button"
           onClick={controls.copy}
-          className="ml-auto rounded-xl border border-border bg-panel px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97]"
+          className="rounded-xl border border-border bg-panel px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97]"
         >
           {words('copy')}
         </button>
@@ -109,7 +117,7 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
         </div>
       </div>
 
-      {open ? (
+      {open || editing.draft !== null ? (
         <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-surface-raised p-3">
           <textarea
             ref={field}
@@ -136,7 +144,7 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
             <button
               data-drive="edit.unstage"
               type="button"
-              disabled={!open.staged}
+              disabled={open === null || !open.staged}
               onClick={controls.unstage}
               className="grow rounded-xl border border-border bg-panel px-3 text-sm text-text-subtle transition-transform duration-75 active:scale-[0.97] disabled:opacity-50"
             >

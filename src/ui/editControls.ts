@@ -1,5 +1,5 @@
 import type { PlayView } from '../runtime/session';
-import { deleteLine, kindsOffered, offeredBy, SHOW_LINE, stage, type Section, type Standing, type SurfaceId } from './authoringSurface';
+import { deleteLine, emptied, kindsOffered, offeredBy, openingLine, removeLine, SHOW_LINE, stage, type Section, type Standing, type SurfaceId } from './authoringSurface';
 import { gotoLine } from './devMode';
 import type { Editing } from './editorMemory';
 
@@ -9,6 +9,7 @@ export interface EditControls {
   surface(id: SurfaceId): void;
   kind(id: string | null): void;
   open(key: string | null): void;
+  add(): void;
   text(draft: string): void;
   cursor(at: number): void;
   scroll(at: number): void;
@@ -48,22 +49,35 @@ export const draftIn = (sections: readonly Section[], editing: Editing): string 
 
 export function editControls(held: { sections: readonly Section[]; editing: Editing }, act: EditActs): EditControls {
   const { sections, editing } = held;
+  const shut = (): Editing => ({ ...editing, open: null, draft: null, cursor: 0 });
 
   return {
     surface: (surface) => act.move({ ...editing, surface, open: null, draft: null, cursor: 0, scroll: 0 }),
     kind: (kind) => act.move({ ...editing, kind, open: null, draft: null, cursor: 0 }),
     open: (open) => act.move({ ...editing, open, draft: null, cursor: 0 }),
+    add: () => {
+      const opening = openingLine(editing.surface === 'global' ? editing.kind : null);
+      act.move({ ...editing, open: null, draft: opening, cursor: opening.length });
+    },
     text: (text) => act.move({ ...editing, draft: text }),
     cursor: (at) => act.move({ ...editing, cursor: at }),
     scroll: (at) => act.move({ ...editing, scroll: at }),
     stage: () => {
-      const staged = stage(draftIn(sections, editing));
+      const section = openedIn(sections, editing);
+      const draft = draftIn(sections, editing);
+      if (section !== null && emptied(draft)) {
+        act.send(section.staged ? deleteLine(section) : removeLine(section));
+        return act.move(shut());
+      }
+      const staged = stage(draft);
       if ('refused' in staged) return act.note(staged.refused);
       act.send(staged.line);
     },
     unstage: () => {
       const section = openedIn(sections, editing);
-      if (section) act.send(deleteLine(section));
+      if (section === null) return;
+      act.send(deleteLine(section));
+      act.move(shut());
     },
     copy: () => {
       act.send(SHOW_LINE);
