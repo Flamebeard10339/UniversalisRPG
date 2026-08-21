@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { arrowAt } from './MapPane';
 import type { Location } from '../content/sections/location';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { addressable, MAPPED_KIND, names, NOWHERE, offeredBy, type Section } from './authoringSurface';
@@ -270,5 +271,21 @@ describe('a new place is written where the map is looking', () => {
     expect(names(made.address, stagedKey('north-shore'))).toBe(true);
     expect(placedInto([made], stagedKey('north-shore'), { x: 9, y: 9 })).toHaveProperty('line');
     expect(joined(made, 'tutorial-island.beach')).toHaveProperty('line');
+  });
+});
+
+describe('the point of a one-way road', () => {
+  it('stands in the middle of it, pointing the way it is walked', () => {
+    const points = arrowAt({ x: 0, y: 0 }, { x: 100, y: 0 }).split(' ').map((pair) => pair.split(',').map(Number));
+
+    expect(points[1]).toEqual([55, 0]);
+    expect(points[0]![0]).toBeLessThan(points[1]![0]!);
+    expect(points[0]![1]).toBe(-points[2]![1]!);
+  });
+
+  it('turns with the road, so it points at the far end whichever way that lies', () => {
+    const [, tip] = arrowAt({ x: 0, y: 0 }, { x: 0, y: 100 }).split(' ').map((pair) => pair.split(',').map(Number));
+
+    expect(tip).toEqual([0, 55]);
   });
 });

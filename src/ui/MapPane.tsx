@@ -85,22 +85,33 @@ function Bubble({
   );
 }
 
-function Road({ from, to, open, walking }: { from: Node; to: Node; open: boolean; walking: boolean }): JSX.Element {
+// Whether a road is walked both ways is what the line is: solid for a road walked both, dashed and pointed for one walked only towards where it points. Whether it is open is the weight and the colour, so the two facts do not share a channel.
+function Road({ from, to, open, mutual, walking }: { from: Node; to: Node; open: boolean; mutual: boolean; walking: boolean }): JSX.Element {
   const a = spotOf(from);
   const b = spotOf(to);
+  const look = {
+    className: walking ? 'stroke-accent-strong' : open ? 'stroke-accent' : 'stroke-text-subtle',
+    strokeWidth: walking ? 7 : open ? 3 : 2,
+  };
   return (
-    <line
-      x1={a.x}
-      y1={a.y}
-      x2={b.x}
-      y2={b.y}
-      data-walk={walking ? 'road' : undefined}
-      className={walking ? 'stroke-accent-strong' : open ? 'stroke-accent' : 'stroke-text-subtle'}
-      strokeWidth={walking ? 7 : open ? 3 : 2}
-      strokeDasharray={open ? undefined : '4 5'}
-      strokeLinecap="round"
-    />
+    <g data-road={mutual ? 'both ways' : 'one way'}>
+      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} data-walk={walking ? 'road' : undefined} {...look} strokeDasharray={mutual ? undefined : '5 4'} strokeLinecap="round" />
+      {mutual ? null : <polyline points={arrowAt(a, b)} {...look} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+    </g>
   );
+}
+
+const HEAD = 10;
+const BARB = 7;
+
+// The point of a one-way road, set at the middle of it. A place is a label of whatever width its title needs, so an arrow drawn where the road arrives would be under one.
+export function arrowAt(a: Point, b: Point): string {
+  const run = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const along = { x: (b.x - a.x) / run, y: (b.y - a.y) / run };
+  const tip = { x: (a.x + b.x) / 2 + (along.x * HEAD) / 2, y: (a.y + b.y) / 2 + (along.y * HEAD) / 2 };
+  const back = { x: tip.x - along.x * HEAD, y: tip.y - along.y * HEAD };
+  const side = { x: -along.y * BARB, y: along.x * BARB };
+  return [`${back.x + side.x},${back.y + side.y}`, `${tip.x},${tip.y}`, `${back.x - side.x},${back.y - side.y}`].join(' ');
 }
 
 export function MapPane({
@@ -278,7 +289,7 @@ export function MapPane({
     >
       <svg className="pointer-events-none absolute overflow-visible" width={1} height={1}>
         {map.sheet.roads.map((road) => (
-          <Road key={`${road.from.place.id}>${road.to.place.id}`} from={road.from} to={road.to} open={road.open} walking={onWalk(walk, road.from.place.id, road.to.place.id)} />
+          <Road key={`${road.from.place.id}>${road.to.place.id}`} from={road.from} to={road.to} open={road.open} mutual={road.mutual} walking={onWalk(walk, road.from.place.id, road.to.place.id)} />
         ))}
       </svg>
 

@@ -14,6 +14,8 @@ export interface Road {
   from: Node;
   to: Node;
   open: boolean;
+  // Connectivity is directional, so a road that is only walked one way is a different road from one walked both, and is drawn as one.
+  mutual: boolean;
 }
 
 export interface Sheet {
@@ -45,7 +47,7 @@ export function sheetAt(discovered: readonly Place[], here: string, plane: numbe
       if (!other) continue;
       const mutual = other.place.adjacent.some((back) => back.to === node.place.id);
       if (mutual && node.place.id > edge.to) continue;
-      roads.push({ from: node, to: other, open: edge.open });
+      roads.push({ from: node, to: other, open: edge.open, mutual });
     }
   }
 

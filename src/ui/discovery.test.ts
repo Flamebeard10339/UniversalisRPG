@@ -85,6 +85,16 @@ describe('one plane of the map', () => {
     expect(sheetAt(oneWay, 'cliff', 0).roads).toHaveLength(1);
   });
 
+  it('says of a road whether it is walked both ways or only the way it points', () => {
+    const oneWay = [place('cliff', 0, 0, 0, 'ledge'), place('ledge', 1, 0, 0)];
+
+    expect(sheetAt(oneWay, 'cliff', 0).roads.map((road) => [road.from.place.id, road.to.place.id, road.mutual])).toEqual([['cliff', 'ledge', false]]);
+    const house = sheetAt(HOUSE, 'hall', 0).roads;
+    const between = (one: string, other: string) => house.find((road) => [road.from.place.id, road.to.place.id].sort().join('-') === [one, other].sort().join('-'));
+    expect(between('hall', 'beach')?.mutual).toBe(true);
+    expect(between('cove', 'beach')?.mutual).toBe(false);
+  });
+
   it('leaves out a road to somewhere this plane is not drawing', () => {
     const roads = sheetAt(HOUSE, 'beach', 0).roads.flatMap((road) => [road.from.place.id, road.to.place.id]);
 
