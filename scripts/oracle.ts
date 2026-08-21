@@ -5,6 +5,8 @@ import { align, type Hole } from '../src/grammar/form';
 import { NOTE_MARK } from '../src/grammar/note';
 import { amissIn, fillingWords, namesKind, offeringAt, said, type Addressed, type Amiss } from '../src/content/completion';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
+import { formatModuleDiagnostic } from '../src/content/registry';
+import type { ModuleSource } from '../src/content/universe';
 import { declaredBy } from '../src/content/references';
 import { gathered, shownIn } from '../src/ui/offerGroups';
 import { sectionFor, sectionKinds } from '../src/content/sections';
@@ -15,22 +17,43 @@ const usage = [
   '',
   '  <kind>    print every line that may be written under that kind, at the',
   '            indentation it is written at; with no kind, print every kind',
-  '  --at      read a draft: for every line, where it sits, what the engine reads',
-  '            it as, what it refuses, and — walking the cursor to each',
-  '            placeholder in turn — what may stand there and what is declared',
+  '  --at      read a draft: every line the engine has something to say about,',
+  '            then what it says when handed the whole file beside the world as',
+  '            it stands, then — walking the cursor to each placeholder in turn —',
+  '            where each line sits, what it is read as, and what may stand there',
   '',
   'Ids come from the shipped corpus, so what this prints is what the page shows.',
   'An answer given once is pointed back at rather than written out again.',
 ].join('\n');
 
-const shipped = (): Addressed[] =>
-  declaredBy(
-    loadUniverseWithDiagnostics(
-      readdirSync('content')
-        .filter((name) => name.endsWith('.dsl'))
-        .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') })),
-    ).registry,
-  );
+const corpus = (): ModuleSource[] =>
+  readdirSync('content')
+    .filter((name) => name.endsWith('.dsl'))
+    .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') }));
+
+const shipped = (world: readonly ModuleSource[]): Addressed[] => declaredBy(loadUniverseWithDiagnostics(world).registry);
+
+const DECLARES_A_MODULE = /^#[ \t]+info\b/m;
+
+const slug = (file: string): string => path.basename(file).replace(/\.[^.]*$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'draft';
+
+// Ids are kept apart by the module that owns them, so the engine will not take a file that declares none. A draft that has not said which module it is is read as one of its own, standing on everything already loaded.
+export function draftModule(file: string, text: string, world: readonly ModuleSource[]): { source: ModuleSource; supplied: boolean } {
+  const id = slug(file);
+  if (DECLARES_A_MODULE.test(text)) return { source: { name: id, text }, supplied: false };
+  const loaded = loadUniverseWithDiagnostics(world).loadedModules;
+  const head = [`# info ${id}`, 'version: 0.0.1', ...(loaded.length === 0 ? [] : ['dependencies:', ...loaded.map((each) => `  ${each}`)]), ''];
+  return { source: { name: id, text: [...head, text].join('\n') }, supplied: true };
+}
+
+// What the engine says when it is handed the whole file beside everything already loaded. The lines above are each read on their own, and a rule that is about two sections at once — one starting location, one player, a table that rolls itself — has no line to be laid on and is only reachable by taking the file.
+export function takenLines(file: string, text: string, world: readonly ModuleSource[]): string[] {
+  const { source, supplied } = draftModule(file, text, world);
+  const said = loadUniverseWithDiagnostics([...world, source]).diagnostics;
+  const read = supplied ? `read as # info ${source.name} standing on everything already loaded, since the file declares no module of its own` : 'read as the module it declares';
+  if (said.length === 0) return [`the engine takes this file into the world, ${read}`, ''];
+  return [`the engine will not take this file into the world, ${read}.`, 'It stops at the first thing it cannot take, so fixing this may uncover another:', ...said.map((each) => `  ${formatModuleDiagnostic(each)}`), ''];
+}
 
 const STEP = '  ';
 // No line of the language begins with this, so what is written out here can be told from what an author writes.
@@ -216,8 +239,9 @@ function main(): void {
       process.exit(2);
     }
     const written = readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
-    const known = shipped();
-    console.log([...amissLines(written, known), ...offeringLines(written, known)].join('\n'));
+    const world = corpus();
+    const known = shipped(world);
+    console.log([...amissLines(written, known), ...takenLines(file, written, world), ...offeringLines(written, known)].join('\n'));
     return;
   }
   const kinds = args.length > 0 ? args : sectionKinds();

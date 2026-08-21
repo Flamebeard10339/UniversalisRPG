@@ -215,6 +215,14 @@ describe('a half-written line', () => {
     expect(refused(said).map((each) => [each.line, each.refused!.includes('nothing to deplete')])).toEqual([[1, true]]);
   });
 
+  const CHAT = ['# dialogue tutorial-island.chat', 'node greet:', '  A traveller, out here?', '  goto NODE'].join('\n');
+
+  // A goto reaches only inside its own dialogue, so the page can rule on it with nothing else loaded — and does, because the kind's own file is where that rule is written.
+  it('says a goto names no node of this dialogue, which is a rule the section carries by itself', () => {
+    expect(refused(amissIn(CHAT.replace('NODE', 'nowhere'), KNOWN)).map((each) => [each.line, each.refused])).toEqual([[1, '# dialogue tutorial-island.chat: node greet goto names an unknown node: nowhere']]);
+    expect(refused(amissIn(`${CHAT.replace('NODE', 'farewell')}\n\nnode farewell:\n  Safe travels.`, KNOWN))).toEqual([]);
+  });
+
   const THREE = '# item tutorial-island.torch\nnonsense: 3\nexamine: A torch.\nalso-nonsense: 4\nthird-nonsense: 5';
 
   it('says every line it can clear out of its own way to reach, not only the first', () => {

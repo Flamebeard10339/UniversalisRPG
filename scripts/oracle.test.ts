@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { offeringAt } from '../src/content/completion';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 import { literalOf } from '../src/content/completion';
-import { amissLines, offeringLines, treeOf } from './oracle';
+import { amissLines, offeringLines, takenLines, treeOf } from './oracle';
 
 const REFERS = /…indented under it, what `(?<form>.+)` holds$/;
 
@@ -67,5 +67,31 @@ describe('a draft read back', () => {
 
     expect(read.filter((line) => line.trim() === '<operators>')).toHaveLength(1);
     expect(read.filter((line) => line.trim().endsWith(', as above')).length).toBeGreaterThan(0);
+  });
+});
+
+describe('a draft handed to the engine whole', () => {
+  const WORLD = [
+    { name: 'island', text: ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope'].join('\n') },
+  ];
+
+  // A rule about two sections at once has no line of its own to be laid on, so a draft can be clean line by line and still be a draft the engine will not take.
+  it('says what the world refuses about a draft that every line of is fine', () => {
+    const said = takenLines('glade.dsl', ['# location glade', 'x: 12, y: 4', 'starting'].join('\n'), WORLD).join('\n');
+
+    expect(amissLines(['# location glade', 'x: 12, y: 4', 'starting'].join('\n'), [])[0]).toBe('nothing here is refused and every id it names is declared');
+    expect(said).toContain('a new game begins in exactly one place');
+    expect(said).toContain('# info glade standing on everything already loaded');
+  });
+
+  it('says so plainly where the world takes it', () => {
+    expect(takenLines('glade.dsl', ['# location glade', 'x: 12, y: 4'].join('\n'), WORLD)[0]).toBe('the engine takes this file into the world, read as # info glade standing on everything already loaded, since the file declares no module of its own');
+  });
+
+  it('leaves a draft that declares its own module alone, and stands it beside the world under that name', () => {
+    const draft = ['# info hermitage', 'version: 0.0.1', 'dependencies:', '  island', '', '# location glade', 'x: 12, y: 4', 'entities: no-such-thing'].join('\n');
+
+    expect(takenLines('anything.dsl', draft, WORLD).join('\n')).toContain('read as the module it declares');
+    expect(takenLines('anything.dsl', draft, WORLD).join('\n')).toContain('hermitage');
   });
 });

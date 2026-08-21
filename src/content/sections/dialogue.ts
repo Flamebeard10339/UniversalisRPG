@@ -129,9 +129,24 @@ function nodeLines(node: DialogueNode): string[] {
   return lines;
 }
 
+// A goto names a node of this dialogue, and this dialogue holds every node it may name, so the answer is here and needs nothing else loaded.
+function unknownNode(value: Dialogue): string | undefined {
+  const names = new Set(value.nodes.map((node) => node.name));
+  for (const node of value.nodes) {
+    const where = `node ${node.name}`;
+    for (const step of node.steps) {
+      if (step.kind === 'goto' && !names.has(step.target)) return `${where} goto names an unknown node: ${step.target}`;
+      if (step.kind !== 'menu') continue;
+      for (const choice of step.choices) if (choice.goto !== undefined && !names.has(choice.goto)) return `${where} choice goto names an unknown node: ${choice.goto}`;
+    }
+  }
+  return undefined;
+}
+
 export const dialogue = section<Dialogue>()({
   kind: 'dialogue',
   ids: 'owned',
+  validate: unknownNode,
   maps: {
     dialogues: (value) => [[value.id, value]],
     dialoguesByOwner: (value) => (value.owner === undefined ? [] : [[value.owner, value]]),

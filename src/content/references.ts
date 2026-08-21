@@ -3,7 +3,6 @@ import type { Addressed } from './completion';
 import { CAPABILITY } from './refs';
 import { Recipe } from './sections/recipe';
 import { Registry } from './registry';
-import { Dialogue } from './sections/dialogue';
 import { Directive, Test } from './sections/test';
 import { } from './namespace';
 import { isNamespacedKind } from './sections';
@@ -68,20 +67,6 @@ export function validateItemSlots(registry: Registry): void {
 export function validateRecipeReferences(recipe: Recipe, capabilities: ReadonlySet<string>): void {
   if (recipe.requiresCapability !== undefined && !capabilities.has(recipe.requiresCapability)) {
     throw new DslError(`# recipe ${recipe.id} station: names an unknown capability: ${recipe.requiresCapability}`);
-  }
-}
-
-export function validateDialogueReferences(dialogue: Dialogue): void {
-  const names = new Set(dialogue.nodes.map((node) => node.name));
-  const goto = (target: string | undefined, where: string): void => {
-    if (target !== undefined && !names.has(target)) throw new DslError(`${where} goto names an unknown node in # dialogue ${dialogue.id}: ${target}`);
-  };
-  for (const node of dialogue.nodes) {
-    const where = `# dialogue ${dialogue.id} node ${node.name}`;
-    for (const step of node.steps) {
-      if (step.kind === 'goto') goto(step.target, where);
-      if (step.kind === 'menu') for (const choice of step.choices) goto(choice.goto, `${where} choice`);
-    }
   }
 }
 

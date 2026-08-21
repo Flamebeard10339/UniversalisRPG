@@ -3,7 +3,7 @@ import type { ListParser } from '../grammar/list';
 import { DslError, type Filled, type Parser, type Span, type Written } from '../grammar/parser';
 import { DEFAULT_CONTEXT, isPositionalField, typoOf } from '../grammar/section';
 import { indentLines, splitSections } from '../grammar/structure';
-import { parseModule, Section, sectionFor, sectionKinds } from './sections';
+import { parseSectionOf, Section, sectionFor, sectionKinds } from './sections';
 import { filledBy } from '../grammar/codec';
 import { REFERENCE } from '../grammar/values';
 
@@ -173,7 +173,16 @@ const around = (heading: string, above: readonly Enclosing[], line: string, open
 // What the engine says when it is handed the whole section, which is the only honest account of whether it took. Where it says nothing the section is content, whatever any one line of it would read as pulled out of the others. Reading it is half of taking it: a section is built as well, since a kind refuses on what its lines say together as much as on how each one is written.
 export function refusalOf(text: string): { at: number; refused: string } | null {
   try {
-    for (const each of parseModule(text)) sectionFor(each.kind)?.build(each.value, DEFAULT_CONTEXT);
+    for (const raw of splitSections(text)) {
+      try {
+        const parsed = parseSectionOf(raw);
+        sectionFor(parsed.kind)?.build(parsed.value, DEFAULT_CONTEXT);
+      } catch (error) {
+        if (!(error instanceof DslError)) throw error;
+        // A section refused for what its lines say together rather than for any one of them has no line of its own to be laid on, so it is laid on the heading it belongs to — which is this section's, not whatever the file opens with.
+        throw error.span === undefined ? new DslError(error.message, raw.span) : error;
+      }
+    }
     return null;
   } catch (error) {
     if (!(error instanceof DslError)) throw error;
@@ -205,7 +214,26 @@ function bears(text: string, line: number): boolean {
 }
 
 // The engine refuses a section once and stops, so it is asked again with the line it named cleared out of its way, and again, for as long as it keeps moving down the section on lines it can be cleared of. Everything it says past that is about what the clearing left behind rather than about what the author wrote, so the list ends there — the lines it did name are the author's to fix, and asking again once they are shows whatever stood behind them.
+// Sections are read one at a time and a section is refused for its own lines, so a draft with three broken sections is three answers rather than one — the engine's word on one of them is not about any of the others.
 export function refusalsIn(text: string): Refusal[] {
+  // Where the file cannot even be cut into sections — a line standing above the first heading — there is one answer about the whole of it, and the engine gives it.
+  const heads = headingsIn(text);
+  if (heads === null) return refusalsWithin(text);
+  return heads.flatMap((start, at) => {
+    const above = lineOf(text, start) - 1;
+    return refusalsWithin(text.slice(start, heads[at + 1] ?? text.length)).map((said) => ({ ...said, line: said.line + above }));
+  });
+}
+
+const headingsIn = (text: string): number[] | null => {
+  try {
+    return splitSections(text).map((each) => each.span.start);
+  } catch {
+    return null;
+  }
+};
+
+function refusalsWithin(text: string): Refusal[] {
   const found: Refusal[] = [];
   let asked = text;
   let after = 0;

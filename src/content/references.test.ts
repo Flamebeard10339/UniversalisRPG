@@ -198,8 +198,8 @@ describe('references the walk used to step over', () => {
   });
 
   it('rejects a goto naming no node in its own dialogue', () => {
-    expect(loading('  give: 1 straw', '  goto elsewhere')).toThrow(/# dialogue caretaker node hello goto names an unknown node in # dialogue caretaker: elsewhere/);
-    expect(loading('  give: 1 straw', '  -> Take it.\n    goto elsewhere')).toThrow(/choice goto names an unknown node in # dialogue caretaker: elsewhere/);
+    expect(loading('  give: 1 straw', '  goto elsewhere')).toThrow(/# dialogue caretaker: node hello goto names an unknown node: elsewhere/);
+    expect(loading('  give: 1 straw', '  -> Take it.\n    goto elsewhere')).toThrow(/# dialogue caretaker: node hello choice goto names an unknown node: elsewhere/);
   });
 
   it('rejects a recipe whose station nothing provides, and accepts one an entity does', () => {
