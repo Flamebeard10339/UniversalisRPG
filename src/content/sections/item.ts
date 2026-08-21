@@ -75,8 +75,8 @@ export const item = section<Item, never, 'actions'>()({
     examine: { parser: text },
     slot: { parser: id, note: 'the slots are every id any equipment-slots: names, so this declares one as much as it uses one; a # slot only supplies display words for it' },
     tags: { parser: list(tagClause), default: () => [] },
-    clusterJewel: { parser: id, keyword: 'cluster-jewel' },
-    originCluster: { parser: id, keyword: 'origin-cluster' },
+    clusterJewel: { parser: id, keyword: 'cluster-jewel', names: { id: 'cluster-jewel' } },
+    originCluster: { parser: id, keyword: 'origin-cluster', names: { id: 'cluster-jewel' } },
     clusterEffect: { parser: clusterEffectValue, keyword: 'cluster-effect' },
     itemExperience: { parser: number, keyword: 'item-experience' },
     maxLevel: {

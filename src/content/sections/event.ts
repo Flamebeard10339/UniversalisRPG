@@ -64,7 +64,7 @@ export const event = section<GameEvent>()({
   text: ['title'],
   fields: {
     title: TITLE_FIELD,
-    resource: { parser: id },
+    resource: { parser: id, names: { id: 'resource' } },
     trigger: { parser: triggerValue },
   },
   validate: (value) => (value.trigger ? (triggerArityProblem(value) ?? answeredByAHook(value)) : 'requires a trigger:'),

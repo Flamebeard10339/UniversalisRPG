@@ -98,7 +98,8 @@ function scan(nodes: readonly Node[], written: string): Alignment | null {
   return at === written.length ? { holes, open: null, complete: true, spelt } : null;
 }
 
-const worth = (found: Alignment): number => (found.complete ? 1000 : 0) + found.spelt;
+// Two branches that account for the same amount of what is written differ in whether the text runs out inside a placeholder; the one that says where the author is standing is the one to take.
+const worth = (found: Alignment): number => (found.complete ? 1000 : 0) + found.spelt * 2 + (found.open === null ? 0 : 1);
 
 // How the form reads what is written, taking the branch that accounts for the most of it. Null where the text is not this form, half-written or whole.
 export function align(form: string, written: string): Alignment | null {
@@ -123,6 +124,11 @@ export const holesIn = (form: string, example: string): readonly Hole[] | null =
 };
 
 export const valueIn = (example: string, hole: Hole): string => example.slice(hole.start, hole.end);
+
+const NAMED = /<([a-z][a-z0-9 -]*)>/g;
+
+// What a form calls its placeholders, in the order it writes them. A form stands for every line it could be, so this asks the shape rather than any one line of it.
+export const holeNames = (form: string): string[] => [...form.matchAll(NAMED)].map((each) => each[1]!);
 
 // The example with one hole given over to a stand-in, which is how the engine is asked what that hole names.
 export const standingIn = (example: string, hole: Hole, stood: string): string => `${example.slice(0, hole.start)}${stood}${example.slice(hole.end)}`;

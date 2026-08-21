@@ -92,7 +92,7 @@ export const handlerEvent = (label: string): string | undefined => HANDLER_LABEL
 export const isHandlerBlock = (block: EntityBlock): block is HandlerBlock => 'event' in block;
 
 const entityBlock: EntryBody = {
-  grammar: [...actionBody.grammar, { form: 'on <event>:', example: 'on death:', family: HOOK_FAMILY, names: 'event', block: resultGrammar }],
+  grammar: [...actionBody.grammar, { form: 'on <event>:', example: 'on death:', family: HOOK_FAMILY, block: resultGrammar }],
   parse(cursor, label) {
     const event = handlerEvent(label);
     return event === undefined ? actionBody.parse(cursor, label) : { event, results: resultList.parse(cursor) };
@@ -133,15 +133,16 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
       parser: list(id),
       hydrate: (parsed) => [...new Set(parsed as string[])],
       default: () => [],
+      names: { id: 'skill' },
     },
-    passives: { parser: list(id), default: () => [] },
+    passives: { parser: list(id), default: () => [], names: { id: 'passive' } },
     equipmentSlots: {
       parser: list(id),
       keyword: 'equipment-slots',
       default: () => [],
     },
-    uses: { parser: list(id), default: () => [] },
-    faction: { parser: list(id), default: () => [] },
+    uses: { parser: list(id), default: () => [], names: { id: 'action' } },
+    faction: { parser: list(id), default: () => [], names: { id: 'faction' } },
     allies: { parser: list(allyValue), default: () => [] },
     flags: { parser: list(id), default: () => [], block: true },
     ...HOOK_FIELDS,

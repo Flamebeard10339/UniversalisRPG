@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import type { Written } from '../src/grammar/parser';
 import { align, type Hole } from '../src/grammar/form';
-import { amissIn, fillingWords, offeringAt, said, saysKind, type Addressed, type Amiss } from '../src/content/completion';
+import { amissIn, fillingWords, namesKind, offeringAt, said, type Addressed, type Amiss } from '../src/content/completion';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { declaredBy } from '../src/content/references';
 import { gathered, shownIn } from '../src/ui/offerGroups';
@@ -36,9 +36,9 @@ const STEP = '  ';
 const PART = '· ';
 
 // A block is known by the lines it holds and what they name, so the one the results grammar repeats down every branch is written out once and pointed at thereafter, while two lists of bare ids that name different kinds stay apart.
-const signOf = (lines: readonly Written[], sitting: Sitting): string => lines.map((line) => `${line.form} names ${saysKind(sitting.under, sitting.indent, line) ?? 'nothing'}`).join('|');
+const signOf = (lines: readonly Written[]): string => lines.map((line) => `${line.form} names ${namesKind(line) ?? 'nothing'}`).join('|');
 
-// Where a block sits in a draft, which is what the engine needs in order to be asked what the lines of it name.
+// Where a block sits in a draft, which is what the engine needs in order to write out one line of it at the indentation an author writes.
 interface Sitting {
   under: string;
   indent: number;
@@ -47,7 +47,7 @@ interface Sitting {
 export function treeLines(lines: readonly Written[], pad: string, sitting: Sitting, written: Map<string, string>, label: string): string[] {
   const held = new Map(lines.map((line) => [line.form, line]));
   const saidOf = (line: Written | undefined): string => {
-    const spoken = line === undefined ? undefined : said(line.needs === undefined ? undefined : `only once ${line.needs}: is set`, line.note, saysKind(sitting.under, sitting.indent, line));
+    const spoken = line === undefined ? undefined : said(line.needs === undefined ? undefined : `only once ${line.needs}: is set`, line.note, namesKind(line));
     return spoken === undefined ? '' : `   — ${spoken}`;
   };
   // A block whose lines are the values the keyword already takes inline says nothing new: it is the same list, one to a line.
@@ -57,7 +57,7 @@ export function treeLines(lines: readonly Written[], pad: string, sitting: Sitti
     if (block === undefined) return [];
     if (listed(block, beside)) return [];
     const inside: Sitting = { under: [sitting.under, `${' '.repeat(sitting.indent)}${line!.example}`].join('\n'), indent: sitting.indent + 2 };
-    const sign = signOf(block, inside);
+    const sign = signOf(block);
     const already = written.get(sign);
     if (already !== undefined) return [`${deeper}…indented under it, what \`${already}\` holds`];
     written.set(sign, line!.form);
@@ -66,7 +66,7 @@ export function treeLines(lines: readonly Written[], pad: string, sitting: Sitti
   const out: string[] = [];
   for (const family of gathered(lines.map((line) => ({ ...line, insert: line.form })))) {
     const own = family.groups.flatMap((group) => [...(group.opens === null ? [] : [group.opens]), ...group.offers]).flatMap((offer) => held.get(offer.form) ?? []);
-    const sign = `${family.name} of ${signOf(own, sitting)}`;
+    const sign = `${family.name} of ${signOf(own)}`;
     const already = family.name === null ? undefined : written.get(sign);
     // A part is named beside the lines that belong to it rather than above and outside them, so what is indented here is what an author indents.
     if (family.name !== null) out.push(`${pad}${PART}${family.name}${already === undefined ? '' : `, as under \`${already}\``}`);
@@ -107,7 +107,7 @@ export function treeOf(kind: string): string[] {
   if (owner === undefined) return [`# ${kind} — no such kind`];
   const sitting = { under: `# ${kind} probe`, indent: 0 };
   // The section's own lines are a block like any other, so a wrapper that holds them again points back at the heading rather than writing them out twice.
-  const written = new Map([[signOf(owner.grammar, sitting), `# ${kind}`]]);
+  const written = new Map([[signOf(owner.grammar), `# ${kind}`]]);
   return [`# ${kind} <id>`, ...RULES, ...treeLines(owner.grammar, '', sitting, written, `# ${kind}`)];
 }
 

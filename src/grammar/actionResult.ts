@@ -1,7 +1,7 @@
 import { Condition, condition } from './condition';
 import { writtenFrom } from './codec';
 import { ListParser } from './list';
-import { Cursor, DslError, Parser, Span, Written, requireEnd } from './parser';
+import { Cursor, DslError, Holds, Parser, Span, Written, requireEnd } from './parser';
 import { range, Range, scaleRange } from './range';
 import { RawLine, hasBlock, indentLines, requireNoBlock, takeBlock } from './structure';
 import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantified, refuseRange, REFERENCE } from './values';
@@ -453,23 +453,29 @@ const LEAF_FORMS: readonly string[] = [
 export const actionResult: Parser<ActionResult> = {
   parse: parseResult,
   print: printResult,
+  names: { variable: 'flag' },
   forms: LEAF_FORMS,
   examples: LEAF_EXAMPLES,
 };
 
+// The parser behind a `<result>`, which is the same wherever one stands.
+const RESULT: Holds = () => ({ result: actionResult });
+
 const ROW = 'one of these';
 
+const WEIGHTED = { names: { weight: 'stat' }, holds: () => ({ condition, result: actionResult }) };
+
 const ROWS: readonly Written[] = [
-  { form: '<weight>[ if <condition>]: <result>', example: '3x: give: plank', family: ROW },
-  { form: '<weight>[ if <condition>]: nothing', example: '5x: nothing', family: ROW },
-  { form: '<weight>[ if <condition>]:', example: '3x if has-key:', family: ROW, block: () => resultGrammar() },
+  { form: '<weight>[ if <condition>]: <result>', example: '3x: give: plank', family: ROW, ...WEIGHTED },
+  { form: '<weight>[ if <condition>]: nothing', example: '5x: nothing', family: ROW, ...WEIGHTED },
+  { form: '<weight>[ if <condition>]:', example: '3x if has-key:', family: ROW, ...WEIGHTED, block: () => resultGrammar() },
 ];
 
 export const HAPPENS = 'what happens';
 export const SOMETIMES = 'only sometimes';
 
 const WRAPPERS: readonly Written[] = [
-  { form: 'if <condition>:', example: 'if has-key:', family: SOMETIMES, block: () => resultGrammar() },
+  { form: 'if <condition>:', example: 'if has-key:', family: SOMETIMES, holds: () => ({ condition }), block: () => resultGrammar() },
   { form: '<chance> in <of>:', example: '3 in 10:', family: SOMETIMES, block: () => resultGrammar() },
   { form: '<stat> vs <stat>:', example: 'attack vs defence:', family: SOMETIMES, note: 'the first is read off whoever acts and the second off whoever it lands on; either may be a plain number instead, and its block runs only when the contest is won', block: () => resultGrammar() },
   { form: 'one of:', example: 'one of:', family: SOMETIMES, block: () => ROWS },
@@ -487,6 +493,7 @@ const RESULT_LIST_FORMS: readonly string[] = ['<result>, …'];
 
 export const resultList: ListParser<ActionResult> = {
   element: actionResult,
+  holds: RESULT,
   lines: resultGrammar,
   print: printResults,
   forms: RESULT_LIST_FORMS,
@@ -504,6 +511,7 @@ export const resultList: ListParser<ActionResult> = {
 
 export const hookResultList: ListParser<ActionResult> = {
   element: actionResult,
+  holds: RESULT,
   lines: resultGrammar,
   print: printResults,
   forms: RESULT_LIST_FORMS,

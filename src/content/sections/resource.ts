@@ -39,8 +39,8 @@ export const resource = section<Resource>()({
   text: ['title'],
   fields: {
     title: TITLE_FIELD,
-    rate: { parser: id },
-    max: { parser: id },
+    rate: { parser: id, names: { id: 'stat' } },
+    max: { parser: id, names: { id: 'stat' } },
     start: { parser: decimal },
     display: { parser: displayValue, default: () => 'full', printed: 'always' },
   },

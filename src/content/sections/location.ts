@@ -69,6 +69,7 @@ export const edgeValue: Parser<Edge> = {
     return { target };
   },
   print: (value) => (value.condition === undefined ? value.target : `${value.target} while ${condition.print(value.condition)}`),
+  holds: () => ({ condition }),
   forms: ['<location>', '<location> while <condition>'],
   examples: ['clearing', 'clearing while has-key'],
 };

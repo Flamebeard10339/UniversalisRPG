@@ -1,4 +1,5 @@
 import { actionLines } from '../../grammar/action';
+import { filledBy } from '../../grammar/codec';
 import { paired } from '../../grammar/form';
 import { ActionResult } from '../../grammar/actionResult';
 import { DslError, Parser, Written } from '../../grammar/parser';
@@ -71,11 +72,15 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   const written = (value: string): string => (positional ? value : `${keyword}: ${value}`);
   const needs = schema.needs?.[name];
   const block = positional ? undefined : blockOf(parser);
+  // What the field says its placeholders hold stands over what the parser says, since one parser writes the values of fields that name different kinds.
+  const filled = { ...filledBy(parser), ...filledBy(spec) };
   // A family says what a line is for. Whether it was declared as a field, as a positional one or as a keyword is how the engine holds it, not what an author is choosing between, so a schema line joins no family unless its kind says which one it is in.
-  const said = { ...(spec.family === undefined ? {} : { family: spec.family }), ...(spec.note === undefined ? {} : { note: spec.note }), ...(needs === undefined ? {} : { needs }) };
+  const said = { ...(spec.family === undefined ? {} : { family: spec.family }), ...(spec.note === undefined ? {} : { note: spec.note }), ...(needs === undefined ? {} : { needs }), ...filled };
   const shapes = paired(parser.forms, parser.examples).flatMap((example, at) => (example === undefined ? [] : [{ form: written(parser.forms[at]!), example: written(example), ...said }]));
   if (shapes.length === 0) return [];
-  return [...shapes, ...(block === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, ...said, block }])];
+  // A block's lines are a grammar of their own and already say what they hold; only what the field says over its parser is laid on them.
+  const held = block === undefined ? undefined : (): readonly Written[] => block().map((line) => ({ ...line, ...filledBy(spec) }));
+  return [...shapes, ...(held === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, ...said, block: held }])];
 };
 
 const schemaGrammar = (schema: AnySchema): readonly Written[] => [

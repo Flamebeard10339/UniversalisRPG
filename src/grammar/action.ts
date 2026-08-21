@@ -1,8 +1,9 @@
-import { ActionResult, parseResultLine, resultGrammar, resultLines, resultList, spansLines, startsResult } from './actionResult';
+import { ActionResult, actionResult, parseResultLine, resultGrammar, resultLines, resultList, spansLines, startsResult } from './actionResult';
 import { Condition, condition } from './condition';
 import { HOOK_FIELD_REFUSALS, hookLabelProblem } from './hook';
+import { filledBy } from './codec';
 import { list } from './list';
-import { Cursor, DslError, requireEnd, Span, Written } from './parser';
+import { Cursor, DslError, Filled, requireEnd, Span, Written } from './parser';
 import { EntryBody } from './section';
 import { RawLine, hasBlock, indentLines, takeBlock } from './structure';
 import { TagClause, tagClause } from './tagClause';
@@ -118,7 +119,7 @@ const positiveCount =
     return Number(raw);
   };
 
-const ACTION_FIELDS: readonly {
+const ACTION_FIELDS: readonly (Filled & {
   written: string;
   label: RegExp;
   name: keyof Omit<Action, 'label' | 'results'>;
@@ -126,7 +127,7 @@ const ACTION_FIELDS: readonly {
   form: string;
   example: string;
   family: string;
-}[] = [
+})[] = [
   {
     written: 'requires',
     label: /(?:requires|require):[ \t]*/,
@@ -135,6 +136,7 @@ const ACTION_FIELDS: readonly {
     form: '<condition>',
     example: 'has-key',
     family: 'offered when',
+    holds: () => ({ condition }),
   },
   {
     written: 'hidden if',
@@ -144,6 +146,7 @@ const ACTION_FIELDS: readonly {
     form: '<condition>',
     example: 'found-key',
     family: 'offered when',
+    holds: () => ({ condition }),
   },
   {
     written: 'on success',
@@ -153,6 +156,7 @@ const ACTION_FIELDS: readonly {
     form: '<result>, …',
     example: 'give: plank',
     family: 'and afterwards',
+    holds: () => ({ result: actionResult }),
   },
   {
     written: 'on failure',
@@ -162,6 +166,7 @@ const ACTION_FIELDS: readonly {
     form: '<result>, …',
     example: 'say: nothing gives',
     family: 'and afterwards',
+    holds: () => ({ result: actionResult }),
   },
   {
     written: 'on unfinished',
@@ -171,9 +176,10 @@ const ACTION_FIELDS: readonly {
     form: '<result>, …',
     example: 'say: you break off',
     family: 'and afterwards',
+    holds: () => ({ result: actionResult }),
   },
   { written: 'time', label: /time:[ \t]*/, name: 'time', value: seconds, form: '<seconds>', example: '3', family: 'how long it takes' },
-  { written: 'rate', label: /rate:[ \t]*/, name: 'rate', value: perMinute, form: '<per minute>', example: '12', family: 'how long it takes' },
+  { written: 'rate', label: /rate:[ \t]*/, name: 'rate', value: perMinute, form: '<per minute>', example: '12', family: 'how long it takes', names: { 'per minute': 'stat' } },
   {
     written: 'accuracy',
     label: /accuracy:[ \t]*/,
@@ -355,7 +361,7 @@ const STANDING_KINDS = TAGGED_ACTION_KINDS.filter((kind) => actionTableProblem({
 
 const actionFieldLines = (): readonly Written[] =>
   ACTION_FIELDS.flatMap((field) => [
-    { form: `${field.written}: ${field.form}`, example: `${field.written}: ${field.example}`, family: field.family },
+    { form: `${field.written}: ${field.form}`, example: `${field.written}: ${field.example}`, family: field.family, ...filledBy(field) },
     ...(field.value === resultsValue ? [{ form: `${field.written}:`, example: `${field.written}:`, family: field.family, block: resultGrammar }] : []),
   ]);
 
@@ -367,8 +373,9 @@ export const actionLinesWritten = (): readonly Written[] => [
 
 export const actionBody: EntryBody = {
   grammar: [
-    { form: '<action>: <result>, …', example: 'chop-wood: give: log', family: 'an action' },
-    { form: '<action>:', example: 'chop-wood:', family: 'an action', block: actionLinesWritten },
+    // An action's label is the name it is given here, not one it looks up, so the placeholder that reads like a kind names nothing.
+    { form: '<action>: <result>, …', example: 'chop-wood: give: log', family: 'an action', names: { action: null }, holds: () => ({ result: actionResult }) },
+    { form: '<action>:', example: 'chop-wood:', family: 'an action', names: { action: null }, block: actionLinesWritten },
   ],
   parse: (cursor, label) => {
     refuseHookLabel(label, {

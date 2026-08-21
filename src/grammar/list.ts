@@ -1,4 +1,4 @@
-import { writtenFrom } from './codec';
+import { filledBy, writtenFrom } from './codec';
 import { Cursor, Parser, Written, parseWhole } from './parser';
 import { RawLine } from './structure';
 
@@ -24,7 +24,9 @@ export function list<E>(element: Parser<E>): ListParser<E> {
   const forms = element.forms.map((form) => `${form}, …`);
   const line: Parser<E[]> = { parse: parseInline, print, forms, examples };
 
+  // A list is its element written over and over, so what its element's placeholders hold is what the list's do.
   return {
+    ...filledBy(element),
     element,
     parse: parseInline,
     print,

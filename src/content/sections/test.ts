@@ -327,6 +327,9 @@ export function printDirective(value: Directive): string {
   }
 }
 
+// The id under `use:` is of whatever kind the line itself opened with, and the action after it is keyed under that id rather than declared anywhere a name could be offered from.
+const USED = { names: { id: '<kind>', action: null } };
+
 export const test = section<Test>()({
   kind: 'test',
   ids: 'owned',
@@ -335,15 +338,15 @@ export const test = section<Test>()({
     { form: 'run: <test>', example: 'run: opening' },
     { form: 'talk: <entity>', example: 'talk: guide' },
     { form: 'choose: <what the choice reads>', example: 'choose: Tell me more' },
-    { form: 'use: <kind>.<id>.<action>', example: 'use: item.rusty-sword.swing' },
+    { form: 'use: <kind>.<id>.<action>', example: 'use: item.rusty-sword.swing', ...USED },
     { form: 'use: <action> on <entity>', example: 'use: chop on oak' },
     { form: 'travel: <location>', example: 'travel: camp' },
     { form: 'goto: <location>', example: 'goto: camp' },
     { form: 'craft: <recipe>', example: 'craft: plank' },
-    { form: 'begin: use <kind>.<id>.<action>', example: 'begin: use item.rusty-sword.swing' },
+    { form: 'begin: use <kind>.<id>.<action>', example: 'begin: use item.rusty-sword.swing', ...USED },
     { form: 'begin: travel <location>', example: 'begin: travel camp' },
     { form: 'begin: craft <recipe>', example: 'begin: craft plank' },
-    { form: 'assert: <condition>', example: 'assert: has-key' },
+    { form: 'assert: <condition>', example: 'assert: has-key', holds: () => ({ condition }) },
     { form: 'expect: <save>', example: 'expect: after-intro' },
     { form: 'load: <save>', example: 'load: after-intro' },
     { form: 'cancel', example: 'cancel' },
@@ -351,10 +354,10 @@ export const test = section<Test>()({
     { form: 'equip: <item>', example: 'equip: rusty-sword' },
     { form: 'unequip: <slot>', example: 'unequip: main-hand' },
     { form: 'feed: <item> with <item>', example: 'feed: cluster-jewel with fervour' },
-    { form: 'slot: <item> at <q>,<r> <direction> with <jewel>', example: 'slot: cluster-jewel at 0,0 ne with small-jewel' },
+    { form: 'slot: <item> at <q>,<r> <direction> with <jewel item>', example: 'slot: cluster-jewel at 0,0 ne with small-jewel' },
     { form: 'allocate: <item> at <q>,<r> position <n>', example: 'allocate: cluster-jewel at 0,0 position 1' },
     { form: 'allocate: <item> at <q>,<r> slot <direction>', example: 'allocate: cluster-jewel at 0,0 slot ne' },
-    { form: 'apply: <item> at <q>,<r> with <effect>', example: 'apply: cluster-jewel at 0,0 with polish' },
+    { form: 'apply: <item> at <q>,<r> with <effect item>', example: 'apply: cluster-jewel at 0,0 with polish' },
     { form: 'refuse: <the growth directive that must not take>', example: 'refuse: feed cluster-jewel with fervour' },
     { form: 'open-modal: <modal>', example: 'open-modal: name-yourself' },
     { form: 'submit-modal: <key>=<value>', example: 'submit-modal: name=Ash' },

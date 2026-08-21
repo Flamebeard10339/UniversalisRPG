@@ -1,4 +1,4 @@
-import { Cursor, DslError, Parser, Span, Written } from './parser';
+import { Cursor, DslError, Filled, Parser, Span, Written } from './parser';
 import { ListParser } from './list';
 import { RawLine, RawSection, hasBlock, indentLines, sectionParser, takeBlock } from './structure';
 
@@ -11,7 +11,7 @@ export const DEFAULT_CONTEXT: HydrateContext = { language: DEFAULT_LANGUAGE };
 
 export type PrintWhen = 'when-set' | 'always' | 'unless-default';
 
-export interface FieldPrinting {
+export interface FieldPrinting extends Filled {
   note?: string;
   // What this line is for, said in the words an author is choosing between. Lines that share one are offered together, whether the kind declares them as fields, as keywords or in its own grammar.
   family?: string;

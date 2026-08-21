@@ -123,7 +123,7 @@ export const comparison: Parser<ComparisonOperator> = {
 export const condition: Parser<Condition> = {
   parse: parseOr,
   print: printCondition,
-  within: [comparison],
-  forms: ['<flag>', '<reference> <comparison> <number>', 'has <item>', 'has <count> <item>', 'not <condition>', '<condition> and <condition>', '<condition> or <condition>'],
+  holds: () => ({ comparison, condition }),
+  forms: ['<flag>', '<flag> <comparison> <number>', 'has <item>', 'has <count> <item>', 'not <condition>', '<condition> and <condition>', '<condition> or <condition>'],
   examples: ['has-key', 'quest.stage >= 2', 'has plank', 'has 3 plank', 'not has-key', 'has-key and not has-rope', 'has-key or has-rope', 'a and b or c'],
 };

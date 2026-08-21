@@ -1,5 +1,8 @@
 import { matches, paired } from './form';
-import { Parser, Written, parseWhole } from './parser';
+import { Filled, Parser, Written, parseWhole } from './parser';
+
+// What a form says its placeholders hold, carried from the parser that wrote the form onto every line built out of it.
+export const filledBy = (parser: Filled): Filled => ({ ...(parser.names === undefined ? {} : { names: parser.names }), ...(parser.holds === undefined ? {} : { holds: parser.holds }) });
 
 export function isCodec(value: unknown): value is Parser<unknown> {
   if (typeof value !== 'object' || value === null) return false;
@@ -13,7 +16,7 @@ export function reachableCodecs(roots: Iterable<readonly [string, unknown]>): Ma
     if (!isCodec(value) || found.has(value)) return;
     found.set(value, name);
     visit(`${name}.element`, (value as { element?: unknown }).element);
-    (value as Parser<unknown>).within?.forEach((held, at) => visit(`${name}.within.${at}`, held));
+    for (const [hole, held] of Object.entries((value as Parser<unknown>).holds?.() ?? {})) visit(`${name}.<${hole}>`, held);
   };
   for (const [name, value] of roots) visit(name, value);
   return found;
@@ -33,7 +36,7 @@ export function formFailures(name: string, forms: readonly string[], examples: r
 
 export const shapeFailures = (codecs: Map<Parser<unknown>, string>): string[] => [...codecs].flatMap(([parser, name]) => formFailures(name, parser.forms, parser.examples));
 
-export const writtenFrom = (parser: Parser<unknown>): Written[] => paired(parser.forms, parser.examples).map((example, at) => ({ form: parser.forms[at]!, example: example ?? parser.forms[at]! }));
+export const writtenFrom = (parser: Parser<unknown>): Written[] => paired(parser.forms, parser.examples).map((example, at) => ({ form: parser.forms[at]!, example: example ?? parser.forms[at]!, ...filledBy(parser) }));
 
 export function roundTripFailures(name: string, parser: Parser<unknown>): string[] {
   if (parser.examples.length === 0) return [`${name} carries no examples`];

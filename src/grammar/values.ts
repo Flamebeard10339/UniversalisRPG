@@ -57,6 +57,7 @@ export const numberOrStat: Parser<number | string> = {
     return raw === null ? id.parse(cursor) : Number(raw);
   },
   print: (value) => (typeof value === 'string' ? value : String(value)),
+  names: { number: 'stat' },
   forms: ['<number>', '<stat>'],
   examples: ['3', '1.5', 'attack-speed'],
 };

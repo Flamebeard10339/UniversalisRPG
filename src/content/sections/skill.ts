@@ -22,7 +22,7 @@ export const skill = section<Skill>()({
   text: ['title'],
   fields: {
     title: TITLE_FIELD,
-    'stat-id': { parser: id },
+    'stat-id': { parser: id, names: { id: 'stat' } },
     'per-level': { parser: bonusAmount },
     grants: { parser: list(skillGrant), default: () => [], block: true },
   },

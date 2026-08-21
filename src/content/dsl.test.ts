@@ -1,9 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
-import { amissIn, offeringAt, refusalOf } from './completion';
+import { amissIn, kindNamed, offeringAt, refusalOf } from './completion';
+import { CAPABILITY } from './refs';
 import { declaredBy } from './references';
-import { align } from '../grammar/form';
+import { align, holeNames, holesIn, standingIn, valueIn } from '../grammar/form';
 import type { Written } from '../grammar/parser';
 import { text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
@@ -19,43 +20,131 @@ const CORPUS = readdirSync('content')
 
 const problems = (result: { diagnostics: { sourceName: string }[] }): string[] => result.diagnostics.map((each) => formatModuleDiagnostic(each as never));
 
-describe('what the page offers where the cursor stands in a hole', () => {
-  // Every line of every kind whose hole is filled with an id of a named kind, and one id of that kind to fill it with.
-  const naming = sections().flatMap((owner) =>
-    (owner.grammar as readonly { form: string; example: string; names?: string }[])
-      .filter((line) => line.names !== undefined)
-      .map((line) => ({ kind: owner.kind, line, known: [{ kind: line.names!, address: 'a-module.a-name' }] })),
-  );
+// A line may say one hole names whatever another one holds, written as that other hole.
+const POINTS = /^<[a-z][a-z0-9 -]*>$/;
 
-  const NAMED = 'a-module.a-name';
+// Every line of every kind, under the lines and at the indentation an author writes it at. A block reached twice holds the same lines, so it is walked once.
+const GRAMMAR: { kind: string; line: Written; under: string; indent: number }[] = [];
 
-  it.each(naming.map((each) => `# ${each.kind} ${each.line.form}`))('%s offers each id it may name once, wherever the author has got to in typing it', (where) => {
-    const { kind, line, known } = naming.find((each) => `# ${each.kind} ${each.line.form}` === where)!;
-    const literal = line.example.slice(0, line.example.indexOf(' ') + 1);
-    for (let typed = 0; typed <= NAMED.length; typed++) {
-      const draft = `# ${kind} probe\n${literal}${NAMED.slice(0, typed)}`;
-      const said = offeringAt(draft, draft.length, known).offers.filter((each) => each.form.includes(NAMED));
-      expect(said.map((each) => each.form), draft).toEqual([NAMED]);
+{
+  const seen = new Set<string>();
+  const walk = (kind: string, lines: readonly Written[], under: string, indent: number): void => {
+    const sign = `${kind}::${lines.map((each) => each.form).join('|')}`;
+    if (lines.length === 0 || seen.has(sign)) return;
+    seen.add(sign);
+    for (const line of lines) {
+      GRAMMAR.push({ kind, line, under, indent });
+      walk(kind, line.block?.() ?? [], [under, ...indentLines([line.example], indent)].join('\n'), indent + 2);
     }
+  };
+  for (const owner of sections()) walk(owner.kind, owner.grammar, `# ${owner.kind} probe`, 0);
+}
+
+// Every placeholder of every one of those lines, with the line written out around it.
+const HOLES = GRAMMAR.flatMap((at) =>
+  (holesIn(at.line.form, at.line.example) ?? []).map((hole) => ({
+    ...at,
+    hole,
+    // A line that opens a block and is handed over without one is refused for holding nothing, so the block's own first line goes under it.
+    opens: at.line.block?.()[0]?.example,
+    where: `# ${at.kind}${at.under.includes('\n') ? ` under ${at.under.split('\n').pop()!.trim()}` : ''}: ${at.line.form} <${hole.name}>`,
+  })),
+);
+
+// The line with one value stood in the hole, sitting where an author writes it, which is the only form the engine can be asked about.
+const written = (at: (typeof HOLES)[number], value: string): string =>
+  [at.under, ...indentLines([standingIn(at.line.example, at.hole, value)], at.indent), ...(at.opens === undefined ? [] : indentLines([at.opens], at.indent + 2))].join('\n');
+
+// What one hole of a line puts in another, which is how a line that says one hole names whatever another one holds is read.
+const beside = (at: (typeof HOLES)[number]) => (hole: string) => {
+  const other = (holesIn(at.line.form, at.line.example) ?? []).find((each) => each.name === hole);
+  return other === undefined ? undefined : valueIn(at.line.example, other);
+};
+
+const kindAt = (at: (typeof HOLES)[number]): string | undefined => kindNamed(at.line, at.hole.name, beside(at));
+
+describe('a hole of every line of every kind', () => {
+  it('is asked about at all, over every kind there is', () => {
+    expect(new Set(GRAMMAR.map((at) => at.kind)).size).toBe(sections().filter((each) => each.grammar.length > 0).length);
+    expect(HOLES.filter((at) => kindAt(at) !== undefined).length).toBeGreaterThan(100);
+  });
+
+  it('says what it names outright, rather than a kind nothing declares', () => {
+    const held = new Set(sections().map((each) => each.kind));
+    expect(
+      GRAMMAR.flatMap(({ kind, line }) =>
+        Object.entries(line.names ?? {}).flatMap(([hole, said]) => {
+          if (said === null || (POINTS.test(said) && holeNames(line.form).includes(said.slice(1, -1)))) return [];
+          return held.has(said) || said === CAPABILITY ? [] : [`# ${kind} ${line.form} says <${hole}> names a # ${said}`];
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  // The kind file is the one authority on what a line names. This asks the engine the question the panel used to ask it — an id stood in the hole, the section handed over, and whichever reference kind comes back — and holds the line's own word to it.
+  it('names what the engine reads where it stands', () => {
+    const PROBE = 'zzprobezz';
+    const engine = (at: (typeof HOLES)[number]): string[] => {
+      const raw = splitSections(written(at, PROBE))[0];
+      const owner = raw === undefined ? undefined : sectionFor(raw.kind);
+      if (owner === undefined) return [];
+      const found: string[] = [];
+      try {
+        const authored = owner.parse(raw!) as { id: string };
+        owner.visit(authored, '', (kind, id) => {
+          if (id === PROBE || id.endsWith(`.${PROBE}`)) found.push(kind);
+          return id;
+        });
+      } catch {
+        return [];
+      }
+      return found;
+    };
+    expect(
+      HOLES.flatMap((at) => {
+        // A kind the section list does not declare has no ids to offer and nothing the panel could say about it.
+        const read = [...new Set(engine(at))].filter((kind) => sectionFor(kind) !== undefined);
+        const said = kindAt(at);
+        return read.length === 1 && read[0] !== said ? [`${at.where} names ${said === undefined ? 'nothing' : `a # ${said}`}, where the engine reads a # ${read[0]}`] : [];
+      }),
+    ).toEqual([]);
   });
 });
 
-describe('a hole a line says it names', () => {
-  // Every line of every kind that declares the kind of thing it names, gathered from the grammar itself.
-  const naming = sections().flatMap((owner) =>
-    (owner.grammar as readonly { form: string; example: string; names?: string }[]).filter((line) => line.names !== undefined).map((line) => ({ kind: owner.kind, line })),
-  );
+describe('what the page offers where the cursor stands in a hole', () => {
+  const NAMED = 'a-module.a-name';
+  // One line written under one other line is the same question wherever it is reached from, and the results grammar is reached from every kind there is.
+  const asking = new Map(HOLES.filter((at) => kindAt(at) !== undefined).map((at) => [`${at.under.split('\n').pop()!}|${at.line.form}|${at.hole.name}`, at]));
+  const naming = [...asking.values()];
 
-  it('is a shape the section list actually declares', () => {
-    expect(naming.length).toBeGreaterThan(0);
+  it('offers each id that hole may name once, wherever the author has got to in typing it', () => {
+    const complaints: string[] = [];
+    let asked = 0;
+    for (const at of naming) {
+      const known = [{ kind: kindAt(at)!, address: NAMED }];
+      for (const typed of [0, Math.floor(NAMED.length / 2), NAMED.length]) {
+        const draft = written(at, NAMED.slice(0, typed)).slice(0, at.under.length + 1 + at.indent + at.hole.start + typed);
+        const offering = offeringAt(draft, draft.length, known);
+        const said = offering.offers.filter((each) => each.form.includes(NAMED));
+        // Half a line may still be several shapes, and the page names the one it settled on; the claim is about the hole it says the cursor is in.
+        const here = offering.filling?.form === at.line.form && offering.filling.hole === at.hole.name;
+        if (here) asked += 1;
+        if (here ? said.length !== 1 : said.length > 1) complaints.push(`${at.where} with ${JSON.stringify(NAMED.slice(0, typed))} typed offers ${said.length === 0 ? 'nothing' : said.map((each) => each.form).join(', ')}`);
+      }
+    }
+    expect(complaints).toEqual([]);
+    expect(asked).toBeGreaterThan(naming.length);
   });
 
-  it.each(naming.map((each) => `# ${each.kind} ${each.line.form}`))('%s is broken into no grammar of its own, since an id is the whole of it', (where) => {
-    const { kind, line } = naming.find((each) => `# ${each.kind} ${each.line.form}` === where)!;
-    const draft = `# ${kind} probe\n${line.example.slice(0, line.example.indexOf(' ') + 2)}`;
-    const offering = offeringAt(draft, draft.length, []);
-    expect(offering.filling?.holds, draft).toBeUndefined();
-    expect(offering.offers.map((each) => each.family).filter((each) => each?.startsWith('<')), draft).toEqual([]);
+  it('breaks a hole filled with an id into no grammar of its own, since the ids are the whole of it', () => {
+    expect(
+      naming
+        .filter((at) => at.line.holds?.()[at.hole.name] === undefined)
+        .flatMap((at) => {
+          const draft = written(at, '').slice(0, at.under.length + 1 + at.indent + at.hole.start);
+          return offeringAt(draft, draft.length, []).filling?.holds === undefined ? [] : [at.where];
+        }),
+    ).toEqual([]);
   });
 });
 
@@ -164,7 +253,6 @@ describe('every section kind', () => {
       seen.add(key);
       expect(formFailures(`# ${kind} under ${under.join(' / ') || 'itself'}`, lines.map((each) => each.form), lines.map((each) => each.example))).toEqual([]);
       for (const line of lines) {
-        if (line.names !== undefined) expect(sections().map((each) => each.kind), `# ${kind} ${line.form} names`).toContain(line.names);
         const held = line.block?.();
         const opened = held === undefined ? [] : indentLines([held[0]!.example], 2 * (under.length + 1));
         const written = [`# ${kind} probe`, ...under.map((each, deep) => indentLines([each], 2 * deep)[0]!), ...indentLines([line.example], 2 * under.length), ...opened].join('\n');

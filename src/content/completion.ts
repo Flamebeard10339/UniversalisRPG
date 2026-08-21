@@ -1,10 +1,10 @@
-import { align, bare, exampleOf, holesIn, paired, standingIn, valueIn, type Alignment, type Hole } from '../grammar/form';
+import { align, bare, exampleOf, holeNames, holesIn, valueIn, type Alignment } from '../grammar/form';
 import type { ListParser } from '../grammar/list';
-import { DslError, parseWhole, type Parser, type Span, type Written } from '../grammar/parser';
+import { DslError, type Filled, type Parser, type Span, type Written } from '../grammar/parser';
 import { isPositionalField, typoOf } from '../grammar/section';
 import { indentLines, splitSections } from '../grammar/structure';
-import { parseModule, Section, sectionFor, sectionKinds, sections } from './sections';
-import { reachableCodecs } from '../grammar/codec';
+import { parseModule, Section, sectionFor, sectionKinds } from './sections';
+import { filledBy } from '../grammar/codec';
 import { REFERENCE } from '../grammar/values';
 
 export interface Addressed {
@@ -70,8 +70,6 @@ const CLAUSE = /(?:^|,)[ \t]*(?=[^,]*$)/;
 const TRAILING_ID = /[a-z0-9.-]*$/;
 const LEADING_ID = /^[a-z0-9.-]*/;
 const PLACEHOLDER = /[<[]/;
-
-const PROBE = 'zzprobezz';
 
 export function namesFrom(address: string, typed: string): boolean {
   if (address.startsWith(typed)) return true;
@@ -290,45 +288,33 @@ function readSection(text: string): { owner: Section; authored: Record<string, u
   }
 }
 
-// The kinds a stand-in is read as where it was put, which is the engine's own answer to what may be named there.
-const kindsStanding = (written: string): Set<string> => new Set(namedIn(written).filter((each) => each.id === PROBE || each.id.endsWith(`.${PROBE}`)).map((each) => each.kind));
+// The one word of a placeholder's name that is a kind, which is how a placeholder says what it names: `<item>` names a # item, and `<buff item>` names one too.
+const kindWordIn = (hole: string): string | undefined => hole.split(' ').find((word) => sectionFor(word) !== undefined);
 
-const only = (kinds: ReadonlySet<string>): string | undefined => (kinds.size === 1 ? [...kinds][0] : undefined);
+// A declaration standing for another placeholder of the same line, whose written value says which kind is named.
+const POINTED = /^<(?<hole>[a-z][a-z0-9 -]*)>$/;
 
-// Every parser the section list can reach that writes a value more than one way. A parser that writes it one way says no more than the hole's own name does, and a list is not what one hole holds.
-let describing: readonly Parser<unknown>[] | undefined;
+// A hole with a grammar of its own names what the plainest shape of that grammar names, where that shape is one placeholder and nothing else: a condition may be written as a flag alone, so standing in one offers flags.
+function heldName(parser: Parser<unknown>): string | undefined {
+  const alone = POINTED.exec(parser.forms[0] ?? '')?.groups?.hole;
+  if (alone === undefined) return undefined;
+  const said = parser.names?.[alone];
+  return said === undefined ? kindWordIn(alone) : (said ?? undefined);
+}
 
-const describers = (): readonly Parser<unknown>[] =>
-  (describing ??= [...reachableCodecs(sections().flatMap((each) => Object.entries(each.schema?.fields ?? {}).map(([field, spec]) => [`${each.kind}.${field}`, spec.parser] as const))).keys()].filter(
-    (parser) => parser.forms.length > 1 && !('element' in parser),
-  ));
-
-function reads(parser: Parser<unknown>, value: string): boolean {
-  try {
-    parseWhole(parser, value, 0, 'a value');
-    return true;
-  } catch {
-    return false;
+// The kind of thing a hole names, read off the line that writes it rather than found by standing something in it and seeing what the engine makes of it. A placeholder is called after what it names unless its line says otherwise; `wrote` reads what the author has put in another hole, for a line that says one hole names whatever another one holds.
+export function kindNamed(filled: Filled, hole: string, wrote: (hole: string) => string | undefined = () => undefined): string | undefined {
+  const said = filled.names?.[hole];
+  if (said === null) return undefined;
+  const pointed = said === undefined ? undefined : POINTED.exec(said)?.groups?.hole;
+  if (pointed !== undefined) {
+    const written = wrote(pointed);
+    return written !== undefined && sectionFor(written) !== undefined ? written : undefined;
   }
+  if (said !== undefined) return said;
+  const held = filled.holds?.()[hole];
+  return held === undefined ? kindWordIn(hole) : heldName(held);
 }
-
-// One line put back where it belongs: under the blocks it sits in, at its own indentation, and followed by whatever a line that opens a block must hold.
-const sat = (under: string, indent: number, line: string, opens: readonly string[]): string => [under, `${' '.repeat(indent)}${line}`, ...opens].join('\n');
-
-const takes = (under: string, indent: number, line: string, opens: readonly string[]): boolean => readSection(sat(under, indent, line, opens)) !== undefined;
-
-// What a hole may hold, in its own words: the parser whose every line the engine takes where this hole stands, and which says the most. A hole is the same hole wherever it is written, so this asks about the hole and not about the line around it.
-// The parser that describes a hole. Read both ways: it reads what this hole's own line puts there, and everything it writes is taken where the hole stands. One way alone is met by coincidence — a closed list of words is read as an id, and an id is read as a condition.
-function describerIn(under: string, indent: number, written: Written, hole: Hole, beside: readonly string[], opens: readonly string[]): Parser<unknown> | undefined {
-  const fits = describers().filter((parser) => reads(parser, valueIn(written.example, hole)) && parser.examples.every((example) => takes(under, indent, standingIn(written.example, hole, example), opens)));
-  const near = beside.map(bare);
-  const shaping = holeOf(written.form, hole.name);
-  const said = shaping === undefined ? fits : fits.filter((parser) => !parser.forms.every((form) => near.includes(bare(standingIn(written.form, shaping, form)))));
-  return said.reduce<Parser<unknown> | undefined>((held, parser) => (parser.forms.length > (held?.forms.length ?? 0) ? parser : held), undefined);
-}
-
-// The same hole read against the form itself rather than against a line of it, since what stands beside a line is written in shapes and not in values.
-const holeOf = (form: string, name: string): Hole | undefined => (holesIn(form, form) ?? []).find((each) => each.name === name);
 
 const WORD = /[^<>[\]\s]+/g;
 
@@ -344,44 +330,25 @@ export interface Held {
   names: readonly { hole: string; kind: string }[];
 }
 
-const holding = new Map<string, Held | undefined>();
-
-export function heldIn(under: string, indent: number, written: Written, hole: Hole, beside: readonly string[], opens: readonly string[]): Held | undefined {
-  const key = [under, indent, written.form, hole.name, hole.start, opens.join('/')].join(' ');
-  if (holding.has(key)) return holding.get(key);
-  const parser = describerIn(under, indent, written, hole, beside, opens);
-  const shaping = holeOf(written.form, hole.name);
-  const found = parser === undefined || shaping === undefined ? undefined : broken(under, indent, written, hole, shaping, parser, opens);
-  if (holding.size >= RECALL) holding.clear();
-  holding.set(key, found);
-  return found;
-}
-
-function broken(under: string, indent: number, written: Written, hole: Hole, shaping: Hole, parser: Parser<unknown>, opens: readonly string[]): Held {
+export function heldBy(parser: Parser<unknown>): Held {
   const words = new Set<string>();
-  const names = new Map<string, string>();
-  const shown = paired(parser.forms, parser.examples);
-  parser.forms.forEach((form, index) => {
+  const holding = new Map<string, string>();
+  const inner = parser.holds?.() ?? {};
+  for (const form of parser.forms) {
     for (const word of wordsOf(form)) words.add(word);
-    const example = shown[index];
-    if (example === undefined) return;
-    // Each placeholder of the hole's own grammar, stood where the hole stands, so that it is asked the same question the hole was.
-    const whole = { form: standingIn(written.form, shaping, form), example: standingIn(written.example, hole, example) };
-    for (const inner of holesIn(form, example) ?? []) {
-      const at = { name: inner.name, start: hole.start + inner.start, end: hole.start + inner.end };
-      const kind = only(kindsStanding(sat(under, indent, standingIn(whole.example, at, PROBE), opens)));
+    for (const hole of holeNames(form)) {
+      const kind = kindNamed(parser, hole);
+      // Several placeholders of one grammar may name the same kind — a condition calls it `<flag>` in one shape and holds a whole condition in another — and the ids under each would be the same list under two headings.
       if (kind !== undefined) {
-        names.set(inner.name, kind);
+        if (!holding.has(kind)) holding.set(kind, hole);
         continue;
       }
-      const held = describerIn(under, indent, whole, at, [], opens);
+      // A placeholder filled from a closed set of words is those words: the comparisons are part of what a condition is written with, not a list an author picks an id from.
+      const held = inner[hole];
       if (held !== undefined && closed(held)) for (const word of held.forms) words.add(word);
     }
-  });
-  // Several placeholders of one grammar may name the same kind — a condition calls it `<flag>` in one shape and `<reference>` in another — and the ids under each would be the same list under three headings.
-  const once = new Map<string, string>();
-  for (const [hole, kind] of names) if (!once.has(kind)) once.set(kind, hole);
-  return { words: [...words], names: [...once].map(([kind, hole]) => ({ hole, kind })) };
+  }
+  return { words: [...words], names: [...holding].map(([kind, hole]) => ({ hole, kind })) };
 }
 
 export const said = (...parts: (string | undefined)[]): string | undefined => {
@@ -389,22 +356,15 @@ export const said = (...parts: (string | undefined)[]): string | undefined => {
   return held.length === 0 ? undefined : held.join(' — ');
 };
 
-// Asking the engine costs a parse, and a page asks again at every keystroke; what it is asked about changes as an author moves, so the answers are kept but not hoarded.
-const RECALL = 2000;
-const recalled = new Map<string, string | undefined>();
-
-// What a line names beyond what its own placeholders say: the kind the engine reads at each hole, asked by standing a probe there in the line's own example. A hole already called after its kind has nothing to add.
-export function saysKind(under: string, indent: number, written: Written): string | undefined {
-  const key = [under, indent, written.form].join(' ');
-  if (recalled.has(key)) return recalled.get(key);
-  const named = (holesIn(written.form, written.example) ?? [])
-    .map((hole) => ({ hole, kind: only(kindsStanding([under, `${' '.repeat(indent)}${standingIn(written.example, hole, PROBE)}`].join('\n'))) }))
-    .filter((each): each is { hole: Hole; kind: string } => each.kind !== undefined && !each.hole.name.split(' ').includes(each.kind));
-  // A hole whose own line puts an id there names one; a hole that puts something else there, as `<weight>` puts `3x`, takes an id as well as what it shows, and saying it names one would be a lie about the common case.
-  const said = named.length === 0 ? undefined : [...new Set(named.map((each) => `${BARE.test(valueIn(written.example, each.hole)) ? 'names' : 'may instead name'} a # ${each.kind}`))].join(', ');
-  if (recalled.size >= RECALL) recalled.clear();
-  recalled.set(key, said);
-  return said;
+// What a line names beyond what its own placeholders say. A hole already called after its kind has nothing to add; a hole that holds a grammar of its own, or whose own line puts something other than an id there, as `<weight>` puts `3x`, takes an id as well as what it shows.
+export function namesKind(written: Written): string | undefined {
+  const held = written.holds?.() ?? {};
+  const spoken = (holesIn(written.form, written.example) ?? []).flatMap((hole) => {
+    const kind = kindNamed(written, hole.name);
+    if (kind === undefined || hole.name.split(' ').includes(kind)) return [];
+    return [`${BARE.test(valueIn(written.example, hole)) && held[hole.name] === undefined ? 'names' : 'may instead name'} a # ${kind}`];
+  });
+  return spoken.length === 0 ? undefined : [...new Set(spoken)].join(', ');
 }
 
 const addressOffers = (known: readonly Addressed[], kinds: ReadonlySet<string>, before: string, typed: string, family?: string): Offer[] =>
@@ -417,31 +377,30 @@ const KEYED = /^(?<key>[a-z][a-z0-9 -]*?):[ \t]*/;
 
 const oneOf = (parser: Parser<unknown>): Parser<unknown> => ('element' in parser ? (parser as ListParser<unknown>).element : parser);
 
-function fieldNamed(owner: Section, written: string, alone: boolean): { key: string | null; parser: Parser<unknown> | null } {
+// The field a line is written under, and what it says its values hold. What the field says stands over what its parser says, since one parser writes the values of fields that name different kinds.
+function fieldNamed(owner: Section, written: string, alone: boolean): { key: string | null; parser: Parser<unknown> | null; filled: Filled } {
   const schema = owner.schema;
-  if (schema === undefined) return { key: null, parser: null };
+  if (schema === undefined) return { key: null, parser: null, filled: {} };
   const key = KEYED.exec(written)?.groups?.key;
   const found = Object.entries(schema.fields).find(([name, spec]) => (key === undefined ? name === schema.clauses : !isPositionalField(schema, name) && (spec.keyword ?? name) === key));
-  if (found === undefined) return { key: null, parser: null };
+  if (found === undefined) return { key: null, parser: null, filled: {} };
   const parser = found[1].parser as Parser<unknown>;
-  return { key: key ?? null, parser: alone ? oneOf(parser) : parser };
+  return { key: key ?? null, parser: alone ? oneOf(parser) : parser, filled: { ...filledBy(parser), ...filledBy(found[1]) } };
 }
 
 // One shape a line could still turn into, read against the text written under the keyword it sits after.
-interface Shape {
+interface Shape extends Filled {
   form: string;
   example: string;
   under: string;
   against: string;
   family?: string;
   note?: string;
-  // The kind of thing the line says it names, where it says so. Such a hole is filled with an id and with nothing else.
-  names?: string;
   // The first line of the block this shape opens, since a line that opens one and is handed over without it is refused for holding nothing.
   opens?: string;
 }
 
-const shapeOf = (written: Written, under: string, against: string, family?: string): Shape => ({ form: written.form, example: written.example, under, against, ...(written.block?.()[0]?.example === undefined ? {} : { opens: written.block()[0]!.example }), ...((family ?? written.family) === undefined ? {} : { family: family ?? written.family }), ...(written.note === undefined ? {} : { note: written.note }), ...(written.names === undefined ? {} : { names: written.names }) });
+const shapeOf = (written: Written, under: string, against: string, family?: string): Shape => ({ form: written.form, example: written.example, under, against, ...(written.block?.()[0]?.example === undefined ? {} : { opens: written.block()[0]!.example }), ...((family ?? written.family) === undefined ? {} : { family: family ?? written.family }), ...(written.note === undefined ? {} : { note: written.note }), ...filledBy(written) });
 
 const worth = (found: Alignment): number => (found.complete ? 1000 : 0) + found.spelt;
 
@@ -461,18 +420,21 @@ const reading = (shapes: readonly Shape[]): { shape: Shape; read: Alignment }[] 
     return read === null ? [] : [{ shape, read }];
   });
 
-// Where the cursor stands. What one line of this shape puts in that hole is the only thing the engine can be asked what the hole names, and a hole the shape's own example leaves out has nothing but its name to give.
-function fillingHole(found: { shape: Shape; read: Alignment }): { form: string; hole: string; like?: string; probe?: string; whole?: Written; at?: Hole } | undefined {
+// Where the cursor stands. What one line of this shape puts in that hole is the nearest thing to a value an author can be shown, and a hole the shape's own example leaves out has nothing but its name to give.
+function fillingHole(found: { shape: Shape; read: Alignment }): { form: string; hole: string; like?: string } | undefined {
   const open = found.read.open;
   if (open === null) return undefined;
   const holes = holesIn(found.shape.form, found.shape.example) ?? [];
   const hole = holes[found.read.holes.length - 1]?.name === open.name ? holes[found.read.holes.length - 1] : holes.find((each) => each.name === open.name);
   if (hole === undefined) return { form: found.shape.form, hole: open.name };
-  // The whole line this shape writes, keyword and all, since a hole is only a hole of a line the engine can be handed.
-  const whole = { form: `${found.shape.under}${found.shape.form}`, example: `${found.shape.under}${found.shape.example}` };
-  const at = { name: hole.name, start: found.shape.under.length + hole.start, end: found.shape.under.length + hole.end };
-  return { form: found.shape.form, hole: hole.name, like: valueIn(found.shape.example, hole), probe: `${found.shape.under}${standingIn(found.shape.example, hole, PROBE)}`, whole, at };
+  return { form: found.shape.form, hole: hole.name, like: valueIn(found.shape.example, hole) };
 }
+
+// What the author has already put in another hole of the line being written, which is how a line that says one hole names whatever another one holds is read.
+const wroteIn = (found: { shape: Shape; read: Alignment }) => (hole: string): string | undefined => {
+  const at = found.read.holes.find((each) => each.name === hole);
+  return at === undefined || at === found.read.open ? undefined : valueIn(found.shape.against, at);
+};
 
 const offerFor = (form: string, family?: string, note?: string): Offer => ({ form, insert: literalOf(form) === '' ? form : literalOf(form), ...(family === undefined ? {} : { family }), ...(note === undefined ? {} : { note }) });
 
@@ -535,69 +497,69 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const tail = text.slice(at, lineEnd);
   const to = at + (tail.indexOf(',') < 0 ? tail.length : tail.indexOf(','));
 
-  const token = TRAILING_ID.exec(typed)![0];
-  const past = at + LEADING_ID.exec(tail)![0].length;
+  const trailing = TRAILING_ID.exec(typed)![0];
   const continuing = opening !== null && opening[0].startsWith(',');
   const written = continuing ? text.slice(lineStart + indent, from) : typed;
-  const named = fieldNamed(owner, written, true);
-  const under = named.key === null || continuing ? '' : (KEYED.exec(written)?.[0] ?? '');
+  const field = fieldNamed(owner, written, true);
+  const under = field.key === null || continuing ? '' : (KEYED.exec(written)?.[0] ?? '');
   const left = typed.slice(under.length);
   const above = enclosing(text, lineStart, indent);
   const held = asRead(`${text.slice(0, lineStart)}${text.slice(lineEnd)}`);
   const here = linesAt(owner, text, lineStart, indent);
-  const alongside = continuing ? 'one more value' : named.key === null ? 'what goes here' : `what ${named.key}: takes`;
+  const alongside = continuing ? 'one more value' : field.key === null ? 'what goes here' : `what ${field.key}: takes`;
   const lines = here.lines.filter((written) => written.needs === undefined || held === undefined || held[written.needs] !== undefined);
 
   const shapes: Shape[] = [
     ...(continuing || under !== '' ? [] : lines).map((line) => shapeOf(line, '', typed)),
-    ...(named.parser === null ? [] : named.parser.forms).map((form) => shapeOf({ form, example: exampleOf(form, named.parser!.examples) ?? form }, under, left, alongside)),
+    ...(field.parser === null ? [] : field.parser.forms).map((form) => shapeOf({ form, example: exampleOf(form, field.parser!.examples) ?? form, ...field.filled }, under, left, alongside)),
   ];
   const line = text.slice(lineStart, lineEnd);
   const reads = readAs(here.lines, line.trim());
-  const shown = narrowed(reading(shapes));
-  // Where the engine has already read the whole line as one shape, the cursor stands in that shape. Two shapes the line has spelt nothing of are otherwise told apart by which was declared first, which is no answer at all.
-  const stood = standing(shown.filter((each) => each.shape.form === reads)) ?? standing(shown);
+  const read = reading(shapes);
+  const shown = narrowed(read);
+  // Where the engine has already read the whole line as one shape, the cursor stands in that shape, whether or not another shape spells out one character more of it. Two shapes the line has spelt nothing of are otherwise told apart by which was declared first, which is no answer at all.
+  const stood = standing(read.filter((each) => each.shape.form === reads)) ?? standing(shown);
   const filling = stood === undefined ? undefined : fillingHole(stood);
 
-  // A line that opens a block and is handed over without one is refused for holding nothing, so the block's own first line goes under it.
-  const body = stood?.shape.opens === undefined ? [] : indentLines([stood.shape.opens], indent + 2);
-  const spliced = (stood: string): string => around(heading, above, `${text.slice(lineStart, from)}${stood}${text.slice(to, lineEnd)}`, body);
-  // What the hole under the cursor names is asked of the engine by standing a probe in that hole of a whole line of this shape, which is the only account of the hole rather than of whatever the token happens to be part of.
-  const holds = filling?.probe === undefined ? new Set<string>() : kindsStanding(spliced(filling.probe));
-  // The ids on offer are whatever kind the engine reads where the cursor stands: the token it is on, or, where that leaves too little to parse, the hole around it.
-  const kinds = kindsStanding(around(heading, above, `${text.slice(lineStart, at - token.length)}${PROBE}${text.slice(past, lineEnd)}`));
-  if (kinds.size === 0) for (const each of holds) kinds.add(each);
+  // What the hole under the cursor names is what its own line says it names, which is the same answer wherever that line is written and whatever the token happens to be part of.
+  const naming = stood === undefined || filling === undefined ? undefined : kindNamed(stood.shape, filling.hole, wroteIn(stood));
 
   // A shape the line has spelt out but not finished is being written, not broken; anything else is handed to the engine, whose word on it is the only honest one.
   const refused =
     line.trim() === '' || (stood !== undefined && !stood.read.complete && stood.read.spelt > 0)
       ? null
       : refusalAt(text.slice(head.at), { start: lineStart - head.at, end: lineEnd - head.at }, here.lines.find((line) => line.form === reads)?.block?.(), indent, at - head.at);
-  // A shape a refused line has spelt none of is not what it is being written as; saying so would be guessing over the engine's own word.
-  const filled = filling === undefined || (refused !== null && stood!.read.spelt === 0) ? undefined : filling;
+  // A shape a refused line has spelt none of is not what it is being written as; saying so would be guessing over the engine's own word. A shape that opens with a placeholder has nothing to spell before it, so a line standing in that first placeholder has spelt all of it there was to spell.
+  const openedWith = stood?.read.open !== null && stood?.read.open.start === 0;
+  const filled = filling === undefined || (refused !== null && stood!.read.spelt === 0 && !openedWith) ? undefined : filling;
   // The one shape the cursor is standing inside, which the path above the offers already names. The shapes are offered to be chosen between, so where this is the only one still standing there is nothing left to choose and the hole's own values are the answer.
   const writing = filled === undefined ? undefined : stood!.shape.form;
-  // What a hole may hold in its own words, asked of the hole rather than of the line: the same answer wherever that hole is written, and none where the shapes beside it already say it.
-  // A hole its own line declares it names is filled with an id, so it has no grammar of its own to be broken into and the ids are the whole answer. Asked anyway, the search for a grammar that fits finds one by coincidence: a value parser reads `death` as a bare id, and a kind that nests actions takes `on 3 plank:` as an action called that, so nothing the engine does refuses it.
-  const holdings = filled?.whole === undefined || filled.at === undefined || stood?.shape.names !== undefined ? undefined : heldIn(beneath(heading, above), indent, filled.whole, filled.at, shown.map(({ shape }) => `${shape.under}${shape.form}`), body);
+  // What a hole holds where it holds a grammar rather than a name, which its own line says: the same answer wherever that hole is written.
+  const holding = stood === undefined || filled === undefined ? undefined : stood.shape.holds?.()[filled.hole];
+  const holdings = holding === undefined ? undefined : heldBy(holding);
+  // What the author has typed of the hole they are standing in. An address is written with dots in it, so the token runs back through them — but no further than the hole it fills: in `use: item.a-mod` the id being written is `a-mod`.
+  const reached = stood === undefined || stood.read.open === null ? 0 : stood.shape.under.length + stood.read.open.start;
+  const started = typed.slice(0, Math.max(typed.length - trailing.length, Math.min(reached, typed.length)));
+  const token = typed.slice(started.length);
   return {
     from,
     to,
     where: here.where,
     reads,
-    filling:
-      filled === undefined ? null : { form: filled.form, hole: filled.hole, ...(filled.like === undefined ? {} : { like: filled.like }), ...(only(holds) === undefined ? {} : { kind: only(holds)! }), ...(holdings === undefined ? {} : { holds: holdings }) },
+    filling: filled === undefined ? null : { form: filled.form, hole: filled.hole, ...(filled.like === undefined ? {} : { like: filled.like }), ...(naming === undefined ? {} : { kind: naming }), ...(holdings === undefined ? {} : { holds: holdings }) },
     refused,
     undeclared: undeclaredIn(around(heading, above, line), known),
     // A shape whose words are the ones already written would put back what it replaced, and an author who has written them is being offered nothing.
     offers: deduped([
       // A hole broken into what it may name puts each kind under the placeholder that names it, so `<flag>` and `<item>` are told apart under an `if` rather than heaped together.
-      ...(holdings === undefined ? addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token) : holdings.names.flatMap((each) => addressOffers(known, new Set([each.kind]), typed.slice(0, typed.length - token.length), token, `<${each.hole}>`))),
+      ...(holdings === undefined
+        ? addressOffers(known, new Set(naming === undefined ? [] : [naming]), started, token)
+        : holdings.names.flatMap((each) => addressOffers(known, new Set([each.kind]), started, token, `<${each.hole}>`))),
       ...(shown.length === 1 && shown[0]!.shape.form === writing ? [] : shown)
         .map(({ shape }) => {
           // The heading already names the kind under the cursor; a shape that only names the same one has nothing left to add.
-          const names = saysKind(beneath(heading, above), indent, { form: `${shape.under}${shape.form}`, example: `${shape.under}${shape.example}` });
-          return offerFor(shape.form, shape.family, said(shape.note, names === `names a # ${only(holds)}` || names === `may instead name a # ${only(holds)}` ? undefined : names));
+          const names = namesKind({ form: `${shape.under}${shape.form}`, example: `${shape.under}${shape.example}`, ...filledBy(shape) });
+          return offerFor(shape.form, shape.family, said(shape.note, names === `names a # ${naming}` || names === `may instead name a # ${naming}` ? undefined : names));
         })
         .filter((offer) => offer.insert !== text.slice(from, to)),
     ]),
