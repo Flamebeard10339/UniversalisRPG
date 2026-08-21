@@ -1,4 +1,4 @@
-import { Cursor, DslError, Parser, Span } from './parser';
+import { Cursor, DslError, Parser, Span, Written } from './parser';
 import { ListParser } from './list';
 import { RawLine, RawSection, hasBlock, indentLines, sectionParser, takeBlock } from './structure';
 
@@ -31,29 +31,10 @@ export interface MappedField<T, Self> extends FieldPrinting {
   keyword?: string;
 }
 
-export interface Lines {
-  forms: readonly string[];
-  examples: readonly string[];
-}
-
-export interface BlockLines {
-  opens: Lines;
-  lines: Lines;
-}
-
-export interface Grammar {
-  lines: Lines;
-  block?: BlockLines;
-}
-
-export const noLines: Lines = { forms: [], examples: [] };
-
-export const bothLines = (parts: readonly Lines[]): Lines => ({ forms: parts.flatMap((part) => part.forms), examples: parts.flatMap((part) => part.examples) });
-
 export interface EntryBody {
   parse(cursor: Cursor, label: string): object;
   parseBlock(lines: RawLine[], label: string): object;
-  grammar: BlockLines;
+  grammar: readonly Written[];
 }
 
 export interface SectionSchema<H extends { id: string }, Flags extends keyof H = never, Entries extends keyof H = never> {
@@ -67,6 +48,7 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
   keywordsAfter?: Exclude<keyof H, 'id' | Flags | Entries>;
   entries?: { into: Entries; body: EntryBody };
   exclusive?: readonly (readonly Exclude<keyof H, 'id' | Flags | Entries>[])[];
+  needs?: Partial<Record<Exclude<keyof H, 'id'> | Flags, Exclude<keyof H, 'id' | Flags | Entries>>>;
 }
 
 export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H, 'id'>>;
@@ -86,6 +68,7 @@ export interface AnySchema {
   keywords?: readonly string[];
   keywordsAfter?: string;
   entries?: { into: string; body: EntryBody };
+  needs?: Record<string, string>;
 }
 
 const isListParser = (parser: unknown): boolean => typeof parser === 'object' && parser !== null && 'element' in parser;

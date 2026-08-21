@@ -23,6 +23,11 @@ const offered = (written: string): string[] => {
   return offeringAt(text, cursor, KNOWN).offers.map((offer) => offer.form);
 };
 
+const shapes = (written: string): string[] => {
+  const { text, cursor } = at(written);
+  return offeringAt(text, cursor, KNOWN).offers.filter((offer) => offer.kind === undefined).map((offer) => offer.form);
+};
+
 const inserted = (written: string, form: string): string => {
   const { text, cursor } = at(written);
   const offering = offeringAt(text, cursor, KNOWN);
@@ -65,7 +70,11 @@ describe('a namespace', () => {
 
 describe('a field', () => {
   it('shows the shape it takes rather than a value someone once wrote', () => {
-    expect(offered('# location tutorial-island.beach\nadj|')).toEqual(['adjacent: <location>, …']);
+    expect(offered('# location tutorial-island.beach\nadj|')).toEqual(['adjacent: <location>, …', 'adjacent:']);
+  });
+
+  it('offers itself bare, for the block it can be written as instead', () => {
+    expect(shapes('# location tutorial-island.beach\nadjacent:\n  |')).toEqual(['<location>', '<location> while <condition>']);
   });
 
   it('hands over what its form spells out, and stops where the author must choose', () => {
@@ -113,7 +122,7 @@ describe('an offering', () => {
     const opening = `# ${kind} probe\n`;
     const offering = offeringAt(opening, opening.length, KNOWN);
     const owner = sectionFor(kind)!;
-    const declared = [...owner.grammar.lines.forms, ...Object.values(owner.schema?.fields ?? {}).flatMap((spec) => (spec.parser as Parser<unknown>).forms)];
+    const declared = [...owner.grammar.map((each) => each.form), ...Object.values(owner.schema?.fields ?? {}).flatMap((spec) => (spec.parser as Parser<unknown>).forms)];
     for (const offer of offering.offers) {
       expect(declared, `# ${kind} offers ${offer.form}`).toContain(offer.form);
       expect(offer.form.startsWith(offer.insert), `# ${kind} writes in ${JSON.stringify(offer.insert)} for ${offer.form}`).toBe(true);
@@ -123,7 +132,7 @@ describe('an offering', () => {
 
   it.each(sections().map((each) => each.kind))('%s takes an id it names without unsettling the section around it', (kind) => {
     const owner = sectionFor(kind)!;
-    for (const example of owner.grammar.lines.examples) {
+    for (const example of owner.grammar.map((each) => each.example)) {
       const opening = `# ${kind} probe\n${example}`;
       const offering = offeringAt(opening, opening.length, KNOWN);
       for (const offer of offering.offers.filter((each) => each.kind !== undefined)) {

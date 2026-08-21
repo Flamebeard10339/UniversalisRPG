@@ -6,6 +6,14 @@ export interface Parser<T> {
   examples: readonly string[];
 }
 
+// One line an author may write. A `block` says what its indented lines hold, and is a thunk because a result block holds results.
+export interface Written {
+  form: string;
+  example: string;
+  needs?: string;
+  block?: () => readonly Written[];
+}
+
 export interface Span {
   start: number;
   end: number;

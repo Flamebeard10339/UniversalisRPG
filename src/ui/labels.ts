@@ -35,6 +35,8 @@ export const LABELS = {
   'every-kind': 'engine.shell.every-kind',
   section: 'engine.shell.section',
   grammar: 'engine.shell.grammar',
+  'step-in': 'engine.shell.step-in',
+  'step-out': 'engine.shell.step-out',
   new: 'engine.shell.new',
   search: 'engine.shell.search',
   'search-hint': 'engine.shell.search-hint',

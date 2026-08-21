@@ -1,7 +1,7 @@
 import { Condition, condition } from './condition';
+import { writtenFrom } from './codec';
 import { ListParser } from './list';
-import { Lines } from './section';
-import { Cursor, DslError, Parser, Span, requireEnd } from './parser';
+import { Cursor, DslError, Parser, Span, Written, requireEnd } from './parser';
 import { range, Range, scaleRange } from './range';
 import { RawLine, hasBlock, indentLines, requireNoBlock, takeBlock } from './structure';
 import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantified, refuseRange, REFERENCE } from './values';
@@ -449,12 +449,6 @@ const LEAF_FORMS: readonly string[] = [
   'stop',
 ];
 
-// Each of these opens an indented block of its own, so it is two lines at the least.
-export const WRAPPER_LINES: Lines = {
-  forms: ['if <condition>:\n  <result>', 'one of:\n  <weight>x: <result>', '<chance> in <outof>:\n  <result>', 'credit:\n  <result>', '<mine> vs <theirs>:\n  <result>'],
-  examples: ['if has-key:\n  give: plank', 'one of:\n  3x: give: plank', '3 in 10:\n  give: plank', 'credit:\n  give: plank', 'attack vs defence:\n  give: plank'],
-};
-
 export const actionResult: Parser<ActionResult> = {
   parse: parseResult,
   print: printResult,
@@ -462,11 +456,28 @@ export const actionResult: Parser<ActionResult> = {
   examples: LEAF_EXAMPLES,
 };
 
+const ROWS: readonly Written[] = [
+  { form: '<weight>x: <result>', example: '3x: give: plank' },
+  { form: '<weight>x: nothing', example: '5x: nothing' },
+  { form: '<weight>x[ if <condition>]:', example: '3x if has-key:', block: () => resultGrammar() },
+];
+
+const WRAPPERS: readonly Written[] = [
+  { form: 'if <condition>:', example: 'if has-key:', block: () => resultGrammar() },
+  { form: '<chance> in <of>:', example: '3 in 10:', block: () => resultGrammar() },
+  { form: '[my ]<stat> vs [their ]<stat>:', example: 'attack vs defence:', block: () => resultGrammar() },
+  { form: 'credit:', example: 'credit:', block: () => resultGrammar() },
+  { form: 'one of:', example: 'one of:', block: () => ROWS },
+];
+
+export const resultGrammar = (): readonly Written[] => [...writtenFrom(actionResult), ...WRAPPERS];
+
 const RESULT_LIST_EXAMPLES: readonly string[] = [...LEAF_EXAMPLES, 'set: found-key, add: gold 5'];
-const RESULT_LIST_FORMS: readonly string[] = [...LEAF_FORMS, '<result>, <result>'];
+const RESULT_LIST_FORMS: readonly string[] = ['<result>, …', ...LEAF_FORMS];
 
 export const resultList: ListParser<ActionResult> = {
   element: actionResult,
+  lines: resultGrammar,
   print: printResults,
   forms: RESULT_LIST_FORMS,
   examples: RESULT_LIST_EXAMPLES,
@@ -483,6 +494,7 @@ export const resultList: ListParser<ActionResult> = {
 
 export const hookResultList: ListParser<ActionResult> = {
   element: actionResult,
+  lines: resultGrammar,
   print: printResults,
   forms: RESULT_LIST_FORMS,
   examples: RESULT_LIST_EXAMPLES,

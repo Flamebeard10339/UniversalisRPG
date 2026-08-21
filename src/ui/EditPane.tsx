@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { searching } from './authoringSurface';
 import { draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, type EditHeld } from './editControls';
 import { splitFrom } from './gesture';
+import { grouped, shownIn } from './offerGroups';
 import { Splitter } from './Splitter';
 import { useTestSurface } from './useTestSurface';
 import type { Words } from './words';
@@ -167,6 +168,34 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                 onSelect={(event) => controls.cursor(event.currentTarget.selectionStart)}
                 className="min-h-0 flex-1 resize-none select-text rounded-xl border border-border bg-panel px-3 pb-14 pt-2 font-mono text-xs text-text outline-none focus:border-accent"
               />
+              <div className="absolute bottom-2 left-2 flex gap-2">
+                <button
+                  data-drive="edit.step-out"
+                  type="button"
+                  aria-label={words('step-out')}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    taken.current = true;
+                    controls.stepOut();
+                  }}
+                  className="rounded-xl border border-border bg-surface px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97]"
+                >
+                  {words('step-out')}
+                </button>
+                <button
+                  data-drive="edit.step-in"
+                  type="button"
+                  aria-label={words('step-in')}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    taken.current = true;
+                    controls.stepIn();
+                  }}
+                  className="rounded-xl border border-border bg-surface px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97]"
+                >
+                  {words('step-in')}
+                </button>
+              </div>
               <div className="absolute bottom-2 right-2 flex gap-2">
                 <button
                   data-drive="edit.unstage"
@@ -189,24 +218,29 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
             </div>
             {offering.offers.length > 0 ? (
               <div data-drive="edit.offers" aria-label={words('grammar')} className="w-2/5 max-w-[16rem] shrink-0 overflow-y-auto rounded-xl border border-border bg-panel">
-                {offering.offers.map((offer) => (
-                  <button
-                    key={offer.form}
-                    data-drive="edit.take"
-                    type="button"
-                    data-offer={offer.form}
-                    data-kind={offer.kind}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      taken.current = true;
-                      controls.take(offer.form);
-                    }}
-                    className={`block w-full whitespace-pre-wrap break-words border-b border-border px-2 text-left font-mono text-[11px] leading-tight last:border-b-0 ${
-                      offer.kind === undefined ? 'text-text-subtle' : 'text-accent'
-                    }`}
-                  >
-                    {offer.form}
-                  </button>
+                {grouped(offering.offers).map((group, at) => (
+                  <div key={group.head ?? `${at}`} className="border-b border-border last:border-b-0">
+                    {group.head === null ? null : <div className="px-2 font-mono text-[11px] leading-tight text-text">{group.head}</div>}
+                    {group.offers.map((offer) => (
+                      <button
+                        key={offer.form}
+                        data-drive="edit.take"
+                        type="button"
+                        data-offer={offer.form}
+                        data-kind={offer.kind}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          taken.current = true;
+                          controls.take(offer.form);
+                        }}
+                        className={`block w-full whitespace-pre-wrap break-words px-2 text-left font-mono text-[11px] leading-tight ${group.head === null ? '' : 'pl-4'} ${
+                          offer.kind === undefined ? 'text-text-subtle' : 'text-accent'
+                        }`}
+                      >
+                        {shownIn(group, offer)}
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
             ) : null}

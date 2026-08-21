@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
+import type { Written } from '../grammar/parser';
 import { text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
@@ -61,31 +62,26 @@ describe('every section kind', () => {
     }
   });
 
-  it.each(sections().map((each) => each.kind))('%s writes out example lines that parse where they are offered', (kind) => {
+  it.each(sections().map((each) => each.kind))('%s writes out example lines that parse where they sit in its grammar', (kind) => {
     const owner = sectionFor(kind)!;
-    const parses = (lines: readonly string[]): void => {
-      const written = [`# ${kind} probe`, ...lines].join('\n');
-      expect(() => owner.parse(splitSections(written)[0]!), written).not.toThrow();
+    const seen = new Set<string>();
+    let checked = 0;
+    const walk = (lines: readonly Written[], under: readonly string[]): void => {
+      const key = lines.map((each) => each.form).join('\n');
+      if (lines.length === 0 || seen.has(key)) return;
+      seen.add(key);
+      expect(formFailures(`# ${kind} under ${under.join(' / ') || 'itself'}`, lines.map((each) => each.form), lines.map((each) => each.example))).toEqual([]);
+      for (const line of lines) {
+        const held = line.block?.();
+        const opened = held === undefined ? [] : indentLines([held[0]!.example], 2 * (under.length + 1));
+        const written = [`# ${kind} probe`, ...under.map((each, deep) => indentLines([each], 2 * deep)[0]!), ...indentLines([line.example], 2 * under.length), ...opened].join('\n');
+        expect(() => owner.parse(splitSections(written)[0]!), written).not.toThrow();
+        checked += 1;
+        if (held !== undefined) walk(held, [...under, line.example]);
+      }
     };
-    for (const line of owner.grammar.lines.examples) parses(line.split('\n'));
-    const block = owner.grammar.block;
-    if (block === undefined) return;
-    expect(block.opens.examples.length).toBeGreaterThan(0);
-    for (const opens of block.opens.examples) parses(opens.split('\n'));
-    for (const line of block.lines.examples) parses([block.opens.examples[0]!, ...indentLines(line.split('\n'))]);
-  });
-
-  it.each(sections().map((each) => each.kind))('%s shows a form for every line it writes out, and writes out one for every form', (kind) => {
-    const owner = sectionFor(kind)!;
-    const block = owner.grammar.block;
-    const shown = [
-      ['lines', owner.grammar.lines],
-      ...(block === undefined ? [] : ([['block opens', block.opens], ['block lines', block.lines]] as const)),
-    ] as const;
-    for (const [where, lines] of shown) {
-      if (lines.forms.length === 0 && lines.examples.length === 0) continue;
-      expect(formFailures(`# ${kind} ${where}`, lines.forms, lines.examples)).toEqual([]);
-    }
+    walk(owner.grammar, []);
+    expect(checked).toBeGreaterThanOrEqual(owner.grammar.length);
   });
 
   it('is read by parsers that print back what they parsed', () => {

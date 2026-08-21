@@ -1,9 +1,9 @@
-import { ActionResult, parseResultLine, resultLines, resultList, spansLines, startsResult, WRAPPER_LINES } from './actionResult';
+import { ActionResult, parseResultLine, resultGrammar, resultLines, resultList, spansLines, startsResult } from './actionResult';
 import { Condition, condition } from './condition';
 import { HOOK_FIELD_REFUSALS, hookLabelProblem } from './hook';
 import { list } from './list';
-import { Cursor, DslError, requireEnd, Span } from './parser';
-import { bothLines, EntryBody } from './section';
+import { Cursor, DslError, requireEnd, Span, Written } from './parser';
+import { EntryBody } from './section';
 import { RawLine, hasBlock, indentLines, takeBlock } from './structure';
 import { TagClause, tagClause } from './tagClause';
 import { decimal, DECIMAL, id, refuseRange } from './values';
@@ -345,16 +345,23 @@ function refuseHookLabel(label: string, span: Span | undefined): void {
 
 const STANDING_KINDS = TAGGED_ACTION_KINDS.filter((kind) => actionTableProblem({ label: '', kind, results: [] }) === undefined);
 
+const actionFieldLines = (): readonly Written[] =>
+  ACTION_FIELDS.flatMap((field) => [
+    { form: `${field.written}: ${field.form}`, example: `${field.written}: ${field.example}` },
+    ...(field.value === resultsValue ? [{ form: `${field.written}:`, example: `${field.written}:`, block: resultGrammar }] : []),
+  ]);
+
+export const actionLinesWritten = (): readonly Written[] => [
+  ...actionFieldLines(),
+  ...STANDING_KINDS.map((kind) => ({ form: kind, example: kind })),
+  ...resultGrammar(),
+];
+
 export const actionBody: EntryBody = {
-  grammar: {
-    opens: { forms: ['<action>:', '<action>: <results>'], examples: ['chop-wood:', 'chop-wood: give: log'] },
-    lines: bothLines([
-      { forms: ACTION_FIELDS.map((field) => `${field.written}: ${field.form}`), examples: ACTION_FIELDS.map((field) => `${field.written}: ${field.example}`) },
-      { forms: STANDING_KINDS, examples: STANDING_KINDS },
-      { forms: resultList.forms, examples: resultList.examples },
-      WRAPPER_LINES,
-    ]),
-  },
+  grammar: [
+    { form: '<action>: <results>', example: 'chop-wood: give: log' },
+    { form: '<action>:', example: 'chop-wood:', block: actionLinesWritten },
+  ],
   parse: (cursor, label) => {
     refuseHookLabel(label, {
       start: cursor.abs(cursor.pos),

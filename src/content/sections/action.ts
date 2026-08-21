@@ -1,7 +1,7 @@
 import { actionResultLists } from '../../grammar/action';
-import { Action, actionBody, actionLines, actionProblem, assembledActionProblem } from '../../grammar/action';
+import { Action, actionBody, actionLines, actionLinesWritten, actionProblem, assembledActionProblem } from '../../grammar/action';
 import { DslError } from '../../grammar/parser';
-import { bothLines, moduleLocalId } from '../../grammar/section';
+import { moduleLocalId } from '../../grammar/section';
 import { humanizeEn, lastSegment } from '../../grammar/values';
 import { declaredId } from './entity';
 import { actionSlug, localeKey } from '../locale';
@@ -44,7 +44,7 @@ export const action = section<ActionDeclaration>()({
   kind: 'action',
   ids: 'owned',
   map: 'actions',
-  grammar: { lines: bothLines([{ forms: ['title: <text>'], examples: ['title: Chop Wood'] }, actionBody.grammar.lines]) },
+  grammar: [{ form: 'title: <text>', example: 'title: Chop Wood' }, ...actionLinesWritten()],
   parse: (raw) => {
     if (!raw.id) throw new DslError('# action requires an id', raw.span);
     const titles = raw.body.filter((line) => TITLE.test(line.text));

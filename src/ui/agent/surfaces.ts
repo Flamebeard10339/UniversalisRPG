@@ -227,6 +227,8 @@ export function editSurface(held: EditHeld): TestSurface {
       text: (value) => held.controls.text(String(value), String(value).length),
       cursor: (value) => held.controls.cursor(Number(value)),
       take: (value) => held.controls.take(offerNamed(held, value)),
+      'step-in': () => held.controls.stepIn(),
+      'step-out': () => held.controls.stepOut(),
       scroll: (value) => held.controls.scroll(Number(value)),
       split: (value) => held.controls.split(Number(value)),
       stage: () => held.controls.stage(),

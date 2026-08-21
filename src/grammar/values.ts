@@ -100,7 +100,7 @@ export const id: Parser<string> = {
     return raw;
   },
   print: (value) => value,
-  forms: ['<id>', '<module>.<id>'],
+  forms: ['<id>'],
   examples: ['rusty-sword', 'forest.clearing'],
 };
 

@@ -36,7 +36,7 @@ export const save = section<SaveSection>()({
   maps: {
     saves: (value): readonly (readonly [string, ParsedSave])[] => [[value.id, { version: value.version, diff: value.diff }]],
   },
-  grammar: { lines: { forms: ['{"version": <number>[, <the rest of a saved game>]}'], examples: ['{"version": 1}'] } },
+  grammar: [{ form: '{"version": <number>[, <the rest of a saved game>]}', example: '{"version": 1}' }],
   parse: parseSaveSection,
   print: (value, { moduleId, id }) => [`# save ${moduleLocalId(moduleId, id)}`, JSON.stringify({ version: value.version, ...value.diff })],
 });

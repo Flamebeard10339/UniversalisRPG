@@ -1,8 +1,9 @@
 import { actionLines } from '../../grammar/action';
 import { ActionResult } from '../../grammar/actionResult';
-import { DslError, Parser } from '../../grammar/parser';
+import { DslError, Parser, Written } from '../../grammar/parser';
+import { ListParser } from '../../grammar/list';
 import { RawSection, sectionParser } from '../../grammar/structure';
-import { AnyField, AnySchema, Authored, Grammar, HydrateContext, Lines, PrintContext, SectionSchema, bothLines, hydrateSection, isPositionalField, noLines, parseAnySection, printSection } from '../../grammar/section';
+import { AnyField, AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, isPositionalField, parseAnySection, printSection } from '../../grammar/section';
 import { Pruning, Visit } from '../refs';
 import { mergeFields } from '../merge';
 
@@ -24,7 +25,7 @@ export interface Section<V extends { id: string } = { id: string }, M extends Re
   maps: Lands<V, M>;
   nestsActions: boolean;
   flags: readonly string[];
-  grammar: Grammar;
+  grammar: readonly Written[];
   says?: (value: V) => ActionResult[][];
   text: readonly string[];
   schema?: AnySchema;
@@ -57,26 +58,32 @@ type Schematic<V extends { id: string }, F extends keyof V, E extends keyof V> =
 interface Bespoke<V extends { id: string }> extends Common<V> {
   parse: (raw: RawSection) => V;
   print: (value: V, context: PrintContext) => readonly string[];
-  grammar: Grammar;
+  grammar: readonly Written[];
 }
 
-const fieldLine = (schema: AnySchema, name: string, spec: AnyField): Lines => {
+const blockOf = (parser: Parser<unknown>): (() => readonly Written[]) | undefined => ('element' in parser ? () => (parser as ListParser<unknown>).lines() : undefined);
+
+const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] => {
   const parser = spec.parser as Parser<unknown>;
   const [form] = parser.forms;
   const [example] = parser.examples;
-  if (form === undefined || example === undefined) return noLines;
-  const written = (value: string): string => (isPositionalField(schema, name) ? value : `${spec.keyword ?? name}: ${value}`);
-  return { forms: [written(form)], examples: [written(example)] };
+  if (form === undefined || example === undefined) return [];
+  const keyword = spec.keyword ?? name;
+  const positional = isPositionalField(schema, name);
+  const written = (value: string): string => (positional ? value : `${keyword}: ${value}`);
+  const needs = schema.needs?.[name];
+  const block = positional ? undefined : blockOf(parser);
+  return [
+    { form: written(form), example: written(example), ...(needs === undefined ? {} : { needs }) },
+    ...(block === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, block, ...(needs === undefined ? {} : { needs }) }]),
+  ];
 };
 
-const schemaGrammar = (schema: AnySchema): Grammar => ({
-  lines: bothLines([
-    ...Object.entries(schema.fields).map(([name, spec]) => fieldLine(schema, name, spec)),
-    { forms: schema.keywords ?? [], examples: schema.keywords ?? [] },
-    schema.entries?.body.grammar.opens ?? noLines,
-  ]),
-  block: schema.entries?.body.grammar,
-});
+const schemaGrammar = (schema: AnySchema): readonly Written[] => [
+  ...Object.entries(schema.fields).flatMap(([name, spec]) => fieldLines(schema, name, spec)),
+  ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, ...(schema.needs?.[word] === undefined ? {} : { needs: schema.needs![word]! }) })),
+  ...(schema.entries?.body.grammar ?? []),
+];
 
 const ACTION_OWNERS = new Set<string>();
 

@@ -1,12 +1,12 @@
 import { actionResultLists } from '../../grammar/action';
 import { Action, actionBody } from '../../grammar/action';
-import { ActionResult, resultBlock, resultList } from '../../grammar/actionResult';
+import { ActionResult, resultBlock, resultGrammar, resultList } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
 import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
 import { DslError, Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
-import { bothLines, EntryBody, listMembers } from '../../grammar/section';
+import { EntryBody, listMembers } from '../../grammar/section';
 import { duration, id, text } from '../../grammar/values';
 import { condition as visitCondition, hooks, pruneHook, put, results, strings, visitAction, type Loose, type Pruning, type Visit } from '../refs';
 import { section } from './define';
@@ -92,10 +92,7 @@ export const handlerEvent = (label: string): string | undefined => HANDLER_LABEL
 export const isHandlerBlock = (block: EntityBlock): block is HandlerBlock => 'event' in block;
 
 const entityBlock: EntryBody = {
-  grammar: {
-    opens: bothLines([actionBody.grammar.opens, { forms: ['on <event>:'], examples: ['on death:'] }]),
-    lines: actionBody.grammar.lines,
-  },
+  grammar: [...actionBody.grammar, { form: 'on <event>:', example: 'on death:', block: resultGrammar }],
   parse(cursor, label) {
     const event = handlerEvent(label);
     return event === undefined ? actionBody.parse(cursor, label) : { event, results: resultList.parse(cursor) };
@@ -150,6 +147,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     ...HOOK_FIELDS,
   },
   keywords: ['aggressive'],
+  needs: { respawnAfter: 'stats', onHit: 'stats', whenHit: 'stats', aggressive: 'stats' },
   keywordsAfter: 'examine',
   entries: { into: 'blocks', body: entityBlock },
   visit: (value, where, visit) => {

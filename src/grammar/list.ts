@@ -1,10 +1,12 @@
-import { Cursor, Parser, parseWhole } from './parser';
+import { writtenFrom } from './codec';
+import { Cursor, Parser, Written, parseWhole } from './parser';
 import { RawLine } from './structure';
 
 export interface ListParser<E> extends Parser<E[]> {
   element: Parser<E>;
   parseBlock(lines: RawLine[]): E[];
   printBlock(values: readonly E[]): string[];
+  lines(): readonly Written[];
 }
 
 export function list<E>(element: Parser<E>): ListParser<E> {
@@ -28,6 +30,7 @@ export function list<E>(element: Parser<E>): ListParser<E> {
     print,
     forms,
     examples,
+    lines: () => writtenFrom(element),
     parseBlock: (lines) => lines.flatMap((raw) => parseWhole(line, raw.text, raw.span.start, 'a list item')),
     printBlock: (values) => values.map((value) => element.print(value)),
   };

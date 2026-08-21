@@ -2,6 +2,7 @@ import { applied, offeringAt, type Offering } from '../content/completion';
 import type { PlayView } from '../runtime/session';
 import { deleteLine, emptied, kindsOffered, offeredBy, openingLine, removeLine, searching, SHOW_LINE, stage, type Section, type Standing, type SurfaceId } from './authoringSurface';
 import { gotoLine } from './devMode';
+import { stepIn, stepOut } from './editIndent';
 import type { Editing } from './editorMemory';
 
 export const sectionKey = (section: Pick<Section, 'kind' | 'address'>): string => `${section.kind} ${section.address}`;
@@ -15,6 +16,8 @@ export interface EditControls {
   text(draft: string, at: number): void;
   cursor(at: number): void;
   take(form: string): void;
+  stepIn(): void;
+  stepOut(): void;
   scroll(at: number): void;
   split(at: number): void;
   stage(): void;
@@ -75,6 +78,14 @@ export function editControls(held: { sections: readonly Section[]; editing: Edit
       if (offer === undefined) return;
       const taken = applied(draftIn(sections, editing), offering, offer);
       act.move({ ...editing, draft: taken.text, cursor: taken.cursor });
+    },
+    stepIn: () => {
+      const stepped = stepIn(draftIn(sections, editing), editing.cursor);
+      act.move({ ...editing, draft: stepped.text, cursor: stepped.cursor });
+    },
+    stepOut: () => {
+      const stepped = stepOut(draftIn(sections, editing), editing.cursor);
+      act.move({ ...editing, draft: stepped.text, cursor: stepped.cursor });
     },
     scroll: (at) => act.move({ ...editing, scroll: at }),
     split: (at) => act.move({ ...editing, split: at }),

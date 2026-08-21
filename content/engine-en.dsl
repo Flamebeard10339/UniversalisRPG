@@ -155,6 +155,8 @@ engine.shell.global: World
 engine.shell.every-kind: Every kind
 engine.shell.section: Section
 engine.shell.grammar: Grammar
+engine.shell.step-in: →
+engine.shell.step-out: ←
 engine.shell.new: New
 engine.shell.search: Search
 engine.shell.search-hint: all terms must match, e.g. tutorial sword

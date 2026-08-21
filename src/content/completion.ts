@@ -1,6 +1,6 @@
 import type { ListParser } from '../grammar/list';
-import type { Parser } from '../grammar/parser';
-import { DEFAULT_CONTEXT, Lines, isPositionalField, noLines } from '../grammar/section';
+import type { Parser, Written } from '../grammar/parser';
+import { DEFAULT_CONTEXT, isPositionalField } from '../grammar/section';
 import { splitSections } from '../grammar/structure';
 import { Section, sectionFor, sectionKinds } from './sections';
 
@@ -41,18 +41,56 @@ export function namesFrom(address: string, typed: string): boolean {
 }
 
 // Everything a form spells out before its first placeholder is what an author can be handed; a form that opens with one is handed over whole, to edit in place.
-const literalOf = (form: string): string => {
+export const literalOf = (form: string): string => {
   const at = form.search(PLACEHOLDER);
   return at < 0 ? form : form.slice(0, at);
 };
 
-const lineOffers = (lines: Lines, typed: string): Offer[] =>
-  lines.forms
-    .filter((form) => {
-      const literal = literalOf(form);
-      return typed === '' || literal.startsWith(typed) || (literal !== '' && typed.startsWith(literal));
-    })
-    .map((form) => ({ form, insert: literalOf(form) === '' ? form : literalOf(form) }));
+// The line that opened a block names the shape whose block it is: the one spelling out the longest prefix of it, or else the one that spells out nothing.
+function opened(lines: readonly Written[], line: string): Written | undefined {
+  let best: Written | undefined;
+  let longest = -1;
+  for (const written of lines) {
+    if (written.block === undefined) continue;
+    const literal = literalOf(written.form).trimEnd();
+    if (literal !== '' && !line.startsWith(literal)) continue;
+    if (literal.length > longest) {
+      best = written;
+      longest = literal.length;
+    }
+  }
+  return best;
+}
+
+interface Enclosing {
+  text: string;
+  indent: number;
+}
+
+function enclosing(text: string, lineStart: number, indent: number): Enclosing[] {
+  const above = text.slice(0, lineStart).split('\n');
+  const held: Enclosing[] = [];
+  let inner = indent;
+  for (let at = above.length - 1; at >= 0 && inner > 0; at--) {
+    const written = above[at]!;
+    if (written.trim() === '' || written.startsWith('#')) continue;
+    const deep = INDENT.exec(written)![0].length;
+    if (deep >= inner) continue;
+    held.unshift({ text: written.trim(), indent: deep });
+    inner = deep;
+  }
+  return held;
+}
+
+function linesAt(owner: Section, text: string, lineStart: number, indent: number): readonly Written[] {
+  let lines = owner.grammar;
+  for (const above of enclosing(text, lineStart, indent)) {
+    const found = opened(lines, above.text);
+    if (found === undefined) return [];
+    lines = found.block!();
+  }
+  return lines;
+}
 
 const opens = (line: string): string | undefined => HEADING.exec(line)?.groups?.kind;
 
@@ -64,13 +102,23 @@ function kindAbove(text: string, lineStart: number): string | undefined {
   return undefined;
 }
 
+function readSection(text: string): { owner: Section; authored: Record<string, unknown> } | undefined {
+  try {
+    const raw = splitSections(text)[0];
+    const owner = raw === undefined ? undefined : sectionFor(raw.kind);
+    if (raw === undefined || owner === undefined) return undefined;
+    return { owner, authored: owner.parse(raw) as Record<string, unknown> };
+  } catch {
+    return undefined;
+  }
+}
+
 function referencedKinds(text: string, from: number, to: number): Set<string> {
   const found = new Set<string>();
+  const read = readSection(`${text.slice(0, from)}${PROBE}${text.slice(to)}`);
+  if (read === undefined) return found;
   try {
-    const raw = splitSections(`${text.slice(0, from)}${PROBE}${text.slice(to)}`)[0];
-    const owner = raw === undefined ? undefined : sectionFor(raw.kind);
-    if (raw === undefined || owner === undefined) return found;
-    owner.visit(owner.build(owner.parse(raw), DEFAULT_CONTEXT), '', (kind, id) => {
+    read.owner.visit(read.owner.build(read.authored, DEFAULT_CONTEXT), '', (kind, id) => {
       if (id === PROBE || id.endsWith(`.${PROBE}`)) found.add(kind);
       return id;
     });
@@ -99,6 +147,13 @@ function fieldNamed(owner: Section, written: string, alone: boolean): { key: str
   const parser = found[1].parser as Parser<unknown>;
   return { key: key ?? null, parser: alone ? oneOf(parser) : parser };
 }
+
+const shows = (form: string, typed: string): boolean => {
+  const literal = literalOf(form);
+  return typed === '' || literal.startsWith(typed) || (literal !== '' && typed.startsWith(literal));
+};
+
+const offerFor = (form: string): Offer => ({ form, insert: literalOf(form) === '' ? form : literalOf(form) });
 
 function deduped(offers: readonly Offer[]): Offer[] {
   const held = new Map<string, Offer>();
@@ -151,18 +206,18 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const kinds = referencedKinds(text, at - token.length, at + LEADING_ID.exec(tail)![0].length);
   const continuing = opening !== null && opening[0].startsWith(',');
   const named = fieldNamed(owner, continuing ? text.slice(lineStart + indent, from) : typed, continuing);
-  const element = named.parser === null ? noLines : { forms: named.parser.forms, examples: named.parser.examples };
-  const written = continuing
-    ? element
-    : {
-        forms: [...(indent === 0 ? owner.grammar.lines.forms : (owner.grammar.block?.lines.forms ?? [])), ...element.forms.map((form) => (named.key === null ? form : `${named.key}: ${form}`))],
-        examples: [],
-      };
+  const values = named.parser === null ? [] : named.parser.forms.map((form) => (continuing || named.key === null ? form : `${named.key}: ${form}`));
+  // Read the section around the line being written, which is the half of it that stands whole while this one is still being typed.
+  const held = readSection(`${text.slice(0, lineStart)}${text.slice(lineEnd)}`)?.authored;
+  const lines = continuing ? [] : linesAt(owner, text, lineStart, indent).filter((written) => written.needs === undefined || held === undefined || held[written.needs] !== undefined);
 
   return {
     from,
     to,
-    offers: deduped([...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token), ...lineOffers(written, typed)]),
+    offers: deduped([
+      ...addressOffers(known, kinds, typed.slice(0, typed.length - token.length), token),
+      ...[...lines.map((written) => written.form), ...values].filter((form) => shows(form, typed)).map(offerFor),
+    ]),
   };
 }
 

@@ -1,4 +1,4 @@
-import { Parser, parseWhole } from './parser';
+import { Parser, Written, parseWhole } from './parser';
 
 export function isCodec(value: unknown): value is Parser<unknown> {
   if (typeof value !== 'object' || value === null) return false;
@@ -45,6 +45,9 @@ export function formFailures(name: string, forms: readonly string[], examples: r
 }
 
 export const shapeFailures = (codecs: Map<Parser<unknown>, string>): string[] => [...codecs].flatMap(([parser, name]) => formFailures(name, parser.forms, parser.examples));
+
+export const writtenFrom = (parser: Parser<unknown>): Written[] =>
+  parser.forms.map((form) => ({ form, example: parser.examples.find((each) => formPattern(form).test(each)) ?? form }));
 
 export function roundTripFailures(name: string, parser: Parser<unknown>): string[] {
   if (parser.examples.length === 0) return [`${name} carries no examples`];

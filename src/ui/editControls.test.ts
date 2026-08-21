@@ -30,6 +30,8 @@ const EXERCISED: Record<keyof EditControls, true> = {
   text: true,
   cursor: true,
   take: true,
+  stepIn: true,
+  stepOut: true,
   scroll: true,
   split: true,
   stage: true,
