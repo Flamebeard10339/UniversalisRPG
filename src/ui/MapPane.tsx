@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
-import type { Section } from './authoringSurface';
+import { names, type Section } from './authoringSurface';
 import { DragSheet, useSheetHold, type Grip } from './DragSheet';
 import { drawnFor, onWalk, spotOf, walkLine, type Node } from './discovery';
 import { DevOnly } from './DevOnly';
 import type { MapWhere } from './editorMemory';
-import { answering, droppedAt, placedInto } from './mapEdit';
+import { answering, centredOn, created, droppedAt, joinedInto, placedInto, stagedKey, type MapMode } from './mapEdit';
 import { useTestSurface } from './useTestSurface';
 import { useMoment } from './transient';
-import { tappedPlace } from './devMode';
+import { gotoLine, tappedPlace } from './devMode';
 import { bounds, panOnto, tapTarget, type Point } from './viewport';
 import type { Words } from './words';
 
@@ -26,6 +26,7 @@ function Bubble({
   dragged,
   carried,
   grip,
+  chosen,
 }: {
   node: Node;
   arrived: boolean;
@@ -36,6 +37,7 @@ function Bubble({
   dragged: () => boolean;
   carried: Point;
   grip: Grip | null;
+  chosen: boolean;
 }): JSX.Element {
   const spot = spotOf(node);
   const flash = useMoment('arrival', arrived, node.place.id);
@@ -49,7 +51,7 @@ function Bubble({
       node.here ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-panel'
     } ${walking === 'going' ? 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong' : ''} ${
       walking === 'crossing' ? 'border-accent text-accent' : ''
-    } ${node.climb !== 0 ? 'opacity-70' : ''} ${go === null && !grip ? 'text-text-subtle' : ''}`,
+    } ${node.climb !== 0 ? 'opacity-70' : ''} ${go === null && !grip ? 'text-text-subtle' : ''} ${chosen ? 'ring-2 ring-warning' : ''}`,
   };
 
   const inside = (
@@ -126,7 +128,9 @@ export function MapPane({
 }): JSX.Element {
   const bubbles = useRef<Array<HTMLElement | null>>([]);
   const [plane, setPlane] = useState<number | null>(where.plane);
-  const [moving, setMoving] = useState(false);
+  const [mode, setMode] = useState<MapMode>('go');
+  const [from, setFrom] = useState<string | null>(null);
+  const [naming, setNaming] = useState('');
 
   const { plane: at, here, sheet, travels } = drawnFor(view, plane);
   const spots = sheet.nodes.map(spotOf);
@@ -159,13 +163,29 @@ export function MapPane({
     if (node) answering(droppedAt(sections, node, carried), answer);
   }
 
-  const map = { plane: at, zoom: hold.zoom, pan: hold.pan, sheet, travels, moving };
+  const link = (id: string): void => {
+    if (from === id) return setFrom(null);
+    if (from === null) return setFrom(id);
+    answering(joinedInto(sections, from, id), answer);
+    setFrom(null);
+  };
+
+  const make = (id: string): void => {
+    if (view.locations.some((place) => names(place.id, id))) return onNote(`${id} already names a location`);
+    const staged = created(id, centredOn(hold), at);
+    if ('refused' in staged) return onNote(staged.refused);
+    onSend(staged.line);
+    onSend(gotoLine(stagedKey(id)));
+    setNaming('');
+  };
+
+  const map = { plane: at, zoom: hold.zoom, pan: hold.pan, sheet, travels, mode, from };
 
   useEffect(() => {
     onWhere({ pan: hold.pan, zoom: hold.zoom, plane });
   }, [hold.pan.x, hold.pan.y, hold.zoom, plane]);
 
-  useTestSurface('map', { map, controls: { settle: hold.settle, plane: setPlane, recentre, moving: setMoving, place, go } });
+  useTestSurface('map', { map, controls: { settle: hold.settle, plane: setPlane, recentre, mode: setMode, place, go, link, make } });
 
   return (
     <DragSheet
@@ -188,17 +208,53 @@ export function MapPane({
             {words('recentre')}
           </button>
           <DevOnly dev={dev}>
-          <button
-            data-drive="map.moving"
-            type="button"
-            data-moving={moving ? 'yes' : undefined}
-            onClick={() => setMoving(!moving)}
-            className={`absolute bottom-3 left-3 rounded-xl border px-3 text-xs transition-transform duration-75 active:scale-[0.97] ${
-              moving ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-surface text-text-subtle'
-            }`}
-          >
-            {words('place')}
-          </button>
+          <div className="absolute bottom-3 left-3 flex flex-col items-start gap-2">
+            <form
+              className="flex items-center gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                make(naming.trim());
+              }}
+            >
+              <input
+                data-drive="map.make"
+                aria-label={words('new')}
+                value={naming}
+                onChange={(event) => setNaming(event.target.value)}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                className="w-32 select-text rounded-xl border border-border bg-surface px-3 font-mono text-xs text-text outline-none focus:border-accent"
+              />
+              <button
+                data-drive="map.make"
+                type="submit"
+                className="shrink-0 rounded-xl border border-border bg-surface px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97]"
+              >
+                {words('new')}
+              </button>
+            </form>
+            <div className="flex items-center gap-2">
+              {(['place', 'link'] as const).map((which) => (
+                <button
+                  key={which}
+                  data-drive="map.mode"
+                  type="button"
+                  data-mode={which}
+                  data-drawn={which === mode ? 'yes' : undefined}
+                  onClick={() => {
+                    setFrom(null);
+                    setMode(mode === which ? 'go' : which);
+                  }}
+                  className={`rounded-xl border px-3 text-xs transition-transform duration-75 active:scale-[0.97] ${
+                    which === mode ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-surface text-text-subtle'
+                  }`}
+                >
+                  {words(which)}
+                </button>
+              ))}
+            </div>
+          </div>
           </DevOnly>
           {map.sheet.planes.length > 1 ? (
             <div className="absolute right-3 top-3 flex flex-col overflow-hidden rounded-xl border border-border bg-surface">
@@ -232,12 +288,13 @@ export function MapPane({
           node={node}
           arrived={arrivals.includes(node.place.id)}
           walking={node.place.id === going ? 'going' : walk.includes(node.place.id) && !node.here ? 'crossing' : undefined}
-          go={lineFor(node.place.id) === null ? null : () => go(node.place.id)}
+          go={mode === 'link' ? () => link(node.place.id) : lineFor(node.place.id) === null ? null : () => go(node.place.id)}
+          chosen={node.place.id === from}
           scale={map.zoom}
           held={(element) => void (bubbles.current[at] = element)}
           dragged={hold.dragged}
           carried={hold.carried?.id === node.place.id ? hold.carried.by : NOT_CARRIED}
-          grip={moving ? hold.grip(node.place.id) : null}
+          grip={mode === 'place' ? hold.grip(node.place.id) : null}
         />
       ))}
     </DragSheet>

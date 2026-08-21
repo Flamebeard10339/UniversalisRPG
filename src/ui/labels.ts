@@ -40,6 +40,7 @@ export const LABELS = {
   unstage: 'engine.shell.unstage',
   copy: 'engine.shell.copy',
   place: 'engine.shell.place',
+  link: 'engine.shell.link',
   dev: 'engine.shell.dev',
   speed: 'engine.shell.speed',
   clear: 'engine.shell.clear',

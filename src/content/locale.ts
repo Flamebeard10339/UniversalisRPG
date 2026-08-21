@@ -150,6 +150,7 @@ export const ENGINE_KEYS = [
   'engine.shell.unstage',
   'engine.shell.copy',
   'engine.shell.place',
+  'engine.shell.link',
   'engine.shell.dev',
   'engine.shell.speed',
   'engine.shell.clear',

@@ -88,7 +88,7 @@ export interface Standing {
 
 export const NOWHERE: Standing = { location: '', entities: [] };
 
-const names = (published: string, address: string): boolean => published === address || published.endsWith(`.${address}`) || address.endsWith(`.${published}`);
+export const names = (published: string, address: string): boolean => published === address || published.endsWith(`.${address}`) || address.endsWith(`.${published}`);
 
 const standingIn = (section: Section, standing: Standing): boolean =>
   section.kind === MAPPED_KIND ? names(standing.location, section.address) : standing.entities.some((entity) => names(entity, section.address));

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Location } from '../content/sections/location';
 import { loadUniverseWithDiagnostics } from '../content/load';
-import { addressable, MAPPED_KIND, NOWHERE, offeredBy, type Section } from './authoringSurface';
+import { addressable, MAPPED_KIND, names, NOWHERE, offeredBy, type Section } from './authoringSurface';
+import { gotoLine } from './devMode';
 import { drawnAt, PER_UNIT, placedAt, type Node } from './discovery';
 import { createDriver, type Driver } from './driver';
-import { answering, droppedAt, movedTo, placedInto, settledOn } from './mapEdit';
+import { answering, centredOn, created, droppedAt, joined, joinedInto, linkedTo, linksTo, movedTo, placedInto, settledOn, stagedKey, unlinkedFrom } from './mapEdit';
 import { SHIPPED_SOURCES } from './shippedContent';
 
 const addressed = addressable(SHIPPED_SOURCES);
@@ -173,5 +174,101 @@ describe('what a staged edit does from a surface (c8)', () => {
 
     expect([taken.sent, taken.said]).toEqual([['/dsl location a.b x: 1, y: 1'], []]);
     expect([refused.sent, refused.said]).toEqual([[], ['that one is placed relative to another']]);
+  });
+});
+
+const lineOf = (staged: ReturnType<typeof joined>, where: string): string => {
+  if ('refused' in staged) throw new Error(`${where}: ${staged.refused}`);
+  return staged.line;
+};
+
+describe('a connection is a section edit and nothing else', () => {
+  const waysOut = (places: Map<string, Location>, address: string): string[] => (places.get(address)?.adjacent ?? []).map((edge) => edge.target).sort();
+
+  const restaged = (section: Section, to: string): { text: string; adjacent: string[] } => {
+    const text = bodyOf({ line: lineOf(joined(section, to), section.address) });
+    return { text, adjacent: waysOut(withStaged(text), section.address) };
+  };
+
+  const stagedSection = (text: string, address: string): Section => addressable([{ name: 'local-changes', text }]).find((each) => each.address === address)!;
+
+  it('adds a way out to every location the map draws, and takes the same one away again', () => {
+    expect(DRAWN.length).toBeGreaterThan(2);
+
+    for (const section of DRAWN) {
+      const to = [...REGISTRY_PLACES.keys()].find((id) => id !== section.address && !linksTo(section, id));
+      expect(to, section.address).toBeDefined();
+
+      const added = restaged(section, to!);
+      expect(added.adjacent, section.address).toContain(to);
+      expect(added.adjacent, section.address).toEqual([...waysOut(REGISTRY_PLACES, section.address), to].sort());
+
+      const taken = restaged(stagedSection(added.text, section.address), to!);
+      expect(taken.adjacent, section.address).toEqual(waysOut(REGISTRY_PLACES, section.address));
+    }
+  });
+
+  it('reads a way out that was already written, however it was written', () => {
+    for (const section of DRAWN) {
+      for (const edge of REGISTRY_PLACES.get(section.address)?.adjacent ?? []) {
+        expect(linksTo(section, edge.target), `${section.address} -> ${edge.target}`).toBe(true);
+      }
+      expect(linksTo(section, 'nowhere-at-all'), section.address).toBe(false);
+    }
+  });
+
+  it('refuses to take away a way out that was never written, and to draw one on what the map does not draw', () => {
+    const alone: Section = { kind: MAPPED_KIND, address: 'made-up.alone', text: '# location made-up.alone\nx: 0, y: 0', module: 'made-up', staged: false };
+
+    expect(unlinkedFrom(alone, 'tutorial-island.beach')).toHaveProperty('refused');
+    expect(joined(alone, 'tutorial-island.beach')).toHaveProperty('line');
+    expect(linkedTo({ ...alone, kind: 'entity' }, 'tutorial-island.beach')).toHaveProperty('refused');
+    expect(joinedInto([alone], 'nowhere.at-all', 'tutorial-island.beach')).toHaveProperty('refused');
+  });
+});
+
+describe('a new place is written where the map is looking', () => {
+  it('reads the point at the middle of the sheet, wherever the sheet has been dragged to', () => {
+    const box = { minX: 0, minY: 0, maxX: 2 * PER_UNIT, maxY: 2 * PER_UNIT };
+
+    expect(centredOn({ pan: { x: 0, y: 0 }, zoom: 1, box })).toEqual({ x: 1, y: 1 });
+    expect(centredOn({ pan: { x: -PER_UNIT, y: 0 }, zoom: 1, box })).toEqual({ x: 2, y: 1 });
+    expect(centredOn({ pan: { x: -PER_UNIT, y: 0 }, zoom: 2, box })).toEqual({ x: 1.5, y: 1 });
+  });
+
+  it('writes the plane it was drawn on and leaves the ground plane unsaid', () => {
+    expect(lineOf(created('north-shore', { x: 3.4, y: -2.6 }, 0), 'north-shore')).toBe('/dsl location north-shore x: 3, y: -3');
+    expect(lineOf(created('north-shore', { x: 0, y: 0 }, 2), 'north-shore')).toBe('/dsl location north-shore x: 0, y: 0, z: 2');
+  });
+
+  it('refuses a name the DSL would not take rather than staging a section that will not load', () => {
+    for (const name of ['', 'North Shore', 'north shore', '3-shore', 'north.shore']) {
+      expect(created(name, { x: 0, y: 0 }, 0), name).toHaveProperty('refused');
+    }
+  });
+
+  it('stands the author in the place they made, which is the one the map goes on to draw', () => {
+    const driver = opened();
+    driver.send('/dev on');
+
+    driver.send(lineOf(created('north-shore', { x: 3, y: -3 }, 0), 'north-shore'));
+    driver.send(gotoLine(stagedKey('north-shore')));
+
+    expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);
+    expect(driver.snapshot().view.location.id).toBe('local-changes.north-shore');
+    expect(driver.snapshot().view.discovered.map((place) => place.id)).toContain('local-changes.north-shore');
+    expect(withStaged(driver.localChanges() ?? '').get('local-changes.north-shore')).toMatchObject({ x: 3, y: -3, z: 0 });
+  });
+
+  it('places and connects a place it made, which the map addresses by a key no module spells', () => {
+    const driver = opened();
+    driver.send('/dev on');
+    driver.send(lineOf(created('north-shore', { x: 3, y: -3 }, 0), 'north-shore'));
+    driver.send(gotoLine(stagedKey('north-shore')));
+    const made = addressable([{ name: 'local-changes', text: driver.localChanges() ?? '' }]).find((each) => each.address === 'north-shore')!;
+
+    expect(names(made.address, stagedKey('north-shore'))).toBe(true);
+    expect(placedInto([made], stagedKey('north-shore'), { x: 9, y: 9 })).toHaveProperty('line');
+    expect(joined(made, 'tutorial-island.beach')).toHaveProperty('line');
   });
 });

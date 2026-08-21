@@ -75,15 +75,17 @@ const INERT: MapControls = {
   settle: () => undefined,
   plane: () => undefined,
   recentre: () => undefined,
-  moving: () => undefined,
+  mode: () => undefined,
   go: () => undefined,
   place: () => undefined,
+  link: () => undefined,
+  make: () => undefined,
 };
 
 describe('the map as a driving agent reaches it', () => {
   const sheet = sheetAt(HOUSE, 'hall', 0);
   const travels = new Map([['beach', 3]]);
-  const view = { plane: 0, zoom: 1, pan: { x: 0, y: 0 }, moving: false, sheet, travels };
+  const view = { plane: 0, zoom: 1, pan: { x: 0, y: 0 }, mode: 'go' as const, from: null, sheet, travels };
 
   it('publishes what is drawn and where, so nothing has to be read off the markup', () => {
     const state = mapState(view);

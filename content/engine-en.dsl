@@ -160,6 +160,7 @@ engine.shell.stage: Stage
 engine.shell.unstage: Unstage
 engine.shell.copy: Copy
 engine.shell.place: Place
+engine.shell.link: Link
 engine.shell.dev: Dev mode
 engine.shell.speed: Speed
 engine.shell.clear: Clear local changes

@@ -2,6 +2,7 @@ import type { Answer } from '../../runtime/localized';
 import { SURFACES, type Standing, type SurfaceId } from '../authoringSurface';
 import type { Sheet } from '../discovery';
 import { draftIn, kindsIn, rowsIn, sectionKey, type EditHeld } from '../editControls';
+import { modeNamed, type MapMode } from '../mapEdit';
 import { clampZoom, type Point } from '../viewport';
 import { clampIndex } from '../gesture';
 import type { LabelId } from '../labels';
@@ -80,7 +81,8 @@ export interface MapState {
   planes: readonly number[];
   zoom: number;
   pan: Point;
-  moving: boolean;
+  mode: MapMode;
+  from: string | null;
   places: MapPlace[];
 }
 
@@ -88,7 +90,8 @@ export interface MapView {
   plane: number;
   zoom: number;
   pan: Point;
-  moving: boolean;
+  mode: MapMode;
+  from: string | null;
   sheet: Sheet;
   travels: ReadonlyMap<string, number>;
 }
@@ -98,8 +101,10 @@ export interface MapControls {
   go(id: string): void;
   plane(at: number): void;
   recentre(): void;
-  moving(on: boolean): void;
+  mode(which: MapMode): void;
   place(id: string, at: Point): void;
+  link(id: string): void;
+  make(id: string): void;
 }
 
 export function mapState(map: MapView): MapState {
@@ -108,9 +113,16 @@ export function mapState(map: MapView): MapState {
     planes: map.sheet.planes,
     zoom: map.zoom,
     pan: map.pan,
-    moving: map.moving,
+    mode: map.mode,
+    from: map.from,
     places: map.sheet.nodes.map((node) => ({ id: node.place.id, at: node.at, here: node.here, climb: node.climb, goes: map.travels.get(node.place.id) ?? null })),
   };
+}
+
+export function placeDrawn(map: MapView, value: unknown): string {
+  const named = map.sheet.nodes.find((node) => node.place.id === value);
+  if (!named) throw new Error(`the map draws no place called ${String(value)}`);
+  return named.place.id;
 }
 
 export function mapSurface(map: MapView, controls: MapControls): TestSurface {
@@ -121,12 +133,14 @@ export function mapSurface(map: MapView, controls: MapControls): TestSurface {
       zoom: (value) => controls.settle(map.pan, zoomFrom(value)),
       plane: (value) => controls.plane(planeFrom(value, map.sheet.planes)),
       recentre: () => controls.recentre(),
-      moving: (value) => controls.moving(value === true),
-      go: (value) => {
-        const named = map.sheet.nodes.find((node) => node.place.id === value);
-        if (!named) throw new Error(`the map draws no place called ${String(value)}`);
-        controls.go(named.place.id);
+      mode: (value) => {
+        const named = modeNamed(value);
+        if (!named) throw new Error(`the map has no mode called ${String(value)}`);
+        controls.mode(named);
       },
+      link: (value) => controls.link(placeDrawn(map, value)),
+      make: (value) => controls.make(String(value)),
+      go: (value) => controls.go(placeDrawn(map, value)),
       place: (value) => {
         const { place, ...at } = (value ?? {}) as { place?: unknown };
         const named = map.sheet.nodes.find((node) => node.place.id === place);
