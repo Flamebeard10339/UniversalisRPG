@@ -191,7 +191,7 @@ export const quest = section<Quest>()({
         { form: 'done when: <condition>', example: 'done when: rats-killed >= 3', family: 'where it goes', holds: () => ({ condition }), note: 'the quest leaves this stage on its own once this holds' },
         { form: 'goto <stage>', example: 'goto sendoff', family: 'where it goes' },
         { form: 'complete', example: 'complete', family: 'where it goes', note: 'the quest is done when it reaches here' },
-        { form: '<entity> says:', example: 'miki says:', family: 'what is said here', names: { entity: 'entity' }, note: 'lines that entity speaks while the quest stands here, written as a dialogue node is', block: nodeGrammar },
+        { form: '<entity> says:', example: 'miki says:', family: 'what is said here', names: { entity: 'entity' }, note: 'lines that entity speaks while the quest stands here, written as a dialogue node is', block: () => nodeGrammar({ hole: 'stage', like: 'sendoff' }) },
       ],
     },
   ],

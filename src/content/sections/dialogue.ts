@@ -60,15 +60,15 @@ function parseChoice(source: RawLine): Choice {
   return choice;
 }
 
-// The lines a node holds, which is the same grammar wherever a node is written — in a # dialogue of its own, or under a stage of a quest.
-export const nodeGrammar = (): Written[] => [
+// The lines a node holds, which is the same grammar wherever a node is written — in a # dialogue of its own, or under a stage of a quest. What a goto names is the one thing that differs, because what a node sits in is what it goes to next.
+export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[] => [
   { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }) },
   { form: 'once', example: 'once', family: 'reached when' },
   { form: 'sticky', example: 'sticky', family: 'reached when' },
   { form: 'again: <text>', example: 'again: We have spoken already.', family: 'what is said' },
   { form: '<what is said>', example: 'A traveller, out here?', family: 'what is said' },
-  { form: 'goto <node>', example: 'goto farewell', family: 'where it goes' },
-  { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition }), block: () => [{ form: 'goto <node>', example: 'goto farewell', family: 'where it goes' }, ...resultGrammar()] },
+  { form: `goto <${goes.hole}>`, example: `goto ${goes.like}`, family: 'where it goes' },
+  { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition }), block: () => [{ form: `goto <${goes.hole}>`, example: `goto ${goes.like}`, family: 'where it goes' }, ...resultGrammar()] },
   ...resultGrammar(),
 ];
 
@@ -165,7 +165,7 @@ export const dialogue = section<Dialogue>()({
   map: 'dialogues',
   grammar: [
     { form: 'owner = <entity>', example: 'owner = guide' },
-    { form: 'node <name>:', example: 'node greet:', block: nodeGrammar },
+    { form: 'node <name>:', example: 'node greet:', block: () => nodeGrammar() },
   ],
   parse: (raw) => {
     if (!raw.id) throw new DslError('# dialogue requires an id', raw.span);
