@@ -14,3 +14,5 @@ export function devRefusal(line: string, dev: boolean): string | null {
   const token = devTokenIn(line);
   return token === undefined ? null : `${token} is a dev power, and this session is the player's: turn dev mode on to reach it.`;
 }
+
+export const RATES = [1, 2, 8, 64] as const;

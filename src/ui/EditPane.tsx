@@ -81,8 +81,12 @@ export function EditPane({ held, dev, onSend, words }: { held: EditHeld; dev: bo
               data-opened={sectionKey(section) === editing.open ? 'yes' : undefined}
               onClick={() => controls.open(sectionKey(section) === editing.open ? null : sectionKey(section))}
               className={`rounded-xl border px-3 py-2 text-left font-mono text-xs ${
-                sectionKey(section) === editing.open ? 'border-accent bg-accent-strong text-accent-text' : 'border-border bg-panel'
-              } ${section.staged ? 'italic' : ''}`}
+                sectionKey(section) === editing.open
+                  ? 'border-accent bg-accent-strong text-accent-text'
+                  : section.staged
+                    ? 'border-warning bg-panel text-warning'
+                    : 'border-border bg-panel'
+              }`}
             >
               {`# ${section.kind} ${section.address}`}
             </button>

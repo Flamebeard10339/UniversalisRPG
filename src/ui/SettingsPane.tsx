@@ -1,35 +1,27 @@
-import { useState } from 'react';
 import { DevOnly } from './DevOnly';
-import { devLine, speedLine } from './devMode';
+import { devLine, RATES, speedLine } from './devMode';
 import type { Words } from './words';
 
-function SpeedField({ speed, words, onSend }: { speed: number; words: Words; onSend: (line: string) => void }): JSX.Element {
-  const [typed, setTyped] = useState(String(speed));
-
+function Rates({ speed, words, onSend }: { speed: number; words: Words; onSend: (line: string) => void }): JSX.Element {
   return (
-    <form
-      className="flex items-center gap-2 rounded-xl border border-border bg-panel px-3 py-2 text-sm text-text"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSend(speedLine(typed));
-      }}
-    >
+    <div className="flex items-center gap-2 rounded-xl border border-border bg-panel px-3 py-2 text-sm text-text">
       <span className="mr-auto">{words('speed')}</span>
-      <input
-        data-drive="send"
-        className="w-20 select-text rounded-xl border border-border bg-surface px-3 text-right tabular-nums text-text outline-none focus:border-accent"
-        aria-label={words('speed')}
-        inputMode="decimal"
-        value={typed}
-        autoCapitalize="off"
-        autoCorrect="off"
-        spellCheck={false}
-        onChange={(event) => setTyped(event.target.value)}
-      />
-      <button data-drive="send" type="submit" className="shrink-0 rounded-xl bg-accent px-3 text-sm font-medium text-accent-text transition-transform duration-75 active:scale-[0.97]">
-        {words('run')}
-      </button>
-    </form>
+      {RATES.map((rate) => (
+        <button
+          key={rate}
+          data-drive="send"
+          data-rate={rate}
+          data-running={rate === speed ? 'yes' : undefined}
+          type="button"
+          onClick={() => onSend(speedLine(String(rate)))}
+          className={`shrink-0 rounded-xl border px-3 text-sm tabular-nums transition-transform duration-75 active:scale-[0.97] ${
+            rate === speed ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-surface text-text-subtle'
+          }`}
+        >
+          {`${rate}\u00d7`}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -42,7 +34,7 @@ export function SettingsPane({ dev, speed, words, onSend }: { dev: boolean; spee
       </label>
 
       <DevOnly dev={dev}>
-        <SpeedField key={speed} speed={speed} words={words} onSend={onSend} />
+        <Rates speed={speed} words={words} onSend={onSend} />
       </DevOnly>
     </div>
   );

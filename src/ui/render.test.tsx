@@ -17,7 +17,7 @@ import { StatusBanner } from './StatusBanner';
 import { dismissal } from './asking';
 import { sectionKey } from './editControls';
 import { formatClock } from './format';
-import { devLine, speedLine } from './devMode';
+import { devLine, RATES, speedLine } from './devMode';
 import { FORGOTTEN } from './editorMemory';
 import { ModalSheet } from './ModalSheet';
 import { SHIPPED_SOURCES } from './shippedContent';
@@ -494,18 +494,20 @@ describe('what the shell puts on the screen', () => {
     expect(onScreen(readable(html), shellWord('run'))).toBe(true);
   });
 
-  it('draws the speed dial on Settings, carrying the multiplier the session holds', () => {
+  it('offers every rate on Settings and marks the one the session is running', () => {
     const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const running = RATES[RATES.length - 2];
     driver.send(devLine(true));
-    driver.send(speedLine('3'));
+    driver.send(speedLine(String(running)));
     const settings = LAYERS[HOME_LAYER].subpages.findIndex((subpage) => subpage.id === 'settings');
-    const label = `aria-label="${shellWord('speed')}"`;
 
     const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, settings)} />);
+    const drawn = [...html.matchAll(/data-rate="(\d+)"(?:[^>]*?(data-running))?/g)];
 
-    expect(driver.snapshot().speed).toBe(3);
-    expect(html, 'the Settings page draws no field named for the dial').toContain(label);
-    expect(html.slice(html.indexOf(label), html.indexOf('>', html.indexOf(label)))).toContain(`value="${driver.snapshot().speed}"`);
+    expect(driver.snapshot().speed).toBe(running);
+    expect(drawn.map(([, rate]) => Number(rate))).toEqual([...RATES]);
+    expect(drawn.filter(([, , marked]) => marked).map(([, rate]) => Number(rate))).toEqual([running]);
+    expect(html, 'a rate off the list is typed on the command line, not here').not.toContain(`aria-label="${shellWord('speed')}"`);
   });
 
   it('names its two glyph controls with the engine value each one acts on', () => {
@@ -639,5 +641,28 @@ describe('what the shell puts on the screen', () => {
       expect(drawn.map((node) => node.id).sort()).toEqual(view.discovered.map((place) => place.id).sort());
       expect(drawn.filter((node) => node.disabled).map((node) => node.id)).toEqual(['surveyed.workshop']);
     });
+  });
+});
+
+describe('what the editing page says about a section', () => {
+  const rowClass = (html: string, section: string): string => {
+    const tag = new RegExp(`<button[^>]*data-section="${section}"[^>]*>`).exec(html)?.[0] ?? '';
+    return /class="([^"]*)"/.exec(tag)?.[1] ?? '';
+  };
+
+  it('tells a staged section from a shipped one by its colour rather than by a slant', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    driver.send(devLine(true));
+    driver.send('/dsl entity tutorial-island.miki title: Miki');
+    const edit = LAYERS[HOME_LAYER].subpages.findIndex((subpage) => subpage.id === 'edit');
+
+    const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, edit)} />);
+    const staged = rowClass(html, 'entity tutorial-island.miki');
+    const shipped = rowClass(html, 'entity tutorial-island.oven');
+
+    expect(staged, 'the editing page drew no row for the staged section').not.toBe('');
+    expect(staged).not.toBe(shipped);
+    expect(staged).not.toContain('italic');
+    expect(staged).toContain('warning');
   });
 });
