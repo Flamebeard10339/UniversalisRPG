@@ -100,6 +100,7 @@ export const contentSectionMaps = (): readonly (readonly [SectionKind, string])[
 
 export const textFieldsOf = (kind: string): readonly string[] | undefined => sectionFor(kind)?.text;
 
+export type { Named } from './define';
 export type { Section, PrintContext, Maps };
 
 export function parseModule(source: string): ModuleSection[] {

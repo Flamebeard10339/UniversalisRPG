@@ -1,7 +1,6 @@
 import { HOOK_LABELS } from '../../grammar/hook';
 import { DslError, Parser } from '../../grammar/parser';
 import { id } from '../../grammar/values';
-import { put } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -68,5 +67,4 @@ export const event = section<GameEvent>()({
     trigger: { parser: triggerValue },
   },
   validate: (value) => (value.trigger ? (triggerArityProblem(value) ?? answeredByAHook(value)) : 'requires a trigger:'),
-  visit: (value, where, visit) => put(value, 'resource', 'resource', `${where} resource:`, visit),
 });

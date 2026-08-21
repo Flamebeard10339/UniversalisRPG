@@ -1,6 +1,5 @@
 import { DslError, Parser } from '../../grammar/parser';
 import { decimal, id } from '../../grammar/values';
-import { put } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -45,8 +44,4 @@ export const resource = section<Resource>()({
     display: { parser: displayValue, default: () => 'full', printed: 'always' },
   },
   validate: (value) => (value.max ? undefined : 'requires a max: stat'),
-  visit: (value, where, visit) => {
-    put(value, 'max', 'stat', `${where} max:`, visit);
-    put(value, 'rate', 'stat', `${where} rate:`, visit);
-  },
 });

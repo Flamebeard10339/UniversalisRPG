@@ -35,25 +35,41 @@ its own name does not say declares it, per hole:
 on a field spec, on a value parser, or on a line of a kind's own `grammar:`.
 A list takes its element's, and `fieldLines` lays the field's over its parser's.
 
+## What the engine reads off the same word
+
+A field whose every shape is one placeholder and nothing else holds a name, or a
+list of them, and nothing else. `section()` reads the kind off that field and
+walks it itself, so no kind's file writes the same word into a `visit` of its
+own. It prunes it too: a list loses the members nothing declares any more, and a
+name held on its own takes its section with it — unless the field says
+`standsWithout: true`, which `origin-cluster:` does, because an item that merely
+points at a cluster stands when the cluster goes.
+
+A value with structure inside it — an ally, an edge, a tag, a quantity — is
+still walked by hand, because where each placeholder lands in the parsed value
+is not something the form says. The claims below hold those walks to the
+grammar, and to each other.
+
 ## Where this is proved
 
-`src/content/dsl.test.ts`, `a hole of every line of every kind`. It walks every
-line of every kind's grammar and every placeholder in them, stands an id in each,
-hands the section to the engine, and holds the line's declaration to whatever
-reference kind comes back. That is the probe that used to run in the panel,
-moved to where a second authority belongs: as the proof, not as the answer.
+Three claims in `src/content/dsl.test.ts`, each picking its own subjects.
 
-It is one-directional. Where the engine names a kind, the line must say the same
-kind. Where the engine names none, the panel may still offer — `unequip: <slot>`
-and `open-modal: <modal>` in a `# test` are checked by nothing and offered
-anyway. A kind the section list does not declare is passed over: the action slug
-under `use:` is keyed rather than declared, and there is nothing to offer for it.
+`a hole of every line of every kind` walks every line of every kind's grammar and
+every placeholder in them, stands an id in each, hands the section to the engine,
+and holds the line's declaration to whatever reference kind comes back. That is
+the probe that used to run in the panel, moved to where a second authority
+belongs: as the proof, not as the answer. It is one-directional — where the
+engine names a kind, the line must say the same kind; where the engine names
+none, the panel may still offer, as `unequip: <slot>` and `open-modal: <modal>`
+do. A kind the section list does not declare is passed over: the action slug
+under `use:` is keyed rather than declared, so there is nothing to offer for it.
 
-## The one duplication left
+`a field whose values are names` holds the generated walk and the generated
+pruning to what each field declares.
 
-A field that declares `names: { id: 'stat' }` says the same thing its kind's
-`visit` says with `put(held, 'rate', 'stat', …)`. Both live in the kind's own
-file, and the claim above fails the moment they disagree — but they are two
-statements of one fact, and collapsing them would mean generating a kind's
-`visit` from its fields. That is a larger change than this one and touches every
-kind. It is the next thing to do here if this drifts.
+`what a section is pruned by` takes every reference the shipped corpus makes, one
+per site each kind writes, removes it, and requires the section to change. A
+section says what it names twice — once walking, once pruning — and the second is
+not derived from the first, so this holds them to each other. It found two
+things the day it was written: an entity's `on <event>:` handler was walked and
+never pruned, and so was its `hidden if:`.

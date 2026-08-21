@@ -9,9 +9,10 @@ import type { Written } from '../grammar/parser';
 import { text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
-import { formatModuleDiagnostic } from './registry';
+import { DEFAULT_CONTEXT, hydrateSection } from '../grammar/section';
+import { formatModuleDiagnostic, mapOf } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
-import { sections, sectionFor } from './sections';
+import { contentSectionMaps, sections, sectionFor, type Section } from './sections';
 import { canSerialize, roundTripUniverse } from './serialize';
 
 const CORPUS = readdirSync('content')
@@ -144,6 +145,127 @@ describe('what the page offers where the cursor stands in a hole', () => {
           const draft = written(at, '').slice(0, at.under.length + 1 + at.indent + at.hole.start);
           return offeringAt(draft, draft.length, []).filling?.holds === undefined ? [] : [at.where];
         }),
+    ).toEqual([]);
+  });
+});
+
+describe('a field whose values are names', () => {
+  const NAMED = sections().flatMap((owner) => owner.names.map((each) => ({ owner, each, where: `# ${owner.kind} ${each.site}` })));
+  const PROBE = 'zzprobezz';
+
+  // The engine, asked to take one name out from under a section: what it names is gone, and nothing else is.
+  const cutting = (kind: string) => {
+    let missing = false;
+    const visit = (asked: string, id: string): string => {
+      if (asked === kind && (id === PROBE || id.endsWith(`.${PROBE}`))) missing = true;
+      return id;
+    };
+    return {
+      visit,
+      gone: (asked: string, id: string): boolean => asked === kind && (id === PROBE || id.endsWith(`.${PROBE}`)),
+      intact: (walk: () => void): boolean => {
+        missing = false;
+        walk();
+        return !missing;
+      },
+    };
+  };
+
+  // A section of that kind holding the probe in that field and nothing else of its own, filled out with whatever its fields default to.
+  const holding = (owner: (typeof NAMED)[number]['owner'], each: (typeof NAMED)[number]['each']): { id: string } => {
+    const written = `# ${owner.kind} probe\n${each.site} ${PROBE}`;
+    const authored = owner.parse(splitSections(written)[0]!);
+    return hydrateSection(authored as never, owner.schema as never, DEFAULT_CONTEXT) as { id: string };
+  };
+
+  it('is declared by kinds that hold names at all, so nothing below is vacuous', () => {
+    expect(NAMED.length).toBeGreaterThan(10);
+    expect(new Set(NAMED.map((each) => each.each.kind)).size).toBeGreaterThan(4);
+  });
+
+  it('is read as naming what its field says, and takes the value the author wrote', () => {
+    expect(
+      NAMED.flatMap(({ owner, each, where }) => {
+        const found: string[] = [];
+        owner.visit(holding(owner, each) as never, '', (kind, id) => {
+          found.push(`${kind} ${id}`);
+          return id;
+        });
+        return found.includes(`${each.kind} ${PROBE}`) ? [] : [`${where} walks ${found.join(', ') || 'nothing'}`];
+      }),
+    ).toEqual([]);
+  });
+
+  it('loses the name when what it names is removed, and says whether its section stands without it', () => {
+    expect(
+      NAMED.flatMap(({ owner, each, where }) => {
+        const held = holding(owner, each);
+        const left = owner.prune(held as never, cutting(each.kind), `# ${owner.kind} probe`);
+        if (!each.list && !each.standsWithout) return left === null ? [] : [`${where} keeps a section written around a name nothing declares`];
+        if (left === null) return [`${where} takes its whole section out over one name it could stand without`];
+        const kept = (left as unknown as Record<string, unknown>)[each.field];
+        return JSON.stringify(kept ?? null).includes(PROBE) ? [`${where} still holds ${PROBE} after it was removed`] : [];
+      }),
+    ).toEqual([]);
+  });
+
+  it('is left alone when something of another kind is removed', () => {
+    const other = (kind: string): string => sections().map((each) => each.kind).find((each) => each !== kind)!;
+    expect(
+      NAMED.flatMap(({ owner, each, where }) => {
+        const held = holding(owner, each);
+        return owner.prune(held as never, cutting(other(each.kind)), `# ${owner.kind} probe`) === held ? [] : [`${where} reacts to a # ${other(each.kind)} being removed`];
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe('what a section is pruned by', () => {
+  const registry = loadUniverseWithDiagnostics(CORPUS).registry;
+
+  // Every reference the shipped corpus makes, one for each site each kind writes: the site is what a section's own prune has to answer for, and the corpus writes them all.
+  const sites = new Map<string, { kind: string; owner: Section; value: object; names: string; id: string; where: string }>();
+  for (const [kind, primary] of contentSectionMaps()) {
+    const owner = sectionFor(kind)!;
+    for (const [id, value] of mapOf(registry, primary)) {
+      owner.visit(value as never, `# ${kind} ${id}`, (names, named, where) => {
+        // A site is the same site whatever id it names there, so the ids and labels written into it are rubbed out.
+        const at = `${kind} ${names} ${where.replace(/"[^"]*"/g, '<>').replace(`# ${kind} ${id}`, '')}`;
+        if (!sites.has(at)) sites.set(at, { kind, owner, value: value as object, names, id: named, where: `# ${kind} ${id}` });
+        return named;
+      });
+    }
+  }
+
+  // The engine taking one thing out from under the world: that name of that kind is gone, and nothing else is.
+  const cutting = (kind: string, id: string) => {
+    let missing = false;
+    const visit = (asked: string, named: string): string => {
+      if (asked === kind && named === id) missing = true;
+      return named;
+    };
+    return {
+      visit,
+      gone: (asked: string, named: string): boolean => asked === kind && named === id,
+      intact: (walk: () => void): boolean => {
+        missing = false;
+        walk();
+        return !missing;
+      },
+    };
+  };
+
+  it('is asked of every site the corpus writes, so nothing below is vacuous', () => {
+    expect(sites.size).toBeGreaterThan(20);
+    expect(new Set([...sites.values()].map((each) => each.kind)).size).toBeGreaterThan(5);
+  });
+
+  // A section says what it names twice — once walking, once pruning — and the second is not derived from the first. This holds them to each other: whatever a section is read as naming, taking that away has to change the section.
+  it('is everything it is read as naming', () => {
+    expect(
+      [...sites.values()].flatMap(({ owner, value, names, id, where }) =>
+        owner.prune(value as never, cutting(names, id), where) === value ? [`${where} names a # ${names} ${id} and stands unchanged when it is taken away`] : [],
+      ),
     ).toEqual([]);
   });
 });

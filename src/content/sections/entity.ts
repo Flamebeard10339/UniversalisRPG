@@ -8,7 +8,7 @@ import { DslError, Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
 import { EntryBody, listMembers } from '../../grammar/section';
 import { duration, id, text } from '../../grammar/values';
-import { condition as visitCondition, hooks, pruneHook, put, results, strings, visitAction, type Loose, type Pruning, type Visit } from '../refs';
+import { condition as visitCondition, hooks, pruneHook, put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -154,41 +154,26 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
     for (const assignment of listMembers<[string, unknown]>(held.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
-    strings(held, 'uses', 'action', `${where} uses:`, visit);
-    strings(held, 'faction', 'faction', `${where} faction:`, visit);
-    strings(held, 'skills', 'skill', `${where} skills:`, visit);
-    strings(held, 'passives', 'passive', `${where} passives:`, visit);
     for (const entry of listMembers<Ally>(held.allies)) put(entry, 'entity', 'entity', `${where} allies:`, visit);
     visitCondition(held.hiddenIf as Condition | undefined, `${where} hidden if:`, visit);
     blocks(held.blocks, where, visit);
     hooks(held, where, visit);
   },
   prune: (value, at, where) => {
+    if (!at.intact(() => visitCondition(value.hiddenIf, `${where} hidden if:`, at.visit))) return null;
     const stats = Object.fromEntries(Object.entries(value.stats).filter(([statId]) => !at.gone('stat', statId, `${where} stats:`)));
     const blocks = pruneBlocks(value.blocks, where, at);
-    const uses = value.uses.filter((used) => !at.gone('action', used, `${where} uses:`));
-    const faction = value.faction.filter((named) => !at.gone('faction', named, `${where} faction:`));
     const allies = value.allies.filter((entry) => !at.gone('entity', entry.entity, `${where} allies:`));
-    const passives = value.passives.filter((named) => !at.gone('passive', named, `${where} passives:`));
-    const skills = value.skills.filter((named) => !at.gone('skill', named, `${where} skills:`));
     const onHit = pruneHook(value.onHit, `${where} on hit:`, at);
     const whenHit = pruneHook(value.whenHit, `${where} when hit:`, at);
     const kept =
-      Object.keys(stats).length === Object.keys(value.stats).length &&
-      blocks.length === value.blocks.length &&
-      uses.length === value.uses.length &&
-      faction.length === value.faction.length &&
-      allies.length === value.allies.length &&
-      passives.length === value.passives.length &&
-      skills.length === value.skills.length &&
-      onHit === value.onHit &&
-      whenHit === value.whenHit;
-    return kept ? value : { ...value, stats, blocks, uses, faction, allies, passives, skills, onHit, whenHit };
+      Object.keys(stats).length === Object.keys(value.stats).length && blocks.length === value.blocks.length && allies.length === value.allies.length && onHit === value.onHit && whenHit === value.whenHit;
+    return kept ? value : { ...value, stats, blocks, allies, onHit, whenHit };
   },
 });
 
-const pruneBlocks = (list: readonly EntityBlock[], where: string, at: Pruning): EntityBlock[] =>
-  list.filter((block) => at.intact(() => (isHandlerBlock(block) ? at.visit('event', block.event, `${where} ${block.label}:`) : visitAction(block, `${where} action ${JSON.stringify(block.label)}`, at.visit))));
+// A block is pruned by everything walking it names, which is the walk itself asked one block at a time: a handler answering an event that is gone goes, and so does one whose results name what nothing declares any more.
+const pruneBlocks = (list: readonly EntityBlock[], where: string, at: Pruning): EntityBlock[] => list.filter((block) => at.intact(() => blocks([block], where, at.visit)));
 
 function blocks(list: unknown, where: string, visit: Visit): void {
   for (const block of listMembers<EntityBlock>(list)) {

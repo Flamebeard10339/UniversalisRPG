@@ -125,8 +125,6 @@ export const recipe = section<Recipe>()({
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
     for (const field of ['in', 'out', 'burnt'] as const) quantifiedItems(held[field], 'item', `${where} ${field}:`, visit);
-    for (const field of ['rate', 'accuracy', 'evasion'] as const) put(held, field, 'stat', `${where} ${field}:`, visit);
-    put(held, 'requiresCapability', CAPABILITY, `${where} station`, visit);
     if (held.skill) put(held.skill as Loose & { skill: string }, 'skill', 'skill', `${where} skill:`, visit);
   },
 });

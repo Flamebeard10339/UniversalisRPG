@@ -29,12 +29,9 @@ export const skill = section<Skill>()({
   clauses: 'grants',
   validate: (value) => (value['per-level'] && !value['stat-id'] ? 'per-level: needs a stat-id: to raise' : undefined),
   visit: (value, where, visit) => {
-    put(value, 'stat-id', 'stat', `${where} stat-id:`, visit);
     for (const grant of listMembers<SkillGrant>(value.grants)) put(grant, 'event', 'event', `${where} gain`, visit);
   },
   prune: (value, at, where) => {
-    const statId = value['stat-id'];
-    if (statId !== undefined && at.gone('stat', statId, `${where} stat-id:`)) return null;
     const grants = value.grants.filter((grant) => !at.gone('event', grant.event, `${where} gain`));
     return grants.length === value.grants.length ? value : { ...value, grants };
   },
