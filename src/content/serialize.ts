@@ -126,7 +126,8 @@ function printedSections(registry: Registry, options: SerializeModuleOptions): P
       continue;
     }
     if (owner.map === null) continue;
-    for (const [id, value] of tableOf(registry, kind)) if (inModule(moduleId, id)) printed.push({ id, section: sectionOf(kind, value) });
+    // What a module wrote of this kind, which is not everything standing in this kind's map: a kind may land entries in another's — a quest gives dialogues away — and those are that kind's to write, not this one's. The namespace declared the written ones and not the given ones, and it is asked rather than guessed at.
+    for (const [id, value] of tableOf(registry, kind)) if (inModule(moduleId, id) && registry.namespace.has(kind, id)) printed.push({ id, section: sectionOf(kind, value) });
   }
   return printed;
 }

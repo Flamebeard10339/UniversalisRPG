@@ -290,16 +290,18 @@ function pruneStrandedActionMembers(registry: Registry, pruned: Set<string>): bo
   return dropped;
 }
 
-function rebuildSecondaryMaps(registry: Registry): void {
-  for (const [kind, primary] of contentSectionMaps()) {
-    const survivors = [...(mapOf(registry, primary) as ReadonlyMap<string, { id: string }>).values()];
+// A map that some kind derives into rather than owns outright is emptied once pruning has settled and refilled from everything that lands in it. It is refilled from every such kind and not only from the one that calls it its own: `dialogues` is where # dialogue keeps its own and where # quest puts the ones it gives away, and rebuilding it from either alone loses the other. The primaries are read before anything is emptied, because one of them may be what is being emptied.
+function rebuildDerivedMaps(registry: Registry): void {
+  const owned = new Map(contentSectionMaps());
+  const derived = new Set(contentSectionMaps().flatMap(([kind]) => Object.keys(sectionFor(kind)!.maps).filter((name) => name !== owned.get(kind))));
+  const survivors = new Map(contentSectionMaps().map(([kind, primary]) => [kind, [...(mapOf(registry, primary) as ReadonlyMap<string, { id: string }>).values()]] as const));
+  for (const name of derived) mapOf(registry, name).clear();
+  for (const [kind] of contentSectionMaps())
     for (const [name, lands] of Object.entries(sectionFor(kind)!.maps)) {
-      if (name === primary) continue;
+      if (!derived.has(name)) continue;
       const map = mapOf(registry, name);
-      map.clear();
-      for (const value of survivors) for (const [key, held] of lands(value)) map.set(key, held as { id?: string });
+      for (const value of survivors.get(kind)!) for (const [key, held] of lands(value)) map.set(key, held as { id?: string });
     }
-  }
 }
 
 function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: ReadonlySet<string>): void {
@@ -328,7 +330,7 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
     if (pruneStrandedActionMembers(registry, pruned)) changed = true;
 
     if (!changed) {
-      rebuildSecondaryMaps(registry);
+      rebuildDerivedMaps(registry);
       return;
     }
   }

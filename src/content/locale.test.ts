@@ -39,6 +39,7 @@ const FIELDS: Record<keyof Registry, 'content' | 'the locale table'> = {
   resources: 'content',
   dropTables: 'content',
   dialogues: 'content',
+  quests: 'content',
   tests: 'content',
   flags: 'content',
   variables: 'content',

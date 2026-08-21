@@ -1,6 +1,6 @@
 import { ActionResult, parseResultLine, resultGrammar, resultLines, startsResult } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
-import { Cursor, DslError, parseWhole } from '../../grammar/parser';
+import { Cursor, DslError, parseWhole, Written } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { parseSegments, printSegments, TextSegment } from '../../grammar/segment';
 import { indentLines, RawLine, takeBlock } from '../../grammar/structure';
@@ -60,7 +60,19 @@ function parseChoice(source: RawLine): Choice {
   return choice;
 }
 
-function parseNode(name: string, source: RawLine): DialogueNode {
+// The lines a node holds, which is the same grammar wherever a node is written — in a # dialogue of its own, or under a stage of a quest.
+export const nodeGrammar = (): Written[] => [
+  { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }) },
+  { form: 'once', example: 'once', family: 'reached when' },
+  { form: 'sticky', example: 'sticky', family: 'reached when' },
+  { form: 'again: <text>', example: 'again: We have spoken already.', family: 'what is said' },
+  { form: '<what is said>', example: 'A traveller, out here?', family: 'what is said' },
+  { form: 'goto <node>', example: 'goto farewell', family: 'where it goes' },
+  { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition }), block: () => [{ form: 'goto <node>', example: 'goto farewell', family: 'where it goes' }, ...resultGrammar()] },
+  ...resultGrammar(),
+];
+
+export function parseNode(name: string, source: RawLine): DialogueNode {
   const node: DialogueNode = { name, steps: [] };
   let menu: Choice[] | null = null;
   const flush = () => {
@@ -108,8 +120,11 @@ function mergeNodes(into: Dialogue, from: Dialogue): Dialogue {
   };
 }
 
-function nodeLines(node: DialogueNode): string[] {
-  const lines = [`node ${node.name}:`];
+export const nodeLines = (node: DialogueNode): string[] => [`node ${node.name}:`, ...nodeBody(node)];
+
+// A node's own lines, indented once, without the heading that names it — which is what a quest writes under a stage instead.
+export function nodeBody(node: DialogueNode): string[] {
+  const lines: string[] = [];
   if (node.when) lines.push(`  when: ${condition.print(node.when)}`);
   if (node.once) lines.push('  once');
   if (node.sticky) lines.push('  sticky');
@@ -150,20 +165,7 @@ export const dialogue = section<Dialogue>()({
   map: 'dialogues',
   grammar: [
     { form: 'owner = <entity>', example: 'owner = guide' },
-    {
-      form: 'node <name>:',
-      example: 'node greet:',
-      block: () => [
-        { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }) },
-        { form: 'once', example: 'once', family: 'reached when' },
-        { form: 'sticky', example: 'sticky', family: 'reached when' },
-        { form: 'again: <text>', example: 'again: We have spoken already.', family: 'what is said' },
-        { form: '<what is said>', example: 'A traveller, out here?', family: 'what is said' },
-        { form: 'goto <node>', example: 'goto farewell', family: 'where it goes' },
-        { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition }), block: () => [{ form: 'goto <node>', example: 'goto farewell', family: 'where it goes' }, ...resultGrammar()] },
-        ...resultGrammar(),
-      ],
-    },
+    { form: 'node <name>:', example: 'node greet:', block: nodeGrammar },
   ],
   parse: (raw) => {
     if (!raw.id) throw new DslError('# dialogue requires an id', raw.span);

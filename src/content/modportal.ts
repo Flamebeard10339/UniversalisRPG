@@ -124,6 +124,7 @@ function renamedRegistry(loaded: Registry, moduleId: string): Registry {
     }
     (registry as unknown as Record<string, unknown>)[mapName] = next;
   }
+  registry.namespace = loaded.namespace.renamed(LOCAL_CHANGES_MODULE_ID, moduleId);
   return registry;
 }
 

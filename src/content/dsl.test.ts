@@ -118,7 +118,8 @@ describe('what the page offers where the cursor stands in a hole', () => {
   const asking = new Map(HOLES.filter((at) => kindAt(at) !== undefined).map((at) => [`${at.under.split('\n').pop()!}|${at.line.form}|${at.hole.name}`, at]));
   const naming = [...asking.values()];
 
-  it('offers each id that hole may name once, wherever the author has got to in typing it', () => {
+  // A sweep of the whole language rather than one claim about one line: its cost grows with every kind and every block a kind reaches, so it is given room rather than held to the default a single claim gets.
+  it('offers each id that hole may name once, wherever the author has got to in typing it', { timeout: 30_000 }, () => {
     const complaints: string[] = [];
     let asked = 0;
     for (const at of naming) {
