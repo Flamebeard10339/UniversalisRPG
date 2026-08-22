@@ -75,8 +75,8 @@ The name of the kingdom is undefined. But we can call it Yanodonin.
 - **The bladesmith's son** — cannot take up his father's mantle, because the father
   hid his notes behind *a real smith paves his own way*
 - **A reporter** — wants juicy details on the duke. Unnamed
-- **The barman** — *The Bar's Crawl* wants a new brew from him. ? Is this Sunny, or a
-  second bar?
+- **The barman** — *The Bar's Crawl* wants a new brew from him. This is Sunny. There 
+  is only one bar in Tulsa. 
 - **Guards** — generic; with *The Swampy Menace* available they send you to the captain
 
 ## Antagonists
