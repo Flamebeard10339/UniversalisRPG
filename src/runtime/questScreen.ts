@@ -17,10 +17,16 @@ export const questFocus = (frame: { quest: string }): { kind: 'quest'; quest: An
 export function questOptions(frame: { quest: string }, state: GameState, registry: Registry): readonly ModalOption[] {
   const localizer = localizerOf(registry, state);
   if (frame.quest !== '') return [{ key: LEAVE, label: localizer.engine('engine.journal.reading'), values: [{ value: LEAVE, shown: localizer.engine(LEAVE_SHOWN) }] }];
-  return [{ key: 'quest', label: localizer.engine('engine.journal.which'), values: journal(registry, state).map((entry) => ({ value: entry.quest, shown: entry.title })) }];
+  // The way out is one of the values, the way it is on every list a screen offers: a screen is left by answering it, and clicking away from it answers it with this.
+  const quests = journal(registry, state).map((entry) => ({ value: entry.quest, shown: entry.title }));
+  return [{ key: 'quest', label: localizer.engine('engine.journal.which'), values: [...quests, { value: LEAVE, shown: localizer.engine(LEAVE_SHOWN) }] }];
 }
 
-export const questSubmit = (frame: { quest: string; answers: Record<string, unknown> }): ModalFrame | null => (frame.quest === '' ? questFrame(String(frame.answers.quest ?? '')) : null);
+export function questSubmit(frame: { quest: string; answers: Record<string, unknown> }): ModalFrame | null {
+  if (frame.quest !== '') return null;
+  const asked = String(frame.answers.quest ?? '');
+  return asked === LEAVE || asked === '' ? null : questFrame(asked);
+}
 
 export const sameQuest = (a: { quest: string }, b: { quest: string }): boolean => a.quest === b.quest;
 

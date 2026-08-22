@@ -11,6 +11,7 @@ import { MODAL_SCREENS } from '../content/sections/modal';
 import { SAVE_VERSION } from './save';
 import { choose, createGameState, DialogueCursor, GameState, talk } from './runtime';
 import { applyResultsNow } from './effects';
+import { askedOption } from './command';
 import { apply, applyDirective, PlaySession, PlayStatus, startSession, submitModal, view } from './session';
 
 const STACKING_MODULE = `
@@ -801,6 +802,7 @@ describe('nothing a player answers with carries words', () => {
   };
 
   const walked = new Set<string>();
+  const leavable: { name: string; offers: boolean }[] = [];
 
   const rows = (session: PlaySession): string[] => {
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
@@ -820,6 +822,11 @@ describe('nothing a player answers with carries words', () => {
         walked.add(modal.name);
         for (const option of modal.options) for (const choice of option.values ?? []) values.push(choice.value);
       }
+      const open = view(session).modals;
+      const top = open[open.length - 1];
+      const asking = askedOption(open);
+      // A screen that names no way out is one there is no leaving early — character creation is answered, a dialogue menu is chosen — and says so by publishing none.
+      if (top?.leaving && asking) leavable.push({ name: top.name, offers: (asking.values ?? []).some((choice) => choice.value === top.leaving) });
     };
 
     applyDirective(session, { kind: 'open-modal', modal: 'character-creation' });
@@ -873,6 +880,14 @@ describe('nothing a player answers with carries words', () => {
 
   it('publishes the same values in every language, so a recording replays in each', () => {
     expect(everyValue('es')).toEqual(everyValue('en'));
+  });
+
+  // Clicking away from a screen answers it with the value it says it leaves by, so a screen that does not offer that value among the ones it is asking for cannot be left that way. The subjects are every screen the walk above opens, in every state it opens them in.
+  it('offers the value it says it leaves by, in every state every screen is asked in', () => {
+    everyValue('en');
+
+    expect(leavable.length).toBeGreaterThan(5);
+    expect(leavable.filter((each) => !each.offers).map((each) => each.name)).toEqual([]);
   });
 
   it('walks every modal the engine declares, so the enumeration is of all of them', () => {

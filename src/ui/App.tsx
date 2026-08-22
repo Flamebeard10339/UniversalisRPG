@@ -27,7 +27,7 @@ import { ModalSheet } from './ModalSheet';
 import { LAYERS, OPENING, pageRested, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
 import { PlaneModal } from './PlaneModal';
-import { QuestModal } from './QuestModal';
+import { QuestBody } from './QuestBody';
 import { carried, counted, worn } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
@@ -274,8 +274,11 @@ export function App({
           onSelect={(index) => go((held) => toSubpage(held, held.layer, here.shown[index].id))}
         />
         {asking && plane ? <PlaneModal plane={plane} option={asking} words={words} onAnswer={driver.answer} /> : null}
-        {asking && questRead ? <QuestModal entry={questRead} option={asking} words={words} onAnswer={driver.answer} /> : null}
-        {asking && !plane && !questRead ? <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave} /> : null}
+        {asking && !plane ? (
+          <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave}>
+            {questRead ? <QuestBody entry={questRead} words={words} /> : null}
+          </ModalSheet>
+        ) : null}
       </div>
     </TransientProvider>
   );

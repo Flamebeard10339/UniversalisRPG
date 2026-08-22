@@ -37,7 +37,7 @@ describe('the journal as a screen the engine opens', () => {
   });
 
   it('asks which quest, offering every one the world holds', () => {
-    expect(asked(opened())).toMatchObject({ key: 'quest', values: [{ value: 'an-errand', shown: 'An Errand' }] });
+    expect(asked(opened())).toMatchObject({ key: 'quest', values: [{ value: 'an-errand', shown: 'An Errand' }, { value: 'close', shown: 'Close' }] });
   });
 
   it('reads the quest it is answered with, publishing which one for the page to draw beside it', () => {
@@ -56,5 +56,32 @@ describe('the journal as a screen the engine opens', () => {
 
     expect(view(session).modals).toEqual([]);
     expect(view(session).focus).toBeNull();
+  });
+});
+
+// Clicking away from a screen answers it with the value it says it leaves by, which
+// is why that value has to be one of the ones it offers. What holds of every screen
+// is held to in modals.test.ts; this is that the journal's two halves both offer it.
+describe('leaving the journal', () => {
+  const leaves = (session: ReturnType<typeof opened>): boolean => {
+    const modal = view(session).modals[view(session).modals.length - 1]!;
+    return (asked(session).values ?? []).some((choice) => choice.value === modal.leaving);
+  };
+
+  it('is offered while it is asking which quest, and closes it', () => {
+    const session = opened();
+    expect(leaves(session)).toBe(true);
+    applyDirective(session, { kind: 'submit-modal', key: 'quest', value: 'close' });
+
+    expect(view(session).modals).toEqual([]);
+  });
+
+  it('is offered while it is reading one, and closes it', () => {
+    const session = opened();
+    applyDirective(session, { kind: 'submit-modal', key: 'quest', value: 'an-errand' });
+    expect(leaves(session)).toBe(true);
+    applyDirective(session, { kind: 'submit-modal', key: 'close', value: 'close' });
+
+    expect(view(session).modals).toEqual([]);
   });
 });
