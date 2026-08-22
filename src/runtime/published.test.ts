@@ -33,6 +33,10 @@ const NOT_PUBLISHED: ReadonlyArray<{ type: string; why: string }> = [
     type: 'src/runtime/openUniverse.ts#OpenedUniverse',
     why: 'the handle a driver opens through — a session, the module ids that loaded and what is wrong with them. Its problems reach this walk on their own, as `UniverseProblem`, which declares the tool as whose words they are; the session it holds reaches a driver as `CommandContext` does and is passed over for the same reason',
   },
+  {
+    type: 'src/runtime/session.ts#PlaySession',
+    why: 'the live session a driver threads through `apply`/`applyDirective`/`view`. Everything it publishes reaches this walk on its own — the view as `PlayView`, the status as `PlayStatus` — and its own `registry` field is content the walk is not about, for the same reason `OpenedUniverse.session` is passed over',
+  },
 ];
 
 const UNPUBLISHED = new Set(NOT_PUBLISHED.map((each) => each.type));

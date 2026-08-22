@@ -14,6 +14,7 @@
     "test:tools": "vitest run --configLoader runner --project tools",
     "layer-check": "tsx scripts/layer-check.ts",
     "play": "tsx scripts/play-cli.ts",
+    "playbot": "tsx scripts/playbot.ts",
     "probe": "tsx scripts/probe.ts",
     "oracle": "tsx scripts/oracle.ts",
     "notes": "tsx scripts/notes.ts",
