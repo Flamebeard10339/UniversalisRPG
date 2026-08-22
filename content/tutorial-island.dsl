@@ -492,7 +492,7 @@ entities:
 
 # location beach
 east of guide-house
-examine: Pale sand and the sound of the tide. The mainland waits past the water.
+examine: Pale sand and the sound of the tide, and the road into town running the other way.
 adjacent:
   guide-house
   market-district

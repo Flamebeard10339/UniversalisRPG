@@ -366,6 +366,24 @@ describe('the shipped corpus', () => {
     expect(trip.differences).toEqual([]);
   });
 
+  // A road runs both ways or it does not, and which it is has to be a decision rather than an oversight. Inside one module it is always both, because a one-way road there would be a slip nothing else catches. Across modules it cannot be: the return road belongs to the far end's section, which serializes into the module that owns it, and that module cannot name ids from a module depending on it — so a one-way road out of a region is the engine's shape and not the author's choice.
+  it('runs every road both ways within a module, and only ever one way out of one', () => {
+    const places = loadUniverseWithDiagnostics(CORPUS).registry.locations;
+    const moduleOf = (id: string): string => id.slice(0, id.indexOf('.'));
+    const oneWay: string[] = [];
+
+    for (const [from, place] of places) {
+      for (const edge of place.adjacent) {
+        if ((places.get(edge.target)?.adjacent ?? []).some((back) => back.target === from)) continue;
+        oneWay.push(`${from} -> ${edge.target}`);
+        expect(moduleOf(from), `${from} -> ${edge.target} runs one way inside one module`).not.toBe(moduleOf(edge.target));
+      }
+    }
+
+    // Not zero: the corpus really does hold roads out of a region that nothing brings you back along, and this claim is about which ones may be.
+    expect(oneWay.length).toBeGreaterThan(0);
+  });
+
   it.each(CORPUS.map((source) => source.name))('%s refuses an indented block nobody reads', (name) => {
     const { text } = CORPUS.find((each) => each.name === name)!;
     for (const section of splitSections(text)) {

@@ -196,10 +196,13 @@ describe('a connection is a section edit and nothing else', () => {
 
   const stagedSection = (text: string, address: string): Section => addressable([{ name: 'local-changes', text }]).find((each) => each.address === address)!;
 
-  it('adds a way out to every location the map draws, and takes the same one away again', () => {
+  it('is a rule about every location the map draws', () => {
     expect(DRAWN.length).toBeGreaterThan(2);
+  });
 
-    for (const section of DRAWN) {
+  // One case per place rather than one loop over all of them: each stages an edit and reloads the universe twice to read it back, and a corpus that grows a region runs the loop out of one test's budget while each place on its own stays quick.
+  for (const section of DRAWN) {
+    it(`adds a way out of ${section.address} and takes the same one away again`, () => {
       const to = [...REGISTRY_PLACES.keys()].find((id) => id !== section.address && !linksTo(section, id));
       expect(to, section.address).toBeDefined();
 
@@ -209,8 +212,8 @@ describe('a connection is a section edit and nothing else', () => {
 
       const taken = restaged(stagedSection(added.text, section.address), to!);
       expect(taken.adjacent, section.address).toEqual(waysOut(REGISTRY_PLACES, section.address));
-    }
-  });
+    });
+  }
 
   it('reads a way out that was already written, however it was written', () => {
     for (const section of DRAWN) {
