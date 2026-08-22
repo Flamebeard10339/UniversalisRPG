@@ -30,6 +30,19 @@ import {
 } from '../src/runtime/command';
 import { formatPlane } from './planeView';
 
+// scripts/viewSurfaces.test.ts asks the same question of this terminal that
+// scripts/playbot.test.ts asks of the model: every field a live view carries must either reach a
+// rendered line here or be named below with why not.
+export const CLI_NOT_SHOWN: ReadonlyArray<{ field: keyof PlayView; why: string }> = [
+  { field: 'carried', why: 'the same holdings /state already prints as the raw `inventory` id-count map; a friendlier per-slot listing here would say the same holdings twice' },
+  { field: 'planes', why: 'the jewel plane of an item, drawn by the GUI as a diagram; this terminal opens the same modal but only ever names its screen and keys, never the plane inside it' },
+  { field: 'focus', why: 'which screen is focused, which only matters once more than one screen can be open at a time; this terminal shows the one open modal already, through `formatModals`' },
+  { field: 'discovered', why: "the map of walked-to places and the roads between them; this terminal has no map feature at all, unlike the GUI's own pane for it, so nothing here draws one" },
+  { field: 'locations', why: "every location the registry holds, discovered or not; this terminal has no map feature to draw either half of it on, the same gap that leaves `discovered` unshown" },
+  { field: 'equipment', why: '/state only prints a slot once something is worn in it; an empty-handed session has nothing here to point at, which is a real gap and not a design choice' },
+  { field: 'stats', why: 'the counted stats a character carries; no command in this terminal reads this field at all, a real gap rather than a deliberate exclusion' },
+];
+
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
 const defaultLocalChanges = 'content/local-changes.dsl';

@@ -7,6 +7,7 @@ import type { Registry } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, newContext, runLine } from '../src/runtime/command';
 import { sessionStatus, startSession, view, type PlaySession } from '../src/runtime/session';
+import { excusedFieldsAreReal, unaccountedFields } from './lib/viewCoverage';
 import {
   isolatedCwd,
   journalWindowText,
@@ -165,28 +166,17 @@ describe('playbot', () => {
   // The four fields the first spike went blind to were missing because nothing failed when they
   // were left out. The subjects here are the keys of a live view rather than a list, so a field
   // added to PlayStatus next month arrives in this claim on its own and has to be shown or
-  // answered for.
+  // answered for. scripts/viewSurfaces.test.ts asks the same question of play-cli and the GUI.
   it('every field a live view publishes is either shown to the player or answered for', () => {
     const live = view(startSession(played()));
-    const excused = new Set(NOT_SHOWN.map((each) => each.field as string));
-    const carries = (held: unknown): boolean => {
-      if (held === null || held === undefined || held === '') return false;
-      if (Array.isArray(held)) return held.length > 0;
-      if (typeof held === 'object') return Object.values(held as Record<string, unknown>).some(carries);
-      return true;
-    };
     const shown = renderView(live);
-    const held = live as unknown as Record<string, unknown>;
-    const unshown = Object.keys(held).filter((field) => !excused.has(field) && carries(held[field]) && !shown.includes(`${field}:`));
+    const unshown = unaccountedFields(live, NOT_SHOWN, (field) => shown.includes(`${field}:`));
     expect(unshown, `these view fields reach no line of the rendered turn: ${unshown.join(', ')}`).toEqual([]);
   });
 
   it('nothing is excused from a turn that a live view does not publish', () => {
     const live = view(startSession(played()));
-    for (const each of NOT_SHOWN) {
-      expect(Object.keys(live), `${each.field} is excused and no view has it`).toContain(each.field as string);
-      expect(each.why.length, `${each.field} is excused without a reason`).toBeGreaterThan(20);
-    }
+    expect(excusedFieldsAreReal(live, NOT_SHOWN)).toEqual([]);
   });
 
   // c6, narrowed for free text (see docs/specs' ## Decisions for 2026-08-22): the loop builds no
