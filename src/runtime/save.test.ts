@@ -6,7 +6,7 @@ import { IMPLICIT_TARGET_FULL } from './encounter';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal } from './modals';
 import { openModalNamed } from './modalStack';
-import { compareSave, compareSaveOnly, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave } from './save';
+import { compareSave, compareSaveOnly, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave, type SaveField } from './save';
 import { parseSaveSection } from '../content/sections/save';
 import { runTest } from './session';
 import { travelAction, TRAVEL_ADDRESS } from './actions';
@@ -66,6 +66,26 @@ describe('diffState', () => {
     const state = initialState(registry);
     state.inventory.bread = 1;
     expect(diffState(state, baseline)).toEqual({ inventory: { bread: 1 } });
+  });
+
+  // Derived from what each record field declares its sparsest holding to be, so a record field added next month is covered here without an edit.
+  it.each((Object.keys(SAVE_FIELDS) as SaveField[]).filter((field) => SAVE_FIELDS[field].shape === 'record'))('says nothing of a %s key held at its sparsest value', (field) => {
+    const registry = loadInEnglish(MODULE);
+    const baseline = initialState(registry);
+    const state = initialState(registry);
+    (state[field] as Record<string, unknown>)['nothing-here'] = SAVE_FIELDS[field].sparsest;
+
+    expect(diffState(state, baseline)).toEqual({});
+  });
+
+  it('still says a holding that fell to its sparsest value from a baseline that was not', () => {
+    const registry = loadInEnglish(MODULE);
+    const baseline = initialState(registry);
+    const state = initialState(registry);
+    expect(baseline.resources.health).toBeGreaterThan(0);
+    restorePools(state, { health: 0 });
+
+    expect(diffState(state, baseline)).toEqual({ resources: { health: 0 } });
   });
 
   it('captures only location on a relocation', () => {

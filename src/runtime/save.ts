@@ -22,7 +22,7 @@ export const SAVE_VERSION = 11;
 
 export type SaveDiff = Partial<Omit<GameState, 'log' | 'language'>>;
 
-type SaveField = Exclude<keyof GameState, 'log' | 'language'>;
+export type SaveField = Exclude<keyof GameState, 'log' | 'language'>;
 
 interface RecordPrune {
   of: string;
@@ -109,10 +109,15 @@ function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-function diffRecord(state: Record<string, unknown>, baseline: Record<string, unknown>): Record<string, unknown> | undefined {
+// A key a record does not hold and a key it holds at its sparsest value are the same holding, so a save body says neither: a fixture listing an item at count zero reads as holdings the player does not have.
+const held = (record: Record<string, unknown>, key: string, sparsest: unknown): unknown => record[key] ?? sparsest;
+
+function diffRecord(field: SaveField, state: Record<string, unknown>, baseline: Record<string, unknown>): Record<string, unknown> | undefined {
+  const { sparsest } = SAVE_FIELDS[field];
   const out: Record<string, unknown> = {};
   for (const key of new Set([...Object.keys(state), ...Object.keys(baseline)])) {
-    if (!deepEqual(state[key], baseline[key])) out[key] = state[key];
+    const value = held(state, key, sparsest);
+    if (!deepEqual(value, held(baseline, key, sparsest))) out[key] = value;
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
@@ -229,7 +234,7 @@ export function diffState(state: GameState, baseline: GameState): SaveDiff {
   const diff: Record<string, unknown> = {};
 
   for (const field of RECORD_FIELDS) {
-    const recordDiff = diffRecord(state[field] as Record<string, unknown>, baseline[field] as Record<string, unknown>);
+    const recordDiff = diffRecord(field, state[field] as Record<string, unknown>, baseline[field] as Record<string, unknown>);
     if (recordDiff) diff[field] = recordDiff;
   }
   for (const field of SCALAR_FIELDS) {
@@ -303,10 +308,11 @@ export function compareSave(state: GameState, saved: ParsedSave, registry: Regis
   const diffs: string[] = [];
 
   for (const field of RECORD_FIELDS) {
+    const { sparsest } = SAVE_FIELDS[field];
     const a = (current[field] ?? {}) as Record<string, unknown>;
     const b = (expected[field] ?? {}) as Record<string, unknown>;
     for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
-      if (!deepEqual(a[key], b[key])) diffs.push(`${field}.${key}: ${describeValue(a[key])} vs ${describeValue(b[key])}`);
+      if (!deepEqual(held(a, key, sparsest), held(b, key, sparsest))) diffs.push(`${field}.${key}: ${describeValue(a[key])} vs ${describeValue(b[key])}`);
     }
   }
 
