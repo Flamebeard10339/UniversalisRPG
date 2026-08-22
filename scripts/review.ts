@@ -1,4 +1,5 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { NOTE_MARK, noteIn, withoutNote } from '../src/grammar/note';
 import { localeKey, moduleLocaleSections } from '../src/content/locale';
@@ -8,10 +9,45 @@ import type { Registry } from '../src/content/registry';
 import { contentSectionMaps, globalSectionKinds, textFieldsOf } from '../src/content/sections';
 import type { ModuleSource } from '../src/content/universe';
 
+export interface Said {
+  key: string;
+  field: string;
+  text: string;
+  // A hash of the whole line as the engine holds it, note and all. What a mark is written against, so nothing has to reconstruct the words later and be subtly wrong about them.
+  hash: string;
+  asked?: string;
+  generated: boolean;
+  // Absent until the line has been read by a person. Held as a hash of what they read, so a line someone rewrites afterwards comes back rather than staying signed off against writing nobody saw.
+  standing?: Standing;
+}
+
+export type Standing = 'reviewed' | 'changed';
+
+export const LEDGER = 'content/reviewed.tsv';
+
+export const stamp = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 12);
+
+export const parseLedger = (text: string): Map<string, string> => new Map(text.split(/\r?\n/).flatMap((line) => (line.trim() === '' || line.startsWith('#') ? [] : [line.split('\t') as [string, string]])));
+
+export const printLedger = (held: ReadonlyMap<string, string>): string =>
+  ['# What a person has read, and what it said when they read it. Written by `npm run review`.', ...[...held].sort(([one], [other]) => one.localeCompare(other)).map(([key, hash]) => `${key}\t${hash}`), ''].join('\n');
+
+export const readLedger = (): Map<string, string> => (existsSync(LEDGER) ? parseLedger(readFileSync(LEDGER, 'utf8')) : new Map());
+
+function standingOf(held: ReadonlyMap<string, string>, key: string, text: string): Standing | undefined {
+  const signed = held.get(key);
+  if (signed === undefined) return undefined;
+  return signed === stamp(text) ? 'reviewed' : 'changed';
+}
+
 const usage = [
-  'Usage: npm run review [-- <module>...]',
+  'Usage: npm run review [-- <module>...] [--all] [--read-through <section>] [--read <section>...]',
   '',
-  '  <module>   a module id; with none, every module the corpus holds',
+  '  <module>              a module id; with none, every module the corpus holds',
+  '  --all                 show the lines already read as well as the ones left',
+  '  --read-through <id>   mark every line from the top of the module down to and',
+  '                        including this section as read',
+  '  --read <id>...        mark just these sections as read',
   '',
   'Every line the game can say, in the order its module writes them, under the',
   'section that says it. The set derives itself from the locale tables the engine',
@@ -20,14 +56,12 @@ const usage = [
   '',
   `A ${NOTE_MARK} is shown beneath the line it was left in, so one read covers both`,
   'the writing and what an author asked for and did not get.',
+  '',
+  `What has been read is kept in ${LEDGER}, against a hash of the words that were`,
+  'read. Rewrite a line someone signed off and it comes back marked CHANGED, so no',
+  'line stays approved against writing nobody saw. Edit first, then mark: a mark is',
+  'taken from what the file says at the moment it is written.',
 ].join('\n');
-
-export interface Said {
-  field: string;
-  text: string;
-  asked?: string;
-  generated: boolean;
-}
 
 export interface Spoken {
   kind: string;
@@ -41,7 +75,7 @@ export interface Sheet {
   source: string;
   sections: Spoken[];
   // Lines the module says that no section header claims. Empty is the proof that the walk above reached everything; anything here is a line that would otherwise be reviewed by nobody.
-  loose: Array<Said & { key: string }>;
+  loose: Said[];
 }
 
 const HEADER = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[^\s]+))?[ \t]*$/;
@@ -91,7 +125,7 @@ function ordered(kind: string, said: Said[]): Said[] {
   return [...said].sort((one, other) => rank(one.field) - rank(other.field) || naturally(one.field, other.field));
 }
 
-export function sheetFor(registry: Registry, module: string, source: string, text: string): Sheet {
+export function sheetFor(registry: Registry, module: string, source: string, text: string, held: ReadonlyMap<string, string> = new Map()): Sheet {
   const headers = headersIn(module, text);
   const claims = headers.flatMap((header) => header.prefixes.map((prefix) => ({ header, prefix }))).sort((one, other) => other.prefix.length - one.prefix.length);
   const said = new Map<Header, Said[]>(headers.map((header) => [header, []]));
@@ -101,14 +135,18 @@ export function sheetFor(registry: Registry, module: string, source: string, tex
     if (entry.language !== 'en') continue;
     const claim = claims.find((each) => key.startsWith(each.prefix));
     const asked = noteIn(entry.text);
+    const standing = standingOf(held, key, entry.text);
     const one: Said = {
+      key,
       field: claim ? key.slice(claim.prefix.length) : key,
       text: withoutNote(entry.text),
+      hash: stamp(entry.text),
       ...(asked === undefined ? {} : { asked: asked.trim() }),
       generated: entry.generated === true,
+      ...(standing === undefined ? {} : { standing }),
     };
     if (claim) said.get(claim.header)!.push(one);
-    else if (key.startsWith(`${module}.`) || key.includes(`.${module}.`)) loose.push({ ...one, key });
+    else if (key.startsWith(`${module}.`) || key.includes(`.${module}.`)) loose.push(one);
   }
 
   // What a module declares outright, which is how the engine's own English arrives: a `# locale` section names its keys rather than growing them off a section's fields, so nothing above would ever reach them.
@@ -117,7 +155,8 @@ export function sheetFor(registry: Registry, module: string, source: string, tex
     if (header === undefined) continue;
     for (const { key, value } of declared.entries) {
       const asked = noteIn(value);
-      said.get(header)!.push({ field: key, text: withoutNote(value), ...(asked === undefined ? {} : { asked: asked.trim() }), generated: false });
+      const standing = standingOf(held, key, value);
+      said.get(header)!.push({ key, field: key, text: withoutNote(value), hash: stamp(value), ...(asked === undefined ? {} : { asked: asked.trim() }), generated: false, ...(standing === undefined ? {} : { standing }) });
     }
   }
 
@@ -132,22 +171,39 @@ const FIELD_WIDTH = 24;
 
 function saidLines(said: Said): string[] {
   const gutter = ' '.repeat(FIELD_WIDTH);
-  const field = `${said.field}${said.generated ? ' (auto)' : ''}`;
+  const field = `${said.field}${said.generated ? ' (auto)' : ''}${said.standing === 'changed' ? ' CHANGED' : said.standing === 'reviewed' ? ' ok' : ''}`;
   const text = said.text === '' ? '(nothing at all)' : said.text;
   const opening = field.length < FIELD_WIDTH ? [`  ${field.padEnd(FIELD_WIDTH)}${text}`] : [`  ${field}`, `  ${gutter}${text}`];
   return [...opening, ...(said.asked === undefined ? [] : [`  ${gutter}${NOTE_MARK} ${said.asked === '' ? 'rough' : said.asked}`])];
 }
 
-export function sheetLines(sheet: Sheet): string[] {
+export const isLeft = (said: Said): boolean => said.standing !== 'reviewed';
+
+export function sheetLines(sheet: Sheet, all = false): string[] {
   const every = sheet.sections.flatMap((section) => section.said);
-  const counted = [`${every.length} line(s) the game says, across ${sheet.sections.length} section(s)`, `${every.filter((said) => said.generated).length} of them written by nobody: a title the engine made out of an id`, `${every.filter((said) => said.asked !== undefined).length} carry a ${NOTE_MARK}`];
+  const left = every.filter(isLeft);
+  const shown = sheet.sections.map((section) => ({ ...section, said: all ? section.said : section.said.filter(isLeft) })).filter((section) => section.said.length > 0);
+  const counted = [
+    `${left.length} line(s) left to read, of ${every.length} the game says across ${sheet.sections.length} section(s)`,
+    `${left.filter((said) => said.standing === 'changed').length} of those were read once and have been rewritten since`,
+    `${left.filter((said) => said.generated).length} written by nobody: a title the engine made out of an id`,
+    `${left.filter((said) => said.asked !== undefined).length} carry a ${NOTE_MARK}`,
+  ];
   return [
     `${sheet.source} — ${sheet.module}`,
     ...counted.map((line) => `  ${line}`),
     '',
-    ...sheet.sections.flatMap((section) => [`# ${section.kind} ${section.id}`.padEnd(52) + `${sheet.source}:${section.line}`, ...section.said.flatMap(saidLines), '']),
+    ...(left.length === 0 ? ['every line this module says has been read.', ''] : []),
+    ...shown.flatMap((section) => [`# ${section.kind} ${section.id}`.padEnd(52) + `${sheet.source}:${section.line}`, ...section.said.flatMap(saidLines), '']),
     ...(sheet.loose.length === 0 ? [] : [`${sheet.loose.length} line(s) under no section of this module, so nothing above reviews them:`, ...sheet.loose.flatMap((said) => saidLines({ ...said, field: said.key })), '']),
   ];
+}
+
+// The sections a `--read-through` covers: everything the module writes down to and including the one named. What "down to" means is the order the sheet is read in, which is the order the file is written in.
+export function through(sheet: Sheet, id: string): Spoken[] {
+  const at = sheet.sections.findIndex((section) => section.id === id);
+  if (at === -1) throw new Error(`${sheet.module} writes no section called ${id}. Its ids are the ones printed after the kind on each header line.`);
+  return sheet.sections.slice(0, at + 1);
 }
 
 const shipped = (): ModuleSource[] =>
@@ -155,28 +211,72 @@ const shipped = (): ModuleSource[] =>
     .filter((name) => name.endsWith('.dsl'))
     .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') }));
 
+interface Asked {
+  modules: string[];
+  all: boolean;
+  through?: string;
+  read: string[];
+}
+
+function parseArgs(argv: readonly string[]): Asked {
+  const asked: Asked = { modules: [], all: false, read: [] };
+  for (let at = 0; at < argv.length; at++) {
+    if (argv[at] === '--all') asked.all = true;
+    else if (argv[at] === '--read-through') asked.through = argv[++at];
+    else if (argv[at] === '--read') while (at + 1 < argv.length && !argv[at + 1].startsWith('--')) asked.read.push(argv[++at]);
+    else asked.modules.push(argv[at]);
+  }
+  if (asked.through !== undefined && asked.read.length > 0) throw new Error('--read-through and --read say the same thing two ways; use one');
+  return asked;
+}
+
 function main(): void {
-  const args = process.argv.slice(2);
-  if (args.includes('--help')) {
+  const argv = process.argv.slice(2);
+  if (argv.includes('--help')) {
     console.log(usage);
     return;
   }
-  const sources = shipped();
-  const { registry, diagnostics, parsed } = loadUniverseWithDiagnostics(sources);
+  const asked = parseArgs(argv);
+  const { registry, diagnostics, parsed } = loadUniverseWithDiagnostics(shipped());
   for (const diagnostic of diagnostics) console.error(formatModuleDiagnostic(diagnostic));
 
-  const wanted = args.length > 0 ? args : parsed.map((module) => module.info.id);
+  const wanted = asked.modules.length > 0 ? asked.modules : parsed.map((module) => module.info.id);
   const unknown = wanted.filter((id) => !parsed.some((module) => module.info.id === id));
   if (unknown.length > 0) {
     console.error(`no such module: ${unknown.join(', ')}. The corpus holds ${parsed.map((module) => module.info.id).join(', ')}.`);
     process.exitCode = 1;
     return;
   }
-
-  for (const id of wanted) {
-    const module = parsed.find((each) => each.info.id === id)!;
-    console.log(sheetLines(sheetFor(registry, id, `content/${module.source.name}`, module.source.text)).join('\n'));
+  const marking = asked.through !== undefined || asked.read.length > 0;
+  if (marking && wanted.length > 1) {
+    console.error('name the one module being marked, so a section id can only mean one thing');
+    process.exitCode = 1;
+    return;
   }
+
+  const held = readLedger();
+  const sheets = wanted.map((id) => {
+    const module = parsed.find((each) => each.info.id === id)!;
+    return sheetFor(registry, id, `content/${module.source.name}`, module.source.text, held);
+  });
+
+  if (marking) {
+    const sheet = sheets[0];
+    const covered = asked.through === undefined ? sheet.sections.filter((section) => asked.read.includes(section.id)) : through(sheet, asked.through);
+    const missing = asked.read.filter((id) => !covered.some((section) => section.id === id));
+    if (missing.length > 0) {
+      console.error(`${sheet.module} writes no section called ${missing.join(', ')}`);
+      process.exitCode = 1;
+      return;
+    }
+    const marked = covered.flatMap((section) => section.said).filter(isLeft);
+    for (const section of covered) for (const said of section.said) held.set(said.key, said.hash);
+    writeFileSync(LEDGER, printLedger(held));
+    console.log(`read through ${covered[covered.length - 1]?.id ?? '(nothing)'}: ${marked.length} line(s) across ${covered.length} section(s) marked, in ${LEDGER}.`);
+    return;
+  }
+
+  for (const sheet of sheets) console.log(sheetLines(sheet, asked.all).join('\n'));
 }
 
 if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) main();

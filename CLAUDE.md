@@ -99,7 +99,7 @@ Tools, none of which are gates:
 - `npm run oracle [-- <kind>... | --at <draft.dsl>]` — print the grammar the editing page offers, as a tree per kind; or read a draft: every line the engine refuses, then its word on the whole file stood beside the shipped world, then line by line what may be written where
 - `npm run inspect -- "<expression>"` — evaluate against the repo's own module resolution, leaving no file behind
 - `npm run notes [-- <source>...]` — list every `@@@` the corpus holds: writing that is standing in for better writing, and what an author asked for that the engine cannot do
-- `npm run review [-- <module>...]` — every line the game can say, under the section that says it, in the order its module writes them. The sheet a human reads to review the writing; nothing has to be marked to appear on it
+- `npm run review [-- <module>...]` — every line the game can say, under the section that says it, in the order its module writes them; `--read-through <section>` marks a sitting as read. The sheet a human reads to review the writing. Nothing has to be marked to appear on it, and a line someone rewrites after it was read comes back
 - `npm run mutate -- <manifest.json>` — break a named line, run the tests it names, report what the suite failed to notice
 
 **A UI feature is tested by the author, not by the agent.** Build it, hand it
