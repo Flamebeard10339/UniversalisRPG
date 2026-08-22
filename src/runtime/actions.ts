@@ -83,17 +83,17 @@ export function resolvesPerAttempt(action: Action): boolean {
   return action.accuracy !== undefined || action.depletes !== undefined;
 }
 
-export function actionStillValid(action: Action, active: ActiveAction, state: GameState): boolean {
-  if (!requiresMet(action, state)) return false;
+export function actionStillValid(action: Action, active: ActiveAction, state: GameState, registry: Registry): boolean {
+  if (!requiresMet(action, state, registry)) return false;
   return !active.repeating || inputLimit(action, state).completions > 0;
 }
 
-export function requiresMet(action: Action, state: GameState): boolean {
-  return !action.requires || evaluateCondition(action.requires, state);
+export function requiresMet(action: Action, state: GameState, registry: Registry): boolean {
+  return !action.requires || evaluateCondition(action.requires, state, registry);
 }
 
-export function actionVisible(action: Action, state: GameState): boolean {
-  return !action.hiddenIf || !evaluateCondition(action.hiddenIf, state);
+export function actionVisible(action: Action, state: GameState, registry: Registry): boolean {
+  return !action.hiddenIf || !evaluateCondition(action.hiddenIf, state, registry);
 }
 
 export function perCompletionCost(action: Action): Map<string, number> {

@@ -24,7 +24,7 @@ export function retaliation(state: GameState, registry: Registry, actorId: strin
   for (const action of actorEntity(registry, actorId)?.actions ?? []) {
     const id = declaredId(action);
     if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
-    if (!performable(action, state)) continue;
+    if (!performable(action, state, registry)) continue;
     if (!hasPool(state, registry, attackerId, action.depletes.id)) continue;
     return { id, action };
   }

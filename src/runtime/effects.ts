@@ -112,7 +112,7 @@ function statSide(value: number | string, state: GameState, registry: Registry):
 }
 
 function selectRow(rows: readonly DropRow[], state: GameState, registry: Registry): DropRow | undefined {
-  const live = rows.filter((row) => row.requires === undefined || evaluateCondition(row.requires, state));
+  const live = rows.filter((row) => row.requires === undefined || evaluateCondition(row.requires, state, registry));
   const weights = live.map((row) => Math.max(0, statSide(row.weight, state, registry)));
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   if (total <= 0) return undefined;
@@ -151,7 +151,7 @@ export function spreadDiscovery(state: GameState, registry: Registry): void {
   for (const edge of effectiveAdjacent(registry, here.id)) {
     const key = `${edge.target}.${DISCOVERED}`;
     if (state.flags[key]) continue;
-    if (edge.condition && !evaluateCondition(edge.condition, state)) continue;
+    if (edge.condition && !evaluateCondition(edge.condition, state, registry)) continue;
     state.flags[key] = true;
   }
 }
@@ -237,7 +237,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       }
       return undefined;
     case 'gate':
-      if (evaluateCondition(result.condition, state)) applyResults(segment, result.results, actor, count);
+      if (evaluateCondition(result.condition, state, registry)) applyResults(segment, result.results, actor, count);
       return undefined;
     case 'credit':
       applyResults(segment, result.results, segment.credit ?? actor, count);

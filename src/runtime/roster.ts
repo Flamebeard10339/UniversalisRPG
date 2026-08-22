@@ -9,7 +9,7 @@ export function actorEntity(registry: Registry, actorId: string): Entity | undef
   return actorId === PLAYER ? registry.player : registry.entities.get(templateOf(actorId));
 }
 
-export const performable = (action: Action, state: GameState): boolean => requiresMet(action, state) && actionVisible(action, state);
+export const performable = (action: Action, state: GameState, registry: Registry): boolean => requiresMet(action, state, registry) && actionVisible(action, state, registry);
 
 export const seatOf = (id: string, action: Action, target: string): Seat => ({ ownerRef: `action.${id}`, actionSlug: actionAddress(action), target });
 
@@ -45,7 +45,7 @@ export function participants(state: GameState, registry: Registry): Participant[
     const seat = active.roster?.[actorId];
     if (!seat) continue;
     const action = seatedAction(seat, registry, actorId);
-    if (action && performable(action, state)) list.push({ self: actorId, other: seat.target, action, cadence });
+    if (action && performable(action, state, registry)) list.push({ self: actorId, other: seat.target, action, cadence });
   }
   return list;
 }
