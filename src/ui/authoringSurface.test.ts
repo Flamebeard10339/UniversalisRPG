@@ -42,10 +42,11 @@ const sectionKeyOf = (section: Section): string => `${section.kind} ${section.ad
 
 const REGISTRY = loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry;
 
-const GUIDE_HOUSE: Standing = {
-  location: 'tutorial-island.guide-house',
-  entities: ['tutorial-island.miki', 'tutorial-island.front-door', 'tutorial-island.oven'],
-};
+// Any real location with a few entities standing in it proves the same rule;
+// naming one by hand would go stale the day an author renamed it.
+const HOUSE = [...REGISTRY.locations.values()].find((location) => location.entities.length >= 3)!;
+const GUIDE_HOUSE: Standing = { location: HOUSE.id, entities: HOUSE.entities.map((each) => each.entity) };
+const ELSEWHERE = [...REGISTRY.locations.keys()].find((id) => id !== GUIDE_HOUSE.location)!;
 
 const surfacesOffering = (section: Section, standing: Standing): string[] =>
   SURFACES.filter((surface) => offeredBy([section], standing, surface).length === 1);
@@ -113,13 +114,13 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
   });
 
   it('shadows a shipped section with the copy staged over it, rather than offering both', () => {
-    const staged = { name: 'local-changes', text: '# info local-changes\nversion: 0.0.0\n\n# location tutorial-island.beach\nx: 4, y: 0\n' };
+    const staged = { name: 'local-changes', text: `# info local-changes\nversion: 0.0.0\n\n# location ${ELSEWHERE}\nx: 4, y: 0\n` };
     const withLocal = addressable([...SHIPPED_SOURCES, staged]);
-    const beach = withLocal.filter((section) => section.address === 'tutorial-island.beach');
+    const shadowing = withLocal.filter((section) => section.address === ELSEWHERE);
 
-    expect(beach).toHaveLength(1);
-    expect(beach[0].staged).toBe(true);
-    expect(beach[0].text).toContain('x: 4, y: 0');
+    expect(shadowing).toHaveLength(1);
+    expect(shadowing[0].staged).toBe(true);
+    expect(shadowing[0].text).toContain('x: 4, y: 0');
     expect(withLocal).toHaveLength(addressed.length);
   });
 });
@@ -173,8 +174,12 @@ describe('every control sends a line the shared table parses (c2)', () => {
   });
 
   it('refuses to take out a section the world still names, and says what still names it', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
-    const mirror = { kind: 'entity', address: 'tutorial-island.mirror' };
+    const named = {
+      name: 'base',
+      text: '# info base\nversion: 1.0.0\n\n# location camp\nx: 0, y: 0\nstarting\nentities:\n  mirror\n\n# entity mirror\nlook in: say: hm\n',
+    };
+    const driver = createDriver([engineLocale(), named], { ticker: () => () => undefined });
+    const mirror = { kind: 'entity', address: 'base.mirror' };
 
     driver.send(removeLine(mirror));
 
@@ -184,9 +189,9 @@ describe('every control sends a line the shared table parses (c2)', () => {
   });
 
   it('deletes and exports by lines the same table parses', () => {
-    expect(deleteLine({ kind: 'location', address: 'tutorial-island.beach' })).toBe('/local delete location tutorial-island.beach');
+    expect(deleteLine({ kind: 'location', address: 'somewhere.place' })).toBe('/local delete location somewhere.place');
     const local = COMMANDS.find((command) => command.name === '/local')!;
-    expect(local.parse('delete location tutorial-island.beach', undefined as never)).toEqual({ op: 'delete', kind: 'location', id: 'tutorial-island.beach' });
+    expect(local.parse('delete location somewhere.place', undefined as never)).toEqual({ op: 'delete', kind: 'location', id: 'somewhere.place' });
     expect(local.parse(SHOW_LINE.slice('/local '.length), undefined as never)).toEqual({ op: 'show' });
   });
 });
