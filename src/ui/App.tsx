@@ -275,7 +275,7 @@ export function App({
         />
         {asking && plane ? <PlaneModal plane={plane} option={asking} words={words} onAnswer={driver.answer} /> : null}
         {asking && !plane ? (
-          <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave}>
+          <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value}>
             {questRead ? <QuestBody entry={questRead} words={words} /> : null}
           </ModalSheet>
         ) : null}
