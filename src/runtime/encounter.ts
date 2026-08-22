@@ -1,7 +1,8 @@
 import { RuntimeError } from './error';
 import { Action, isTwoSided, sideOf } from '../grammar/action';
 import { attemptDuration, hasPool, statValue } from './stats';
-import { actorEntity, participants, performable, seatOf } from './roster';
+import { participants, performable, seatOf } from './roster';
+import { actorEntity } from './seat';
 import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
 import { declaredId } from '../content/sections/entity';
 import { hostile, Registry } from '../content/registry';

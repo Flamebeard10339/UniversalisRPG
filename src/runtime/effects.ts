@@ -9,7 +9,7 @@ import { Registry } from '../content/registry';
 import { Resource } from '../content/sections/resource';
 import { evaluateCondition } from './conditions';
 import { effectiveAdjacent } from './journey';
-import { actorEntity } from './roster';
+import { actorEntity } from './seat';
 import { hasPool } from './stats';
 import { stockItem } from './itemInstance';
 import { openModalNamed } from './modalStack';

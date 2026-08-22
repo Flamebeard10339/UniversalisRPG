@@ -1,13 +1,9 @@
 import { Action } from '../grammar/action';
 import { actionAddress } from '../content/sections/action';
-import { declaredId, Entity } from '../content/sections/entity';
 import { Registry } from '../content/registry';
-import { actionVisible, findActiveAction, findActionOwner, requiresMet } from './actions';
-import { type Cadence, GameState, PLAYER, type Seat, templateOf } from './state';
-
-export function actorEntity(registry: Registry, actorId: string): Entity | undefined {
-  return actorId === PLAYER ? registry.player : registry.entities.get(templateOf(actorId));
-}
+import { actionVisible, findActiveAction, requiresMet } from './actions';
+import { seatedAction } from './seat';
+import { type Cadence, GameState, PLAYER, type Seat } from './state';
 
 export const performable = (action: Action, state: GameState, registry: Registry): boolean => requiresMet(action, state, registry) && actionVisible(action, state, registry);
 
@@ -18,18 +14,6 @@ export interface Participant {
   other: string;
   action: Action;
   cadence: Cadence;
-}
-
-function seatedAction(seat: Seat, registry: Registry, actorId: string): Action | undefined {
-  const dot = seat.ownerRef.indexOf('.');
-  const obj = seat.ownerRef.slice(0, dot);
-  const objId = seat.ownerRef.slice(dot + 1);
-  if (obj === 'action') {
-    const own = actorEntity(registry, actorId)?.actions.find((each) => declaredId(each) === objId);
-    if (own) return own;
-  }
-  const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-  return owner?.actions?.find((each) => actionAddress(each) === seat.actionSlug);
 }
 
 export function armedAction(state: GameState, registry: Registry): Action {

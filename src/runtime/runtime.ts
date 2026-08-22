@@ -1,20 +1,7 @@
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
-import {
-  actionStillValid,
-  actionVisible,
-  fightBatch,
-  findActionOwner,
-  FightOutcome,
-  inputLimit,
-  outcomeResults,
-  parseOwnerRef,
-  requiresMet,
-  resolvesPerAttempt,
-  stopsOnOutcome,
-  travelAction,
-  travelPair,
-} from './actions';
+import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, outcomeResults, parseOwnerRef, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
+import { findActionOwner, travelAction, travelPair } from './seat';
 import {
   applyResults,
   applyResultsNow,
@@ -31,7 +18,8 @@ import {
   settlePools,
 } from './effects';
 import { damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, opposes, leaveFight, playerCadence, poolLevel, retaliation, targetLevel } from './encounter';
-import { actorEntity, armedAction, Participant, participants, seatOf } from './roster';
+import { armedAction, Participant, participants, seatOf } from './roster';
+import { actorEntity } from './seat';
 import { hasPool } from './stats';
 import { sideOf } from '../grammar/action';
 import { applyRespawns, downOne, isStanding, nextRespawn, standing } from './population';
