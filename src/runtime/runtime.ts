@@ -505,22 +505,29 @@ export function resolve(state: GameState, registry: Registry, toTimeMs: number):
   }
 }
 
-// The engine already knows when what is under way ends, so an author waiting it out asks rather than guesses a number of seconds large enough. An action that repeats without bound has no end to name, and says so instead of running forever.
-const UNDER_WAY_BOUNDARIES = 1000;
+// An author waiting out an action wants it finished, not a number of seconds guessed large enough to cover it. What is under way is stepped one unit of its own at a time — the cycle the progress bar reads — and stops the moment nothing is in flight, so a fight ends when the last swing lands rather than when a clock a test picked runs out. An action that never ends runs into the step cap and says so, rather than running forever.
+const UNDER_WAY_STEPS = 1000;
 
 export interface WaitedOut {
   ended: boolean;
   reason?: string;
 }
 
+const underWayUnit = (state: GameState, registry: Registry): number => {
+  const active = state.activeAction;
+  if (!active) return 0;
+  const { obj, objId } = parseOwnerRef(active.ownerRef);
+  return actionFirstUnit(obj, objId, active.actionSlug, registry, state);
+};
+
 export function resolveUnderWay(state: GameState, registry: Registry): WaitedOut {
-  for (let step = 0; step < UNDER_WAY_BOUNDARIES; step++) {
+  for (let step = 0; step < UNDER_WAY_STEPS; step++) {
     if (!state.activeAction && !state.journey) return { ended: true };
-    const { at } = nextBoundary(state, registry, Number.MAX_SAFE_INTEGER);
-    if (at <= state.time || at === Number.MAX_SAFE_INTEGER) return { ended: false, reason: 'what is under way has no end the engine can name' };
-    resolve(state, registry, at);
+    const unit = underWayUnit(state, registry);
+    if (!(unit > 0)) return { ended: false, reason: 'what is under way advances by nothing, so waiting it out would never end' };
+    resolve(state, registry, state.time + Math.max(1, Math.ceil(unit)));
   }
-  return { ended: false, reason: `what is under way had not finished after ${UNDER_WAY_BOUNDARIES} boundaries` };
+  return { ended: false, reason: `what is under way had not finished after ${UNDER_WAY_STEPS} of its own cycles` };
 }
 
 function grantFoodBuff(item: Item, state: GameState): void {

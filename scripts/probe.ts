@@ -140,9 +140,17 @@ function runTests(registry: Registry, specs: readonly string[]): { lines: string
       continue;
     }
     for (const id of named) {
-      const result = runTest(id, registry, createGameState());
-      lines.push(result.passed ? `${id}: PASSED` : `${id}: FAILED — ${result.failure ?? 'no reason given'}`);
-      if (!result.passed) ok = false;
+      // A directive the engine refuses outright throws rather than failing, and one test throwing is not a reason to stop running the others: it is reported where its verdict would have been.
+      const failure = ((): string | null => {
+        try {
+          const result = runTest(id, registry, createGameState());
+          return result.passed ? null : (result.failure ?? 'no reason given');
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error);
+        }
+      })();
+      lines.push(failure === null ? `${id}: PASSED` : `${id}: FAILED — ${failure}`);
+      if (failure !== null) ok = false;
     }
   }
   return { lines, ok };

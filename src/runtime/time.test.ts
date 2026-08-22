@@ -159,7 +159,7 @@ describe('wait: done stands until what is under way has finished', () => {
 # location camp
 x: 0, y: 0
 starting
-entities: kiln
+entities: kiln, straw-man
 
 # item brick
 
@@ -174,6 +174,47 @@ bake forever:
   on success:
     give: 1 brick
 
+# stat attack
+base: 10
+
+# stat defense
+
+# stat accuracy
+base: 100
+
+# stat evasion
+
+# stat attack-rate
+base: 25
+
+# stat max-health
+
+# resource health
+max: max-health
+
+# event death
+resource: health
+trigger: on empty
+
+# action swing
+continuous
+rate: my attack-rate
+accuracy: my accuracy vs their evasion
+damage: my attack vs their defense
+depletes: their health
+
+# entity player
+stats: max-health 30, attack 10, attack-rate 25, accuracy 100
+uses: swing
+
+# flag straw-man-down
+
+# entity straw-man
+title: Straw Man
+stats: max-health 20, attack-rate 20, evasion 0
+on death:
+  set: straw-man-down
+
 # test one-firing
 goto: camp
 begin: use entity.kiln.fire
@@ -184,6 +225,15 @@ assert: inventory.brick = 1
 # test nothing-under-way
 wait: done
 assert: time = 0
+
+// The case a guessed number was written for: a fight ends when the last swing
+// lands, and nothing here says how long that takes.
+# test one-straw-man
+goto: camp
+use: swing on straw-man
+wait: done
+assert: straw-man-down
+assert: time > 0
 
 # test a-kiln-that-never-stops
 goto: camp
@@ -201,9 +251,14 @@ wait: done
     expect(runTest('nothing-under-way', registry(), createGameState())).toEqual({ passed: true });
   });
 
-  it('refuses, rather than running forever, when what is under way has no end the engine can name', () => {
+  // nextBoundary predicts the runway of an action that drains a pool it can read, and a fight drains the pool of whoever is being swung at, which is not one of them. Stepping by the action's own cycle needs no such prediction.
+  it('runs a fight out to the end of it, which no boundary the engine computes predicts', () => {
+    expect(runTest('one-straw-man', registry(), createGameState())).toEqual({ passed: true });
+  });
+
+  it('refuses, rather than running forever, when what is under way never finishes', () => {
     const result = runTest('a-kiln-that-never-stops', registry(), createGameState());
     expect(result.passed).toBe(false);
-    expect(result.failure).toMatch(/wait: done — .*no end the engine can name/);
+    expect(result.failure).toMatch(/wait: done — .*had not finished after/);
   });
 });
