@@ -626,7 +626,8 @@ describe('what the shell puts on the screen', () => {
       const tabs = LAYERS[2].subpages.map((subpage) => named(subpage.id));
       const bar = html.slice(html.lastIndexOf('<nav'));
 
-      expect(tabs).toHaveLength(4);
+      expect(tabs.length).toBe(LAYERS[2].subpages.length);
+      expect(tabs.length).toBeGreaterThan(1);
       for (const tab of tabs) expect(bar, `the tab bar does not offer ${tab}`).toContain(tab);
       for (const tab of LAYERS[OPENING.layer].subpages.map((subpage) => named(subpage.id))) {
         if (!tabs.includes(tab)) expect(bar, `the tab bar still offers ${tab}`).not.toContain(tab);

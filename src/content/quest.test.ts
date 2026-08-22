@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { amissIn } from './completion';
 import { loadInEnglish } from './engineLocale';
 import { loadModule } from './load';
 import { parseModule, printSectionOf } from './sections';
@@ -55,6 +56,14 @@ describe('a quest', () => {
 
   it('declares a flag for every stage, so anything in the world may ask where the quest has got to', () => {
     expect(loaded(QUEST, '# entity gate', 'title: Gate', 'open it:', '  requires: finding-your-feet.sendoff', '  say: It opens.')).toBeTruthy();
+  });
+
+  // A stage's `done when:` is a reference like any other, so the walk reaches it and the page can say what it names that nothing declares.
+  it('names what its `done when:` reads, so an undeclared flag there is not silently never true', () => {
+    const draft = ['# quest a-quest', 'stage one:', '  done when: no-such-flag', '  goto two', '', 'stage two:', '  complete'].join('\n');
+
+    expect(amissIn(draft, [{ kind: 'flag', address: 'mirror-done' }]).flatMap((each) => each.undeclared)).toEqual([{ kind: 'flag', id: 'no-such-flag' }]);
+    expect(amissIn(draft.replace('no-such-flag', 'mirror-done'), [{ kind: 'flag', address: 'mirror-done' }]).flatMap((each) => each.undeclared)).toEqual([]);
   });
 
   it('prints back to the same quest, so nothing it holds is lost on the way out', () => {

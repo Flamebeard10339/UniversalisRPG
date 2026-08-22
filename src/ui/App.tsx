@@ -13,6 +13,7 @@ import { SettingsPane } from './SettingsPane';
 import { recorded, remembered, type Editing, type MapWhere } from './editorMemory';
 import { FloatingText } from './FloatingText';
 import { Home } from './Home';
+import { JournalPane } from './JournalPane';
 import { Ledger } from './Ledger';
 import { LocationBanner } from './LocationBanner';
 import { MapPane } from './MapPane';
@@ -217,6 +218,7 @@ export function App({
     if (subpage.id === 'stats') return <Ledger entries={counted(view.stats, localizer)} />;
     if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
     if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} onOpen={driver.open} />;
+    if (subpage.id === 'journal') return <JournalPane view={view} words={words} />;
     return <Ledger entries={carried(view.carried, view.planes, localizer)} onOpen={driver.open} />;
   };
 

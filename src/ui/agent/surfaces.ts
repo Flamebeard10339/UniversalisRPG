@@ -8,6 +8,7 @@ import { clampIndex } from '../gesture';
 import type { LabelId } from '../labels';
 import { LAYERS, pageOf, shownIn, toLayer, toSubpage, type LayerId, type Where } from '../nav';
 import type { PlaneGraph, Plane } from '../planeGraph';
+import type { JournalRow } from '../journalPanel';
 import { filled, type SkillPanel } from '../skillPanels';
 import type { TestSurface } from '../testSurface';
 
@@ -293,11 +294,20 @@ export function skillNamed(panels: readonly SkillPanel[], value: unknown): Answe
   return panel.id;
 }
 
+// A journal is read and not driven, so the harness is handed what it shows and nothing to press.
+export function journalSurface(held: AgentSurfaces['journal']): TestSurface {
+  return {
+    state: () => ({ rows: held.rows.map((row) => ({ id: row.id, title: row.title, log: row.log, hint: row.hint, done: row.done })) }),
+    actions: {},
+  };
+}
+
 export interface AgentSurfaces {
   shell: { where: Where; dev: boolean; commandLine: boolean; go: (where: Where) => void; showCommandLine: (shown: boolean) => void };
   map: { map: MapView; controls: MapControls };
   skills: { panels: readonly SkillPanel[]; opened: Answer | null; greeted: readonly Answer[]; controls: { open(id: Answer | null): void } };
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
+  journal: { rows: readonly JournalRow[] };
   edit: EditHeld;
 }
 
@@ -306,5 +316,6 @@ export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurface
   map: ({ map, controls }) => mapSurface(map, controls),
   plane: (held) => planeSurface(held),
   skills: (held) => skillsSurface(held),
+  journal: (held) => journalSurface(held),
   edit: (held) => editSurface(held),
 };

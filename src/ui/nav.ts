@@ -37,6 +37,7 @@ export const LAYERS: readonly Layer[] = [
       { id: 'skills' },
       { id: 'equipment' },
       { id: 'inventory' },
+      { id: 'journal' },
     ],
   },
 ];

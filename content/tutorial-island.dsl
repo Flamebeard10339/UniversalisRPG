@@ -634,6 +634,42 @@ say: The oven bakes your dough into a golden loaf.
 
 // --- dialogue ---
 
+// --- quests ---
+
+// The tutorial's own beats, read as one thing. It writes no dialogue and sets no
+// flag of its own: every stage stands on a flag Miki's conversation already sets,
+// so the journal follows the tutorial without changing a step of it.
+# quest finding-your-feet
+title: Finding Your Feet
+
+stage offered:
+  log: A guide called Miki offered to show you the ropes.
+  hint: Talk to Miki.
+  done when: quest-given
+  goto name-yourself
+
+stage name-yourself:
+  log: Miki wants you to find the mirror and say who you are.
+  hint: The mirror is upstairs in the guide house.
+  done when: mirror-done
+  goto bake-bread
+
+stage bake-bread:
+  log: Water and flour make dough, and the oven makes bread of it.
+  hint: Knead the dough, then bake it in the oven.
+  done when: made-bread
+  goto clear-the-rats
+
+stage clear-the-rats:
+  log: Miki wants three giant rats put down.
+  hint: The basement, below the guide house.
+  done when: rats-killed >= 3
+  goto sendoff
+
+stage sendoff:
+  log: You have the measure of the place. There is a boat to the mainland.
+  complete
+
 # dialogue miki
 owner = miki
 

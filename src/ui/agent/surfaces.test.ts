@@ -39,7 +39,7 @@ describe('the shell as a driving agent reaches it', () => {
   it('says which pages are on offer, which is the layer being stood on and no other', () => {
     const character = shellState(toLayer(OPENING, LAYERS.findIndex((layer) => layer.id === 'character')), true);
 
-    expect(character.subpages).toEqual(['stats', 'skills', 'equipment', 'inventory']);
+    expect(character.subpages).toEqual(['stats', 'skills', 'equipment', 'inventory', 'journal']);
   });
 
   it('moves the layer by name', () => {

@@ -139,6 +139,9 @@ engine.shell.stats: Stats
 engine.shell.skills: Skills
 engine.shell.equipment: Equipment
 engine.shell.inventory: Inventory
+engine.shell.journal: Journal
+engine.shell.journal.empty: You have taken nothing on yet.
+engine.shell.journal.done: done
 engine.shell.command: Command
 engine.shell.run: Run
 engine.shell.level: Level

@@ -4,7 +4,7 @@ import { DslError, parseWhole, Written } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { indentLines, RawLine, takeBlock } from '../../grammar/structure';
 import { lastSegment, text } from '../../grammar/values';
-import { put, results, type Visit } from '../refs';
+import { condition as visitCondition, put, results, type Visit } from '../refs';
 import { Dialogue, DialogueNode, nodeBody, nodeGrammar, parseNode, visitDialogue } from './dialogue';
 import { section } from './define';
 
@@ -116,8 +116,8 @@ export function stageNow(quest: Quest, holds: (asked: Condition) => boolean): Qu
   });
 }
 
-// Whether the player has anything to say about this quest yet. A quest nobody has touched is not a journal entry, and its first stage stands from the outset, so what is asked is whether any stage has actually been reached.
-export const begun = (quest: Quest, set: (flag: string) => boolean): boolean => quest.stages.some((stage) => set(flagOf(quest, stage.name)));
+// Whether anything about this quest has happened yet. A quest nobody has touched is not a journal entry; its first stage stands from the outset, so standing anywhere else is enough, and so is any stage having been reached outright — which is how a quest driven by nothing but its own `done when:` lines comes to be in the journal at all.
+export const begun = (quest: Quest, at: QuestStage | undefined, set: (flag: string) => boolean): boolean => (at !== undefined && at !== quest.stages[0]) || quest.stages.some((stage) => set(flagOf(quest, stage.name)));
 
 // A goto inside a quest names a stage, so the line that takes it sets that stage's flag. Nothing else in the language moves a quest along, and nothing else needs to.
 const reaching = (quest: Quest, stage: string): ActionResult => ({ kind: 'set', variable: flagOf(quest, stage) });
@@ -217,6 +217,7 @@ export const quest = section<Quest>()({
   visit: (value, where, visit: Visit) => {
     for (const stage of value.stages) {
       const at = `${where} stage ${stage.name}`;
+      visitCondition(stage.doneWhen, `${at} done when:`, visit);
       results([stage.log, stage.hint].filter((said): said is ActionResult => said !== undefined), at, visit);
       for (const speech of stage.speech) {
         put(speech as unknown as Record<string, unknown>, 'owner', 'entity', `${at} says`, visit);
