@@ -140,11 +140,11 @@ describe('the two drivers cannot drift', () => {
 
     for (const spec of COMMANDS) {
       const bare = SHAPED[spec.name] ?? spec.name;
-      if (spec.dev) inStep(repl, gui, '/dev on');
+      if (spec.audience === 'cheat') inStep(repl, gui, '/dev on');
       for (const line of [bare, `${bare} 1`]) {
         if (!refused(inStep(repl, gui, line).result)) accepted += 1;
       }
-      if (spec.dev) inStep(repl, gui, '/dev off');
+      if (spec.audience === 'cheat') inStep(repl, gui, '/dev off');
     }
 
     expect(accepted).toBeGreaterThan(7);

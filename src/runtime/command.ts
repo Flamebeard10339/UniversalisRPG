@@ -163,6 +163,11 @@ export type ArgKind = keyof ArgTypes;
 
 export type CommandMatch = 'name' | 'blank' | 'directive' | 'choice';
 
+// 'player' is what an ordinary session may run; 'author' is the authoring workflow
+// (staging DSL, saves-as-fixtures, dev mode itself); 'cheat' is a power that skips the world's
+// own rules (only /goto today). DEV_TOKENS below is every 'cheat' entry, derived rather than listed.
+export type CommandAudience = 'player' | 'author' | 'cheat';
+
 export interface CommandHelp {
   name: string;
   aliases: readonly string[];
@@ -181,7 +186,7 @@ export interface CommandSpec<K extends ArgKind = ArgKind> {
   readonly arg: K;
   readonly argHint: string;
   readonly summary: string;
-  readonly dev: boolean;
+  readonly audience: CommandAudience;
   parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
   run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
 }
@@ -193,11 +198,11 @@ function define<K extends ArgKind>(spec: {
   arg: K;
   argHint?: string;
   summary: string;
-  dev?: boolean;
+  audience?: CommandAudience;
   parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
   run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
 }): CommandSpec {
-  return { aliases: [], match: 'name', argHint: '', dev: false, ...spec };
+  return { aliases: [], match: 'name', argHint: '', audience: 'player', ...spec };
 }
 
 function isProblem(value: unknown): value is CommandProblem {
@@ -726,7 +731,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: '/goto',
     arg: 'directive',
     argHint: '<location>',
-    dev: true,
+    audience: 'cheat',
     summary: 'stand in a location at once, whether or not a road reaches it',
     parse: directiveFrom('/goto', (rest) => `goto: ${rest}`),
     run: runDirective,
@@ -786,6 +791,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'id',
     argHint: '<id>',
     summary: 'run a # test by id and report PASSED/FAILED',
+    audience: 'author',
     parse: requireId('/test'),
     run: runNamedTest,
   }),
@@ -794,6 +800,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'directive',
     argHint: '<id>',
     summary: 'load a # save by id',
+    audience: 'author',
     parse: directiveFrom('/load', (rest) => `load: ${rest}`),
     run: runDirective,
   }),
@@ -802,6 +809,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'directive',
     argHint: '<id>',
     summary: 'assert current state matches a # save by id',
+    audience: 'author',
     parse: directiveFrom('/expect', (rest) => `expect: ${rest}`),
     run: runDirective,
   }),
@@ -810,6 +818,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'directive',
     argHint: '<c>',
     summary: 'assert a condition against current state',
+    audience: 'author',
     parse: directiveFrom('/assert', (rest) => `assert: ${rest}`),
     run: runDirective,
   }),
@@ -825,6 +834,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'section',
     argHint: '<kind> <id> [body]',
     summary: 'stage or replace one local DSL section; use | for new lines',
+    audience: 'author',
     parse: (rest) => {
       const match = /^(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?(?:[ \t]+(?<body>.*))?$/.exec(rest)?.groups;
       if (!match?.kind || !match.id) return { problem: '/dsl requires <kind> <id> [body]' };
@@ -837,6 +847,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'local',
     argHint: '[show | delete <kind> <id> | clear]',
     summary: 'list, print, delete or clear staged local changes',
+    audience: 'author',
     parse: (rest) => {
       if (rest === '' || rest === 'list') return { op: 'list' };
       if (rest === 'show' || rest === 'export') return { op: 'show' };
@@ -851,6 +862,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: '/reload',
     arg: 'none',
     summary: 're-read the local DSL file and adopt it, or refuse the whole edit',
+    audience: 'author',
     parse: nothing,
     run: runReload,
   }),
@@ -858,6 +870,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: '/export',
     arg: 'none',
     summary: 'print the current save as a # save body',
+    audience: 'author',
     parse: nothing,
     run: (ctx) => ({ output: [{ kind: 'source', words: 'tool', lines: [serializeSession(ctx.session)] }], quit: false, recorded: [] }),
   }),
@@ -866,6 +879,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'id',
     argHint: '<body>',
     summary: 'load a # save body printed by /export',
+    audience: 'author',
     parse: (rest) => (rest === '' ? { problem: '/import requires a # save body' } : rest),
     run: (ctx, body) => importPayload(ctx, body, 'Imported.', null),
   }),
@@ -917,6 +931,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'id',
     argHint: 'on | off',
     summary: 'author against a slot of its own, and come back to this session on the way out',
+    audience: 'author',
     parse: (rest) => (rest === 'on' || rest === 'off' ? rest : { problem: '/dev requires on or off' }),
     run: (ctx, mode) => withSaves(ctx, (save) => (mode === 'on' ? devOn(ctx, save) : devOff(ctx, save))),
   }),
@@ -925,6 +940,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'id',
     argHint: '<id>',
     summary: 'emit a # test from what you just did in this session',
+    audience: 'author',
     parse: requireId('/create-test'),
     run: (ctx, id) => buildCreateTest(ctx, id, { valid: false }),
   }),
@@ -933,6 +949,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'id',
     argHint: '<id>',
     summary: 'same, plus a # save + expect: regression assertion',
+    audience: 'author',
     parse: requireId('/create-valid-test'),
     run: (ctx, id) => buildCreateTest(ctx, id, { valid: true }),
   }),
@@ -957,7 +974,7 @@ const BY_TOKEN = new Map<string, CommandSpec>(
   COMMANDS.filter((spec) => spec.match === 'name').flatMap((spec) => [spec.name, ...spec.aliases].map((token) => [token, spec] as const)),
 );
 
-export const DEV_TOKENS: readonly string[] = [...BY_TOKEN].filter(([, spec]) => spec.dev).map(([token]) => token);
+export const DEV_TOKENS: readonly string[] = [...BY_TOKEN].filter(([, spec]) => spec.audience === 'cheat').map(([token]) => token);
 
 export function devTokenIn(line: string): string | undefined {
   const token = line.trim().split(/[ \t]+/)[0];

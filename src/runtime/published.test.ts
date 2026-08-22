@@ -30,6 +30,10 @@ const NOT_PUBLISHED: ReadonlyArray<{ type: string; why: string }> = [
   { type: 'src/runtime/command.ts#CommandContext', why: 'the handle a driver runs a line through — a session, a recorder and two dials. Every value it publishes reaches this walk on its own: the view as `PlayView`, the answer as `CommandResult`' },
   { type: 'src/runtime/command.ts#CommandHelp', why: "the command table, whose name, aliases and summary are the tool's own English (c4): both drivers print one as a tool line, and the `help` arm that carries it says so" },
   {
+    type: 'src/runtime/command.ts#CommandSpec',
+    why: "the command table's own entry, reached now that scripts/playbot.ts reads a command's audience off it to decide the vocabulary a turn may name. `CommandHelp` is the tool-facing projection every driver prints and reaches this walk on its own; `arg`'s `K` is the entry's dispatch, never a value a tool or player sees",
+  },
+  {
     type: 'src/runtime/openUniverse.ts#OpenedUniverse',
     why: 'the handle a driver opens through — a session, the module ids that loaded and what is wrong with them. Its problems reach this walk on their own, as `UniverseProblem`, which declares the tool as whose words they are; the session it holds reaches a driver as `CommandContext` does and is passed over for the same reason',
   },

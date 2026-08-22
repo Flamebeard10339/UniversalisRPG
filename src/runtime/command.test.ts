@@ -500,7 +500,7 @@ describe('the commands a player plays with', () => {
   });
 
   it('marks the dev-only commands, and the tokens are read off the marks', () => {
-    expect(DEV_TOKENS).toEqual(COMMANDS.filter((spec) => spec.dev).flatMap((spec) => [spec.name, ...spec.aliases]));
+    expect(DEV_TOKENS).toEqual(COMMANDS.filter((spec) => spec.audience === 'cheat').flatMap((spec) => [spec.name, ...spec.aliases]));
     expect(DEV_TOKENS).toContain('/goto');
 
     for (const token of DEV_TOKENS) expect(devTokenIn(`${token} somewhere`), token).toBe(token);

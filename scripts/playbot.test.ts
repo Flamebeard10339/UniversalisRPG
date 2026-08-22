@@ -5,10 +5,10 @@ import { engineLocale, withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import type { Registry } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
-import { askedOption } from '../src/runtime/command';
+import { askedOption, newContext, runLine } from '../src/runtime/command';
 import { sessionStatus, startSession, view, type PlaySession } from '../src/runtime/session';
+import { excusedFieldsAreReal, unaccountedFields } from './lib/viewCoverage';
 import {
-  applyAction,
   isolatedCwd,
   journalWindowText,
   parseReply,
@@ -45,10 +45,10 @@ function wellBehavedReply(session: PlaySession): unknown {
   const asking = askedOption(status.modals);
   if (asking) {
     const value = asking.values ? asking.values[0].value : 'Ash';
-    return { action: { kind: 'modal', key: asking.key, value }, note: 'proceeding', expected: '', confusion: '' };
+    return { line: `submit-modal: ${asking.key}=${value}`, note: 'proceeding', expected: '', confusion: '' };
   }
   const choice = status.choices[0];
-  return { action: { kind: 'choice', id: choice.id }, note: 'exploring', expected: '', confusion: '' };
+  return { line: choice.id, note: 'exploring', expected: '', confusion: '' };
 }
 
 function wellBehavedClient(session: PlaySession): ModelClient {
@@ -71,8 +71,10 @@ describe('playbot', () => {
       },
     };
 
-    await runTurn({ session: sessionA, read: constantReader(PLAYED_SOURCES), client: recording, system: systemPromptFor('author'), log: [], turn: 1 });
-    await runTurn({ session: sessionB, read: constantReader(PLAYED_SOURCES), client: recording, system: systemPromptFor('bughunt'), log: [], turn: 1 });
+    const ctxA = newContext(sessionA, view(sessionA));
+    const ctxB = newContext(sessionB, view(sessionB));
+    await runTurn({ ctx: ctxA, read: constantReader(PLAYED_SOURCES), client: recording, system: systemPromptFor('author'), log: [], turn: 1 });
+    await runTurn({ ctx: ctxB, read: constantReader(PLAYED_SOURCES), client: recording, system: systemPromptFor('bughunt'), log: [], turn: 1 });
 
     expect(requests).toHaveLength(2);
     expect(requests[0].system).not.toBe(requests[1].system);
@@ -102,7 +104,7 @@ describe('playbot', () => {
       Array.from({ length: upTo }, (_unused, index) => ({
         turn: index + 1,
         outcome: 'applied' as const,
-        action: { kind: 'choice' as const, id: 'travel:x' },
+        line: 'travel:x',
         note: 'moving along the fixed loop',
         expected: '',
         confusion: '',
@@ -164,65 +166,79 @@ describe('playbot', () => {
   // The four fields the first spike went blind to were missing because nothing failed when they
   // were left out. The subjects here are the keys of a live view rather than a list, so a field
   // added to PlayStatus next month arrives in this claim on its own and has to be shown or
-  // answered for.
+  // answered for. scripts/viewSurfaces.test.ts asks the same question of play-cli and the GUI.
   it('every field a live view publishes is either shown to the player or answered for', () => {
     const live = view(startSession(played()));
-    const excused = new Set(NOT_SHOWN.map((each) => each.field as string));
-    const carries = (held: unknown): boolean => {
-      if (held === null || held === undefined || held === '') return false;
-      if (Array.isArray(held)) return held.length > 0;
-      if (typeof held === 'object') return Object.values(held as Record<string, unknown>).some(carries);
-      return true;
-    };
     const shown = renderView(live);
-    const held = live as unknown as Record<string, unknown>;
-    const unshown = Object.keys(held).filter((field) => !excused.has(field) && carries(held[field]) && !shown.includes(`${field}:`));
+    const unshown = unaccountedFields(live, NOT_SHOWN, (field) => shown.includes(`${field}:`));
     expect(unshown, `these view fields reach no line of the rendered turn: ${unshown.join(', ')}`).toEqual([]);
   });
 
   it('nothing is excused from a turn that a live view does not publish', () => {
     const live = view(startSession(played()));
-    for (const each of NOT_SHOWN) {
-      expect(Object.keys(live), `${each.field} is excused and no view has it`).toContain(each.field as string);
-      expect(each.why.length, `${each.field} is excused without a reason`).toBeGreaterThan(20);
-    }
+    expect(excusedFieldsAreReal(live, NOT_SHOWN)).toEqual([]);
   });
 
-  // c6: a selector is a token the engine published. Walking a real, live session across many
-  // turns, every id or value the loop sends is one this turn's own view actually offered — the
-  // subjects are read off the live view each time, not listed by hand.
-  it('[c6] every selector parseReply accepts appears among the view it was taken from', () => {
+  // c6, narrowed for free text (see docs/specs' ## Decisions for 2026-08-22): the loop builds no
+  // selector of its own. It forwards exactly the line a well-behaved reply drew from the live
+  // view to the same runLine every driver shares, and none of them come back refused as
+  // unrecognised — walking a real session across many turns, not two hand-picked ones.
+  it('[c6] a line drawn from the view it was taken from is accepted, never refused as unrecognised', () => {
     const session = startSession(played());
+    const ctx = newContext(session, view(session));
+    let exercised = 0;
     for (let i = 0; i < 40; i++) {
       const before = sessionStatus(session);
       if (before.choices.length === 0 && before.modals.length === 0) break;
       const raw = wellBehavedReply(session);
-      const v = { ...before, said: [] } as unknown as Parameters<typeof parseReply>[1];
-      const parsed = parseReply(raw, v);
+      const parsed = parseReply(raw);
       expect(parsed.ok).toBe(true);
       if (!parsed.ok) continue;
+      exercised += 1;
 
-      if (parsed.reply.action.kind === 'choice') {
-        expect(before.choices.map((choice) => choice.id)).toContain(parsed.reply.action.id);
-      } else {
-        const asking = askedOption(before.modals);
-        expect(asking).toBeDefined();
-        expect(parsed.reply.action.key).toBe(asking!.key);
-        if (asking!.values) expect(asking!.values.map((choice) => choice.value)).toContain(parsed.reply.action.value);
-      }
-      applyAction(session, parsed.reply.action);
+      const result = runLine(ctx, parsed.reply.line);
+      const refusals = result.output.filter((each) => each.kind === 'message' && each.tone === 'error');
+      expect(refusals, parsed.reply.line).toEqual([]);
     }
+    expect(exercised).toBeGreaterThan(10);
+  });
+
+  // c6's residue: without the view itself gating what parseReply accepts, the guarantee that
+  // moves to runLine is the registry's own, not a positional one this loop keeps. The proof
+  // covers three different directive shapes reaching runLine, so it is not one lucky case.
+  it('[c6, c8] a line naming something this world does not recognise is refused, not approximated', () => {
+    for (const line of ['travel:nowhere-at-all', 'talk:nobody-at-all', 'use:entity.nobody-at-all.look']) {
+      const session = startSession(played());
+      const ctx = newContext(session, view(session));
+      const before = sessionStatus(session).location.id;
+
+      const result = runLine(ctx, line);
+
+      expect(result.output.some((each) => each.kind === 'message' && each.tone === 'error'), line).toBe(true);
+      expect(sessionStatus(session).location.id, line).toBe(before);
+    }
+  });
+
+  // c9's teeth, not just its prose: a line naming a command this player's vocabulary never
+  // listed is refused before runLine ever sees it, regardless of whether the engine itself would
+  // have honoured it.
+  it("[c9] a line naming a command outside this player's audience is refused before runLine runs it", async () => {
+    const session = startSession(played());
+    const client: ModelClient = { send: async () => ({ line: '/dsl location tutorial-island.guide-house x: 9, y: 9', note: 'n', expected: '', confusion: '' }) };
+    const log = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 1, write: () => {} });
+    expect(log[0].outcome).toBe('invalid-reply');
+    expect(log[0].detail).toMatch(/\/dsl is not a command this player may run/);
   });
 
   // c8, and the refusal half of c6: a reply naming a token the view did not offer ends the turn
   // with a recorded failure rather than a guess — the loop never approximates to a nearby id.
   it('[c8] a reply naming an id the view never offered is refused, not approximated', async () => {
     const session = startSession(played());
-    const client: ModelClient = { send: async () => ({ action: { kind: 'choice', id: 'travel:somewhere-that-does-not-exist' }, note: 'n', expected: '', confusion: '' }) };
+    const client: ModelClient = { send: async () => ({ line: 'travel:somewhere-that-does-not-exist', note: 'n', expected: '', confusion: '' }) };
     const locationBefore = sessionStatus(session).location.id;
     const log = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 1, write: () => {} });
-    expect(log[0].outcome).toBe('invalid-reply');
-    expect(log[0].detail).toMatch(/did not offer/);
+    expect(log[0].outcome).toBe('refused');
+    expect(log[0].detail).toMatch(/unknown location/);
     expect(sessionStatus(session).location.id).toBe(locationBefore);
   });
 
@@ -230,10 +246,10 @@ describe('playbot', () => {
   // a reply missing a required field is refused, not read as free text.
   it('[c8] a structurally malformed reply is refused loudly', async () => {
     const session = startSession(played());
-    const client: ModelClient = { send: async () => ({ action: { kind: 'choice', id: 'whatever' } }) };
+    const client: ModelClient = { send: async () => ({ line: 'whatever' }) };
     const log = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 1, write: () => {} });
     expect(log[0].outcome).toBe('invalid-reply');
-    expect(log[0].detail).toMatch(/note, expected, confusion/);
+    expect(log[0].detail).toMatch(/line, note, expected, confusion/);
   });
 
   // c7: content edits land between turns without a restart, and a load that fails leaves the
@@ -293,7 +309,7 @@ adjacent:
       send: async () => {
         const choices = sessionStatus(session).choices;
         seenChoices.push(choices.map((choice) => choice.id));
-        return { action: { kind: 'choice', id: choices[0].id }, note: 'n', expected: '', confusion: '' };
+        return { line: choices[0].id, note: 'n', expected: '', confusion: '' };
       },
     };
 
