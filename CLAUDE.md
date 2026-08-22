@@ -109,24 +109,3 @@ Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.ym
 Android: Capacitor sync + Gradle release build, APK signed and attached to the release.
 CI runs `tsc --noEmit`, `npm test` and `npm run layer-check`.
 
-# Content facts worth knowing
-
-- "descriptive flavor text for an object" is **one** mechanism
-- modals are rendered unconditionally with guaranteed closing behavior. A screen
-  that shows something rather than asking about it publishes it on the view and
-  says which through `focus`, the way the plane and the quest journal both do
-- a `# quest` is one section: stages, what the journal reads at each, and what an
-  entity says while the quest stands there. A stage is a flag, `goto` names a
-  stage, and the quest gives its lines to entities rather than editing them
-- a quest lives in its own module. Take that module out and the world still
-  loads: `content/tutorial-quests.dsl` is the pattern, and the entity it speaks
-  through keeps an `always` node of its own to say when nothing else has anything
-- quest/stage conditions are runtime flag checks evaluated against live state
-- `<obj>.<objId>.<actionId>` is a first-class pattern for anything an object can do
-- item actions are not location-scoped; location and entity actions are
-- enemy-shaped actions and instant actions are two intentionally different tools
-- location connectivity is always explicit and directional
-- travel actions with no cost or reward are pathfinding edges for map navigation
-- progress signals get lightweight UI acknowledgement
-- there is no browser storage to clear and no reset command: `play-cli` starts
-  fresh every run, and a `# save` fixture is how a session starts anywhere else
