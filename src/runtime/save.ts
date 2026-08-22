@@ -316,3 +316,28 @@ export function compareSave(state: GameState, saved: ParsedSave, registry: Regis
 
   return diffs;
 }
+
+// Only the keys a save names are compared: a field or record key the save is silent on holds whatever the live state gives it, unchecked.
+export function compareSaveOnly(state: GameState, saved: ParsedSave): string[] {
+  checkSave(saved);
+  const expected = saved.diff;
+  const diffs: string[] = [];
+
+  for (const field of RECORD_FIELDS) {
+    const declared = expected[field] as Record<string, unknown> | undefined;
+    if (!declared) continue;
+    const live = state[field] as unknown as Record<string, unknown>;
+    for (const key of Object.keys(declared)) {
+      const value = live[key] ?? SAVE_FIELDS[field].sparsest;
+      if (!deepEqual(value, declared[key])) diffs.push(`${field}.${key}: ${describeValue(value)} vs ${describeValue(declared[key])}`);
+    }
+  }
+
+  for (const field of SCALAR_FIELDS) {
+    if (!(field in expected)) continue;
+    const value = state[field];
+    if (!deepEqual(value, expected[field])) diffs.push(`${field}: ${describeValue(value)} vs ${describeValue(expected[field])}`);
+  }
+
+  return diffs;
+}

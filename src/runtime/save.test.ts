@@ -6,7 +6,7 @@ import { IMPLICIT_TARGET_FULL } from './encounter';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal } from './modals';
 import { openModalNamed } from './modalStack';
-import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave } from './save';
+import { compareSave, compareSaveOnly, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/sections/save';
 import { runTest } from './session';
 import { travelAction, TRAVEL_ADDRESS } from './actions';
@@ -352,6 +352,47 @@ describe('compareSave', () => {
   });
 });
 
+describe('compareSaveOnly', () => {
+  it('ignores a live key the save is silent on', () => {
+    const registry = loadInEnglish(MODULE);
+    const state = initialState(registry);
+    state.inventory.bread = 1;
+    state.flags['side-quest'] = true;
+    const saved = { version: SAVE_VERSION, diff: { inventory: { bread: 1 } } };
+    expect(compareSaveOnly(state, saved)).toEqual([]);
+  });
+
+  it('reports a human-readable mismatch on a key the save does name', () => {
+    const registry = loadInEnglish(MODULE);
+    const state = initialState(registry);
+    state.inventory.bread = 2;
+    const saved = { version: SAVE_VERSION, diff: { inventory: { bread: 1 } } };
+    expect(compareSaveOnly(state, saved)).toEqual(['inventory.bread: 2 vs 1']);
+  });
+
+  it('reads through to the field default for a key the live state never touched', () => {
+    const registry = loadInEnglish(MODULE);
+    const state = initialState(registry);
+    const saved = { version: SAVE_VERSION, diff: { flags: { 'tutorial.quest-given': true } } };
+    expect(compareSaveOnly(state, saved)).toEqual(['flags.tutorial.quest-given: false vs true']);
+  });
+
+  it('ignores a scalar field the save does not mention, however far the live state has drifted', () => {
+    const registry = loadInEnglish(MODULE);
+    const state = initialState(registry);
+    state.time = 5000;
+    state.location = 'elsewhere';
+    const saved = { version: SAVE_VERSION, diff: {} };
+    expect(compareSaveOnly(state, saved)).toEqual([]);
+  });
+
+  it('throws a clear error on a version mismatch', () => {
+    const registry = loadInEnglish(MODULE);
+    const state = initialState(registry);
+    expect(() => compareSaveOnly(state, { version: SAVE_VERSION + 1, diff: {} })).toThrow(/version/);
+  });
+});
+
 const SAVE_TEST_MODULE = `
 # location camp
 x: 0, y: 0
@@ -382,6 +423,14 @@ expect: empty
 load: empty
 use: entity.chest.open
 expect: empty
+
+# test load-then-diverge-only
+load: empty
+use: entity.chest.open
+expect only: empty
+
+# test never-loaded-fails-only
+expect only: empty
 
 # test equips-a-charm
 equip: charm
@@ -428,6 +477,21 @@ describe('# save section wired through load: / expect: test directives', () => {
     expect(result.passed).toBe(false);
     expect(result.failure).toMatch(/^save mismatch empty:/);
     expect(result.failure).toMatch(/inventory\.gold/);
+  });
+
+  it('expect only: passes on the same divergence, since the save never names inventory', () => {
+    const registry = loadInEnglish(SAVE_TEST_MODULE);
+    const state = createGameState();
+    expect(runTest('load-then-diverge-only', registry, state)).toEqual({ passed: true });
+  });
+
+  it('expect only: still fails when a key the save does name has not been reached', () => {
+    const registry = loadInEnglish(SAVE_TEST_MODULE);
+    const state = createGameState();
+    const result = runTest('never-loaded-fails-only', registry, state);
+    expect(result.passed).toBe(false);
+    expect(result.failure).toMatch(/^save mismatch empty:/);
+    expect(result.failure).toMatch(/flags\.camp\.discovered/);
   });
 });
 

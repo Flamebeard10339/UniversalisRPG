@@ -64,7 +64,7 @@ function classify(registry: Registry, fixtures: readonly Fixture[]): (id: string
   for (const test of registry.tests.values()) {
     for (const directive of test.directives) {
       if (directive.kind === 'load' && found.get(directive.save) === 'unreferenced') found.set(directive.save, 'input');
-      if (directive.kind === 'expect') found.set(directive.save, 'recording');
+      if (directive.kind === 'expect' || directive.kind === 'expect-only') found.set(directive.save, 'recording');
     }
   }
   return (id) => found.get(id) ?? 'unreferenced';

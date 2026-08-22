@@ -214,6 +214,7 @@ talk: tutorial-island.miki
 assert: finding-your-feet.sendoff
 assert: tutorial-island.front-door.unlocked
 travel: beach
+expect only: left-mikis-house
 // The whole sheet, not a handful of flags: inventory, visits, xp, pools, the
 // clock and the rng cursor all have to land where they landed. Regenerate with
 // /create-valid-test when the route's content changes on purpose.
@@ -243,6 +244,7 @@ assert: leave-tutorial-island.adrift
 use: entity.stairs.ascend
 use: entity.window.climb-out
 assert: not tutorial-island.front-door.unlocked
+expect only: left-mikis-house
 // Regenerate with /create-valid-test when this route's content changes on
 // purpose. See thieving-route-full-end for why this isn't miki-route-end.
 expect: thieving-route-full-end
@@ -266,7 +268,6 @@ talk: tutorial-island.miki
 assert: finding-your-feet.sendoff
 assert: tutorial-island.front-door.unlocked
 travel: beach
-assert: tutorial-island.market-district.discovered
 // Miki's ordinary sendoff is what a talk gets on the way out (see the door
 // route's test); this quest is what stepping back in for one more word gets
 // instead, now that there is somewhere to have come back from.
@@ -274,11 +275,22 @@ travel: guide-house
 talk: tutorial-island.miki
 assert: leave-tutorial-island.adrift
 travel: beach
+expect only: left-mikis-house
 // Regenerate with /create-valid-test when this route's content changes on
 // purpose. See apology-route-full-end for why this isn't miki-route-end.
 expect: apology-route-full-end
 
 // --- saves ---
+
+// What all three routes out of the house genuinely land on, named once
+// instead of asserted three times: the same beach, the same house explored,
+// the same quest picked up. `finding-your-feet.sendoff`, `front-door.unlocked`
+// and `leave-tutorial-island.adrift` are each true for two of the three routes
+// and false or unset for the third — the thief never gets the ordinary
+// sendoff, the door route never doubles back for the eternal one — so none of
+// them belong here; each stays proven by its own route's `assert:` instead.
+# save left-mikis-house
+{"version":11,"location":"tutorial-island.beach","flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-island.beach.discovered":true,"tutorial-island.market-district.discovered":true}}
 
 # save miki-route-start
 {"version":11}
@@ -293,9 +305,9 @@ expect: apology-route-full-end
 
 // The thief's own closing sheet — not the door route's. `expect:` is a whole
 // save compared exactly, so a route that never bakes or fights has no way to
-// land on the same xp, clock or rng cursor as one that does both; see the
-// commit message for what that closes off and what `assert:` above already
-// proves instead (the same location, the same standing quest).
+// land on the same xp, clock or rng cursor as one that does both; what
+// genuinely converges across all three routes is left-mikis-house instead,
+// checked above by `expect only:`.
 # save thieving-route-full-end
 {"version":11,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.snubbed":true,"tutorial-island.dresser.searched":true,"tutorial-island.miki.angered":true,"tutorial-quests.leave-tutorial-island.adrift":true,"tutorial-island.beach.discovered":true,"tutorial-island.market-district.discovered":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.snubbed.miki.0.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.1.said":1},"resources":{"tutorial-island.health":25000},"location":"tutorial-island.beach","rng":2617077404}
 

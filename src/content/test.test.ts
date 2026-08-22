@@ -180,6 +180,18 @@ describe('test: composable in-game scripts', () => {
   });
 });
 
+describe('expect only: compares just what the save names', () => {
+  it('parses the save id, distinct from a plain expect:', () => {
+    expect(parseDirectiveLine('expect only: after-intro')).toEqual({ kind: 'expect-only', save: 'after-intro' });
+    expect(parseDirectiveLine('expect: after-intro')).toEqual({ kind: 'expect', save: 'after-intro' });
+  });
+
+  it('rejects a save id that is not a valid path', () => {
+    expect(() => parseModule('# test bad\nexpect only: Not Valid')).toThrow(/unexpected line in # test/);
+    expect(() => parseModule('# test bad\nexpect only:')).toThrow(/unexpected line in # test/);
+  });
+});
+
 describe('open-modal: raises a screen by name', () => {
   it('takes the name of the screen and nothing else, so the route onto one is a recorded line', () => {
     const source = ['# test opening', 'open-modal: character-creation', 'open-modal: carried-items'].join('\n');

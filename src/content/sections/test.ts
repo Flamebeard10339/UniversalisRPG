@@ -25,6 +25,7 @@ export type Directive =
     }
   | { kind: 'assert'; condition: Condition }
   | { kind: 'expect'; save: string }
+  | { kind: 'expect-only'; save: string }
   | { kind: 'load'; save: string }
   | { kind: 'cancel' }
   | { kind: 'wait'; seconds: number }
@@ -74,6 +75,7 @@ const BEGIN_TRAVEL = new RegExp(`^${TRAVEL_PAYLOAD}$`);
 const BEGIN_CRAFT = new RegExp(`^${CRAFT_PAYLOAD}$`);
 const ASSERT = /^assert:[ \t]*(?<cond>.+)$/;
 const EXPECT = new RegExp(`^expect:[ \\t]*(?<id>${PATH})$`);
+const EXPECT_ONLY = new RegExp(`^expect only:[ \\t]*(?<id>${PATH})$`);
 const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
 const CANCEL = /^cancel$/;
 const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
@@ -227,6 +229,9 @@ export function parseDirectiveLine(text: string): Directive | null {
       condition: parseWhole(condition, assert.cond, 0, 'an assert condition'),
     };
 
+  const expectOnly = EXPECT_ONLY.exec(text)?.groups;
+  if (expectOnly) return { kind: 'expect-only', save: expectOnly.id };
+
   const expect = EXPECT.exec(text)?.groups;
   if (expect) return { kind: 'expect', save: expect.id };
 
@@ -298,6 +303,8 @@ export function printDirective(value: Directive): string {
       return `assert: ${condition.print(value.condition)}`;
     case 'expect':
       return `expect: ${value.save}`;
+    case 'expect-only':
+      return `expect only: ${value.save}`;
     case 'load':
       return `load: ${value.save}`;
     case 'cancel':
@@ -348,6 +355,7 @@ export const test = section<Test>()({
     { form: 'begin: craft <recipe>', example: 'begin: craft plank' },
     { form: 'assert: <condition>', example: 'assert: has-key', holds: () => ({ condition }) },
     { form: 'expect: <save>', example: 'expect: after-intro' },
+    { form: 'expect only: <save>', example: 'expect only: after-intro' },
     { form: 'load: <save>', example: 'load: after-intro' },
     { form: 'cancel', example: 'cancel' },
     { form: 'wait: <seconds>', example: 'wait: 1' },
@@ -400,6 +408,7 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       put(value, 'recipe', 'recipe', `${where} craft:`, visit);
       return;
     case 'expect':
+    case 'expect-only':
     case 'load':
       put(value, 'save', 'save', `${where} ${value.kind}:`, visit);
       return;

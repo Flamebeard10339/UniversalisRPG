@@ -1,4 +1,3 @@
-import {condition} from '../grammar/condition';
 import {dependency, version as versionParser, Version} from '../grammar/dependency';
 import {indentLines} from '../grammar/structure';
 import {Registry} from './registry';
@@ -6,8 +5,6 @@ import type {ModuleDiagnostic, UniverseLoadResult} from './registry';
 import {registryDiff} from './registryDiff';
 import {globalSectionKinds, printSectionOf, registryMapOf, sectionKinds, sectionFor, sectionOf, type ModuleSection, type SectionKind} from './sections';
 import type {ModuleSource, ParsedModule} from './universe';
-import {Directive, usePayload} from './sections/test';
-import {hexKey} from './hex';
 import {ModuleInfo} from './sections/info';
 import {DEFAULT_LANGUAGE} from '../grammar/section';
 import {localeKey, moduleLocaleSections} from './locale';
@@ -18,65 +15,6 @@ type Lines = string[];
 export interface SerializeModuleOptions {
   info: Pick<ModuleInfo, 'id'> & Partial<Pick<ModuleInfo, 'version' | 'dependencies' | 'pack' | 'language'>>;
   globals?: readonly string[];
-}
-
-function inlined(inner: Directive, verb = inner.kind): string {
-  return `${verb} ${printDirective(inner).replace(/^[a-z-]+:[ \t]*/, '')}`;
-}
-
-export function printDirective(value: Directive): string {
-  switch (value.kind) {
-    case 'run':
-      return `run: ${value.test}`;
-    case 'talk':
-      return `talk: ${value.entity}`;
-    case 'choose':
-      return `choose: ${value.text}`;
-    case 'use':
-      return `use: ${usePayload(value)}`;
-    case 'use-on':
-      return `use: ${value.action} on ${value.target}`;
-    case 'travel':
-      return `travel: ${value.location}`;
-    case 'goto':
-      return `goto: ${value.location}`;
-    case 'craft':
-      return `craft: ${value.recipe}`;
-    case 'begin':
-      return `begin: ${inlined(value.inner, value.inner.kind === 'use-on' ? 'use' : value.inner.kind)}`;
-    case 'refuse':
-      return `refuse: ${inlined(value.inner)}`;
-    case 'assert':
-      return `assert: ${condition.print(value.condition)}`;
-    case 'expect':
-      return `expect: ${value.save}`;
-    case 'load':
-      return `load: ${value.save}`;
-    case 'cancel':
-      return 'cancel';
-    case 'wait':
-      return `wait: ${value.seconds}`;
-    case 'equip':
-      return `equip: ${value.item}`;
-    case 'unequip':
-      return `unequip: ${value.slot}`;
-    case 'feed':
-      return `feed: ${value.target} with ${value.food}`;
-    case 'slot':
-      return `slot: ${value.target} at ${hexKey(value.hex)} ${value.direction} with ${value.jewel}`;
-    case 'allocate':
-      return `allocate: ${value.target} at ${hexKey(value.node.hex)} ${value.node.kind === 'position' ? `position ${value.node.position}` : `slot ${value.node.direction}`}`;
-    case 'apply':
-      return `apply: ${value.target} at ${hexKey(value.hex)} with ${value.effect}`;
-    case 'open-modal':
-      return `open-modal: ${value.modal}`;
-    case 'submit-modal':
-      return `submit-modal: ${value.key}=${value.value}`;
-    default: {
-      const unreached: never = value;
-      return unreached;
-    }
-  }
 }
 
 function infoLines(info: SerializeModuleOptions['info']): Lines {

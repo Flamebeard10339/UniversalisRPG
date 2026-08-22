@@ -28,10 +28,9 @@ import { Registry } from '../content/registry';
 import { type ParsedSave } from '../content/sections/save';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { ResourceDisplay } from '../content/sections/resource';
-import { compareSave, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
+import { compareSave, compareSaveOnly, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import type { PruneWarning } from './pruning';
-import { Directive, parseUseChoiceId, useChoiceId } from '../content/sections/test';
-import { printDirective } from '../content/serialize';
+import { Directive, parseUseChoiceId, printDirective, useChoiceId } from '../content/sections/test';
 import { Answer, AnswerTable, Localized, Localizer, localizerOf } from './localized';
 import { skillLevel, xpForLevel } from './skills';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
@@ -474,6 +473,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'begin':
     case 'assert':
     case 'expect':
+    case 'expect-only':
     case 'load':
     case 'cancel':
     case 'wait':
@@ -597,10 +597,11 @@ function performDirective(session: PlaySession, directive: Directive): { failure
     case 'assert':
       if (!evaluateCondition(directive.condition, state)) return { failure: describeCondition(directive.condition) };
       return {};
-    case 'expect': {
+    case 'expect':
+    case 'expect-only': {
       const saved = registry.saves.get(directive.save);
       if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
-      const diffs = compareSave(state, saved, registry);
+      const diffs = directive.kind === 'expect' ? compareSave(state, saved, registry) : compareSaveOnly(state, saved);
       if (diffs.length > 0) return { failure: `save mismatch ${directive.save}: ${diffs.join('; ')}` };
       return {};
     }
