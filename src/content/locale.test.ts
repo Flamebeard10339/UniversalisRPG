@@ -46,6 +46,7 @@ const FIELDS: Record<keyof Registry, 'content' | 'the locale table'> = {
   modals: 'content',
   saves: 'content',
   namespace: 'content',
+  roads: 'content',
   locales: 'the locale table',
 };
 

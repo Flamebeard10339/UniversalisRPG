@@ -5,12 +5,14 @@ import { ParsedModule } from './universe';
 import { Span } from '../grammar/parser';
 import { actionOwnerKinds, mapNames, registryMapOf, SectionMaps } from './sections';
 import type { Entity } from './sections/entity';
+import type { Edge } from './sections/location';
 
 export interface Registry extends SectionMaps {
   factionBits: Map<string, number>;
   player?: Entity;
   namespace: Namespace;
   locales: Locales;
+  roads: ReadonlyMap<string, readonly Edge[]>;
 }
 
 export const mapOf = (registry: Registry, name: string): Map<string, { id?: string }> => registry[name as keyof SectionMaps] as Map<string, { id?: string }>;
