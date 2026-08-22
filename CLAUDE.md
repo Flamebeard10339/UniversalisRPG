@@ -49,6 +49,11 @@ A module that a section file imports may not read the section list — that clos
 a cycle and yields a list with an undefined in it. `scripts/lib/acyclic.test.ts`
 is the guard.
 
+**Never rewrite a file under `content/` without reading it first.** These carry
+`# save` bodies and `# test` sections that read like noise to anyone who has not
+met them, and they are the proof the rest of the module still works. Add to a
+module; replace one only having read what you are replacing.
+
 # Layers
 
 `grammar < content < runtime < ui < scripts`. Imports point downward only, gated
