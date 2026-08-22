@@ -126,27 +126,10 @@ one of:
 // forgot. Distances are in the units tutorial island already set: five seconds
 // of walking each.
 
-// The town's hub, and the one road this module is not allowed to write.
-//
-// tutorial-island.market-district is where all three routes out of Miki's
-// house land, so the town should hang off it and this square should have been
-// what that stub was a stub for. The engine will not have it. A module may
-// point at an upstream location — combat-expansion's proving ground does — but
-// a section merged from two modules serializes wholly into the module that
-// owns its id, and that module cannot name ids from a module depending on it.
-// Writing `+adjacent: market-row` onto tutorial-island.market-district loads
-// and then the universe no longer prints back to itself, the map surface draws
-// the square under a doubled address, and publishing either module alone loses
-// the road.
-//
-// So the road out of town is written here, where this module may write it, and
-// the road into town is the one edge Tulsa is missing.
-// @@@ tutorial-island.market-district -> market-square: one line, the day a
-// merged section can print back under the module that wrote it.
 # location market-square
 x: 3, y: 0
 title: Market Square
-examine: Awnings, shouting, and a sewer grate set into the cobbles with a boy hunched over it. @@@ asked for a road from tutorial-island.market-district into this square, so the town hangs off where every route out of Miki's house lands; a section merged from two modules serializes wholly into the module owning its id, and that module cannot name ids from a module depending on it — nearest playable thing: the road out of town is written here and the road in is missing
+examine: Awnings, shouting, and a sewer grate set into the cobbles with a boy hunched over it.
 adjacent:
   tutorial-island.market-district
   market-row
@@ -848,10 +831,6 @@ node at-the-stakes:
 
 // --- saves ---
 
-// Every route out of Miki's house lands in tutorial-island.market-district,
-// and the road from there into the square is the one this module cannot write
-// (see # location market-square). Until it can, a session that means to be in
-// town opens on this.
 # save in-town
 {"version":11,"location":"tulsa.market-square"}
 
