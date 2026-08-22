@@ -9,22 +9,26 @@ run's actual product. A line is struck when it is fixed or ruled not-a-bug.
 Twelve turns applied, none refused. Reached: Miki, character creation, dough,
 bread, the basement, two rounds against a giant rat.
 
-### The engine has three input surfaces, not two
+### The playbot built a door beside the one the other drivers share
 
-**c6 of `a-turn-costs-what-the-last-turn-did` says the engine has exactly two ways
-of taking an input, and the run proved otherwise.** The loop supports
-`apply(choiceId)` and `applyDirective(submit-modal)`. Opening a screen at all is a
-third, `applyDirective({ kind: 'open-modal', modal: … })`, which
-`src/runtime/command.ts:277` uses to reach the carried-items screen.
+**This was first written up as "the engine has three input surfaces, not two", and
+that was the wrong diagnosis.** The engine's input vocabulary is `Directive` in
+`src/content/sections/test.ts`, and it has 24 kinds — `equip` among them. The
+engine could always equip.
 
-The consequence is not cosmetic. Equipping is done through that screen, so a
-playbot cannot equip anything. It said so three turns running — *"I have an Iron
-Sword and Wooden Shield in my inventory but no visible equip action, only Main Hand
-and Off Hand slots listed without interactable choices."* It was right, and it will
-be right about every screen a player opens rather than answers.
+What is actually true is smaller and worse. `play-cli` and the GUI both reach the
+session through `runLine` in `src/runtime/command.ts`, so `COMMANDS` is already
+their one home and a command added there arrives in both for free. The playbot
+alone bypassed it, and hand-picked two cases out of twenty-four to support.
 
-**This blocks item 4.** A bot that cannot put on gear cannot measure gear, so no
-balance question can be asked of it until c6 is widened.
+So the player was right three turns running — *"I have an Iron Sword and Wooden
+Shield in my inventory but no visible equip action, only Main Hand and Off Hand
+slots listed without interactable choices."* — but not for the reason first
+recorded. There was a way in. It just was not one of the two the loop had built.
+
+The fix is to delete the private surface rather than add a third case to it, which
+is being done on this branch. Widening c6 would have been chasing the surface
+instead of removing it.
 
 ### Reported by the player, not yet diagnosed
 
