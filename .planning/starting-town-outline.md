@@ -102,7 +102,12 @@ The name of the kingdom is undefined. But we can call it Yanodonin.
 So the town must stand before any of it, and these are its load-bearing pieces:
 Kelsa and George at the apiary, the crier, Mouse and the grate, Larry and the
 sewers, Oolga and her basement, Sunny and the bar, the duke and the captain at the
-castle. The forge, the reporter and the barman can wait.
+castle. The forge and the reporter can wait.
+
+Sunny is the only one carrying two quests — the poison in *Kill it with Fire* and
+the brew in *The Bar's Crawl* — so Sunny is where two quest modules must both give
+lines to one entity without either editing the other. That is the mechanism the
+engine has just been given, and it has no shipped subject yet.
 
 ## What the notes reference that the engine does not have
 
