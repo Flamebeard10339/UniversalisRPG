@@ -97,11 +97,81 @@ stage sendoff:
 
 stage snubbed:
   log: You turned Miki down, and found your own way.
-  complete
+  hint: @@@
   tutorial-island.miki says:
     always
     sticky
+    again: @@@
     Hmph. Suit yourself. Don't come crying when a door won't open.
+    if has tutorial-island.lockpick:
+      set: tutorial-island.miki.angered
+    -> Actually - sorry. Show me the ropes after all.
+      goto apologised
+    -> Not a chance.
+      goto snubbed
+  // Crossing routes is acknowledged: a player who snubbed Miki and killed the
+  // rats anyway does not get the straight clear-the-rats line, since that one
+  // lives in a stage this branch never reaches — they get this instead.
+  tutorial-island.miki says:
+    when: tutorial-island.rats-killed >= 3
+    sticky
+    again: @@@
+    @@@
+    if has tutorial-island.lockpick:
+      set: tutorial-island.miki.angered
+    -> Actually - sorry. Show me the ropes after all.
+      goto apologised
+    -> Not a chance.
+      goto snubbed
+
+stage apologised:
+  log: @@@
+  hint: @@@
+  tutorial-island.miki says:
+    always
+    sticky
+    again: @@@
+    give: tutorial-island.fishing-net
+    @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one fish caught with the net instead, a plain item check
+  tutorial-island.miki says:
+    when: has tutorial-island.fish
+    @@@
+    set: tutorial-island.front-door.unlocked
+    goto sendoff
+
+// Every route out of the house lands here, and the joke is that it never
+// leaves: no `complete` is ever reached, so the quest stands forever. Which
+// line plays back is the choice outliving the house — a flag no route sets on
+// purpose, only as a side effect of which way out it took.
+//
+// The door route's trigger is market-district.discovered rather than
+// front-door.unlocked itself: a quest's stage only ever advances when the
+// entity its dialogue is pinned to is talked to, and the door's own unlock —
+// like reaching the beach it opens onto — happens while Miki can still be
+// talked to, one talk before a player has anywhere to travel to. Gating on a
+// place that is only discovered by having stood in it means Miki still gives
+// his ordinary sendoff on the way out; this quest is what he has to say once
+// you come back for one more word.
+# quest leave-tutorial-island
+title: Leave Tutorial Island
+log: @@@
+hint: @@@
+
+stage adrift:
+  log: @@@
+  hint: @@@
+  tutorial-island.miki says:
+    when: tutorial-island.market-district.discovered
+    sticky
+    again: @@@
+    @@@
+    goto adrift
+  tutorial-island.miki says:
+    when: tutorial-island.miki.angered
+    sticky
+    again: @@@
+    @@@
+    goto adrift
 
 // --- tests ---
 
@@ -149,10 +219,86 @@ travel: beach
 // /create-valid-test when the route's content changes on purpose.
 expect: miki-route-end
 
+// --- thieving route: snub Miki, take the lockpick, fail the door, take the
+// window instead. Costs 5 health on landing and leaves Miki angry — a fact
+// the door itself can't carry (see the commit message), so it lives on Miki.
+
+# test thieving-route-full
+talk: tutorial-island.miki
+choose: 1
+use: entity.stairs.ascend
+use: entity.dresser.search-drawer
+assert: has tutorial-island.lockpick
+use: entity.stairs-down.descend
+// Reaching Miki with the lockpick already in hand is what the snubbed stage
+// reads to get angry; declining to apologise is what closes that
+// conversation back up, since a test (like a player) can't leave one hanging.
+talk: tutorial-island.miki
+choose: 1
+assert: tutorial-island.miki.angered
+// A second, separate talk: same as the door route above, a quest whose own
+// condition just turned true does not pick it up until asked again.
+talk: tutorial-island.miki
+assert: leave-tutorial-island.adrift
+use: entity.stairs.ascend
+use: entity.window.climb-out
+assert: not tutorial-island.front-door.unlocked
+// Regenerate with /create-valid-test when this route's content changes on
+// purpose. See thieving-route-full-end for why this isn't miki-route-end.
+expect: thieving-route-full-end
+
+// --- apology route: snub Miki, apologise, take the net, catch a fish, and
+// the door opens the ordinary way. Converges on Miki's usual sendoff, since
+// that line no longer says which route earned it.
+
+# test apology-route-full
+talk: tutorial-island.miki
+choose: 1
+talk: tutorial-island.miki
+choose: 0
+talk: tutorial-island.miki
+assert: has tutorial-island.fishing-net
+use: entity.stairs.ascend
+use: entity.window.fish
+assert: has tutorial-island.fish
+use: entity.stairs-down.descend
+talk: tutorial-island.miki
+assert: finding-your-feet.sendoff
+assert: tutorial-island.front-door.unlocked
+travel: beach
+assert: tutorial-island.market-district.discovered
+// Miki's ordinary sendoff is what a talk gets on the way out (see the door
+// route's test); this quest is what stepping back in for one more word gets
+// instead, now that there is somewhere to have come back from.
+travel: guide-house
+talk: tutorial-island.miki
+assert: leave-tutorial-island.adrift
+travel: beach
+// Regenerate with /create-valid-test when this route's content changes on
+// purpose. See apology-route-full-end for why this isn't miki-route-end.
+expect: apology-route-full-end
+
 // --- saves ---
 
 # save miki-route-start
 {"version":11}
 
+// Does not carry leave-tutorial-island.adrift: this route's own extra talk
+// would land on the exact moment src/runtime/session.test.ts pins Miki's
+// sendoff repeat to, and picking up the eternal quest one talk earlier than
+// that test replays would overwrite that line with this quest's own stub. See
+// the commit message.
 # save miki-route-end
-{"version":11,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.iron-sword":1,"tutorial-island.wooden-shield":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tutorial-island.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tutorial-island.rats-killed":3,"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"elf"}}
+{"version":11,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.iron-sword":1,"tutorial-island.wooden-shield":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tutorial-island.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tutorial-island.rats-killed":3,"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tutorial-island.market-district.discovered":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"elf"}}
+
+// The thief's own closing sheet — not the door route's. `expect:` is a whole
+// save compared exactly, so a route that never bakes or fights has no way to
+// land on the same xp, clock or rng cursor as one that does both; see the
+// commit message for what that closes off and what `assert:` above already
+// proves instead (the same location, the same standing quest).
+# save thieving-route-full-end
+{"version":11,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.snubbed":true,"tutorial-island.dresser.searched":true,"tutorial-island.miki.angered":true,"tutorial-quests.leave-tutorial-island.adrift":true,"tutorial-island.beach.discovered":true,"tutorial-island.market-district.discovered":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.snubbed.miki.0.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.1.said":1},"resources":{"tutorial-island.health":25000},"location":"tutorial-island.beach","rng":2617077404}
+
+// The apology route's own closing sheet, same reasoning as the thief's above.
+# save apology-route-full-end
+{"version":11,"inventory":{"tutorial-island.fishing-net":1,"tutorial-island.fish":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.snubbed":true,"tutorial-quests.finding-your-feet.apologised":true,"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tutorial-island.market-district.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.snubbed.miki.0.said":1,"tutorial-quests.finding-your-feet.apologised.miki.0.said":1,"tutorial-quests.finding-your-feet.apologised.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"location":"tutorial-island.beach","time":15000}
