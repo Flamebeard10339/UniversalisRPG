@@ -35,7 +35,7 @@ function playing(): { driver: Driver; slots: SlotDriver } {
 
 const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.map((entry) => String(entry.text));
 
-const MARKED: readonly CommandSpec[] = COMMANDS.filter((spec) => spec.dev);
+const MARKED: readonly CommandSpec[] = COMMANDS.filter((spec) => spec.audience === 'cheat');
 
 const ACTS_ON: Record<string, string> = { '/goto': 'tutorial-island.basement' };
 

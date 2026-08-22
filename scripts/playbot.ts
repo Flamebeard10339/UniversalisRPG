@@ -7,8 +7,8 @@ import { withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
-import { askedOption } from '../src/runtime/command';
-import { adoptRegistry, apply, applyDirective, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
+import { askedOption, COMMANDS, findCommand, newContext, runLine, type CommandContext, type CommandResult, type CommandSpec } from '../src/runtime/command';
+import { adoptRegistry, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
 
 // scripts/playbot.ts holds one live session and calls the model once per turn — see
 // docs/specs/a-turn-costs-what-the-last-turn-did.md, whose clauses this file exists to satisfy.
@@ -20,32 +20,45 @@ export type PlaybotMode = (typeof PLAYBOT_MODES)[number];
 
 const SHARED_INTRO = `You are playing Universalis RPG, a text game, through a programmatic loop rather than a chat conversation. Each message you receive is one turn: it shows you everything visible from the current moment, and you answer with exactly one structured reply. You do not see the turns before this one directly — instead, a short journal of the last several turns is included above the view, summarizing what you tried and what happened. Treat that journal as your memory of the run; nothing else persists between turns.
 
-The world is described entirely through the view you are given: a location, what is here, what you can do, and — when the world is asking you something directly — a screen you must answer before anything else. You are the player, not the author and not the engine: you can only act through the two mechanisms below, and only using the exact tokens the current view hands you.`;
+The world is described entirely through the view you are given: a location, what is here, what you can do, and — when the world is asking you something directly — a screen you must answer before anything else. You are the player, not the author and not the engine: everything you do goes through this game's own command line, one line per turn, using only the exact tokens the current view hands you or the direct actions listed below.`;
+
+function playerCommands(): readonly CommandSpec[] {
+  return COMMANDS.filter((spec) => spec.match === 'name' && spec.audience === 'player');
+}
+
+function commandLine(spec: CommandSpec): string {
+  const spelling = [spec.name, ...spec.aliases].join(', ');
+  const label = spec.argHint ? `${spelling} ${spec.argHint}` : spelling;
+  return `- ${label} — ${spec.summary}`;
+}
+
+// Read off COMMANDS rather than written out, so a command's audience is the one place that
+// decides both what /help lists for an author and what this block tells the model exists.
+function playerVocabularyBlock(): string {
+  return playerCommands().map(commandLine).join('\n');
+}
 
 const SHARED_MECHANISM = `## How you act
 
 Every turn ends with exactly one JSON object, matching this shape:
 
 {
-  "action": { "kind": "choice", "id": "<a choice id copied verbatim from the view>" },
+  "line": "<one line of input, exactly as this game's own command line accepts it>",
   "note": "<one short sentence: what you just decided and why>",
   "expected": "<one short sentence: something you looked for here and could not do, or an empty string if nothing>",
   "confusion": "<one short sentence: anything that read as unclear, contradictory, or unfinished, or an empty string if nothing>"
 }
 
-or, in place of the choice action:
+"line" is sent to the same command line a human plays this game through, verbatim and unmodified — there is no second channel and no structured alternative. Two shapes of "line" cover almost every turn:
 
-{
-  "action": { "kind": "modal", "key": "<the key the open screen is asking>", "value": "<a value copied verbatim from that option, or free text if none are offered>" },
-  "note": "...", "expected": "...", "confusion": "..."
-}
+- If the view lists choices, "line" is a choice id copied character-for-character from one of them. Never invent an id, never guess one from a pattern you have seen elsewhere, never renumber or reorder a list to make one up. If the id is not printed in this turn's view, it does not exist for this turn.
+- If the view shows an open screen (a modal — dialogue, character creation, an inventory screen, a crafting confirmation, anything the world is actively asking you), "line" is "submit-modal: <key>=<value>", using the exact key the screen names and, when it lists values, one of those values verbatim. Free-text fields (like a character's name) take a short plain-text value instead of a listed one. A modal always takes priority: while one is open there are no choices alongside it, and you must answer it before anything else happens.
 
-There are exactly two shapes for "action", because the engine has exactly two ways of taking an input:
+Beyond those two shapes, the command line also answers to a small set of direct actions a player — never this game's own authors — may use without a choice being offered first:
 
-- If the view lists choices, answer with a "choice" action, and "id" must be copied character-for-character from one of the listed choice ids. Never invent an id, never guess one from a pattern you have seen elsewhere, never renumber or reorder a list to make one up. If the id is not printed in this turn's view, it does not exist for this turn.
-- If the view shows an open screen (a modal — dialogue, character creation, an inventory screen, a crafting confirmation, anything the world is actively asking you), answer with a "modal" action instead, using the exact "key" the screen names and, when it lists values, one of those values verbatim. Free-text fields (like a character's name) take a short plain-text answer instead of a listed value. A modal always takes priority: while one is open there are no choices alongside it, and you must answer it before anything else happens.
+${playerVocabularyBlock()}
 
-A reply naming a token this turn's view did not offer is refused outright and the turn ends without your action having any effect — the loop does not try to guess what you meant, and does not fall back to the closest match. If you are unsure what is available, re-read the view rather than reusing something you remember from an earlier turn: ids can stop existing when an author edits the world mid-run, and a dialogue option's value is only ever its current position, not a name that survives being reordered.`;
+Reach for one of these only when it is the clearest way to say what you are doing (an "equip: <item>" once an item is in hand, a "/wait <seconds>" to let something finish); the choice ids and modal answers above are how most turns are spent. A reply naming anything this turn's view did not offer, or a line this game's own command line refuses for any reason, is refused outright and the turn ends without your action having any effect — the loop does not try to guess what you meant, and does not fall back to the closest match. If you are unsure what is available, re-read the view rather than reusing something you remember from an earlier turn: ids can stop existing when an author edits the world mid-run, and a dialogue option's value is only ever its current position, not a name that survives being reordered.`;
 
 const SHARED_PRODUCT = `## What your reply is for
 
@@ -74,7 +87,7 @@ Suppose the view shows:
 
 A reasonable reply is:
 
-  {"action":{"kind":"choice","id":"use:entity.tutorial-island.mirror.look-in"},"note":"Trying the mirror before talking to anyone, since it is the first thing described in the room.","expected":"","confusion":""}
+  {"line":"use:entity.tutorial-island.mirror.look-in","note":"Trying the mirror before talking to anyone, since it is the first thing described in the room.","expected":"","confusion":""}
 
 If that opens a screen asking for a name, the next turn's view shows a modal instead of choices, something like:
 
@@ -83,15 +96,15 @@ If that opens a screen asking for a name, the next turn's view shows a modal ins
 
 and the next reply answers that modal directly:
 
-  {"action":{"kind":"modal","key":"name","value":"Ash"},"note":"Naming the character now that the mirror is asking.","expected":"","confusion":""}
+  {"line":"submit-modal: name=Ash","note":"Naming the character now that the mirror is asking.","expected":"","confusion":""}
 
-When a screen lists values instead, each one is printed on its own line and the thing you send is the token after \`value=\`, never the words after \`::\` — those are only there so you know what you are picking:
+When a screen lists values instead, each one is printed on its own line and the thing you send after the "=" is the token after \`value=\`, never the words after \`::\` — those are only there so you know what you are picking:
 
   open screen: dialogue — asks choice:
     value=0 :: Sounds good. Teach me.
     value=1 :: Not now.
 
-answered with {"action":{"kind":"modal","key":"choice","value":"0"}, ...}. Sending \`Sounds good. Teach me.\` there is refused, because it is the label and not the value.
+answered with {"line":"submit-modal: choice=0", ...}. Sending "submit-modal: choice=Sounds good. Teach me." there is refused, because it is the label and not the value.
 
 Notice the second reply does not repeat the mirror action or reference the choices from the previous turn — those choices do not exist while the modal is open, and answering it is the only thing this turn can do.`;
 
@@ -110,10 +123,8 @@ export function systemPromptFor(mode: PlaybotMode): string {
   return [SHARED_INTRO, SHARED_MECHANISM, SHARED_PRODUCT, MODE_FRAMING[mode], SHARED_EXAMPLE, SHARED_TAIL].join('\n\n');
 }
 
-export type TurnAction = { readonly kind: 'choice'; readonly id: string } | { readonly kind: 'modal'; readonly key: string; readonly value: string };
-
 export interface TurnReply {
-  readonly action: TurnAction;
+  readonly line: string;
   readonly note: string;
   readonly expected: string;
   readonly confusion: string;
@@ -142,7 +153,7 @@ export interface ModelClient {
 interface AppliedEntry {
   readonly turn: number;
   readonly outcome: 'applied' | 'refused';
-  readonly action: TurnAction;
+  readonly line: string;
   readonly note: string;
   readonly expected: string;
   readonly confusion: string;
@@ -159,13 +170,9 @@ export type RunLogEntry = AppliedEntry | SkippedEntry;
 
 export const JOURNAL_WINDOW = 10;
 
-function describeAction(action: TurnAction): string {
-  return action.kind === 'choice' ? `choice ${action.id}` : `modal ${action.key}=${action.value}`;
-}
-
 export function describeEntry(entry: RunLogEntry): string {
-  if ('action' in entry) {
-    return `turn ${entry.turn} [${entry.outcome}] ${describeAction(entry.action)} — note: ${entry.note || '(none)'}; expected: ${entry.expected || '(none)'}; confusion: ${entry.confusion || '(none)'}; result: ${entry.detail}`;
+  if ('line' in entry) {
+    return `turn ${entry.turn} [${entry.outcome}] ${entry.line} — note: ${entry.note || '(none)'}; expected: ${entry.expected || '(none)'}; confusion: ${entry.confusion || '(none)'}; result: ${entry.detail}`;
   }
   return `turn ${entry.turn} [${entry.outcome}] ${entry.detail}`;
 }
@@ -267,36 +274,28 @@ function stringField(value: Record<string, unknown>, key: string): string | unde
   return typeof value[key] === 'string' ? (value[key] as string) : undefined;
 }
 
-export function parseReply(raw: unknown, v: PlayView): { ok: true; reply: TurnReply } | { ok: false; error: string } {
+// A command the audience field marks as anything but 'player' is not in the vocabulary this
+// prompt offered, so a line naming one is refused here rather than handed to runLine — the one
+// place that classification has to make a behavioural difference, not just a prompt-text one.
+function offMenuCommand(line: string): CommandSpec | undefined {
+  const token = line.trim().split(/[ \t]+/)[0];
+  const spec = token === undefined ? undefined : findCommand(token);
+  return spec && spec.audience !== 'player' ? spec : undefined;
+}
+
+export function parseReply(raw: unknown): { ok: true; reply: TurnReply } | { ok: false; error: string } {
   if (!isRecord(raw)) return { ok: false, error: 'reply is not a JSON object' };
+  const line = stringField(raw, 'line');
   const note = stringField(raw, 'note');
   const expected = stringField(raw, 'expected');
   const confusion = stringField(raw, 'confusion');
-  if (note === undefined || expected === undefined || confusion === undefined) {
-    return { ok: false, error: 'reply is missing one of note, expected, confusion as a string' };
+  if (line === undefined || note === undefined || expected === undefined || confusion === undefined) {
+    return { ok: false, error: 'reply is missing one of line, note, expected, confusion as a string' };
   }
-  const rawAction = raw.action;
-  if (!isRecord(rawAction)) return { ok: false, error: 'reply.action is not a JSON object' };
-
-  if (rawAction.kind === 'choice') {
-    const id = stringField(rawAction, 'id');
-    if (id === undefined) return { ok: false, error: 'choice action is missing id' };
-    if (!v.choices.some((choice) => choice.id === id)) return { ok: false, error: `chose an id this view did not offer: ${id}` };
-    return { ok: true, reply: { action: { kind: 'choice', id }, note, expected, confusion } };
-  }
-
-  if (rawAction.kind === 'modal') {
-    const key = stringField(rawAction, 'key');
-    const value = stringField(rawAction, 'value');
-    if (key === undefined || value === undefined) return { ok: false, error: 'modal action is missing key or value' };
-    const asking = askedOption(v.modals);
-    if (!asking) return { ok: false, error: 'no modal is open to answer' };
-    if (key !== asking.key) return { ok: false, error: `answered a key the open screen did not ask: ${key}` };
-    if (asking.values && !asking.values.some((choice) => choice.value === value)) return { ok: false, error: `named a value the asked option did not publish: ${value}` };
-    return { ok: true, reply: { action: { kind: 'modal', key, value }, note, expected, confusion } };
-  }
-
-  return { ok: false, error: `reply.action.kind must be "choice" or "modal", got ${JSON.stringify(rawAction.kind)}` };
+  if (line.trim() === '') return { ok: false, error: 'reply.line is empty' };
+  const blocked = offMenuCommand(line);
+  if (blocked) return { ok: false, error: `${blocked.name} is not a command this player may run` };
+  return { ok: true, reply: { line, note, expected, confusion } };
 }
 
 function summarize(v: PlayView): string {
@@ -304,14 +303,18 @@ function summarize(v: PlayView): string {
   return said.length > 0 ? said : `arrived at ${v.location.title}`;
 }
 
-export function applyAction(session: PlaySession, action: TurnAction): { outcome: 'applied' | 'refused'; detail: string } {
-  if (action.kind === 'choice') {
-    const v = apply(session, action.id);
-    return { outcome: 'applied', detail: summarize(v) };
-  }
-  const result = applyDirective(session, { kind: 'submit-modal', key: action.key, value: action.value });
-  const v = view(session);
-  return result.failure ? { outcome: 'refused', detail: result.failure } : { outcome: 'applied', detail: summarize(v) };
+// The engine, not this file, decides what a line refuses: an error-toned message in the result
+// is the one signal command.ts already gives every driver, so reading it is not a second
+// validation layer beside runLine — it is how the CLI and the GUI already tell success from
+// refusal too.
+function refusalMessages(result: CommandResult): string[] {
+  return result.output.flatMap((output) => (output.kind === 'message' && output.tone === 'error' ? [String(output.text)] : []));
+}
+
+function settleTurn(result: CommandResult, before: PlayView): { outcome: 'applied' | 'refused'; detail: string } {
+  const refusals = refusalMessages(result);
+  if (refusals.length > 0) return { outcome: 'refused', detail: refusals.join('; ') };
+  return { outcome: 'applied', detail: summarize(result.view ?? before) };
 }
 
 export type ContentReader = () => readonly ModuleSource[];
@@ -332,7 +335,7 @@ export function reloadInto(session: PlaySession, read: ContentReader): { ok: tru
 }
 
 export interface RunTurnDeps {
-  readonly session: PlaySession;
+  readonly ctx: CommandContext;
   readonly read: ContentReader;
   readonly client: ModelClient;
   readonly system: string;
@@ -341,11 +344,11 @@ export interface RunTurnDeps {
 }
 
 export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
-  const reloaded = reloadInto(deps.session, deps.read);
+  const reloaded = reloadInto(deps.ctx.session, deps.read);
   if (!reloaded.ok) return { turn: deps.turn, outcome: 'reload-failed', detail: reloaded.message };
 
-  const v = view(deps.session);
-  const request: TurnRequest = { system: deps.system, turn: deps.turn, journal: journalWindowText(deps.log), view: renderView(v) };
+  deps.ctx.view = view(deps.ctx.session);
+  const request: TurnRequest = { system: deps.system, turn: deps.turn, journal: journalWindowText(deps.log), view: renderView(deps.ctx.view) };
 
   let raw: unknown;
   try {
@@ -354,19 +357,14 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
     return { turn: deps.turn, outcome: 'invalid-reply', detail: error instanceof Error ? error.message : String(error) };
   }
 
-  const parsed = parseReply(raw, v);
+  const parsed = parseReply(raw);
   if (!parsed.ok) return { turn: deps.turn, outcome: 'invalid-reply', detail: parsed.error };
 
-  const applied = applyAction(deps.session, parsed.reply.action);
-  return {
-    turn: deps.turn,
-    outcome: applied.outcome,
-    action: parsed.reply.action,
-    note: parsed.reply.note,
-    expected: parsed.reply.expected,
-    confusion: parsed.reply.confusion,
-    detail: applied.detail,
-  };
+  const before = deps.ctx.view;
+  const result = runLine(deps.ctx, parsed.reply.line);
+  const { outcome, detail } = settleTurn(result, before);
+
+  return { turn: deps.turn, outcome, line: parsed.reply.line, note: parsed.reply.note, expected: parsed.reply.expected, confusion: parsed.reply.confusion, detail };
 }
 
 export interface PlaybotOptions {
@@ -380,9 +378,10 @@ export interface PlaybotOptions {
 
 export async function runPlaybot(options: PlaybotOptions): Promise<RunLogEntry[]> {
   const system = systemPromptFor(options.mode);
+  const ctx = newContext(options.session, view(options.session));
   const log: RunLogEntry[] = [];
   for (let turn = 1; turn <= options.turns; turn++) {
-    const entry = await runTurn({ session: options.session, read: options.read, client: options.client, system, log, turn });
+    const entry = await runTurn({ ctx, read: options.read, client: options.client, system, log, turn });
     log.push(entry);
     const billed = options.client.lastUsage?.() ?? null;
     options.write(billed === null ? describeEntry(entry) : `${describeEntry(entry)} [billed ${billed.input} in, ${billed.cacheRead} cached read, ${billed.cacheWrite} cached write]`);
@@ -393,17 +392,12 @@ export async function runPlaybot(options: PlaybotOptions): Promise<RunLogEntry[]
 const REPLY_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['action', 'note', 'expected', 'confusion'],
+  required: ['line', 'note', 'expected', 'confusion'],
   properties: {
+    line: { type: 'string' },
     note: { type: 'string' },
     expected: { type: 'string' },
     confusion: { type: 'string' },
-    action: {
-      oneOf: [
-        { type: 'object', additionalProperties: false, required: ['kind', 'id'], properties: { kind: { const: 'choice' }, id: { type: 'string' } } },
-        { type: 'object', additionalProperties: false, required: ['kind', 'key', 'value'], properties: { kind: { const: 'modal' }, key: { type: 'string' }, value: { type: 'string' } } },
-      ],
-    },
   },
 } as const;
 
