@@ -58,6 +58,7 @@ export interface ClusterReport {
 }
 
 export interface PlaneFocus {
+  readonly kind: 'plane';
   readonly instance: Answer;
   readonly hex: Answer;
 }

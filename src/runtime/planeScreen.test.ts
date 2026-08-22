@@ -223,14 +223,14 @@ describe('what the screen has in hand', () => {
   it('names the copy and the hexagon, whichever way the copy is carried', () => {
     const state = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 1 });
 
-    expect(planeFocus(planeFrame('blade'))).toEqual({ instance: 'blade', hex: '0,0' });
+    expect(planeFocus(planeFrame('blade'))).toEqual({ kind: 'plane', instance: 'blade', hex: '0,0' });
     const walked = plane(state, [...FED, 'allocate: slot e', 'slot: e with spark-jewel', 'go: 1,0']);
-    expect(planeFocus(walked)).toEqual({ instance: '1', hex: '1,0' });
+    expect(planeFocus(walked)).toEqual({ kind: 'plane', instance: '1', hex: '1,0' });
     expect(planeReport(registry, state, planeFocus(walked).instance)?.clusters.map((cluster) => cluster.hex)).toContain('1,0');
   });
 
   it('names them the same whatever the plane last said', () => {
-    expect(planeFocus(planeFrame('blade', '1,0', says('engine.plane.no-points', { node: anId('position 1 of 1,0') })))).toEqual({ instance: 'blade', hex: '1,0' });
+    expect(planeFocus(planeFrame('blade', '1,0', says('engine.plane.no-points', { node: anId('position 1 of 1,0') })))).toEqual({ kind: 'plane', instance: 'blade', hex: '1,0' });
   });
 });
 

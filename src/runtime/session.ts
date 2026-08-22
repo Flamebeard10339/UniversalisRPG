@@ -6,7 +6,7 @@ import { actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFigh
 import { createGameState, type Journey } from './state';
 import { itemCopies, Growth, grownItems } from './itemInstance';
 import { grow } from './growth';
-import { planeReports, type PlaneFocus, type PlaneReport } from './planeReport';
+import { planeReports, type PlaneReport } from './planeReport';
 import { actionAddress } from '../content/sections/action';
 import { parseOwnerRef, TRAVEL_PAIR } from './actions';
 import { relocateTo, spreadDiscovery } from './effects';
@@ -21,7 +21,7 @@ import { declaredId } from '../content/sections/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
-import { answerModal, Modal, modalFocus, pruneModals, publishModal } from './modals';
+import { answerModal, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
 import { dialogueFrame, openModal, openModalNamed, topModal } from './modalStack';
 import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carried';
 import { Registry } from '../content/registry';
@@ -80,7 +80,7 @@ export interface PlayStatus {
   grown: AnswerTable<Answer>;
   carried: CarriedEntry[];
   planes: PlaneReport[];
-  focus: PlaneFocus | null;
+  focus: Focus | null;
   equipment: WornRow[];
   xp: SkillRow[];
   stats: CountedRow[];

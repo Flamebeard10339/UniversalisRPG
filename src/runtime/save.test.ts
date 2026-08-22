@@ -181,7 +181,7 @@ describe('loadSave', () => {
   it('closes a modal frame the loaded registry cannot answer, and says so, instead of restoring it', () => {
     const registry = loadInEnglish(MODULE);
     for (const [frame, message] of [
-      [{ name: 'quest-journal', answers: {} }, 'Closed modal quest-journal because it is not a modal this engine knows.'],
+      [{ name: 'shop', answers: {} }, 'Closed modal shop because it is not a modal this engine knows.'],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'gone', node: 'greeting', resumeIndex: 1, replay: true } }, 'Closed modal dialogue because dialogue gone is not loaded.'],
       [{ name: 'character-creation', answers: { name: 'Rowan', race: 'elf' } }, 'Closed modal character-creation because it was saved with every option already answered.'],
       [{ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' }, 'Closed modal item-plane because it grows charm, which the player no longer carries.'],

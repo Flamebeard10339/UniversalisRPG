@@ -27,6 +27,7 @@ import { ModalSheet } from './ModalSheet';
 import { LAYERS, OPENING, pageRested, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
 import { PlaneModal } from './PlaneModal';
+import { QuestModal } from './QuestModal';
 import { carried, counted, worn } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
@@ -138,7 +139,9 @@ export function App({
   const localizer = driver.localizer();
   const words = wordsOf(localizer);
   const asking = askedOption(view.modals);
-  const plane = view.focus ? (view.planes.find((each) => each.instance === view.focus?.instance) ?? null) : null;
+  const reading = view.focus;
+  const plane = reading?.kind === 'plane' ? (view.planes.find((each) => each.instance === reading.instance) ?? null) : null;
+  const questRead = reading?.kind === 'quest' ? (view.journal.find((entry) => entry.quest === reading.quest) ?? null) : null;
   const { arrivals, generation } = useArrivals(view.discovered);
   const rows = view.xp;
   const notes = useXpNotes(view, clock);
@@ -218,7 +221,7 @@ export function App({
     if (subpage.id === 'stats') return <Ledger entries={counted(view.stats, localizer)} />;
     if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
     if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} onOpen={driver.open} />;
-    if (subpage.id === 'journal') return <JournalPane view={view} words={words} />;
+    if (subpage.id === 'journal') return <JournalPane view={view} words={words} onOpen={driver.readQuest} />;
     return <Ledger entries={carried(view.carried, view.planes, localizer)} onOpen={driver.open} />;
   };
 
@@ -271,7 +274,8 @@ export function App({
           onSelect={(index) => go((held) => toSubpage(held, held.layer, here.shown[index].id))}
         />
         {asking && plane ? <PlaneModal plane={plane} option={asking} words={words} onAnswer={driver.answer} /> : null}
-        {asking && !plane ? <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave} /> : null}
+        {asking && questRead ? <QuestModal entry={questRead} option={asking} words={words} onAnswer={driver.answer} /> : null}
+        {asking && !plane && !questRead ? <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave} /> : null}
       </div>
     </TransientProvider>
   );

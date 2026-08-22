@@ -7,7 +7,7 @@ const withModal = (body: string): string => `# modal look-here\n${body}\n`;
 describe('the closed set lives in screen:', () => {
   it('accepts every screen the engine runs and nothing else', () => {
     for (const screen of MODAL_SCREENS) expect(() => loadModule(withModal(`screen: ${screen}`)), screen).not.toThrow();
-    for (const absent of ['quest-journal', 'shop', 'dialogue', 'item-plane', 'characterCreation']) {
+    for (const absent of ['shop', 'dialogue', 'item-plane', 'characterCreation']) {
       expect(() => loadModule(withModal(`screen: ${absent}`)), absent).toThrow('a modal screen must be one of');
     }
   });

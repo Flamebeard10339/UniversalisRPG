@@ -113,7 +113,7 @@ export function planeSubmit(frame: PlaneFrame, state: GameState, registry: Regis
 }
 
 export function planeFocus(frame: PlaneFrame): PlaneFocus {
-  return { instance: frame.target, hex: frame.hex };
+  return { kind: 'plane', instance: frame.target, hex: frame.hex };
 }
 
 export function isPlaneFrameBody(value: Record<string, unknown>): boolean {

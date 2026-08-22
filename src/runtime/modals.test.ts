@@ -263,9 +263,9 @@ describe('opening and answering', () => {
 
   it('refuses a modal nothing defines, and one that carries a payload no result line can spell', () => {
     const state = createGameState();
-    expect(() => openModalNamed(state, 'quest-journal')).toThrow(/unknown modal: quest-journal/);
+    expect(() => openModalNamed(state, 'shop')).toThrow(/unknown modal: shop/);
     expect(() => openModalNamed(state, 'dialogue')).toThrow(/not opened by name/);
-    expect(() => applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'quest-journal' }])).toThrow(RuntimeError);
+    expect(() => applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'shop' }])).toThrow(RuntimeError);
     expect(state.modals).toEqual([]);
   });
 
@@ -338,8 +338,8 @@ describe('opening and answering', () => {
     const cursor = { ...(talking(registry).modals[1] as { cursor: DialogueCursor }).cursor };
 
     const withStranger = createGameState();
-    (withStranger.modals as ModalFrame[]).push({ name: 'quest-journal', answers: {} } as unknown as ModalFrame);
-    expect(pruneModals(withStranger, registry)).toEqual([{ name: 'quest-journal', reason: 'it is not a modal this engine knows' }]);
+    (withStranger.modals as ModalFrame[]).push({ name: 'shop', answers: {} } as unknown as ModalFrame);
+    expect(pruneModals(withStranger, registry)).toEqual([{ name: 'shop', reason: 'it is not a modal this engine knows' }]);
     expect(withStranger.modals).toEqual([]);
 
     for (const [broken, reason] of [
@@ -639,7 +639,7 @@ describe('the plane screen, as a frame like any other', () => {
     submitModal(session, { verb: 'grow' });
 
     const shown = view(session);
-    expect(shown.focus).toEqual({ instance: 'blade', hex: '0,0' });
+    expect(shown.focus).toEqual({ kind: 'plane', instance: 'blade', hex: '0,0' });
     expect(shown.planes.map((plane) => plane.instance)).toContain('blade');
   });
 
@@ -760,6 +760,14 @@ describe('nothing a player answers with carries words', () => {
     '  -> Ask about the mirror.',
     '  -> Say nothing.',
     '',
+    '# quest an-errand',
+    'title: An Errand',
+    'log: Someone at the forge wants something fetched.',
+    '',
+    'stage asking:',
+    '  log: The sage asked for a whetstone.',
+    '  complete',
+    '',
     '# save stocked',
     `{"version":${SAVE_VERSION},"inventory":{"forge.blade":2,"forge.whetstone":2,"forge.bough-jewel":1}}`,
   ].join('\n');
@@ -840,6 +848,13 @@ describe('nothing a player answers with carries words', () => {
 
     applyDirective(session, { kind: 'talk', entity: 'forge.sage' });
     published();
+    applyDirective(session, { kind: 'submit-modal', key: 'choice', value: '1' });
+
+    applyDirective(session, { kind: 'open-modal', modal: 'quest-journal' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'quest', value: 'forge.an-errand' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'close', value: 'close' });
     return values;
   };
 

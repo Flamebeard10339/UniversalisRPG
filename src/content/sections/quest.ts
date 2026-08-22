@@ -28,6 +28,9 @@ export interface QuestStage {
 export interface Quest {
   id: string;
   title?: string;
+  // What the journal reads before the quest has begun, and what to do to begin it. A stage's own log says what has happened; these say what has not.
+  log?: ActionResult;
+  hint?: ActionResult;
   stages: QuestStage[];
   // A flag per stage, which is how the rest of the world names where a quest has got to. Derived from the stages, so nothing declares it twice.
   flags: string[];
@@ -189,9 +192,11 @@ export const quest = section<Quest>()({
     quests: (value) => [[value.id, value]],
     dialogues: (value) => questDialogues(value).map((each) => [each.id, each] as const),
   },
-  says: (value) => value.stages.map((stage) => [stage.log, stage.hint].filter((said): said is ActionResult => said !== undefined)),
+  says: (value) => [[value.log, value.hint].filter((said): said is ActionResult => said !== undefined), ...value.stages.map((stage) => [stage.log, stage.hint].filter((said): said is ActionResult => said !== undefined))],
   grammar: [
     { form: 'title: <text>', example: 'title: Finding Your Feet' },
+    { form: 'log: <text>', example: 'log: A guide on the island is said to take newcomers in hand.', family: 'before it begins', note: 'what the journal reads before the quest has begun' },
+    { form: 'hint: <text>', example: 'hint: Talk to Miki in the guide house.', family: 'before it begins', note: 'what to do to begin it' },
     {
       form: 'stage <name>:',
       example: 'stage offered:',
@@ -211,8 +216,12 @@ export const quest = section<Quest>()({
     const parsed: Quest = { id: raw.id, stages: [], flags: [] };
     for (const line of raw.body) {
       const title = TITLE.exec(line.text)?.groups;
+      const log = LOG.exec(line.text)?.groups;
+      const hint = HINT.exec(line.text)?.groups;
       const stage = STAGE.exec(line.text)?.groups;
       if (title) parsed.title = parseWhole(text, title.said!, line.span.start, 'a quest title');
+      else if (log) parsed.log = spoken(log.said!);
+      else if (hint) parsed.hint = spoken(hint.said!);
       else if (stage) parsed.stages.push(parseStage(stage.name!, line));
       else throw new DslError(`unexpected line in # quest: ${JSON.stringify(line.text)}`, line.span);
     }
@@ -222,9 +231,12 @@ export const quest = section<Quest>()({
   print: (value, { moduleId }) => [
     `# quest ${moduleLocalId(moduleId, value.id)}`,
     ...(value.title === undefined ? [] : [`title: ${value.title}`]),
+    ...(value.log === undefined ? [] : [`log: ${value.log.kind === 'say' ? value.log.text : ''}`]),
+    ...(value.hint === undefined ? [] : [`hint: ${value.hint.kind === 'say' ? value.hint.text : ''}`]),
     ...value.stages.flatMap((stage) => ['', ...stageLines(stage)]),
   ],
   visit: (value, where, visit: Visit) => {
+    results([value.log, value.hint].filter((said): said is ActionResult => said !== undefined), where, visit);
     for (const stage of value.stages) {
       const at = `${where} stage ${stage.name}`;
       visitCondition(stage.doneWhen, `${at} done when:`, visit);

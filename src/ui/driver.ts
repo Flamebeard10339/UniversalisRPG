@@ -44,6 +44,7 @@ export interface Driver {
   choose(position: number): void;
   answer(key: string, value: string): void;
   open(item: string): void;
+  readQuest(quest: string): void;
   cancel(): void;
   localizer(): Localizer;
   serialized(): string;
@@ -218,6 +219,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     choose: (position) => send(String(position)),
     answer: (key, value) => send(`submit-modal: ${key}=${value}`),
     open: (item) => send(`/inv ${item}`),
+    readQuest: (quest) => send(`/quests ${quest}`),
     localizer: () => sessionLocalizer(context.session),
     cancel: () => close(true),
     serialized: () => serializeSession(context.session),

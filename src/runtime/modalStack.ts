@@ -1,6 +1,7 @@
 import { RuntimeError } from './error';
 import { carriedFrame } from './carried';
 import { samePlane } from './planeScreen';
+import { questFrame, sameQuest } from './questScreen';
 import { type DialogueCursor, GameState, type ModalFrame } from './state';
 
 export type ModalName = ModalFrame['name'];
@@ -18,6 +19,7 @@ const FRAMES: { [K in ModalName]: FrameKind<Extract<ModalFrame, { name: K }>> } 
   'character-creation': { open: () => ({ name: 'character-creation', answers: {} }) },
   'carried-items': { open: () => carriedFrame() },
   'item-plane': { open: () => null, same: samePlane },
+  'quest-journal': { open: () => questFrame() as Extract<ModalFrame, { name: 'quest-journal' }>, same: sameQuest },
   dialogue: {
     open: () => null,
     same: (a, b) => a.cursor.dialogue === b.cursor.dialogue && a.cursor.node === b.cursor.node && a.cursor.resumeIndex === b.cursor.resumeIndex,

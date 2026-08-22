@@ -139,6 +139,9 @@ engine.shell.stats: Stats
 engine.shell.skills: Skills
 engine.shell.equipment: Equipment
 engine.shell.inventory: Inventory
+engine.journal.which: Which quest?
+engine.journal.reading: Quest
+engine.journal.close: Close
 engine.shell.journal: Journal
 engine.shell.journal.empty: You have taken nothing on yet.
 engine.shell.journal.untouched: You have not begun this quest.
@@ -191,6 +194,7 @@ engine.repl.journal.none: You have taken nothing on yet.
 engine.repl.journal.doing: {quest}
 engine.repl.journal.untouched: {quest} - not started
 engine.repl.journal.struck: (done) {said}
+engine.repl.journal.unknown: no quest is called {quest}
 engine.repl.journal.done: {quest} - done
 engine.repl.state.location: Location: {location}
 engine.repl.state.time: Elapsed simulated time: {time}s

@@ -4,7 +4,11 @@ import { dialogueFrame, keepModals, type ModalName, openModal, popModal, topModa
 import { choose, cursorProblem, menuChoices } from './dialogue-runtime';
 import { carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit } from './planeScreen';
+import { holdsQuest, questFocus, questOptions, questSubmit, LEAVE as QUEST_LEAVE } from './questScreen';
 import { type PlaneFocus } from './planeReport';
+
+// What the screen standing open is about, where it is about something the view publishes elsewhere. A plane and a quest are both read beside the question rather than in it.
+export type Focus = PlaneFocus | { readonly kind: 'quest'; readonly quest: Answer };
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { GameState, type ModalAnswers, type ModalFrame } from './state';
 import { Registry } from '../content/registry';
@@ -21,7 +25,7 @@ interface ModalDefinition<F extends ModalFrame> {
   submit(frame: F, state: GameState, registry: Registry): ModalFrame | null;
   holds?(value: Record<string, unknown>): boolean;
   stale?(frame: F, state: GameState, registry: Registry): Localized | null;
-  focus?(frame: F): PlaneFocus;
+  focus?(frame: F): Focus | undefined;
   leaves?: Answer;
 }
 
@@ -56,6 +60,13 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     focus: planeFocus,
     leaves: BACK,
   },
+  'quest-journal': {
+    options: (frame, state, registry) => questOptions(frame, state, registry),
+    submit: (frame) => questSubmit(frame),
+    holds: holdsQuest,
+    focus: questFocus,
+    leaves: QUEST_LEAVE,
+  },
   dialogue: {
     options: (frame, state, registry) => [
       { key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuChoices(frame.cursor, registry, state).map((choice) => ({ value: String(choice.index), shown: choice.display })) },
@@ -83,7 +94,7 @@ function declaredFor(name: string): ModalDefinition<ModalFrame> | undefined {
   return DEFINITIONS[name as ModalName] as ModalDefinition<ModalFrame> | undefined;
 }
 
-export function modalFocus(state: GameState): PlaneFocus | null {
+export function modalFocus(state: GameState): Focus | null {
   const frame = topModal(state);
   if (!frame) return null;
   return definitionFor(frame).focus?.(frame) ?? null;

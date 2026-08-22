@@ -19,6 +19,8 @@ dependencies:
 
 # quest finding-your-feet
 title: Finding Your Feet
+log: They say a guide keeps an eye on this island, and takes newcomers in hand.
+hint: Talk to Miki, in the guide house you woke in.
 
 stage offered:
   log: A guide called Miki offered to show you the ropes.

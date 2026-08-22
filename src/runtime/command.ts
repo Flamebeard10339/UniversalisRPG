@@ -17,7 +17,7 @@ import { printDirective } from '../content/serialize';
 import { resolveCarried, resolveDirective } from '../content/typed';
 import { type ParsedSave } from '../content/sections/save';
 import { describeCondition } from './runtime';
-import { sessionJournal } from './session';
+import { sessionJournal, type JournalEntry } from './session';
 import { wornCopySlot } from './itemInstance';
 import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal } from './modals';
@@ -284,6 +284,17 @@ function openInventory(ctx: CommandContext, id: string): CommandResult {
   if (opened.recorded.length === 0) return opened;
   const selected = runDirective(ctx, { kind: 'submit-modal', key: 'item', value: entry.id });
   return { ...selected, recorded: [...opened.recorded, ...selected.recorded] };
+}
+
+// The journal opened on one quest, which is the screen opened and then answered — the same two lines a recording would replay.
+function openJournal(ctx: CommandContext, entries: readonly JournalEntry[], quest: string): CommandResult {
+  const found = entries.find((entry) => entry.quest === quest || entry.quest.endsWith(`.${quest}`));
+  if (!found) return said('error', sessionLocalizer(ctx.session).engine('engine.repl.journal.unknown', { quest: sessionLocalizer(ctx.session).identifier(quest) }));
+
+  const opened = runDirective(ctx, { kind: 'open-modal', modal: 'quest-journal' });
+  if (opened.recorded.length === 0) return opened;
+  const reading = runDirective(ctx, { kind: 'submit-modal', key: 'quest', value: found.quest });
+  return { ...reading, recorded: [...opened.recorded, ...reading.recorded] };
 }
 
 function nothingIsNamed(localizer: Localizer, id: string): Localized {
@@ -740,12 +751,14 @@ export const COMMANDS: readonly CommandSpec[] = [
   define({
     name: '/quests',
     aliases: ['/journal'],
-    arg: 'none',
-    summary: 'show what you have taken on and where each of it stands',
-    parse: nothing,
-    run: (ctx) => {
+    arg: 'id',
+    argHint: '[<quest>]',
+    summary: 'list every quest and where each stands, or open the journal on one',
+    parse: (rest) => rest,
+    run: (ctx, quest) => {
       const localizer = sessionLocalizer(ctx.session);
       const entries = sessionJournal(ctx.session);
+      if (quest !== '') return openJournal(ctx, entries, quest);
       if (entries.length === 0) return { output: [message('plain', localizer.engine('engine.repl.journal.none'))], quit: false, recorded: [] };
       const heading = { unstarted: 'engine.repl.journal.untouched', started: 'engine.repl.journal.doing', complete: 'engine.repl.journal.done' } as const;
       return {

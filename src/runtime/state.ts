@@ -87,6 +87,7 @@ export type ModalFrame =
   | { readonly name: 'character-creation'; readonly answers: ModalAnswers }
   | { readonly name: 'carried-items'; readonly answers: ModalAnswers }
   | { readonly name: 'item-plane'; readonly answers: ModalAnswers; readonly target: string; readonly hex: string; readonly said?: Said }
+  | { readonly name: 'quest-journal'; readonly answers: ModalAnswers; readonly quest: string }
   | { readonly name: 'dialogue'; readonly answers: ModalAnswers; readonly cursor: DialogueCursor };
 
 export interface GameState extends RngCursor {

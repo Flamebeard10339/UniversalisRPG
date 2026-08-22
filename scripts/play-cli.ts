@@ -117,7 +117,7 @@ function formatEncounter(encounter: PlayView['encounter'], localizer: Localizer)
 
 function formatFocus(v: PlayView, localizer: Localizer): PlayerLine[] {
   const focus = v.focus;
-  if (!focus) return [];
+  if (focus?.kind !== 'plane') return [];
   const plane = v.planes.find((each) => each.instance === focus.instance);
   if (!plane) return [];
   const blank = localizer.identifier('');

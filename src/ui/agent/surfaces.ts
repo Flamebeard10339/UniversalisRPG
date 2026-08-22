@@ -9,6 +9,7 @@ import type { LabelId } from '../labels';
 import { LAYERS, pageOf, shownIn, toLayer, toSubpage, type LayerId, type Where } from '../nav';
 import type { PlaneGraph, Plane } from '../planeGraph';
 import type { JournalRow } from '../journalPanel';
+import type { JournalEntry } from '../../runtime/session';
 import { filled, type SkillPanel } from '../skillPanels';
 import type { TestSurface } from '../testSurface';
 
@@ -294,16 +295,21 @@ export function skillNamed(panels: readonly SkillPanel[], value: unknown): Answe
   return panel.id;
 }
 
-// A journal is read rather than played, so what the harness is given is what it shows and the one way in: which quest is open.
+// The list of quests, and the one way in: opening one, which is a screen the engine opens.
 export function journalSurface(held: AgentSurfaces['journal']): TestSurface {
   return {
-    state: () => ({
-      opened: held.opened,
-      rows: held.rows.map((row) => ({ id: row.id, title: row.title, standing: row.standing, hint: row.hint, lines: row.lines.map((line) => ({ said: line.said, struck: line.struck })) })),
-    }),
+    state: () => ({ rows: held.rows.map((row) => ({ id: row.id, title: row.title, standing: row.standing, hint: row.hint, lines: row.lines.map((line) => ({ said: line.said, struck: line.struck })) })) }),
     actions: {
-      open: (value) => held.controls.open(value === null ? null : questNamed(held.rows, value)),
+      open: (value) => held.controls.open(questNamed(held.rows, value)),
     },
+  };
+}
+
+// What the journal screen is showing, which is read and not driven: closing it is the modal's own question, answered the way every modal is.
+export function questSurface(held: AgentSurfaces['quest']): TestSurface {
+  return {
+    state: () => ({ quest: held.entry.quest, standing: held.entry.standing, hint: held.entry.hint, lines: held.entry.lines.map((line) => ({ said: line.said, struck: line.struck })) }),
+    actions: {},
   };
 }
 
@@ -318,7 +324,8 @@ export interface AgentSurfaces {
   map: { map: MapView; controls: MapControls };
   skills: { panels: readonly SkillPanel[]; opened: Answer | null; greeted: readonly Answer[]; controls: { open(id: Answer | null): void } };
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
-  journal: { rows: readonly JournalRow[]; opened: Answer | null; controls: { open(id: Answer | null): void } };
+  journal: { rows: readonly JournalRow[]; controls: { open(id: Answer): void } };
+  quest: { entry: JournalEntry };
   edit: EditHeld;
 }
 
@@ -328,5 +335,6 @@ export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurface
   plane: (held) => planeSurface(held),
   skills: (held) => skillsSurface(held),
   journal: (held) => journalSurface(held),
+  quest: (held) => questSurface(held),
   edit: (held) => editSurface(held),
 };

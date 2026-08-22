@@ -29,7 +29,10 @@ function grown(): Driver {
   return driver;
 }
 
-const planeOf = (view: PlayView): PlayView['planes'][number] => view.planes.find((each) => each.instance === view.focus!.instance)!;
+// A plane screen is open in every one of these, so what it is reading is a plane.
+const planeRead = (view: PlayView): { instance: string; hex: string } => view.focus as { instance: string; hex: string };
+
+const planeOf = (view: PlayView): PlayView['planes'][number] => view.planes.find((each) => each.instance === planeRead(view).instance)!;
 
 const choicesOf = (view: PlayView): readonly Choice[] => askedOption(view.modals)!.values ?? [];
 
@@ -159,7 +162,7 @@ describe('a node of a cluster the screen is not standing on', () => {
     const driver = opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with tutorial-island.crossroads-jewel');
     const view = driver.snapshot().view;
     const graph = planeGraph(planeOf(view));
-    const elsewhere = graph.nodes.filter((node) => node.hex !== view.focus!.hex);
+    const elsewhere = graph.nodes.filter((node) => node.hex !== planeRead(view).hex);
 
     expect(elsewhere.length).toBeGreaterThan(0);
     for (const node of elsewhere) expect(panelFor(graph, node.key, choicesOf(view)).walks, node.key).not.toBeNull();
@@ -168,7 +171,7 @@ describe('a node of a cluster the screen is not standing on', () => {
   it('needs no walk for a node of the cluster the screen is already on', () => {
     const view = opened().snapshot().view;
     const graph = planeGraph(planeOf(view));
-    const here = graph.nodes.filter((node) => node.hex === view.focus!.hex);
+    const here = graph.nodes.filter((node) => node.hex === planeRead(view).hex);
 
     expect(here.length).toBeGreaterThan(0);
     for (const node of here) expect(panelFor(graph, node.key, choicesOf(view)).walks, node.key).toBeNull();
