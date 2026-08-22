@@ -298,6 +298,31 @@ open:
   });
 });
 
+describe('an action that sets the flag it hides on', () => {
+  const ONCE_MODULE = `
+# item trinket
+title: Trinket
+
+# entity drawer
+flags: searched
+search:
+  hidden if: searched
+  give: trinket
+  set: searched
+`;
+
+  it('gives once, and refuses the second reach rather than giving again', () => {
+    const registry = loadInEnglish(ONCE_MODULE);
+    const state = createGameState();
+
+    useAction('entity', 'drawer', 'search', registry, state);
+    expect(state.inventory['trinket']).toBe(1);
+
+    expect(() => useAction('entity', 'drawer', 'search', registry, state)).toThrow(/action hidden/);
+    expect(state.inventory['trinket']).toBe(1);
+  });
+});
+
 describe('renderSegments', () => {
   it('interpolates a reference and includes a conditional only when it holds', () => {
     const state = createGameState();

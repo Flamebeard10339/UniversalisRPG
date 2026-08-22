@@ -690,6 +690,13 @@ assert: has lockpick
 assert: searched
 expect: dresser-trinket-end
 
+# test a-lockpick-opens-the-front-door
+run: dresser-trinket
+travel: guide-house
+use: entity.front-door.pick-lock
+assert: front-door.unlocked
+assert: beach.discovered
+
 # test save-restores-object-owned-flags
 load: explored-and-unlocked
 assert: front-door.unlocked

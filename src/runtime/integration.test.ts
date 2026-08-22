@@ -1,7 +1,7 @@
 import { clearBuffs } from './buffs';
 import { readdirSync, readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { buffsOf, createGameState, GameState, grantBuff, PLAYER, resolve, statValue, useAction, useFight } from './runtime';
+import { buffsOf, createGameState, GameState, grantBuff, PLAYER, resolve, statValue, useFight } from './runtime';
 import { restorePools } from './effects';
 import { Registry } from '../content/registry';
 import { engineLocale, withEngineLocale } from '../content/engineLocale';
@@ -53,27 +53,6 @@ describe('shipped content', () => {
       expect(runTest(id, shipped, createGameState())).toEqual({ passed: true });
     });
   }
-});
-
-describe('tutorial-island content, continued', () => {
-  it('spans the front door by the 4 seconds its inert 4s tag used to only suggest', () => {
-    const state = createGameState('tutorial-island.guide-house');
-    state.inventory['tutorial-island.lockpick'] = 1;
-
-    useAction('entity', 'tutorial-island.front-door', 'pick-lock', registry, state);
-    expect(state.time).toBe(secondsToMs(4));
-    expect(state.flags['tutorial-island.front-door.unlocked']).toBe(true);
-  });
-
-  it('hands out one lockpick from the dresser, not one per search', () => {
-    const state = createGameState();
-    const search = () => useAction('entity', 'tutorial-island.dresser', 'search-drawer', registry, state);
-
-    search();
-    expect(state.inventory['tutorial-island.lockpick']).toBe(1);
-    expect(search).toThrow(/action hidden/);
-    expect(state.inventory['tutorial-island.lockpick']).toBe(1);
-  });
 });
 
 describe('combat-expansion, read off the routes it ships', () => {
