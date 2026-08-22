@@ -136,12 +136,36 @@ not compile until it reads something. `assert: xp.thieving = 4` and
 comparison the grammar already had. The lockpick claim is one `assert:` in
 `content/tutorial-island.dsl` rather than a save built to hold one number.
 
-**`stat` is the root still missing, and it is the one that needs a registry.**
-A stat is derived from buffs, equipment and passives, so `statValue` takes the
-registry, and `evaluateCondition` does not carry one — fifteen call sites away
-from having it. That is the remaining half, and it is a threading job rather than
-a design question: the `Record` over `ENGINE_ROOTS` is where the answer goes when
-it is threaded.
+~~**`stat` is the root still missing, and it is the one that needs a registry.**~~
+Closed 2026-08-22. `assert: stat.max-health > 100` is a line an author writes, and
+`content/combat-expansion.dsl`'s rage test now claims `stat.max-rage = 20` — a
+number that exists only because a jewel was allocated, so the root is proved to
+read a folded bonus and not just a base.
+
+**It was not the threading job the diagnosis above called it.** Threading the
+registry through fifteen files was the easy half and went in clean. Wiring the
+root then closed `conditions -> stats -> roster -> actions -> conditions`, because
+`statValue` folds in the tags of the action an actor is performing and asked
+`roster.participants()`, which filters by whether that action *may* be performed.
+
+That is a **semantic** circularity, not an import one: an action carrying
+`requires: stat.attack > 5` whose own tags raise attack would make "is this
+performable" depend on a stat that depends on whether it is performable. *In
+flight* is a fact about state and *offerable* is a fact about legality, and only
+the first definition terminates. `src/runtime/actionLookup.ts` now sits beneath
+both and answers which action a reference or a seat names, with no opinion on
+whether it may be run.
+
+**One consequence is deliberate and untested.** An action whose `requires:` or
+`hidden if:` stops holding partway through a cycle keeps contributing its stat
+tags until that cycle ends. No test in the suite changed when this landed, which
+means the filter never differed in practice and nothing pins the new reading down.
+A fixture that exercises it is owed.
+
+**This is the third place one distinction has gone missing.** The fight nobody can
+win (`run-findings.md`, playbot run 3) is *re-issuing an action in flight is read
+as starting a new one*; this cycle is *in flight read as offerable*. Whatever
+closes the first should be checked against the second.
 
 **A range is still equality plus a second line.** `xp.thieving >= 100 and
 xp.thieving <= 200` says it, which is a bound written twice rather than a bound.
