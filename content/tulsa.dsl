@@ -120,11 +120,11 @@ one of:
 
 // --- locations ---
 //
-// A dense, mostly bidirectional town read as a text adventure. Every road is
-// written from both ends, because connectivity here is explicit and
-// directional, and a one-way road is a thing you mean rather than a thing you
-// forgot. Distances are in the units tutorial island already set: five seconds
-// of walking each.
+// A dense town read as a text adventure. Every road is written from both ends
+// so that a place's own `adjacent:` reads as the whole list of its exits; the
+// engine answers a road from both ends either way, which is what lets the
+// square below name a location in the module underneath this one. Distances are
+// in the units tutorial island already set: five seconds of walking each.
 
 # location market-square
 x: 3, y: 0

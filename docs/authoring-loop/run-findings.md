@@ -44,9 +44,36 @@ A directive the engine refuses outright throws rather than failing, so one bad
 test killed the other four and printed a stack trace instead of four verdicts.
 Fixed: a throw is reported where that test's verdict would have gone.
 
-### A region cannot be joined to another region — STILL OPEN
+### ~~A region cannot be joined to another region~~ — closed, and not the way it was framed
 
-**The one thing this run could not author.** `tutorial-island.market-district`
+**Closed 2026-08-22 by making adjacency symmetric by construction.** A road is
+one authored statement, and the engine derives the return edge — same condition
+— unless the far end writes one of its own, which always wins. The effective
+relation is closed once at load into `Registry.roads` and read through
+`effectiveAdjacent`; `Location.adjacent` stays exactly what the author wrote, so
+the printer, the round trip and publishing never see a derived edge and needed no
+change at all.
+
+**The framing below is what cost the time, and it is the lesson.** The problem
+was read as *a merged section cannot print back under the module that wrote it*,
+which points at provenance tracking in `merge.ts` and the serializer — a large,
+invasive change. But the corpus uses **zero** `+` field edits, and the way a
+downstream module already reaches an upstream thing is `QuestSpeech`: the
+contribution is a field of the *contributing* section and the engine lands the
+effect at the far end. `tulsa.market-square adjacent: tutorial-island.beach` was
+already that shape. Only the landing was missing.
+
+A blocker described as *the engine will not let me write X* is worth re-reading
+as *what does this module already own, and what should the engine derive from
+it?* The two readings cost about ten lines and about a week respectively.
+
+`one-way` was designed and then deliberately not built: nothing in the corpus
+needs it, and the map is churning. Every road is two-way until something wants
+otherwise, and the keyword is ten lines the day a chute exists.
+
+Standing, from the run:
+
+`tutorial-island.market-district`
 is where all three routes out of Miki's house land, so the town should hang off
 it. Writing `+adjacent: market-row` onto it loads clean, and then:
 
@@ -68,14 +95,13 @@ health pool, factions and `melee-combat`, so it cannot be the module underneath;
 and moving that furniture into a third module below both is the namespace churn
 across 40 files that the deliverable log has already ruled out.
 
-So Tulsa is joined one way — you can walk out of town and not back in — and the
-missing edge is one line, the day a merged section can print back under the
-module that wrote it. It is marked `@@@` on the square's own `examine:` and
-`src/content/dsl.test.ts` now claims the constraint as a rule: every road runs
-both ways inside a module, and only ever one way out of one.
-
-**This is the largest thing standing between the engine and a world with more
-than one region in it.**
+~~So Tulsa is joined one way — you can walk out of town and not back in.~~ It is
+joined both ways now, and `combat-expansion.proving-ground` is a place you can
+walk to rather than a fixture only a `# save` reaches. `src/content/dsl.test.ts`
+no longer claims one-way roads out of a region as a rule; it claims instead that
+every location the corpus declares is reachable on foot from the starting one,
+which is a claim that could not have been made before and derives its subjects
+from the corpus.
 
 ### Smaller, and each real
 
@@ -90,10 +116,47 @@ than one region in it.**
   every drawn location, reloading the universe twice each; 6 locations became 34
   and it ran out of its five seconds. Split into one case per place, which is
   what the sweep above it already did.
+- **`npm run oracle -- --at` cannot answer for a module that already ships.** It
+  loads the corpus beside the draft, so a draft that *is* a shipped file collides
+  with its own copy and the whole answer becomes `two modules declare the id
+  tulsa`. The tool reads a new module and refuses an edited one, which is the
+  same tool an author reaches for either way. `npm run probe -- content` is the
+  standing-in answer and says much less.
 - **Nothing else in 900 lines was refused.** After the oracle was answering the
   right question, the module went in clean, and `npm run probe -- content --test
   tulsa` turned each of the five `# test` sections around in about a second.
   Both of those are item 2 and item 3 paying for themselves in the same hour.
+
+## Reviewing the writing, 2026-08-22
+
+`npm run review [-- <module>...]` prints every line the game can say, under the
+section that says it, in the order its module writes them. The set derives itself
+from the locale tables the engine builds off each kind's own prose fields, so
+nothing has to be marked to be reviewed and `@@@` keeps meaning what it means.
+
+Building it found two things:
+
+- **`engine-en` reported nothing to review, and it holds 209 lines.** A `#
+  locale` section names its keys rather than growing them off a section's fields,
+  so a sweep over the base table reaches none of them. Every travel line, every
+  combat line, every inventory label — what the game says when it is speaking on
+  its own behalf — would have been reviewed by nobody. A sheet that reports zero
+  is the failure a `loose` bucket exists to catch, and the bucket is now asserted
+  empty over the corpus.
+- **The writing hole is `tutorial-quests`, not `tulsa`.** 17 of its 59 lines carry
+  a mark and most are bare: Miki's *snubbed* and *apologised* routes have empty
+  `log:`, `hint:`, `again:` and whole dialogue lines, so a player who turns her
+  down walks into blank text repeatedly. Tulsa is written; the quest module that
+  the tutorial actually runs on is not.
+
+Standing, per module: tulsa 213 lines / 6 auto-titled / 7 marked; engine-en 209 /
+0 / 0; tutorial-island 168 / **78 auto-titled** / 6; tutorial-quests 59 / 0 / 17;
+combat-expansion 52 / 23 / 0.
+
+Two named lines for whoever reviews: `sha-dynastys` renders **"Sha Dynastys"**
+without its apostrophe, and the outline's *two lines of island fiction* were never
+actually replaced — `content/tutorial-quests.dsl:22` and `:85` still say *this
+island* and *a boat to the mainland*.
 
 ## Run 2, 2026-08-22, author mode, 12 turns, tutorial island
 
