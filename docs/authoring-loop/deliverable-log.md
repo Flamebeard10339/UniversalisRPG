@@ -203,3 +203,75 @@ which `@@@` are expected.
    Miki's house joined to the town. Correcting is cheaper than authoring, and the
    corrections are the specimen the outline format is read off.
 2. Nothing else. The reload question is closed and the quest notes stay as they are.
+
+---
+
+## Where this stands, 2026-08-22 — the phase after Tulsa
+
+Items 3 and 5 are both built and both have run. What is open is no longer *can
+the loop produce a module* — it did, twice — but **what has to be true before the
+next ten modules are worth writing.** Four things, and they are ordered by what
+blocks what.
+
+### 1. The region wall — closed
+
+Adjacency is symmetric by construction; a road answers from both ends and a
+module may name a location in the module beneath it. Tulsa hangs off where every
+route out of Miki's house lands. Detail and the lesson in `run-findings.md`.
+
+**`tutorial-island.dsl` is not being deleted, and the reasoning is worth keeping**
+because the instinct will come back. The module is two things — engine furniture
+(lines 6–465: stats, resources, factions, skills, slots, passives, cluster
+jewels, orbs, modals, `melee-combat`, the death event) and Miki's house (466–824).
+Only the first has dependents. Deleting the module means rehoming ids named 100+
+times across ~16 code and content files plus every `# save` body, to buy nothing
+a player can see — and it would not have fixed the road, which was the actual
+complaint. The id is machine-facing and outlives the fiction it was named for.
+
+### 2. Module size — a removability unit, not a size unit
+
+**One module is one file** (two files declaring the same `# info` id is refused),
+so "chunk a region" and "split its namespace" are the same act. The rule:
+
+> A module is what you can take out and still have a world that loads.
+
+By it: Tulsa standing is one module and stays one. Each of the ten quests is its
+own module, per the `tutorial-quests` pattern — and a quest module adds to
+entities rather than editing `tulsa.dsl`, so the file nobody wants to re-read
+does not get re-read. Splitting Tulsa geographically buys nothing and fragments
+the ids all ten quests are about to name. 962 lines is not the pressure point; if
+a region file passes ~1500 and still cannot be split by the rule above, the region
+is doing two jobs.
+
+### 3. The writing — a human pass over 492 lines
+
+`npm run review` is the sheet, and `content/reviewed.tsv` is what makes it
+resumable. Both derive their subjects; nothing is marked by hand and nothing is
+enumerated. A line rewritten after it was signed off comes back marked CHANGED,
+which is the case that matters while agents edit the same modules a person is
+reading.
+
+**The review is the long pole and it is Yonatan's, so everything else is
+scheduled around it.** Agents work below `src/` while it runs; content-editing
+passes wait.
+
+### 4. The hardening pass — after the playbot, not before
+
+An exploratory playbot run over the beginning of the game and Tulsa comes first,
+because its `confusion` reports say which lines are actually confusing. Reviewing
+blind and then hardening would do the same reading twice.
+
+**Map churn is deliberately deferred to that pass.** The beach stops making sense
+once Miki's house sits in Tulsa properly; `tutorial-island.market-district` is a
+stub duplicating `tulsa.market-square`; `combat-expansion.proving-ground` and
+`tulsa.market-row` now collide at x:3,y:0. None of these are worth a hand-fix
+while the map is moving — a playtest names them better than a reading does.
+
+### What is not on this list, and why
+
+`one-way` roads: designed, deliberately not built. Nothing in the corpus needs
+one and the map is churning; the keyword is ten lines the day a chute exists.
+
+Renaming the `tutorial-island` namespace: still ruled out, for the reasons in
+"What the outline answers settled" above.
+
