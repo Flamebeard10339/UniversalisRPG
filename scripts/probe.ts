@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { formatVersion } from '../src/grammar/dependency';
 import {  formatModuleDiagnostic, type Registry } from '../src/content/registry';
@@ -7,11 +7,14 @@ import { contentSectionMaps } from '../src/content/sections';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from '../src/content/serialize';
 import { type ModuleSource, type ParsedModule } from '../src/content/universe';
+import { createGameState } from '../src/runtime/state';
+import { runTest } from '../src/runtime/session';
 
 export type RoundTripMode = 'universe' | 'module';
 
 export interface ProbeOptions {
   show: string[];
+  test?: string[];
   roundTrip: boolean;
   roundTripMode?: RoundTripMode;
   each?: boolean;
@@ -31,10 +34,13 @@ const SHOWABLE = new Map<string, string>(contentSectionMaps());
 export const DOCUMENT_SEPARATOR = '---';
 
 const usage = [
-  'Usage: npm run probe -- <source>... [--show <kind>.<id>] [--round-trip] [--each]',
+  'Usage: npm run probe -- <source>... [--show <kind>.<id>] [--test <id>] [--round-trip] [--each]',
   '',
-  '  <source>       a DSL file, or - to read from stdin',
+  '  <source>       a DSL file, a directory of them, or - to read from stdin',
   '  --show         print one registry record as JSON; repeatable',
+  '  --test         run one # test and report PASSED/FAILED; repeatable. An id',
+  '                 that names no test but stands as a prefix over some — a',
+  '                 module id — runs every test under it',
   '  --round-trip[=universe|module]',
   '                 universe (the default): serialize every loaded module, reload',
   '                 the universe from those serializations alone, and report what',
@@ -56,7 +62,7 @@ const usage = [
 ].join('\n');
 
 export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
-  const args: ProbeArgs = { sources: [], show: [], roundTrip: false, roundTripMode: 'universe', each: false };
+  const args: ProbeArgs = { sources: [], show: [], test: [], roundTrip: false, roundTripMode: 'universe', each: false };
   for (let i = 0; i < raw.length; i++) {
     const arg = raw[i];
     if (arg === '--help' || arg === '-h') {
@@ -72,6 +78,10 @@ export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
       const spec = raw[++i];
       if (spec === undefined) throw new Error('--show wants a <kind>.<id> after it');
       args.show.push(spec);
+    } else if (arg === '--test') {
+      const spec = raw[++i];
+      if (spec === undefined) throw new Error('--test wants a # test id after it');
+      args.test!.push(spec);
     } else if (arg.startsWith('--')) {
       throw new Error(`unknown flag ${arg}\n\n${usage}`);
     } else {
@@ -80,7 +90,7 @@ export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
   }
   if (args.sources.length === 0) throw new Error(`name at least one source\n\n${usage}`);
   if (args.sources.filter((source) => source === '-').length > 1) throw new Error('stdin can only be read once — pass - at most once, and split the body on a line of ---');
-  if (args.each && (args.show.length > 0 || args.roundTrip)) throw new Error('--each surveys sources one at a time, so it cannot be combined with --show or --round-trip');
+  if (args.each && (args.show.length > 0 || args.test!.length > 0 || args.roundTrip)) throw new Error('--each surveys sources one at a time, so it cannot be combined with --show, --test or --round-trip');
   return args;
 }
 
@@ -110,6 +120,32 @@ function showRecord(registry: Registry, spec: string): { lines: string[]; ok: bo
     return { lines: [`${spec}: no ${kind} with that id. Defined: ${defined.length > 0 ? defined.join(', ') : 'none'}`], ok: false };
   }
   return { lines: [`${kind}.${id}`, JSON.stringify(record, null, 2)], ok: true };
+}
+
+// An id is a test's own or a prefix over some: `tulsa` names no test and runs every test the module owns, which is what an author asks for while a module is the thing being written.
+function testsNamed(registry: Registry, spec: string): string[] {
+  if (registry.tests.has(spec)) return [spec];
+  return [...registry.tests.keys()].filter((id) => id.startsWith(`${spec}.`)).sort();
+}
+
+function runTests(registry: Registry, specs: readonly string[]): { lines: string[]; ok: boolean } {
+  const lines: string[] = [];
+  let ok = true;
+  for (const spec of specs) {
+    const named = testsNamed(registry, spec);
+    if (named.length === 0) {
+      const defined = [...registry.tests.keys()].sort();
+      lines.push(`${spec}: no # test with that id, and none under it. Defined: ${defined.length > 0 ? defined.join(', ') : 'none'}`);
+      ok = false;
+      continue;
+    }
+    for (const id of named) {
+      const result = runTest(id, registry, createGameState());
+      lines.push(result.passed ? `${id}: PASSED` : `${id}: FAILED — ${result.failure ?? 'no reason given'}`);
+      if (!result.passed) ok = false;
+    }
+  }
+  return { lines, ok };
 }
 
 function roundTripEachModule(sources: readonly ModuleSource[], parsed: readonly ParsedModule[], loaded: Registry): { lines: string[]; ok: boolean } {
@@ -181,6 +217,13 @@ export function probe(sources: readonly ModuleSource[], options: ProbeOptions): 
     if (!shown.ok) ok = false;
   }
 
+  const named = options.test ?? [];
+  if (named.length > 0) {
+    const ran = runTests(loaded.registry, named);
+    lines.push('', ...ran.lines);
+    if (!ran.ok) ok = false;
+  }
+
   if (options.roundTrip) {
     const trip = options.roundTripMode === 'module' ? roundTripEachModule(sources, parsed, loaded.registry) : roundTrip(parsed, loaded.registry);
     lines.push('', ...trip.lines);
@@ -196,8 +239,16 @@ export function splitDocuments(name: string, text: string): ModuleSource[] {
   return documents.map((document, index) => ({ name: `${name}-${index + 1}`, text: document })).filter((source) => source.text.trim() !== '');
 }
 
+const asSource = (file: string): ModuleSource => ({ name: path.basename(file).replace(/\.[^.]*$/, ''), text: readFileSync(file, 'utf8') });
+
+// A directory stands for the .dsl files in it, so `content` names the corpus on a shell that expands no globs.
+export function sourceFiles(file: string): string[] {
+  if (!statSync(file).isDirectory()) return [file];
+  return readdirSync(file).filter((name) => name.endsWith('.dsl')).sort().map((name) => path.join(file, name));
+}
+
 function readSources(files: readonly string[]): ModuleSource[] {
-  return files.flatMap((file) => (file === '-' ? splitDocuments('stdin', readFileSync(0, 'utf8')) : [{ name: path.basename(file).replace(/\.[^.]*$/, ''), text: readFileSync(file, 'utf8') }]));
+  return files.flatMap((file) => (file === '-' ? splitDocuments('stdin', readFileSync(0, 'utf8')) : sourceFiles(file).map(asSource)));
 }
 
 function main(): void {

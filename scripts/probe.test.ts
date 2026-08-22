@@ -1,12 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { contentSectionMaps } from '../src/content/sections';
 import type { ModuleSource } from '../src/content/universe';
 import { tsxCli } from './lib/tsxCli';
-import { parseProbeArgs, probe, splitDocuments, type ProbeOptions } from './probe';
+import { loadUniverseWithDiagnostics } from '../src/content/load';
+import { parseProbeArgs, probe, sourceFiles, splitDocuments, type ProbeOptions } from './probe';
 
 const BASE: ModuleSource = {
   name: 'base',
@@ -243,10 +244,43 @@ describe('probe: stdin carrying several documents', () => {
   });
 });
 
+const TESTED: ModuleSource = {
+  name: 'tested',
+  text: ['# info tested', 'version: 1.0.0', '', '# test starts-at-zero', 'assert: time = 0', '', '# test starts-at-five', 'assert: time = 5'].join('\n'),
+};
+
+describe('probe: running a # test from a shell', () => {
+  const ran = (...specs: string[]) => probe([TESTED], { show: [], test: specs, roundTrip: false });
+
+  it('runs the one test it is named, and says so', () => {
+    const result = ran('tested.starts-at-zero');
+    expect(result.ok).toBe(true);
+    expect(result.lines).toContain('tested.starts-at-zero: PASSED');
+    expect(result.lines.join('\n')).not.toContain('starts-at-five');
+  });
+
+  it('refuses, and names why, when the test fails', () => {
+    const result = ran('tested.starts-at-five');
+    expect(result.ok).toBe(false);
+    expect(result.lines.join('\n')).toMatch(/tested\.starts-at-five: FAILED — .*time = 5/);
+  });
+
+  it('runs every test under an id that names none of its own, which is how a module id reads', () => {
+    const result = ran('tested');
+    expect(result.lines.filter((line) => line.includes('tested.'))).toEqual(['tested.starts-at-five: FAILED — time = 5', 'tested.starts-at-zero: PASSED']);
+  });
+
+  it('names what is defined when an id matches nothing at all', () => {
+    const result = ran('tested.no-such-thing');
+    expect(result.ok).toBe(false);
+    expect(result.lines.join('\n')).toContain('Defined: tested.starts-at-five, tested.starts-at-zero');
+  });
+});
+
 describe('probe: arguments', () => {
   it('reads sources, --show and --round-trip', () => {
     const args = parseProbeArgs(['a.dsl', 'b.dsl', '--show', 'entity.base.rat', '--round-trip']);
-    expect(args).toEqual({ sources: ['a.dsl', 'b.dsl'], show: ['entity.base.rat'], roundTrip: true, roundTripMode: 'universe', each: false });
+    expect(args).toEqual({ sources: ['a.dsl', 'b.dsl'], show: ['entity.base.rat'], test: [], roundTrip: true, roundTripMode: 'universe', each: false });
   });
 
   it('takes --show more than once', () => {
@@ -275,9 +309,15 @@ describe('probe: arguments', () => {
     expect(() => parseProbeArgs(['a.dsl', '--round-trip=sideways'])).toThrow(/universe or module/);
   });
 
-  it('refuses --each beside --show or --round-trip rather than dropping them', () => {
+  it('refuses --each beside --show, --test or --round-trip rather than dropping them', () => {
     expect(() => parseProbeArgs(['a.dsl', '--each', '--show', 'entity.a'])).toThrow(/--each/);
+    expect(() => parseProbeArgs(['a.dsl', '--each', '--test', 'm.t'])).toThrow(/--each/);
     expect(() => parseProbeArgs(['a.dsl', '--each', '--round-trip'])).toThrow(/--each/);
+  });
+
+  it('takes --test more than once, and refuses it with nothing after it', () => {
+    expect(parseProbeArgs(['a.dsl', '--test', 'm.one', '--test', 'm.two'])).toMatchObject({ test: ['m.one', 'm.two'] });
+    expect(() => parseProbeArgs(['a.dsl', '--test'])).toThrow(/--test/);
   });
 
   it('refuses stdin named twice, which would read empty the second time', () => {
@@ -315,5 +355,16 @@ describe('probe: the command seam', () => {
     const result = run(['content/tutorial-island.dsl']);
     expect(result.status).toBe(0);
     expect(result.out).toContain('tutorial-island');
+  });
+
+  it('reads a directory as the .dsl files in it, so the corpus is nameable where no glob expands', () => {
+    expect(sourceFiles('content')).toEqual(readdirSync('content').filter((name) => name.endsWith('.dsl')).sort().map((name) => path.join('content', name)));
+  });
+
+  it('runs one shipped # test by name and exits 0', () => {
+    const id = [...loadUniverseWithDiagnostics(readdirSync('content').filter((name) => name.endsWith('.dsl')).map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') }))).registry.tests.keys()][0];
+    const result = run(['content', '--test', id]);
+    expect(result.status).toBe(0);
+    expect(result.out).toContain(`${id}: PASSED`);
   });
 });
