@@ -95,7 +95,7 @@ for malformed input is the language's contract and the corpus cannot exercise it
 Tools, none of which are gates:
 
 - `npm run play` — interactive REPL over a live session; `# test` scripts run with `/test`
-- `npm run probe -- <source>... [--show <kind>.<id>] [--round-trip] [--each]` — ask the load path a question without building a runner
+- `npm run probe -- <source>...` — ask the load path a question without building a runner; `--test <id>` runs one `# test` (or a module's own) in about a second, `--help` prints the rest. A directory source stands for the `.dsl` files in it, so `content` names the corpus
 - `npm run oracle [-- <kind>... | --at <draft.dsl>]` — print the grammar the editing page offers, as a tree per kind; or read a draft: every line the engine refuses, then its word on the whole file stood beside the shipped world, then line by line what may be written where
 - `npm run inspect -- "<expression>"` — evaluate against the repo's own module resolution, leaving no file behind
 - `npm run notes [-- <source>...]` — list every `@@@` the corpus holds: writing that is standing in for better writing, and what an author asked for that the engine cannot do
