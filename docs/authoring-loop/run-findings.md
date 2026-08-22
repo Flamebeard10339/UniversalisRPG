@@ -158,6 +158,81 @@ without its apostrophe, and the outline's *two lines of island fiction* were nev
 actually replaced — `content/tutorial-quests.dsl:22` and `:85` still say *this
 island* and *a boat to the mainland*.
 
+## Playbot run 3, 2026-08-22, bughunt mode, 23 turns — stopped itself
+
+Ran over all five modules. Twenty-three turns applied, none refused, and the bot
+ended the run itself by declaring the game blocked. **It never reached Tulsa**;
+every turn was spent in the guide house and the basement. Each of its two findings
+was reproduced here before being written down, and in both cases the symptom was
+real and the cause it named was wrong.
+
+### Swinging again never kills anything, and swinging then waiting does
+
+Measured, three swings at the basement rats each way:
+
+    swing, swing, swing                 rats-killed 0    xp {}                 time 7200
+    swing, wait 5s, swing, wait 5s, …   rats-killed 3    xp melee 16          time 22200
+    swing, wait 30s, …                  rats-killed 3    xp melee 16          time 97200
+
+Twenty consecutive swings with no wait kill nothing at all and earn no xp. The bot
+called this *"health tracking is broken"* after watching a rat sit at 10/20 for a
+dozen turns; health tracking is fine. **Re-issuing the action restarts the cycle
+that was in flight, so a swing only ever lands if something lets it finish.**
+
+`content/tutorial-quests.dsl:203` already knows: *"each `use:` starts the fight and
+the `wait:` lets it play out"*. So the corpus's own test passes, and a player doing
+the one obvious thing — hit it again — can never win a fight. Every renderer offers
+that button and none of them says waiting is what resolves it.
+
+**The decision this needs is whose bug it is.** Either re-issuing an action already
+under way against the same target is a no-op rather than a restart, or the view has
+to say a swing is in flight and how long it needs. The first is an engine rule and
+would fix every renderer at once; the second is presentation and leaves the trap in
+place for anyone not reading carefully.
+
+### Miki's apology branch says nothing, and reads as a softlock
+
+The bot reported the snub-then-reconcile path as *"a genuine softlock in that
+dialogue branch"* and repeated it for six turns. The branch works. What is said
+along it:
+
+    accept                       three lines, as written
+    decline                      "Hmph. Suit yourself. Don't come crying …"
+    apologise, then talk again   [""]
+
+The mechanic advances correctly and the options offered are the right ones. The
+line is a bare `@@@`, so Miki opens her mouth and nothing comes out, and a player
+reasonably concludes the game is broken. **This is unwritten prose presenting as an
+engine fault**, which is the strongest argument yet that `@@@` on a line the game
+actually says is not a neutral placeholder — it is a bug report waiting to be filed
+by somebody who cannot see the source.
+
+`npm run review` had already named this file as the hole — 17 of its 59 lines carry
+a mark, concentrated in exactly these two stages — one run before the playbot found
+it from the outside.
+
+### The bot cannot start anywhere, so it can only ever test the tutorial
+
+`scripts/playbot.ts` calls `startSession(registry)` and has no way to open on a
+`# save`. The corpus holds twenty save fixtures, three of which put a player in
+Tulsa, and none of them is reachable from the run. So the bot has to play the
+tutorial correctly before it can reach anything else, and this run proves it will
+not always manage that: it snubbed Miki on turn 2 and was still in the basement at
+turn 23.
+
+The playbot spec calls the save fixtures "the start-anywhere lever" and they are
+not wired to the lever. **A `--save <id>` flag is what stands between the bot and
+every region authored from here on.**
+
+### What worked
+
+- The self-stop. `BLOCKED` ended the run cleanly rather than burning seventeen more
+  turns on a rat, and the reason it gave was specific enough to reproduce from.
+- The cost shape holds: 2–4 tokens billed in per turn against 3.5k–10k cache reads,
+  every turn from the second onward.
+- `npm run playbot` has no `--help`; it reads the first unrecognised argument as a
+  file and dies in `readFileSync`.
+
 ## Run 2, 2026-08-22, author mode, 12 turns, tutorial island
 
 Twelve turns applied, none refused. Reached: Miki, character creation, dough,
