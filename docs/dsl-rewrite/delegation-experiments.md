@@ -588,6 +588,7 @@ a numbered finding on a bug that existed for four minutes.
 | 89 | Haiku (cold spawn) x2, concurrent | **Re-run the blind trial against a changed tool.** Same rules as rows 86–88, aimed at what had changed since: a compound `if` condition using two or more of its keywords, `open modal:` against the newly added kind, and a `when hit:` with a contest, a party-facing inflict, and a weighted table. Both were asked to answer *directly* whether the tool told them the keywords and valid values or whether they guessed, and to quote it. | 40.9k / 54.7k | 12 / 17 | 111s / 152s | high, plus two forced-answer questions and a quote requirement | Both drafts came back clean on the esoteric grammar — compound conditions, modals, contests, party targeting, weighted tables — which is the first time that has happened without a fix in between. Both rated 6/10 and both named the *same* thing first, unprompted: the answers repeat. One quoted the eight-line condition grammar coming back on every line that had a condition; the other counted the same thirty-six item ids printed five times. |
 | 90 | Sonnet (cold spawn, isolated worktree) | **Implement a spec that was already argued out.** `scripts/playbot.ts` against `a-turn-costs-what-the-last-turn-did`, ten clauses. Prompt carried the spec pointer, four traps pulled out of its Decisions section ahead of time (c4 needs a fourth opt-out, the prefix must be big not small, c3's proof must derive its subjects, c6 is deliberately narrow), two corrections to the spec as written, and an explicit ban on spending the author's plan on a live turn. | 247.6k | 84 | 20m | high, front-loaded; none mid-run | Nine clauses closed with derived proofs, c5 closed in half and **said so plainly** rather than faked — its cache-read proof needs a live call the prompt forbade. Found on its own that naming `PlaySession` in a driver trips `published.test.ts`'s derived walk, and closed it through the existing allowlist whose neighbouring entry names that exact case, rather than dodging the type. tsc, 3016 tests and layer-check all green on delivery. |
 | 91 | Sonnet (cold spawn, isolated worktree) | **Delete a duplicated surface across three drivers.** Move the playbot onto the `runLine` door play-cli and the GUI already share, widen `CommandSpec.dev` into an audience field and classify all 26 commands, and generalise a one-renderer view-coverage claim to all three. Prompt carried the facts already dug out (runLine is the shared door, `CommandMatch` has a `choice` case, `dev` is only `/goto`, `Directive` has 24 kinds), both design rulings, an instruction to propose c6's rewording rather than silently edit it, and the two lessons row 90 produced. | 344.2k | 146 | 36m | high, front-loaded; none mid-run | Landed green on all three gates. Named its own narrowing without being pushed: the old c6 proof — the sent selector appears verbatim among this turn's printed choice ids — cannot survive free text reaching all 24 directive kinds, since `equip: sword` was never a printed choice. Kept the negative property and said plainly that this is a real loss, not a rewording. Recorded two play-cli gaps as gaps rather than dressing them as exclusions, one of which is true and checkable: `PlayStatus.stats` is read by no command in the terminal. |
+| 92 | Sonnet (cold spawn, isolated worktree) | **Author content from a requirement, with the oracle as the only reference.** Three routes out of Miki's house, forbidden from reading TypeScript, asked to count its own oracle rounds and quote every question the oracle would not answer. The first real pass of the authoring loop, run with the author watching live. | 398.4k | 225 | 61m | high brief, none mid-run; author observed without intervening | Built all three routes and shipped them green after two engine bugs were fixed on the far side. Its measurement is the deliverable: `oracle --at` **cannot be pointed at a module already in the corpus** — the common authoring case — because the draft loads beside the world and is refused for declaring a duplicate id. Six further questions it had to settle by experiment, each quoted. Reported honestly that literal three-way convergence on one save is impossible because `expect:` is exact whole-sheet equality. |
 
 **What row 89 says.** Forcing a direct question ("did it tell you, or did you
 guess? quote it") got sharper answers than the free-form critique did in rows
@@ -632,3 +633,23 @@ Both rows now point the same way: a cold agent's diagnosis is worth more than it
 prescription, and its honesty scales with how explicitly the prompt asks for it.
 Neither row needed steering after dispatch. What both needed was the argument
 already settled before they started.
+
+**What row 92 says.** The first authoring run, and the run the loop existed to
+measure. Two things it found were engine faults no shipped content had reached
+before: a `# test` playing at zero health where the same script under the REPL did
+not, and the note-dropping claim breaking the first time a corpus shipped a rough
+line. Both were real, both are fixed, and neither was findable without authoring
+something new. That is the loop paying for itself on its first turn.
+
+The headline is a gap, not a bug. `oracle --at` works on a new file and refuses a
+module that already exists, which is what an author extending a zone always has.
+The agent worked around it with `npm run probe` and `npm test` and said so. Half of
+what it needed to know it got by experiment rather than from the tool that exists
+to tell it — and it wrote the module nearly in one pass once it knew, which is the
+argument for the oracle owing that knowledge up front rather than for the agent
+being slow.
+
+One instruction backfired. "Mark it `@@@` and move on" was read as leaving the line
+empty, and seventeen of twenty-three notes carry no words at all. A playtester
+cannot report on a room described by nothing, so the mark has to mean *unreviewed*
+rather than *absent*, and the brief has to say so.
