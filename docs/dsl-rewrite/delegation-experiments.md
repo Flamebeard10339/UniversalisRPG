@@ -586,6 +586,7 @@ a numbered finding on a bug that existed for four minutes.
 | # | agent | dispatch | tokens | tools | wall | steering | what came back |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 89 | Haiku (cold spawn) x2, concurrent | **Re-run the blind trial against a changed tool.** Same rules as rows 86–88, aimed at what had changed since: a compound `if` condition using two or more of its keywords, `open modal:` against the newly added kind, and a `when hit:` with a contest, a party-facing inflict, and a weighted table. Both were asked to answer *directly* whether the tool told them the keywords and valid values or whether they guessed, and to quote it. | 40.9k / 54.7k | 12 / 17 | 111s / 152s | high, plus two forced-answer questions and a quote requirement | Both drafts came back clean on the esoteric grammar — compound conditions, modals, contests, party targeting, weighted tables — which is the first time that has happened without a fix in between. Both rated 6/10 and both named the *same* thing first, unprompted: the answers repeat. One quoted the eight-line condition grammar coming back on every line that had a condition; the other counted the same thirty-six item ids printed five times. |
+| 90 | Sonnet (cold spawn, isolated worktree) | **Implement a spec that was already argued out.** `scripts/playbot.ts` against `a-turn-costs-what-the-last-turn-did`, ten clauses. Prompt carried the spec pointer, four traps pulled out of its Decisions section ahead of time (c4 needs a fourth opt-out, the prefix must be big not small, c3's proof must derive its subjects, c6 is deliberately narrow), two corrections to the spec as written, and an explicit ban on spending the author's plan on a live turn. | 247.6k | 84 | 20m | high, front-loaded; none mid-run | Nine clauses closed with derived proofs, c5 closed in half and **said so plainly** rather than faked — its cache-read proof needs a live call the prompt forbade. Found on its own that naming `PlaySession` in a driver trips `published.test.ts`'s derived walk, and closed it through the existing allowlist whose neighbouring entry names that exact case, rather than dodging the type. tsc, 3016 tests and layer-check all green on delivery. |
 
 **What row 89 says.** Forcing a direct question ("did it tell you, or did you
 guess? quote it") got sharper answers than the free-form critique did in rows
@@ -595,3 +596,24 @@ helpful change" answer was again the weakest part of both reports: one asked for
 a `--filter` mode and one for a listing mode, where the actual fix was to stop
 saying the same thing twice. Their diagnosis was worth more than their
 prescription, which has now held across seven trials.
+
+**What row 90 says.** A spec that had already done its arguing made a cold Sonnet
+agent behave like an expensive one: 20 minutes, no steering after dispatch, and a
+finding it was not looking for. The four traps lifted out of the Decisions section
+and put in the prompt were all real and all hit — worth doing again, because a
+cold agent reads a long spec once and a warning it has already been given is
+cheaper than the mistake.
+
+What it did not do is the part worth remembering. Told a proof needed a live model
+call it was forbidden to make, it marked the clause half-closed and moved on —
+correct, and better than faking it. But a **proxy** for that proof was available
+and it never reached for one: the prefix could be measured in characters against
+the token floor without any network at all, which is what actually shipped after
+review. A blocked agent reports the block; it does not go looking for the nearest
+thing it can still prove. Ask for that explicitly next time.
+
+Second: it left the mode list in three homes, one of them a pair of string literals
+in an argument parser that would have silently kept accepting only two modes. The
+repository's single largest failure mode, in a file written from a spec that opens
+by naming it. Implementation agents do not inherit the standing rules from
+`CLAUDE.md` as strongly as a prompt states them.
