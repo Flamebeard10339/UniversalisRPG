@@ -669,3 +669,40 @@ into the open — "report rather than switch", "do not weaken a claim", "say wha
 did not reach" all worked. And row 94's miss is an argument for telling an agent
 what landed in the hour before it started; it had no way to know a directive added
 in row 93 dissolved the wall it ran into.
+
+## 2026-08-22 — one coding agent over a ratified engine change
+
+Cold Sonnet, isolated worktree, one bounded task: make adjacency symmetric by
+construction so a road can cross a module boundary. 192k tokens, 88 tool uses,
+about 13 minutes. Four commits, ten files, +52/-47. All three gates green in its
+own worktree and again after the merge; no scope violations that mattered.
+
+**The design was ratified in Opus before the spawn, and that is the whole result.**
+The prompt carried four numbered semantic rules, the named structural constraint
+(*derived edges must not enter `Location.adjacent`, and the round-trip test is
+your tripwire*), the eight read sites listed by file and line, and the two corpus
+consequences the owner had already accepted. What came back needed no design
+conversation — only a diff read.
+
+**The one instruction it broke, it broke correctly.** "Do not change any `# save`
+fixture body" was written to prevent id churn; the change genuinely altered three
+route-end saves by one discovery flag each. It made the edit, said so, and named
+the field. Compare row 93: the expensive error is the quiet narrowing, not the
+stated deviation. Telling an agent *a report saying "I could not do X without
+also doing Y" is a success* keeps producing the cheap kind of wrong.
+
+**It over-reported one finding.** It flagged `locale.test.ts`'s
+`Record<keyof Registry, ...>` as a hand-kept list of the shape `one-home`
+forbids. It is the opposite: the `Record` fails to compile until a new field is
+read, which is the derived proof this repository asks for — the same shape
+`CLAUDE.md` praises for the condition roots. Invoking `one-home` made it
+suspicious of enumeration in general rather than of enumeration *nothing
+checks*. Worth watching whether that misfire repeats.
+
+**What the orchestrator still had to do**, and it was not nothing: read the diff,
+check that pruning and coordinate resolution run before the closure call (they
+do, at load.ts:500-518 against 710), confirm no `Registry` is built anywhere that
+would leave `roads` silently empty, verify the derived roads actually exist in a
+loaded corpus, and fix the one stale content comment the agent had correctly
+declined to touch as out of scope.
+
