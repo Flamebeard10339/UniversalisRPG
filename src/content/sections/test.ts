@@ -29,6 +29,7 @@ export type Directive =
   | { kind: 'load'; save: string }
   | { kind: 'cancel' }
   | { kind: 'wait'; seconds: number }
+  | { kind: 'wait-out' }
   | { kind: 'equip'; item: string }
   | { kind: 'unequip'; slot: string }
   | { kind: 'feed'; target: string; food: string }
@@ -79,6 +80,7 @@ const EXPECT_ONLY = new RegExp(`^expect only:[ \\t]*(?<id>${PATH})$`);
 const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
 const CANCEL = /^cancel$/;
 const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
+const WAIT_OUT = /^wait:[ \t]*done$/;
 const CARRIED = `(?:${PATH}|[0-9]+)`;
 const HEX = '-?\\d+,-?\\d+';
 const DIRECTION = [...DIRECTIONS].sort((a, b) => b.length - a.length).join('|');
@@ -243,6 +245,8 @@ export function parseDirectiveLine(text: string): Directive | null {
   const wait = WAIT.exec(text)?.groups;
   if (wait) return { kind: 'wait', seconds: Number(wait.seconds) };
 
+  if (WAIT_OUT.test(text)) return { kind: 'wait-out' };
+
   const equip = EQUIP.exec(text)?.groups;
   if (equip) return { kind: 'equip', item: equip.item };
 
@@ -311,6 +315,8 @@ export function printDirective(value: Directive): string {
       return 'cancel';
     case 'wait':
       return `wait: ${value.seconds}`;
+    case 'wait-out':
+      return 'wait: done';
     case 'equip':
       return `equip: ${value.item}`;
     case 'unequip':
@@ -359,6 +365,7 @@ export const test = section<Test>()({
     { form: 'load: <save>', example: 'load: after-intro' },
     { form: 'cancel', example: 'cancel' },
     { form: 'wait: <seconds>', example: 'wait: 1' },
+    { form: 'wait: done', example: 'wait: done', note: 'stands until whatever is under way has finished, rather than a number of seconds guessed large enough to cover it' },
     { form: 'equip: <item>', example: 'equip: rusty-sword' },
     { form: 'unequip: <slot>', example: 'unequip: main-hand' },
     { form: 'feed: <item> with <item>', example: 'feed: cluster-jewel with fervour' },
@@ -455,6 +462,7 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'choose':
     case 'cancel':
     case 'wait':
+    case 'wait-out':
       return;
     default: {
       const unreached: never = value;

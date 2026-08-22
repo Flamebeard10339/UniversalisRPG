@@ -2,7 +2,7 @@ import { endJourney } from './actionEnd';
 import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { DISCOVERED, Location } from '../content/sections/location';
-import { actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
+import { actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { createGameState, type Journey } from './state';
 import { itemCopies, Growth, grownItems } from './itemInstance';
 import { grow } from './growth';
@@ -477,6 +477,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'load':
     case 'cancel':
     case 'wait':
+    case 'wait-out':
     case 'equip':
     case 'unequip':
     case 'feed':
@@ -617,6 +618,10 @@ function performDirective(session: PlaySession, directive: Directive): { failure
     case 'wait':
       resolve(state, registry, state.time + secondsToMs(directive.seconds));
       return {};
+    case 'wait-out': {
+      const waited = resolveUnderWay(state, registry);
+      return waited.ended ? {} : { failure: `wait: done — ${waited.reason}` };
+    }
     case 'equip':
       equip(state, registry, directive.item);
       return {};

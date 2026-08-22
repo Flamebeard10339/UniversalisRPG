@@ -505,6 +505,24 @@ export function resolve(state: GameState, registry: Registry, toTimeMs: number):
   }
 }
 
+// The engine already knows when what is under way ends, so an author waiting it out asks rather than guesses a number of seconds large enough. An action that repeats without bound has no end to name, and says so instead of running forever.
+const UNDER_WAY_BOUNDARIES = 1000;
+
+export interface WaitedOut {
+  ended: boolean;
+  reason?: string;
+}
+
+export function resolveUnderWay(state: GameState, registry: Registry): WaitedOut {
+  for (let step = 0; step < UNDER_WAY_BOUNDARIES; step++) {
+    if (!state.activeAction && !state.journey) return { ended: true };
+    const { at } = nextBoundary(state, registry, Number.MAX_SAFE_INTEGER);
+    if (at <= state.time || at === Number.MAX_SAFE_INTEGER) return { ended: false, reason: 'what is under way has no end the engine can name' };
+    resolve(state, registry, at);
+  }
+  return { ended: false, reason: `what is under way had not finished after ${UNDER_WAY_BOUNDARIES} boundaries` };
+}
+
 function grantFoodBuff(item: Item, state: GameState): void {
   if (!item.tags.some((tag) => tag.kind === 'keyword' && tag.value === 'food')) return;
   if (!item.tags.some((tag) => tag.kind === 'stat-bonus')) return;

@@ -722,7 +722,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: '/wait',
     arg: 'directive',
     argHint: '<s>',
-    summary: 'advance simulated time by <s> seconds',
+    summary: 'advance simulated time by <s> seconds, or /wait done until what is under way has finished',
     parse: directiveFrom('/wait', (rest) => `wait: ${rest}`),
     run: runDirective,
   }),

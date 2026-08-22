@@ -153,3 +153,57 @@ assert: time > 60
     expect(result.failure).toBe('time > 60');
   });
 });
+
+describe('wait: done stands until what is under way has finished', () => {
+  const MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities: kiln
+
+# item brick
+
+# entity kiln
+fire:
+  time: 45
+  on success:
+    give: 1 brick
+bake forever:
+  continuous
+  rate: 60
+  on success:
+    give: 1 brick
+
+# test one-firing
+goto: camp
+begin: use entity.kiln.fire
+wait: done
+assert: time = 45
+assert: inventory.brick = 1
+
+# test nothing-under-way
+wait: done
+assert: time = 0
+
+# test a-kiln-that-never-stops
+goto: camp
+begin: use entity.kiln.bake-forever
+wait: done
+`;
+
+  const registry = () => loadModule(MODULE);
+
+  it('runs an armed action out to its end without being told how long that is', () => {
+    expect(runTest('one-firing', registry(), createGameState())).toEqual({ passed: true });
+  });
+
+  it('is a no-op when nothing is under way', () => {
+    expect(runTest('nothing-under-way', registry(), createGameState())).toEqual({ passed: true });
+  });
+
+  it('refuses, rather than running forever, when what is under way has no end the engine can name', () => {
+    const result = runTest('a-kiln-that-never-stops', registry(), createGameState());
+    expect(result.passed).toBe(false);
+    expect(result.failure).toMatch(/wait: done — .*no end the engine can name/);
+  });
+});

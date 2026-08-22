@@ -220,7 +220,8 @@ starting
 
     expect(lines[0]).toBe('Commands:');
     expect(lines).toContain('  <N>          choose option N');
-    expect(lines).toContain('  /wait <s>    advance simulated time by <s> seconds');
+    const wait = COMMANDS.find((spec) => spec.name === '/wait')!;
+    expect(lines).toContain(`  ${wait.name} ${wait.argHint}${' '.repeat(4)}${wait.summary}`);
     expect(lines).toContain('  /quit, /q    show final state and exit');
     expect(lines).toContain('  /dsl <kind> <id> [body] stage or replace one local DSL section; use | for new lines');
 
