@@ -78,3 +78,37 @@ for the next pass over the oracle.
 
 Nothing here is a criticism of what it built. Watching where it was slow is the
 whole reason the first run was worth doing with someone watching.
+
+## 7. What a `# test` can assert about a number, and what it still cannot
+
+`assert:` resolves only four things — `time`, `player.name`/`race`, `visits`, and
+flags (`resolveReference`, `src/runtime/conditions.ts`). It cannot see a resource,
+a stat, an xp total or an inventory count. That reads as a wall in front of the
+rule that content claims belong in `# test`, and it is half a wall.
+
+**Exact numbers already move.** A `# save` body carries `xp`, `resources`,
+`inventory` and the rest, and `expect only:` compares just the keys the save
+declares. So a claim about a number is written as a save holding only that number:
+
+    # save just-the-thieving-xp
+    {"version":11,"xp":{"tutorial-island.thieving":4}}
+
+    # test picking-the-lock-is-worth-four-thieving
+    run: a-lockpick-opens-the-front-door
+    expect only: just-the-thieving-xp
+
+Measured 2026-08-22: this passes, and corrupting the number fails with
+`xp.tutorial-island.thieving: 4 vs 999`. The tests left in TypeScript on the
+grounds that a numeric claim cannot move are therefore movable, and the sweep is
+not finished.
+
+**Ranges do not move, and that is what balancing wants.** `expect only:` is
+equality, and `assert:` cannot compare a number it cannot read. So *this gear
+against this enemy earns between 100 and 200 melee an hour* — the shape the fourth
+item of the content dream asks for — has no form in the language yet. Whichever way
+it is closed, teaching `resolveReference` to see pools, stats and xp is the smaller
+half of it and would let `assert:` carry a bound.
+
+**This is one gap wearing two hats.** The thing stopping the last content claims
+from leaving TypeScript is the thing stopping a balance test from being written at
+all.
