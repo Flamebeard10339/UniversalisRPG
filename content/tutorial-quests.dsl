@@ -37,7 +37,7 @@ stage offered:
 
 stage name-yourself:
   log: Miki wants you to find the mirror and say who you are.
-  hint: The mirror is upstairs in the guide house.
+  hint: The mirror stands in the guide house, in the room Miki is in.
   tutorial-island.miki says:
     always
     sticky

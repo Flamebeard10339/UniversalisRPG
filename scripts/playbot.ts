@@ -78,11 +78,20 @@ A reasonable reply is:
 
 If that opens a screen asking for a name, the next turn's view shows a modal instead of choices, something like:
 
-  open screen: character-creation — asks name: (free text)
+  open screen: character-creation — asks name:
+    value=<free text>
 
 and the next reply answers that modal directly:
 
   {"action":{"kind":"modal","key":"name","value":"Ash"},"note":"Naming the character now that the mirror is asking.","expected":"","confusion":""}
+
+When a screen lists values instead, each one is printed on its own line and the thing you send is the token after \`value=\`, never the words after \`::\` — those are only there so you know what you are picking:
+
+  open screen: dialogue — asks choice:
+    value=0 :: Sounds good. Teach me.
+    value=1 :: Not now.
+
+answered with {"action":{"kind":"modal","key":"choice","value":"0"}, ...}. Sending \`Sounds good. Teach me.\` there is refused, because it is the label and not the value.
 
 Notice the second reply does not repeat the mirror action or reference the choices from the previous turn — those choices do not exist while the modal is open, and answering it is the only thing this turn can do.`;
 
@@ -117,8 +126,17 @@ export interface TurnRequest {
   readonly view: string;
 }
 
+export interface TurnUsage {
+  readonly input: number;
+  readonly cacheRead: number;
+  readonly cacheWrite: number;
+}
+
 export interface ModelClient {
   send(request: TurnRequest): Promise<unknown>;
+  // What the last send billed, when the client is one that knows. A fake does not, and c2 keeps
+  // every test on a fake, so this is how a live run answers the half of c5 the suite cannot.
+  lastUsage?(): TurnUsage | null;
 }
 
 interface AppliedEntry {
@@ -223,8 +241,9 @@ export function renderView(v: PlayView): string {
 
   const asking = askedOption(v.modals);
   if (asking) {
-    const values = asking.values ? asking.values.map((choice) => `${choice.value}=${String(choice.shown)}`).join(', ') : '(free text)';
-    parts.push(`open screen: ${v.modals[v.modals.length - 1].name} — asks ${asking.key}: ${values}`);
+    parts.push(`open screen: ${v.modals[v.modals.length - 1].name} — asks ${asking.key}:`);
+    if (asking.values) for (const choice of asking.values) parts.push(`  value=${choice.value} :: ${String(choice.shown)}`);
+    else parts.push('  value=<free text>');
   } else if (v.choices.length > 0) {
     parts.push('choices:');
     for (const choice of v.choices) parts.push(`  id=${choice.id} :: ${String(choice.label)}`);
@@ -365,7 +384,8 @@ export async function runPlaybot(options: PlaybotOptions): Promise<RunLogEntry[]
   for (let turn = 1; turn <= options.turns; turn++) {
     const entry = await runTurn({ session: options.session, read: options.read, client: options.client, system, log, turn });
     log.push(entry);
-    options.write(describeEntry(entry));
+    const billed = options.client.lastUsage?.() ?? null;
+    options.write(billed === null ? describeEntry(entry) : `${describeEntry(entry)} [billed ${billed.input} in, ${billed.cacheRead} cached read, ${billed.cacheWrite} cached write]`);
   }
   return log;
 }
@@ -388,6 +408,9 @@ const REPLY_JSON_SCHEMA = {
 } as const;
 
 const MODEL_ID = 'claude-sonnet-5';
+// A turn picks one of a handful of printed options and says why in a sentence. Deliberation buys
+// nothing here and is the difference between a run of five hundred turns and a run of fifty.
+const TURN_EFFORT = 'low';
 
 // The fourth opt-out c4 needs: settingSources/tools alone still leave a turn naming this
 // repository's own working directory, git status and CLAUDE.md, because those ride a section a
@@ -399,6 +422,7 @@ export function sdkOptionsFor(system: string, cwd: string): Options {
     tools: [],
     cwd,
     model: MODEL_ID,
+    effort: TURN_EFFORT,
     outputFormat: { type: 'json_schema', schema: REPLY_JSON_SCHEMA as unknown as Record<string, unknown> },
   };
 }
@@ -408,11 +432,16 @@ export function isolatedCwd(): string {
 }
 
 export function createSdkModelClient(cwd: string): ModelClient {
+  let usage: TurnUsage | null = null;
   return {
+    lastUsage: () => usage,
     async send(request) {
+      usage = null;
       const stream = query({ prompt: renderPrompt(request), options: sdkOptionsFor(request.system, cwd) });
       for await (const message of stream) {
         if (message.type === 'result') {
+          const billed = message.usage as unknown as Record<string, number> | undefined;
+          usage = billed === undefined ? null : { input: billed.input_tokens ?? 0, cacheRead: billed.cache_read_input_tokens ?? 0, cacheWrite: billed.cache_creation_input_tokens ?? 0 };
           if (message.subtype === 'success') return message.structured_output;
           throw new Error(`playbot turn did not complete: ${message.subtype}`);
         }
