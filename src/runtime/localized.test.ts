@@ -9,6 +9,7 @@ import { ENGINE_KEYS } from '../content/locale';
 import { loadUniverse } from '../content/load';
 import { NOTE_MARK } from '../grammar/note';
 import { everyKey, englishOf } from '../content/translation';
+import { hasNote, withoutNote } from '../grammar/note';
 import { itemExamine, localizerFor, type Localized } from './localized';
 import { initialState, pruneStateForRegistry } from './save';
 
@@ -188,7 +189,7 @@ describe('a note an author left is dropped from every line the game says', () =>
     expect(localizer.title('item', 'island.rope')).toBe('Rope');
   });
 
-  // The subjects are every key the engine can say, taken from the registry, so a kind or a field added next month is proved here with no edit.
+  // The subjects are every key the engine can say, taken from the registry, so a kind or a field added next month is proved here with no edit. What a key is measured against is the English with any note the author already left taken off it — a corpus that ships its own rough lines is the point of the mark, and comparing against the raw declaration would fail the moment one appeared.
   it('drops it from every key the shipped corpus can address, whatever shape that prose has', () => {
     const shipped = [{ name: 'engine-en', text: readFileSync('content/engine-en.dsl', 'utf8') }, { name: 'tutorial-island', text: readFileSync('content/tutorial-island.dsl', 'utf8') }];
     const plain = loadUniverse(shipped);
@@ -196,7 +197,10 @@ describe('a note an author left is dropped from every line the game says', () =>
     const notes = { name: 'noted', text: ['# info noted', 'version: 1.0.0', '', '# locale en', ...keys.map((key) => `${key}: ${marked(englishOf(plain.locales, key))}`)].join('\n') };
     const spoken = localizerFor(loadUniverse([...shipped, notes]), 'en');
 
+    const said = (key: string): string => withoutNote(englishOf(plain.locales, key));
+
     expect(keys.length).toBeGreaterThan(100);
-    expect(keys.filter((key) => spoken.spoken(key) !== englishOf(plain.locales, key))).toEqual([]);
+    expect(keys.some((key) => hasNote(englishOf(plain.locales, key))), 'no shipped line carries a note, so this proves nothing about one that does').toBe(true);
+    expect(keys.filter((key) => spoken.spoken(key) !== said(key))).toEqual([]);
   });
 });
