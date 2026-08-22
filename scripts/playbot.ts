@@ -139,7 +139,7 @@ interface SkippedEntry {
 
 export type RunLogEntry = AppliedEntry | SkippedEntry;
 
-export const JOURNAL_WINDOW = 6;
+export const JOURNAL_WINDOW = 10;
 
 function describeAction(action: TurnAction): string {
   return action.kind === 'choice' ? `choice ${action.id}` : `modal ${action.key}=${action.value}`;
@@ -158,16 +158,68 @@ export function journalWindowText(log: readonly RunLogEntry[]): string {
   return windowed.map(describeEntry).join('\n');
 }
 
-function fieldLine(label: string, text: string): string {
-  return `${label}: ${text}`;
+// A player who cannot see what it holds reports the world as poorer than it is: the first spike
+// blamed content four times over an object it was carrying and could not find. The claim in
+// scripts/playbot.test.ts reads its subjects off a live view, so a field added to PlayStatus
+// cannot go unshown here without something saying so.
+export const NOT_SHOWN: ReadonlyArray<{ field: keyof PlayView; why: string }> = [
+  { field: 'inventory', why: 'the same holdings as `carried`, keyed by id and without names or counts, so showing both states one fact twice' },
+  { field: 'grown', why: 'which held items are instances, which `carried` already reports as its own `grown` flag' },
+  { field: 'planes', why: 'the jewel plane of an item, reached through a modal and published as one for as long as it is open' },
+  { field: 'focus', why: 'which screen is being shown, which the open-screen line already says in the words the player reads' },
+  { field: 'modals', why: 'rendered as the open screen, carrying the key and the values this turn has to answer' },
+  { field: 'flags', why: 'the engine bookkeeping behind what the world says. A player learns a quest has moved by being told so, and reading the flags would let it act on content it has not met' },
+  { field: 'locations', why: 'every location the registry holds, discovered or not. `discovered` is the half the player has walked to, and handing over the rest is what c9 exists to refuse' },
+];
+
+function renderResources(v: PlayView): string[] {
+  return v.resources.map((each) => `${each.title} ${each.current}/${each.max}`);
+}
+
+function renderCarried(v: PlayView): string[] {
+  return v.carried.map((each) => `${each.shown}${each.count > 1 ? ` x${each.count}` : ''}${each.worn ? ` (worn: ${each.worn.title})` : ''}`);
+}
+
+function renderEquipment(v: PlayView): string[] {
+  return v.equipment.map((row) => (row.name === null ? String(row.title) : `${row.title}: ${row.name}`));
+}
+
+function renderJournal(v: PlayView): string[] {
+  return v.journal.map((entry) => `${entry.title} [${entry.standing}]${entry.hint === null ? '' : ` — next: ${entry.hint}`}`);
+}
+
+function renderDiscovered(v: PlayView): string[] {
+  return v.discovered.map((each) => `${each.title}${each.adjacent.length === 0 ? '' : ` → ${each.adjacent.filter((edge) => edge.open).map((edge) => edge.to).join(' ')}`}`);
+}
+
+function renderEncounter(v: PlayView): string[] {
+  return v.encounter === null ? [] : v.encounter.foes.map((foe) => `${foe.title} ${foe.current}/${foe.max}`);
+}
+
+// Every line of a turn is labelled with the name the view itself gives the field, so that the
+// claim in scripts/playbot.test.ts can read what must appear off a live view rather than off a
+// second list of labels that would drift from it.
+function labelled(field: keyof PlayView, held: readonly string[]): string[] {
+  return held.length === 0 ? [] : [`${field}: ${held.join(', ')}`];
 }
 
 export function renderView(v: PlayView): string {
-  const parts: string[] = [];
-  if (v.said.length > 0) parts.push(v.said.map((line) => String(line)).join('\n'));
-  parts.push(fieldLine('location', `${v.location.title} (${v.location.id})`));
-  if (v.location.description) parts.push(String(v.location.description));
-  if (v.entities.length > 0) parts.push(fieldLine('here', v.entities.map((entity) => String(entity.title)).join(', ')));
+  const parts: string[] = [
+    ...labelled('said', v.said.map((line) => String(line))),
+    `location: ${v.location.title} (${v.location.id})${v.location.description ? ` — ${v.location.description}` : ''}`,
+    ...labelled('entities', v.entities.map((entity) => String(entity.title))),
+    ...labelled('resources', renderResources(v)),
+    ...labelled('encounter', renderEncounter(v)),
+    ...labelled('carried', renderCarried(v)),
+    ...labelled('equipment', renderEquipment(v)),
+    ...labelled('xp', v.xp.map((row) => `${row.title} level ${row.level}`)),
+    ...labelled('stats', v.stats.map((row) => `${row.title} ${row.value}`)),
+    ...labelled('journal', renderJournal(v)),
+    ...labelled('discovered', renderDiscovered(v)),
+    ...labelled('player', [v.player.name, v.player.race].filter((each) => each !== '')),
+    ...labelled('journey', v.journey === null ? [] : [`travelling to ${v.journey.to} by ${v.journey.legs.join(' ')}`]),
+    ...labelled('action', v.action === null ? [] : [`${v.action.label} ${Math.round(v.action.completion * 100)}% done, ${v.action.attempts} attempts`]),
+  ];
 
   const asking = askedOption(v.modals);
   if (asking) {
@@ -177,10 +229,10 @@ export function renderView(v: PlayView): string {
     parts.push('choices:');
     for (const choice of v.choices) parts.push(`  id=${choice.id} :: ${String(choice.label)}`);
   } else {
-    parts.push('(nothing offers itself here)');
+    parts.push('choices: (nothing offers itself here)');
   }
 
-  parts.push(fieldLine('clock', String(v.time)));
+  parts.push(`time: ${v.time}`);
   return parts.join('\n');
 }
 
