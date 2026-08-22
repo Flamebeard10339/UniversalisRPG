@@ -5,7 +5,7 @@ import { align, type Hole } from '../src/grammar/form';
 import { NOTE_MARK } from '../src/grammar/note';
 import { amissIn, fillingWords, namesKind, offeringAt, said, type Addressed, type Amiss } from '../src/content/completion';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
-import { formatModuleDiagnostic } from '../src/content/registry';
+import { formatModuleDiagnostic, type ModuleDiagnostic } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
 import { declaredBy } from '../src/content/references';
 import { gathered, shownIn } from '../src/ui/offerGroups';
@@ -22,7 +22,8 @@ const usage = [
   '            it stands, then — walking the cursor to each placeholder in turn —',
   '            where each line sits, what it is read as, and what may stand there',
   '',
-  'Ids come from the shipped corpus, so what this prints is what the page shows.',
+  'Ids come from the corpus, and under --at from the draft as well, so what this',
+  'prints is what the page would show with the draft loaded.',
   'An answer given once is pointed back at rather than written out again.',
 ].join('\n');
 
@@ -31,7 +32,24 @@ const corpus = (): ModuleSource[] =>
     .filter((name) => name.endsWith('.dsl'))
     .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') }));
 
-const shipped = (world: readonly ModuleSource[]): Addressed[] => declaredBy(loadUniverseWithDiagnostics(world).registry);
+// One reading of the draft beside the world, which both the per-line pass and the whole-file verdict are about. A draft stands in the world it declares as well as in the one already loaded, so an id it declares on one line is declared for every other line that names it; a draft the engine will not take is not in that world at all, and then nothing it declares is known.
+export interface Reading {
+  known: Addressed[];
+  said: readonly ModuleDiagnostic[];
+  read: string;
+  stood: boolean;
+}
+
+export function reading(file: string, text: string, world: readonly ModuleSource[]): Reading {
+  const { source, supplied } = draftModule(file, text, world);
+  const loaded = loadUniverseWithDiagnostics([...world, source]);
+  return {
+    known: declaredBy(loaded.registry),
+    said: loaded.diagnostics,
+    read: supplied ? `read as # info ${source.name} standing on everything already loaded, since the file declares no module of its own` : 'read as the module it declares',
+    stood: loaded.diagnostics.length === 0,
+  };
+}
 
 const DECLARES_A_MODULE = /^#[ \t]+info\b/m;
 
@@ -47,11 +65,8 @@ export function draftModule(file: string, text: string, world: readonly ModuleSo
 }
 
 // What the engine says when it is handed the whole file beside everything already loaded. The lines above are each read on their own, and a rule that is about two sections at once — one starting location, one player, a table that rolls itself — has no line to be laid on and is only reachable by taking the file.
-export function takenLines(file: string, text: string, world: readonly ModuleSource[]): string[] {
-  const { source, supplied } = draftModule(file, text, world);
-  const said = loadUniverseWithDiagnostics([...world, source]).diagnostics;
-  const read = supplied ? `read as # info ${source.name} standing on everything already loaded, since the file declares no module of its own` : 'read as the module it declares';
-  if (said.length === 0) return [`the engine takes this file into the world, ${read}`, ''];
+export function takenLines({ said, read, stood }: Reading): string[] {
+  if (stood) return [`the engine takes this file into the world, ${read}`, ''];
   return [`the engine will not take this file into the world, ${read}.`, 'It stops at the first thing it cannot take, so fixing this may uncover another:', ...said.map((each) => `  ${formatModuleDiagnostic(each)}`), ''];
 }
 
@@ -182,10 +197,17 @@ const wrongIn = (each: Amiss): string[] => [
 ];
 
 // What stands between the draft and the engine taking it, said first and all at once, so an author works down a list rather than reading every line looking for the one that is wrong.
-export function amissLines(text: string, known: readonly Addressed[]): string[] {
-  const amiss = amissIn(text, known);
-  if (amiss.length === 0) return ['nothing here is refused and every id it names is declared', ''];
-  return [`${amiss.length} line(s) the engine has something to say about:`, ...amiss.flatMap(wrongIn), ''];
+//
+// A draft the engine would not take is not in the world, so nothing it declares is known and every id it names itself reads as undeclared — hundreds of lines of noise around the one refusal that caused it. In that state only the refusals are reported, and the whole-file verdict below names what kept the draft out.
+export function amissLines(text: string, known: readonly Addressed[], stood = true): string[] {
+  const amiss = amissIn(text, known).map((each) => (stood ? each : { ...each, undeclared: [] })).filter((each) => each.refused !== null || each.undeclared.length > 0);
+  if (amiss.length === 0) return [stood ? 'nothing here is refused and every id it names is declared' : 'no line here is refused on its own, and the engine still will not take the file: see below. Until it does, what this draft declares is not in the world, so no id it names is checked.', ''];
+  return [
+    `${amiss.length} line(s) the engine has something to say about:`,
+    ...(stood ? [] : ['  (the file is not in the world — see below — so what it declares is not known, and only refusals are listed)']),
+    ...amiss.flatMap(wrongIn),
+    '',
+  ];
 }
 
 export function offeringLines(text: string, known: readonly Addressed[]): string[] {
@@ -240,8 +262,8 @@ function main(): void {
     }
     const written = readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
     const world = corpus();
-    const known = shipped(world);
-    console.log([...amissLines(written, known), ...takenLines(file, written, world), ...offeringLines(written, known)].join('\n'));
+    const read = reading(file, written, world);
+    console.log([...amissLines(written, read.known, read.stood), ...takenLines(read), ...offeringLines(written, read.known)].join('\n'));
     return;
   }
   const kinds = args.length > 0 ? args : sectionKinds();

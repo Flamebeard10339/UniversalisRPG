@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { offeringAt } from '../src/content/completion';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 import { literalOf } from '../src/content/completion';
-import { amissLines, offeringLines, takenLines, treeOf } from './oracle';
+import { amissLines, offeringLines, reading, takenLines, treeOf } from './oracle';
 
 const REFERS = /…indented under it, what `(?<form>.+)` holds$/;
 
@@ -77,7 +77,7 @@ describe('a draft handed to the engine whole', () => {
 
   // A rule about two sections at once has no line of its own to be laid on, so a draft can be clean line by line and still be a draft the engine will not take.
   it('says what the world refuses about a draft that every line of is fine', () => {
-    const said = takenLines('glade.dsl', ['# location glade', 'x: 12, y: 4', 'starting'].join('\n'), WORLD).join('\n');
+    const said = takenLines(reading('glade.dsl', ['# location glade', 'x: 12, y: 4', 'starting'].join('\n'), WORLD)).join('\n');
 
     expect(amissLines(['# location glade', 'x: 12, y: 4', 'starting'].join('\n'), [])[0]).toBe('nothing here is refused and every id it names is declared');
     expect(said).toContain('a new game begins in exactly one place');
@@ -85,13 +85,43 @@ describe('a draft handed to the engine whole', () => {
   });
 
   it('says so plainly where the world takes it', () => {
-    expect(takenLines('glade.dsl', ['# location glade', 'x: 12, y: 4'].join('\n'), WORLD)[0]).toBe('the engine takes this file into the world, read as # info glade standing on everything already loaded, since the file declares no module of its own');
+    expect(takenLines(reading('glade.dsl', ['# location glade', 'x: 12, y: 4'].join('\n'), WORLD))[0]).toBe('the engine takes this file into the world, read as # info glade standing on everything already loaded, since the file declares no module of its own');
   });
 
   it('leaves a draft that declares its own module alone, and stands it beside the world under that name', () => {
     const draft = ['# info hermitage', 'version: 0.0.1', 'dependencies:', '  island', '', '# location glade', 'x: 12, y: 4', 'entities: no-such-thing'].join('\n');
 
-    expect(takenLines('anything.dsl', draft, WORLD).join('\n')).toContain('read as the module it declares');
-    expect(takenLines('anything.dsl', draft, WORLD).join('\n')).toContain('hermitage');
+    expect(takenLines(reading('anything.dsl', draft, WORLD)).join('\n')).toContain('read as the module it declares');
+    expect(takenLines(reading('anything.dsl', draft, WORLD)).join('\n')).toContain('hermitage');
+  });
+});
+
+describe('a draft is answered against the world it declares, not only the one already loaded', () => {
+  const WORLD = [{ name: 'island', text: ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting'].join('\n') }];
+  const DRAFT = ['# info hermitage', 'version: 0.0.1', 'dependencies:', '  island', '', '# item lamp', 'title: Lamp', '', '# entity hermit', 'examine: A hermit.', 'hand it over:', '  instant', '  give: 1 lamp'].join('\n');
+
+  it('counts what the draft itself declares as declared, so an id it mints is not reported undeclared', () => {
+    const read = reading('hermitage.dsl', DRAFT, WORLD);
+
+    expect(read.stood).toBe(true);
+    expect(amissLines(DRAFT, read.known, read.stood)[0]).toBe('nothing here is refused and every id it names is declared');
+  });
+
+  it('still names an id nothing declares, in the draft or out of it', () => {
+    const typo = DRAFT.replace('give: 1 lamp', 'give: 1 lampp');
+    const read = reading('hermitage.dsl', typo, WORLD);
+
+    expect(read.stood).toBe(false);
+    expect(takenLines(read).join('\n')).toContain('lampp');
+  });
+
+  // The one refusal that keeps a draft out is also what empties the world of everything the draft declares, so reporting both leaves the real error buried under its own consequences.
+  it('says nothing about undeclared ids while the draft is out of the world, since none of what it declares is in it', () => {
+    const typo = DRAFT.replace('give: 1 lamp', 'give: 1 lampp');
+    const read = reading('hermitage.dsl', typo, WORLD);
+    const said = amissLines(typo, read.known, read.stood).join('\n');
+
+    expect(said).not.toContain('nothing declares lamp as');
+    expect(said).not.toContain('nothing declares hermit as');
   });
 });
