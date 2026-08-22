@@ -131,14 +131,15 @@ export const begun = (quest: Quest, at: QuestStage | undefined, set: (flag: stri
 // A goto inside a quest names a stage, so the line that takes it sets that stage's flag. Nothing else in the language moves a quest along, and nothing else needs to.
 const reaching = (quest: Quest, stage: string): ActionResult => ({ kind: 'set', variable: flagOf(quest, stage) });
 
-function saidAt(quest: Quest, at: number, speech: QuestSpeech, reached: Condition | undefined): Dialogue {
+function saidAt(quest: Quest, at: number, speech: QuestSpeech, said: number, reached: Condition | undefined): Dialogue {
   const node = speech.node;
   const stage = quest.stages[at]!;
   const gone = (target: string | undefined): ActionResult[] => (target === undefined ? [] : [reaching(quest, target)]);
   // The first stage stands before anything has happened, so nothing has set its flag; speaking its lines is what starts the quest, and that is where the journal gets its first entry.
   const opening = at === 0 ? [{ kind: 'effect' as const, result: reaching(quest, stage.name) }] : [];
   return {
-    id: `${quest.id}.${stage.name}.${lastSegment(speech.owner)}`,
+    // The place in the stage as well as who says it: one stage may give one entity more than one thing to say — a line for arriving and a line for coming back with the bread — and two dialogues under one id would be one dialogue.
+    id: `${quest.id}.${stage.name}.${lastSegment(speech.owner)}.${said}`,
     owner: speech.owner,
     nodes: [
       {
@@ -157,7 +158,7 @@ function saidAt(quest: Quest, at: number, speech: QuestSpeech, reached: Conditio
 }
 
 // Every dialogue a quest gives away. A stage's lines belong to the entity the stage names, so the entity says them without anything editing the entity or the dialogue it already had.
-export const questDialogues = (quest: Quest): Dialogue[] => quest.stages.flatMap((stage, at) => stage.speech.map((speech) => saidAt(quest, at, speech, whileOn(quest, at))));
+export const questDialogues = (quest: Quest): Dialogue[] => quest.stages.flatMap((stage, at) => stage.speech.map((speech, said) => saidAt(quest, at, speech, said, whileOn(quest, at))));
 
 const stageProblem = (quest: Quest, stage: QuestStage): string | undefined => {
   const named = new Set(quest.stages.map((each) => each.name));

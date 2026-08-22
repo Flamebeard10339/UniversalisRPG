@@ -92,15 +92,7 @@ trigger: on empty
 
 # flag mirror-done
 
-# flag made-bread
-
 # flag rats-killed
-
-# flag quest-given
-
-# flag snubbed-miki
-
-# flag miki-complete
 
 // --- skills ---
 
@@ -634,162 +626,17 @@ say: The oven bakes your dough into a golden loaf.
 
 // --- dialogue ---
 
-// --- quests ---
-
-// The tutorial's own beats, read as one thing. It writes no dialogue and sets no
-// flag of its own: every stage stands on a flag Miki's conversation already sets,
-// so the journal follows the tutorial without changing a step of it.
-# quest finding-your-feet
-title: Finding Your Feet
-
-stage offered:
-  log: A guide called Miki offered to show you the ropes.
-  hint: Talk to Miki.
-  done when: quest-given
-  goto name-yourself
-
-stage name-yourself:
-  log: Miki wants you to find the mirror and say who you are.
-  hint: The mirror is upstairs in the guide house.
-  done when: mirror-done
-  goto bake-bread
-
-stage bake-bread:
-  log: Water and flour make dough, and the oven makes bread of it.
-  hint: Knead the dough, then bake it in the oven.
-  done when: made-bread
-  goto clear-the-rats
-
-stage clear-the-rats:
-  log: Miki wants three giant rats put down.
-  hint: The basement, below the guide house.
-  done when: rats-killed >= 3
-  goto sendoff
-
-stage sendoff:
-  log: You have the measure of the place. There is a boat to the mainland.
-  complete
-
+// Miki has a word for a traveller whatever else is loaded. A quest that wants
+// more of him gives him more to say; this is what is left when none is.
 # dialogue miki
 owner = miki
 
 node greeting:
-  when: not quest-given
-  Greetings, adventurer! Welcome to UniversalisRPG.
-  The name's Miki, your tutorial guide, here to walk you through your first steps.
-  What do you say I show you the ropes?
-  -> Sounds good. Teach me.
-  -> I'd rather find my own way.
-    set: snubbed-miki
-    goto snub
-  Splendid! We start with what gives an adventurer purpose: quests.
-  Your first task: find the mirror in this house and decide who you are, your name and your people.
-  set: quest-given
-
-node remind-mirror:
-  when: quest-given
-  sticky
-  again: The mirror's still waiting. Name yourself first, then we'll talk.
-  The mirror's still waiting. Name yourself first, then we'll talk.
-
-node buffs:
-  when: mirror-done
-  once
-  again: Knead that dough and get it in the oven, {player.name} - water and flour won't bake themselves.
-  There you are, {player.name}. A fine name.
-  give: jug-of-water
-  give: pot-of-flour
-  Water and flour make dough - knead them together, then bake the dough in the oven.
-  Give it a go. I'll wait.
-
-node baked:
-  when: mirror-done and has bread and not made-bread
-  once
-  A warm loaf! Well done, {player.name}.
-  Keep it in your pack - eat it whenever you're hungry.
-  set: made-bread
-
-node skills:
-  when: made-bread
-  once
-  again: Still those rats, {player.name}? Downstairs, in the basement.
-  Every swing and catch builds a skill, and skills raise your stats.
-  Here, gear changes your stats the moment you equip it.
-  give: iron-sword
-  give: wooden-shield
-  Downstairs in the basement you'll find giant rats. Put them down and watch your stats work.
-
-node skills-annoyed:
-  when: skills.visits >= 5
-  sticky
-  Are you deaf, {player.name}? Rats. Basement. Now.
-
-node sendoff:
-  when: rats-killed >= 3
-  once
-  again: Still here? The boat to the mainland won't wait forever.
-  Ha! Barely a scratch on you. You're a natural.
-  Truth be told, there's little left I can teach you.
-  So here's the last of it: get off this island. There's a boat to the mainland, and a whole world of skills waiting past it.
-  set: miki-complete
-  set: front-door.unlocked
-  Go on. Make some trouble worth telling stories about.
-
-node snub:
-  Hmph. Suit yourself. Don't come crying when a door won't open.
-
-// --- tests ---
-
-# test tutorial-quest-given
-talk: miki
-choose: 0
-assert: quest-given
-
-// Opens on a save so the route is walked with the pools a played game has.
-# test miki-route-full
-load: miki-route-start
-run: tutorial-quest-given
-use: entity.mirror.look-in
-submit-modal: name=Rowan
-submit-modal: race=elf
-assert: mirror-done
-talk: miki
-assert: has jug-of-water
-craft: dough
-assert: has dough
-craft: bread
-assert: has bread
-talk: miki
-assert: made-bread
-// A fight is bounded by its location, so the rats are fought where they stand
-// rather than through the floor. A rat takes a few swings to put down, so each
-// `use:` starts the fight and the `wait:` lets it play out — 30s is far longer
-// than the ~6s it actually needs.
-use: entity.stairs.descend
-use: melee-combat on giant-rat
-wait: 30
-use: melee-combat on giant-rat
-wait: 30
-use: melee-combat on giant-rat
-wait: 30
-assert: rats-killed >= 3
-use: entity.stairs-up.ascend
-talk: miki
-assert: miki-complete
-assert: front-door.unlocked
-travel: beach
-// The whole sheet, not a handful of flags: inventory, visits, xp, pools, the
-// clock and the rng cursor all have to land where they landed. Regenerate with
-// /create-valid-test when the route's content changes on purpose.
-expect: miki-route-end
+  always
+  Well met. Miki, they call me - I keep an eye on this island.
+  There's a mirror upstairs if you've a mind to know your own face, and rats in the basement if you haven't.
 
 // --- saves ---
-
-# save miki-route-start
-{"version":11}
-
-# save miki-route-end
-{"version":11,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.beach.discovered":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"elf"}}
 
 # save dresser-trinket-end
 {"version":11,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}

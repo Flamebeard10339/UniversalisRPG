@@ -43,15 +43,23 @@ describe('a quest', () => {
   it('gives its lines to the entity each stage names, without that entity or its own dialogue being edited', () => {
     const registry = loaded(QUEST);
 
-    expect(spokenBy(registry.dialogues, 'miki').map((each) => each.id)).toEqual(['finding-your-feet.offered.miki']);
-    expect(registry.dialogues.get('finding-your-feet.offered.miki')?.owner).toBe('miki');
+    expect(spokenBy(registry.dialogues, 'miki').map((each) => each.id)).toEqual(['finding-your-feet.offered.miki.0']);
+    expect(registry.dialogues.get('finding-your-feet.offered.miki.0')?.owner).toBe('miki');
   });
 
   it('moves the quest along by setting the stage a goto names, which is the whole of what a goto does here', () => {
-    const node = loaded(QUEST).dialogues.get('finding-your-feet.offered.miki')!.nodes[0]!;
+    const node = loaded(QUEST).dialogues.get('finding-your-feet.offered.miki.0')!.nodes[0]!;
     const menu = node.steps.find((step) => step.kind === 'menu')!;
 
     expect(menu.kind === 'menu' && menu.choices.map((choice) => choice.effects)).toEqual([[{ kind: 'set', variable: 'finding-your-feet.name-yourself' }], [{ kind: 'set', variable: 'finding-your-feet.snubbed' }]]);
+  });
+
+  // Two lines from one entity at one stage — a word on arriving and a word on coming back — are two dialogues, and two dialogues under one id would be one dialogue.
+  it("keeps a stage's second word to an entity apart from its first", () => {
+    const twice = ['# quest an-errand', 'stage asking:', '  log: Asked.', '  complete', '  miki says:', '    always', '    A thing I need.', '  miki says:', '    when: mirror-done', '    You have it.'].join('\n');
+    const registry = loaded(twice);
+
+    expect(spokenBy(registry.dialogues, 'miki').map((each) => each.id)).toEqual(['an-errand.asking.miki.0', 'an-errand.asking.miki.1']);
   });
 
   it('declares a flag for every stage, so anything in the world may ask where the quest has got to', () => {

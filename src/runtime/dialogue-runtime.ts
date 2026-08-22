@@ -67,11 +67,14 @@ function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, s
   return runSteps(dialogue, node, registry, state, 0, replay);
 }
 
+// A node that is put forward at all, as against one that is only ever arrived at by a goto from another.
+const offering = (node: DialogueNode): boolean => node.always === true || node.when !== undefined;
+
 // The one thing this entity has to say now, out of everything anyone has given it to say. Every node an author wrote a `when:` on is a claim on this moment, and the last such claim wins — within a dialogue by the order its nodes are written, and between dialogues by the order their modules loaded.
 export function reachedNow(registry: Registry, state: GameState, entityId: string): { dialogue: Dialogue; node: DialogueNode } | null {
   let chosen: { dialogue: Dialogue; node: DialogueNode } | null = null;
   for (const dialogue of spokenBy(registry.dialogues, entityId)) {
-    for (const node of dialogue.nodes) if (node.when && evaluateCondition(node.when, state)) chosen = { dialogue, node };
+    for (const node of dialogue.nodes) if (offering(node) && (node.when === undefined || evaluateCondition(node.when, state))) chosen = { dialogue, node };
   }
   return chosen;
 }

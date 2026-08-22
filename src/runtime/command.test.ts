@@ -33,6 +33,7 @@ import {
 } from './command';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
+const quests = readFileSync('content/tutorial-quests.dsl', 'utf8');
 
 const CARRYING_MODULE = `
 # skill smithing
@@ -107,8 +108,12 @@ interface Fixture {
   ctx: CommandContext;
 }
 
-function fixture(text: string, authoring?: AuthoringContext): Fixture {
-  const session = startSession(loadInEnglish(text));
+// A world holding a quest, which is what a played game is: the module the quest
+// gives its lines to, and the module that gives them.
+const played = (): Registry => loadUniverse([engineLocale(), { name: 'tutorial-island', text: source }, { name: 'tutorial-quests', text: quests }]);
+
+function fixture(text: string, authoring?: AuthoringContext, registry: Registry = loadInEnglish(text)): Fixture {
+  const session = startSession(registry);
   const recorder: Recorder = { history: [], startSave: serializeSession(session) };
   return { session, recorder, ctx: newContext(session, view(session), { recorder, authoring }) };
 }
@@ -310,7 +315,7 @@ describe('a command result says what happened, not how it looks', () => {
 
 describe('the commands a player plays with', () => {
   it('applies a numeric choice, mutating state and returning its narration', () => {
-    const { ctx } = fixture(source);
+    const { ctx } = fixture(source, undefined, played());
     const result = runLine(ctx, choiceIndex(ctx, 'talk:tutorial-island.miki'));
 
     expect(result.quit).toBe(false);

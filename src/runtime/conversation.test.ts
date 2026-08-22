@@ -43,3 +43,30 @@ describe('what an entity has to say', () => {
     expect(() => talk('miki', loaded(own), state)).toThrow(new RuntimeError('no reachable node in any dialogue owned by entity: miki'));
   });
 });
+
+describe('a node reached whenever nothing further along is', () => {
+  const boilerplate = ['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  Well met.'].join('\n');
+
+  it('is what an entity says by default, where a node with neither `always` nor `when:` is only ever arrived at', () => {
+    const state = createGameState();
+
+    expect(reachedNow(loaded(boilerplate), state, 'miki')?.node.name).toBe('greeting');
+    expect(reachedNow(loaded(['# dialogue miki', 'owner = miki', '', 'node greeting:', '  Well met.'].join('\n')), state, 'miki')).toBeNull();
+  });
+
+  it('gives way to a node whose `when:` holds, and takes over again when it stops holding', () => {
+    const gated = ['# dialogue an-errand', 'owner = miki', '', 'node offer:', '  when: asked', '  A thing I need.'].join('\n');
+    const registry = loaded(boilerplate, gated);
+    const state = createGameState();
+
+    expect(reachedNow(registry, state, 'miki')?.node.name).toBe('greeting');
+    state.flags['asked'] = true;
+    expect(reachedNow(registry, state, 'miki')?.node.name).toBe('offer');
+  });
+
+  it('is narrowed by a `when:` written beside it, rather than overriding it', () => {
+    const narrowed = loaded(['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  when: asked', '  Well met.'].join('\n'));
+
+    expect(reachedNow(narrowed, createGameState(), 'miki')).toBeNull();
+  });
+});

@@ -16,6 +16,10 @@ import { parseDirectiveLine, useChoiceId, type UseDirective } from '../content/s
 import { printDirective } from '../content/serialize';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
+const quests = readFileSync('content/tutorial-quests.dsl', 'utf8');
+
+// The island and the quest that runs on it, which is what a played game loads.
+const played = (): Registry => loadUniverse([engineLocale(), { name: 'tutorial-island', text: source }, { name: 'tutorial-quests', text: quests }]);
 
 function primed(registry: Registry, diff: SaveDiff): PlaySession {
   registry.saves.set('primed', { version: SAVE_VERSION, diff });
@@ -36,7 +40,7 @@ function modalNames(v: PlayView): string[] {
 
 describe('session', () => {
   it('drives the tutorial-island miki route through the choice-list API', () => {
-    const registry = loadInEnglish(source);
+    const registry = played();
     const session = startSession(registry);
 
     let v = view(session);
@@ -54,7 +58,7 @@ describe('session', () => {
 
     v = submitModal(session, { choice: menu.values![0].value });
     expect(modalNames(v)).toEqual([]);
-    expect(v.flags['tutorial-island.quest-given']).toBe(true);
+    expect(v.flags['tutorial-quests.finding-your-feet.name-yourself']).toBe(true);
 
     v = apply(session, 'use:entity.tutorial-island.mirror.look-in');
     expect(v.said).toContain('modal:character-creation');
@@ -92,10 +96,7 @@ describe('session', () => {
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual([]);
-    expect(v.flags['tutorial-island.made-bread']).toBe(true);
-
-    v = apply(session, 'talk:tutorial-island.miki');
-    expect(modalNames(v)).toEqual([]);
+    expect(v.flags['tutorial-quests.finding-your-feet.clear-the-rats']).toBe(true);
     expect(v.inventory['tutorial-island.iron-sword']).toBe(1);
     expect(v.inventory['tutorial-island.wooden-shield']).toBe(1);
 
@@ -120,7 +121,7 @@ describe('session', () => {
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(modalNames(v)).toEqual([]);
-    expect(v.flags['tutorial-island.miki-complete']).toBe(true);
+    expect(v.flags['tutorial-quests.finding-your-feet.sendoff']).toBe(true);
     expect(v.flags['tutorial-island.front-door.unlocked']).toBe(true);
 
     v = view(session);

@@ -23,6 +23,8 @@ export type NodeStep = ({ kind: 'say' } & Spoken) | { kind: 'effect'; result: Ac
 
 export interface DialogueNode {
   name: string;
+  // Reachable on its own rather than only by a goto, which is what an entity says when nothing further along has anything to say. A `when:` beside it narrows when that is.
+  always?: boolean;
   when?: Condition;
   once?: boolean;
   sticky?: boolean;
@@ -62,6 +64,7 @@ function parseChoice(source: RawLine): Choice {
 
 // The lines a node holds, which is the same grammar wherever a node is written — in a # dialogue of its own, or under a stage of a quest. What a goto names is the one thing that differs, because what a node sits in is what it goes to next.
 export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[] => [
+  { form: 'always', example: 'always', family: 'reached when', note: 'reached whenever nothing further along is, which is what this entity says by default' },
   { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }) },
   { form: 'once', example: 'once', family: 'reached when' },
   { form: 'sticky', example: 'sticky', family: 'reached when' },
@@ -92,6 +95,7 @@ export function parseNode(name: string, source: RawLine): DialogueNode {
     const goto = GOTO.exec(line.text)?.groups;
     if (when) node.when = parseWhole(condition, when.cond, line.span.start, 'a node when');
     else if (again) node.again = { segments: parseSegments(again.text, line.span.start) };
+    else if (line.text === 'always') node.always = true;
     else if (line.text === 'once') node.once = true;
     else if (line.text === 'sticky') node.sticky = true;
     else if (goto) node.steps.push({ kind: 'goto', target: goto.target });
@@ -125,6 +129,7 @@ export const nodeLines = (node: DialogueNode): string[] => [`node ${node.name}:`
 // A node's own lines, indented once, without the heading that names it — which is what a quest writes under a stage instead.
 export function nodeBody(node: DialogueNode): string[] {
   const lines: string[] = [];
+  if (node.always) lines.push('  always');
   if (node.when) lines.push(`  when: ${condition.print(node.when)}`);
   if (node.once) lines.push('  once');
   if (node.sticky) lines.push('  sticky');
