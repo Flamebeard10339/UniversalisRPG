@@ -37,7 +37,10 @@ const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.
 
 const MARKED: readonly CommandSpec[] = COMMANDS.filter((spec) => spec.audience === 'cheat');
 
-const ACTS_ON: Record<string, string> = { '/goto': 'tutorial-island.basement' };
+// Any real location proves the same rule; naming one by hand would go stale the day an author renamed it.
+const REAL_LOCATION = [...loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations.keys()][0];
+
+const ACTS_ON: Record<string, string> = { '/goto': REAL_LOCATION };
 
 const lineFor = (spec: CommandSpec): string => `${spec.name}${ACTS_ON[spec.name] ? ` ${ACTS_ON[spec.name]}` : ''}`;
 
@@ -168,7 +171,7 @@ describe("the toggle is the dev slot's entry, not a second one (c7)", () => {
   it('takes the snapshot on the way in and puts the session back on the way out', () => {
     const { driver, slots } = playing();
     const store = slotStore(slots, () => 0);
-    driver.send('/dsl location tutorial-island.guide-house x: 7, y: 7');
+    driver.send(`/dsl location ${REAL_LOCATION} x: 7, y: 7`);
     const before = driver.serialized();
 
     driver.send(devLine(true));
@@ -187,14 +190,14 @@ describe("the toggle is the dev slot's entry, not a second one (c7)", () => {
   it('leaves the staged edits where they were, because they are not a game', () => {
     const { driver } = playing();
     driver.send(devLine(true));
-    driver.send('/dsl location tutorial-island.guide-house x: 7, y: 7');
+    driver.send(`/dsl location ${REAL_LOCATION} x: 7, y: 7`);
     const staged = driver.localChanges();
     expect(staged).toContain('x: 7, y: 7');
 
     driver.send(devLine(false));
 
     expect(driver.localChanges()).toBe(staged);
-    expect(driver.snapshot().view.discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
+    expect(driver.snapshot().view.discovered.find((place) => place.id === REAL_LOCATION)).toMatchObject({ x: 7, y: 7 });
   });
 });
 
@@ -306,7 +309,7 @@ describe('with dev off, nothing changes (c11)', () => {
   });
 
   it('says nothing about a line that names no dev power', () => {
-    for (const line of ['/look', '', '1', '/local list', 'travel: tutorial-island.basement']) {
+    for (const line of ['/look', '', '1', '/local list', 'travel: somewhere']) {
       expect(devRefusal(line, false), line).toBeNull();
     }
     for (const spec of MARKED) expect(devRefusal(spec.name, true), spec.name).toBeNull();

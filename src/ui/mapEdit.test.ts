@@ -184,6 +184,9 @@ const lineOf = (staged: ReturnType<typeof joined>, where: string): string => {
 };
 
 describe('a connection is a section edit and nothing else', () => {
+  // Any real drawn location proves the same rule; naming one by hand would go stale the day an author renamed it.
+  const REAL_PLACE = DRAWN[0].address;
+
   const waysOut = (places: Map<string, Location>, address: string): string[] => (places.get(address)?.adjacent ?? []).map((edge) => edge.target).sort();
 
   const restaged = (section: Section, to: string): { text: string; adjacent: string[] } => {
@@ -221,10 +224,10 @@ describe('a connection is a section edit and nothing else', () => {
   it('refuses to take away a way out that was never written, and to draw one on what the map does not draw', () => {
     const alone: Section = { kind: MAPPED_KIND, address: 'made-up.alone', text: '# location made-up.alone\nx: 0, y: 0', module: 'made-up', staged: false };
 
-    expect(unlinkedFrom(alone, 'tutorial-island.beach')).toHaveProperty('refused');
-    expect(joined(alone, 'tutorial-island.beach')).toHaveProperty('line');
-    expect(linkedTo({ ...alone, kind: 'entity' }, 'tutorial-island.beach')).toHaveProperty('refused');
-    expect(joinedInto([alone], 'nowhere.at-all', 'tutorial-island.beach')).toHaveProperty('refused');
+    expect(unlinkedFrom(alone, REAL_PLACE)).toHaveProperty('refused');
+    expect(joined(alone, REAL_PLACE)).toHaveProperty('line');
+    expect(linkedTo({ ...alone, kind: 'entity' }, REAL_PLACE)).toHaveProperty('refused');
+    expect(joinedInto([alone], 'nowhere.at-all', REAL_PLACE)).toHaveProperty('refused');
   });
 });
 
@@ -270,7 +273,7 @@ describe('a new place is written where the map is looking', () => {
 
     expect(names(made.address, stagedKey('north-shore'))).toBe(true);
     expect(placedInto([made], stagedKey('north-shore'), { x: 9, y: 9 })).toHaveProperty('line');
-    expect(joined(made, 'tutorial-island.beach')).toHaveProperty('line');
+    expect(joined(made, DRAWN[0].address)).toHaveProperty('line');
   });
 });
 

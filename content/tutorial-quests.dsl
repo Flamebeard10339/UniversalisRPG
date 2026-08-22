@@ -214,6 +214,13 @@ talk: tutorial-island.miki
 assert: finding-your-feet.sendoff
 assert: tutorial-island.front-door.unlocked
 travel: beach
+// Same second-talk shape as the apology route below: the eternal quest only
+// picks up once the market district has been stood in, so a talk had while
+// still inside the house would only repeat the ordinary sendoff.
+travel: guide-house
+talk: tutorial-island.miki
+assert: leave-tutorial-island.adrift
+travel: beach
 expect only: left-mikis-house
 // The whole sheet, not a handful of flags: inventory, visits, xp, pools, the
 // clock and the rng cursor all have to land where they landed. Regenerate with
@@ -284,24 +291,18 @@ expect: apology-route-full-end
 
 // What all three routes out of the house genuinely land on, named once
 // instead of asserted three times: the same beach, the same house explored,
-// the same quest picked up. `finding-your-feet.sendoff`, `front-door.unlocked`
-// and `leave-tutorial-island.adrift` are each true for two of the three routes
-// and false or unset for the third — the thief never gets the ordinary
-// sendoff, the door route never doubles back for the eternal one — so none of
-// them belong here; each stays proven by its own route's `assert:` instead.
+// the same quest picked up. `finding-your-feet.sendoff` and
+// `front-door.unlocked` are each true for two of the three routes and false
+// for the third — the thief never gets the ordinary sendoff — so those two
+// stay proven by each route's own `assert:` instead.
 # save left-mikis-house
-{"version":11,"location":"tutorial-island.beach","flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-island.beach.discovered":true,"tutorial-island.market-district.discovered":true}}
+{"version":11,"location":"tutorial-island.beach","flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-island.beach.discovered":true,"tutorial-island.market-district.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true}}
 
 # save miki-route-start
 {"version":11}
 
-// Does not carry leave-tutorial-island.adrift: this route's own extra talk
-// would land on the exact moment src/runtime/session.test.ts pins Miki's
-// sendoff repeat to, and picking up the eternal quest one talk earlier than
-// that test replays would overwrite that line with this quest's own stub. See
-// the commit message.
 # save miki-route-end
-{"version":11,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.iron-sword":1,"tutorial-island.wooden-shield":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tutorial-island.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tutorial-island.rats-killed":3,"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tutorial-island.market-district.discovered":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":107200,"rng":2776008081,"player":{"name":"Rowan","race":"elf"}}
+{"version":11,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.iron-sword":1,"tutorial-island.wooden-shield":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tutorial-island.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tutorial-island.rats-killed":3,"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tutorial-island.market-district.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":117200,"rng":2776008081,"player":{"name":"Rowan","race":"elf"}}
 
 // The thief's own closing sheet — not the door route's. `expect:` is a whole
 // save compared exactly, so a route that never bakes or fights has no way to

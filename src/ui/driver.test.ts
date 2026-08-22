@@ -41,6 +41,40 @@ const LATHE = [engineLocale(), WORKSHOP];
 
 const SPINDLE = 'use:entity.workshop.lathe.turn-a-spindle';
 
+// A small world for driver-layer mechanics (choice indexing, modal answers)
+// that any dialogue and any modal-opening entity would prove just as well —
+// so a rename of a real entity like Miki cannot break them.
+const DRIVER_MODULE = {
+  name: 'proving-ground',
+  text: [
+    '# info proving-ground',
+    'version: 1.0.0',
+    '',
+    '# location camp',
+    'x: 0, y: 0',
+    'starting',
+    'entities:',
+    '  guide',
+    '  mirror',
+    '',
+    '# entity guide',
+    'title: Guide',
+    '',
+    '# dialogue guide-chat',
+    'owner = guide',
+    '',
+    'node greeting:',
+    '  always',
+    '  Hello there, traveller.',
+    '  -> Nod.',
+    '',
+    '# entity mirror',
+    'title: Mirror',
+    'look in: open modal: character-creation',
+    '',
+  ].join('\n'),
+};
+
 function handTicker(): Ticker & { advance(elapsedMs: number): void; stops: number } {
   let ticking: ((elapsedMs: number) => void) | null = null;
   const ticker = ((tick) => {
@@ -79,10 +113,10 @@ describe('the GUI driver', () => {
   });
 
   it('dispatches a choice by the position the engine listed it at', () => {
-    const driver = createDriver(SHIPPED_SOURCES);
+    const driver = createDriver([engineLocale(), DRIVER_MODULE]);
     const before = texts(driver).length;
 
-    driver.choose(position(driver, 'talk:tutorial-island.miki'));
+    driver.choose(position(driver, 'talk:proving-ground.guide'));
 
     expect(shown(driver).modals).toHaveLength(1);
     expect(shown(driver).choices).toEqual([]);
@@ -90,22 +124,22 @@ describe('the GUI driver', () => {
   });
 
   it('answers a modal by its published option key, and what was beneath comes back', () => {
-    const driver = createDriver(SHIPPED_SOURCES);
-    driver.choose(position(driver, 'talk:tutorial-island.miki'));
+    const driver = createDriver([engineLocale(), DRIVER_MODULE]);
+    driver.choose(position(driver, 'talk:proving-ground.guide'));
 
     const asked = shown(driver).modals[0].options[0];
     driver.answer(asked.key, asked.values![0].value);
 
     expect(shown(driver).modals).toEqual([]);
-    expect(shown(driver).choices.map((choice) => choice.id)).toContain('talk:tutorial-island.miki');
+    expect(shown(driver).choices.map((choice) => choice.id)).toContain('talk:proving-ground.guide');
   });
 
   it('carries a free-text answer through with the spaces it was typed with', () => {
-    const driver = createDriver(SHIPPED_SOURCES);
-    driver.choose(position(driver, 'talk:tutorial-island.miki'));
+    const driver = createDriver([engineLocale(), DRIVER_MODULE]);
+    driver.choose(position(driver, 'talk:proving-ground.guide'));
     const menu = shown(driver).modals[0].options[0];
     driver.answer(menu.key, menu.values![0].value);
-    driver.choose(position(driver, 'use:entity.tutorial-island.mirror.look-in'));
+    driver.choose(position(driver, 'use:entity.proving-ground.mirror.look-in'));
 
     const name = shown(driver).modals[0].options[0];
     driver.answer(name.key, 'Sir Robin');
@@ -117,7 +151,7 @@ describe('the GUI driver', () => {
   });
 
   it('reports a refusal as the engine worded it and leaves the session where it was', () => {
-    const driver = createDriver(SHIPPED_SOURCES);
+    const driver = createDriver([engineLocale(), DRIVER_MODULE]);
     const before = shown(driver).choices.length;
 
     driver.choose(before + 7);
@@ -242,7 +276,10 @@ const sourceLines = (driver: Driver): string[] =>
 
 const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.filter((entry) => entry.words === 'tool').map((entry) => String(entry.text));
 
-const EDIT = '/dsl location tutorial-island.guide-house x: 7, y: 7';
+// Any real location proves the same rule; naming one by hand would go stale the day an author renamed it.
+const STARTING_LOCATION = [...loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations.values()].find((location) => location.starting)!.id;
+
+const EDIT = `/dsl location ${STARTING_LOCATION} x: 7, y: 7`;
 
 describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
   it('stages a section, adopts it, and the session is playing the edit', () => {
@@ -250,15 +287,15 @@ describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
 
     driver.send(EDIT);
 
-    expect(said(driver)).toContain('Staged # location tutorial-island.guide-house in local-changes.');
-    expect(shown(driver).discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
+    expect(said(driver)).toContain(`Staged # location ${STARTING_LOCATION} in local-changes.`);
+    expect(shown(driver).discovered.find((place) => place.id === STARTING_LOCATION)).toMatchObject({ x: 7, y: 7 });
   });
 
   it('refuses a whole edit that does not load, and goes on playing what it had', () => {
     const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots() });
     const before = shown(driver);
 
-    driver.send('/dsl location tutorial-island.guide-house adjacent: nowhere-at-all');
+    driver.send(`/dsl location ${STARTING_LOCATION} adjacent: nowhere-at-all`);
 
     expect(said(driver)).toContain('local changes did not load.');
     expect(shown(driver)).toEqual(before);
@@ -274,8 +311,8 @@ describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
     const reopened = createDriver(SHIPPED_SOURCES, { slots });
     reopened.send('/local list');
 
-    expect(shown(reopened).discovered.find((place) => place.id === 'tutorial-island.guide-house')).toMatchObject({ x: 7, y: 7 });
-    expect(sourceLines(reopened)).toEqual(['# location tutorial-island.guide-house — also in tutorial-island', ...sourceLines(first)]);
+    expect(shown(reopened).discovered.find((place) => place.id === STARTING_LOCATION)).toMatchObject({ x: 7, y: 7 });
+    expect(sourceLines(reopened)).toEqual([`# location ${STARTING_LOCATION} — also in tutorial-island`, ...sourceLines(first)]);
     expect(reopened.localChanges()).toBe(first.localChanges());
   });
 
@@ -286,7 +323,7 @@ describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
     driver.send('/local show');
 
     const handed = driver.localChanges()!;
-    expect(handed).toContain('# location tutorial-island.guide-house');
+    expect(handed).toContain(`# location ${STARTING_LOCATION}`);
     expect(sourceLines(driver).join('\n')).toBe(handed.trimEnd());
     expect(slotStore(slots, () => 0).read('local-changes')?.payload).toBe(handed);
   });
@@ -370,7 +407,7 @@ const STORE_REACHES = [...readFileSync('src/ui/driver.ts', 'utf8').matchAll(/sav
       const quiet = through(pageSlots());
 
       expect(refused.driver.snapshot().problems).toEqual([]);
-      expect(shown(refused.driver).location.id).toBe('tutorial-island.guide-house');
+      expect(shown(refused.driver).location.id).toBe(STARTING_LOCATION);
 
       const refusing = Object.keys(MOMENTS).filter((moment) => refusesAt(slots, moment));
       expect(refusing, `${mode} refuses nothing, so nothing below is asked`).not.toEqual([]);
@@ -379,7 +416,7 @@ const STORE_REACHES = [...readFileSync('src/ui/driver.ts', 'utf8').matchAll(/sav
       }
 
       refused.driver.send('/look');
-      expect(shown(refused.driver).location.id).toBe('tutorial-island.guide-house');
+      expect(shown(refused.driver).location.id).toBe(STARTING_LOCATION);
     });
   }
 });

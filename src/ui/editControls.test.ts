@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { addressable, NOWHERE, searching, searchHint, STATES, type Section, type Standing } from './authoringSurface';
 import { draftIn, editControls, kindsIn, openedIn, rowsIn, sectionKey, TONES, tonesIn, type EditActs, type EditControls } from './editControls';
 import { FORGOTTEN, type Editing } from './editorMemory';
-import { SHIPPED_SOURCES } from './shippedContent';
+import { FIXTURE_SOURCES } from './testFixtures';
 
-const addressed = addressable(SHIPPED_SOURCES);
+const addressed = addressable(FIXTURE_SOURCES);
 
-const GUIDE_HOUSE: Standing = { location: 'tutorial-island.guide-house', entities: ['tutorial-island.miki'] };
+const KEEP: Standing = { location: 'fixture.keep', entities: ['fixture.warden'] };
 
-const MIKI = addressed.find((section) => section.kind === 'entity' && section.address === 'tutorial-island.miki')!;
+const WARDEN = addressed.find((section) => section.kind === 'entity' && section.address === 'fixture.warden')!;
 
 function watching(editing: Editing, sections: readonly Section[] = addressed): { controls: EditControls; sent: string[]; said: string[]; handed: number; at: Editing[] } {
   const sent: string[] = [];
@@ -19,7 +19,7 @@ function watching(editing: Editing, sections: readonly Section[] = addressed): {
   return { controls: editControls({ sections, declared: sections, editing }, acts), sent, said, at, get handed() { return handed; } };
 }
 
-const opened: Editing = { ...FORGOTTEN, open: sectionKey(MIKI) };
+const opened: Editing = { ...FORGOTTEN, open: sectionKey(WARDEN) };
 
 const EXERCISED: Record<keyof EditControls, true> = {
   surface: true,
@@ -57,28 +57,28 @@ describe('what a control on the editing page does', () => {
     kinded.controls.kind('item');
     expect(kinded.at[0]).toMatchObject({ kind: 'item', open: null, draft: null });
     const reopened = watching(typed);
-    reopened.controls.open('entity tutorial-island.front-door');
-    expect(reopened.at[0]).toMatchObject({ open: 'entity tutorial-island.front-door', draft: null, cursor: 0 });
+    reopened.controls.open('entity fixture.gate');
+    expect(reopened.at[0]).toMatchObject({ open: 'entity fixture.gate', draft: null, cursor: 0 });
   });
 
   it('keeps what was typed, where the cursor was and how far the list was scrolled', () => {
     const held = watching(opened);
-    held.controls.text('# entity tutorial-island.miki\ntitle: Miki the Guide', 51);
+    held.controls.text('# entity fixture.warden\ntitle: Warden the Second', 51);
     held.controls.cursor(12);
     held.controls.scroll(220);
 
     expect(held.at.map((each) => [each.draft, each.cursor, each.scroll])).toEqual([
-      ['# entity tutorial-island.miki\ntitle: Miki the Guide', 51, 0],
+      ['# entity fixture.warden\ntitle: Warden the Second', 51, 0],
       [null, 12, 0],
       [null, 0, 220],
     ]);
   });
 
   it('stages what is in the field, as the line the console types', () => {
-    const held = watching({ ...opened, draft: '# entity tutorial-island.miki\ntitle: Miki the Guide' });
+    const held = watching({ ...opened, draft: '# entity fixture.warden\ntitle: Warden the Second' });
     held.controls.stage();
 
-    expect(held.sent).toEqual(['/dsl entity tutorial-island.miki title: Miki the Guide']);
+    expect(held.sent).toEqual(['/dsl entity fixture.warden title: Warden the Second']);
     expect(held.said).toEqual([]);
   });
 
@@ -86,7 +86,7 @@ describe('what a control on the editing page does', () => {
     const held = watching(opened);
     held.controls.stage();
 
-    expect(held.sent).toEqual([`/dsl entity ${MIKI.address} ${MIKI.text.split('\n').slice(1).map((line, at) => (at === 0 ? line : ` ${line}`)).join('|')}`]);
+    expect(held.sent).toEqual([`/dsl entity ${WARDEN.address} ${WARDEN.text.split('\n').slice(1).map((line, at) => (at === 0 ? line : ` ${line}`)).join('|')}`]);
   });
 
   it('says why rather than sending half a section', () => {
@@ -103,7 +103,7 @@ describe('what a control on the editing page does', () => {
     const shut = watching(FORGOTTEN);
     shut.controls.unstage();
 
-    expect(held.sent).toEqual([`/local delete entity ${MIKI.address}`]);
+    expect(held.sent).toEqual([`/local delete entity ${WARDEN.address}`]);
     expect(shut.sent).toEqual([]);
   });
 
@@ -121,11 +121,11 @@ describe('what a control on the editing page does', () => {
   it('takes an emptied section out rather than staging nothing over it', () => {
     const shipped = watching({ ...opened, draft: '   \n' });
     shipped.controls.stage();
-    const held = watching({ ...opened, draft: '' }, addressed.map((section) => (section === MIKI ? { ...section, staged: true } : section)));
+    const held = watching({ ...opened, draft: '' }, addressed.map((section) => (section === WARDEN ? { ...section, staged: true } : section)));
     held.controls.stage();
 
-    expect(shipped.sent).toEqual([`/dsl remove entity.${MIKI.address}`]);
-    expect(held.sent).toEqual([`/local delete entity ${MIKI.address}`]);
+    expect(shipped.sent).toEqual([`/dsl remove entity.${WARDEN.address}`]);
+    expect(held.sent).toEqual([`/local delete entity ${WARDEN.address}`]);
     expect(held.at[0]).toMatchObject({ open: null, draft: null });
     expect(shipped.said).toEqual([]);
   });
@@ -147,9 +147,9 @@ describe('what a control on the editing page does', () => {
 
   it('stands the author somewhere else by the same line a tapped place sends', () => {
     const held = watching(FORGOTTEN);
-    held.controls.stand('tutorial-island.beach');
+    held.controls.stand('fixture.yard');
 
-    expect(held.sent).toEqual(['/goto tutorial-island.beach']);
+    expect(held.sent).toEqual(['/goto fixture.yard']);
   });
 
   it('hands the module over and prints it, which is one command and one set of bytes', () => {
@@ -163,19 +163,19 @@ describe('what a control on the editing page does', () => {
 
 describe('what the page draws, assembled once', () => {
   it('narrows Global by the kind chosen and leaves Local whole', () => {
-    const everything = rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'global' } });
-    const items = rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'global', kind: 'item' } });
+    const everything = rowsIn({ sections: addressed, standing: KEEP, editing: { ...FORGOTTEN, surface: 'global' } });
+    const items = rowsIn({ sections: addressed, standing: KEEP, editing: { ...FORGOTTEN, surface: 'global', kind: 'item' } });
 
     expect(items.length).toBeGreaterThan(0);
     expect(items.length).toBeLessThan(everything.length);
     expect([...new Set(items.map((section) => section.kind))]).toEqual(['item']);
-    expect(rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'local', kind: 'item' } }).map(sectionKey)).toEqual(
-      rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'local' } }).map(sectionKey),
+    expect(rowsIn({ sections: addressed, standing: KEEP, editing: { ...FORGOTTEN, surface: 'local', kind: 'item' } }).map(sectionKey)).toEqual(
+      rowsIn({ sections: addressed, standing: KEEP, editing: { ...FORGOTTEN, surface: 'local' } }).map(sectionKey),
     );
   });
 
   it('narrows by the kind and by what was searched for at once', () => {
-    const held = { sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'global' as const, kind: 'item' } };
+    const held = { sections: addressed, standing: KEEP, editing: { ...FORGOTTEN, surface: 'global' as const, kind: 'item' } };
     const items = rowsIn(held);
     const swords = rowsIn({ ...held, editing: { ...held.editing, query: 'sword' } });
 
@@ -186,7 +186,7 @@ describe('what the page draws, assembled once', () => {
   });
 
   it('offers the kinds the surface has something of and no others', () => {
-    const kinds = kindsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: { ...FORGOTTEN, surface: 'global' } });
+    const kinds = kindsIn({ sections: addressed, standing: KEEP, editing: { ...FORGOTTEN, surface: 'global' } });
 
     expect(kinds).toEqual([...kinds].sort());
     expect(kinds).not.toContain('location');
@@ -194,17 +194,17 @@ describe('what the page draws, assembled once', () => {
   });
 
   it('puts the section in the field until something is typed, and what was typed after', () => {
-    expect(draftIn(addressed, opened)).toBe(MIKI.text);
+    expect(draftIn(addressed, opened)).toBe(WARDEN.text);
     expect(draftIn(addressed, { ...opened, draft: 'typed' })).toBe('typed');
     expect(draftIn(addressed, FORGOTTEN)).toBe('');
     expect(openedIn(addressed, { ...FORGOTTEN, open: 'entity nothing.at-all' })).toBeNull();
   });
 
   it('offers the place being stood in beside the things standing in it', () => {
-    const rows = rowsIn({ sections: addressed, standing: GUIDE_HOUSE, editing: FORGOTTEN }).map(sectionKey);
+    const rows = rowsIn({ sections: addressed, standing: KEEP, editing: FORGOTTEN }).map(sectionKey);
 
-    expect(rows).toContain(`location ${GUIDE_HOUSE.location}`);
-    expect(rows.filter((row) => row.startsWith('location '))).toEqual([`location ${GUIDE_HOUSE.location}`]);
+    expect(rows).toContain(`location ${KEEP.location}`);
+    expect(rows.filter((row) => row.startsWith('location '))).toEqual([`location ${KEEP.location}`]);
   });
 
   it('offers nothing local where nothing is standing', () => {
