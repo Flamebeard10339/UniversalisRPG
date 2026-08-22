@@ -235,6 +235,32 @@ log rather than a second architecture: the player already emits what the world o
 the author's answer mid-run, and what is missing is a queue to answer rather than a channel to build.
 That shape is a second system prompt, which is the slot c1 already reserves.
 
+**2026-08-22: the playbot now drives `runLine`, and c6's wording is false as written.** The
+private two-case surface — `apply(session, choiceId)` and `applyDirective(session, {kind:
+'submit-modal', ...})` — was a second front door onto the same session: `scripts/play-cli.ts` and
+`src/ui/driver.ts` already went through `command.ts`'s `runLine`, and the playbot alone had not.
+Ruled by the author: a turn now sends one string, the model's own `line`, straight into the
+CommandContext `runLine` every driver shares; `TurnAction` and `applyAction` are deleted, and the
+reply schema drops from `{action:{kind,...}}` to `{line, note, expected, confusion}`. This also
+gives the loop access to every one of `Directive`'s 24 kinds — `equip:` among them — rather than
+only the two the old union named, which is a capability gain the ruling did not set out to buy but
+takes anyway, since `runLine` was never narrower than that.
+
+The same change made `CommandSpec.dev` worth generalising: a boolean that only `/goto` ever set
+becomes `audience: 'player' | 'author' | 'cheat'` on every entry, ruled the same day. `DEV_TOKENS`
+now derives from `audience === 'cheat'` rather than the boolean, unchanged in the single token it
+produces. The playbot's system prompt reads its own vocabulary off `COMMANDS` filtered to
+`audience === 'player'`, and a reply naming any other command is refused before `runLine` ever
+sees it — audience is not only prompt text now, it gates.
+
+c6 as written promises the engine has exactly two input surfaces and that the loop echoes a token
+the view published under one of two call shapes. Neither survives: there are 24 directive shapes
+plus a player's own slash commands, not two, and `parseReply` no longer checks a selector against
+the view before sending it — that check now belongs to `runLine` alone, the same one `play-cli`
+and the GUI already relied on. The clause list is left unedited pending the author's own wording;
+the implementing report carries the proposed replacement and names which property it believes
+survives free text reaching the engine's full input grammar.
+
 ## Open questions
 
 - What ends a run. A turn count is the obvious bound and a usage budget is the honest one, but the
