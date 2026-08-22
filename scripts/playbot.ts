@@ -15,7 +15,8 @@ import { adoptRegistry, apply, applyDirective, startSession, view, type PlaySess
 
 export const repoRoot = path.join(import.meta.dirname, '..');
 
-export type PlaybotMode = 'author' | 'bughunt';
+export const PLAYBOT_MODES = ['author', 'bughunt'] as const;
+export type PlaybotMode = (typeof PLAYBOT_MODES)[number];
 
 const SHARED_INTRO = `You are playing Universalis RPG, a text game, through a programmatic loop rather than a chat conversation. Each message you receive is one turn: it shows you everything visible from the current moment, and you answer with exactly one structured reply. You do not see the turns before this one directly — instead, a short journal of the last several turns is included above the view, summarizing what you tried and what happened. Treat that journal as your memory of the run; nothing else persists between turns.
 
@@ -389,8 +390,9 @@ interface CliArgs {
 }
 
 function requireMode(value: string | undefined): PlaybotMode {
-  if (value === 'author' || value === 'bughunt') return value;
-  throw new Error(`--mode must be author or bughunt, got ${JSON.stringify(value)}`);
+  const found = PLAYBOT_MODES.find((mode) => mode === value);
+  if (found !== undefined) return found;
+  throw new Error(`--mode must be one of ${PLAYBOT_MODES.join(', ')}, got ${JSON.stringify(value)}`);
 }
 
 function requireTurns(value: string | undefined): number {

@@ -18,6 +18,7 @@ import {
   runPlaybot,
   runTurn,
   sdkOptionsFor,
+  PLAYBOT_MODES,
   systemPromptFor,
   type ContentReader,
   type ModelClient,
@@ -146,6 +147,16 @@ describe('playbot', () => {
     const distinctSystems = new Set(requests.map((request) => request.system));
     expect(distinctSystems.size).toBe(1);
     expect(requests[0].system.length).toBeGreaterThan(0);
+  });
+
+  // c5, the other half: byte identity is necessary and not sufficient. A frozen prefix under
+  // 1024 tokens does not cache at all, so a run that passes the clause above and sits under the
+  // floor is re-billed in full on every turn and looks correct while doing it. Measured in
+  // characters because the tokenizer is not in this repository; 4096 is 1024 tokens at four
+  // characters each, which is the conservative end of English prose.
+  const CACHE_FLOOR_CHARS = 4096;
+  it.each(PLAYBOT_MODES)('[c5] the %s prefix clears the floor under which nothing caches', (mode) => {
+    expect(systemPromptFor(mode).length).toBeGreaterThan(CACHE_FLOOR_CHARS);
   });
 
   // c6: a selector is a token the engine published. Walking a real, live session across many
