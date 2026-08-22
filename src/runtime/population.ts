@@ -23,7 +23,7 @@ export function standing(state: GameState, registry: Registry, location: Locatio
   return location.entities
     .filter((entry) => {
       const gate = registry.entities.get(entry.entity)?.hiddenIf;
-      return !gate || !evaluateCondition(gate, state);
+      return !gate || !evaluateCondition(gate, state, registry);
     })
     .map((entry) => ({ entity: entry.entity, count: populationCount(entry) - (deficitOf(state, location.id, entry.entity)?.down ?? 0) }))
     .filter((entry) => entry.count > 0);

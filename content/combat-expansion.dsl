@@ -333,6 +333,9 @@ allocate: 1 at 1,0 position 7
 equip: 1
 use: tutorial-island.melee-combat on proving-post
 wait: 30
+// rising-fury is the only source of max-rage on this route, so the stat root
+// reading 20 back is the jewel's allocation and nothing else.
+assert: stat.max-rage = 20
 expect: rage-rises-as-swings-land-end
 
 // The other half of the same arc, and the half a stack count cannot have: the

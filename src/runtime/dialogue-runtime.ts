@@ -7,8 +7,8 @@ import { Registry } from '../content/registry';
 import { type DialogueCursor, GameState } from './state';
 
 function spokenLine(registry: Registry, state: GameState, line: Spoken): Localized {
-  if (line.key === undefined) throw new RuntimeError(`a dialogue line reached the log with no address: ${JSON.stringify(renderSegments(line.segments, state))}`);
-  return localizerOf(registry, state).line(line.key, (segments) => renderSegments(segments, state));
+  if (line.key === undefined) throw new RuntimeError(`a dialogue line reached the log with no address: ${JSON.stringify(renderSegments(line.segments, state, registry))}`);
+  return localizerOf(registry, state).line(line.key, (segments) => renderSegments(segments, state, registry));
 }
 
 function findNode(dialogue: Dialogue, name: string): DialogueNode {
@@ -74,7 +74,7 @@ const offering = (node: DialogueNode): boolean => node.always === true || node.w
 export function reachedNow(registry: Registry, state: GameState, entityId: string): { dialogue: Dialogue; node: DialogueNode } | null {
   let chosen: { dialogue: Dialogue; node: DialogueNode } | null = null;
   for (const dialogue of spokenBy(registry.dialogues, entityId)) {
-    for (const node of dialogue.nodes) if (offering(node) && (node.when === undefined || evaluateCondition(node.when, state))) chosen = { dialogue, node };
+    for (const node of dialogue.nodes) if (offering(node) && (node.when === undefined || evaluateCondition(node.when, state, registry))) chosen = { dialogue, node };
   }
   return chosen;
 }
@@ -91,7 +91,7 @@ export function talk(entityId: string, registry: Registry, state: GameState): Di
 function offered(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ choice: Choice; index: number }> {
   return resolveMenu(cursor, registry)
     .choices.map((choice, index) => ({ choice, index }))
-    .filter((entry) => !entry.choice.when || evaluateCondition(entry.choice.when, state));
+    .filter((entry) => !entry.choice.when || evaluateCondition(entry.choice.when, state, registry));
 }
 
 export function menuChoices(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ index: number; display: Localized }> {

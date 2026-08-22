@@ -1,20 +1,7 @@
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
-import {
-  actionStillValid,
-  actionVisible,
-  fightBatch,
-  findActionOwner,
-  FightOutcome,
-  inputLimit,
-  outcomeResults,
-  parseOwnerRef,
-  requiresMet,
-  resolvesPerAttempt,
-  stopsOnOutcome,
-  travelAction,
-  travelPair,
-} from './actions';
+import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, outcomeResults, parseOwnerRef, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
+import { findActionOwner, travelAction, travelPair } from './seat';
 import {
   applyResults,
   applyResultsNow,
@@ -31,7 +18,8 @@ import {
   settlePools,
 } from './effects';
 import { damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, opposes, leaveFight, playerCadence, poolLevel, retaliation, targetLevel } from './encounter';
-import { actorEntity, armedAction, Participant, participants, seatOf } from './roster';
+import { armedAction, Participant, participants, seatOf } from './roster';
+import { actorEntity } from './seat';
 import { hasPool } from './stats';
 import { sideOf } from '../grammar/action';
 import { applyRespawns, downOne, isStanding, nextRespawn, standing } from './population';
@@ -306,7 +294,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
   const active = state.activeAction!;
 
   for (;;) {
-    if (!actionStillValid(action, active, state)) {
+    if (!actionStillValid(action, active, state, registry)) {
       endAction(state);
       return;
     }
@@ -415,7 +403,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
 
     if (state.activeAction) {
       const action = armedAction(state, registry);
-      if (!actionStillValid(action, state.activeAction, state)) {
+      if (!actionStillValid(action, state.activeAction, state, registry)) {
         endAction(state);
         changed = true;
       } else if (!resolvesPerAttempt(action)) {
@@ -574,8 +562,8 @@ export function armAction(obj: string, objId: string, actionId: string, registry
 
   const action = target.actions?.find((each) => actionAddress(each) === actionId);
   if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(actionId), owner: say.identifier(`${obj}.${objId}`) }));
-  if (!requiresMet(action, state)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
-  if (!actionVisible(action, state)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
+  if (!requiresMet(action, state, registry)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
+  if (!actionVisible(action, state, registry)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
   const unpayable = refuseUnpayableInputs(action, registry, state);
   if (unpayable) return unpayable;
@@ -610,8 +598,8 @@ export function armFightAction(actionId: string, targetId: string, registry: Reg
   const action = actorEntity(registry, PLAYER)?.actions.find((each) => declaredId(each) === actionId) ?? declared;
   if (!declared || !action) throw new RuntimeError(`unknown action: ${actionId}`);
   if (!registry.entities.has(targetId)) throw new RuntimeError(`unknown entity: ${targetId}`);
-  if (!requiresMet(action, state)) throw new RuntimeError(`action requires unmet: ${actionId}`);
-  if (!actionVisible(action, state)) throw new RuntimeError(`action hidden: ${actionId}`);
+  if (!requiresMet(action, state, registry)) throw new RuntimeError(`action requires unmet: ${actionId}`);
+  if (!actionVisible(action, state, registry)) throw new RuntimeError(`action hidden: ${actionId}`);
 
   const unpayable = refuseUnpayableInputs(action, registry, state);
   if (unpayable) return unpayable;

@@ -15,6 +15,7 @@ export const ENGINE_ROOTS = {
   xp: 'skill',
   resource: 'resource',
   inventory: 'item',
+  stat: 'stat',
 } as const satisfies Readonly<Record<string, string | null>>;
 
 export type EngineRoot = keyof typeof ENGINE_ROOTS;
@@ -143,6 +144,7 @@ export const condition: Parser<Condition> = {
     'xp.<skill> <comparison> <number>',
     'resource.<resource> <comparison> <number>',
     'inventory.<item> <comparison> <number>',
+    'stat.<stat> <comparison> <number>',
     'has <item>',
     'has <count> <item>',
     'not <condition>',
@@ -155,6 +157,7 @@ export const condition: Parser<Condition> = {
     'xp.thieving >= 4',
     'resource.health < 10',
     'inventory.plank = 3',
+    'stat.attack = 10',
     'has plank',
     'has 3 plank',
     'not has-key',

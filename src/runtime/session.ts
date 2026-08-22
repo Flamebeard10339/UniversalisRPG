@@ -8,7 +8,8 @@ import { itemCopies, Growth, grownItems } from './itemInstance';
 import { grow } from './growth';
 import { planeReports, type PlaneReport } from './planeReport';
 import { actionAddress } from '../content/sections/action';
-import { parseOwnerRef, TRAVEL_PAIR } from './actions';
+import { parseOwnerRef } from './actions';
+import { TRAVEL_PAIR } from './seat';
 import { relocateTo, spreadDiscovery } from './effects';
 import { effectiveAdjacent, reachable } from './journey';
 import { journal, type JournalEntry } from './journal';
@@ -136,13 +137,13 @@ function sessionOver(registry: Registry, state: GameState): PlaySession {
 
 type Actable = { actions?: Action[] };
 
-function actionAvailable(action: Action, state: GameState): boolean {
+function actionAvailable(action: Action, state: GameState, registry: Registry): boolean {
   if (isTwoSided(action)) return false;
-  return requiresMet(action, state) && actionVisible(action, state);
+  return requiresMet(action, state, registry) && actionVisible(action, state, registry);
 }
 
-function availableActions(owner: Actable, state: GameState): Action[] {
-  return (owner.actions ?? []).filter((action) => actionAvailable(action, state));
+function availableActions(owner: Actable, state: GameState, registry: Registry): Action[] {
+  return (owner.actions ?? []).filter((action) => actionAvailable(action, state, registry));
 }
 
 function movesTo(action: Action): string | undefined {
@@ -161,7 +162,7 @@ function entityAliasesTravelTo(location: Location, target: string, registry: Reg
   return standingHere(registry, state, location).some((entityId) => {
     const entity = registry.entities.get(entityId);
     if (!entity) return false;
-    return availableActions(entity, state).some((action) => isFreeTravelAction(action, target));
+    return availableActions(entity, state, registry).some((action) => isFreeTravelAction(action, target));
   });
 }
 
@@ -178,7 +179,7 @@ function fightChoices(registry: Registry, state: GameState, location: Location):
     for (const action of player.actions) {
       const id = declaredId(action);
       if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
-      if (!requiresMet(action, state) || !actionVisible(action, state)) continue;
+      if (!requiresMet(action, state, registry) || !actionVisible(action, state, registry)) continue;
       if (action.depletes.side === 'their' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
       choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action), detail: localizer.title('entity', entityId) });
     }
@@ -202,7 +203,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     if (canTalk(entityId, registry, state)) {
       choices.push({ id: `talk:${entityId}`, kind: 'talk', label: localizer.engine('engine.talk.to', { entity: localizer.title('entity', entityId) }) });
     }
-    for (const action of availableActions(entity, state)) {
+    for (const action of availableActions(entity, state, registry)) {
       const slug = actionAddress(action);
       choices.push({ id: useChoiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, action), detail: localizer.title('entity', entityId), leadsTo: movesTo(action) });
     }
@@ -210,7 +211,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 
   choices.push(...fightChoices(registry, state, location));
 
-  for (const action of availableActions(location, state)) {
+  for (const action of availableActions(location, state, registry)) {
     const slug = actionAddress(action);
     choices.push({ id: useChoiceId({ kind: 'use', obj: 'location', objId: location.id, actionId: slug }), kind: 'action', label: localizer.actionLabel('location', location.id, action), detail: localizer.title('location', location.id) });
   }
@@ -218,7 +219,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   for (const [itemId] of itemCopies(state)) {
     const item = registry.items.get(itemId);
     if (!item) continue;
-    for (const action of availableActions(item, state)) {
+    for (const action of availableActions(item, state, registry)) {
       const slug = actionAddress(action);
       choices.push({ id: useChoiceId({ kind: 'use', obj: 'item', objId: itemId, actionId: slug }), kind: 'action', label: localizer.actionLabel('item', itemId, action), detail: localizer.title('item', itemId) });
     }
@@ -234,7 +235,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   }
 
   for (const edge of effectiveAdjacent(registry, location.id)) {
-    if (edge.condition && !evaluateCondition(edge.condition, state)) continue;
+    if (edge.condition && !evaluateCondition(edge.condition, state, registry)) continue;
     if (entityAliasesTravelTo(location, edge.target, registry, state)) continue;
     choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: travelLabel(localizer, edge.target), leadsTo: edge.target, legs: 1 });
   }
@@ -409,7 +410,7 @@ function publishDiscovered(state: GameState, registry: Registry): PlayStatus['di
     z: each.z,
     adjacent: effectiveAdjacent(registry, each.id)
       .filter((edge) => known.has(edge.target))
-      .map((edge) => ({ to: edge.target, open: !edge.condition || evaluateCondition(edge.condition, state) })),
+      .map((edge) => ({ to: edge.target, open: !edge.condition || evaluateCondition(edge.condition, state, registry) })),
   }));
 }
 
@@ -596,7 +597,7 @@ function performDirective(session: PlaySession, directive: Directive): { failure
       beginAction(session, choiceIdFor(directive.inner));
       return {};
     case 'assert':
-      if (!evaluateCondition(directive.condition, state)) return { failure: describeCondition(directive.condition) };
+      if (!evaluateCondition(directive.condition, state, registry)) return { failure: describeCondition(directive.condition) };
       return {};
     case 'expect':
     case 'expect-only': {

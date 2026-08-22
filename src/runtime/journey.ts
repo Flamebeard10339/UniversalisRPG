@@ -14,7 +14,7 @@ export function effectiveAdjacent(registry: Registry, from: string): readonly Ed
 
 export function roadsFrom(from: string, registry: Registry, state: GameState): string[] {
   return effectiveAdjacent(registry, from)
-    .filter((edge) => !edge.condition || evaluateCondition(edge.condition, state))
+    .filter((edge) => !edge.condition || evaluateCondition(edge.condition, state, registry))
     .map((edge) => edge.target);
 }
 

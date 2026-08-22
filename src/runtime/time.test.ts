@@ -23,17 +23,19 @@ describe('advanceTime', () => {
 });
 
 describe('time reference', () => {
+  const registry = loadModule('');
+
   it('is readable via an ordinary comparison condition', () => {
     const state = createGameState();
     advanceTime(state, secondsToMs(100));
-    expect(evaluateCondition({ kind: 'comparison', left: { path: ['time'] }, operator: '>=', right: 100 }, state)).toBe(true);
-    expect(evaluateCondition({ kind: 'comparison', left: { path: ['time'] }, operator: '>', right: 100 }, state)).toBe(false);
+    expect(evaluateCondition({ kind: 'comparison', left: { path: ['time'] }, operator: '>=', right: 100 }, state, registry)).toBe(true);
+    expect(evaluateCondition({ kind: 'comparison', left: { path: ['time'] }, operator: '>', right: 100 }, state, registry)).toBe(false);
   });
 
   it('interpolates into rendered text', () => {
     const state = createGameState();
     advanceTime(state, secondsToMs(42));
-    const rendered = renderSegments([{ kind: 'interpolate', reference: { path: ['time'] } }], state);
+    const rendered = renderSegments([{ kind: 'interpolate', reference: { path: ['time'] } }], state, registry);
     expect(rendered).toBe('42');
   });
 });

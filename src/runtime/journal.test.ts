@@ -40,7 +40,7 @@ const held = (...set: string[]): GameState => {
 };
 
 // The condition a stage compiles to is derived and evaluated, never written down, so what is held to account here is where the quest stands rather than how that condition prints.
-const standing = (...set: string[]): string | undefined => stageNow(registry.quests.get('finding-your-feet')!, (asked) => evaluateCondition(asked, held(...set)))?.name;
+const standing = (...set: string[]): string | undefined => stageNow(registry.quests.get('finding-your-feet')!, (asked) => evaluateCondition(asked, held(...set), registry))?.name;
 
 describe('where a quest stands', () => {
   it('is its first stage before anything has happened, and moves as stages are reached', () => {

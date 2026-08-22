@@ -2,7 +2,7 @@ import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
-import { actorEntity, participants } from './roster';
+import { actorEntity, seatedAction } from './seat';
 import { sideOf } from '../grammar/action';
 import { Registry } from '../content/registry';
 import { carriedPassives, CounterLevel, itemContribution, scaledAmount, StatContribution } from './itemContribution';
@@ -101,8 +101,8 @@ function foldSkillLevels(registry: Registry, actorId: string, statId: string, xp
 }
 
 function performing(state: GameState, registry: Registry, actorId: string): Action | undefined {
-  if (!state.activeAction) return undefined;
-  return participants(state, registry).find((each) => each.self === actorId)?.action;
+  const seat = state.activeAction?.roster?.[actorId];
+  return seat && seatedAction(seat, registry, actorId);
 }
 
 export function hasPool(state: GameState, registry: Registry, actorId: string, resourceId: string): boolean {

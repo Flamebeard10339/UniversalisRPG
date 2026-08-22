@@ -94,40 +94,41 @@ describe('travelSecondsPerUnit', () => {
 });
 
 describe('evaluateCondition', () => {
+  const registry = loadInEnglish('');
   const ref = (...path: string[]): Condition => ({ kind: 'reference', reference: { path } });
 
   it('treats a bare reference as a truthiness check', () => {
     const state = createGameState();
-    expect(evaluateCondition(ref('unlocked'), state)).toBe(false);
+    expect(evaluateCondition(ref('unlocked'), state, registry)).toBe(false);
     state.flags.unlocked = true;
-    expect(evaluateCondition(ref('unlocked'), state)).toBe(true);
+    expect(evaluateCondition(ref('unlocked'), state, registry)).toBe(true);
   });
 
   it('reads a node visit counter off a dotted <node-name>.visits reference', () => {
     const state = createGameState();
     state.visits.toll = 5;
-    expect(evaluateCondition({ kind: 'comparison', left: { path: ['toll', 'visits'] }, operator: '>=', right: 5 }, state)).toBe(true);
-    expect(evaluateCondition({ kind: 'comparison', left: { path: ['toll', 'visits'] }, operator: '>=', right: 6 }, state)).toBe(false);
+    expect(evaluateCondition({ kind: 'comparison', left: { path: ['toll', 'visits'] }, operator: '>=', right: 5 }, state, registry)).toBe(true);
+    expect(evaluateCondition({ kind: 'comparison', left: { path: ['toll', 'visits'] }, operator: '>=', right: 6 }, state, registry)).toBe(false);
   });
 
   it('combines with not/and/or', () => {
     const state = createGameState();
     state.flags.a = true;
-    expect(evaluateCondition({ kind: 'not', condition: ref('a') }, state)).toBe(false);
-    expect(evaluateCondition({ kind: 'and', conditions: [ref('a'), ref('b')] }, state)).toBe(false);
-    expect(evaluateCondition({ kind: 'or', conditions: [ref('a'), ref('b')] }, state)).toBe(true);
+    expect(evaluateCondition({ kind: 'not', condition: ref('a') }, state, registry)).toBe(false);
+    expect(evaluateCondition({ kind: 'and', conditions: [ref('a'), ref('b')] }, state, registry)).toBe(false);
+    expect(evaluateCondition({ kind: 'or', conditions: [ref('a'), ref('b')] }, state, registry)).toBe(true);
   });
 
   it('checks a has condition against live inventory counts', () => {
     const state = createGameState();
-    expect(evaluateCondition({ kind: 'has', item: 'lockpick', count: 1 }, state)).toBe(false);
+    expect(evaluateCondition({ kind: 'has', item: 'lockpick', count: 1 }, state, registry)).toBe(false);
     state.inventory.lockpick = 1;
-    expect(evaluateCondition({ kind: 'has', item: 'lockpick', count: 1 }, state)).toBe(true);
-    expect(evaluateCondition({ kind: 'has', item: 'cooked-shrimp', count: 5 }, state)).toBe(false);
+    expect(evaluateCondition({ kind: 'has', item: 'lockpick', count: 1 }, state, registry)).toBe(true);
+    expect(evaluateCondition({ kind: 'has', item: 'cooked-shrimp', count: 5 }, state, registry)).toBe(false);
     state.inventory['cooked-shrimp'] = 4;
-    expect(evaluateCondition({ kind: 'has', item: 'cooked-shrimp', count: 5 }, state)).toBe(false);
+    expect(evaluateCondition({ kind: 'has', item: 'cooked-shrimp', count: 5 }, state, registry)).toBe(false);
     state.inventory['cooked-shrimp'] = 5;
-    expect(evaluateCondition({ kind: 'has', item: 'cooked-shrimp', count: 5 }, state)).toBe(true);
+    expect(evaluateCondition({ kind: 'has', item: 'cooked-shrimp', count: 5 }, state, registry)).toBe(true);
   });
 });
 
@@ -171,12 +172,12 @@ describe('applyResult', () => {
   it('flips a >= count condition true once enough add: increments land', () => {
     const state = createGameState();
     const condition: Condition = { kind: 'comparison', left: { path: ['rats-killed'] }, operator: '>=', right: 3 };
-    expect(evaluateCondition(condition, state)).toBe(false);
+    expect(evaluateCondition(condition, state, registry)).toBe(false);
     applyResultsNow(state, registry, [{ kind: 'add', variable: 'rats-killed', amount: 1 }]);
     applyResultsNow(state, registry, [{ kind: 'add', variable: 'rats-killed', amount: 1 }]);
-    expect(evaluateCondition(condition, state)).toBe(false);
+    expect(evaluateCondition(condition, state, registry)).toBe(false);
     applyResultsNow(state, registry, [{ kind: 'add', variable: 'rats-killed', amount: 1 }]);
-    expect(evaluateCondition(condition, state)).toBe(true);
+    expect(evaluateCondition(condition, state, registry)).toBe(true);
   });
 
   it('accumulates xp and moves location on relocate/discover', () => {
@@ -325,6 +326,8 @@ search:
 });
 
 describe('renderSegments', () => {
+  const registry = loadInEnglish('');
+
   it('interpolates a reference and includes a conditional only when it holds', () => {
     const state = createGameState();
     state.flags.snubbed = true;
@@ -335,6 +338,7 @@ describe('renderSegments', () => {
         { kind: 'conditional', condition: { kind: 'reference', reference: { path: ['snubbed'] } }, text: ' already answered' },
       ],
       state,
+      registry,
     );
     expect(rendered).toBe('Hello  already answered');
   });
@@ -351,13 +355,14 @@ describe('renderSegments', () => {
         { kind: 'literal', text: '.' },
       ],
       state,
+      registry,
     );
     expect(rendered).toBe('There you are, Rowan, Elf.');
   });
 
   it('renders an unset player.name as empty text', () => {
     const state = createGameState();
-    const rendered = renderSegments([{ kind: 'interpolate', reference: { path: ['player', 'name'] } }], state);
+    const rendered = renderSegments([{ kind: 'interpolate', reference: { path: ['player', 'name'] } }], state, registry);
     expect(rendered).toBe('');
   });
 });
@@ -634,7 +639,8 @@ describe('a deterministic batch settles `on empty:` at the completion that drain
 });
 
 describe('what an engine root reads', () => {
-  const reads = (path: string[], state: GameState, right: number): boolean => evaluateCondition({ kind: 'comparison', left: { path }, operator: '=', right }, state);
+  const registry = loadInEnglish('');
+  const reads = (path: string[], state: GameState, right: number): boolean => evaluateCondition({ kind: 'comparison', left: { path }, operator: '=', right }, state, registry);
 
   it('reads an xp total, a pool and a held count as numbers a comparison can bound', () => {
     const state = createGameState();
@@ -659,9 +665,9 @@ describe('what an engine root reads', () => {
   it.each(ENGINE_ROOT_NAMES)('does not let a flag named after %s answer for it', (root) => {
     const state = createGameState();
     const path = [root, 'island', 'anything'];
-    const before = renderSegments([{ kind: 'interpolate', reference: { path } }], state);
+    const before = renderSegments([{ kind: 'interpolate', reference: { path } }], state, registry);
     state.flags[path.join('.')] = 99;
 
-    expect(renderSegments([{ kind: 'interpolate', reference: { path } }], state)).toBe(before);
+    expect(renderSegments([{ kind: 'interpolate', reference: { path } }], state, registry)).toBe(before);
   });
 });

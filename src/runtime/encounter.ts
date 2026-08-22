@@ -1,7 +1,8 @@
 import { RuntimeError } from './error';
 import { Action, isTwoSided, sideOf } from '../grammar/action';
 import { attemptDuration, hasPool, statValue } from './stats';
-import { actorEntity, participants, performable, seatOf } from './roster';
+import { participants, performable, seatOf } from './roster';
+import { actorEntity } from './seat';
 import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
 import { declaredId } from '../content/sections/entity';
 import { hostile, Registry } from '../content/registry';
@@ -24,7 +25,7 @@ export function retaliation(state: GameState, registry: Registry, actorId: strin
   for (const action of actorEntity(registry, actorId)?.actions ?? []) {
     const id = declaredId(action);
     if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
-    if (!performable(action, state)) continue;
+    if (!performable(action, state, registry)) continue;
     if (!hasPool(state, registry, attackerId, action.depletes.id)) continue;
     return { id, action };
   }
