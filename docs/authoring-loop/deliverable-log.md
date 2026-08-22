@@ -160,6 +160,40 @@ to measure. Levelling them all up first would delete the experiment.
 
 ---
 
+## What the outline answers settled
+
+`.planning/starting-town-outline.md` came back corrected. The rulings that change
+what gets built, rather than what gets written:
+
+**Tulsa is the town and effectively the region; the kingdom is Yanodonin.** The
+town carries z-layers — basements, surface, roofs — and each place is its own
+location, sometimes several adjacent ones, so that travel has distance and
+enemies separate naturally. Densely connected, mostly bidirectional, read as a
+text adventure. No `look` or `sound` vocabulary, at least not yet.
+
+**Tutorial island is scrapped as a concept, and it costs two lines.** Miki is
+joking about escaping it; the player is on the mainland the whole time, and the
+joke becomes a quest that runs the length of the game. The instinct is that this
+is a rename with a long tail — `tutorial-island` occurs 376 times across 40 files.
+It is not. Every one of those is machine-facing: the module id, flag and item
+namespaces, save fixtures, test fixtures. The player-visible fiction is two lines
+of prose in `content/tutorial-quests.dsl`, at 22 and 85. The module keeps its id
+forever and no player ever meets it.
+
+**Renaming the namespace is therefore ruled out**, and this note exists so it is
+not proposed again. It would touch 40 files, churn every save fixture, and buy
+nothing a reader could see.
+
+**The eleven unheld mechanics were triaged by the author**, and the triage is in
+the outline beside each one. Two results matter to ordering: screenshake is
+removed outright, and instanced areas are backlogged as being the same thing as
+respawns plus death mechanics. The rest are believed reachable, several with
+implementation work, and `use`-a-weapon-on-an-NPC is to be a dialogue option
+instead. That triage is what an authoring agent should be handed so it knows
+which `@@@` are expected.
+
+---
+
 ## What Yonatan has to deliver
 
 1. **Corrections to a town outline**, which is extracted from the cast and places
