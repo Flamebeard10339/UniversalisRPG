@@ -9,7 +9,7 @@ import { grow } from './growth';
 import { planeReports, type PlaneReport } from './planeReport';
 import { actionAddress } from '../content/sections/action';
 import { parseOwnerRef } from './actions';
-import { TRAVEL_PAIR } from './seat';
+import { TRAVEL_PAIR } from './actionLookup';
 import { relocateTo, spreadDiscovery } from './effects';
 import { effectiveAdjacent, reachable } from './journey';
 import { journal, type JournalEntry } from './journal';

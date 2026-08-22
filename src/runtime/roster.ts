@@ -2,7 +2,7 @@ import { Action } from '../grammar/action';
 import { actionAddress } from '../content/sections/action';
 import { Registry } from '../content/registry';
 import { actionVisible, findActiveAction, requiresMet } from './actions';
-import { seatedAction } from './seat';
+import { seatedAction } from './actionLookup';
 import { type Cadence, GameState, PLAYER, type Seat } from './state';
 
 export const performable = (action: Action, state: GameState, registry: Registry): boolean => requiresMet(action, state, registry) && actionVisible(action, state, registry);

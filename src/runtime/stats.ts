@@ -2,7 +2,7 @@ import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
-import { actorEntity, seatedAction } from './seat';
+import { actorEntity, seatedAction } from './actionLookup';
 import { sideOf } from '../grammar/action';
 import { Registry } from '../content/registry';
 import { carriedPassives, CounterLevel, itemContribution, scaledAmount, StatContribution } from './itemContribution';

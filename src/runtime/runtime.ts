@@ -1,7 +1,7 @@
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
 import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, outcomeResults, parseOwnerRef, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
-import { findActionOwner, travelAction, travelPair } from './seat';
+import { findActionOwner, travelAction, travelPair } from './actionLookup';
 import {
   applyResults,
   applyResultsNow,
@@ -19,7 +19,7 @@ import {
 } from './effects';
 import { damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, opposes, leaveFight, playerCadence, poolLevel, retaliation, targetLevel } from './encounter';
 import { armedAction, Participant, participants, seatOf } from './roster';
-import { actorEntity } from './seat';
+import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
 import { sideOf } from '../grammar/action';
 import { applyRespawns, downOne, isStanding, nextRespawn, standing } from './population';

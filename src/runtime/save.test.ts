@@ -9,7 +9,7 @@ import { openModalNamed } from './modalStack';
 import { compareSave, compareSaveOnly, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave, type SaveField } from './save';
 import { parseSaveSection } from '../content/sections/save';
 import { runTest } from './session';
-import { travelAction, TRAVEL_ADDRESS } from './seat';
+import { travelAction, TRAVEL_ADDRESS } from './actionLookup';
 import { actionAddress } from '../content/sections/action';
 import { type Registry } from '../content/registry';
 import { CRAFT_ADDRESS } from '../content/sections/recipe';

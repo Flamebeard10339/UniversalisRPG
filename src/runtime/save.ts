@@ -9,7 +9,7 @@ import { initResources } from './effects';
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/sections/save';
 import { parseOwnerRef } from './actions';
-import { findActionOwner, travelEndProblem, TRAVEL_PAIR } from './seat';
+import { findActionOwner, travelEndProblem, TRAVEL_PAIR } from './actionLookup';
 import { isBuffList, pruneBuffs } from './buffs';
 import { isInstanceTable, pruneInstances } from './instances';
 import { itemTemplate } from './itemInstance';

@@ -4,7 +4,7 @@ import { evaluateCondition } from './conditions';
 import { Action } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
 import { Registry } from '../content/registry';
-import { findActionOwner } from './seat';
+import { findActionOwner } from './actionLookup';
 import { copiesOf } from './itemInstance';
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { type ActiveAction, GameState } from './state';
