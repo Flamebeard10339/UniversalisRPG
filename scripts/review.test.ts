@@ -50,6 +50,15 @@ describe('the sheet a reviewer reads', () => {
     expect(written.loose).toEqual([]);
   });
 
+  it('reviews the lines a module names outright, which is the only way the engine says anything on its own behalf', () => {
+    const { registry, parsed } = loadUniverseWithDiagnostics(shipped());
+    const english = parsed.find((module) => module.info.id === 'engine-en')!;
+    const written = sheetFor(registry, 'engine-en', 'content/engine-en.dsl', english.source.text);
+
+    expect(written.sections.map((section) => section.kind)).toEqual(['locale']);
+    expect(written.sections[0].said.map((said) => said.field)).toContain('engine.travel.to');
+  });
+
   it('leaves nothing the corpus says outside the sheet its module writes', () => {
     const { registry, parsed } = loadUniverseWithDiagnostics(shipped());
     const loose = parsed.flatMap((module) => sheetFor(registry, module.info.id, module.source.name, module.source.text).loose);

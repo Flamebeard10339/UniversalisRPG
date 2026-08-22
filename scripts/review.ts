@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { NOTE_MARK, noteIn, withoutNote } from '../src/grammar/note';
-import { localeKey } from '../src/content/locale';
+import { localeKey, moduleLocaleSections } from '../src/content/locale';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import type { Registry } from '../src/content/registry';
@@ -109,6 +109,16 @@ export function sheetFor(registry: Registry, module: string, source: string, tex
     };
     if (claim) said.get(claim.header)!.push(one);
     else if (key.startsWith(`${module}.`) || key.includes(`.${module}.`)) loose.push({ ...one, key });
+  }
+
+  // What a module declares outright, which is how the engine's own English arrives: a `# locale` section names its keys rather than growing them off a section's fields, so nothing above would ever reach them.
+  for (const declared of moduleLocaleSections(registry.locales, module)) {
+    const header = headers.find((each) => each.kind === 'locale' && each.id === declared.language);
+    if (header === undefined) continue;
+    for (const { key, value } of declared.entries) {
+      const asked = noteIn(value);
+      said.get(header)!.push({ field: key, text: withoutNote(value), ...(asked === undefined ? {} : { asked: asked.trim() }), generated: false });
+    }
   }
 
   const sections = headers
