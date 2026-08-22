@@ -166,6 +166,12 @@ shield, +2 defense
 examine: A bent sliver of metal, worn smooth from use.
 thieving-tool
 
+# item fishing-net
+examine: A fishing net. @@@
+
+# item fish
+examine: A fish. @@@
+
 # item jug-of-water
 examine: A clay jug of clean water.
 
@@ -474,7 +480,7 @@ examine: A narrow landing with a dresser and a view of the coast.
 adjacent:
   guide-house
 entities:
-  dresser, stairs-down
+  dresser, stairs-down, window
 
 # location basement
 x: 0, y: 0, z: -1
@@ -489,6 +495,15 @@ east of guide-house
 examine: Pale sand and the sound of the tide. The mainland waits past the water.
 adjacent:
   guide-house
+  market-district
+
+// However a route leaves the house, it lands adjacent to here: the shared
+// ground every route's test converges on.
+# location market-district
+east of beach
+examine: The market district. @@@
+adjacent:
+  beach
 
 // --- entities ---
 
@@ -510,6 +525,7 @@ on death:
 # entity miki
 faction: player
 examine: A weathered man in patched leather, quick to smile.
+flags: angered
 
 # entity front-door
 examine: A heavy wooden door, bound in iron.
@@ -588,6 +604,22 @@ search drawer:
   set: searched
   luck vs 60:
     roll: trinket
+
+// The only way out that never runs through Miki. A player who has burned the
+// front door still has this — a straight drop with a cost, not a puzzle.
+# entity window
+examine: A window. @@@
+climb out:
+  instant
+  relocate: beach
+  drain: 5 health
+  say: You climb out. @@@
+fish:
+  instant
+  requires: has fishing-net
+  hidden if: has fish
+  give: 1 fish
+  say: You catch a fish. @@@
 
 // 20 health against the player's 10 a hit is two hits, ~2.5 swings at 80%, so a
 // rat falls in about six seconds and lands a bite or two on the way out. It
