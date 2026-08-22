@@ -32,9 +32,6 @@ import {
   type Recorder,
 } from './command';
 
-const source = readFileSync('content/tutorial-island.dsl', 'utf8');
-const quests = readFileSync('content/tutorial-quests.dsl', 'utf8');
-
 const CARRYING_MODULE = `
 # skill smithing
 
@@ -102,15 +99,30 @@ adjacent:
 x: 41, y: 0
 `;
 
+const TALK_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  guide
+
+# entity guide
+title: Guide
+
+# dialogue guide-chat
+owner = guide
+
+node greeting:
+  always
+  Hello there, traveller.
+  -> Nod.
+`;
+
 interface Fixture {
   session: PlaySession;
   recorder: Recorder;
   ctx: CommandContext;
 }
-
-// A world holding a quest, which is what a played game is: the module the quest
-// gives its lines to, and the module that gives them.
-const played = (): Registry => loadUniverse([engineLocale(), { name: 'tutorial-island', text: source }, { name: 'tutorial-quests', text: quests }]);
 
 function fixture(text: string, authoring?: AuthoringContext, registry: Registry = loadInEnglish(text)): Fixture {
   const session = startSession(registry);
@@ -304,7 +316,7 @@ describe('a command result says what happened, not how it looks', () => {
   });
 
   it('hands the resulting view back rather than a rendering of it', () => {
-    const { ctx } = fixture(source);
+    const { ctx } = fixture(SAVE_MODULE);
     const result = runLine(ctx, '/wait 30');
     expect(kinds(result)).toEqual(['view']);
     expect(result.view?.time).toBe(30);
@@ -315,16 +327,16 @@ describe('a command result says what happened, not how it looks', () => {
 
 describe('the commands a player plays with', () => {
   it('applies a numeric choice, mutating state and returning its narration', () => {
-    const { ctx } = fixture(source, undefined, played());
-    const result = runLine(ctx, choiceIndex(ctx, 'talk:tutorial-island.miki'));
+    const { ctx } = fixture(TALK_MODULE);
+    const result = runLine(ctx, choiceIndex(ctx, 'talk:guide'));
 
     expect(result.quit).toBe(false);
     expect(result.view?.modals.map((modal) => modal.name)).toEqual(['dialogue']);
-    expect(result.view?.said.some((line) => line.includes('Greetings, adventurer!'))).toBe(true);
+    expect(result.view?.said.some((line) => line.includes('Hello there, traveller.'))).toBe(true);
   });
 
   it('/wait <seconds> advances the returned view.time by that amount', () => {
-    const { ctx } = fixture(source);
+    const { ctx } = fixture(SAVE_MODULE);
     const before = ctx.view.time;
     const result = runLine(ctx, '/wait 30');
     expect(result.quit).toBe(false);
@@ -332,7 +344,7 @@ describe('the commands a player plays with', () => {
   });
 
   it('/state reports the current status without advancing it, and produces no view', () => {
-    const { ctx, session } = fixture(source);
+    const { ctx, session } = fixture(SAVE_MODULE);
     runLine(ctx, '/wait 42');
 
     const result = runLine(ctx, '/state');
@@ -422,7 +434,7 @@ describe('the commands a player plays with', () => {
   });
 
   it('a blank line re-lists the choices without touching the world', () => {
-    const { ctx, session } = fixture(source);
+    const { ctx, session } = fixture(SAVE_MODULE);
     const result = runLine(ctx, '');
     const listed = result.output[0];
     expect(listed.kind === 'choices' && listed.choices).toEqual(ctx.view.choices);
@@ -431,7 +443,7 @@ describe('the commands a player plays with', () => {
   });
 
   it('/look asks for the location description again', () => {
-    const { ctx } = fixture(source);
+    const { ctx } = fixture(SAVE_MODULE);
     const result = runLine(ctx, '/look');
     const shown = result.output[0];
     expect(shown.kind === 'view' && shown.reread).toBe(true);
@@ -439,7 +451,7 @@ describe('the commands a player plays with', () => {
   });
 
   it('reports a friendly error for an out-of-range choice number, without throwing or quitting', () => {
-    const { ctx } = fixture(source);
+    const { ctx } = fixture(SAVE_MODULE);
     const result = runLine(ctx, String(ctx.view.choices.length + 10));
     expect(result.quit).toBe(false);
     expect(result.view).toBeUndefined();
@@ -447,7 +459,7 @@ describe('the commands a player plays with', () => {
   });
 
   it('reports a friendly error for an unknown slash command, without throwing or quitting', () => {
-    const { ctx } = fixture(source);
+    const { ctx } = fixture(SAVE_MODULE);
     const result = runLine(ctx, '/bogus');
     expect(result.quit).toBe(false);
     expect(result.view).toBeUndefined();
@@ -456,15 +468,15 @@ describe('the commands a player plays with', () => {
 
   it('/quit and /q both signal quit with the final status', () => {
     for (const spelling of ['/quit', '/q']) {
-      const { ctx } = fixture(source);
+      const { ctx } = fixture(SAVE_MODULE);
       const result = runLine(ctx, spelling);
       expect(result.quit, spelling).toBe(true);
-      expect(statusOf(result).status.location.id).toBe('tutorial-island.guide-house');
+      expect(statusOf(result).status.location.id).toBe('camp');
     }
   });
 
   it('/speed <n> turns the live dial and rejects a non-positive or unreadable one', () => {
-    const { ctx } = fixture(source);
+    const { ctx } = fixture(SAVE_MODULE);
 
     expect(errors(runLine(ctx, '/speed 4'))).toEqual([]);
     expect(ctx.live.speed).toBe(4);
@@ -510,10 +522,10 @@ describe('the commands a player plays with', () => {
   });
 
   it('a typed travel: directive moves the player and records the canonical form', () => {
-    const { ctx } = fixture(source);
-    const result = runLine(ctx, 'travel: basement');
-    expect(result.view?.location.id).toBe('tutorial-island.basement');
-    expect(result.recorded).toEqual(['travel: tutorial-island.basement']);
+    const { ctx } = fixture(TRAVEL_MODULE);
+    const result = runLine(ctx, 'travel: ruins');
+    expect(result.view?.location.id).toBe('ruins');
+    expect(result.recorded).toEqual(['travel: ruins']);
   });
 
   it('a numbered choice records the same canonical directive its typed twin does', () => {
