@@ -5,7 +5,7 @@ import { engineLocale, withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import type { Registry } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
-import { askedOption, newContext, runLine } from '../src/runtime/command';
+import { askedOption, isChoiceLine, newContext, runLine } from '../src/runtime/command';
 import { sessionStatus, startSession, view, type PlaySession } from '../src/runtime/session';
 import { excusedFieldsAreReal, unaccountedFields } from './lib/viewCoverage';
 import {
@@ -20,6 +20,7 @@ import {
   sdkOptionsFor,
   NOT_SHOWN,
   PLAYBOT_MODES,
+  REFUSALS_BEFORE_STOPPING,
   systemPromptFor,
   type ContentReader,
   type ModelClient,
@@ -108,6 +109,7 @@ describe('playbot', () => {
         note: 'moving along the fixed loop',
         expected: '',
         confusion: '',
+        blocked: '',
         detail: 'arrived somewhere',
       }));
     const requestSize = (n: number): number => system.length + journalWindowText(syntheticLog(n)).length + viewText.length;
@@ -183,6 +185,53 @@ describe('playbot', () => {
   // selector of its own. It forwards exactly the line a well-behaved reply drew from the live
   // view to the same runLine every driver shares, and none of them come back refused as
   // unrecognised — walking a real session across many turns, not two hand-picked ones.
+  // The run measured on 2026-08-22 lost eleven turns to this: every `fight:` choice the view
+  // printed was refused, because a choice id that is not also a directive verb could once be
+  // picked only by its position, which c6 forbids the loop from constructing. The subjects are
+  // every choice a live session offers, so a choice shape added later is covered with no edit.
+  it('every choice a live view prints can be taken by the id it was printed under', () => {
+    const session = startSession(played());
+    const ctx = newContext(session, view(session));
+    expect(ctx.view.choices.length).toBeGreaterThan(0);
+    for (const choice of ctx.view.choices) {
+      expect(isChoiceLine(ctx.view, choice.id), `${choice.id} is offered and cannot be answered by its own id`).not.toBeNull();
+    }
+  });
+
+  it('a player that says it is blocked ends the run on that turn', async () => {
+    const session = startSession(played());
+    const lines: string[] = [];
+    let asked = 0;
+    const client: ModelClient = {
+      send: async () => {
+        asked += 1;
+        return { line: '/look', note: 'looking', expected: '', confusion: '', blocked: asked === 2 ? 'every way on is refused' : '' };
+      },
+    };
+    const log = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 20, write: (line) => lines.push(line) });
+
+    expect(asked).toBe(2);
+    expect(log).toHaveLength(2);
+    expect(lines[lines.length - 1]).toContain('every way on is refused');
+  });
+
+  it('a run the world has stopped answering ends without the player having to say so', async () => {
+    const session = startSession(played());
+    const lines: string[] = [];
+    let asked = 0;
+    const client: ModelClient = {
+      send: async () => {
+        asked += 1;
+        return { line: 'no-such-choice-at-all', note: 'trying', expected: '', confusion: 'it keeps refusing', blocked: '' };
+      },
+    };
+    const log = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 30, write: (line) => lines.push(line) });
+
+    expect(asked).toBe(REFUSALS_BEFORE_STOPPING);
+    expect(log.every((entry) => entry.outcome === 'refused' || entry.outcome === 'invalid-reply')).toBe(true);
+    expect(lines[lines.length - 1]).toContain('in a row were refused');
+  });
+
   it('[c6] a line drawn from the view it was taken from is accepted, never refused as unrecognised', () => {
     const session = startSession(played());
     const ctx = newContext(session, view(session));

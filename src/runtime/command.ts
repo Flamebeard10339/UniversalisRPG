@@ -870,7 +870,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: '/export',
     arg: 'none',
     summary: 'print the current save as a # save body',
-    audience: 'author',
+    audience: 'player',
     parse: nothing,
     run: (ctx) => ({ output: [{ kind: 'source', words: 'tool', lines: [serializeSession(ctx.session)] }], quit: false, recorded: [] }),
   }),
@@ -879,7 +879,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'id',
     argHint: '<body>',
     summary: 'load a # save body printed by /export',
-    audience: 'author',
+    audience: 'player',
     parse: (rest) => (rest === '' ? { problem: '/import requires a # save body' } : rest),
     run: (ctx, body) => importPayload(ctx, body, 'Imported.', null),
   }),
@@ -1004,9 +1004,14 @@ export interface ParsedCommand {
   arg: ArgTypes[ArgKind];
 }
 
+// A choice answers to the id it was published under as well as to where it sits in the list. A
+// driver that reads the list aloud can echo the id back and never construct a position; the
+// terminal keeps typing numbers, which is what a person at a keyboard wants.
 export function isChoiceLine(current: PlayView, line: string): number | null {
   const trimmed = line.trim();
   if (trimmed === '') return null;
+  const named = current.choices.findIndex((choice) => choice.id === trimmed);
+  if (named >= 0) return named + 1;
   const index = Number(trimmed);
   if (!Number.isInteger(index) || index < 1 || index > current.choices.length) return null;
   return index;

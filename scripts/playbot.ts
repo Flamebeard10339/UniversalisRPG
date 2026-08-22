@@ -66,6 +66,12 @@ const SHARED_PRODUCT = `## What your reply is for
 
 "expected" and "confusion" are the actual point of this exercise. You are not just moving through the world — you are the first read of it. Every time you reach for something that is not there — an action you would expect to be able to take here, an object the room describes but does not let you touch, a verb that exists everywhere else but not on this one thing — say so in "expected", specifically enough that whoever reads it later knows exactly what is missing and where. Every time something reads as unclear, unfinished, self-contradictory, or like it is announcing a fact that never pays off — a room that keeps mentioning something with no way to interact with it, text that promises a consequence nothing delivers — say so in "confusion". Leave both empty only when there is truly nothing to report: do not pad them with something trivial to seem thorough, and do not leave them empty out of politeness when something genuinely did not work. A run that only records the moves you made and never records what you could not do has produced nothing anyone can act on.`;
 
+const SHARED_STOPPING = `## Ending the run
+
+"blocked" is normally an empty string. Put a sentence in it only when you judge the run genuinely cannot continue — the one path forward is refused every time you take it, every option leads back to the same wall, or the world has stopped responding to anything you do. Setting it ends the run immediately, so say what is blocking you and what you last tried.
+
+Two things about this. Saying a bug is severe in "confusion" does not stop anything; only "blocked" does, and a report that a run is unrecoverable followed by another attempt at the same refused line is worth less than stopping. And do not use it for a single refusal or an ordinary dead end: retry, try another way in, and reserve it for the case where you have run out of ways in.`;
+
 const AUTHOR_FRAMING = `## Your situation: early, unfinished content
 
 You are playtesting a zone that is still being written. Assume gaps are the normal state of things, not a sign you have done something wrong — an unfinished room is exactly what you are here to find. Be an eager, curious player rather than a cautious one: try the things a careful reader would skip, talk to everyone twice, open every screen that offers itself, attempt an action even when you are not sure it is meant to work yet. Your "expected" notes are the actual deliverable of this run — they become a work list for whoever is writing this content next, so favor being concrete and specific over being brief. If a room announces an object with no way to interact with it, or a character mentions something with no dialogue node behind it, that is exactly the kind of thing worth naming.`;
@@ -120,7 +126,7 @@ const MODE_FRAMING: Record<PlaybotMode, string> = {
 };
 
 export function systemPromptFor(mode: PlaybotMode): string {
-  return [SHARED_INTRO, SHARED_MECHANISM, SHARED_PRODUCT, MODE_FRAMING[mode], SHARED_EXAMPLE, SHARED_TAIL].join('\n\n');
+  return [SHARED_INTRO, SHARED_MECHANISM, SHARED_PRODUCT, SHARED_STOPPING, MODE_FRAMING[mode], SHARED_EXAMPLE, SHARED_TAIL].join('\n\n');
 }
 
 export interface TurnReply {
@@ -128,6 +134,9 @@ export interface TurnReply {
   readonly note: string;
   readonly expected: string;
   readonly confusion: string;
+  // Non-empty when the player judges the run cannot go on. A run that keeps asking after the
+  // world has stopped answering buys nothing and spends the plan it is drawn against.
+  readonly blocked: string;
 }
 
 export interface TurnRequest {
@@ -157,6 +166,7 @@ interface AppliedEntry {
   readonly note: string;
   readonly expected: string;
   readonly confusion: string;
+  readonly blocked: string;
   readonly detail: string;
 }
 
@@ -172,7 +182,8 @@ export const JOURNAL_WINDOW = 10;
 
 export function describeEntry(entry: RunLogEntry): string {
   if ('line' in entry) {
-    return `turn ${entry.turn} [${entry.outcome}] ${entry.line} — note: ${entry.note || '(none)'}; expected: ${entry.expected || '(none)'}; confusion: ${entry.confusion || '(none)'}; result: ${entry.detail}`;
+    const stopping = entry.blocked === '' ? '' : `; BLOCKED: ${entry.blocked}`;
+    return `turn ${entry.turn} [${entry.outcome}] ${entry.line} — note: ${entry.note || '(none)'}; expected: ${entry.expected || '(none)'}; confusion: ${entry.confusion || '(none)'}${stopping}; result: ${entry.detail}`;
   }
   return `turn ${entry.turn} [${entry.outcome}] ${entry.detail}`;
 }
@@ -202,7 +213,7 @@ function renderResources(v: PlayView): string[] {
 }
 
 function renderCarried(v: PlayView): string[] {
-  return v.carried.map((each) => `${each.shown}${each.count > 1 ? ` x${each.count}` : ''}${each.worn ? ` (worn: ${each.worn.title})` : ''}`);
+  return v.carried.map((each) => `${each.id} (${each.shown})${each.count > 1 ? ` x${each.count}` : ''}${each.worn ? ` worn:${each.worn.slot}` : ''}`);
 }
 
 function renderEquipment(v: PlayView): string[] {
@@ -293,9 +304,9 @@ export function parseReply(raw: unknown): { ok: true; reply: TurnReply } | { ok:
     return { ok: false, error: 'reply is missing one of line, note, expected, confusion as a string' };
   }
   if (line.trim() === '') return { ok: false, error: 'reply.line is empty' };
-  const blocked = offMenuCommand(line);
-  if (blocked) return { ok: false, error: `${blocked.name} is not a command this player may run` };
-  return { ok: true, reply: { line, note, expected, confusion } };
+  const offMenu = offMenuCommand(line);
+  if (offMenu) return { ok: false, error: `${offMenu.name} is not a command this player may run` };
+  return { ok: true, reply: { line, note, expected, confusion, blocked: stringField(raw, 'blocked') ?? '' } };
 }
 
 function summarize(v: PlayView): string {
@@ -364,7 +375,7 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   const result = runLine(deps.ctx, parsed.reply.line);
   const { outcome, detail } = settleTurn(result, before);
 
-  return { turn: deps.turn, outcome, line: parsed.reply.line, note: parsed.reply.note, expected: parsed.reply.expected, confusion: parsed.reply.confusion, detail };
+  return { turn: deps.turn, outcome, line: parsed.reply.line, note: parsed.reply.note, expected: parsed.reply.expected, confusion: parsed.reply.confusion, blocked: parsed.reply.blocked, detail };
 }
 
 export interface PlaybotOptions {
@@ -376,6 +387,19 @@ export interface PlaybotOptions {
   readonly write: (line: string) => void;
 }
 
+// A player that says it is stuck is believed at once. A player that does not say so is still cut
+// off, because the run measured on 2026-08-22 called its own bug severe and run-blocking on turn
+// twenty and went on asking for three more turns: saying so and stopping are not the same act.
+export const REFUSALS_BEFORE_STOPPING = 4;
+
+function stoppedBy(log: readonly RunLogEntry[]): string | null {
+  const last = log[log.length - 1];
+  if (last !== undefined && 'blocked' in last && last.blocked !== '') return `the player stopped the run: ${last.blocked}`;
+  const tail = log.slice(-REFUSALS_BEFORE_STOPPING);
+  if (tail.length < REFUSALS_BEFORE_STOPPING || !tail.every((entry) => entry.outcome === 'refused')) return null;
+  return `${REFUSALS_BEFORE_STOPPING} turns in a row were refused, the last of them: ${tail[tail.length - 1].detail}`;
+}
+
 export async function runPlaybot(options: PlaybotOptions): Promise<RunLogEntry[]> {
   const system = systemPromptFor(options.mode);
   const ctx = newContext(options.session, view(options.session));
@@ -385,6 +409,11 @@ export async function runPlaybot(options: PlaybotOptions): Promise<RunLogEntry[]
     log.push(entry);
     const billed = options.client.lastUsage?.() ?? null;
     options.write(billed === null ? describeEntry(entry) : `${describeEntry(entry)} [billed ${billed.input} in, ${billed.cacheRead} cached read, ${billed.cacheWrite} cached write]`);
+    const stopping = stoppedBy(log);
+    if (stopping !== null) {
+      options.write(`run ended after turn ${turn}: ${stopping}`);
+      return log;
+    }
   }
   return log;
 }
@@ -392,12 +421,13 @@ export async function runPlaybot(options: PlaybotOptions): Promise<RunLogEntry[]
 const REPLY_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['line', 'note', 'expected', 'confusion'],
+  required: ['line', 'note', 'expected', 'confusion', 'blocked'],
   properties: {
     line: { type: 'string' },
     note: { type: 'string' },
     expected: { type: 'string' },
     confusion: { type: 'string' },
+    blocked: { type: 'string' },
   },
 } as const;
 
