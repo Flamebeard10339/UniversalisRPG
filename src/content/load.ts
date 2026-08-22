@@ -9,7 +9,7 @@ import { Entity, Handler, isHandlerBlock } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
 import { actionSlugProblem, textFieldsOf } from './sections';
-import { recursivelyResolveRelativeCoordinates } from './sections/location';
+import { closeAdjacency, recursivelyResolveRelativeCoordinates } from './sections/location';
 import { type Maps, buildSection, sectionFor, contentSectionMaps, isActionOwnerKind, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind } from './sections';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
@@ -30,6 +30,7 @@ function emptyRegistry(): Registry {
     factionBits: new Map(),
     namespace: new Namespace(),
     locales: emptyLocales(),
+    roads: new Map(),
   };
 }
 
@@ -706,6 +707,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   }
   const validationFailure = validateBuiltRegistry(registry, owners, danglingRoots);
   if (validationFailure) return { failure: validationFailure };
+  registry.roads = closeAdjacency(registry.locations);
   for (const [kind, byId] of merged) {
     for (const [id, section] of byId) {
       const owned = isNamespacedKind(kind);

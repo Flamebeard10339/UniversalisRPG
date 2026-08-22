@@ -8,6 +8,7 @@ import { isPoint, Range, sampleCount, sampleRange } from '../grammar/range';
 import { Registry } from '../content/registry';
 import { Resource } from '../content/sections/resource';
 import { evaluateCondition } from './conditions';
+import { effectiveAdjacent } from './journey';
 import { actorEntity } from './roster';
 import { hasPool } from './stats';
 import { stockItem } from './itemInstance';
@@ -147,7 +148,7 @@ export function spreadDiscovery(state: GameState, registry: Registry): void {
   const here = registry.locations.get(state.location);
   if (!here) return;
   state.flags[`${here.id}.${DISCOVERED}`] = true;
-  for (const edge of here.adjacent) {
+  for (const edge of effectiveAdjacent(registry, here.id)) {
     const key = `${edge.target}.${DISCOVERED}`;
     if (state.flags[key]) continue;
     if (edge.condition && !evaluateCondition(edge.condition, state)) continue;

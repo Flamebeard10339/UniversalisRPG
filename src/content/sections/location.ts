@@ -105,6 +105,21 @@ const DIRECTION_VECTORS: Record<Direction, [number, number, number]> = {
   down: [0, 0, -1],
 };
 
+// A road an author writes only from one end is walked from the other end too, carrying the same
+// condition, unless the far end already writes an edge back — an authored edge always beats a derived one.
+export function closeAdjacency(locations: ReadonlyMap<string, Location>): Map<string, Edge[]> {
+  const roads = new Map<string, Edge[]>();
+  for (const location of locations.values()) roads.set(location.id, [...location.adjacent]);
+  for (const location of locations.values()) {
+    for (const edge of location.adjacent) {
+      const farEnd = locations.get(edge.target);
+      if (farEnd?.adjacent.some((back) => back.target === location.id)) continue;
+      roads.get(edge.target)?.push({ target: location.id, condition: edge.condition });
+    }
+  }
+  return roads;
+}
+
 export function recursivelyResolveRelativeCoordinates(locations: Map<string, Location>): void {
   const placing = new Set<string>();
   const coords = new Map<string, [number, number, number]>();

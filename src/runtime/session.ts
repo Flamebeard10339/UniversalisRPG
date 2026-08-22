@@ -10,7 +10,7 @@ import { planeReports, type PlaneReport } from './planeReport';
 import { actionAddress } from '../content/sections/action';
 import { parseOwnerRef, TRAVEL_PAIR } from './actions';
 import { relocateTo, spreadDiscovery } from './effects';
-import { reachable } from './journey';
+import { effectiveAdjacent, reachable } from './journey';
 import { journal, type JournalEntry } from './journal';
 export type { JournalEntry, JournalLine, QuestStanding } from './journal';
 import { playerCadence } from './encounter';
@@ -233,7 +233,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     choices.push({ id: `craft:${recipe.id}`, kind: 'craft', label: craftLabel(localizer, recipe.id), detail });
   }
 
-  for (const edge of location.adjacent) {
+  for (const edge of effectiveAdjacent(registry, location.id)) {
     if (edge.condition && !evaluateCondition(edge.condition, state)) continue;
     if (entityAliasesTravelTo(location, edge.target, registry, state)) continue;
     choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: travelLabel(localizer, edge.target), leadsTo: edge.target, legs: 1 });
@@ -407,7 +407,7 @@ function publishDiscovered(state: GameState, registry: Registry): PlayStatus['di
     x: each.x,
     y: each.y,
     z: each.z,
-    adjacent: each.adjacent
+    adjacent: effectiveAdjacent(registry, each.id)
       .filter((edge) => known.has(edge.target))
       .map((edge) => ({ to: edge.target, open: !edge.condition || evaluateCondition(edge.condition, state) })),
   }));
