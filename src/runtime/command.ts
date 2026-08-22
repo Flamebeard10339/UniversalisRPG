@@ -12,8 +12,7 @@ import {
   renderLocalChangesModule,
   upsertLocalSection,
 } from '../content/localChanges';
-import { isGrowthDirective, parseDirectiveLine, type Directive } from '../content/sections/test';
-import { printDirective } from '../content/serialize';
+import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
 import { type ParsedSave } from '../content/sections/save';
 import { describeCondition } from './runtime';
@@ -247,7 +246,7 @@ function nothing(): undefined {
 }
 
 export function canonicalDirective(directive: Directive): string {
-  if (directive.kind === 'run' || directive.kind === 'expect' || directive.kind === 'assert') {
+  if (directive.kind === 'run' || directive.kind === 'expect' || directive.kind === 'expect-only' || directive.kind === 'assert') {
     throw new RuntimeError(`canonicalDirective: ${directive.kind}: is authored, not recorded`);
   }
   return printDirective(directive);
@@ -312,8 +311,8 @@ function nothingIsNamed(localizer: Localizer, id: string): Localized {
 function runDirective(ctx: CommandContext, directive: Directive): CommandResult {
   if (directive.kind === 'run') return runNamedTest(ctx, directive.test);
 
-  if (directive.kind === 'assert' || directive.kind === 'expect') {
-    const label = directive.kind === 'expect' ? directive.save : describeCondition(directive.condition);
+  if (directive.kind === 'assert' || directive.kind === 'expect' || directive.kind === 'expect-only') {
+    const label = directive.kind === 'assert' ? describeCondition(directive.condition) : directive.save;
     try {
       const result = applyDirective(ctx.session, directive);
       return result.failure ? noted('warn', result.failure) : noted('ok', `${label} matches`);
