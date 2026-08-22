@@ -364,7 +364,7 @@ repository names first. The proof moved with it, to
   records a line that replays" (recorder.history is ['goto: island'] and a `# test` built from that line
   replays to the same place) and "marks the dev-only commands, and the tokens are read off the marks";
   vitest src/ui/devMode.test.tsx "marks at least one, and every mark is a line both drivers can run", which
-  walks COMMANDS.filter(spec => spec.dev) rather than naming /goto. "No component mutates session state
+  walks COMMANDS.filter(spec => spec.audience === 'cheat') rather than naming /goto. "No component mutates session state
   directly" is derived by src/ui/surface.test.ts's DISPATCHES allowlist plus MOVES_THE_WORLD, over every
   module under src/ui; the branch's one addition to that list, devTokenIn, is a pure read of the table's own
   marks. Mutations c8 (src/content/serialize.ts printing goto: as travel:) and c9b both KILLED.
@@ -495,7 +495,7 @@ repository names first. The proof moved with it, to
   Mutation (src/ui/devMode.ts devLine inverted, so the toggle spells the opposite direction) KILLED by the byte test.
 - proof 8: met — vitest src/runtime/command.test.ts "marks the dev-only commands, and the tokens are read off the marks",
   and src/ui/devMode.test.tsx "marks at least one, and every mark is a line both drivers can run", which walks
-  COMMANDS.filter(spec => spec.dev). Mutation (src/runtime/command.ts devTokenIn pointed at a token nothing spells,
+  COMMANDS.filter(spec => spec.audience === 'cheat'). Mutation (src/runtime/command.ts devTokenIn pointed at a token nothing spells,
   which empties the derived set) KILLED by the named command test. The clause's sentence was edited in the triage
   from "recorded by the recorder and replayable" to "what moved the world is recorded and replayable"; judged and
   accepted as a correction rather than a weakening, because the reasoning — a speed: directive would replay as a

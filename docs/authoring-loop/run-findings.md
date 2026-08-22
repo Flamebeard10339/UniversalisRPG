@@ -43,6 +43,22 @@ instead of removing it.
   chestnuts' is available but I have no chestnuts."* Same family as the first
   spike's *the oven is unlimited*.
 
+## What the unification found, 2026-08-22
+
+Deleting the playbot's private door and asking all three renderers the same
+question turned up gaps in the two drivers that were not being examined:
+
+- **The terminal never shows a character's stats.** `PlayStatus.stats` is read by
+  no command in `scripts/play-cli.ts` or `src/runtime/command.ts` — `/state`
+  prints location, time, flags, inventory, resources and the encounter, and stops.
+  A real gap, recorded as one rather than dressed up as an exclusion.
+- **The terminal shows an equipment slot only once something is worn in it**, so an
+  empty-handed session has nothing to point at.
+- **The terminal has no map**, so neither `discovered` nor `locations` is drawn
+  anywhere, where the GUI has a pane for it.
+- The GUI's only deliberate exclusion is `flags`, on the same anti-spoiler
+  reasoning the playbot refuses it for.
+
 ## Fixed by these runs
 
 - ~~The journal sent the player upstairs for a mirror the guide house keeps on the
