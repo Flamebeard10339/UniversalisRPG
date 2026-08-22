@@ -76,53 +76,96 @@ The first run is a measurement. It has no pass mark.
 
 ## Item 5 — the playbot
 
-### The four constraints, which fix the design
+### It is already specified, and almost already built
 
-1. local, inside Claude Code, **not through the API**
-2. cheap, fast, convenient for the agent
-3. asynchronous — the DSL may be edited mid-session, by a human or a GM agent
-4. the agent can register feedback, questions and confusion at every point, in a
-   form that is actually usable afterwards
+`docs/specs/a-turn-costs-what-the-last-turn-did.md` is a ten-clause spec with a
+`## Decisions` section and measured numbers behind every ruling. It was written,
+argued and never implemented; the tooling around it was deleted and the record
+kept. **Nothing on this branch re-decides it.** The work is to implement it.
 
-Constraint 1 is the one that decides the shape. This is **not** a script that
-calls a model in a loop. It is a long-lived session the agent drives one cheap
-turn at a time. `runLine` in `src/runtime/command.ts` is already that seam;
-`play-cli` is a printer sitting on it.
+Standing already, checked on this branch:
 
-Constraint 3 is the hard engineering: a live session whose world is reloaded
-underneath it. What happens to state that points at a location the edit changed
-is an open question and must be answered before the harness is built, not after.
+- `@anthropic-ai/claude-agent-sdk` is in `package.json` and in `node_modules`
+- `adoptRegistry` (`src/runtime/session.ts`) is built and tested against content
+  changing under a live session — c7 needs no new runtime
+- `apply` and `applyDirective` are the two input surfaces c6 names, and both exist
+- 14 `# save` fixtures exist, which is the start-anywhere lever
 
-Constraint 4 is where this meets item 3. A bot that says "I did not understand
-what this NPC wanted" is writing the same kind of note an author leaves with
-`@@@`. It goes to the same place and comes out of `npm run notes`.
+`scripts/playbot.ts` is the only thing missing.
+
+### What the spec already answers, so it is not asked again
+
+**The four constraints are all ruled on.** Local and on the plan rather than an
+API key: the Agent SDK is what puts a turn on the author's subscription, and that
+is the reason it was chosen. Cheap: measured. Asynchronous mid-run edits: c7.
+Feedback at every point: c8's `expected`/`confusion` pair, which the spec calls
+the run's actual product — a run recording only moves has produced nothing an
+author can act on.
+
+**One harness, several prompts** is c1, and it is stronger than "same harness,
+different prompt": below the point where a prompt is selected there is to be no
+branch on which prompt was chosen, and the proof runs a turn under each and
+asserts the request bodies differ in the system block and nowhere else.
+
+**A restart on edit is not needed** and the deliverable no longer contemplates one.
+
+### The one correction to make, and it inverts an instinct
+
+The playbot must **not** be made as small as possible. Measured 2026-08-15: a
+frozen prefix under 1024 tokens does not cache at all — a 932-token prefix billed
+932 fresh on every turn with zero cache reads, while a 6,450-token prefix wrote
+once and read 6,450 on every turn thereafter. 1024 is a cliff, not a target, and
+the prefix belongs comfortably above it.
+
+The cost ladder for one turn: full harness default 45,927; `tools: []` 35,245;
+tools off plus `settingSources: []` 5,849; both off and `cwd` outside the
+repository 296. `settingSources: []` alone does not isolate — working directory,
+git status and auto-memory ride a dynamic section a string system prompt does not
+remove, so c4's fourth opt-out is the load-bearing one.
+
+For contrast, the shape this replaces: a Claude Code subagent playing the same
+game was measured at ~44k tokens per turn and growing without bound, because it
+carries its transcript as memory.
+
+### What is stale in the spec
+
+c10 proves through `npm run tasks -- merge-ready`, which was deleted with the
+workflow tooling. It becomes `tsc --noEmit`, `npm test` and `npm run layer-check`.
 
 ### Not scored on reachability
 
 Independent paths mean no run reaches everything, and the union across runs is
-confounded by which paths were taken. A turn limit plus the agent's own judgment
-is the frame. Reachability-of-the-union is still worth computing as a floor —
-"nothing authored is orphaned" is a real standing check — but it is a by-product,
-not the score.
+confounded by which paths were taken. A turn bound plus the player's own
+`expected`/`confusion` is the frame. Reachability-of-the-union stays worth
+computing as a floor — nothing authored is orphaned — but it is a by-product.
 
-### One harness, three agents
+---
 
-A bug-and-exploit finder, a balance measurer and an explorer want different
-prompts and produce different reports. They want the **same** harness: a session,
-a turn, a view, a note channel. Building three harnesses is the failure mode;
-building one and letting the prompt differ is the shape. Whether one of them
-needs planning that this design cannot give it is a question for after the first
-one runs.
+## The ordering, which the corpus decides
+
+The corpus holds five locations, all of them tutorial island. There is no town.
+Every quest note in `.planning/planning_quests/` starts *speak to Kelsa* or
+*around the back of the castle*, and a quest modifies entities and locations
+rather than creating them, so there is nothing yet for those quests to modify.
+
+The playbot spec reached the same wall from the other side and restored its
+`requires starting-zone` edge on it: a player cannot walk to the edge of a world
+with no rooms, so the loop cannot bootstrap a zone from nothing.
+
+So the town is first, and it is also the right first subject for item 3's
+measurement. The ten quest notes are **not** to be finished before it — they vary
+from a premise-and-reward to named flags with per-stage hints, and how much
+outline detail the loop actually needs is precisely what the first run is meant
+to measure. Levelling them all up first would delete the experiment.
 
 ---
 
 ## What Yonatan has to deliver
 
-1. **One real outline**, for a region you actually want, written the way you would
-   naturally write it. Do not design a format — write one and the format is read
-   off it. Nothing in item 3 can be measured without this.
-2. **An answer on the reload question** (item 5, constraint 3), or agreement that
-   the first cut simply restarts the session on an edit and we find out whether
-   that is good enough.
-
-Everything else on this branch is mine.
+1. **Corrections to a town outline**, which is extracted from the cast and places
+   the quest notes already name — Kelsa, George, the town crier, Mouse, Larry,
+   Charlie the Tramp, Oolga, the duke, the guard captain, the bladesmith's son,
+   the barman; a market district, sewers, a castle, an apiary, a tavern; and
+   Miki's house joined to the town. Correcting is cheaper than authoring, and the
+   corrections are the specimen the outline format is read off.
+2. Nothing else. The reload question is closed and the quest notes stay as they are.
