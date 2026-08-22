@@ -706,3 +706,49 @@ would leave `roads` silently empty, verify the derived roads actually exist in a
 loaded corpus, and fix the one stale content comment the agent had correctly
 declined to touch as out of scope.
 
+## 2026-08-22 — a coding agent that stopped, and was right to
+
+Cold Sonnet, isolated worktree, one bounded task: give `assert:` a `stat` root so
+the last content claims about numbers can leave TypeScript. 186k tokens, 102 tool
+uses, ~12 minutes. **It did not finish, and the run was worth its cost.**
+
+It threaded `registry` through `evaluateCondition` and fifteen runtime files —
+clean, `tsc` green, no invented parameters — then hit an import cycle wiring the
+root to `statValue`:
+
+    conditions.ts -> stats.ts -> roster.ts -> actions.ts -> conditions.ts
+
+and stopped, with the cycle named, the two failing guards named, the diff left in
+place uncommitted, and a specific question: should the stat fold read the
+availability-filtered participant list or a raw seat lookup, given the two differ
+for an action whose `requires:` stops holding mid-cycle. It called that a
+combat-balance call rather than a mechanical one and refused to make it silently.
+
+**The prompt line that produced this** was *"Report the cost before you pay it …
+a report saying 'this is bigger than plumbing, and here is why' is a success, not
+a failure"*, together with a named ceiling (~fifteen files). It paid the cheap
+half, stopped at the boundary, and handed back a decision rather than a guess.
+Fourth run in a row where an instruction to surface the assumption worked.
+
+**What the orchestrator added, and it was not a coin flip.** The agent framed the
+question as a balance call. Read against the change it was making, it is not:
+once `stat` is a condition root, filtering "what is this actor performing" through
+`performable` makes a stat depend on a condition that depends on that stat — an
+action carrying `requires: stat.attack > 5` whose own tags boost attack closes the
+loop at runtime. The layer check was reporting a **semantic** circularity, not a
+packaging one, and only the raw seat terminates. Checking that took four greps:
+`participants()` filters by `performable`, `seatedAction` does not, and
+`findActionOwner` is a pure registry lookup whose address is simply wrong.
+
+**Cost saved by not throwing the work away.** The 15-file threading diff was
+committed on the agent's own branch as a WIP that does not build, the worktree
+freed, and a second cold agent started from that commit with the seam ratified.
+Regenerating those 91 lines would have cost most of another 186k.
+
+**The general shape, now four rows deep:** a cold agent is cheap at executing a
+ratified design and honest about hitting a wall, and it will describe the wall in
+the vocabulary of the layer it was working in. Re-reading the wall one layer up is
+the orchestrator's job and is where the leverage is — the first agent called this
+one "balance", the roads agent called its blocker "serialization", and both were
+one level too low.
+
