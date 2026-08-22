@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { ENGINE_ROOT_NAMES, rootedKind } from '../grammar/condition';
 import { DslError } from '../grammar/parser';
 import { loadModule } from './load';
+import { mapOf } from './registry';
+import { contentSectionMaps } from './sections';
 
 const VALID = `
 # stat attack
@@ -367,4 +370,28 @@ describe('a use: names an object and a member of it', () => {
   it('leaves the kind it leads with the one thing still checked here', () => {
     expect(walking('use: creature.player.strike')).toThrow(/names an unknown kind: creature/);
   });
+});
+
+// Derived from the roots the grammar declares, so a root paired with a kind next month is answered here without an edit.
+describe('an engine root reads an id of the kind it names', () => {
+  const maps = new Map(contentSectionMaps());
+  const WHEN = 'when: time >= 0';
+
+  const declared = (kind: string): string => {
+    const held = mapOf(loadModule(VALID), maps.get(kind)!) as ReadonlyMap<string, unknown>;
+    const first = [...held.keys()][0];
+    if (first === undefined) throw new Error(`the fixture declares no ${kind} for an engine root to name`);
+    return first;
+  };
+
+  for (const root of ENGINE_ROOT_NAMES) {
+    const kind = rootedKind(root);
+    if (kind === null) continue;
+
+    it(`takes ${root}.<${kind}>, refuses a ${kind} nothing declares, and refuses ${root} on its own`, () => {
+      expect(loading(WHEN, `when: ${root}.${declared(kind)} >= 0`)).not.toThrow();
+      expect(loading(WHEN, `when: ${root}.not-a-${kind} >= 0`)).toThrow(new RegExp(`unknown ${kind}: not-a-${kind}`));
+      expect(loading(WHEN, `when: ${root} >= 0`)).toThrow(new RegExp(`reads ${root} on its own, which names no ${kind}`));
+    });
+  }
 });

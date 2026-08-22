@@ -1,4 +1,4 @@
-import { ENGINE_ROOTS } from '../grammar/condition';
+import { ENGINE_ROOT_NAMES } from '../grammar/condition';
 import { formatDependency, formatVersion, satisfies } from '../grammar/dependency';
 import { ModuleInfo, info as infoSection } from './sections/info';
 import { DEFAULT_CONTEXT } from '../grammar/section';
@@ -25,7 +25,7 @@ export interface ModuleOrderProblem {
   error: DslError;
 }
 
-const RESERVED_IDS: readonly string[] = [...sectionKinds(), ...ENGINE_ROOTS, 'self'];
+const RESERVED_IDS: readonly string[] = [...sectionKinds(), ...ENGINE_ROOT_NAMES, 'self'];
 
 const MODULE_ID = /^[a-z][a-z0-9-]*$/;
 

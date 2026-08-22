@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { comparison, condition } from '../grammar/condition';
 import type { Parser } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
 import { amissIn, applied, fillingWords, offeringAt, refusalsIn, type Addressed, type Amiss } from './completion';
@@ -301,13 +302,12 @@ describe('a hole with a grammar of its own', () => {
   const under = '# entity tutorial-island.giant-rat\nstats: attack 3\non hit:\n';
 
   it('breaks it into the words it is written with and the things it may name', () => {
-    expect(holds(`${under}  if |`)).toEqual({
-      words: ['>', '>=', '=', '!=', '<=', '<', 'has', 'not', 'and', 'or'],
-      names: [
-        { hole: 'flag', kind: 'flag' },
-        { hole: 'item', kind: 'item' },
-      ],
-    });
+    const held = holds(`${under}  if |`)!;
+    const holes = condition.forms.flatMap((form) => [...form.matchAll(/<([a-z]+)>/g)].map((each) => each[1]));
+    const spelled = (form: string): string[] => form.replace(/<[^>]*>/g, ' ').split(/\s+/).filter((word) => word !== '');
+
+    expect(held.names).toEqual([...new Set(holes.filter((hole) => sectionFor(hole) !== undefined))].map((hole) => ({ hole, kind: hole })));
+    expect(held.words).toEqual([...comparison.forms, ...new Set(condition.forms.flatMap(spelled))]);
   });
 
   it('says the same of the same hole wherever it is written', () => {

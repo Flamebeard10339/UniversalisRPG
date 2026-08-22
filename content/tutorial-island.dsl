@@ -696,6 +696,8 @@ travel: guide-house
 use: entity.front-door.pick-lock
 assert: front-door.unlocked
 assert: beach.discovered
+assert: xp.thieving = 4
+assert: time >= 4
 
 # test save-restores-object-owned-flags
 load: explored-and-unlocked

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { Condition } from '../grammar/condition';
+import { Condition, ENGINE_ROOT_NAMES } from '../grammar/condition';
 import {
   actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, GameState, initResources, renderSegments, resolve, travelSecondsPerUnit, useAction } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
+import { restorePools } from './effects';
 import { loadInEnglish } from '../content/engineLocale';
-import { secondsToMs } from './units';
+import { secondsToMs, toMilliUnits } from './units';
 import { runTest } from './session';
 
 const MODULE = `
@@ -629,5 +630,38 @@ describe('a deterministic batch settles `on empty:` at the completion that drain
     expect(oneShot.log.filter((line) => line === 'The ash settles.')).toHaveLength(1);
 
     agreesWithOneShot('bellows', 'work', oneShot, [[3, 200], [10, 200], [1, 2, 3, 4, 200], [2.5, 7.5, 60, 200]]);
+  });
+});
+
+describe('what an engine root reads', () => {
+  const reads = (path: string[], state: GameState, right: number): boolean => evaluateCondition({ kind: 'comparison', left: { path }, operator: '=', right }, state);
+
+  it('reads an xp total, a pool and a held count as numbers a comparison can bound', () => {
+    const state = createGameState();
+    state.xp['island.thieving'] = 4;
+    restorePools(state, { 'island.health': toMilliUnits(12) });
+    state.inventory['island.plank'] = 3;
+
+    expect(reads(['xp', 'island', 'thieving'], state, 4)).toBe(true);
+    expect(reads(['xp', 'island', 'thieving'], state, 5)).toBe(false);
+    expect(reads(['resource', 'island', 'health'], state, 12)).toBe(true);
+    expect(reads(['inventory', 'island', 'plank'], state, 3)).toBe(true);
+  });
+
+  it('reads nothing it holds as zero rather than as absent, so a bound holds before the first grant', () => {
+    const state = createGameState();
+    expect(reads(['xp', 'island', 'thieving'], state, 0)).toBe(true);
+    expect(reads(['resource', 'island', 'health'], state, 0)).toBe(true);
+    expect(reads(['inventory', 'island', 'plank'], state, 0)).toBe(true);
+  });
+
+  // Derived from the grammar's own roots: a root that fell through to the flag table would read whatever a flag of that name held.
+  it.each(ENGINE_ROOT_NAMES)('does not let a flag named after %s answer for it', (root) => {
+    const state = createGameState();
+    const path = [root, 'island', 'anything'];
+    const before = renderSegments([{ kind: 'interpolate', reference: { path } }], state);
+    state.flags[path.join('.')] = 99;
+
+    expect(renderSegments([{ kind: 'interpolate', reference: { path } }], state)).toBe(before);
   });
 });

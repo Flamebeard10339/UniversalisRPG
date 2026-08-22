@@ -8,9 +8,22 @@ export interface Reference {
 export const TIME = 'time';
 export const PLAYER = 'player';
 
-export const ENGINE_ROOTS: readonly string[] = [TIME, PLAYER];
+// What the engine holds itself, rather than a flag an author declares. A root paired with a kind reads the rest of the path as an id of that kind, so `xp.thieving` is the writing module's own skill and a name nothing declares is refused where it is written.
+export const ENGINE_ROOTS = {
+  [TIME]: null,
+  [PLAYER]: null,
+  xp: 'skill',
+  resource: 'resource',
+  inventory: 'item',
+} as const satisfies Readonly<Record<string, string | null>>;
 
-export const isEngineRoot = (path: readonly string[]): boolean => ENGINE_ROOTS.includes(path[0]);
+export type EngineRoot = keyof typeof ENGINE_ROOTS;
+
+export const ENGINE_ROOT_NAMES = Object.keys(ENGINE_ROOTS) as EngineRoot[];
+
+export const isEngineRoot = (path: readonly string[]): boolean => path.length > 0 && path[0] in ENGINE_ROOTS;
+
+export const rootedKind = (root: string): string | null => (root in ENGINE_ROOTS ? ENGINE_ROOTS[root as EngineRoot] : null);
 
 export const VISITS = 'visits';
 
@@ -124,6 +137,29 @@ export const condition: Parser<Condition> = {
   parse: parseOr,
   print: printCondition,
   holds: () => ({ comparison, condition }),
-  forms: ['<flag>', '<flag> <comparison> <number>', 'has <item>', 'has <count> <item>', 'not <condition>', '<condition> and <condition>', '<condition> or <condition>'],
-  examples: ['has-key', 'quest.stage >= 2', 'has plank', 'has 3 plank', 'not has-key', 'has-key and not has-rope', 'has-key or has-rope', 'a and b or c'],
+  forms: [
+    '<flag>',
+    '<flag> <comparison> <number>',
+    'xp.<skill> <comparison> <number>',
+    'resource.<resource> <comparison> <number>',
+    'inventory.<item> <comparison> <number>',
+    'has <item>',
+    'has <count> <item>',
+    'not <condition>',
+    '<condition> and <condition>',
+    '<condition> or <condition>',
+  ],
+  examples: [
+    'has-key',
+    'quest.stage >= 2',
+    'xp.thieving >= 4',
+    'resource.health < 10',
+    'inventory.plank = 3',
+    'has plank',
+    'has 3 plank',
+    'not has-key',
+    'has-key and not has-rope',
+    'has-key or has-rope',
+    'a and b or c',
+  ],
 };

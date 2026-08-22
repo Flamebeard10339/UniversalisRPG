@@ -1,7 +1,8 @@
 import type { TextSegment } from '../grammar/segment';
 import { Action, Sided } from '../grammar/action';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
-import { Condition, isEngineRoot, Reference, VISITS, visitedNode } from '../grammar/condition';
+import { Condition, isEngineRoot, Reference, rootedKind, VISITS, visitedNode } from '../grammar/condition';
+import { DslError } from '../grammar/parser';
 import { isFieldEdits, listMembers } from '../grammar/section';
 import { mayBeInstanceId } from './instanceId';
 import { Quantified } from '../grammar/values';
@@ -49,7 +50,15 @@ export function strings(holder: Loose, key: string, kind: ReferenceKind, where: 
 }
 
 export function reference(value: Reference | undefined, where: string, visit: Visit): void {
-  if (!value || isEngineRoot(value.path)) return;
+  if (!value) return;
+  const rooted = rootedKind(value.path[0]);
+  if (rooted !== null) {
+    const under = value.path.slice(1).join('.');
+    if (under === '') throw new DslError(`${where} reads ${value.path[0]} on its own, which names no ${rooted}: write ${value.path[0]}.<${rooted}>`);
+    value.path = [value.path[0], ...visit(rooted, under, where).split('.')];
+    return;
+  }
+  if (isEngineRoot(value.path)) return;
   const node = visitedNode(value.path);
   const raw = (node ?? value.path).join('.');
   const resolved = visit(node ? 'node' : 'flag', raw, where);
