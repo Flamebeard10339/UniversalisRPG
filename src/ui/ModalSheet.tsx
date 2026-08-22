@@ -15,7 +15,7 @@ export function ModalSheet({ option, onAnswer, onDismiss, leaving, children }: {
   const asks = !onlyLeaves(option, leaving);
 
   return (
-    <div role="dialog" aria-modal data-drive={onDismiss ? 'dismiss' : undefined} onClick={onDismiss ? (event) => event.target === event.currentTarget && onDismiss() : undefined} className={`${darkened} fixed inset-0 z-50 flex flex-col justify-end gap-3 bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-8`}>
+    <div role="dialog" aria-modal data-drive={onDismiss ? 'dismiss' : undefined} onClick={onDismiss ? (event) => event.target === event.currentTarget && onDismiss() : undefined} className={`${darkened} fixed inset-0 z-50 flex flex-col ${asks ? 'justify-end' : 'justify-center'} gap-3 bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-8`}>
       {children}
       {asks ? (
         <div key={option.key} className={`${risen} mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4`}>
