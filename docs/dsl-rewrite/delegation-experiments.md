@@ -587,6 +587,7 @@ a numbered finding on a bug that existed for four minutes.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 89 | Haiku (cold spawn) x2, concurrent | **Re-run the blind trial against a changed tool.** Same rules as rows 86–88, aimed at what had changed since: a compound `if` condition using two or more of its keywords, `open modal:` against the newly added kind, and a `when hit:` with a contest, a party-facing inflict, and a weighted table. Both were asked to answer *directly* whether the tool told them the keywords and valid values or whether they guessed, and to quote it. | 40.9k / 54.7k | 12 / 17 | 111s / 152s | high, plus two forced-answer questions and a quote requirement | Both drafts came back clean on the esoteric grammar — compound conditions, modals, contests, party targeting, weighted tables — which is the first time that has happened without a fix in between. Both rated 6/10 and both named the *same* thing first, unprompted: the answers repeat. One quoted the eight-line condition grammar coming back on every line that had a condition; the other counted the same thirty-six item ids printed five times. |
 | 90 | Sonnet (cold spawn, isolated worktree) | **Implement a spec that was already argued out.** `scripts/playbot.ts` against `a-turn-costs-what-the-last-turn-did`, ten clauses. Prompt carried the spec pointer, four traps pulled out of its Decisions section ahead of time (c4 needs a fourth opt-out, the prefix must be big not small, c3's proof must derive its subjects, c6 is deliberately narrow), two corrections to the spec as written, and an explicit ban on spending the author's plan on a live turn. | 247.6k | 84 | 20m | high, front-loaded; none mid-run | Nine clauses closed with derived proofs, c5 closed in half and **said so plainly** rather than faked — its cache-read proof needs a live call the prompt forbade. Found on its own that naming `PlaySession` in a driver trips `published.test.ts`'s derived walk, and closed it through the existing allowlist whose neighbouring entry names that exact case, rather than dodging the type. tsc, 3016 tests and layer-check all green on delivery. |
+| 91 | Sonnet (cold spawn, isolated worktree) | **Delete a duplicated surface across three drivers.** Move the playbot onto the `runLine` door play-cli and the GUI already share, widen `CommandSpec.dev` into an audience field and classify all 26 commands, and generalise a one-renderer view-coverage claim to all three. Prompt carried the facts already dug out (runLine is the shared door, `CommandMatch` has a `choice` case, `dev` is only `/goto`, `Directive` has 24 kinds), both design rulings, an instruction to propose c6's rewording rather than silently edit it, and the two lessons row 90 produced. | 344.2k | 146 | 36m | high, front-loaded; none mid-run | Landed green on all three gates. Named its own narrowing without being pushed: the old c6 proof — the sent selector appears verbatim among this turn's printed choice ids — cannot survive free text reaching all 24 directive kinds, since `equip: sword` was never a printed choice. Kept the negative property and said plainly that this is a real loss, not a rewording. Recorded two play-cli gaps as gaps rather than dressing them as exclusions, one of which is true and checkable: `PlayStatus.stats` is read by no command in the terminal. |
 
 **What row 89 says.** Forcing a direct question ("did it tell you, or did you
 guess? quote it") got sharper answers than the free-form critique did in rows
@@ -617,3 +618,17 @@ in an argument parser that would have silently kept accepting only two modes. Th
 repository's single largest failure mode, in a file written from a spec that opens
 by naming it. Implementation agents do not inherit the standing rules from
 `CLAUDE.md` as strongly as a prompt states them.
+
+**What row 91 says.** The two lessons from row 90 were put in the prompt and both
+took. Asked to propose a clause rewording rather than perform one, it produced the
+narrowing argument itself and volunteered what was lost — the judgement a spec
+change actually needs, and the thing row 90's agent had no room to offer. Asked to
+report gaps honestly, it recorded two of its own drivers' failures as failures
+where the easy move was an excuse with a confident-sounding reason. Front-loading
+the facts already dug out — four lines of prompt — is what kept a 36-minute run
+from rediscovering them.
+
+Both rows now point the same way: a cold agent's diagnosis is worth more than its
+prescription, and its honesty scales with how explicitly the prompt asks for it.
+Neither row needed steering after dispatch. What both needed was the argument
+already settled before they started.
