@@ -4,7 +4,10 @@ Observations taken live while the first authoring agent worked, 2026-08-22, plus
 what each one turns out to be underneath. Ordered by what they cost, not by when
 they were noticed.
 
-## 1. An author is gated on a suite that has no business gating them
+**Struck through means closed.** What is left standing is the queue for the pass
+after this one; the ordering is the original ordering, not the remaining one.
+
+## ~~1. An author is gated on a suite that has no business gating them~~ — closed
 
 `npm test` runs 3000-odd tests in twenty seconds, and an author changing one line
 of content ran it over and over. Worse, two of those tests assert shipped tutorial
@@ -20,7 +23,12 @@ mechanics or derived sweeps and should stay.
 
 **Unit tests are for mechanics. Content claims live in `# test`.**
 
-## 2. There is no way to run one `# test` from a shell
+## ~~2. There is no way to run one `# test` from a shell~~ — closed
+
+`npm run probe -- content --test <id>` runs one in about a second, and an id that
+names no test but stands as a prefix over some — a module id — runs the module's
+own. A directory source stands for the `.dsl` files in it, so the corpus is
+nameable on a shell that expands no globs.
 
 `/test <id>` runs one, and only from inside the interactive REPL. So iterating on a
 single route means the whole suite, and the agent did the rational thing: it piped
@@ -34,7 +42,7 @@ the other. It also removes most of the appeal of a background watcher that pings
 breakage: a watcher hides latency, and there is no latency to hide once the check
 is a second long.
 
-## 3. `expect:` is all-or-nothing, and convergence is not
+## ~~3. `expect:` is all-or-nothing, and convergence is not~~ — closed by `expect only:`
 
 Three routes are meant to end in the same place holding the same quest, and are
 meant to differ in experience, damage taken and what the world remembers. A full
@@ -44,7 +52,11 @@ state that must match — position and quest standing — and stay quiet about t
 Until it can, convergence has to be written as a pile of `assert:` lines, which is
 the enumerated form of a claim that should be derived from one save.
 
-## 4. `@@@` was read as "leave it empty", and that was the prompt's fault
+## ~~4. `@@@` was read as "leave it empty", and that was the prompt's fault~~ — closed
+
+The oracle's own preamble now says it, so it is read in minute one rather than
+carried in a brief: *write what you can say now, then `@@@` alone to mark it
+rough, or `@@@ <what you wanted>` where the engine cannot do what was asked.*
 
 The brief said mark a stub and move on, which the agent read as writing
 `examine: @@@`. A playtester cannot test that, and the run's own product —
@@ -57,16 +69,16 @@ outside.
 
 ## 5. Smaller things, each real
 
-- **No shorthand for waiting out an action.** The agent wrote `/wait 30`, guessing a
-  number large enough. It wants "wait until this finishes".
-- **Saves carry items at count zero.** The fixture the agent produced lists holdings
-  it does not hold, which is noise in a file a human is meant to read.
-- **`drain: 5 health` cost a syntax fight.** One of several places the oracle did not
-  say what a line takes, and the author found out by trying.
-- **Do not rewrite a content module unread.** These files carry save bodies and
-  `# test` sections that read like noise and are not. This is a repository rule and
-  wants saying; that a tool refuses an unread write is a different fact and belongs
-  to the tool.
+- ~~**No shorthand for waiting out an action.**~~ `wait: done` walks the runway
+  `nextBoundary` already computes. An action that repeats without bound has no end
+  to name and refuses saying so, rather than running to a cap nobody declared.
+- ~~**Saves carry items at count zero.**~~ A key absent and a key at its sparsest
+  value are the same holding, and each field already declared its own sparsest.
+- ~~**`drain: 5 health` cost a syntax fight.**~~ The oracle prints
+  `drain: <amount> <resource>[ from <me or them>]` with a written-out example, as
+  it does for every result line.
+- ~~**Do not rewrite a content module unread.**~~ Now a repository rule in
+  `CLAUDE.md`; that a tool refuses an unread write stays the tool's own fact.
 
 ## 6. The measurement, which is the point of the run
 
@@ -79,7 +91,7 @@ for the next pass over the oracle.
 Nothing here is a criticism of what it built. Watching where it was slow is the
 whole reason the first run was worth doing with someone watching.
 
-## 7. What a `# test` can assert about a number, and what it still cannot
+## ~~7. What a `# test` can assert about a number~~ — closed, and half of what it could not
 
 `assert:` resolves only four things — `time`, `player.name`/`race`, `visits`, and
 flags (`resolveReference`, `src/runtime/conditions.ts`). It cannot see a resource,
@@ -112,3 +124,26 @@ half of it and would let `assert:` carry a bound.
 **This is one gap wearing two hats.** The thing stopping the last content claims
 from leaving TypeScript is the thing stopping a balance test from being written at
 all.
+
+### What closed it
+
+An engine root now carries the kind of the id beneath it — `xp` a skill,
+`resource` a resource, `inventory` an item — so the reference walk resolves it in
+the writing module's namespace and refuses a name nothing declares, and the
+resolver is a `Record` over the grammar's own roots, so a root added there does
+not compile until it reads something. `assert: xp.thieving = 4` and
+`assert: resource.health < 10` are lines an author writes, and a bound is any
+comparison the grammar already had. The lockpick claim is one `assert:` in
+`content/tutorial-island.dsl` rather than a save built to hold one number.
+
+**`stat` is the root still missing, and it is the one that needs a registry.**
+A stat is derived from buffs, equipment and passives, so `statValue` takes the
+registry, and `evaluateCondition` does not carry one — fifteen call sites away
+from having it. That is the remaining half, and it is a threading job rather than
+a design question: the `Record` over `ENGINE_ROOTS` is where the answer goes when
+it is threaded.
+
+**A range is still equality plus a second line.** `xp.thieving >= 100 and
+xp.thieving <= 200` says it, which is a bound written twice rather than a bound.
+Whether that wants its own form is a question for whoever first writes a hundred
+of them.
