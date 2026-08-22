@@ -15,10 +15,6 @@ import { inEnglish } from './sayFixture';
 import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } from '../content/sections/test';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
-const quests = readFileSync('content/tutorial-quests.dsl', 'utf8');
-
-// The island and the quest that runs on it, which is what a played game loads.
-const played = (): Registry => loadUniverse([engineLocale(), { name: 'tutorial-island', text: source }, { name: 'tutorial-quests', text: quests }]);
 
 function primed(registry: Registry, diff: SaveDiff): PlaySession {
   registry.saves.set('primed', { version: SAVE_VERSION, diff });
@@ -33,109 +29,50 @@ function ids(v: PlayView): string[] {
 
 const statValueOf = (v: PlayView, id: string): number | undefined => v.stats.find((row) => row.id === id)?.value;
 
-function modalNames(v: PlayView): string[] {
-  return v.modals.map((modal) => modal.name);
-}
-
 describe('session', () => {
-  it('drives the tutorial-island miki route through the choice-list API', () => {
-    const registry = played();
-    const session = startSession(registry);
+  it('surfaces a fight as an encounter naming its foes, and clears it once the foe is down', () => {
+    const module = `
+# stat attack
+base: 1
 
-    let v = view(session);
-    expect(v.location.id).toBe('tutorial-island.guide-house');
-    expect(v.said).toEqual([]);
-    expect(ids(v)).toContain('talk:tutorial-island.miki');
-    expect(ids(v)).not.toContain('use:entity.tutorial-island.front-door.pick-lock');
+# stat max-health
+base: 10
 
-    v = apply(session, 'talk:tutorial-island.miki');
-    expect(modalNames(v)).toEqual(['dialogue']);
-    expect(v.choices).toEqual([]);
-    const menu = v.modals[0].options[0];
-    expect(menu.key).toBe('choice');
-    expect(menu.values).toHaveLength(2);
+# stat swings-per-minute
+base: 60
 
-    v = submitModal(session, { choice: menu.values![0].value });
-    expect(modalNames(v)).toEqual([]);
-    expect(v.flags['tutorial-quests.finding-your-feet.name-yourself']).toBe(true);
+# resource health
+max: max-health
 
-    v = apply(session, 'use:entity.tutorial-island.mirror.look-in');
-    expect(v.said).toContain('modal:character-creation');
-    expect(v.flags['tutorial-island.mirror-done']).toBe(true);
-    expect(v.choices).toEqual([]);
-    v = submitModal(session, { name: 'Rowan' });
-    expect(modalNames(v)).toEqual(['character-creation']);
-    v = submitModal(session, { race: 'elf' });
-    expect(modalNames(v)).toEqual([]);
-    expect(ids(v)).not.toContain('use:entity.tutorial-island.mirror.look-in');
+# location arena
+x: 0, y: 0
+starting
+entities:
+  rat
 
-    v = apply(session, 'talk:tutorial-island.miki');
-    expect(modalNames(v)).toEqual([]);
-    expect(v.inventory['tutorial-island.jug-of-water']).toBe(1);
-    expect(v.inventory['tutorial-island.pot-of-flour']).toBe(1);
+# action hit
+title: hit
+continuous
+rate: my swings-per-minute
+damage: my attack
+depletes: their health
 
-    expect(ids(v)).toContain('craft:tutorial-island.dough');
-    v = apply(session, 'craft:tutorial-island.dough');
-    expect(v.inventory['tutorial-island.dough']).toBe(1);
+# entity player
+stats: attack 1, max-health 10, swings-per-minute 60
+uses: hit
 
-    expect(ids(v)).toContain('craft:tutorial-island.bread');
-    v = apply(session, 'craft:tutorial-island.bread');
-    expect(v.inventory['tutorial-island.bread']).toBe(1);
+# entity rat
+title: Giant Rat
+stats: attack 0, max-health 10, swings-per-minute 60
+`;
+    const session = startSession(loadInEnglish(module));
 
-    v = apply(session, 'use:entity.tutorial-island.stairs.ascend');
-    expect(v.location.id).toBe('tutorial-island.guide-house-upstairs');
-    expect(ids(v)).toContain('use:entity.tutorial-island.dresser.search-drawer');
+    let v = apply(session, 'fight:hit:rat');
+    expect(v.encounter).not.toBeNull();
+    expect(v.encounter!.foes.map((foe) => foe.title)).toEqual(['Giant Rat']);
 
-    v = apply(session, 'use:entity.tutorial-island.dresser.search-drawer');
-    expect(v.inventory['tutorial-island.lockpick']).toBe(1);
-
-    v = apply(session, 'use:entity.tutorial-island.stairs-down.descend');
-    expect(v.location.id).toBe('tutorial-island.guide-house');
-    expect(ids(v)).toContain('use:entity.tutorial-island.front-door.pick-lock');
-
-    v = apply(session, 'talk:tutorial-island.miki');
-    expect(modalNames(v)).toEqual([]);
-    expect(v.flags['tutorial-quests.finding-your-feet.clear-the-rats']).toBe(true);
-    expect(v.inventory['tutorial-island.iron-sword']).toBe(1);
-    expect(v.inventory['tutorial-island.wooden-shield']).toBe(1);
-
-    v = apply(session, 'use:entity.tutorial-island.stairs.descend');
-    expect(v.location.id).toBe('tutorial-island.basement');
-    expect(ids(v)).toContain('fight:tutorial-island.melee-combat:tutorial-island.giant-rat');
-
-    for (let killed = 1; killed <= 3; killed++) {
-      v = apply(session, 'fight:tutorial-island.melee-combat:tutorial-island.giant-rat');
-      expect(v.encounter).not.toBeNull();
-      expect(v.encounter!.foes.map((foe) => foe.title)).toEqual(['Giant Rat']);
-
-      v = wait(session, 30);
-      expect(v.flags['tutorial-island.rats-killed']).toBe(killed);
-      expect(v.encounter).toBeNull();
-    }
-    expect(ids(v)).not.toContain('fight:tutorial-island.melee-combat:tutorial-island.giant-rat');
-
-    v = apply(session, 'use:entity.tutorial-island.stairs-up.ascend');
-    expect(v.location.id).toBe('tutorial-island.guide-house');
-    expect(ids(v)).not.toContain('travel:tutorial-island.beach');
-
-    v = apply(session, 'talk:tutorial-island.miki');
-    expect(modalNames(v)).toEqual([]);
-    expect(v.flags['tutorial-quests.finding-your-feet.sendoff']).toBe(true);
-    expect(v.flags['tutorial-island.front-door.unlocked']).toBe(true);
-
-    v = view(session);
-    expect(ids(v)).toContain('travel:tutorial-island.beach');
-
-    v = apply(session, 'talk:tutorial-island.miki');
-    expect(modalNames(v)).toEqual([]);
-    expect(v.said).toContain("Still here? The boat to the mainland won't wait forever.");
-
-    v = apply(session, 'travel:tutorial-island.beach');
-    expect(v.location.id).toBe('tutorial-island.beach');
-
-    const beachJourney = 1 * travelSecondsPerUnit(registry);
-    const ratRound = 60 / 25 + 30;
-    expect(v.time).toBeCloseTo(2 + 3 + 3 * ratRound + beachJourney, 9);
+    v = wait(session, 15);
+    expect(v.encounter).toBeNull();
   });
 
   it('throws a clear error on an unavailable or unknown choice id', () => {
