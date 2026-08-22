@@ -57,19 +57,40 @@ describe('where a quest stands', () => {
 });
 
 describe('the journal', () => {
-  it('holds nothing for a quest nobody has reached a stage of, whatever the world declares', () => {
-    expect(journal(registry, held())).toEqual([]);
+  const shown = (...set: string[]) => journal(registry, held(...set));
+
+  // Every quest the world declares is in the list, whether or not the player has touched it: that is how they learn there is one.
+  it('holds a quest nobody has begun, saying so rather than reading out what has not happened', () => {
+    expect(shown()).toEqual([{ quest: 'finding-your-feet', title: 'Finding Your Feet', stage: 'offered', standing: 'unstarted', lines: [], hint: null }]);
   });
 
-  it('reads the log and the hint of the stage the quest stands on', () => {
-    expect(journal(registry, held('finding-your-feet.offered'))).toEqual([
-      { quest: 'finding-your-feet', title: 'Finding Your Feet', stage: 'offered', log: 'Miki offered to show you the ropes.', hint: 'Talk to Miki.', complete: false },
+  it('reads a line for each stage the quest has been through, crossing off all but the one it stands on', () => {
+    expect(shown('finding-your-feet.offered')).toMatchObject([
+      {
+        standing: 'started',
+        stage: 'offered',
+        lines: [{ stage: 'offered', said: 'Miki offered to show you the ropes.', struck: false }],
+        hint: 'Talk to Miki.',
+      },
+    ]);
+    expect(shown('finding-your-feet.offered', 'finding-your-feet.name-yourself')).toMatchObject([
+      {
+        standing: 'started',
+        stage: 'name-yourself',
+        lines: [
+          { stage: 'offered', said: 'Miki offered to show you the ropes.', struck: true },
+          { stage: 'name-yourself', said: 'Miki wants you to name yourself.', struck: false },
+        ],
+      },
     ]);
   });
 
-  it('follows the quest to the stage it has reached, and says when it is done', () => {
-    expect(journal(registry, held('finding-your-feet.name-yourself'))).toMatchObject([{ stage: 'name-yourself', log: 'Miki wants you to name yourself.', hint: null, complete: false }]);
-    expect(journal(registry, held('finding-your-feet.name-yourself', 'mirror-done'))).toMatchObject([{ stage: 'sendoff', log: 'You saw Miki off.', complete: true }]);
+  it('crosses off everything once the quest is done, and offers nothing further to do', () => {
+    const [over] = shown('finding-your-feet.offered', 'finding-your-feet.name-yourself', 'mirror-done');
+
+    expect(over).toMatchObject({ standing: 'complete', stage: 'sendoff', hint: null });
+    expect(over!.lines.every((line) => line.struck)).toBe(true);
+    expect(over!.lines.map((line) => line.stage)).toEqual(['offered', 'name-yourself', 'sendoff']);
   });
 });
 
@@ -83,6 +104,6 @@ describe('a quest played through', () => {
 
     expect(runTest('takes-the-offer', played, state)).toEqual({ passed: true });
     expect(state.flags['finding-your-feet.offered']).toBe(true);
-    expect(journal(played, state)).toMatchObject([{ stage: 'name-yourself', log: 'Miki wants you to name yourself.' }]);
+    expect(journal(played, state)).toMatchObject([{ stage: 'name-yourself', standing: 'started', lines: [{ said: 'Miki offered to show you the ropes.', struck: true }, { said: 'Miki wants you to name yourself.', struck: false }] }]);
   });
 });

@@ -294,12 +294,23 @@ export function skillNamed(panels: readonly SkillPanel[], value: unknown): Answe
   return panel.id;
 }
 
-// A journal is read and not driven, so the harness is handed what it shows and nothing to press.
+// A journal is read rather than played, so what the harness is given is what it shows and the one way in: which quest is open.
 export function journalSurface(held: AgentSurfaces['journal']): TestSurface {
   return {
-    state: () => ({ rows: held.rows.map((row) => ({ id: row.id, title: row.title, log: row.log, hint: row.hint, done: row.done })) }),
-    actions: {},
+    state: () => ({
+      opened: held.opened,
+      rows: held.rows.map((row) => ({ id: row.id, title: row.title, standing: row.standing, hint: row.hint, lines: row.lines.map((line) => ({ said: line.said, struck: line.struck })) })),
+    }),
+    actions: {
+      open: (value) => held.controls.open(value === null ? null : questNamed(held.rows, value)),
+    },
   };
+}
+
+export function questNamed(rows: readonly JournalRow[], value: unknown): Answer {
+  const row = rows.find((each) => each.id === value);
+  if (!row) throw new Error(`the journal holds no quest called ${String(value)}`);
+  return row.id;
 }
 
 export interface AgentSurfaces {
@@ -307,7 +318,7 @@ export interface AgentSurfaces {
   map: { map: MapView; controls: MapControls };
   skills: { panels: readonly SkillPanel[]; opened: Answer | null; greeted: readonly Answer[]; controls: { open(id: Answer | null): void } };
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
-  journal: { rows: readonly JournalRow[] };
+  journal: { rows: readonly JournalRow[]; opened: Answer | null; controls: { open(id: Answer | null): void } };
   edit: EditHeld;
 }
 

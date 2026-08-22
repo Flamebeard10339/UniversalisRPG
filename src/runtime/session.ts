@@ -12,6 +12,7 @@ import { parseOwnerRef, TRAVEL_PAIR } from './actions';
 import { relocateTo, spreadDiscovery } from './effects';
 import { reachable } from './journey';
 import { journal, type JournalEntry } from './journal';
+export type { JournalEntry, JournalLine, QuestStanding } from './journal';
 import { playerCadence } from './encounter';
 import { armedAction } from './roster';
 import { hasPool } from './stats';

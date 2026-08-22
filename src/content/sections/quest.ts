@@ -116,6 +116,15 @@ export function stageNow(quest: Quest, holds: (asked: Condition) => boolean): Qu
   });
 }
 
+// Every stage the quest has actually been through, in the order it declares them. A quest that branches has not been through the branch it did not take, so this asks each stage whether it was reached rather than counting up to the one standing.
+export function stagesReached(quest: Quest, holds: (asked: Condition) => boolean): QuestStage[] {
+  const held = new Map<number, Condition | undefined>();
+  return quest.stages.filter((_, at) => {
+    const when = reachedWhen(quest, at, held);
+    return when === undefined || holds(when);
+  });
+}
+
 // Whether anything about this quest has happened yet. A quest nobody has touched is not a journal entry; its first stage stands from the outset, so standing anywhere else is enough, and so is any stage having been reached outright — which is how a quest driven by nothing but its own `done when:` lines comes to be in the journal at all.
 export const begun = (quest: Quest, at: QuestStage | undefined, set: (flag: string) => boolean): boolean => (at !== undefined && at !== quest.stages[0]) || quest.stages.some((stage) => set(flagOf(quest, stage.name)));
 

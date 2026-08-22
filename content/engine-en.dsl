@@ -141,7 +141,8 @@ engine.shell.equipment: Equipment
 engine.shell.inventory: Inventory
 engine.shell.journal: Journal
 engine.shell.journal.empty: You have taken nothing on yet.
-engine.shell.journal.done: done
+engine.shell.journal.untouched: You have not begun this quest.
+engine.shell.close: Close
 engine.shell.command: Command
 engine.shell.run: Run
 engine.shell.level: Level
@@ -188,6 +189,8 @@ engine.repl.modal.asking: {option}:
 engine.repl.modal.free: submit-modal: {option}=<text>
 engine.repl.journal.none: You have taken nothing on yet.
 engine.repl.journal.doing: {quest}
+engine.repl.journal.untouched: {quest} - not started
+engine.repl.journal.struck: (done) {said}
 engine.repl.journal.done: {quest} - done
 engine.repl.state.location: Location: {location}
 engine.repl.state.time: Elapsed simulated time: {time}s

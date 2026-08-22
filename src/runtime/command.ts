@@ -747,13 +747,14 @@ export const COMMANDS: readonly CommandSpec[] = [
       const localizer = sessionLocalizer(ctx.session);
       const entries = sessionJournal(ctx.session);
       if (entries.length === 0) return { output: [message('plain', localizer.engine('engine.repl.journal.none'))], quit: false, recorded: [] };
+      const heading = { unstarted: 'engine.repl.journal.untouched', started: 'engine.repl.journal.doing', complete: 'engine.repl.journal.done' } as const;
       return {
         output: entries.map((entry) => ({
           kind: 'message' as const,
           words: 'player' as const,
-          tone: entry.complete ? ('ok' as const) : ('plain' as const),
-          text: localizer.engine(entry.complete ? 'engine.repl.journal.done' : 'engine.repl.journal.doing', { quest: entry.title }),
-          detail: [entry.log, entry.hint].filter((said): said is Localized => said !== null),
+          tone: entry.standing === 'complete' ? ('ok' as const) : ('plain' as const),
+          text: localizer.engine(heading[entry.standing], { quest: entry.title }),
+          detail: [...entry.lines.map((line) => (line.struck ? localizer.engine('engine.repl.journal.struck', { said: line.said }) : line.said)), ...(entry.hint === null ? [] : [entry.hint])],
         })),
         quit: false,
         recorded: [],
