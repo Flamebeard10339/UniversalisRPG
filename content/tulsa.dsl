@@ -765,12 +765,25 @@ pick lock:
     say: The lock clicks open.
 
 # entity mirror
-examine: A tall mirror in a gilt frame. Your reflection waits, nameless. Whoever looks into it comes away with a name and a people, and the glass does not ask a second time.
+examine: A tall mirror in a gilt frame. Whoever stands in front of it comes away with a name and a people, and may stand in front of it again as often as they like. The first look is free. Every look after it wants a thousand coin, and the glass is not sentimental about it.
 look in:
   instant
   hidden if: mirror-done
-  open modal: character-creation
+  open modal: choose-race
+  open modal: name-yourself
   set: mirror-done
+  on success:
+    say: The glass gives you back a name and a people. Come and change your mind whenever you like - it will want paying next time, but it will not turn you away.
+look in again:
+  instant
+  hidden if: not mirror-done
+  take: 1000 coin
+  open modal: choose-race
+  open modal: name-yourself
+  on success:
+    say: The coin goes somewhere behind the frame. The glass clears, and waits to be told who you are this time.
+  on failure:
+    say: The glass shows you exactly what you are carrying, and it is not enough to be looked at twice.
 
 # entity oven
 examine: A stone oven, its coals still glowing.
@@ -1062,7 +1075,60 @@ node greeting:
 # save growing-through-the-inventory-screen-end
 {"version":12,"inventory":{"core.heartwood-blade":1,"core.iron-sword":0,"core.whetstone":6,"core.masters-whetstone":3,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.crossroads-jewel":0,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}
 
+// A purse with the price of a second look in it, and a purse a coin short of
+// one, standing in the room the mirror is in.
+# save at-the-mirror-with-a-thousand-coin
+{"version":12,"location":"tulsa.guide-house","inventory":{"core.coin":1000}}
+
+# save at-the-mirror-one-coin-short
+{"version":12,"location":"tulsa.guide-house","inventory":{"core.coin":999}}
+
+# save renamed-at-the-mirror
+{"version":12,"player":{"name":"Wren","race":"core.orc"},"inventory":{"core.coin":0}}
+
+# save named-once-with-nine-hundred-and-ninety-nine-coin
+{"version":12,"player":{"name":"Rowan","race":"core.elf"},"inventory":{"core.coin":999}}
+
 // --- tests ---
+
+// The first look at the mirror is free and every look after it is a thousand
+// coin. The claim is the difference across the second look — a purse of a
+// thousand is untouched by the first and empty after the second — so a price
+// that moved would fail here rather than pass inside a band.
+# test the-mirror-charges-nothing-once-and-a-thousand-coin-after
+load: at-the-mirror-with-a-thousand-coin
+use: entity.mirror.look-in
+submit-modal: name=Rowan
+submit-modal: race=core.elf
+assert: mirror-done and inventory.coin = 1000
+use: entity.mirror.look-in-again
+submit-modal: name=Wren
+submit-modal: race=core.orc
+assert: inventory.coin = 0
+expect only: renamed-at-the-mirror
+
+// What a player who cannot pay sees. The action stays on the mirror rather
+// than hiding itself, because a mirror that vanishes is what a playtester
+// reads as a broken save; it takes the look, says what is missing, and leaves
+// the purse and the character exactly as they were.
+# test a-purse-a-coin-short-is-turned-away-and-charged-nothing
+load: at-the-mirror-one-coin-short
+use: entity.mirror.look-in
+submit-modal: name=Rowan
+submit-modal: race=core.elf
+use: entity.mirror.look-in-again
+assert: inventory.coin = 999 and player.name and player.race
+expect only: named-once-with-nine-hundred-and-ninety-nine-coin
+
+// The name is asked first and the race second, which this proves by answering
+// them in that order: the race screen has no `name` to answer, so a run that
+// asked in the other order refuses the first line here rather than passing.
+# test the-name-screen-is-answered-before-the-race-screen
+load: at-the-mirror-with-a-thousand-coin
+use: entity.mirror.look-in
+submit-modal: name=Rowan
+submit-modal: race=core.orc
+assert: player.name and player.race
 
 // The town is walkable, and every road it holds is walked. The list is long
 // because a road is a fact about two named places and nothing derives it; what
