@@ -1189,7 +1189,7 @@ travel: tavern-street
 travel: sha-dynastys
 craft: cooked-herring
 assert: has cooked-herring
-assert: xp.core.cooking > 0
+assert: xp.core.cooking = 3
 
 // The two things in the market a light hand gets, and fifteen is the whole of
 // what they are worth: three at the grate and twelve off the rack. Each sets

@@ -300,9 +300,9 @@ entities:
 
 // --- tests ---
 //
-// Every route below opens on this, because where the archetype content sits in
-// the world is out of this module's scope and a save is the smallest thing that
-// puts a player in front of it.
+// Every route below opens on this or on a copy of it, because where the
+// archetype content sits in the world is out of this module's scope and a save
+// is the smallest thing that puts a player in front of it.
 
 # save at-the-proving-ground
 {"version":12,"location":"combat-expansion.proving-ground","flags":{"combat-expansion.proving-ground.discovered":true}}
@@ -357,12 +357,28 @@ assert: stat.max-rage = 20
 assert: resource.rage = 0
 expect only: rage-drains-when-the-swinging-stops-end
 
-// The gate is a wrapper and the payload stacks, so what the sheet records is
-// several instances of one declaration, each on its own clock. `quickening` is
+// What the route below counts with, and a save that puts it in the player's
+// hand. One evasion a stack, on a stat nothing else this route moves, so the
+// number the claim rests on is one this file writes rather than the balance of
+// the payload being counted: `accelerated-vigor` may be worth anything at all
+// and six held is still six read.
+# item vigor-tally
+DEBUG
+slot: offhand
++1 evasion per stack of accelerated-vigor
+
+# save at-the-proving-ground-with-a-tally
+DEBUG
+{"version":12,"location":"combat-expansion.proving-ground","flags":{"combat-expansion.proving-ground.discovered":true},"inventory":{"combat-expansion.vigor-tally":1}}
+
+// The gate is a wrapper and the payload stacks, so what a minute of swinging
+// leaves the player holding is several instances of one declaration, each on
+// its own clock, rather than one that keeps being refreshed. `quickening` is
 // allocated beside `spurred` and reads how many are held; the two are separate
 // passives on separate points, which is what makes them separable.
 # test accelerated-vigor-stacks-behind-its-gate
-load: at-the-proving-ground
+DEBUG
+load: at-the-proving-ground-with-a-tally
 use: entity.armourers-chest.open
 feed: proving-blade with core.masters-whetstone
 feed: 1 with core.masters-whetstone
@@ -375,15 +391,15 @@ allocate: 1 at 1,0 position 2
 allocate: 1 at 1,0 position 6
 allocate: 1 at 1,0 position 5
 equip: 1
+equip: vigor-tally
 use: core.melee-combat on proving-post
 wait: 60
-// The player's own attack-rate is where both halves of the pair land, and the
-// arithmetic tells them apart. The base is 25; `accelerated-vigor` adds 2 flat
-// an instance and `quickening` 3% of the total per instance held, folded as
-// (25 + 2n) x (1 + 0.03n). One instance is 27.8 and six flat ones alone are 37,
-// so anything past 40 is several held at once *and* the passive reading how
-// many. The sheet is what says they are six separate instances on six clocks.
-assert: stat.attack-rate > 40
+// Six instances held at the end of the minute, counted and not inferred: the
+// tally is one evasion a stack and nothing else on this route touches that
+// stat, so the reading is the number of them rather than arithmetic over the
+// base attack-rate, the payload's own figure and the passive that reads how
+// many are held, none of which the count answers to.
+assert: stat.evasion = 6
 expect only: accelerated-vigor-stacks-behind-its-gate-end
 
 // The debuff is held by the struck party rather than by the swinger, which is

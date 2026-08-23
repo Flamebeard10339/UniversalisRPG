@@ -238,9 +238,11 @@ use: entity.stairs.ascend
 use: entity.window.climb-out
 assert: not tulsa.front-door.unlocked
 // The drop is what the route pays instead of the door: five off the thirty the
-// player starts with, and nothing on this route gives any of it back. Stated as
-// what is missing rather than as a total, so a bigger pool is not a failure.
-assert: resource.core.health <= 25
+// player starts with, and nothing on this route gives any of it back. The
+// condition roots read a pool and not what is missing from one, so this is the
+// total the drop leaves — exact, because a band here would also hold in a world
+// where the window cost twenty.
+assert: resource.core.health = 25
 expect only: left-mikis-house
 // Regenerate with /create-valid-test when this route's content changes on
 // purpose. See thieving-route-full-end for why this isn't miki-route-end.
