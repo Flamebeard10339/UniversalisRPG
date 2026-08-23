@@ -186,7 +186,7 @@ load: miki-route-start
 run: quest-offered
 use: entity.mirror.look-in
 submit-modal: name=Rowan
-submit-modal: race=elf
+submit-modal: race=core.elf
 assert: tulsa.mirror-done
 talk: tulsa.miki
 assert: finding-your-feet.bake-bread
@@ -303,7 +303,7 @@ load: miki-route-start
 run: quest-offered
 use: entity.mirror.look-in
 submit-modal: name=Rowan
-submit-modal: race=elf
+submit-modal: race=core.elf
 talk: tulsa.miki
 assert: finding-your-feet.bake-bread and not has core.bread
 journal: finding-your-feet says I have made nothing of the water and the flour yet.
@@ -359,7 +359,7 @@ assert: tulsa.rats-killed >= 1
 {"version":12}
 
 # save miki-route-end
-{"version":12,"inventory":{"core.jug-of-water":0,"core.pot-of-flour":0,"core.dough":0,"core.bread":1,"core.iron-sword":1,"core.wooden-shield":1,"core.rat-bone":7,"core.bent-coin":3,"core.rat-tail":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tulsa.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tulsa.rats-killed":3,"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tulsa.market-square.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"core.cooking":6,"core.melee":14},"resources":{"core.health":21570},"location":"tulsa.beach","populations":{"tulsa.basement":{"tulsa.giant-rat":{"down":3,"due":[]}}},"time":41600,"rng":1706300260,"player":{"name":"Rowan","race":"elf"}}
+{"version":12,"inventory":{"core.jug-of-water":0,"core.pot-of-flour":0,"core.dough":0,"core.bread":1,"core.iron-sword":1,"core.wooden-shield":1,"core.rat-bone":7,"core.bent-coin":3,"core.rat-tail":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tulsa.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tulsa.rats-killed":3,"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tulsa.market-square.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"core.cooking":6,"core.melee":14},"resources":{"core.health":21570},"location":"tulsa.beach","populations":{"tulsa.basement":{"tulsa.giant-rat":{"down":3,"due":[]}}},"time":41600,"rng":1706300260,"player":{"name":"Rowan","race":"core.elf"}}
 
 // The thief's own closing sheet — not the door route's. A route that never
 // bakes or fights lands on different holdings, a different clock and a

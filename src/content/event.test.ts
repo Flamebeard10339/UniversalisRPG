@@ -84,12 +84,12 @@ base: 4
 trigger: damage-dealt
 
 # skill melee
-stat-id: attack
+tags: +1 attack per level of melee
 gain 4 experience on absent.gone
 gain 2 experience on moment
 
 # skill lost-cause
-stat-id: absent.brawn
+tags: +1 absent.brawn per level of lost-cause
 
 # entity player
 skills: melee, lost-cause
@@ -101,10 +101,10 @@ describe('a grant into a module that is absent prunes like every other reference
     expect(registry.skills.get('m.melee')!.grants).toEqual([{ coefficient: 2, amount: false, event: 'm.moment' }]);
   });
 
-  it('drops a skill whose stat went with the absent module, and the sheets that named it', () => {
+  it('drops the tag whose stat went with the absent module and keeps the skill anyone levelled', () => {
     const registry = loadModule(OPTIONAL);
-    expect(registry.skills.has('m.lost-cause')).toBe(false);
-    expect(registry.entities.get('m.player')!.skills).toEqual(['m.melee']);
+    expect(registry.skills.get('m.lost-cause')!.tags).toEqual([]);
+    expect(registry.entities.get('m.player')!.skills).toEqual(['m.melee', 'm.lost-cause']);
   });
 
   it('still refuses a name that no absent module could have supplied', () => {

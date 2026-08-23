@@ -111,16 +111,31 @@ trigger: on empty
 // --- skills ---
 
 # skill thieving
-stat-id: attack
 
 # skill melee
-stat-id: attack
 
 # skill cooking
 
 # skill fishing
 
 # skill woodcutting
+
+// --- races ---
+
+// What the player is, chosen once at the mirror and carried for the whole of a
+// life. A race is a modifier carrier like a buff, a worn item or a skill: it
+// hangs its bonus off the character with the same clause the rest of them use.
+# race human
++5% max-health
+
+# race elf
++5% accuracy
+
+# race dwarf
++5% defense
+
+# race orc
++5% attack
 
 // --- equipment slots ---
 

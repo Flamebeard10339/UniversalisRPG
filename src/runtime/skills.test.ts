@@ -26,22 +26,18 @@ max: max-stamina
 rate: dodge
 
 # skill brawling
-stat-id: attack
-per-level: +1
+tags: +1 attack per level of brawling
 
 # skill footwork
-stat-id: dodge
-per-level: +2%
+tags: +2% dodge per level of footwork
 
 # skill lore
 
 # skill haggling
-stat-id: haggle
-per-level: +2-5
+tags: +2-5 haggle per level of haggling
 
 # skill grudge
-stat-id: grudge-power
-per-level: -3%
+tags: -3% grudge-power per level of grudge
 
 # entity player
 title: You
@@ -124,7 +120,7 @@ describe('the xp curve', () => {
   });
 });
 
-describe('a skill level feeding the stat it names', () => {
+describe('a skill level counting a bonus the skill carries', () => {
   it('folds a flat grant through the added channel, once per level', () => {
     const registry = loaded();
     expect(statValue('attack', withXp({}), registry)).toBe(11);
@@ -153,19 +149,15 @@ describe('a skill level feeding the stat it names', () => {
     expect(statValue('attack', state, registry, 'mannequin')).toBe(3);
   });
 
-  it('grants nothing for a skill that names no stat', () => {
+  it('grants nothing for a skill that carries no bonus', () => {
     const registry = loaded();
-    expect(registry.skills.get('lore')!['stat-id']).toBeUndefined();
+    expect(registry.skills.get('lore')!.tags).toEqual([]);
     expect(statValue('attack', withXp({ lore: xpForLevel(40) }), registry)).toBe(11);
   });
 
-  it('refuses a grant with no stat-id to raise', () => {
-    expect(() => loadModule('# skill brawling\nper-level: +1\n')).toThrow(/# skill brawling: per-level: needs a stat-id: to raise/);
-  });
-
-  it('refuses a grant that names a stat, since stat-id is where the stat is named', () => {
-    expect(() => loadModule('# stat attack\n\n# skill brawling\nstat-id: attack\nper-level: +1 attack\n')).toThrow(/expected a bonus like \+1 or \+1%, got "\+1 attack"/);
-    expect(() => loadModule('# skill brawling\nper-level: sneaky\n')).toThrow(/expected a bonus like \+1 or \+1%, got "sneaky"/);
+  it('counts a level of any skill, not only the one carrying the clause', () => {
+    const registry = loadModule(MODULE.replace('+1 attack per level of brawling', '+1 attack per level of footwork'));
+    expect(statValue('attack', withXp({ footwork: xpForLevel(5) }), registry)).toBe(15);
   });
 });
 

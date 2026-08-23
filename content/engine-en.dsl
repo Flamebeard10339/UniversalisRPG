@@ -42,10 +42,6 @@ engine.carried.verb.unequip: Unequip
 engine.carried.verb.destroy: Destroy
 engine.carried.close: Close
 engine.carried.confirmed: Go ahead
-engine.race.human: Human
-engine.race.elf: Elf
-engine.race.dwarf: Dwarf
-engine.race.orc: Orc
 engine.growth.max-level: {item} is already at level {level}, which is its maximum
 engine.growth.no-copy: you carry no {item}
 engine.growth.no-worn: you wear nothing in {slot}
@@ -98,6 +94,7 @@ engine.shop.refused.not-carried: You are not carrying that many.
 engine.shop.refused.not-afforded: You cannot afford that.
 engine.shop.refused.not-a-count: That is not a number of things to trade.
 engine.modal.opened: modal:{modal}
+engine.prune.race: Cleared the player's race because {race} is not loaded.
 engine.prune.record: Removed {path} {id} because its {kind} is not loaded.
 engine.prune.location: Moved from unavailable location {from} to {to}.
 engine.prune.nowhere: (nowhere)

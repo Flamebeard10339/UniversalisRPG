@@ -602,6 +602,14 @@ entities:
 # entity mirror
 look in: open modal: character-creation
 
+# race human
+
+# race elf
+
+# race dwarf
+
+# race orc
+
 # entity sage
 title: Sage
 
@@ -625,6 +633,13 @@ submit-modal: race=elf
 `;
 
 const STACKED_MODAL_MODULE = `
+# race human
+
+# race elf
+
+# race dwarf
+
+# race orc
 # location camp
 x: 0, y: 0
 starting
@@ -1230,7 +1245,7 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     const { ctx, session } = authoringFixture();
     const commands = [
       '/dsl stat vigor base: 10',
-      '/dsl skill focus stat-id: local-changes.vigor',
+      '/dsl skill focus tags: +1 local-changes.vigor per level of local-changes.focus',
       '/dsl item token title: Token',
       '/dsl item ore title: Ore',
       '/dsl item ingot title: Ingot',
@@ -1251,7 +1266,7 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
 
     const registry = session.registry;
     expect(registry.stats.get('local-changes.vigor')?.base).toEqual({ min: 10, max: 10 });
-    expect(registry.skills.get('local-changes.focus')?.['stat-id']).toBe('local-changes.vigor');
+    expect(registry.skills.get('local-changes.focus')?.tags).toEqual([{ kind: 'stat-bonus', statId: 'local-changes.vigor', percent: false, amount: { min: 1, max: 1 }, per: { kind: 'level', id: 'local-changes.focus' } }]);
     expect(registry.items.get('local-changes.token')?.title).toBe('Token');
     expect(registry.entities.get('local-changes.npc')?.actions).toEqual([{ label: 'cheer', results: [{ kind: 'say', text: 'Hello.', key: 'local-changes.entity.npc.say.0' }] }]);
     expect(registry.locations.get('local-changes.grove')).toMatchObject({ x: 1, y: 0, entities: [{ entity: 'local-changes.npc' }] });

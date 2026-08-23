@@ -25,6 +25,10 @@ node greeting:
   set: greeted
   -> Say nothing.
 
+# race human
+
+# race elf
+
 # cluster-jewel core
 shape: point
 open-connections: e

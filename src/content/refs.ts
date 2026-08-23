@@ -6,7 +6,7 @@ import { DslError } from '../grammar/parser';
 import { isFieldEdits, listMembers } from '../grammar/section';
 import { mayBeInstanceId } from './instanceId';
 import { Quantified } from '../grammar/values';
-import { TagClause } from '../grammar/tagClause';
+import { COUNTERS, TagClause } from '../grammar/tagClause';
 
 export const INFLICT_SITE = 'inflict:';
 
@@ -160,7 +160,7 @@ export function visitTags(list: unknown, where: string, visit: Visit): void {
   for (const tag of listMembers<TagClause>(list)) {
     if (tag.kind !== 'stat-bonus') continue;
     put(tag, 'statId', 'stat', `${where} tag`, visit);
-    if (tag.per !== undefined) put(tag.per, 'id', tag.per.kind === 'stack' ? 'item' : 'resource', `${where} tag per`, visit);
+    if (tag.per !== undefined) put(tag.per, 'id', COUNTERS[tag.per.kind].names, `${where} tag per`, visit);
   }
 }
 

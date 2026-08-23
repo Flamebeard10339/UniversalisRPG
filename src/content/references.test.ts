@@ -28,7 +28,7 @@ resource: health
 trigger: on empty
 
 # skill brawling
-stat-id: attack
+tags: +1 attack per level of brawling
 
 # item straw
 examine: A fistful of straw.
@@ -349,9 +349,13 @@ describe('the slot vocabulary is what entities declare', () => {
   });
 });
 
-describe('a skill names the stat it raises', () => {
-  it('checks stat-id like any other reference', () => {
-    expect(loading('stat-id: attack', 'stat-id: attak')).toThrow(/# skill brawling stat-id: names an unknown stat: attak/);
+describe('a skill carries what knowing it is worth', () => {
+  it('checks the stat its tag names like any other reference', () => {
+    expect(loading('+1 attack per level of brawling', '+1 attak per level of brawling')).toThrow(/# skill brawling tag names an unknown stat: attak/);
+  });
+
+  it('checks the skill its tag counts levels of', () => {
+    expect(loading('+1 attack per level of brawling', '+1 attack per level of brawlin')).toThrow(/# skill brawling tag per names an unknown skill: brawlin/);
   });
 });
 

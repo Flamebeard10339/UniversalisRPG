@@ -94,7 +94,7 @@ export const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   shops: { shape: 'record', holds: (value) => value === null || isShopStock(value), sparsest: null, prune: { of: 'shop', loaded: (registry, id) => registry.shops.has(id) } },
   time: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
   rng: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
-  player: { shape: 'scalar', holds: isPlayer, sparsest: { name: '', race: '' }, prune: 'holds no registry id' },
+  player: { shape: 'scalar', holds: isPlayer, sparsest: { name: '', race: '' }, prune: 'pruned by a rule of its own' },
   modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), sparsest: [], prune: 'pruned by a rule of its own' },
 };
 
@@ -220,6 +220,12 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
       state.journey = null;
       addWarning(warnings, 'journey', journey.to, localizer.engine('engine.prune.journey', { to: named(journey.to), lost: named(lost) }));
     }
+  }
+
+  const race = state.player.race;
+  if (race && !registry.races.has(race)) {
+    state.player = { ...state.player, race: '' };
+    addWarning(warnings, 'player.race', race, localizer.engine('engine.prune.race', { race: named(race) }));
   }
 
   const activeProblem = activeActionProblem(localizer, state, registry);

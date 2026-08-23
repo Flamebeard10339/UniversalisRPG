@@ -117,6 +117,14 @@ entities:
 # entity mirror
 look in: open modal: character-creation
 
+# race human
+
+# race elf
+
+# race dwarf
+
+# race orc
+
 # dialogue mirror-greeting
 owner = mirror
 
@@ -482,6 +490,14 @@ entities:
 
 # entity mirror
 look in: open modal: character-creation
+
+# race human
+
+# race elf
+
+# race dwarf
+
+# race orc
 
 # entity sage
 title: Sage
@@ -1046,6 +1062,14 @@ examine: Warm.
 # entity mirror
 look in: open modal: character-creation
 
+# race human
+
+# race elf
+
+# race dwarf
+
+# race orc
+
 # entity oven
 roast:
   continuous
@@ -1524,6 +1548,14 @@ describe('a modal answer is spelled in the base language on every screen, and on
     '# item whetstone',
     'title: Whetstone',
     'item-experience: 1000',
+    '',
+    '# race human',
+    '',
+    '# race elf',
+    '',
+    '# race dwarf',
+    '',
+    '# race orc',
   ].join('\n');
   const FORGE_ES = [
     '# info forge-es',
@@ -1534,7 +1566,7 @@ describe('a modal answer is spelled in the base language on every screen, and on
     '# locale es',
     'forge.item.whetstone.title: Piedra',
     'engine.carried.verb.grow: Cultiva',
-    'engine.race.elf: Elfo',
+    'forge.race.elf.title: Elfo',
     'engine.plane.feed: alimenta: con {item}',
   ].join('\n');
 
@@ -1588,8 +1620,8 @@ describe('a modal answer is spelled in the base language on every screen, and on
     expect(words(moves('en'))).toContain('feed: with Whetstone');
   });
 
-  it('shows the key for every engine word the played language has no entry for', () => {
-    expect(words(races('es'))).toEqual(['engine.race.human', 'Elfo', 'engine.race.dwarf', 'engine.race.orc']);
+  it('shows the key for every word the played language has no entry for', () => {
+    expect(words(races('es'))).toEqual(['forge.race.human.title', 'Elfo', 'forge.race.dwarf.title', 'forge.race.orc.title']);
     expect(words(verbs('es'))).toEqual(['Cultiva', 'engine.carried.verb.equip', 'engine.carried.verb.destroy', 'engine.carried.close']);
     expect(words(moves('es'))).toContain('alimenta: con Piedra');
     expect(words(moves('es'))).toContain('engine.plane.back');

@@ -15,6 +15,14 @@ import { askedOption } from './command';
 import { apply, applyDirective, PlaySession, PlayStatus, startSession, submitModal, view } from './session';
 
 const STACKING_MODULE = `
+# race human
+
+# race elf
+
+# race dwarf
+
+# race orc
+
 # location camp
 x: 0, y: 0
 starting
@@ -84,6 +92,14 @@ node greeting:
 `;
 
 const ANSWER_OPENS_MODULE = `
+# race human
+
+# race elf
+
+# race dwarf
+
+# race orc
+
 # location camp
 x: 0, y: 0
 starting
@@ -329,7 +345,7 @@ describe('opening and answering', () => {
     const state = talking(loadInEnglish(STACKING_MODULE));
     expect(names(state)).toEqual(['character-creation', 'dialogue']);
 
-    const dropped = pruneModals(state, loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n'));
+    const dropped = pruneModals(state, loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n\n# race human\n'));
     expect(dropped).toEqual([{ name: 'dialogue', reason: 'dialogue sage-talk is not loaded' }]);
     expect(names(state)).toEqual(['character-creation']);
   });
@@ -765,6 +781,9 @@ describe('nothing a player answers with carries words', () => {
     '# entity sage',
     'title: Sage',
     '',
+    '# race elf',
+    'title: Elf',
+    '',
     '# entity pedlar',
     'title: Pedlar',
     'keeps shop: stall',
@@ -803,7 +822,7 @@ describe('nothing a player answers with carries words', () => {
     'forge.entity.sage.title: Sabio',
     'engine.carried.verb.grow: Cultiva',
     'engine.carried.close: Cierra',
-    'engine.race.elf: Elfo',
+    'forge.race.elf.title: Elfo',
     'engine.plane.back: Vuelve',
   ].join('\n');
 
@@ -849,7 +868,7 @@ describe('nothing a player answers with carries words', () => {
     applyDirective(session, { kind: 'open-modal', modal: 'character-creation' });
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'name', value: 'Rowan' });
-    applyDirective(session, { kind: 'submit-modal', key: 'race', value: 'elf' });
+    applyDirective(session, { kind: 'submit-modal', key: 'race', value: 'forge.elf' });
 
     applyDirective(session, { kind: 'feed', target: 'forge.blade', food: 'forge.whetstone' });
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });

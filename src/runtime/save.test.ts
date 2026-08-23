@@ -43,6 +43,10 @@ max: max-health
 # entity chest
 open:
   give: 1 gold
+
+# race human
+
+# race elf
 `;
 
 describe('initialState', () => {
@@ -313,6 +317,18 @@ describe('pruneStateForRegistry', () => {
         'activeAction',
       ]),
     );
+  });
+
+  it('clears a race the loaded world no longer declares, and keeps the name the player chose', () => {
+    const registry = loadInEnglish(`${PRUNE_MODULE}
+# race human
+`);
+    const state = createGameState();
+    const warnings = loadSave(state, { version: SAVE_VERSION, diff: { player: { name: 'Rowan', race: 'elf' } } }, registry);
+
+    expect(state.player).toEqual({ name: 'Rowan', race: '' });
+    expect(warnings).toEqual([{ path: 'player.race', id: 'elf', message: "Cleared the player's race because elf is not loaded." }]);
+    expect(loadSave(createGameState(), { version: SAVE_VERSION, diff: { player: { name: 'Rowan', race: 'human' } } }, registry)).toEqual([]);
   });
 
   it('keeps object-owned flags and map discovery, which live only in the namespace', () => {
