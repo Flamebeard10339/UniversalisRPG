@@ -152,3 +152,74 @@ describe('a fight pool emptied by a result, not by the hit that opened the segme
     }
   });
 });
+
+// Two foes and one blow. The brute has a hundred to lose and the wisp was never above nothing, so
+// the pair asks whether the killing blow gets its own answer about what emptying is.
+const STILLBORN = `
+# stat attack
+base: 5
+
+# stat swing-rate
+base: 60
+
+# stat foe-max
+base: 100
+
+# resource stamina
+max: foe-max
+
+# event collapse
+resource: stamina
+trigger: on empty
+
+# item trophy
+
+# action wear-down
+title: wear-down
+rate: my swing-rate
+damage: my attack
+depletes: their stamina
+
+# entity player
+stats: attack 5, swing-rate 60
+uses: wear-down
+
+# entity brute
+stats: foe-max 100
+on collapse:
+  credit:
+    give: 1 trophy
+
+# entity wisp
+stats: foe-max 0
+on collapse:
+  credit:
+    give: 1 trophy
+
+# location pit
+x: 0, y: 0
+starting
+entities: brute, wisp
+`;
+
+describe('a pool fires on empty: by falling to nothing', () => {
+  const swungAt = (registry: Registry, foe: string): GameState => {
+    const state = createGameState('pit');
+    initResources(state, registry);
+    armFightAction('wear-down', foe, registry, state);
+    resolve(state, registry, secondsToMs(60));
+    return state;
+  };
+
+  it('pays out for the foe that had something to lose, and not for the one that never did', () => {
+    const registry = loadModule(STILLBORN);
+
+    const brute = swungAt(registry, 'brute');
+    expect(brute.inventory['trophy']).toBe(1);
+    expect(brute.activeAction).toBeNull();
+
+    const wisp = swungAt(registry, 'wisp');
+    expect(wisp.inventory['trophy'] ?? 0, 'nothing fell, so nothing emptied — the blow does not decide this').toBe(0);
+    expect(wisp.activeAction, 'it is taken out of the fight all the same').toBeNull();
+  });
+});
