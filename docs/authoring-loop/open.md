@@ -165,28 +165,6 @@ at least honest. Still no evidence that an author has wanted the conditional for
 one rat down, which survives a rebalance of base attack or a better weapon — but a
 one-shot rebalance would make even that stop telling advance from restart.
 
-## Facts an author must know that nothing yet tells them
-
-Each line is **verified against the code, then given a home, then deleted from
-here**. Three homes, in order of preference: the engine refuses it, so `oracle --at`
-names it at the point of writing; the oracle says it, derived from the kind's own
-declaration; or the outline template says it, for a convention no engine rule could
-enforce. A line that verification shows is stale is deleted with no home.
-
-Nothing is to be added to this section. When it is empty, delete the heading.
-
-Nine of the eleven are gone: three were already said by the engine or the oracle,
-two were wrong about the code, two the owner ruled not worth the archaeology, and
-two are now oracle notes derived from each kind's own declaration.
-
-- [ ] a quest lives in its own module, and the world still loads without it
-- [ ] progress signals get lightweight UI acknowledgement
-
-**Both want the same home, and it does not exist.** The only candidate is the
-outline template, and there is no template — `.planning/starting-town-outline.md`
-is a specimen of one town and says so in its own first line. *Closes when:* there
-is a template, or these two find another home.
-
 ## Open questions, not yet work
 
 **A range is equality written twice.** `xp.thieving >= 100 and xp.thieving <= 200`
