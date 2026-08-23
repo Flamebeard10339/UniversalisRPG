@@ -156,6 +156,20 @@ describe('names the engine keeps for itself', () => {
     expect(() => loadUniverse([module('base', '# location camp', 'x: 0, y: 0', 'flags: visits')])).toThrow(/declares a flag named visits/);
   });
 
+  it('refuses a location called starting-location, which a result reads as whichever one is marked starting', () => {
+    expect(() => loadUniverse([module('base', '# location starting-location', 'x: 0, y: 0', 'title: Home')])).toThrow(/starting-location is the name the engine answers/);
+    expect(() => loadUniverse([module('base', '# location camp', 'x: 0, y: 0', 'title: Camp')])).not.toThrow();
+  });
+
+  it('leaves starting-location unnamespaced where a module that stands nowhere names it', () => {
+    const furniture = module('furniture', '# entity plinth', 'title: Plinth', 'go-home:', '  relocate: starting-location', '  discover: starting-location');
+    const registry = loadUniverse([furniture]);
+    expect(registry.entities.get('furniture.plinth')!.actions[0].results.map((result) => JSON.stringify(result))).toEqual([
+      '{"kind":"relocate","location":"starting-location"}',
+      '{"kind":"discover","location":"starting-location"}',
+    ]);
+  });
+
   it('reserves the module ids the engine actually owns', () => {
     for (const reserved of ['time', 'player', 'item', 'self']) {
       expect(() => loadUniverse([module(reserved, '# item rope')])).toThrow(/is a reserved module id/);
