@@ -6,17 +6,23 @@ Avoid patches that accrue technical debt.
 
 **Do not create systems that must be manually kept in sync.** This is the single
 largest and most frequent failure mode this repository has had — 11.5% of its
-commits undo one. A derived proof beats a listed one: if a rule says *every*, its
-proof should derive its own subjects rather than enumerate them. The procedure
-for catching this before it is written, and the seven shapes it takes here, live
-in the `one-home` skill. That skill is the authority; this paragraph is why.
+commits undid one when it was last counted, on 2026-08-21. A derived proof beats
+a listed one: if a rule says *every*, its proof should derive its own subjects
+rather than enumerate them. The procedure for catching this before it is written,
+and the seven shapes it takes here, live in the `one-home` skill. That skill is
+the authority; this paragraph is why.
 
 Make commits after each logical chunk. `git add <explicit paths>`, never
-`git add -A`. When more than one worker shares this checkout, note that staging
-explicit paths is **not** enough isolation: the index is shared too, so a commit
-takes whatever anyone else has staged. It has happened here three times in one
-session. If you are one of several, either work in your own worktree or expect
-your files to land under someone else's message.
+`git add -A`.
+
+**A worker sharing this checkout does not commit at all.** Staging explicit paths
+is **not** enough isolation: the index is shared too, so a commit takes whatever
+anyone else has staged — three times in one session, here. Run no `git add`,
+`commit`, `stash` or `checkout`; say what you changed and let the orchestrator
+commit by pathspec. One writer at a time is what a shared checkout is for. Two or
+more writers — or anyone who must run the suite and believe the answer — take a
+worktree each, because a test run reads the whole tree and a disjoint file list
+does not make its result trustworthy.
 
 # The DSL
 
