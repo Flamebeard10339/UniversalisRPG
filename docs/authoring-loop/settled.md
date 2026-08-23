@@ -158,8 +158,7 @@ outright, which is why `resolvesPerAttempt` is exactly targetedness. `tulsa`'s
 dead alder is the corpus's one writing of it — four swings of `damage: felling` at
 0.25 a swing for one log — so the terminal's `engine.repl.live.counting` line and
 `LiveSheet.tsx`'s implicit bar are lit by shipped content and are **not dead code
-to delete**. The unsided `damage:` that makes the cycle multi-attempt is a form
-`npm run oracle` does not print; see `open.md`.
+to delete**.
 
 **Prune records are addressed to whoever loaded the save, not to the player.**
 They travel as `PruneWarning[]` — stderr and the run log for the playbot, a
@@ -171,9 +170,15 @@ written in save-key vocabulary a player never wrote and cannot act on.
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.
 - `npm run oracle` prints the grammar; `--at <draft>` reads a draft against the
   world, **answering with the refusals and the verdict only** — the per-line
-  reference walk is `--walk`, and it is 3000 lines for a 950-line file. A draft is
-  the module its own `# info` declares, so `--at` answers for a file that already
-  ships by replacing the shipped copy rather than colliding with it.
+  reference walk is `--walk`, which takes the line you are stuck on and is
+  thousands of lines without one. A draft is the module its own `# info`
+  declares, so `--at` answers for a file that already ships by replacing the
+  shipped copy rather than colliding with it.
+- **An action field's writable shapes are its parser's own**, and every action the
+  corpus holds is printed back and held to them in `dsl.test.ts`. Restating a
+  shape beside the parser is what let `damage:` offer only the `vs` half, hid
+  `continuous` entirely, and left an action's bare stat-bonus clauses off the page
+  while all three shipped in `content/`.
 - `npm run notes` lists every `@@@` the corpus holds.
 - `npm run review [-- <module>]` is every line the game can say, under the section
   that says it; `--read-through <section>` marks a sitting as read. What has been
