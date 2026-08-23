@@ -38,6 +38,11 @@ const NOT_PUBLISHED: ReadonlyArray<{ type: string; why: string }> = [
     why: 'the handle a driver opens through — a session, the module ids that loaded and what is wrong with them. Its problems reach this walk on their own, as `UniverseProblem`, which declares the tool as whose words they are; the session it holds reaches a driver as `CommandContext` does and is passed over for the same reason',
   },
   {
+    type: 'src/runtime/runLog.ts#RunLogEntry',
+    why: "one turn of a recorded run — the line played, whether the engine took it, and what it answered with. It is the protocol a run is written in and is addressed to whoever reads the run afterwards, never to the player, which is why it is one flat English string in every language, the way `Recorder`'s history is",
+  },
+  { type: 'src/runtime/runLog.ts#RunNotes', why: 'what the player said about a turn in their own words, keyed by the field names a reply and a run log both write. It rides in the run log above and reaches a player through no surface at all' },
+  {
     type: 'src/runtime/session.ts#PlaySession',
     why: 'the live session a driver threads through `apply`/`applyDirective`/`view`. Everything it publishes reaches this walk on its own — the view as `PlayView`, the status as `PlayStatus` — and its own `registry` field is content the walk is not about, for the same reason `OpenedUniverse.session` is passed over',
   },

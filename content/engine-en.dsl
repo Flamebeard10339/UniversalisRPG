@@ -196,6 +196,20 @@ engine.shell.dev: Dev mode
 engine.shell.speed: Speed
 engine.shell.clear: Clear local changes
 engine.shell.reopen: Open again
+engine.playtest: Record a playtest
+engine.playtest.turn: Turn {turn}
+engine.playtest.nothing: Nothing played yet.
+engine.playtest.attach: Note
+engine.playtest.keep: Attach
+engine.playtest.discard: Never mind
+engine.playtest.copy: Copy the run
+engine.playtest.copied: The run is on the clipboard.
+engine.playtest.stop: Stop recording
+engine.playtest.about: About {line}
+engine.playtest.note: What you were doing, and why
+engine.playtest.expected: Something you reached for and could not do
+engine.playtest.confusion: Anything unclear, contradictory or unfinished
+engine.playtest.blocked: Say why the run cannot go on, if it cannot
 engine.repl.place: {location} ({id})
 engine.repl.here: Here: {entities}
 engine.repl.clock: [time: {time}s]

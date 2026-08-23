@@ -12,6 +12,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, findCommand, newContext, runLine, type CommandContext, type CommandOutput, type CommandResult, type CommandSpec } from '../src/runtime/command';
 import type { Localizer } from '../src/runtime/localized';
 import type { PruneWarning } from '../src/runtime/pruning';
+import { blocking, describeEntry, journalWindowText, NOTE_FIELDS, turnRecord, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
 import { adoptRegistry, loadSaved, sessionLocalizer, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
 import { sourceFiles } from './probe';
@@ -137,14 +138,8 @@ export function systemPromptFor(mode: PlaybotMode): string {
   return [SHARED_INTRO, SHARED_MECHANISM, SHARED_PRODUCT, SHARED_STOPPING, MODE_FRAMING[mode], SHARED_EXAMPLE, SHARED_TAIL].join('\n\n');
 }
 
-export interface TurnReply {
+export interface TurnReply extends RunNotes {
   readonly line: string;
-  readonly note: string;
-  readonly expected: string;
-  readonly confusion: string;
-  // Non-empty when the player judges the run cannot go on. A run that keeps asking after the
-  // world has stopped answering buys nothing and spends the plan it is drawn against.
-  readonly blocked: string;
 }
 
 export interface TurnRequest {
@@ -165,41 +160,6 @@ export interface ModelClient {
   // What the last send billed, when the client is one that knows. A fake does not, and c2 keeps
   // every test on a fake, so this is how a live run answers the half of c5 the suite cannot.
   lastUsage?(): TurnUsage | null;
-}
-
-interface AppliedEntry {
-  readonly turn: number;
-  readonly outcome: 'applied' | 'refused';
-  readonly line: string;
-  readonly note: string;
-  readonly expected: string;
-  readonly confusion: string;
-  readonly blocked: string;
-  readonly detail: string;
-}
-
-interface SkippedEntry {
-  readonly turn: number;
-  readonly outcome: 'reload-failed' | 'invalid-reply';
-  readonly detail: string;
-}
-
-export type RunLogEntry = AppliedEntry | SkippedEntry;
-
-export const JOURNAL_WINDOW = 10;
-
-export function describeEntry(entry: RunLogEntry): string {
-  if ('line' in entry) {
-    const stopping = entry.blocked === '' ? '' : `; BLOCKED: ${entry.blocked}`;
-    return `turn ${entry.turn} [${entry.outcome}] ${entry.line} — note: ${entry.note || '(none)'}; expected: ${entry.expected || '(none)'}; confusion: ${entry.confusion || '(none)'}${stopping}; result: ${entry.detail}`;
-  }
-  return `turn ${entry.turn} [${entry.outcome}] ${entry.detail}`;
-}
-
-export function journalWindowText(log: readonly RunLogEntry[]): string {
-  const windowed = log.slice(-JOURNAL_WINDOW);
-  if (windowed.length === 0) return '(run just started; no turns yet)';
-  return windowed.map(describeEntry).join('\n');
 }
 
 function renderResources(v: PlayView): string[] {
@@ -311,32 +271,25 @@ function offMenuCommand(line: string): CommandSpec | undefined {
   return spec && spec.audience !== 'player' ? spec : undefined;
 }
 
+const DEMANDED = ['line', ...NOTE_FIELDS.filter((field) => field.required).map((field) => field.name)];
+
 export function parseReply(raw: unknown): { ok: true; reply: TurnReply } | { ok: false; error: string } {
   if (!isRecord(raw)) return { ok: false, error: 'reply is not a JSON object' };
   const line = stringField(raw, 'line');
-  const note = stringField(raw, 'note');
-  const expected = stringField(raw, 'expected');
-  const confusion = stringField(raw, 'confusion');
-  if (line === undefined || note === undefined || expected === undefined || confusion === undefined) {
-    return { ok: false, error: 'reply is missing one of line, note, expected, confusion as a string' };
+  const notes = Object.fromEntries(NOTE_FIELDS.map((field) => [field.name, stringField(raw, field.name)]));
+  if (line === undefined || DEMANDED.some((name) => name !== 'line' && notes[name] === undefined)) {
+    return { ok: false, error: `reply is missing one of ${DEMANDED.join(', ')} as a string` };
   }
   if (line.trim() === '') return { ok: false, error: 'reply.line is empty' };
   const offMenu = offMenuCommand(line);
   if (offMenu) return { ok: false, error: `${offMenu.name} is not a command this player may run` };
-  return { ok: true, reply: { line, note, expected, confusion, blocked: stringField(raw, 'blocked') ?? '' } };
+  const said = Object.fromEntries(NOTE_FIELDS.map((field) => [field.name, notes[field.name] ?? ''])) as RunNotes;
+  return { ok: true, reply: { ...said, line } };
 }
 
 function summarize(v: PlayView): string {
   const said = v.said.map((line) => String(line)).join(' ').trim();
   return said.length > 0 ? said : `arrived at ${v.location.title}`;
-}
-
-// The engine, not this file, decides what a line refuses: an error-toned message in the result
-// is the one signal command.ts already gives every driver, so reading it is not a second
-// validation layer beside runLine — it is how the CLI and the GUI already tell success from
-// refusal too.
-function refused(result: CommandResult): boolean {
-  return result.output.some((output) => output.kind === 'message' && output.tone === 'error');
 }
 
 // A view output is the only kind this reads nothing out of, because runTurn renders the view
@@ -354,11 +307,6 @@ const excusedKinds = new Set(ANSWER_NOT_SHOWN.map((each) => each.kind));
 export function answerLines(result: CommandResult, localizer: Localizer): string[] {
   const moved = result.view === undefined ? [] : [summarize(result.view)];
   return [...moved, ...result.output.flatMap((output) => (excusedKinds.has(output.kind) ? [] : formatOutput(output, localizer).map(printed)))];
-}
-
-function settleTurn(result: CommandResult, localizer: Localizer): { outcome: 'applied' | 'refused'; detail: string } {
-  const detail = answerLines(result, localizer).join('\n');
-  return { outcome: refused(result) ? 'refused' : 'applied', detail: detail === '' ? 'nothing happened' : detail };
 }
 
 export type ContentReader = () => readonly ModuleSource[];
@@ -409,9 +357,7 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   if (!parsed.ok) return { turn: deps.turn, outcome: 'invalid-reply', detail: parsed.error };
 
   const result = runLine(deps.ctx, parsed.reply.line);
-  const { outcome, detail } = settleTurn(result, sessionLocalizer(deps.ctx.session));
-
-  return { turn: deps.turn, outcome, line: parsed.reply.line, note: parsed.reply.note, expected: parsed.reply.expected, confusion: parsed.reply.confusion, blocked: parsed.reply.blocked, detail };
+  return turnRecord(deps.turn, parsed.reply.line, result, answerLines(result, sessionLocalizer(deps.ctx.session)), parsed.reply);
 }
 
 export interface PlaybotOptions {
@@ -430,7 +376,7 @@ export const REFUSALS_BEFORE_STOPPING = 4;
 
 function stoppedBy(log: readonly RunLogEntry[]): string | null {
   const last = log[log.length - 1];
-  if (last !== undefined && 'blocked' in last && last.blocked !== '') return `the player stopped the run: ${last.blocked}`;
+  if (last !== undefined && blocking(last) !== '') return `the player stopped the run: ${blocking(last)}`;
   const tail = log.slice(-REFUSALS_BEFORE_STOPPING);
   if (tail.length < REFUSALS_BEFORE_STOPPING || !tail.every((entry) => entry.outcome === 'refused')) return null;
   return `${REFUSALS_BEFORE_STOPPING} turns in a row were refused, the last of them: ${tail[tail.length - 1].detail}`;
@@ -454,18 +400,14 @@ export async function runPlaybot(options: PlaybotOptions): Promise<RunLogEntry[]
   return log;
 }
 
+const REPLY_KEYS = ['line', ...NOTE_FIELDS.map((field) => field.name)];
+
 const REPLY_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['line', 'note', 'expected', 'confusion', 'blocked'],
-  properties: {
-    line: { type: 'string' },
-    note: { type: 'string' },
-    expected: { type: 'string' },
-    confusion: { type: 'string' },
-    blocked: { type: 'string' },
-  },
-} as const;
+  required: REPLY_KEYS,
+  properties: Object.fromEntries(REPLY_KEYS.map((key) => [key, { type: 'string' }])),
+};
 
 const MODEL_ID = 'claude-sonnet-5';
 // A turn picks one of a handful of printed options and says why in a sentence. Deliberation buys

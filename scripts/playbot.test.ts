@@ -6,12 +6,12 @@ import type { Registry } from '../src/content/registry';
 import { moduleSource, shippedFiles } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, isChoiceLine, newContext, runLine } from '../src/runtime/command';
+import { journalWindowText, NOTE_FIELDS, type RunLogEntry } from '../src/runtime/runLog';
 import { sessionLocalizer, sessionStatus, startSession, view, type PlaySession } from '../src/runtime/session';
 import {
   DEFAULT_SOURCES,
   fileContentReader,
   isolatedCwd,
-  journalWindowText,
   openSession,
   parseReply,
   reloadInto,
@@ -26,7 +26,6 @@ import {
   systemPromptFor,
   type ContentReader,
   type ModelClient,
-  type RunLogEntry,
   type TurnRequest,
 } from './playbot';
 
@@ -165,6 +164,22 @@ describe('playbot', () => {
   const CACHE_FLOOR_CHARS = 4096;
   it.each(PLAYBOT_MODES)('[c5] the %s prefix clears the floor under which nothing caches', (mode) => {
     expect(systemPromptFor(mode).length).toBeGreaterThan(CACHE_FLOOR_CHARS);
+  });
+
+  // The shape a turn is recorded in is shared with the app's own playtest recorder, and the
+  // schema and the parser already read it. The prompt is the one thing that cannot: it is a page
+  // of prose tuned for a model, not a form label. So a field added to the list fails here until
+  // the prose that tells the model what to put in it is written.
+  it.each(PLAYBOT_MODES)('the %s prompt asks for every field a recorded turn carries', (mode) => {
+    const unasked = NOTE_FIELDS.filter((field) => !systemPromptFor(mode).includes(`"${field.name}"`));
+    expect(unasked.map((field) => field.name)).toEqual([]);
+  });
+
+  it('[c1] the reply schema takes exactly the line and the fields a recorded turn carries', () => {
+    const schema = sdkOptionsFor('THE SYSTEM PROMPT', isolatedCwd()).outputFormat as unknown as { schema: { required: string[]; properties: Record<string, unknown> } };
+    const expected = ['line', ...NOTE_FIELDS.map((field) => field.name)];
+    expect(schema.schema.required).toEqual(expected);
+    expect(Object.keys(schema.schema.properties)).toEqual(expected);
   });
 
 
