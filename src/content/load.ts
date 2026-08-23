@@ -20,6 +20,7 @@ import { emptyMaps, mapOf, everyActionTable, ModuleDiagnostic, ModuleLoadStage, 
 import { registryCapabilities, registrySlots, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
 import { Pruning, ReferenceKind, Visit } from './refs';
 import { Removal } from './sections/remove';
+import { unpriceableStock } from './sections/shop';
 import { actionAddresses, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { validateTuningVariable } from './tuningVariables';
@@ -585,6 +586,11 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
     const module = id ? sectionOwner(owners, 'item', id) : undefined;
     if (!module) throw error;
     return { module, stage: 'validate', error };
+  }
+
+  for (const shop of registry.shops.values()) {
+    const problem = unpriceableStock(shop, registry.items);
+    if (problem) return { module: sectionOwner(owners, 'shop', shop.id)!, stage: 'validate', error: new DslError(problem) };
   }
 
   const capabilities = registryCapabilities(registry);
