@@ -58,7 +58,8 @@ describe('a universe with every word replaced', () => {
 
   it('says nothing a shipped title says', () => {
     const asShipped = localizerFor(shipped, BASE_LANGUAGE);
-    const ids = [...shipped.items.keys()];
+    // A title that moves is one somebody is shown, so the subjects are the items the locale carries words for rather than every item declared: a DEBUG section says nothing in any language, and asking its untranslatable fallback to move would be asking for the opposite of that.
+    const ids = [...shipped.items.keys()].filter((id) => asShipped.words('item', id, 'title') !== undefined);
 
     expect(ids.length).toBeGreaterThan(5);
     for (const language of PLAYED) {
