@@ -15,6 +15,7 @@ import { formatModuleDiagnostic, mapOf } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { contentSectionMaps, sections, sectionFor, type Section } from './sections';
 import { canSerialize, roundTripUniverse } from './serialize';
+import type { Directive } from './sections/test';
 
 const CORPUS = readdirSync('content')
   .filter((name) => name.endsWith('.dsl'))
@@ -381,6 +382,28 @@ describe('the shipped corpus', () => {
       }
     }
     expect([...registry.locations.keys()].filter((id) => !seen.has(id))).toEqual([]);
+  });
+
+  // A directive that reaches a state someone else's route already reached, rather than walking one of its own: it has nothing to claim beyond what it re-runs or re-checks.
+  const REACHES: readonly Directive['kind'][] = ['load', 'run', 'expect', 'expect-only'];
+  // Where a test's claim is written in words. `refuse:` is one: it names the growth that must not take, which is as readable as an assertion and is how the growth routes state theirs.
+  const SPELLS_IT_OUT: readonly Directive['kind'][] = ['assert', 'refuse'];
+
+  it('says in words what each test it holds walked a route to prove, rather than only in a save body', () => {
+    const { registry } = loadUniverseWithDiagnostics(CORPUS);
+    const walked = [...registry.tests.values()].filter((each) => each.directives.some((directive) => !REACHES.includes(directive.kind)));
+    expect(walked.length).toBeGreaterThan(0);
+
+    const unspoken = walked
+      .filter((each) => !each.directives.some((directive) => SPELLS_IT_OUT.includes(directive.kind)))
+      // `expect:` compares the whole sheet, and is therefore the one form that can say a key the state no longer holds is gone — an absence no condition can name. It is the corpus's deliberate exception, and every use of it carries its argument in a comment.
+      .filter((each) => !each.directives.some((directive) => directive.kind === 'expect'))
+      .map((each) => {
+        const sheets = each.directives.flatMap((directive) => (directive.kind === 'expect-only' ? [directive.save] : []));
+        const only = sheets.length > 0 ? `save ${sheets.join(' and ')}` : 'nowhere at all';
+        return `# test ${each.id} states no claim: what it proves lives in ${only}. Write the claim as assert: lines — npm run oracle -- test lists what a condition may read — or, where nothing a condition can read names it, close on expect: and say why in a comment.`;
+      });
+    expect(unspoken).toEqual([]);
   });
 
   it.each(CORPUS.map((source) => source.name))('%s refuses an indented block nobody reads', (name) => {

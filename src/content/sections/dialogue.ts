@@ -22,16 +22,26 @@ export interface Choice extends Spoken {
 
 export type NodeStep = ({ kind: 'say' } & Spoken) | { kind: 'effect'; result: ActionResult } | { kind: 'goto'; target: string } | { kind: 'menu'; choices: Choice[] };
 
+// The player's own phrase for a thread. Held as a said line rather than a plain string, because it is shown to a player and so is addressed, translated and reviewed like everything else the game says.
+type Asked = Extract<ActionResult, { kind: 'say' }>;
+
 export interface DialogueNode {
   name: string;
   // Reachable on its own rather than only by a goto, which is what an entity says when nothing further along has anything to say. A `when:` beside it narrows when that is.
   always?: boolean;
   when?: Condition;
+  ask?: Asked;
   once?: boolean;
   sticky?: boolean;
   again?: Spoken;
   steps: NodeStep[];
 }
+
+// A node put forward on its own rather than only ever arrived at by a goto from another.
+export const offering = (node: DialogueNode): boolean => node.always === true || node.when !== undefined;
+
+// A thread of this entity's, as against what they say when no thread of theirs is open. Saying which moment is its turn makes one, and so does being named: a node a quest gives is a thread because the quest has already said which moment it belongs to, and a node offering nothing but `always` is not one.
+export const isThread = (node: DialogueNode): boolean => node.when !== undefined || node.ask !== undefined;
 
 export interface Dialogue {
   id: string;
@@ -44,6 +54,7 @@ const OWNER = new RegExp(`^owner[ \\t]*=[ \\t]*(?<id>${PATH})$`);
 const NODE = /^node[ \t]+(?<name>[a-z][a-z0-9-]*):$/;
 const WHEN = /^when:[ \t]*(?<cond>.+)$/;
 const AGAIN = /^again:[ \t]?(?<text>.*)$/;
+const ASK = /^ask:[ \t]?(?<text>.*)$/;
 const GOTO = /^goto[ \t]+(?<target>[a-z][a-z0-9-]*)$/;
 const CHOICE = /^->[ \t]+(?<text>.*?)(?:[ \t]+\(when[ \t]+(?<cond>[^)]+)\))?[ \t]*$/;
 
@@ -65,8 +76,9 @@ function parseChoice(source: RawLine): Choice {
 
 // The lines a node holds, which is the same grammar wherever a node is written — in a # dialogue of its own, or under a stage of a quest. What a goto names is the one thing that differs, because what a node sits in is what it goes to next.
 export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[] => [
-  { form: 'always', example: 'always', family: 'reached when', note: 'reached whenever nothing further along is, which is what this entity says by default' },
-  { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }) },
+  { form: 'always', example: 'always', family: 'reached when', note: 'what this entity says when no thread of theirs is open — talking to somebody puts up every thread they have open at that moment, and a node offering nothing but `always` is not one of them' },
+  { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }), note: 'a thread of its own, open while this holds, and put up beside whatever else the entity has open then' },
+  { form: 'ask: <text>', example: 'ask: About the bees.', family: 'reached when', note: 'what the player picks to open this thread, and writing it makes the node one — a thread with no `ask:` is named in the list by the first line it says, and is entered without a list at all when it is the only one open' },
   { form: 'once', example: 'once', family: 'reached when' },
   { form: 'sticky', example: 'sticky', family: 'reached when', note: 'without this, a node is said once and falls silent on every visit after — sticky says it again in full every time' },
   { form: 'again: <text>', example: 'again: We have spoken already.', family: 'what is said', note: 'what a node without sticky says on a visit after its first, instead of the silence it would otherwise fall to — a sticky node is refused one, because it says everything again anyway' },
@@ -99,9 +111,11 @@ export function parseNode(name: string, source: RawLine): DialogueNode {
 
     const when = WHEN.exec(line.text)?.groups;
     const again = AGAIN.exec(line.text)?.groups;
+    const ask = ASK.exec(line.text)?.groups;
     const goto = GOTO.exec(line.text)?.groups;
     if (when) node.when = parseWhole(condition, when.cond, line.span.start, 'a node when');
     else if (again) node.again = { segments: parseSegments(again.text, line.span.start) };
+    else if (ask) node.ask = { kind: 'say', text: ask.text! };
     else if (line.text === 'always') node.always = true;
     else if (line.text === 'once') node.once = true;
     else if (line.text === 'sticky') node.sticky = true;
@@ -145,6 +159,7 @@ export function nodeBody(node: DialogueNode): string[] {
   const lines: string[] = [];
   if (node.always) lines.push('  always');
   if (node.when) lines.push(`  when: ${condition.print(node.when)}`);
+  if (node.ask) lines.push(`  ask: ${node.ask.text}`);
   if (node.once) lines.push('  once');
   if (node.sticky) lines.push('  sticky');
   if (node.again) lines.push(`  again: ${printSegments(node.again.segments)}`);
@@ -168,6 +183,7 @@ function unknownNode(value: Dialogue): string | undefined {
   const names = new Set(value.nodes.map((node) => node.name));
   for (const node of value.nodes) {
     const where = `node ${node.name}`;
+    if (node.ask && !offering(node)) return `${where} writes ask: and is only ever arrived at from another node, so nothing ever puts its phrase to a player: write always or a when: beside it`;
     for (const step of node.steps) {
       if (step.kind === 'goto' && !names.has(step.target)) return `${where} goto names an unknown node: ${step.target}`;
       if (step.kind !== 'menu') continue;
@@ -182,6 +198,7 @@ export const dialogue = section<Dialogue>()({
   ids: 'owned',
   validate: unknownNode,
   map: 'dialogues',
+  says: (value) => value.nodes.map((node) => (node.ask === undefined ? [] : [node.ask])),
   members: (value) => value.nodes.map((node) => ({ kind: DIALOGUE_NODE, name: node.name })),
   grammar: [
     { form: 'owner = <entity>', example: 'owner = guide' },
@@ -205,7 +222,7 @@ export const dialogue = section<Dialogue>()({
   visit: visitDialogue,
 });
 
-// Everything an entity says. A dialogue names its owner rather than an owner naming its dialogue, so an entity speaks with as many voices as there are dialogues pointing at it — its own, and whatever a quest or an expansion has since given it. They are read in the order they were loaded, so a module that loads later has the last word, which is what an expansion is for.
+// Everything an entity says. A dialogue names its owner rather than an owner naming its dialogue, so an entity speaks with as many voices as there are dialogues pointing at it — its own, and whatever a quest or an expansion has since given it. Nothing here settles which of them talking to that entity reaches: every thread they hold open is put to the player at once.
 export const spokenBy = (dialogues: ReadonlyMap<string, Dialogue>, owner: string): Dialogue[] => [...dialogues.values()].filter((each) => each.owner === owner);
 
 export function visitDialogue(value: Dialogue, where: string, visit: Visit): void {

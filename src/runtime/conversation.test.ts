@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
 import { spokenBy } from '../content/sections/dialogue';
 import { createGameState, RuntimeError } from './runtime';
-import { reachedNow, talk } from './dialogue-runtime';
+import { choose, menuChoices, openerShown, openersNow, reachedNow, talk } from './dialogue-runtime';
 
 const WORLD = ['# location shore', 'x: 0, y: 0', 'starting', '', '# flag greeted', '# flag asked', '', '# entity miki', 'title: Miki'].join('\n');
 
@@ -11,6 +11,8 @@ const own = ['# dialogue miki', 'owner = miki', '', 'node idle:', '  when: not a
 const given = ['# dialogue an-errand', 'owner = miki', '', 'node offer:', '  when: asked', '  Since you ask — there is a thing I need.'].join('\n');
 
 const loaded = (...parts: string[]) => loadInEnglish([WORLD, ...parts].join('\n\n'));
+
+const shown = (registry: ReturnType<typeof loaded>, state = createGameState()) => openersNow(registry, state, 'miki').map((opener) => openerShown(registry, state, opener.node));
 
 describe('what an entity has to say', () => {
   it('is every dialogue that names it, not the one dialogue that happens to be its own', () => {
@@ -27,20 +29,56 @@ describe('what an entity has to say', () => {
     expect(reachedNow(registry, state, 'miki')).toMatchObject({ dialogue: { id: 'an-errand' }, node: { name: 'offer' } });
   });
 
-  // Two nodes may both claim the moment; the loading order settles it, which is how an expansion speaks over what it expands.
-  it('gives the last word to whichever dialogue was loaded last', () => {
-    const both = ['# dialogue an-errand', 'owner = miki', '', 'node offer:', '  when: not asked', '  Since you are here — there is a thing I need.'].join('\n');
-
-    expect(reachedNow(loaded(own, both), createGameState(), 'miki')?.dialogue.id).toBe('an-errand');
-    expect(reachedNow(loaded(both, own), createGameState(), 'miki')?.dialogue.id).toBe('miki');
-  });
-
   it('tells an entity nobody has written a word for apart from one that has nothing to say yet', () => {
     const state = createGameState();
     state.flags['asked'] = true;
 
     expect(() => talk('miki', loaded(), state)).toThrow(new RuntimeError('no dialogue owned by entity: miki'));
     expect(() => talk('miki', loaded(own), state)).toThrow(new RuntimeError('no node with anything to say in any dialogue owned by entity: miki'));
+  });
+});
+
+// The whole of the arbitration the engine still does: none. Two modules may both hand this entity something to say and the player is the one who settles which they hear.
+describe('every thread an entity holds open is put to the player at once', () => {
+  const both = ['# dialogue an-errand', 'owner = miki', '', 'node offer:', '  when: not asked', '  Since you are here — there is a thing I need.'].join('\n');
+
+  it('opens the one thread outright, so an entity with a single thing to say costs no click', () => {
+    const registry = loaded(own);
+    const state = createGameState();
+
+    expect(talk('miki', registry, state)).toBeNull();
+    expect(state.log).toEqual(['Fine weather for it.']);
+  });
+
+  it('puts up both when two of them hold, whichever module was loaded first', () => {
+    for (const registry of [loaded(own, both), loaded(both, own)]) {
+      expect(shown(registry)).toEqual(['Fine weather for it.', 'Since you are here — there is a thing I need.']);
+    }
+  });
+
+  it('says nothing until the player picks, and then says only what they picked', () => {
+    const registry = loaded(own, both);
+    const state = createGameState();
+
+    const cursor = talk('miki', registry, state)!;
+    expect(state.log).toEqual([]);
+    expect(menuChoices(cursor, registry, state).map((each) => each.display)).toEqual(['Fine weather for it.', 'Since you are here — there is a thing I need.']);
+
+    expect(choose('1', cursor, registry, state)).toBeNull();
+    expect(state.log).toEqual(['Since you are here — there is a thing I need.']);
+  });
+
+  it('drops a thread once it is spent, and offers no conversation at all when the last one is', () => {
+    const registry = loaded(own, both);
+    const state = createGameState();
+
+    const cursor = talk('miki', registry, state)!;
+    choose('0', cursor, registry, state);
+    expect(shown(registry, state)).toEqual(['Since you are here — there is a thing I need.']);
+
+    talk('miki', registry, state);
+    expect(openersNow(registry, state, 'miki')).toEqual([]);
+    expect(() => talk('miki', registry, state)).toThrow(RuntimeError);
   });
 });
 
@@ -66,17 +104,6 @@ describe('a conversation with nothing left to say is not offered', () => {
   it('keeps one that still puts a choice, since a spent node holds back what it says and not what it offers', () => {
     expect(secondVisit(spent('  Fine weather for it.', '  -> Indeed.'))).toMatchObject({ node: { name: 'idle' } });
   });
-
-  // The last claim on the moment wins, so a spent one hands the moment back rather than taking it and saying nothing.
-  it('falls back to a node written earlier that still has something to say', () => {
-    const registry = loaded(['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  sticky', '  Well met.', '', 'node news:', '  always', '  There is talk of a boat.'].join('\n'));
-    const state = createGameState();
-
-    expect(reachedNow(registry, state, 'miki')).toMatchObject({ node: { name: 'news' } });
-    talk('miki', registry, state);
-
-    expect(reachedNow(registry, state, 'miki')).toMatchObject({ node: { name: 'greeting' } });
-  });
 });
 
 describe('a node reached whenever nothing further along is', () => {
@@ -89,19 +116,38 @@ describe('a node reached whenever nothing further along is', () => {
     expect(reachedNow(loaded(['# dialogue miki', 'owner = miki', '', 'node greeting:', '  Well met.'].join('\n')), state, 'miki')).toBeNull();
   });
 
-  it('gives way to a node whose `when:` holds, and takes over again when it stops holding', () => {
+  it('gives way to a thread whose `when:` holds rather than standing beside it, and takes over again when it stops holding', () => {
     const gated = ['# dialogue an-errand', 'owner = miki', '', 'node offer:', '  when: asked', '  A thing I need.'].join('\n');
     const registry = loaded(boilerplate, gated);
     const state = createGameState();
 
-    expect(reachedNow(registry, state, 'miki')?.node.name).toBe('greeting');
+    expect(shown(registry, state)).toEqual(['Well met.']);
     state.flags['asked'] = true;
-    expect(reachedNow(registry, state, 'miki')?.node.name).toBe('offer');
+    expect(shown(registry, state)).toEqual(['A thing I need.']);
   });
 
   it('is narrowed by a `when:` written beside it, rather than overriding it', () => {
     const narrowed = loaded(['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  when: asked', '  Well met.'].join('\n'));
 
     expect(reachedNow(narrowed, createGameState(), 'miki')).toBeNull();
+  });
+});
+
+// What lets ordinary standing dialogue stand in the same list as the threads a quest hands out: naming a node is what makes it one of them.
+describe('a node the player is given a phrase for', () => {
+  const bar = ['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  Well met.', '', 'node the-ale:', '  always', '  ask: What is on tap?', '  Whatever the brewery sends.'].join('\n');
+
+  it('stands beside a thread instead of giving way to it, and is picked by its phrase and not by what it says', () => {
+    const gated = ['# dialogue an-errand', 'owner = miki', '', 'node offer:', '  when: asked', '  A thing I need.'].join('\n');
+    const state = createGameState();
+    state.flags['asked'] = true;
+
+    expect(shown(loaded(bar, gated), state)).toEqual(['A thing I need.', 'What is on tap?']);
+  });
+
+  it('is refused where nothing would ever put the phrase to a player', () => {
+    expect(() => loaded(['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  goto aside', '', 'node aside:', '  ask: What is on tap?', '  Whatever the brewery sends.'].join('\n'))).toThrow(
+      /node aside writes ask: and is only ever arrived at from another node/,
+    );
   });
 });

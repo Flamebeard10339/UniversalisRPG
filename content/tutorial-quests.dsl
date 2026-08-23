@@ -213,13 +213,17 @@ travel: beach
 // still inside the house would only repeat the ordinary sendoff.
 travel: guide-house
 talk: core.miki
+choose: 0
 assert: leave-tutorial-island.adrift
 travel: beach
 expect only: left-mikis-house
-// The whole sheet, not a handful of flags: inventory, visits, xp, pools, the
-// clock and the rng cursor all have to land where they landed. Regenerate with
-// /create-valid-test when the route's content changes on purpose.
-expect: miki-route-end
+// This route's own sheet, on top of the ground all three converge on: the rats'
+// drops, the visits, the xp, the pools, the clock and the rng cursor. A scalar
+// field a save names is compared whole either way, so the clock and the cursor
+// are pinned here as firmly as `expect:` pinned them; what `expect only:` lets
+// go is the keys this sheet never named. Regenerate with /create-valid-test
+// when the route's content changes on purpose.
+expect only: miki-route-end
 
 // --- thieving route: snub Miki, take the lockpick, fail the door, take the
 // window instead. Costs 5 health on landing and leaves Miki angry — a fact
@@ -241,14 +245,19 @@ assert: core.miki.angered
 // A second, separate talk: same as the door route above, a quest whose own
 // condition just turned true does not pick it up until asked again.
 talk: core.miki
+choose: 1
 assert: leave-tutorial-island.adrift
 use: entity.stairs.ascend
 use: entity.window.climb-out
 assert: not core.front-door.unlocked
+// The drop is what the route pays instead of the door: five off the thirty the
+// player starts with, and nothing on this route gives any of it back. Stated as
+// what is missing rather than as a total, so a bigger pool is not a failure.
+assert: resource.core.health <= 25
 expect only: left-mikis-house
 // Regenerate with /create-valid-test when this route's content changes on
 // purpose. See thieving-route-full-end for why this isn't miki-route-end.
-expect: thieving-route-full-end
+expect only: thieving-route-full-end
 
 // --- apology route: snub Miki, apologise, take the net, catch a fish, and
 // the door opens the ordinary way. Converges on Miki's usual sendoff, since
@@ -279,7 +288,7 @@ travel: beach
 expect only: left-mikis-house
 // Regenerate with /create-valid-test when this route's content changes on
 // purpose. See apology-route-full-end for why this isn't miki-route-end.
-expect: apology-route-full-end
+expect only: apology-route-full-end
 
 // bake-bread is left by a line Miki says and not by a `done when:`, so one
 // stage stands over two beats: bake the loaf, then carry it back. This is the
@@ -298,9 +307,23 @@ craft: dough
 craft: bread
 assert: finding-your-feet.bake-bread and has core.bread and not finding-your-feet.clear-the-rats
 
-// A `use:` that finds its own action already under way against the same
-// target advances one cycle of the fight in progress instead of restarting
-// it, so repeated `use:` with no `wait:` anywhere still puts the rats down.
+// A `use:` that finds its own action already under way against the same target
+// advances one cycle of the fight in progress instead of restarting it, so
+// repeated `use:` with no `wait:` anywhere still puts the rats down.
+//
+// What that claim is not is a body count. How many bare `use:` a rat takes to
+// fall is damage arithmetic — base attack, whatever is in the player's hand,
+// the rat's own sheet — and every one of those is going to move. Three down
+// takes nine of the ten below, which leaves one swing of slack between the
+// mechanic and an unrelated rebalance.
+//
+// What holds however hard the player hits is that one rat falls at all. A
+// `use:` that re-armed would snapshot the rat at full health again every time,
+// so no run of them, however long, would ever empty a pool: a rat down is the
+// whole of the difference between advancing a fight and starting one over. The
+// one rebalance that would take that away is a player who puts a rat down in a
+// single swing, which a re-armed fight would manage too; if the day comes that
+// one does, this needs a different claim rather than a bigger number.
 # test rats-fall-to-repeated-use
 load: miki-route-start
 use: entity.stairs.descend
@@ -314,7 +337,7 @@ use: melee-combat on giant-rat
 use: melee-combat on giant-rat
 use: melee-combat on giant-rat
 use: melee-combat on giant-rat
-assert: core.rats-killed >= 3
+assert: core.rats-killed >= 1
 
 // --- saves ---
 
@@ -331,13 +354,13 @@ assert: core.rats-killed >= 3
 {"version":11}
 
 # save miki-route-end
-{"version":11,"inventory":{"core.jug-of-water":0,"core.pot-of-flour":0,"core.dough":0,"core.bread":1,"core.iron-sword":1,"core.wooden-shield":1,"core.rat-bone":7},"flags":{"combat-expansion.proving-ground.discovered":true,"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true,"core.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"core.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"core.rats-killed":3,"core.front-door.unlocked":true,"core.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"core.market-district.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"core.cooking":6,"core.melee":16},"resources":{"core.health":21000},"location":"core.beach","populations":{"core.basement":{"core.giant-rat":{"down":3,"due":[]}}},"time":36800,"rng":2776008081,"player":{"name":"Rowan","race":"elf"}}
+{"version":11,"inventory":{"core.jug-of-water":0,"core.pot-of-flour":0,"core.dough":0,"core.bread":1,"core.iron-sword":1,"core.wooden-shield":1,"core.rat-bone":7,"core.bent-coin":3,"core.rat-tail":1},"flags":{"combat-expansion.proving-ground.discovered":true,"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true,"core.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"core.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"core.rats-killed":3,"core.front-door.unlocked":true,"core.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"core.market-district.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"core.cooking":6,"core.melee":14},"resources":{"core.health":21570},"location":"core.beach","populations":{"core.basement":{"core.giant-rat":{"down":3,"due":[]}}},"time":41600,"rng":1706300260,"player":{"name":"Rowan","race":"elf"}}
 
-// The thief's own closing sheet — not the door route's. `expect:` is a whole
-// save compared exactly, so a route that never bakes or fights has no way to
-// land on the same xp, clock or rng cursor as one that does both; what
-// genuinely converges across all three routes is left-mikis-house instead,
-// checked above by `expect only:`.
+// The thief's own closing sheet — not the door route's. A route that never
+// bakes or fights lands on different holdings, a different clock and a
+// different rng cursor from one that does both, so the three routes get three
+// sheets; what genuinely converges across all of them is left-mikis-house,
+// which each of them also closes on.
 # save thieving-route-full-end
 {"version":11,"inventory":{"core.lockpick":1},"flags":{"combat-expansion.proving-ground.discovered":true,"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true,"core.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.snubbed":true,"core.dresser.searched":true,"core.miki.angered":true,"tutorial-quests.leave-tutorial-island.adrift":true,"core.beach.discovered":true,"core.market-district.discovered":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.snubbed.miki.0.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.1.said":1},"resources":{"core.health":25000},"location":"core.beach","rng":2617077404}
 

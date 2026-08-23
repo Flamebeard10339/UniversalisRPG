@@ -46,7 +46,11 @@ base: 100
 # stat attack-rate
 base: 25
 
+// One health a minute, which is slow enough that a fight still costs something
+// and fast enough that what it cost is never permanent. Anything that wants to
+// heal at a useful pace adds to this rather than restoring a pool of its own.
 # stat regeneration
+base: 1
 
 // Deliberately without a base: a health pool is what makes something worth
 // swinging at, so a door and an oven have none and only what declares
@@ -393,7 +397,7 @@ item-experience: 10000
 
 # item orb-of-vitality
 title: Orb of Vitality
-examine: A dull red bead. It beats, very slowly.
+examine: A dull red bead. It beats, very slowly. Nothing drinks it: an orb is spent on a cluster, and scales what that cluster already gives.
 cluster-effect: +25% max-health
 
 # item orb-of-the-edge
@@ -413,7 +417,7 @@ cluster-effect: +25% defense
 
 # item orb-of-renewal
 title: Orb of Renewal
-examine: Cool, and faintly wet, and it does not dry.
+examine: Cool, and faintly wet, and it does not dry. Nothing drinks it: an orb is spent on a cluster, and scales what that cluster already gives.
 cluster-effect: +25% regeneration
 
 // A base that declares its own origin cluster, which is the general rule the
@@ -719,10 +723,15 @@ assert: beach.discovered
 // --- growing an item ---
 //
 // Recorded from a live session with /create-valid-test, so what follows is what
-// a player types and the closing `expect:` is the sheet that session ended on:
-// both grown copies, their planes, every allocation, and the effects each
-// cluster carries. Regenerate with /create-valid-test when this content changes
-// on purpose.
+// a player types and the closing sheet is where that session ended: both grown
+// copies, their planes, every allocation, and the effects each cluster carries.
+// Regenerate with /create-valid-test when this content changes on purpose.
+//
+// What this route claims is written as its refusals — each one names a growth
+// the plane must not take, and there are eight of them. The plane itself is
+// what no condition can name, so the sheet keeps it: `instances` is compared
+// whole even under `expect only:`, so every hex, jewel, point and orb below is
+// still pinned exactly.
 //
 // The Heartwood Blade's origin is a spindle whose root, position 1, is
 // allocated from the start and free. Both of its jewel slots hang off position
@@ -787,7 +796,7 @@ feed: 2 with masters-whetstone
 refuse: feed 2 with masters-whetstone
 allocate: 2 at 0,0 slot e
 slot: 2 at 0,0 e with causeway-jewel
-expect: growing-a-heartwood-blade-end
+expect only: growing-a-heartwood-blade-end
 
 # save growing-a-heartwood-blade-start
 {"version":11,"flags":{"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true,"core.basement.discovered":true}}
@@ -805,9 +814,12 @@ expect: growing-a-heartwood-blade-end
 // It opens the inventory, opens the Iron Sword's plane, slots a jewel into the
 // bare east slot every base has, walks out to the hexagon that jewel put there
 // and to the one slotted beyond that, allocates on both, leaves the plane for
-// the inventory it was opened from, and equips the copy it just grew. The
-// closing `expect:` is what says the route ended somewhere: the copy is worn in
-// mainhand and, by c21, is no longer in the inventory it was grown from.
+// the inventory it was opened from, and equips the copy it just grew.
+//
+// That the copy is worn is asserted below. That it is, by c21, no longer in the
+// stack it was grown from is the sheet's: `has` and the `inventory` root both
+// count a worn copy as held, so the stack falling to zero is a fact only
+// `inventory.core.iron-sword` in the save body can state.
 
 # test growing-through-the-inventory-screen
 load: growing-a-heartwood-blade-start
@@ -830,7 +842,12 @@ submit-modal: plane=back
 submit-modal: verb=equip
 open-modal: carried-items
 submit-modal: item=close
-expect: growing-through-the-inventory-screen-end
+// A worn item's plane is folded into the wearer's stats, so this one number is
+// both halves of what `verb=equip` did: 14 is the player's own 10, the iron
+// sword's 2, and the 2 that `whetted` carries at position 1 of the ring slotted
+// two hexes out. Nothing else on this route touches attack.
+assert: stat.attack = 14
+expect only: growing-through-the-inventory-screen-end
 
 # save growing-through-the-inventory-screen-end
 {"version":11,"inventory":{"core.heartwood-blade":1,"core.iron-sword":0,"core.whetstone":6,"core.masters-whetstone":3,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.crossroads-jewel":0,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true,"core.basement.discovered":true,"core.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}

@@ -137,7 +137,7 @@ adjacent:
   kelsa-farmhouse
   swamp-edge
 entities:
-  mouse, town-crier, sewer-grate
+  mouse, town-crier, sewer-grate, bench
 
 # location market-row
 east of market-square
@@ -548,6 +548,20 @@ ask after her wares:
 
 // --- stations and props ---
 
+// The only way back from a bad fight, and it sits in the square every road in
+// town runs through. Sitting is worth ten regeneration for as long as you stay
+// sat, on top of the one core gives everybody, so the bench does not restore a
+// pool of its own and anything else that adds to that stat adds to this too.
+# entity bench
+title: Bench
+examine: A bench along the wall under the awnings, worn shiny by people waiting on somebody.
+sit down:
+  continuous
+  time: 60
+  +10 regeneration
+  on success:
+    say: You sit a while longer, and some of it comes back.
+
 # entity sewer-grate
 title: Sewer Grate
 examine: An iron grate in the cobbles. The water below it moves faster than you expect.
@@ -760,13 +774,30 @@ node the-back-way:
   Everyone wants in the front. There is a wall down in the old witch's cellar and nobody minding it.
   set: heard-of-the-back-way
 
+// Three threads rather than one line, which is what a bar is for. Each is
+// named, so all three stand in the list at once and a quest that gives her a
+// fourth stands in it beside them. Sticky, because a barmaid answers the same
+// question as often as it is asked.
 # dialogue sunny
 owner = sunny
 
-node behind-the-bar:
+node the-stove:
   always
-  again: Stove's still there. Rest of it, ask properly — same as I said.
-  Stove is over there, and I do not care what you cook on it. Anything else, you will have to ask properly.
+  sticky
+  ask: Can I use the stove?
+  It is in the corner and I do not care what you cook on it. Wipe it after.
+
+node the-bottle:
+  always
+  sticky
+  ask: What is in the vodka?
+  My own. I do not write it on the label because then people would not drink it.
+
+node the-animals:
+  always
+  sticky
+  ask: They say you can call animals in.
+  They say a lot in here, and most of it after the third one. Some of it is true.
 
 # dialogue larry
 owner = larry
@@ -851,6 +882,11 @@ node at-the-stakes:
 // and the rats between them hand out about this many.
 # save in-town-with-bent-coins
 {"version":11,"location":"tulsa.market-square","inventory":{"core.bent-coin":8}}
+
+// Out of a fight and back in the square with eleven of thirty left, which is
+// about what the three playtest runs walked away from the cellar rats holding.
+# save hurt-in-town
+{"version":11,"location":"tulsa.market-square","resources":{"core.health":11000}}
 
 // Down the back way with the lockpick from Miki's dresser, which is what
 // anybody who came here for the barred door would be carrying.
@@ -939,7 +975,45 @@ wait: 1
 wait: done
 assert: resource.core.health < 30
 
-// Two ways past the barred door, and the door is the same door either way.
+// What the fighting costs, got back. A minute standing about in the square is
+// worth one health and a minute on the bench is worth eleven, because sitting
+// adds ten to the regeneration everybody already has one of rather than
+// restoring a pool of its own. The bench is continuous, so the second minute
+// is had by staying put and not by sitting down again.
+# test the-bench-is-where-health-comes-back
+load: hurt-in-town
+assert: resource.core.health = 11
+wait: 60
+assert: resource.core.health = 12
+use: entity.bench.sit-down
+assert: resource.core.health = 23
+wait: 60
+assert: resource.core.health = 30
+
+// Sunny keeps three threads open at once, so talking to her is the list and
+// not a line. The list is ordered by the words a player reads rather than by
+// the order this file writes them, which is why `choose: 0` is the stove and
+// moving these nodes about would not move it. A thread taken stays open
+// because each is sticky, so the third talk finds all three still there.
+# test sunny-has-three-things-to-say
+load: in-town
+travel: tavern-street
+travel: sha-dynastys
+talk: sunny
+choose: 0
+assert: sunny.the-stove.visits = 1
+talk: sunny
+choose: 2
+assert: sunny.the-bottle.visits = 1
+talk: sunny
+choose: 1
+assert: sunny.the-animals.visits = 1
+assert: sunny.the-stove.visits = 1
+
+// Two ways past the barred door, and the door is the same door either way. The
+// key comes off the table with both ratmen still standing on it: taking it is
+// instant and gated on nothing, and nobody who got this far on what the rats
+// leave behind wins that fight.
 # test the-key-opens-the-barred-door
 load: at-the-sewer-junction
 travel: sewer-outfall
@@ -948,6 +1022,5 @@ use: entity.barred-door.pick-lock
 assert: barred-door.unlocked
 assert: xp.core.thieving = 15
 travel: sewer-locked-room
-wait: done
 use: entity.key-table.take-the-key
 assert: has sewer-key

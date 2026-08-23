@@ -165,6 +165,12 @@ export const begun = (quest: Quest, at: QuestStage | undefined, set: (flag: stri
 // A goto inside a quest names a stage, so the line that takes it sets that stage's flag. Nothing else in the language moves a quest along, and nothing else needs to.
 const reaching = (quest: Quest, stage: string): ActionResult => ({ kind: 'set', variable: flagOf(quest, stage) });
 
+// A line an entity is given here with no `when:` and no `ask:` of its own is what they say at this stage while none of their other lines here applies — the same rule a plain `hint:` follows against the `hint when` lines beside it. Written into the condition rather than settled when it is asked, so nothing downstream has to know a stage wrote two lines for one mouth.
+const otherwise = (stage: QuestStage, speech: QuestSpeech): Condition[] =>
+  speech.node.when !== undefined || speech.node.ask !== undefined
+    ? []
+    : stage.speech.filter((each) => each !== speech && each.owner === speech.owner && each.node.when !== undefined).map((each) => not(each.node.when!));
+
 function saidAt(quest: Quest, at: number, speech: QuestSpeech, said: number, reached: Condition | undefined): Dialogue {
   const node = speech.node;
   const stage = quest.stages[at]!;
@@ -178,7 +184,7 @@ function saidAt(quest: Quest, at: number, speech: QuestSpeech, said: number, rea
     nodes: [
       {
         ...node,
-        when: all([...(reached === undefined ? [] : [reached]), ...(node.when === undefined ? [] : [node.when])]),
+        when: all([...(reached === undefined ? [] : [reached]), ...(node.when === undefined ? [] : [node.when]), ...otherwise(stage, speech)]),
         steps: [...opening, ...node.steps].map((step) =>
           step.kind === 'goto'
             ? { kind: 'effect' as const, result: reaching(quest, step.target) }
@@ -210,6 +216,9 @@ const HINT_WHEN_NOTE = 'the last hint whose condition holds is the one shown, so
 
 // A stage is a name the rest of the world can ask about, and the flag it mints is the one `flagOf` mints, written out of it rather than beside it.
 const STAGE_NOTE = `naming a stage declares the flag \`${flagOf({ id: '<quest>' }, '<stage>')}\`, which anything anywhere may read as a condition; which stage a quest stands on is worked out from the world each time it is asked and never stored`;
+
+// The same rule the hints follow, said where a stage writes more than one line for one mouth.
+const SAYS_NOTE = `lines that entity speaks while the quest stands here, written as a dialogue node is; where a stage gives one entity more than one, the line with no \`when:\` of its own is what they say while none of the others applies`;
 
 // A `done when:` is not a flag check with room for a comparison — it is the whole condition grammar, said out of that grammar's own forms so a form added to it is said here too.
 const DONE_WHEN_NOTE = `the quest leaves this stage on its own once this holds, and it takes any condition, not only a flag: ${condition.forms.join(', ')}`;
@@ -249,7 +258,7 @@ export const quest = section<Quest>()({
         { form: 'done when: <condition>', example: 'done when: rats-killed >= 3', family: 'where it goes', holds: () => ({ condition }), note: DONE_WHEN_NOTE },
         { form: 'goto <stage>', example: 'goto sendoff', family: 'where it goes' },
         { form: 'complete', example: 'complete', family: 'where it goes', note: 'the quest is done when it reaches here' },
-        { form: '<entity> says:', example: 'miki says:', family: 'what is said here', names: { entity: 'entity' }, note: 'lines that entity speaks while the quest stands here, written as a dialogue node is', block: () => nodeGrammar({ hole: 'stage', like: 'sendoff' }) },
+        { form: '<entity> says:', example: 'miki says:', family: 'what is said here', names: { entity: 'entity' }, note: SAYS_NOTE, block: () => nodeGrammar({ hole: 'stage', like: 'sendoff' }) },
       ],
     },
   ],

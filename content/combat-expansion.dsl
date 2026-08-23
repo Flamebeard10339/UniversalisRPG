@@ -308,9 +308,13 @@ entities:
 {"version":11,"location":"combat-expansion.proving-ground","flags":{"combat-expansion.proving-ground.discovered":true}}
 
 // Recorded from live sessions with /create-valid-test, so what each route
-// spells is what a player typed and the closing `expect:` is the sheet that
-// session ended on. Regenerate the same way when this content changes on
-// purpose.
+// spells is what a player typed and the closing sheet is where that session
+// ended. Regenerate the same way when this content changes on purpose.
+//
+// The sheets close on `expect only:`, which compares just the keys the save
+// names, and what each route actually claims is written above it as `assert:`.
+// A buff held by the struck party and an enemy's pool are the two things no
+// condition can name — those stay the sheet's to say.
 //
 // Every route grows the same plain blade: two Master's Whetstones buy the
 // points, the base's bare east slot takes the jewel, and what differs between
@@ -336,15 +340,22 @@ wait: 30
 // rising-fury is the only source of max-rage on this route, so the stat root
 // reading 20 back is the jewel's allocation and nothing else.
 assert: stat.max-rage = 20
-expect: rage-rises-as-swings-land-end
+// Thirteen landed swings granted 39 where the rate bled 15 back over the same
+// thirty seconds, so the pool is not merely up: it is against its ceiling.
+assert: resource.rage = 20
+expect only: rage-rises-as-swings-land-end
 
 // The other half of the same arc, and the half a stack count cannot have: the
-// swinging stops, the rate keeps running, and the pool is empty a minute later.
+// rate keeps running once the swinging stops.
 # test rage-drains-when-the-swinging-stops
 run: rage-rises-as-swings-land
 cancel
 wait: 60
-expect: rage-drains-when-the-swinging-stops-end
+// The pool still exists — the passive granting the ceiling is still allocated —
+// and a minute of the rate with nothing granting has emptied it.
+assert: stat.max-rage = 20
+assert: resource.rage = 0
+expect only: rage-drains-when-the-swinging-stops-end
 
 // The gate is a wrapper and the payload stacks, so what the sheet records is
 // several instances of one declaration, each on its own clock. `quickening` is
@@ -366,7 +377,14 @@ allocate: 1 at 1,0 position 5
 equip: 1
 use: core.melee-combat on proving-post
 wait: 60
-expect: accelerated-vigor-stacks-behind-its-gate-end
+// The player's own attack-rate is where both halves of the pair land, and the
+// arithmetic tells them apart. The base is 25; `accelerated-vigor` adds 2 flat
+// an instance and `quickening` 3% of the total per instance held, folded as
+// (25 + 2n) x (1 + 0.03n). One instance is 27.8 and six flat ones alone are 37,
+// so anything past 40 is several held at once *and* the passive reading how
+// many. The sheet is what says they are six separate instances on six clocks.
+assert: stat.attack-rate > 40
+expect only: accelerated-vigor-stacks-behind-its-gate-end
 
 // The debuff is held by the struck party rather than by the swinger, which is
 // what the closing sheet shows: the venom is under the post's name and its
@@ -383,10 +401,23 @@ allocate: 1 at 1,0 position 7
 equip: 1
 use: core.melee-combat on proving-post
 wait: 10
-expect: poison-holds-the-struck-enemy-end
+// The swinger's own regeneration is untouched. Venom is -30 on a stat whose
+// base is 1, so a swinger holding its own venom would read well under zero;
+// this is the half of "on them" that the player's sheet can say. That the post
+// holds it, and that its health is falling faster than the swings took it, is
+// the closing sheet's to say — no condition names another actor's buffs.
+assert: stat.regeneration > 0
+expect only: poison-holds-the-struck-enemy-end
 
 // Nothing refreshes it once the swinging stops, and the duration on the
 // declaration is the only thing that says when it ends.
+//
+// `expect:` and not `expect only:`, because the claim is an absence: the post
+// no longer holds the venom. `expect only:` compares just the keys a save
+// names, and a sheet recorded after the buff lifted has stopped naming it —
+// which would leave this passing in a world where poison never expires. Only
+// the whole sheet can say a thing is gone. No assertion can stand in either:
+// the buff is on the struck party and the condition roots read the player.
 # test poison-lifts-when-its-own-duration-runs-out
 run: poison-holds-the-struck-enemy
 cancel
@@ -394,31 +425,33 @@ wait: 30
 expect: poison-lifts-when-its-own-duration-runs-out-end
 
 // Thorns, carried by something that swings nothing and declares no action at
-// all: the urchin never attacks, and the player is at 5 health of 30 because
-// every swing that landed cost five.
+// all. The urchin never attacks, so nothing but the thorns can have taken any
+// health off the player: five landed swings at five apiece is 25 of the 30 the
+// player has, and only regeneration gave any of it back.
 # test striking-a-thorned-enemy-costs-the-striker
 load: at-the-proving-ground
 use: core.melee-combat on spined-urchin
 wait: 10
-expect: striking-a-thorned-enemy-costs-the-striker-end
+assert: resource.core.health < 10
+expect only: striking-a-thorned-enemy-costs-the-striker-end
 
 // --- the sheets those routes ended on ---
 
 # save rage-rises-as-swings-land-end
-{"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"resources":{"combat-expansion.rage":20000},"resourceRateRemainders":{"combat-expansion.rage":0},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":1200,"attemptsMade":13}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1825520,"combat-expansion.rage":0},"rateRemainders":{}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":32400,"rng":2882385315}
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"resources":{"combat-expansion.rage":20000},"resourceRateRemainders":{"combat-expansion.rage":0},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":1200,"attemptsMade":13}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1826060,"combat-expansion.rage":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":32400,"rng":2882385315}
 
 # save rage-drains-when-the-swinging-stops-end
 {"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"resourceRateRemainders":{"combat-expansion.rage":0},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":92400,"rng":2882385315}
 
 # save accelerated-vigor-stacks-behind-its-gate-end
-{"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"buffs":{"player":[{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":69600},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":101955},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":109759},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":111534},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":114780},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":117760}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":518,"attemptsMade":31}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1617680,"combat-expansion.rage":0},"rateRemainders":{}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,2,6,5],"allocatedSlots":[],"effects":[]}}}}}},"time":62400,"rng":2103776196}
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"buffs":{"player":[{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":69600},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":101955},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":109759},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":111534},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":114780},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":117760}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":518,"attemptsMade":31}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1618720,"combat-expansion.rage":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,2,6,5],"allocatedSlots":[],"effects":[]}}}}}},"time":62400,"rng":2103776196}
 
 # save poison-holds-the-struck-enemy-end
-{"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":0},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"buffs":{"combat-expansion.proving-post":[{"source":"combat-expansion.venom","tags":[{"kind":"keyword","value":"poison"},{"kind":"stat-bonus","statId":"core.regeneration","percent":false,"amount":{"min":-30,"max":-30}},{"kind":"duration","seconds":20}],"expiresAt":32000}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1935000,"combat-expansion.rage":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":12400,"rng":278522923}
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":0},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"buffs":{"combat-expansion.proving-post":[{"source":"combat-expansion.venom","tags":[{"kind":"keyword","value":"poison"},{"kind":"stat-bonus","statId":"core.regeneration","percent":false,"amount":{"min":-30,"max":-30}},{"kind":"duration","seconds":20}],"expiresAt":32000}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1935206,"combat-expansion.rage":0},"rateRemainders":{"core.health":40000}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":12400,"rng":278522923}
 
 # save poison-lifts-when-its-own-duration-runs-out-end
 {"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":0},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":42400,"rng":278522923}
 
 # save striking-a-thorned-enemy-costs-the-striker-end
-{"version":11,"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true},"resources":{"core.health":5000},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.spined-urchin"}},"actors":{"combat-expansion.spined-urchin":{"resources":{"core.health":1950000,"combat-expansion.rage":0},"rateRemainders":{}}}},"time":12400,"rng":278522923}
+{"version":11,"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true},"resources":{"core.health":5206},"resourceRateRemainders":{"core.health":40000},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.spined-urchin"}},"actors":{"combat-expansion.spined-urchin":{"resources":{"core.health":1950206,"combat-expansion.rage":0},"rateRemainders":{"core.health":40000}}}},"time":12400,"rng":278522923}
 
