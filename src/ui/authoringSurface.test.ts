@@ -125,6 +125,8 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
   });
 });
 
+const ONE_OF_EACH_KIND = [...new Map(addressed.map((section) => [section.kind, section])).values()];
+
 const DSL = COMMANDS.find((command) => command.name === '/dsl')!;
 
 const parsed = (line: string): unknown => DSL.parse(line.slice('/dsl '.length), undefined as never);
@@ -147,11 +149,12 @@ describe('every control sends a line the shared table parses (c2)', () => {
     expect(stage('# location a\nsay: one | two')).toHaveProperty('refused');
   });
 
-  it('puts back what it was given, through the command and the store', () => {
-    const oneEach = [...new Map(addressed.map((section) => [section.kind, section])).values()];
-    expect(oneEach.length).toBeGreaterThan(5);
+  it('reads the kinds it is a rule about', () => {
+    expect(ONE_OF_EACH_KIND.length).toBeGreaterThan(5);
+  });
 
-    for (const section of oneEach) {
+  for (const section of ONE_OF_EACH_KIND) {
+    it(`puts back the ${section.kind} it was given, through the command and the store`, () => {
       const driver = createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
       driver.send((stage(section.text) as { line: string }).line);
       const held = driver.localChanges() ?? '';
@@ -159,8 +162,8 @@ describe('every control sends a line the shared table parses (c2)', () => {
 
       expect(staged.map((each) => each.address), `${section.kind} ${section.address}`).toEqual([section.address]);
       expect(staged[0].text.split('\n')).toEqual(section.text.split('\n').filter((line, at) => at === 0 || line.trim() !== ''));
-    }
-  });
+    });
+  }
 
   it('takes a shipped section out of the game by the line an emptied field sends', () => {
     const driver = createDriver([engineLocale(), SPARE], { ticker: () => () => undefined });
