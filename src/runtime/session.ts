@@ -31,7 +31,7 @@ import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { ResourceDisplay } from '../content/sections/resource';
 import { compareSave, compareSaveOnly, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import type { PruneWarning } from './pruning';
-import { Directive, parseUseChoiceId, printDirective, useChoiceId } from '../content/sections/test';
+import { Directive, parseUseChoiceId, printDirective, Terminator, useChoiceId } from '../content/sections/test';
 import { Answer, AnswerTable, Localized, Localizer, localizerOf } from './localized';
 import { skillLevel, xpForLevel } from './skills';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
@@ -486,6 +486,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'allocate':
     case 'apply':
     case 'refuse':
+    case 'until':
     case 'open-modal':
     case 'submit-modal':
       return null;
@@ -619,9 +620,11 @@ function performDirective(session: PlaySession, directive: Directive): { failure
     case 'wait':
       resolve(state, registry, state.time + secondsToMs(directive.seconds));
       return {};
-    case 'wait-out': {
-      const waited = resolveUnderWay(state, registry);
-      return waited.ended ? {} : { failure: `wait: done — ${waited.reason}` };
+    case 'wait-out':
+      return waitedOut(state, registry);
+    case 'until': {
+      const started = performDirective(session, directive.inner);
+      return started.failure ? started : waitedOut(state, registry, directive.until);
     }
     case 'equip':
       equip(state, registry, directive.item);
@@ -644,6 +647,13 @@ function performDirective(session: PlaySession, directive: Directive): { failure
       return unreached;
     }
   }
+}
+
+function waitedOut(state: GameState, registry: Registry, terminator: Terminator = 'done'): { failure?: string } {
+  const waited = resolveUnderWay(state, registry, terminator === 'done' ? undefined : (s, r) => evaluateCondition(terminator, s, r));
+  if (waited.ended) return {};
+  const label = terminator === 'done' ? 'wait: done' : `until ${describeCondition(terminator)}`;
+  return { failure: `${label} — ${waited.reason}` };
 }
 
 function grew(session: PlaySession, state: GameState, growth: Growth): { failure?: string } {

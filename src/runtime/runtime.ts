@@ -513,8 +513,13 @@ function advanceUnderWayCycle(state: GameState, registry: Registry): void {
   resolve(state, registry, state.time + Math.max(1, Math.ceil(unit)));
 }
 
-export function resolveUnderWay(state: GameState, registry: Registry): WaitedOut {
+export type UnderWayTest = (state: GameState, registry: Registry) => boolean;
+
+// `wait: done` is this stepped with no test of its own: the only thing it is waiting for is the
+// moment nothing is left in flight, which the loop already checks on every step regardless.
+export function resolveUnderWay(state: GameState, registry: Registry, satisfied: UnderWayTest = () => false): WaitedOut {
   for (let step = 0; step < UNDER_WAY_STEPS; step++) {
+    if (satisfied(state, registry)) return { ended: true };
     if (!state.activeAction && !state.journey) return { ended: true };
     const unit = underWayUnit(state, registry);
     if (!(unit > 0)) return { ended: false, reason: 'what is under way advances by nothing, so waiting it out would never end' };

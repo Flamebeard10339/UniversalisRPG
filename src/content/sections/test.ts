@@ -43,10 +43,14 @@ export type Directive =
   | { kind: 'allocate'; target: string; node: PlaneNode }
   | { kind: 'apply'; target: string; hex: Hex; effect: string }
   | { kind: 'refuse'; inner: GrowthDirective }
+  | { kind: 'until'; inner: Directive; until: Terminator }
   | { kind: 'open-modal'; modal: string }
   | { kind: 'submit-modal'; key: string; value: string };
 
 export type GrowthDirective = Extract<Directive, { kind: 'feed' | 'slot' | 'allocate' | 'apply' }>;
+
+// `done` is a fact about the action system — nothing is under way — not a fact about game state, so no engine root could ever spell it and it stays a word rather than a condition.
+export type Terminator = 'done' | Condition;
 
 export interface Test {
   id: string;
@@ -81,6 +85,16 @@ const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
 const CANCEL = /^cancel$/;
 const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
 const WAIT_OUT = /^wait:[ \t]*done$/;
+const UNTIL = /^(?<rest>.+)[ \t]+until[ \t]+(?<terminator>.+)$/;
+
+function parseTerminator(text: string): Terminator | null {
+  if (text.trim() === 'done') return 'done';
+  try {
+    return parseWhole(condition, text, 0, 'an until condition');
+  } catch {
+    return null;
+  }
+}
 const CARRIED = `(?:${PATH}|[0-9]+)`;
 const HEX = '-?\\d+,-?\\d+';
 const DIRECTION = [...DIRECTIONS].sort((a, b) => b.length - a.length).join('|');
@@ -192,6 +206,15 @@ function parseBegin(text: string, verb: string, rest: string): Directive {
 }
 
 export function parseDirectiveLine(text: string): Directive | null {
+  const until = UNTIL.exec(text)?.groups;
+  if (until) {
+    const terminator = parseTerminator(until.terminator);
+    if (terminator !== null) {
+      const inner = parseDirectiveLine(until.rest);
+      if (inner) return { kind: 'until', inner, until: terminator };
+    }
+  }
+
   const run = RUN.exec(text)?.groups;
   if (run) return { kind: 'run', test: run.id };
 
@@ -303,6 +326,8 @@ export function printDirective(value: Directive): string {
       return `begin: ${inlined(value.inner, value.inner.kind === 'use-on' ? 'use' : value.inner.kind)}`;
     case 'refuse':
       return `refuse: ${inlined(value.inner)}`;
+    case 'until':
+      return `${printDirective(value.inner)} until ${value.until === 'done' ? 'done' : condition.print(value.until)}`;
     case 'assert':
       return `assert: ${condition.print(value.condition)}`;
     case 'expect':
@@ -366,6 +391,17 @@ export const test = section<Test>()({
     { form: 'cancel', example: 'cancel' },
     { form: 'wait: <seconds>', example: 'wait: 1' },
     { form: 'wait: done', example: 'wait: done', note: 'stands until whatever is under way has finished, rather than a number of seconds guessed large enough to cover it' },
+    {
+      form: '<a directive that starts an action> until done',
+      example: 'use: melee-combat on giant-rat until done',
+      note: 'performs the directive, then stands until whatever it started has finished, exactly as wait: done does',
+    },
+    {
+      form: '<a directive that starts an action> until <condition>',
+      example: 'use: melee-combat on giant-rat until resource.health < 10',
+      note: 'performs the directive, then keeps stepping what it started, one cycle at a time, until the condition holds or nothing is left under way',
+      holds: () => ({ condition }),
+    },
     { form: 'equip: <item>', example: 'equip: rusty-sword' },
     { form: 'unequip: <slot>', example: 'unequip: main-hand' },
     { form: 'feed: <item> with <item>', example: 'feed: cluster-jewel with fervour' },
@@ -455,6 +491,10 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       return;
     case 'refuse':
       visitDirective(value.inner, `${where} refuse:`, visit);
+      return;
+    case 'until':
+      visitDirective(value.inner, `${where} until:`, visit);
+      if (value.until !== 'done') visitCondition(value.until, `${where} until:`, visit);
       return;
     case 'unequip':
     case 'open-modal':
