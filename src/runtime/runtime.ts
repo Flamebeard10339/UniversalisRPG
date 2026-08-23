@@ -508,12 +508,17 @@ const underWayUnit = (state: GameState, registry: Registry): number => {
   return actionFirstUnit(obj, objId, active.actionSlug, registry, state);
 };
 
+function advanceUnderWayCycle(state: GameState, registry: Registry): void {
+  const unit = underWayUnit(state, registry);
+  resolve(state, registry, state.time + Math.max(1, Math.ceil(unit)));
+}
+
 export function resolveUnderWay(state: GameState, registry: Registry): WaitedOut {
   for (let step = 0; step < UNDER_WAY_STEPS; step++) {
     if (!state.activeAction && !state.journey) return { ended: true };
     const unit = underWayUnit(state, registry);
     if (!(unit > 0)) return { ended: false, reason: 'what is under way advances by nothing, so waiting it out would never end' };
-    resolve(state, registry, state.time + Math.max(1, Math.ceil(unit)));
+    advanceUnderWayCycle(state, registry);
   }
   return { ended: false, reason: `what is under way had not finished after ${UNDER_WAY_STEPS} of its own cycles` };
 }
@@ -609,12 +614,22 @@ export function armFightAction(actionId: string, targetId: string, registry: Reg
 }
 
 export function useFight(actionId: string, targetId: string, registry: Registry, state: GameState): void {
+  const active = state.activeAction;
+  if (active?.ownerRef === `action.${actionId}` && active.roster?.[PLAYER]?.target === targetId) {
+    advanceUnderWayCycle(state, registry);
+    return;
+  }
   const armed = armFightAction(actionId, targetId, registry, state);
   if (!armed.armed) return;
   resolve(state, registry, state.time + armed.firstUnit);
 }
 
 export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
+  const active = state.activeAction;
+  if (active?.ownerRef === `${obj}.${objId}` && active.actionSlug === actionId) {
+    advanceUnderWayCycle(state, registry);
+    return;
+  }
   const armed = armAction(obj, objId, actionId, registry, state);
   if (!armed.armed) return;
   resolve(state, registry, state.time + armed.firstUnit);
