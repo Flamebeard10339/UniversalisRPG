@@ -338,8 +338,8 @@ const KIND_LINES: readonly Written[] = TAGGED_ACTION_KINDS.map((kind) => {
   return { form: kind, example: kind, family: 'how long it takes', ...(caveat === undefined ? {} : { note: caveat }) };
 });
 
-// A bare clause on an action holds on whoever is performing it while it runs. Which clauses those are is asked of `checkTags`, which is what refuses one, rather than listed here — so a clause an action starts or stops taking reaches the page with it.
-const CLAUSE_NOTE = 'holds on whoever is performing the action, for as long as it is under way';
+// A bare clause on an action holds on whoever is performing it while it runs, which is what the part it stands under says. Which clauses those are is asked of `checkTags`, which is what refuses one, rather than listed here — so a clause an action starts or stops taking reaches the page with it.
+const CLAUSES = 'what it is worth to whoever performs it, while it is under way';
 
 const clauseLines = (): readonly Written[] =>
   paired(tagClause.forms, tagClause.examples).flatMap((example, at) => {
@@ -349,7 +349,7 @@ const clauseLines = (): readonly Written[] =>
     } catch {
       return [];
     }
-    return [{ form: tagClause.forms[at]!, example, family: 'while it is under way', note: CLAUSE_NOTE, ...filledBy(tagClause) }];
+    return [{ form: tagClause.forms[at]!, example, family: CLAUSES, ...filledBy(tagClause) }];
   });
 
 // What a field's parser reads is what its lines offer. The shapes are the parser's own, so a shape the engine takes and the page will not show is not a thing that can be written here.

@@ -14,7 +14,7 @@ import { sectionFor, sectionKinds } from '../src/content/sections';
 
 const usage = [
   'Usage: npm run oracle -- [<kind>...]',
-  '       npm run oracle -- --at <draft.dsl> [--walk]',
+  '       npm run oracle -- --at <draft.dsl> [--walk [<line>]]',
   '',
   '  <kind>    print every line that may be written under that kind, at the',
   '            indentation it is written at; with no kind, print every kind',
@@ -23,9 +23,10 @@ const usage = [
   '            it stands. That is the answer to "is this draft good, and where is',
   '            it not", and it stops there',
   '  --walk    go on, after that, to walk the cursor to each placeholder in turn',
-  '            and say line by line where each line sits, what it is read as, and',
-  '            what may stand there. Thousands of lines for a whole module — what',
-  '            to reach for when one line has you stuck, not to read start to end',
+  '            and say where the line sits, what it is read as, and what may stand',
+  '            there. Name a line number and it answers for that line alone, which',
+  '            is what to reach for when one line has you stuck; with none it walks',
+  '            the whole file, and that is thousands of lines for a module',
   '',
   'A draft is whichever module its own `# info` names, so an edited copy of a module',
   'that already ships is read in place of the shipped one rather than beside it.',
@@ -104,13 +105,33 @@ const PART = '· ';
 // A block is known by the lines it holds and what they name, so the one the results grammar repeats down every branch is written out once and pointed at thereafter, while two lists of bare ids that name different kinds stay apart.
 const signOf = (lines: readonly Written[]): string => lines.map((line) => `${line.form} names ${namesKind(line) ?? 'nothing'}`).join('|');
 
+// What has already been written out, and under which kind. A run printing every kind writes the results grammar once rather than once a kind, so a block met again is pointed back at across a heading as readily as under one.
+interface Already {
+  kind: string;
+  seen: Map<string, { label: string; kind: string }>;
+}
+
+const freshly = (): Already['seen'] => new Map();
+
+const heldBefore = (already: Already, sign: string): string | undefined => {
+  const found = already.seen.get(sign);
+  if (found === undefined) return undefined;
+  if (found.kind === already.kind) return `\`${found.label}\``;
+  // A block held at the top of its own kind is pointed at by that heading and nothing else; saying the heading twice reads as two places.
+  return found.label === found.kind ? `\`${found.kind}\`` : `\`${found.label}\` under \`${found.kind}\``;
+};
+
+const holdNow = (already: Already, sign: string, label: string): void => {
+  already.seen.set(sign, { label, kind: already.kind });
+};
+
 // Where a block sits in a draft, which is what the engine needs in order to write out one line of it at the indentation an author writes.
 interface Sitting {
   under: string;
   indent: number;
 }
 
-export function treeLines(lines: readonly Written[], pad: string, sitting: Sitting, written: Map<string, string>, label: string): string[] {
+function treeLines(lines: readonly Written[], pad: string, sitting: Sitting, written: Already, label: string): string[] {
   const held = new Map(lines.map((line) => [line.form, line]));
   const saidOf = (line: Written | undefined): string => {
     const spoken = line === undefined ? undefined : said(line.needs === undefined ? undefined : `only once ${line.needs}: is set`, line.note, namesKind(line));
@@ -124,20 +145,20 @@ export function treeLines(lines: readonly Written[], pad: string, sitting: Sitti
     if (listed(block, beside)) return [];
     const inside: Sitting = { under: [sitting.under, `${' '.repeat(sitting.indent)}${line!.example}`].join('\n'), indent: sitting.indent + 2 };
     const sign = signOf(block);
-    const already = written.get(sign);
-    if (already !== undefined) return [`${deeper}…indented under it, what \`${already}\` holds`];
-    written.set(sign, line!.form);
+    const already = heldBefore(written, sign);
+    if (already !== undefined) return [`${deeper}…indented under it, what ${already} holds`];
+    holdNow(written, sign, line!.form);
     return treeLines(block, deeper, inside, written, line!.form);
   };
   const out: string[] = [];
   for (const family of gathered(lines.map((line) => ({ ...line, insert: line.form })))) {
     const own = family.groups.flatMap((group) => [...(group.opens === null ? [] : [group.opens]), ...group.offers]).flatMap((offer) => held.get(offer.form) ?? []);
     const sign = `${family.name} of ${signOf(own)}`;
-    const already = family.name === null ? undefined : written.get(sign);
+    const already = family.name === null ? undefined : heldBefore(written, sign);
     // A part is named beside the lines that belong to it rather than above and outside them, so what is indented here is what an author indents.
-    if (family.name !== null) out.push(`${pad}${PART}${family.name}${already === undefined ? '' : `, as under \`${already}\``}`);
+    if (family.name !== null) out.push(`${pad}${PART}${family.name}${already === undefined ? '' : `, as under ${already}`}`);
     if (already !== undefined) continue;
-    if (family.name !== null) written.set(sign, label);
+    if (family.name !== null) holdNow(written, sign, label);
     // The shapes a keyword takes stand on its own line, one or another of them; only a block it opens is indented, because only a block is indented in a file.
     for (const group of family.groups) {
       const spoken = (form: string | null): string => (form === null ? '' : saidOf(held.get(form)));
@@ -166,16 +187,18 @@ const RULES: readonly string[] = [
   `${PART}a keyword whose shape trails off in \`, …\` takes a list, and may instead hold it one value to a line, indented under the bare \`keyword:\``,
   `${PART}an \`e.g.\` shows one line of that shape written out; the ids in it stand for ids and are not ids anything declares`,
   `${PART}an id may be written whole, as \`tulsa.bread\`, or by the name its own module gave it, as \`bread\``,
+  `${PART}an answer given once is pointed back at rather than written out again: \`as under X\` and \`what X holds\` both say to read it there`,
   `${PART}in a line the game says to a player, a \`${NOTE_MARK}\` and everything after it is a note the engine drops: write what you can say now, then \`${NOTE_MARK}\` alone to mark it rough, or \`${NOTE_MARK} <what you wanted>\` where the engine cannot do what was asked. \`npm run notes\` lists them`,
 ];
 
-export function treeOf(kind: string): string[] {
+export function treeOf(kind: string, seen: Already['seen'] = freshly()): string[] {
   const owner = sectionFor(kind);
   if (owner === undefined) return [`# ${kind} — no such kind`];
   const sitting = { under: `# ${kind} probe`, indent: 0 };
+  const already: Already = { kind: `# ${kind}`, seen };
   // The section's own lines are a block like any other, so a wrapper that holds them again points back at the heading rather than writing them out twice.
-  const written = new Map([[signOf(owner.grammar), `# ${kind}`]]);
-  return [`# ${kind} <id>`, ...RULES, ...treeLines(owner.grammar, '', sitting, written, `# ${kind}`)];
+  holdNow(already, signOf(owner.grammar), `# ${kind}`);
+  return [`# ${kind} <id>`, ...treeLines(owner.grammar, '', sitting, already, `# ${kind}`)];
 }
 
 const NAMED = 24;
@@ -279,7 +302,7 @@ const linesRead = (draft: readonly string[], starts: readonly number[]): Readonl
   return kept;
 };
 
-export function offeringLines(text: string, known: readonly Addressed[]): string[] {
+export function offeringLines(text: string, known: readonly Addressed[], only: number | null = null): string[] {
   const out: string[] = [];
   const already = new Set<string>();
   const draft = text.split('\n');
@@ -290,6 +313,7 @@ export function offeringLines(text: string, known: readonly Addressed[]): string
   // A line the engine drops is not a place an author writes either, so it is passed over the same way. A blank line is kept: what may be written on it is the one thing an author standing there is asking.
   const dropped = (index: number, line: string): boolean => read !== null && line.trim() !== '' && !read.has(index);
   for (const [index, line] of draft.entries()) {
+    if (only !== null && index + 1 !== only) continue;
     if (dropped(index, line)) continue;
     const at = starts[index]! + line.length;
     const offering = offeringAt(text, at, known);
@@ -322,6 +346,8 @@ export function offeringLines(text: string, known: readonly Addressed[]): string
 export interface Asked {
   at: string | null;
   walk: boolean;
+  // The one line the walk was asked about, where it was asked about one. A module is thousands of lines walked and an author who is stuck is stuck on one of them.
+  line: number | null;
   kinds: readonly string[];
 }
 
@@ -330,9 +356,17 @@ const requireDraft = (value: string | undefined): string => {
   return value;
 };
 
+const LINE = /^\d+$/;
+
+const requireLine = (value: string): number => {
+  if (!LINE.test(value) || Number(value) < 1) throw new Error(`--walk takes a line number, and ${JSON.stringify(value)} is not one\n\n${usage}`);
+  return Number(value);
+};
+
 export function parseArgs(argv: readonly string[]): Asked {
   let at: string | null = null;
   let walk = false;
+  let line: number | null = null;
   const kinds: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -346,21 +380,28 @@ export function parseArgs(argv: readonly string[]): Asked {
     }
     if (arg === '--walk') {
       walk = true;
+      // A kind is a word and a line is a number, so the one that follows --walk says on its own which it is.
+      if (argv[i + 1] !== undefined && LINE.test(argv[i + 1]!)) line = requireLine(argv[++i]!);
+      continue;
+    }
+    if (arg.startsWith('--walk=')) {
+      walk = true;
+      line = requireLine(arg.slice('--walk='.length));
       continue;
     }
     if (arg.startsWith('-')) throw new Error(`unknown flag ${arg}\n\n${usage}`);
     kinds.push(arg);
   }
-  return { at, walk, kinds };
+  return { at, walk, line, kinds };
 }
 
 // Where the walk is left unasked for, the answer says it is there. It is the rest of the same question, and an author stuck on one line has no other way to hear of it.
-const WALK = 'For any one line — where it sits, what it is read as, and what may stand there — run this again with --walk.';
+const WALK = 'For any one line — where it sits, what it is read as, and what may stand there — run this again with --walk <line>, or --walk alone for the whole file.';
 
-export function atLines(file: string, written: string, world: readonly ModuleSource[], walk: boolean): string[] {
+export function atLines(file: string, written: string, world: readonly ModuleSource[], walk: boolean, line: number | null = null): string[] {
   const read = reading(file, written, world);
   const short = [...amissLines(written, read.known, read.stood), ...takenLines(read)];
-  return walk ? [...short, ...offeringLines(written, read.known)] : [...short, WALK];
+  return walk ? [...short, ...offeringLines(written, read.known, line)] : [...short, WALK];
 }
 
 function main(): void {
@@ -379,11 +420,13 @@ function main(): void {
   }
   if (asked.at !== null) {
     const written = readFileSync(asked.at, 'utf8').replace(/\r\n?/g, '\n');
-    console.log(atLines(asked.at, written, corpus(), asked.walk).join('\n'));
+    console.log(atLines(asked.at, written, corpus(), asked.walk, asked.line).join('\n'));
     return;
   }
   const kinds = asked.kinds.length > 0 ? asked.kinds : sectionKinds();
-  console.log(kinds.flatMap((kind) => [...treeOf(kind), '']).join('\n'));
+  // The rules hold of every kind, so a run says them once above whatever it was asked for rather than once a kind.
+  const seen = freshly();
+  console.log([...RULES, '', ...kinds.flatMap((kind) => [...treeOf(kind, seen), ''])].join('\n'));
 }
 
 if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) main();

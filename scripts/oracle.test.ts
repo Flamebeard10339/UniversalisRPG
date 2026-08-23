@@ -12,7 +12,7 @@ const REFERS = /…indented under it, what `(?<form>.+)` holds$/;
 describe('the grammar tree', () => {
   it.each(sectionKinds())('%s is written out once, however deep its blocks reach', (kind) => {
     const tree = treeOf(kind);
-    expect(tree.length).toBeGreaterThan(1);
+    expect(tree[0]).toBe(`# ${kind} <id>`);
     expect(tree.length).toBeLessThan(200);
   });
 
@@ -275,6 +275,15 @@ describe('the short answer and the walk', () => {
     expect(short[short.length - 1]).toContain('--walk');
   });
 
+  it('answers for one line alone where a line was named, and for that line the same way it would in the whole walk', () => {
+    const whole = offeringLines(DRAFT, reading('glade.dsl', DRAFT, WORLD).known);
+    const alone = atLines('glade.dsl', DRAFT, WORLD, true, 4).slice(atLines('glade.dsl', DRAFT, WORLD, false).length - 1);
+
+    expect(alone[0]).toBe('entities: no-such-thing');
+    expect(alone.length).toBeLessThan(whole.length);
+    expect(whole.join('\n')).toContain(alone.join('\n'));
+  });
+
   it('walks on from exactly where the short answer stopped', () => {
     const short = atLines('glade.dsl', DRAFT, WORLD, false);
     const full = atLines('glade.dsl', DRAFT, WORLD, true);
@@ -288,9 +297,16 @@ describe('the short answer and the walk', () => {
 
 describe('what the oracle is asked for', () => {
   it('reads a draft, a walk and a list of kinds off the arguments', () => {
-    expect(parseArgs(['--at', 'draft.dsl'])).toEqual({ at: 'draft.dsl', walk: false, kinds: [] });
-    expect(parseArgs(['--at=draft.dsl', '--walk'])).toEqual({ at: 'draft.dsl', walk: true, kinds: [] });
-    expect(parseArgs(['item', 'location'])).toEqual({ at: null, walk: false, kinds: ['item', 'location'] });
+    expect(parseArgs(['--at', 'draft.dsl'])).toEqual({ at: 'draft.dsl', walk: false, line: null, kinds: [] });
+    expect(parseArgs(['--at=draft.dsl', '--walk'])).toEqual({ at: 'draft.dsl', walk: true, line: null, kinds: [] });
+    expect(parseArgs(['item', 'location'])).toEqual({ at: null, walk: false, line: null, kinds: ['item', 'location'] });
+  });
+
+  // A kind is a word and a line is a number, so what follows --walk says on its own which of them it is.
+  it('reads the one line a walk was asked about, however it was written', () => {
+    expect(parseArgs(['--at=draft.dsl', '--walk', '738'])).toEqual({ at: 'draft.dsl', walk: true, line: 738, kinds: [] });
+    expect(parseArgs(['--at=draft.dsl', '--walk=738'])).toEqual({ at: 'draft.dsl', walk: true, line: 738, kinds: [] });
+    expect(parseArgs(['--walk', 'item'])).toEqual({ at: null, walk: true, line: null, kinds: ['item'] });
   });
 
   it('will not read a flag as the draft it was asked for, and will not pass one off as a kind', () => {
@@ -298,5 +314,7 @@ describe('what the oracle is asked for', () => {
     expect(() => parseArgs(['--at', '--help'])).toThrow('--at wants a draft file after it');
     expect(() => parseArgs(['--at'])).toThrow('--at wants a draft file after it');
     expect(() => parseArgs(['--nonsense'])).toThrow('unknown flag --nonsense');
+    expect(() => parseArgs(['--walk=0'])).toThrow('--walk takes a line number');
+    expect(() => parseArgs(['--walk=nonsense'])).toThrow('--walk takes a line number');
   });
 });
