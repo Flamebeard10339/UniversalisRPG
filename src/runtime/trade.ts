@@ -2,7 +2,7 @@ import { Registry } from '../content/registry';
 import { Item } from '../content/sections/item';
 import { buyPrice, declaredStock, replenished, replenishSteps, sellPrice, Shop, takesItem } from '../content/sections/shop';
 import { RuntimeError } from './error';
-import { carriedCount, stockItem } from './itemInstance';
+import { spendableCount, stockItem } from './itemInstance';
 import { GameState, ShopStock } from './state';
 
 export const isShopStock = (value: unknown): boolean => {
@@ -56,13 +56,13 @@ export function forSale(shop: Shop, state: GameState, registry: Registry): Trade
 export function wanted(shop: Shop, state: GameState, registry: Registry): Trade[] {
   return Object.keys(state.inventory).flatMap((itemId) => {
     const item = itemOf(registry, itemId);
-    const count = carriedCount(state, itemId);
+    const count = spendableCount(state, itemId);
     if (count <= 0 || !takesItem(shop, item)) return [];
     return [{ item: itemId, count, coin: sellPrice(shop, item)! }];
   });
 }
 
-export const coinHeld = (shop: Shop, state: GameState): number => carriedCount(state, shop.coin);
+export const coinHeld = (shop: Shop, state: GameState): number => spendableCount(state, shop.coin);
 
 export type Refusal = 'unknown-item' | 'untradable' | 'out-of-stock' | 'not-carried' | 'not-afforded' | 'not-a-count';
 
@@ -85,7 +85,7 @@ export function sellProblem(shop: Shop, state: GameState, registry: Registry, it
   const item = itemOf(registry, itemId);
   if (!item) return 'unknown-item';
   if (!takesItem(shop, item)) return 'untradable';
-  if (carriedCount(state, itemId) < count) return 'not-carried';
+  if (spendableCount(state, itemId) < count) return 'not-carried';
   return undefined;
 }
 

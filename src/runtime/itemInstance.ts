@@ -109,6 +109,15 @@ export function copiesOf(state: GameState, itemId: string): Copies {
   return itemCopies(state).get(itemId) ?? NO_COPIES;
 }
 
+// A grown copy is a thing in its own right and a worn one is on the player, so neither is a unit of the stack and neither can be handed over by name — which is the count `stockItem` moves and the only count anything parting with an item may ask for.
+export function spendable(copies: Copies): number {
+  return copies.stack;
+}
+
+export function spendableCount(state: GameState, itemId: string): number {
+  return spendable(copiesOf(state, itemId));
+}
+
 export function carriedCount(state: GameState, itemId: string): number {
   const { stack, grown } = copiesOf(state, itemId);
   return stack + grown;
@@ -184,8 +193,6 @@ interface Growing {
   change(payload: ItemInstance, item: Item): Said | undefined;
 }
 
-const held = (state: GameState, itemId: string): number => copiesOf(state, itemId).stack;
-
 const take = (state: GameState, itemId: string): void => void stockItem(state, itemId, -1);
 
 export function growItem(state: GameState, registry: Registry, growing: Growing): Growth {
@@ -201,7 +208,7 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
 
   const source = standing ? undefined : stackCopy(state, target);
   if (!standing && !source) return refused(says('engine.growth.no-copy', { item: anId(template) }));
-  if (consumes !== undefined && held(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(says('engine.growth.no-copy', { item: anId(consumes) }));
+  if (consumes !== undefined && spendableCount(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(says('engine.growth.no-copy', { item: anId(consumes) }));
 
   const payload = standing?.payload ?? { experience: 0, plane };
   const problem = growing.change(payload, item);

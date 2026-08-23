@@ -5,7 +5,7 @@ import { Action } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
 import { Registry } from '../content/registry';
 import { findActionOwner } from './actionLookup';
-import { copiesOf } from './itemInstance';
+import { copiesOf, spendable } from './itemInstance';
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { type ActiveAction, GameState } from './state';
 
@@ -63,10 +63,10 @@ export function inputLimit(action: Action, state: GameState): InputLimit {
   let unspendable: InputLimit['unspendable'];
   for (const [item, need] of perCompletionCost(action)) {
     if (need <= 0) continue;
-    const { stack, grown, worn } = copiesOf(state, item);
-    if (stack + grown + worn < need) short ??= item;
-    else if (stack < need) unspendable ??= { item, kind: grown > 0 ? 'grown' : 'worn' };
-    completions = Math.min(completions, Math.floor(stack / need));
+    const copies = copiesOf(state, item);
+    if (copies.stack + copies.grown + copies.worn < need) short ??= item;
+    else if (spendable(copies) < need) unspendable ??= { item, kind: copies.grown > 0 ? 'grown' : 'worn' };
+    completions = Math.min(completions, Math.floor(spendable(copies) / need));
   }
   return { completions, short, unspendable };
 }
