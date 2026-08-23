@@ -43,6 +43,7 @@ export interface AuthoredEntity extends HookCarrier {
   passives: string[];
   equipmentSlots: string[];
   flags: string[];
+  shop?: string;
   uses: string[];
   faction: string[];
   allies: Ally[];
@@ -142,6 +143,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
       keyword: 'equipment-slots',
       default: () => [],
     },
+    shop: { parser: id, keyword: 'keeps shop', names: { id: 'shop' }, standsWithout: true },
     uses: { parser: list(id), default: () => [], names: { id: 'action' } },
     faction: { parser: list(id), default: () => [], names: { id: 'faction' } },
     allies: { parser: list(allyValue), default: () => [] },

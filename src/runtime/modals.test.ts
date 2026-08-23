@@ -264,7 +264,7 @@ describe('opening and answering', () => {
 
   it('refuses a modal nothing defines, and one that carries a payload no result line can spell', () => {
     const state = createGameState();
-    expect(() => openModalNamed(state, 'shop')).toThrow(/unknown modal: shop/);
+    expect(() => openModalNamed(state, 'haggling')).toThrow(/unknown modal: haggling/);
     expect(() => openModalNamed(state, 'dialogue')).toThrow(/not opened by name/);
     expect(() => applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'shop' }])).toThrow(RuntimeError);
     expect(state.modals).toEqual([]);
@@ -339,8 +339,8 @@ describe('opening and answering', () => {
     const cursor = { ...(talking(registry).modals[1] as { cursor: DialogueCursor }).cursor };
 
     const withStranger = createGameState();
-    (withStranger.modals as ModalFrame[]).push({ name: 'shop', answers: {} } as unknown as ModalFrame);
-    expect(pruneModals(withStranger, registry)).toEqual([{ name: 'shop', reason: 'it is not a modal this engine knows' }]);
+    (withStranger.modals as ModalFrame[]).push({ name: 'haggling', answers: {} } as unknown as ModalFrame);
+    expect(pruneModals(withStranger, registry)).toEqual([{ name: 'haggling', reason: 'it is not a modal this engine knows' }]);
     expect(withStranger.modals).toEqual([]);
 
     for (const [broken, reason] of [
@@ -726,6 +726,7 @@ describe('nothing a player answers with carries words', () => {
     'starting',
     'entities:',
     '  sage',
+    '  pedlar',
     '',
     '# cluster-jewel core',
     'shape: point',
@@ -749,8 +750,24 @@ describe('nothing a player answers with carries words', () => {
     'title: Whetstone',
     'item-experience: 1000',
     '',
+    '# item coin',
+    'title: Coin',
+    '',
+    '# item nail',
+    'title: Nail',
+    'value: 3',
+    '',
+    '# shop stall',
+    'coin: coin',
+    'stocks:',
+    '  4 nail',
+    '',
     '# entity sage',
     'title: Sage',
+    '',
+    '# entity pedlar',
+    'title: Pedlar',
+    'keeps shop: stall',
     '',
     '# flag greeted',
     '',
@@ -770,7 +787,7 @@ describe('nothing a player answers with carries words', () => {
     '  complete',
     '',
     '# save stocked',
-    `{"version":${SAVE_VERSION},"inventory":{"forge.blade":2,"forge.whetstone":2,"forge.bough-jewel":1}}`,
+    `{"version":${SAVE_VERSION},"inventory":{"forge.blade":2,"forge.whetstone":2,"forge.bough-jewel":1,"forge.coin":50,"forge.nail":1}}`,
   ].join('\n');
 
   const SPANISH = [
@@ -852,6 +869,14 @@ describe('nothing a player answers with carries words', () => {
       published();
       applyDirective(session, { kind: 'submit-modal', key: 'verb', value: 'close' });
     }
+
+    applyDirective(session, { kind: 'shop', shop: 'forge.stall' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'buy:forge.nail' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'count', value: '2' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'close' });
 
     applyDirective(session, { kind: 'talk', entity: 'forge.sage' });
     published();

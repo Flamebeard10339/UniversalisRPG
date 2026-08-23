@@ -196,15 +196,18 @@ thieving-tool
 
 # item fishing-net
 examine: A weighted throw net, the mesh mended in three places with line that does not match.
+value: 20
 
 # item fish
 examine: Whatever came up in the net. Bright, cold, and still working its gills.
 
 # item jug-of-water
 examine: A clay jug of clean water.
+value: 1
 
 # item pot-of-flour
 examine: A small pot of milled flour.
+value: 3
 
 # item dough
 examine: A ball of raw dough, ready for the oven.
@@ -223,6 +226,7 @@ examine: Still twitching, faintly.
 
 # item bent-coin
 examine: A copper coin someone stepped on.
+value: 2
 
 # item rats-eye-gem
 examine: A red stone the size of a thumbnail. It does not warm in your hand.
@@ -450,6 +454,7 @@ examine: A milled coin of Yanodonin, the duke's profile worn nearly flat.
 
 # item herring
 examine: A silver fish, still cold from the water.
+value: 5
 
 # item honeycomb
 examine: A slab of comb, heavy and dripping.
@@ -478,11 +483,13 @@ examine: A single split leaf. It is the last thing on every list that has one, a
 title: Hand Axe
 examine: A short axe, good for firewood and not much else.
 slot: mainhand
+value: 12
 weapon, +1 attack
 
 # item bundle-of-firewood
 title: Bundle of Firewood
 examine: Split logs, roped together. Anywhere with a stove in it buys these by the armful.
+value: 12
 
 # item log
 title: Log

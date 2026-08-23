@@ -23,7 +23,7 @@ import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
 import { answerModal, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
-import { dialogueFrame, openModal, openModalNamed, topModal } from './modalStack';
+import { dialogueFrame, openModal, openModalNamed, openShop, topModal } from './modalStack';
 import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carried';
 import { Registry } from '../content/registry';
 import { type ParsedSave } from '../content/sections/save';
@@ -37,7 +37,7 @@ import { skillLevel, xpForLevel } from './skills';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 import { say } from './said';
 
-export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft';
+export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'shop';
 
 export interface PlayChoice {
   id: Answer;
@@ -170,6 +170,13 @@ function entityAliasesTravelTo(location: Location, target: string, registry: Reg
 
 const standingHere = (registry: Registry, state: GameState, location: Location): string[] => standing(state, registry, location).map((entry) => entry.entity);
 
+// Whoever is standing here that opens this shop. A shop is reached through the thing keeping it, so a shop nobody here keeps is not reachable from here at all.
+export function shopkeeperHere(registry: Registry, state: GameState, shopId: string): string | undefined {
+  const location = registry.locations.get(state.location);
+  if (!location) return undefined;
+  return standingHere(registry, state, location).find((entityId) => registry.entities.get(entityId)?.shop === shopId);
+}
+
 function fightChoices(registry: Registry, state: GameState, location: Location): PlayChoice[] {
   const choices: PlayChoice[] = [];
   const player = registry.player;
@@ -202,6 +209,9 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
     if (!entity) continue;
+    if (entity.shop !== undefined && registry.shops.has(entity.shop)) {
+      choices.push({ id: `shop:${entity.shop}`, kind: 'shop', label: localizer.engine('engine.shop.label', { entity: localizer.title('entity', entityId) }), detail: localizer.title('entity', entityId) });
+    }
     if (canTalk(entityId, registry, state)) {
       choices.push({ id: `talk:${entityId}`, kind: 'talk', label: localizer.engine('engine.talk.to', { entity: localizer.title('entity', entityId) }) });
     }
@@ -285,6 +295,8 @@ export function choiceToDirective(choice: PlayChoice): Directive {
       return { kind: 'travel', location: choice.id.slice('travel:'.length) };
     case 'craft':
       return { kind: 'craft', recipe: choice.id.slice('craft:'.length) };
+    case 'shop':
+      return { kind: 'shop', shop: choice.id.slice('shop:'.length) };
   }
 }
 
@@ -500,6 +512,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'until':
     case 'open-modal':
     case 'submit-modal':
+    case 'shop':
       return null;
     default: {
       const unreached: never = directive;
@@ -613,6 +626,12 @@ function performDirective(session: PlaySession, directive: Directive): Directive
     case 'craft':
       craft(directive.recipe, registry, state);
       return {};
+    case 'shop': {
+      if (!registry.shops.has(directive.shop)) throw new RuntimeError(`unknown shop: ${directive.shop}`);
+      if (shopkeeperHere(registry, state, directive.shop) === undefined) throw new RuntimeError(`nobody standing in ${state.location} keeps the shop ${directive.shop}`);
+      openShop(state, directive.shop);
+      return {};
+    }
     case 'begin':
       beginAction(session, choiceIdFor(directive.inner));
       return {};

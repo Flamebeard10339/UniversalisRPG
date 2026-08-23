@@ -5,6 +5,7 @@ import { choose, cursorProblem, menuChoices } from './dialogue-runtime';
 import { carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit } from './planeScreen';
 import { holdsQuest, questFocus, questOptions, questSubmit, LEAVE as QUEST_LEAVE } from './questScreen';
+import { countOptions, countSubmit, holdsCount, holdsShop, shopOptions, shopStale, shopSubmit, LEAVE as SHOP_LEAVE } from './shopScreen';
 import { type PlaneFocus } from './planeReport';
 
 // What the screen standing open is about, where it is about something the view publishes elsewhere. A plane and a quest are both read beside the question rather than in it.
@@ -66,6 +67,19 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     holds: holdsQuest,
     focus: questFocus,
     leaves: QUEST_LEAVE,
+  },
+  shop: {
+    options: shopOptions,
+    submit: shopSubmit,
+    holds: holdsShop,
+    stale: shopStale,
+    leaves: SHOP_LEAVE,
+  },
+  'shop-count': {
+    options: countOptions,
+    submit: countSubmit,
+    holds: holdsCount,
+    stale: shopStale,
   },
   dialogue: {
     options: (frame, state, registry) => [

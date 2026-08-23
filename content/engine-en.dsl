@@ -83,6 +83,20 @@ engine.cluster.not-an-effect: {item} carries no cluster effect
 engine.cluster.effect-repeated: the cluster at {hex} already carries {effect}
 engine.cluster.slots-full: the cluster at {hex} fills all {count} of its mod slots
 engine.said.elided: … {dropped} more lines
+engine.shop.label: Trade with {entity}
+engine.shop.counter: The counter — you are carrying {held} {coin}
+engine.shop.buy: Buy {item} — {price} each, {count} in stock
+engine.shop.sell: Sell {item} — {price} each, you carry {count}
+engine.shop.count.buy: How many {item} will you buy?
+engine.shop.count.sell: How many {item} will you sell?
+engine.shop.close: Step away from the counter
+engine.shop.stale: nothing here keeps a shop called {shop} any more
+engine.shop.refused.unknown-item: There is nothing by that name to trade.
+engine.shop.refused.untradable: That is not something they will put a price on.
+engine.shop.refused.out-of-stock: They do not have that many.
+engine.shop.refused.not-carried: You are not carrying that many.
+engine.shop.refused.not-afforded: You cannot afford that.
+engine.shop.refused.not-a-count: That is not a number of things to trade.
 engine.modal.opened: modal:{modal}
 engine.prune.record: Removed {path} {id} because its {kind} is not loaded.
 engine.prune.location: Moved from unavailable location {from} to {to}.

@@ -485,62 +485,41 @@ examine: A soldier of Yanodonin on the last piece of it, and not glad to be.
 
 // --- the stores ---
 //
-// Buying is a trade written out: what it costs, what it hands over. There is
-// no shop mechanism in the engine and this does not invent one.
+// A store is a # shop the entity behind the counter keeps. What it stocks is
+// what it has when nobody has been in; every one of them will take anything
+// tradable off you, because none of them says otherwise.
+
+# shop general-store
+coin: coin
+stocks:
+  6 core.pot-of-flour
+  10 core.jug-of-water
 
 # entity general-store
 title: General Store
 examine: Flour, water, rope, and a jar by the till for coins too bent to spend elsewhere.
-sell bent coins:
-  instant
-  requires: has core.bent-coin
-  take: 1 core.bent-coin
-  give: 1 coin
-  say: The grocer weighs it, shrugs, and gives you a good one.
-buy flour:
-  instant
-  requires: has 4 coin
-  take: 4 coin
-  give: 1 core.pot-of-flour
-  say: A pot of milled flour, four coins.
-buy water:
-  instant
-  requires: has 2 coin
-  take: 2 coin
-  give: 1 core.jug-of-water
-  say: A jug off the rack, two coins.
+keeps shop: general-store
+
+# shop fishing-supplies
+coin: coin
+stocks:
+  3 core.fishing-net
+  20 herring
 
 # entity fishing-supplies
 title: Fishing Supplies
 examine: Nets on hooks, line on spools, and a crate of herring on ice at the front.
-buy net:
-  instant
-  requires: has 25 coin
-  take: 25 coin
-  give: 1 core.fishing-net
-  say: A net, twenty-five coins, and she throws in the advice for free.
-buy herring:
-  instant
-  requires: has 6 coin
-  take: 6 coin
-  give: 1 herring
-  say: A herring off the ice, six coins.
+keeps shop: fishing-supplies
+
+# shop woodcutters-stall
+coin: coin
+stocks:
+  5 hand-axe
 
 # entity woodcutters-stall
 title: Woodcutter's Stall
 examine: A rack of hand axes and a standing offer chalked on the board behind it.
-buy axe:
-  instant
-  requires: has 15 coin
-  take: 15 coin
-  give: 1 hand-axe
-  say: A hand axe, fifteen coins, and no warranty.
-sell firewood:
-  instant
-  requires: has bundle-of-firewood
-  take: 1 bundle-of-firewood
-  give: 9 coin
-  say: He counts out nine coins without looking up.
+keeps shop: woodcutters-stall
 
 # entity oolgas-counter
 title: Oolga's Counter
@@ -1042,46 +1021,46 @@ node greeting:
 // --- saves ---
 
 # save in-town
-{"version":11,"location":"tulsa.market-square"}
+{"version":12,"location":"tulsa.market-square"}
 
 // A pocket of curios out of the tutorial's rats, which is what a new arrival
 // has to trade with and the whole of the town's on-ramp to money. The drawer
 // and the rats between them hand out about this many.
 # save in-town-with-bent-coins
-{"version":11,"location":"tulsa.market-square","inventory":{"core.bent-coin":8}}
+{"version":12,"location":"tulsa.market-square","inventory":{"core.bent-coin":8}}
 
 // Out of a fight and back in the square with eleven of thirty left, which is
 // about what the three playtest runs walked away from the cellar rats holding.
 # save hurt-in-town
-{"version":11,"location":"tulsa.market-square","resources":{"core.health":11000}}
+{"version":12,"location":"tulsa.market-square","resources":{"core.health":11000}}
 
 // Down the back way with the lockpick from Miki's dresser, which is what
 // anybody who came here for the barred door would be carrying.
 # save at-the-sewer-junction
-{"version":11,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
+{"version":12,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
 
 # save dresser-trinket-end
-{"version":11,"inventory":{"core.lockpick":1},"flags":{"tulsa.dresser.searched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true},"resources":{},"location":"tulsa.guide-house-upstairs","rng":2617077404}
+{"version":12,"inventory":{"core.lockpick":1},"flags":{"tulsa.dresser.searched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true},"resources":{},"location":"tulsa.guide-house-upstairs","rng":2617077404}
 
 # save explored-and-unlocked
-{"version":11,"flags":{"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true}}
+{"version":12,"flags":{"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true}}
 
 // Standing at the oven with something to roast. Nothing in the world grants a
 // raw chestnut, so this save is the only way the continuous cadence is reached.
 # save chestnuts-in-hand
-{"version":11,"inventory":{"core.raw-chestnut":3}}
+{"version":12,"inventory":{"core.raw-chestnut":3}}
 
 # save axe-at-the-swamp-edge
-{"version":11,"location":"tulsa.swamp-edge","inventory":{"core.hand-axe":1}}
+{"version":12,"location":"tulsa.swamp-edge","inventory":{"core.hand-axe":1}}
 
 # save growing-a-heartwood-blade-start
-{"version":11,"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}}
+{"version":12,"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}}
 
 # save growing-a-heartwood-blade-end
-{"version":11,"inventory":{"core.heartwood-blade":0,"core.iron-sword":0,"core.whetstone":2,"core.masters-whetstone":1,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":0,"core.crossroads-jewel":0,"core.orb-of-vitality":0,"core.orb-of-the-edge":1,"core.lesser-orb-of-the-edge":0,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":12,"inventory":{"core.heartwood-blade":0,"core.iron-sword":0,"core.whetstone":2,"core.masters-whetstone":1,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":0,"core.crossroads-jewel":0,"core.orb-of-vitality":0,"core.orb-of-the-edge":1,"core.lesser-orb-of-the-edge":0,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 # save growing-through-the-inventory-screen-end
-{"version":11,"inventory":{"core.heartwood-blade":1,"core.iron-sword":0,"core.whetstone":6,"core.masters-whetstone":3,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.crossroads-jewel":0,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":12,"inventory":{"core.heartwood-blade":1,"core.iron-sword":0,"core.whetstone":6,"core.masters-whetstone":3,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.crossroads-jewel":0,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // --- tests ---
 
@@ -1128,15 +1107,16 @@ assert: beach.discovered
 # test a-bent-coin-becomes-a-cooked-herring
 load: in-town-with-bent-coins
 travel: market-row
-use: entity.general-store.sell-bent-coins
-use: entity.general-store.sell-bent-coins
-use: entity.general-store.sell-bent-coins
-use: entity.general-store.sell-bent-coins
-use: entity.general-store.sell-bent-coins
-use: entity.general-store.sell-bent-coins
+shop: general-store
+submit-modal: item=sell:core.bent-coin
+submit-modal: count=6
+submit-modal: item=close
 assert: inventory.coin = 6
 assert: inventory.core.bent-coin = 2
-use: entity.fishing-supplies.buy-herring
+shop: fishing-supplies
+submit-modal: item=buy:core.herring
+submit-modal: count=1
+submit-modal: item=close
 assert: has herring
 assert: inventory.coin = 0
 travel: tavern-street

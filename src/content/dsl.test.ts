@@ -382,6 +382,19 @@ describe('the shipped corpus', () => {
     expect([...registry.locations.keys()].filter((id) => !seen.has(id))).toEqual([]);
   });
 
+  // The subjects are every # shop the corpus holds, so a store written next month is held to both of these with no edit here.
+  it('is reached at every counter it holds through the entity keeping it, since a shop nobody keeps stands nowhere', () => {
+    const { registry } = loadUniverseWithDiagnostics(CORPUS);
+    const kept = new Set([...registry.entities.values()].flatMap((entity) => (entity.shop === undefined ? [] : [entity.shop])));
+    expect(registry.shops.size).toBeGreaterThan(0);
+    expect([...registry.shops.keys()].filter((id) => !kept.has(id))).toEqual([]);
+  });
+
+  it('counts every counter in a coin that declares no value of its own, which is what a shop would otherwise sell itself', () => {
+    const { registry } = loadUniverseWithDiagnostics(CORPUS);
+    expect([...registry.shops.values()].filter((shop) => registry.items.get(shop.coin)?.value !== undefined).map((shop) => shop.id)).toEqual([]);
+  });
+
   // A directive that reaches a state someone else's route already reached, rather than walking one of its own: it has nothing to claim beyond what it re-runs or re-checks.
   const REACHES: readonly Directive['kind'][] = ['load', 'run', 'expect', 'expect-only'];
   // Where a test's claim is written in words. `refuse:` is one: it names the growth that must not take, which is as readable as an assertion and is how the growth routes state theirs.
