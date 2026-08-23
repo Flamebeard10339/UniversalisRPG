@@ -82,7 +82,8 @@ export function actionAddresses(kind: string, value: MemberOwner): string[] {
   if (!isActionOwnerKind(kind)) return [];
   const used = addedMembers<string>(value.uses).map(lastSegment);
   const inline = [...addedMembers<Action>(value.actions), ...addedMembers<EntityBlock>(value.blocks).filter((block) => !isHandlerBlock(block))] as Action[];
-  return [...used, ...inline.filter((block) => !used.includes(lastSegment(block.label))).map((block) => actionSlug(block.label))];
+  const minted = sectionFor(kind)?.mintedActions?.(value) ?? [];
+  return [...used, ...minted, ...inline.filter((block) => !used.includes(lastSegment(block.label))).map((block) => actionSlug(block.label))];
 }
 
 type Members = (value: { id: string }) => readonly MemberName[];

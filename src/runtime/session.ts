@@ -86,7 +86,7 @@ export type PlayerRows = Readonly<Record<PlayerField, PlayerRow | null>>;
 
 export interface PlayStatus {
   location: { id: Answer; title: Localized; description?: Localized };
-  entities: Array<{ id: Answer; title: Localized; examine?: Localized }>;
+  entities: Array<{ id: Answer; title: Localized }>;
   choices: PlayChoice[];
   time: number;
   resources: Array<{ id: Answer; title: Localized; current: number; max: number; display: ResourceDisplay }>;
@@ -387,7 +387,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
   const entities: PlayStatus['entities'] = [];
   for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
-    if (entity) entities.push({ id: entity.id, title: localizer.title('entity', entity.id), examine: entity.examine === undefined ? undefined : localizer.content('entity', entity.id, 'examine') });
+    if (entity) entities.push({ id: entity.id, title: localizer.title('entity', entity.id) });
   }
 
   return {

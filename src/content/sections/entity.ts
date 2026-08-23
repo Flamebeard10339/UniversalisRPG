@@ -7,9 +7,11 @@ import { list } from '../../grammar/list';
 import { DslError, Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
 import { EntryBody, listMembers } from '../../grammar/section';
-import { duration, id, text } from '../../grammar/values';
+import { duration, humanizeEn, id, text } from '../../grammar/values';
+import { localeKey } from '../locale';
 import { condition as visitCondition, hooks, pruneHook, put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
 import { section } from './define';
+import { Dialogue, spokenBy } from './dialogue';
 import { TITLE_FIELD } from './info';
 
 export type { Action } from '../../grammar/action';
@@ -56,6 +58,31 @@ export interface AuthoredEntity extends HookCarrier {
 export interface Entity extends AuthoredEntity {
   actions: Action[];
   handlers: Handler[];
+}
+
+const EXAMINE_FIELD = 'examine';
+
+export const EXAMINE_ADDRESS = 'look';
+
+// `examine:` is a thing a player does, not a field a surface has to know how to draw. It stands in
+// the entity's own action list, saying the words under the key the field already holds them at, so
+// every driver offers it the way it offers any other action and none of them names examine at all.
+export function mintedActions(value: { id: string; examine?: string }, namespace: string | null): Action[] {
+  if (value.examine === undefined) return [];
+  const said: ActionResult = { kind: 'say', text: value.examine, key: localeKey(namespace, 'entity', value.id, EXAMINE_FIELD) };
+  return [{ id: EXAMINE_ADDRESS, label: humanizeEn(EXAMINE_ADDRESS), generatedLabel: true, kind: 'instant', results: [said] } as Action];
+}
+
+const mintedAddresses = (value: { id: string; examine?: string }): string[] => mintedActions(value, null).map((action) => declaredId(action)!);
+
+// Whether walking up to this entity is worth a player's turn. `actions` is asked after linking, so
+// an entity's own blocks, what it `uses:` and what its `examine:` mints are one question here.
+// `requires:` and `hidden if:` are deliberately unread: something offered only once a flag is set
+// is still something.
+export function offersNothing(entity: Entity, dialogues: ReadonlyMap<string, Dialogue>, stoodIn: string): string | undefined {
+  if (entity.actions.length > 0 || entity.shop !== undefined || entity.capabilities.length > 0) return undefined;
+  if (Object.keys(entity.stats).length > 0 || spokenBy(dialogues, entity.id).length > 0) return undefined;
+  return `stands in ${stoodIn} and offers a player nothing there: no examine:, no action of its own or named in uses:, no stations:, no keeps shop:, no stats: to fight and no # dialogue that owns it. Give it something to do, or take it out of that location's entities:.`;
 }
 
 export const statAssignmentValue: Parser<[string, Range]> = {
@@ -112,10 +139,11 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     entities: (value: AuthoredEntity): readonly (readonly [string, Entity])[] => [[value.id, { ...value, actions: [], handlers: [] }]],
   },
   nestsActions: 'only while the player stands in a location this entity stands in',
-  text: ['title', 'examine'],
+  mintedActions: mintedAddresses,
+  text: ['title', EXAMINE_FIELD],
   fields: {
     title: TITLE_FIELD,
-    examine: { parser: text },
+    examine: { parser: text, note: `offered as an action addressed \`${EXAMINE_ADDRESS}\`, which says these words and nothing else` },
     hiddenIf: { parser: condition, keyword: 'hidden if' },
     respawnAfter: { parser: duration, keyword: 'respawn after' },
     capabilities: {

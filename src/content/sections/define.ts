@@ -33,6 +33,7 @@ export interface Section<V extends { id: string } = { id: string }, M extends Re
   map: string | null;
   maps: Lands<V, M>;
   nestsActions: boolean;
+  mintedActions?: (value: V) => readonly string[];
   flags: readonly string[];
   names: readonly Named[];
   grammar: readonly Written[];
@@ -53,6 +54,8 @@ interface Common<V extends { id: string }> {
   ids: Ids;
   // Where the actions written under this kind reach, said as the rest of "offered …". A kind that nests actions is the only thing that knows this — nothing in the engine can tell an item the player carries from an entity that stays where it stands — so declaring the reach is how a kind declares that it nests them at all.
   nestsActions?: string;
+  // The addresses of the actions a section of this kind offers that its author did not write as an action block. Read off the value, since a kind mints one only where the field it compiles is written.
+  mintedActions?: (value: V) => readonly string[];
   // Flags every section of this kind owns without an author writing them.
   flags?: readonly string[];
   // The result lists an author wrote here, whose spoken lines key under this id.
@@ -159,7 +162,7 @@ export const section =
       maps?: Lands<V, Filled>;
     },
   ): Section<V, Filled> => {
-    const { kind, ids, map, maps, nestsActions, flags = [], says, members, text = [], validate, visit, merge, print, prune } = spec;
+    const { kind, ids, map, maps, nestsActions, mintedActions, flags = [], says, members, text = [], validate, visit, merge, print, prune } = spec;
     const walk = visit ?? ((): void => {});
     const schema = 'fields' in spec ? ({ ...spec, kind } as unknown as AnySchema) : undefined;
     if (nestsActions !== undefined) ACTION_OWNERS.add(kind);
@@ -212,6 +215,7 @@ export const section =
       map: map ?? (maps === undefined ? null : Object.keys(maps)[0]!),
       maps: (maps ?? (map === undefined ? {} : { [map]: (value: V) => [[value.id, value] as const] })) as Lands<V, Filled>,
       nestsActions: nestsActions !== undefined,
+      mintedActions,
       flags,
       names,
       grammar: nestsActions === undefined ? written : nestedActionLines(kind, nestsActions, written),

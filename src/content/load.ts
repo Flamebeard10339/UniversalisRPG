@@ -5,11 +5,11 @@ import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
 import { actionAddress, actionTextKey, actionTextOwner } from './sections/action';
-import { Entity, Handler, isHandlerBlock } from './sections/entity';
+import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
 import { actionSlugProblem, textFieldsOf } from './sections';
-import { closeAdjacency, recursivelyResolveRelativeCoordinates } from './sections/location';
+import { closeAdjacency, entitiesStood, recursivelyResolveRelativeCoordinates } from './sections/location';
 import { type Maps, buildSection, sectionFor, contentSectionMaps, isActionOwnerKind, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind } from './sections';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
@@ -442,7 +442,8 @@ function linkEntity(entity: Entity, registry: Registry): Entity {
     return overload ? overlayAction(declaration, overload) : declaration;
   });
 
-  return { ...entity, actions: [...performed, ...own], handlers };
+  const minted = mintedActions(entity, registry.namespace.ownerOf('entity', entity.id) ?? null);
+  return { ...entity, actions: [...performed, ...own, ...minted], handlers };
 }
 
 function performerStatProblem(entity: Entity, action: Action, registry: Registry): string | undefined {
@@ -456,7 +457,9 @@ function performerStatProblem(entity: Entity, action: Action, registry: Registry
   return undefined;
 }
 
-function entityProblem(entity: Entity, registry: Registry): string | undefined {
+function entityProblem(entity: Entity, registry: Registry, stoodIn: string | undefined): string | undefined {
+  const bare = stoodIn === undefined ? undefined : offersNothing(entity, registry.dialogues, stoodIn);
+  if (bare) return bare;
   for (const ally of entity.allies) {
     if (namesSame(entity.id, ally.entity)) return `allies: names this entity itself: ${ally.entity}`;
     if (namesSame(ally.entity, PLAYER_ENTITY)) return `allies: names the player, who is a side rather than a member of one: ${ally.entity}`;
@@ -476,11 +479,12 @@ function linkRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModu
   compileFactionBits(registry);
 
   const players: Entity[] = [];
+  const stood = entitiesStood(registry.locations);
   for (const [id, entity] of registry.entities) {
     try {
       const linked = linkEntity(entity, registry);
       registry.entities.set(id, linked);
-      const problem = entityProblem(linked, registry);
+      const problem = entityProblem(linked, registry, stood.get(id));
       if (problem) throw new DslError(problem);
       if (namesSame(id, PLAYER_ENTITY)) players.push(linked);
     } catch (raw) {

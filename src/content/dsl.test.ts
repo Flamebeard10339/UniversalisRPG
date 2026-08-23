@@ -504,6 +504,23 @@ describe('an action the corpus writes', () => {
   });
 });
 
+// A prose field reaches a player only where something offers it, and the reach cannot be read off
+// the corpus by asking a renderer: every driver draws the choices it is handed and none of them
+// names examine. So the claim is made where the offer is minted, over every entity that writes one.
+describe('an entity the corpus writes examine: on', () => {
+  const registry = loadUniverseWithDiagnostics(CORPUS).registry;
+  const written = [...registry.entities.values()].filter((entity) => entity.examine !== undefined);
+
+  it('is written by enough of the corpus for what is below to mean something', () => {
+    expect(written.length).toBeGreaterThan(20);
+  });
+
+  it('offers those words as an action, so no scenery is reviewed that nobody can read', () => {
+    const unreachable = written.filter((entity) => !entity.actions.some((action) => action.results.some((result) => result.kind === 'say' && result.text === entity.examine)));
+    expect(unreachable.map((entity) => entity.id)).toEqual([]);
+  });
+});
+
 describe('renaming a module', () => {
   const namespace = loadUniverseWithDiagnostics(CORPUS).registry.namespace;
   const declared = [...namespace.all].filter((each): each is string => each !== null).sort();
