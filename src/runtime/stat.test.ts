@@ -3,6 +3,11 @@ import { Cursor, DslError } from '../grammar/parser';
 import { point, range } from '../grammar/range';
 import { ActiveAction, createGameState, equip, GameState, grantBuff, hitDamage, initResources, minDamage, PLAYER, sampleStat, statRange, statValue } from './runtime';
 import { restorePools } from './effects';
+import { endAction } from './actionEnd';
+import { requiresMet } from './actions';
+import { seatedAction } from './actionLookup';
+import { performable } from './roster';
+import { stockItem } from './itemInstance';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { Registry } from '../content/registry';
 import { loadModule } from '../content/load';
@@ -272,5 +277,95 @@ describe('a stat bonus scaled by a counter', () => {
 
     expect(statValue('attack', state, registry, 'ogre')).toBe(24);
     expect(statValue('attack', state, registry)).toBe(4);
+  });
+});
+
+const SEATED_MODULE = `
+# stat attack
+base: 4
+
+# stat guard
+base: 2
+
+# item whetstone
+
+# entity duelist
+flags: winded
+sharpen:
+  requires: has whetstone
+  time: 1
+  +5 attack
+press:
+  hidden if: winded
+  time: 1
+  +3 guard
+
+# entity gambler
+surge:
+  requires: stat.attack >= 6
+  time: 1
+  +5 attack
+overreach:
+  requires: stat.attack >= 20
+  time: 1
+  +5 attack
+`;
+
+describe('the stat fold reads the seat, not offerability', () => {
+  function seated(entityId: string, slug: string): { registry: Registry; state: GameState } {
+    const registry = loadModule(SEATED_MODULE);
+    const state = createGameState('nowhere');
+    const ownerRef = `entity.${entityId}`;
+    state.activeAction = {
+      ownerRef,
+      actionSlug: slug,
+      repeating: false,
+      implicitTarget: IMPLICIT_TARGET_FULL,
+      cadences: { [PLAYER]: newCadence() },
+      roster: { [PLAYER]: { ownerRef, actionSlug: slug, target: entityId } },
+    };
+    return { registry, state };
+  }
+
+  const inTheSeat = (state: GameState, registry: Registry) => seatedAction(state.activeAction!.roster![PLAYER], registry, PLAYER)!;
+
+  it('keeps a seated action contributing after the item its requires: names has been spent', () => {
+    const { registry, state } = seated('duelist', 'sharpen');
+    stockItem(state, 'whetstone', 1);
+    expect(statValue('attack', state, registry)).toBe(9);
+
+    stockItem(state, 'whetstone', -1);
+    expect(performable(inTheSeat(state, registry), state, registry)).toBe(false);
+    expect(statValue('attack', state, registry)).toBe(9);
+  });
+
+  it('keeps a seated action contributing after its hidden if: has become true', () => {
+    const { registry, state } = seated('duelist', 'press');
+    expect(statValue('guard', state, registry)).toBe(5);
+
+    state.flags['duelist.winded'] = true;
+    expect(performable(inTheSeat(state, registry), state, registry)).toBe(false);
+    expect(statValue('guard', state, registry)).toBe(5);
+  });
+
+  it('drops the contribution when the cycle ends, so the fold is re-read and not frozen at its first answer', () => {
+    const { registry, state } = seated('duelist', 'sharpen');
+    stockItem(state, 'whetstone', 1);
+    expect(statValue('attack', state, registry)).toBe(9);
+
+    endAction(state);
+    expect(statValue('attack', state, registry)).toBe(4);
+  });
+
+  it('computes rather than recurses where the seated action requires the stat its own tag grants', () => {
+    const { registry, state } = seated('gambler', 'surge');
+    expect(statValue('attack', state, registry)).toBe(9);
+    expect(requiresMet(inTheSeat(state, registry), state, registry)).toBe(true);
+  });
+
+  it('still folds the tag of a seated action whose requires: the stat it grants can never satisfy', () => {
+    const { registry, state } = seated('gambler', 'overreach');
+    expect(statValue('attack', state, registry)).toBe(9);
+    expect(requiresMet(inTheSeat(state, registry), state, registry)).toBe(false);
   });
 });
