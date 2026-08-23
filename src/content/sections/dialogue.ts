@@ -68,12 +68,18 @@ export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[
   { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }) },
   { form: 'once', example: 'once', family: 'reached when' },
   { form: 'sticky', example: 'sticky', family: 'reached when', note: 'without this, a node is said once and falls silent on every visit after — sticky says it again in full every time' },
-  { form: 'again: <text>', example: 'again: We have spoken already.', family: 'what is said', note: 'what a node without sticky says on a visit after its first, instead of the silence it would otherwise fall to' },
+  { form: 'again: <text>', example: 'again: We have spoken already.', family: 'what is said', note: 'what a node without sticky says on a visit after its first, instead of the silence it would otherwise fall to — a sticky node is refused one, because it says everything again anyway' },
   { form: '<what is said>', example: 'A traveller, out here?', family: 'what is said' },
   { form: `goto <${goes.hole}>`, example: `goto ${goes.like}`, family: 'where it goes' },
   { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition }), block: () => [{ form: `goto <${goes.hole}>`, example: `goto ${goes.like}`, family: 'where it goes' }, ...resultGrammar()] },
   ...resultGrammar(),
 ];
+
+// `sticky` says a node in full on every visit, and `again:` is what a node without it says instead of the silence it would otherwise fall to. A node writing both has written a line nothing reaches.
+function contradiction(node: DialogueNode): string | undefined {
+  if (node.sticky && node.again) return `node ${node.name} is sticky and also writes again:, and a sticky node says everything again on every visit, so its again: line is never reached`;
+  return undefined;
+}
 
 export function parseNode(name: string, source: RawLine): DialogueNode {
   const node: DialogueNode = { name, steps: [] };
@@ -107,6 +113,8 @@ export function parseNode(name: string, source: RawLine): DialogueNode {
       });
   }
   flush();
+  const problem = contradiction(node);
+  if (problem) throw new DslError(problem, source.span);
   return node;
 }
 
@@ -115,7 +123,12 @@ function mergeNodes(into: Dialogue, from: Dialogue): Dialogue {
   for (const node of from.nodes) {
     const at = nodes.findIndex((existing) => existing.name === node.name);
     if (at === -1) nodes.push(node);
-    else nodes[at] = overlay(nodes[at] as unknown as Record<string, unknown>, node as unknown as Record<string, unknown>) as unknown as DialogueNode;
+    else {
+      const merged = overlay(nodes[at] as unknown as Record<string, unknown>, node as unknown as Record<string, unknown>) as unknown as DialogueNode;
+      const problem = contradiction(merged);
+      if (problem) throw new DslError(`${into.id}: ${problem}`);
+      nodes[at] = merged;
+    }
   }
   return {
     ...into,

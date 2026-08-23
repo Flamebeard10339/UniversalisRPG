@@ -40,7 +40,6 @@ stage name-yourself:
   hint: The mirror stands in the guide house, in the room Miki is in.
   tutorial-island.miki says:
     always
-    sticky
     again: The mirror's still waiting. Name yourself first, then we'll talk.
     Splendid! We start with what gives an adventurer purpose: quests.
     Your first task: find the mirror in this house and decide who you are, your name and your people.
@@ -97,11 +96,10 @@ stage sendoff:
 
 stage snubbed:
   log: You turned Miki down, and found your own way.
-  hint: @@@
+  hint: Miki is still in the guide house, if you think better of it. Otherwise the front door is locked and something will have to open it. @@@ rough — wants rewriting once the lockpick route is settled
   tutorial-island.miki says:
     always
     sticky
-    again: @@@
     Hmph. Suit yourself. Don't come crying when a door won't open.
     if has tutorial-island.lockpick:
       set: tutorial-island.miki.angered
@@ -115,8 +113,7 @@ stage snubbed:
   tutorial-island.miki says:
     when: tutorial-island.rats-killed >= 3
     sticky
-    again: @@@
-    @@@
+    So the rats are dealt with. Nobody had to show you how, obviously. @@@ rough — wants the sting without repeating the snub line above
     if has tutorial-island.lockpick:
       set: tutorial-island.miki.angered
     -> Actually - sorry. Show me the ropes after all.
@@ -125,17 +122,16 @@ stage snubbed:
       goto snubbed
 
 stage apologised:
-  log: @@@
-  hint: @@@
+  log: You thought better of turning Miki down. He is showing you the ropes after all, in his own good time. @@@ rough
+  hint: Miki handed you a fishing net. Catch something with it and bring it back to him. @@@ rough
   tutorial-island.miki says:
     always
     sticky
-    again: @@@
     give: tutorial-island.fishing-net
-    @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one fish caught with the net instead, a plain item check
+    Take the net. Catch me one fish with it and I will call your apology accepted. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one fish caught with the net instead, a plain item check
   tutorial-island.miki says:
     when: has tutorial-island.fish
-    @@@
+    A fish. An actual fish. Fine — you will do. The front door is open; go and see the island. @@@ rough
     set: tutorial-island.front-door.unlocked
     goto sendoff
 
@@ -154,23 +150,21 @@ stage apologised:
 // you come back for one more word.
 # quest leave-tutorial-island
 title: Leave Tutorial Island
-log: @@@
-hint: @@@
+log: You have seen what the island has to show. Whatever comes next is across the water. @@@ rough
+hint: Miki has one more word for you, if you go back for it. @@@ rough
 
 stage adrift:
-  log: @@@
-  hint: @@@
+  log: Miki has said his piece about your leaving, and will say it again as often as you care to hear it. @@@ rough
+  hint: Nothing here needs doing. The island is behind you. @@@ rough
   tutorial-island.miki says:
     when: tutorial-island.market-district.discovered
     sticky
-    again: @@@
-    @@@
+    So you found the market. That is the whole island, then — and the boat is still where I said it was. @@@ rough — wants to sound like a goodbye that never quite happens
     goto adrift
   tutorial-island.miki says:
     when: tutorial-island.miki.angered
     sticky
-    again: @@@
-    @@@
+    Picked the lock, did you. I would be angrier if it had not worked. Go on then; the boat will not ask how you got to it. @@@ rough
     goto adrift
 
 // --- tests ---

@@ -597,7 +597,6 @@ describe('dialogue', () => {
       '',
       'node remind-mirror:',
       '  when: tutorial.quest-given',
-      '  sticky',
       '  again: The mirror is still waiting.',
       '  The mirror awaits you.',
       '',
@@ -639,7 +638,6 @@ describe('dialogue', () => {
         {
           name: 'remind-mirror',
           when: ref('tutorial', 'quest-given'),
-          sticky: true,
           again: { segments: [literal('The mirror is still waiting.')] },
           steps: [{ kind: 'say', segments: [literal('The mirror awaits you.')] }],
         },
@@ -649,6 +647,13 @@ describe('dialogue', () => {
         },
       ],
     });
+  });
+
+  it('refuses a node that is sticky and also writes again:, whichever grammar wrote the node', () => {
+    const node = ['  always', '  sticky', '  again: We have spoken already.', '  Well met.'];
+
+    expect(() => parseModule(['# dialogue miki', 'owner = miki', '', 'node greet:', ...node].join('\n'))).toThrow(/node greet is sticky and also writes again:/);
+    expect(() => parseModule(['# quest errand', 'stage offered:', '  complete', '  miki says:', ...node.map((line) => `  ${line}`)].join('\n'))).toThrow(/node said is sticky and also writes again:/);
   });
 
   it('parses a guarded, consuming choice and a visit-count when: as a comparison', () => {
