@@ -4,7 +4,7 @@ import { loadInEnglish } from '../content/engineLocale';
 import { carriedOptions, carriedSubmit, CONFIRMED, LEAVE } from './carriedScreen';
 import { carriedEntries } from './carried';
 import { equip } from './equipment';
-import { carriedCount, feedItem } from './itemInstance';
+import { feedItem, packedCount } from './itemInstance';
 import { planeFrame } from './planeScreen';
 import { initialState } from './save';
 import { GameState } from './state';
@@ -214,7 +214,7 @@ describe('what the screen does with an answer', () => {
 
     expect(carriedSubmit({ item: 'iron-sword', verb: 'equip' }, state, registry)).toBeNull();
     expect(state.equipped).toEqual({ mainhand: 'iron-sword' });
-    expect(carriedCount(state, 'iron-sword')).toBe(2);
+    expect(packedCount(state, 'iron-sword')).toBe(2);
   });
 
   it('takes off what unequip names, and empties the slot rather than the hands', () => {
@@ -223,23 +223,23 @@ describe('what the screen does with an answer', () => {
 
     expect(carriedSubmit({ item: 'worn:mainhand', verb: 'unequip' }, state, registry)).toBeNull();
     expect(state.equipped).toEqual({});
-    expect(carriedCount(state, 'iron-sword')).toBe(1);
+    expect(packedCount(state, 'iron-sword')).toBe(1);
   });
 
   it('destroys a stack copy at once and a grown copy only once it is confirmed', () => {
     const state = withGrownBlade();
 
     expect(carriedSubmit({ item: 'heartwood-blade', verb: 'destroy' }, state, registry)).toBeNull();
-    expect(carriedCount(state, 'heartwood-blade')).toBe(1);
+    expect(packedCount(state, 'heartwood-blade')).toBe(1);
 
     expect(carriedSubmit({ item: '1', verb: 'destroy' }, state, registry)).toEqual({
       name: 'carried-items',
       answers: { item: '1', verb: 'destroy' },
     });
-    expect(carriedCount(state, 'heartwood-blade')).toBe(1);
+    expect(packedCount(state, 'heartwood-blade')).toBe(1);
 
     expect(carriedSubmit({ item: '1', verb: 'destroy', confirm: CONFIRMED }, state, registry)).toBeNull();
-    expect(carriedCount(state, 'heartwood-blade')).toBe(0);
+    expect(packedCount(state, 'heartwood-blade')).toBe(0);
   });
 
   it('opens the plane of the copy in the slot, and puts what growing it minted back on', () => {
@@ -259,7 +259,7 @@ describe('what the screen does with an answer', () => {
 
     expect(carriedSubmit({ item: 'worn:mainhand', verb: 'destroy' }, state, registry)).toBeNull();
     expect(state.equipped).toEqual({});
-    expect(carriedCount(state, 'iron-sword')).toBe(2);
+    expect(packedCount(state, 'iron-sword')).toBe(2);
   });
 
   it('does nothing for an answer naming what the player has stopped carrying', () => {

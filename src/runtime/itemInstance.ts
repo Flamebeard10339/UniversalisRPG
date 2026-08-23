@@ -120,11 +120,6 @@ export function spendableCount(state: GameState, itemId: string): number {
   return spendable(copiesOf(state, itemId));
 }
 
-export function carriedCount(state: GameState, itemId: string): number {
-  const { stack, grown } = copiesOf(state, itemId);
-  return stack + grown;
-}
-
 export function heldCount(state: GameState, itemId: string): number {
   const { stack, grown, worn } = copiesOf(state, itemId);
   return stack + grown + worn;
@@ -145,6 +140,12 @@ export function packRows(state: GameState): PackRow[] {
     if (wornIn(state, id) === undefined) rows.push({ kind: 'grown', id, template });
   }
   return rows;
+}
+
+// How many of one item are in the pack, read off the rows rather than counted again beside them, so
+// whatever those rows come to hold is what this comes to count.
+export function packedCount(state: GameState, itemId: string): number {
+  return packRows(state).reduce((total, row) => (row.template === itemId ? total + (row.kind === 'stack' ? row.count : 1) : total), 0);
 }
 
 export function packHasRoom(state: GameState, registry: Registry): boolean {
