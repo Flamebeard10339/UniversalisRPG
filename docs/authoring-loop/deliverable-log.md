@@ -59,55 +59,52 @@ around: three runs cost minutes and produced a fortnight of work.
 
 ## The phase this is in
 
-**1. The engine work `open.md` was holding is done.** One orchestration session
-landed eleven lanes, each in its own worktree: the play surfaces can no longer
-drift in capability, `hint:` is gone, the AFK summary exists, the economy is
-priced, the pack is bounded, the mirror is a door anyone may walk back through,
-race is content, `examine:` is an action, and fainting no longer livelocks. What
-`open.md` holds now is the owner's own queue, the balance nobody has played
-against, and the small residue each of those lanes reported on its way out.
+**1. The GUI playtesting mode exists, and one run has been played through it.**
+`.planning/yonatan-playtests/8-23-2026.md` is the first, 32 turns, and it earned its
+keep the way every run before it did: it found writing that does not match what a
+character says, a refusal that is fancy about failing, an entity that should not be
+there, a modal that hides the words it is answering, and a bug in the recorder itself
+— two travels logged as `3` and `5`, because a tap on the map sends a bare position
+and the recorder was reading the control rather than the line.
 
-**2. What the lanes kept finding was second authorities, again.** The pattern from
-the previous session repeated exactly and at a higher rate. A shop that had written
-its own answer to how many copies may be handed over, while the engine's rule sat
-in `engine-en.dsl` in its own words. A player's race hardcoded in the runtime with
-its names in content. A skill's stat bonus on a private path beside the one every
-other carrier folds through. Three `CommandOutput` formatters. `stockItem`'s signed
-delta letting any caller write a holding without asking. **None was on anybody's
-list**, and every one was found by doing something else. Running `one-home` before
-the work rather than after is what this keeps arguing for.
+**2. What that run asked for is now item 1 of the queue, and it is a better design
+than what was built.** A recorded run should *be* a `# test` section — navigation and
+all — with one body line for what the player thought. The mechanism is most of the way
+there and nobody should rediscover it: `CommandContext.recorder` already holds every
+line in canonical directive form plus the save it started from, and `/create-test`
+already writes a `# test` out of one. A run is therefore recorded twice today, and
+those two records are one fact.
 
-**3. The measurements were worth more than the patches.** Three lanes were sent to
-build something and came back having established that it should not be built —
-`wait: until <condition>` has no behaviour behind it, a `testing.dsl` would need an
-exclusion someone has to remember, and a target selector is a second home because
-aggression already is one. A fourth stopped before writing code because the ruling
-it was given rested on a premise that was not true. That is the loop working, and
-it is cheaper than the alternative.
+**3. Nine lanes landed in one session, each in its own worktree.** Five closed what
+they were sent to close. **Four came back having established that the thing should not
+be built, or that the premise was false** — `attempts:` is a per-cycle budget and no
+engine change was correct; the emptied pool's "two independent routes" were each
+independently load-bearing; resolving `open modal:` through `registry.modals` would
+have broken the shipped game, so the `# modal` kind was deleted instead; and the
+strengthened parity proof still cannot separate two paths holding identical words. That
+is four measurements bought for the price of four patches, and it is the loop working.
 
-**4. The writing is the long pole and nothing is in front of it.** `npm run review`
-is the sheet and `content/reviewed.tsv` makes it resumable. **This is Yonatan's and
-everything else is scheduled around it.** Two lines came back to the sheet marked
-CHANGED this session, which is the mechanism working, and five scenery entities
-became reachable prose for the first time.
+**4. What the lanes kept finding was, again, second authorities and listed proofs.**
+`ids: 'global'` silently opting a kind out of reference checking. A review sheet that
+derives from declared prose fields rather than from reachability, which is the
+generator behind three separate `examine:` fixes. A hand-written list of view fields
+where `leaves()` would do. A test whose subjects were items rather than the locale keys
+its claim was about. **None was on anybody's list**, and every one was found by doing
+something else.
 
-**5. Test-only content now says so, and the engine holds it to that.** `DEBUG` under
-any heading takes a section out of the world: out of the locale, off the review
-sheet, and out of reach of anything a player can get to, which is a refusal at load
-rather than a convention. The two hammers, their saves and their tests are the
-first six, and what it cost was one home in `sections/define.ts` — no kind declares
-the key and no tool was taught about it, because `npm run review` and the rest all
-read the locale tables the mark empties.
+**5. `npm test` is trustworthy again.** Every red it produced on this machine was
+`Test timed out` and none was an assertion. The clock now lives once, in
+`vite.config.ts`, as a hang detector rather than a budget, and sweeps over derived sets
+are written one test per subject. 3681 tests, about thirty-five seconds on a quiet
+machine.
 
-**6. Then the author's own playtest, then the quests.** The order is in `open.md`
-under *the next stretch of work*: a GUI playtesting mode unified with the playbot
-rather than beside it, the author's own playtest and the list it produces, and then
-the ten quest notes authored in order with playbot testers in a loop.
+**6. The writing is still the long pole and nothing is in front of it.** `npm run
+review` is the sheet. **This is Yonatan's and everything else is scheduled around it.**
+Fifty-six lines of item and cluster-jewel prose reach a player for the first time.
 
-**Map churn is still deliberately deferred.** `combat-expansion.proving-ground`
-sits at `tulsa.market-square`'s own square and hangs off the beach for want of
-anywhere better. Not worth a hand-fix while the map is moving — a playtest names it
-better than a reading does.
+**Map churn is still deliberately deferred.** `combat-expansion.proving-ground` sits at
+`tulsa.market-square`'s own square and hangs off the beach for want of anywhere better.
+A playtest names it better than a reading does.
 
 ## What Yonatan has to deliver
 

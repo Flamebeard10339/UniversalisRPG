@@ -423,6 +423,71 @@ They travel as `PruneWarning[]` — stderr and the run log for the playbot, a
 warn-toned tool message beside the view for the terminal and the GUI. They are
 written in save-key vocabulary a player never wrote and cannot act on.
 
+**`attempts:` is a per-cycle budget, and a repeating action is not bounded by it.**
+`# recipe`'s `burnt:` compiles to exactly that shape — `continuous`, one attempt,
+an unfinished outcome — and five hundred tiles must slag a few without the craft
+stopping. The four-hour bound is reached by `continuous`, not by `attempts:`, and a
+repeating action ends on `stop` among the outcome's results or on `stops on:` an
+event whose trigger is `unfinished`. Both are proved in `src/runtime/stopping.test.ts`,
+which was written after a lane built the other fix and threw it away.
+
+**One function writes a pool level, and it is the one that fires on empty.**
+`emptyPoolNow` used to write `store.levels[id]` itself and fire the event beside
+it; it goes through `setPoolLevel` now, so cutting the single firing site takes
+thirty tests across twelve files instead of sixteen. The two routes that looked
+redundant were each independently load-bearing — the fight route runs mid-segment
+at the instant of the blow, and `leaveFight` deletes the actor before any settle
+could see it. One behaviour moved with the collapse: a pool that is *already* at
+nothing is no longer fired on, only one that falls to nothing, which is the rule
+the rest of the engine always kept.
+
+**`leaves()` is a fact about `PlayView`, and lives with it.** `src/runtime/viewLeaves.ts`
+holds the walk; `scripts/lib/viewCoverage.ts` keeps what is about *comparing*
+surfaces. So `src/ui/render.test.tsx` derives what a player may read from the same
+walk the parity proof uses — every string the view holds, less the addresses
+`addressable(sources)` derives off the driver's own sources — and the two
+hand-written lists it used to carry are gone.
+
+**A counter pays for the thing on the table.** The steel and the days in it, never
+the plane an item carries or how far it grows — which is why the four weapon bases
+are priced in band with the hand-axe at 12 while every jewel, whetstone and orb
+still declares no value at all. A price that read the ceiling would turn the
+one-shot caches those come out of into purses.
+
+**How long the runner waits for a test lives once, in `vite.config.ts`.** It is a
+hang detector at 120 seconds, not a budget, and no test states its own — the two
+hand-kept per-test budgets are deleted. Every red `npm test` has produced on this
+machine was `Test timed out` and none was an assertion. A sweep over a derived set
+is written as one test per subject, so the clock never stands in for a budget and a
+failure names the subject that broke rather than a list at the end.
+
+**A player preference is one declaration, and the engine branches on none of them.**
+`SETTINGS` in `src/runtime/settings.ts` says what a preference is called, what it is
+for, what values it takes and where it stands; `sessionStatus` publishes the list, and
+`/settings`, the settings page, the help, the save, the prune and the AFK span all read
+that rather than the declaration. What a preference *does* is written in content —
+`hardcore` is an ordinary `setting.<name>` condition — so adding one is that line plus
+its two engine keys' words. It lives in `GameState` and not in a slot, because the only
+thing that can read one is the world running and a `Segment` carries the state and the
+registry and nothing else. The autosave cadence deliberately stays outside: it is one
+cadence for the whole store, and folding it into a portable document would have every
+`/restore` overwrite the player's cadence with a fixture's.
+
+**Every field a kind declares as prose is held to being said to a player.**
+`src/runtime/proseReach.test.ts` takes its subjects from `textFieldsOf` crossed with
+the corpus's own values, and its evidence from a sweep that stands the player in front
+of everything the registry declares. The question is asked of the **field**, not the
+line — a value behind a flag nobody sets is undecidable for the same reason `requires:`
+is — and that reduction is what turns 360 undecidable questions into 19 decidable ones.
+
+**A recorded run is one line a turn and does not echo the engine back.** The author read
+the answer on the screen it was said on; the model's journal is the only sight it has of
+its own last turn, so `turnRecord` is handed null by one harness and a list by the
+other. Notes belong to any turn, because moving between the app's pages is a turn the
+engine never hears about and a player who has just navigated somewhere has something to
+say about it. A run says on its first line when it was played and which commit it was
+played against.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.

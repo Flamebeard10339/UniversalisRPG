@@ -15,19 +15,43 @@ without evidence is a hunch and does not belong here yet.
 
 Everything under this heading is the owner's, and the order is theirs.
 
-**1. The author's own playtest, and the list of problems it produces.** Nothing
-substitutes for it and nothing is in front of it. `npm run review` is the sheet for
-the writing; this is the sheet for the playing.
+**1. A recorded run should be a `# test` section.** Ruled by the owner after the
+first run anybody played: *"Playtests have a lot of noise. It would be cool if the
+output was literally a test section. Including GUI navigation and everything. All
+we would need to add to a test is some kind of line which is the note / expected /
+confusion / blocked."* And: *"Can we regenerate the path the player took into a
+test that I can run and watch happen in real time so I don't have to press the same
+mechanical buttons again and again to confirm behavior?"*
 
-**2. Then author each quest in order, with playbot testers in a loop.** Ten quest
+Most of the mechanism is already here and the next session should not rediscover
+it. `CommandContext.recorder` already holds every line a session ran in canonical
+directive form plus the save it started from, and `/create-test` and
+`/create-valid-test` already write a `# test` (and a `# save`, and an `expect:`)
+out of one — the app's driver builds a recorder like every other. So a run today is
+recorded **twice**: once as directives that replay, once as the run log an author
+reads. Those are one fact and should be one record. *Closes when:* the playtest
+bar's copy hands over a `# test` an author can paste into `content/` and run, with
+their own note / expected / confusion / blocked on the turn it was about, and with
+a page move written as a line the replay honours.
+
+Two things that fall out of it and are not decided:
+
+- **A `# test` has no line for what a player thought.** It is the one thing the
+  format is missing, and it is what makes the run a finding list rather than a
+  script. It has to be a body line no kind's grammar holds, the way `DEBUG` is.
+- **Watching a replay happen** wants a driver that feeds a `# test`'s lines at a
+  visible cadence. `npm run play` runs one with `/test` and `npm run probe --
+  --test <id>` runs one in about a second; neither is watchable in the app.
+
+**2. The author's own playtest, and the list of problems it produces.** The first
+one is `.planning/yonatan-playtests/`. Its findings are under *For the human review
+pass* and *Ours, and small* below.
+
+**3. Then author each quest in order, with playbot testers in a loop.** Ten quest
 notes in `.planning/planning_quests/`, deliberately not levelled up before now —
 how much outline detail the loop actually needs is what the runs were meant to
 measure. The runs are cheap and the fixing is not, which is the asymmetry to plan
 around.
-
-## Death resets the player's health to full
-Optional hardcore mode setting which also clears the player's inventory and 
-equipped items on death. Default false. 
 
 ## A quest cannot hold all of its own state
 
@@ -54,44 +78,62 @@ without re-homing the quest, which is the requirement.
 sets it, so that road is unreachable. It is Larry's toll and belongs to a quest
 that is not written; it closes the same way.
 
-## The review sheet cannot tell written-and-read from written-and-dead
+## Prose nobody can reach
 
-The generator behind three separate fixes, named by the lane that made the last two
-and not yet closed. `npm run review` derives its subjects from each kind's
-**declared prose fields**, never from **reachability**, so a line can sit on the
-sheet for a human to read while no player can reach it. `entity`'s `examine:`
-reached no surface at all; `itemExamine()` had zero non-test callers while shipping
-a live English fallback; `planeReport` read `title` only. All three were on the
-sheet the whole time and no gate in this repository could notice. Each has been
-fixed by hand, one kind at a time.
+The class is closed and what is left is one decision. `src/runtime/proseReach.test.ts`
+holds every field a kind declares as prose to being said to a player, subjects taken
+from `textFieldsOf` crossed with the corpus's own values, evidence from a sweep that
+stands the player in front of everything the registry declares. Two fields the engine
+has no surface for are named in a guarded list, and one of them is a live question:
 
-*Closes when:* one derived claim over the tables the sheet itself reads says every
-line it offers a human reaches some published surface. It needs a decision about
-what counts as a surface, and a line behind a flag nothing sets is unreachable in a
-way no load-time check can see.
+**`# faction` declares a `title` no call site in the engine ever reads.** A faction is
+the bitmask `factionBits` builds in `src/content/load.ts`, and nothing in `src/`,
+`scripts/` or the app ever names one to a player — so two generated lines sit on the
+review sheet that no player can reach, forever. Measured: dropping `title` from
+`src/content/sections/faction.ts` leaves `tsc` clean, loses exactly one derived test
+and adds no failure, and takes two lines off the sheet. *Closes when:* a faction has a
+surface, or the field goes and its entry leaves `NOT_SAID`.
 
-## Tests that would pass in a world where the mechanic did nothing
+**`event.title` has exactly one reader**, `engine.stopped.event`, reached only off an
+action's `stops on:` — and the corpus writes no `stops on:` at all, since `on death:
+stop` is a result and not a stopper. So it is excused rather than dead, and the excuse
+fails the moment the words reach a screen.
 
-**`combat-expansion.accelerated-vigor-stacks-behind-its-gate` rides a 1.08×
-margin.** `assert: stat.attack-rate > 40` where base 25 plus six flat instances
-alone reach 37 — so it would still pass if `quickening`, the passive whose entire
-point is reading how many are held, contributed nothing, given a rebalance of
-`accelerated-vigor` from +2 to +3 flat. Its own comment does the arithmetic that
-condemns it. *Closes when:* it declares its own payload the way the two hammers do,
-and the claim becomes a difference. It is `combat-expansion`'s content.
-RESPONSE: If the test is just asserting that buffs can stack on the player, that is 
-a unit test, not a integration # test. Need to think if this test is actually 
-meaningful.
+## A condition cannot name a number that is not whole
 
-Two lesser ones, listed rather than fixed because neither is the same defect:
-`xp.core.cooking > 0` could be exact the way `xp.thieving = 4` next door already
-is, and `tutorial-quests`' `resource.core.health <= 25` is a band whose comment
-defends it.
+**`assert:` reads integers only** (`/-?\d+/` in `src/grammar/values.ts`), so a claim
+landing on a folded percentage stat cannot be exact and is forced into a band — and a
+band also passes in a world where the mechanic did nothing. That is the structural
+reason the vigor claim existed at all, found by the lane that closed it: it worked
+around the wall by counting the stacks off a `DEBUG` tally instead of reading the
+stat, which is a good answer for one test and not a general one. Every later claim on
+a real-valued stat meets the same wall. *Closes when:* a condition can name a number
+the engine can actually hold.
 
-**An emptied pool reaches the death event by two independent routes** — `felledBy`'s
-`emptied()` → `emptyPoolNow`, and the clamp in `settlePools`. Cutting either alone
-leaves every corpus test passing. That is redundancy in the engine rather than a
-gap in the suite, but no single-line mutation will ever see it.
+**`expect only:` is carrying a claim nobody wrote.** The vigor sheet caught both a
+rebalance and a dead `quickening`, but only through incidental couplings — buff expiry
+clocks shifting because the cadence shifted. The file's own instruction is to
+regenerate a sheet whenever content changes on purpose, so a recording doing work no
+`assert:` states is one regeneration away from doing none. *Closes when:* what the
+sheet stands in for is written as a claim, or the load is measured and found to be
+nothing.
+
+**`settleHandlerDeltas` is a third pool writer that fires no event.**
+`src/runtime/effects.ts` writes `store.levels[…]` directly during a settle and
+deliberately never fires `on empty`, so a handler that drains a pool to nothing is
+silent. It looks intentional — it stops a death handler recursing — but it is the same
+shape as the duplicate just collapsed and nothing in the file says which it is.
+*Closes when:* the file says which, or it goes through the one writer.
+
+**`applyDueBoundaries` discards `segment.stopped`.** A non-repeating deterministic
+action whose `on success:` carries `stop` reports *finished* rather than the reason the
+`stop` named, because `endAction` is called unconditionally after `applyOutcome`.
+Pre-existing and no test sees it.
+
+**`attempts:`'s retirement message says it "bounds the action".** True only for a
+non-repeating one — a repeating action's `attempts:` is a per-cycle budget, which is
+what sent this queue's own line down the wrong path for a session. *Closes when:* the
+message says which.
 
 ## For the human review pass
 
@@ -111,6 +153,26 @@ The long pole, and it is the owner's. `npm run review` is the sheet and
 - **Five scenery entities became reachable** when `examine:` became an action —
   `drunk-patron`, `outfall-grate`, `sewer-signs`, `sewer-hatch`, `dumped-crates`.
   Their prose has never been read by a player and has never been read in place.
+- **Two shipped choices are labelled with a machine address.** `modal:choose-race`
+  and `modal:name-yourself` reach the player as `choices[].label`. Found by the
+  parity lane, which had been passing them precisely because the label *is* the id.
+- **Action labels are cased two ways.** A minted `examine:` reads *Examine* and an
+  authored one reads its own raw line — `ascend`, `descend`, `look in`, `open`
+  stand in the same list as *Talk to Miki* and *Examine*.
+
+Everything below is from the first run somebody played, 2026-08-23, and is quoted
+from what they wrote at the turn it happened.
+
+- **Miki never says to find the mirror.** *"He asks if you want him to show you the
+  ropes."* The quest's opening reads as though he did.
+- **The mirror's refusal is fancy about failing.** *"The message should just be:
+  'You need 1000 gold to perform this action'."* It currently answers *"The glass
+  shows you exactly what you are carrying, and it is not enough to be looked at
+  twice."*
+- **Smith's chest does not belong.** *"Remove completely. Make it a debug entity if
+  necessary."*
+- **Examine sits inconsistently in the choice list.** *"Sometimes examine first and
+  sometimes examine second. It should be consistent. Examine second."*
 
 The eight marks the corpus holds are `tulsa` entities waiting on quests that are
 not written — the anvil on A Grand Blade, Oolga's counter on Kill it with Fire, the
@@ -122,11 +184,6 @@ Every number here was reasoned about and none was played against.
 
 **28 slots has had no play behind it.** The fullest shipped `# save` is 13 rows.
 
-**`adder's-tongue` pays 45 coin a minute** against honeycomb and fen-root near 20 —
-a four-second pick on the corpus's most potent-sounding reagent. The value follows
-the fiction and the clock says it is out of band. Either lengthen the pick or drop
-the value to 2.
-
 **Which stat each race raises is an agent's guess**, not a ruling: human
 max-health, elf accuracy, dwarf defense, orc attack. Evasion and regeneration were
 unusable at +5% of 0 and of 1.
@@ -136,12 +193,50 @@ unusable at +5% of 0 and of 1.
 either live is now one line (`tags: +1 attack per level of melee`) but it is a
 combat balance change.
 
-**Weapon bases are untradable** — iron-sword, wooden-shield, heartwood-blade,
-proving-blade — on the argument that they are builds rather than goods. The shipped
-hand-axe at 12 is the counter-example. Worth a deliberate call now that a grown copy
-can no longer be sold twice.
+**Hardcore mode has never been played.** Death empties the pack and everything worn,
+which is a whole run's worth of consequence nobody has felt yet. Default off.
 
 ## Ours, and small
+
+**The dialogue modal hides the words it is answering.** From the first run: *"The
+dialogue modal darkens the screen and I can't see the words that were just spoken.
+The dialogue that just happened should also be in the modal itself."* The modal
+darkens what is behind it, so the line the player is answering is the one thing
+they cannot read while answering it.
+
+**Nothing says an entity has already been examined.** From the first run: *"There
+should be some sort of visual cue that I already examined this object."* Examining
+twice says the same words; examining a third time says nothing at all, because the
+node has fallen silent — and the player cannot tell those two apart.
+
+**Travelling shows no progress on the map.** From the first run: *"The map doesn't
+show a progress of how far along the travel is, so it reads as a bug like the game
+is frozen."*
+
+**Miki's dialogue does not appear when it should.** From the first run, turn 26,
+after taking the *"I'd rather find my own way"* branch: *"Miki's dialogue doesn't
+appear when it should."* Talking again redrew the room and said nothing. Worth
+reproducing before believing the cause — a spent node and a silent conversation
+have been misdiagnosed here twice.
+
+**A reload starts a fresh game.** `openUniverse` calls `startSession`
+unconditionally, so closing the tab or refreshing loses the session: measured by
+waiting 60 seconds, reloading, and coming back at 0. `/autosave` writes the live
+slot and `/restore` reads it back, so the pieces exist and nothing joins them. It
+costs an author a playtest and a player their game. *Closes when:* the app opens on
+what it last wrote, or refuses to lose it silently.
+
+**`accepts: any` is the default and no shop in the corpus says otherwise.** So
+every counter will buy anything carrying a `value:`, and pricing four items changed
+what three shops do without touching a shop. Item pricing and shop policy are one
+decision written in one place, and nobody reading a `# shop` can see it.
+
+**A proof that loads `standingSources()` may assume no `DEBUG` section stands
+there.** `translationSurvival` took its subjects from `[...shipped.items.keys()]`
+while its claim was about locale keys, and only ever passed because no `DEBUG`
+section had lived in `core` or `tulsa`; moving the hammers into `tulsa` broke it.
+It derives properly now. Whether its neighbours carry the same assumption has not
+been asked.
 
 **A kind cannot ask for one name across modules and have its references checked.**
 `ids: 'global'` reads like an id-scoping choice and is silently also an opt-out of
@@ -176,30 +271,44 @@ claims about its rat and its `rats-killed`. Six `DEBUG` sections move together, 
 the move is refused at load: the two items, the two saves that arm them and the two
 tests that swing them. A clean follow-up.
 
-**`src/ui/render.test.tsx`'s `stringsDrawn` is a hand-written list of view fields.**
-It could derive from the parity walk's `leaves()`.
-
 **The parity excuse on `modals[].options[].label` is keyed to a whole path.** Its
 stated reason covers one narrow case — `ModalSheet`'s `onlyLeaves`, a screen whose
 only answer is *close* — but because the excuse names the path, a driver that
 dropped **every** modal label would pass. That path now carries an item's own words
 and a jewel's, so it is load-bearing.
 
-**The parity proof checks a path's strings against the whole rendered blob.** So a
-path whose words already appear elsewhere in the render passes without being drawn
-in its own right — which is how `choice.detail` went missing from the playbot while
-the entity's name showed in the `entities:` row. One level up from the hole the
-proof closed.
+**Two paths holding the same words at the same moment cannot be told apart.** The
+parity proof now counts per moment and credits a path only beyond what
+already-proved paths account for, which caught `action.label` and the plane node
+titles. It still cannot see `choice.detail` going missing, because
+`entities[].title` holds exactly the same words at that moment and one occurrence
+credits both. Separating them needs locality, and the three surfaces share no unit
+of it: a line is a unit the terminals have and the app does not, an element is a
+unit the app has and the terminals do not. *Closes when:* the harness gives each
+surface a comparable unit — the thing to change is the harness, not the rule.
 
-**`npm test` is red-by-load rather than red-by-code.** Every failure under
-competing load is `Error: Test timed out in 5000ms` and never an assertion; the
-failing set moves between runs with no edit in between. Measured: 44 competing node
-processes gave 15 failures, 14 gave 3, 4 gave 1, and a raised timeout gave none.
-`src/ui/authoringSurface.test.ts`'s slowest case takes 3458ms solo against a 5000ms
-default. The offenders share one shape — a loop that builds a fresh driver or CLI
-session over `SHIPPED_SOURCES` once per section kind or per command — so the cost
-grows with every kind and every command anyone adds. CLAUDE.md budgets twenty
-seconds; it is 55-170s here. *Closes when:* a red suite means a broken tree.
+**The parity harness runs `play-cli` in a shape `play-cli` is never in.** `cliRun`
+builds a non-driving context, so `result.live` never comes back and
+`formatTick`/`formatLive` — the one place the real terminal names an action under
+way — never runs. That is how `action.label` stayed invisible until this session.
+
+**Two-thirds of the suite's CPU is not test bodies.** Measured at 32 competing
+processes: 312s of import and 148s of transform against 176s of test time, across
+152 files. No amount of making a test body faster moves that, `pool: 'threads'`
+makes it worse, and it is a function of how many test *files* there are. Beside it,
+~450 full loads of the shipped corpus, ~105ms each idle and ~220ms under load —
+about a quarter of all test time, with a flat profile and no hot spot, growing with
+the corpus and with the UI. *Closes when:* somebody decides what the suite's cost
+should be a function of.
+
+**A green suite under heavy load is still owed.** The lane that fixed the clock
+measured green at 13 processes and, separately, green at 32 with the new clock on
+the pre-split tree. Nobody has run the whole suite at 70 with the split in place,
+which is where twelve tests used to fail. *Closes when:* that run is taken.
+
+**`vite.config.ts` claims to hold the worker count and does not.** Its comment says
+every route reads its clock and worker count from there. The clock is true now; the
+worker count is still unset and the comment still claims it.
 
 **A GUI wiring line is untested and wants the author's eye** — the two identity rows
 at the top of the Stats page, in `App.tsx`.
