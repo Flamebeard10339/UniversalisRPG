@@ -15,23 +15,11 @@ without evidence is a hunch and does not belong here yet.
 
 Everything under this heading is the owner's, and the order is theirs.
 
-**1. A playtesting mode in the GUI.** A run the author plays in the browser,
-recorded whole, with the author's own notes attached at each step. There should be
-a button visible **only while the mode is active** that opens a modal for feedback
-after a given action, and a way to get the log out — extracted by hand, or written
-into the project where an agent can read it. *The unification is the point*: the
-playbot already has a vocabulary of what a player may do and a shape for what a run
-produces (`line`, `note`, `expected`, `confusion`), and the parity proof already
-forbids the surfaces differing in what they can do. A second recording format
-beside the playbot's would be the failure this repository keeps having. *Closes
-when:* an author can play a session in the browser and an agent can read what they
-did and what they thought about it, in the same shape a playbot run produces.
-
-**2. The author's own playtest, and the list of problems it produces.** Nothing
+**1. The author's own playtest, and the list of problems it produces.** Nothing
 substitutes for it and nothing is in front of it. `npm run review` is the sheet for
 the writing; this is the sheet for the playing.
 
-**3. Then author each quest in order, with playbot testers in a loop.** Ten quest
+**2. Then author each quest in order, with playbot testers in a loop.** Ten quest
 notes in `.planning/planning_quests/`, deliberately not levelled up before now —
 how much outline detail the loop actually needs is what the runs were meant to
 measure. The runs are cheap and the fixing is not, which is the asymmetry to plan
@@ -66,20 +54,21 @@ without re-homing the quest, which is the requirement.
 sets it, so that road is unreachable. It is Larry's toll and belongs to a quest
 that is not written; it closes the same way.
 
-## Prose the engine carries and no player can reach
+## The review sheet cannot tell written-and-read from written-and-dead
 
-The same defect that `examine:` on an entity had, in two more places. Both were
-found by the lane that fixed the first and were deliberately not widened.
+The generator behind three separate fixes, named by the lane that made the last two
+and not yet closed. `npm run review` derives its subjects from each kind's
+**declared prose fields**, never from **reachability**, so a line can sit on the
+sheet for a human to read while no player can reach it. `entity`'s `examine:`
+reached no surface at all; `itemExamine()` had zero non-test callers while shipping
+a live English fallback; `planeReport` read `title` only. All three were on the
+sheet the whole time and no gate in this repository could notice. Each has been
+fixed by hand, one kind at a time.
 
-**44 items' `examine:` is unreachable.** `itemExamine()` in
-`src/runtime/localized.ts` has **zero non-test callers**, and its fallback key
-`engine.item.examine` ships a live English line nothing says. Minting a look action
-per item the way an entity got one is the wrong fix — it would put a "Look" per
-carried item into the room's choice list. The fallback's own wording (*"This is
-{article} {item}."*) suggests a per-item panel was the intended surface. *Closes
-when:* an item's prose reaches a player somewhere, and the derived proof covers it.
-
-**12 cluster jewels' `examine:` likewise.** `planeReport` reads `title` only.
+*Closes when:* one derived claim over the tables the sheet itself reads says every
+line it offers a human reaches some published surface. It needs a decision about
+what counts as a surface, and a line behind a flag nothing sets is unreachable in a
+way no load-time check can see.
 
 ## Tests that would pass in a world where the mechanic did nothing
 
@@ -90,6 +79,9 @@ point is reading how many are held, contributed nothing, given a rebalance of
 `accelerated-vigor` from +2 to +3 flat. Its own comment does the arithmetic that
 condemns it. *Closes when:* it declares its own payload the way the two hammers do,
 and the claim becomes a difference. It is `combat-expansion`'s content.
+RESPONSE: If the test is just asserting that buffs can stack on the player, that is 
+a unit test, not a integration # test. Need to think if this test is actually 
+meaningful.
 
 Two lesser ones, listed rather than fixed because neither is the same defect:
 `xp.core.cooking > 0` could be exact the way `xp.thieving = 4` next door already
@@ -139,11 +131,6 @@ the value to 2.
 max-health, elf accuracy, dwarf defense, orc attack. Evasion and regeneration were
 unusable at +5% of 0 and of 1.
 
-**Fainting leaves the player at about zero health**, and `regeneration` base is 1 a
-minute, so the walk back costs roughly thirty simulated minutes of recovery on top
-of the trip. That reads like the price of dying; it is a consequence of the ruling
-rather than part of it.
-
 **`# skill melee` and `thieving` carried an inert `stat-id: attack`** with no
 `per-level:` anywhere, folding nothing. The dead declarations were deleted. Making
 either live is now one line (`tags: +1 attack per level of melee`) but it is a
@@ -156,45 +143,32 @@ can no longer be sold twice.
 
 ## Ours, and small
 
-**`# modal`'s `screen:` field is dead.** `open modal: X` looks `X` up directly in
-the runtime's frame table and nothing reads `Modal.screen`. The corpus works only
-because every modal's id happens to equal its screen; `# modal foo / screen:
-carried-items` loads clean and throws the first time a player touches it. Pinned by
-a derived test that opens every `# modal` the corpus declares. *Closes when:* either
-the id resolves through `registry.modals` to its screen, or `screen:` is deleted and
-the id validated against `MODAL_SCREENS`.
+**A kind cannot ask for one name across modules and have its references checked.**
+`ids: 'global'` reads like an id-scoping choice and is silently also an opt-out of
+reference checking — `isNamespacedKind` gates both reference visits, two files away
+from the comment that says what `global` means. `# modal` picked the obvious word
+and got the bug; `dsl.test.ts` now refuses any global kind that anything names, so
+the next one fails rather than ships, but a kind that legitimately wants both still
+has no way to say so. *Closes when:* the two are separate declarations.
 
-**An `always` node with no `when:` that writes `take:` can leave an entity silent.**
-The offer gate is uniform and correct; that one shape is the softlock silhouette,
-because it is the fallback line and there is nothing behind it. Nothing in the
-corpus writes one. *Closes when:* it is refused at load, or ruled harmless.
+**A minted action squats the `# action` key space without declaring it.** The
+action `examine:` mints keys its label at `action.examine.examine` through a plain
+`set`, on a bare unnamespaced global id it never declares — so a module writing
+`# action examine` lands on the same key and one of the two silently wins. Nothing
+can refuse the squat, because the namespace was never told the minted id exists.
+Pre-existing, and the same shape when the address was `look`. *Closes when:* a
+minted action's id is declared where an authored one's would be.
 
-**An action refuses with a message where a dialogue node now hides.** `engine.inputs.short`
-is designed and authors have `hidden if:` explicitly, so this was left alone. Say if
-actions should follow dialogue.
-
-**`actionSlugProblem`'s `isProseField` guard is over-broad**, which is the only
-reason the examine choice reads *Look* rather than *Examine*. The collision it
-protects against can only happen for an action with **no declared id**; narrowing it
-to those would let the address be `examine`. Small, but it relaxes an existing
-refusal.
-
-**An entity writing both `examine:` and its own `look:` is refused with a confusing
-message** — it names `action "Look"`, the minted one the author never wrote. Honest,
-badly worded.
-
-**`goto: starting-location` is still refused at load.** It is the one other site
-that names a location and could resolve live; `adjacent:`/`relative:` genuinely
-cannot, since a road to "wherever the game starts" is not a coherent map. `goto:` is
-a `# test`-only teleport.
+**A locale-key move silently orphans a row in `content/reviewed.tsv`.** The ledger
+is keyed by locale key, so a key that moves takes its "a person has read this"
+answer with it — the row does not come back marked CHANGED, it just stops being
+about anything. No file exists yet on this branch, so nothing has broken; the first
+review pass is when it starts to matter. *Closes when:* an orphaned row is reported
+rather than ignored.
 
 **A repeating action with `attempts:` never reaches `on unfinished:` as a
 terminator** — it fires the handler and restarts, so `grind until done` runs to the
 four-hour bound. Only a non-repeating action ends by attempts.
-
-**`carriedCount` has no production caller.** It is the plausible-sounding count that
-caused the shop to sell grown copies for free, and it survives only in three test
-files where it correctly means "loose in the pack".
 
 **Two tests still live in the wrong module.** The hammers and their claims are in
 `content/tutorial-quests.dsl` and neither touches the quest — they are `tulsa`
@@ -205,11 +179,27 @@ tests that swing them. A clean follow-up.
 **`src/ui/render.test.tsx`'s `stringsDrawn` is a hand-written list of view fields.**
 It could derive from the parity walk's `leaves()`.
 
+**The parity excuse on `modals[].options[].label` is keyed to a whole path.** Its
+stated reason covers one narrow case — `ModalSheet`'s `onlyLeaves`, a screen whose
+only answer is *close* — but because the excuse names the path, a driver that
+dropped **every** modal label would pass. That path now carries an item's own words
+and a jewel's, so it is load-bearing.
+
 **The parity proof checks a path's strings against the whole rendered blob.** So a
 path whose words already appear elsewhere in the render passes without being drawn
 in its own right — which is how `choice.detail` went missing from the playbot while
 the entity's name showed in the `entities:` row. One level up from the hole the
 proof closed.
+
+**`npm test` is red-by-load rather than red-by-code.** Every failure under
+competing load is `Error: Test timed out in 5000ms` and never an assertion; the
+failing set moves between runs with no edit in between. Measured: 44 competing node
+processes gave 15 failures, 14 gave 3, 4 gave 1, and a raised timeout gave none.
+`src/ui/authoringSurface.test.ts`'s slowest case takes 3458ms solo against a 5000ms
+default. The offenders share one shape — a loop that builds a fresh driver or CLI
+session over `SHIPPED_SOURCES` once per section kind or per command — so the cost
+grows with every kind and every command anyone adds. CLAUDE.md budgets twenty
+seconds; it is 55-170s here. *Closes when:* a red suite means a broken tree.
 
 **A GUI wiring line is untested and wants the author's eye** — the two identity rows
 at the top of the Stats page, in `App.tsx`.

@@ -98,6 +98,22 @@ words are a pointer, not a copy — the minted `say:` reuses the entity's own
 already reaches the player as `location.description` and was deliberately left
 alone; two ways to the same prose would be the duplication.
 
+**An item's own words stand beside its name where a player holds it, and a
+jewel's beside the cluster in focus.** `itemExamine()` is the one home for what an
+item's examine words are and now answers *nothing* where the author wrote nothing —
+the `engine.item.examine` fallback and its English article are deleted, because the
+name has to stay in the label and `Apple — This is an Apple.` is worse than
+silence. Both ride out on a `ModalOption.label` every driver already draws, so no
+renderer was edited. Derived claims in `carriedScreen.test.ts` and
+`planeScreen.test.ts` take their subjects from the registry.
+
+**An action that is offered and then refuses is deliberate, and does not follow
+dialogue.** A dialogue node the player cannot afford is simply not offered; an
+action in the same position is offered and refuses with `engine.inputs.short`.
+Ruled by the owner: a node is a thing someone says and can go unsaid, an action is a
+thing you can see and try, and being told why you cannot is information. Authors
+keep `hidden if:` for the cases where it should vanish.
+
 **An entity a location stands must offer a player something.** Refused at load
 naming the line, in the `unpriceableStock` shape: an action of its own or in
 `uses:`, `stations:`, `keeps shop:`, `stats:` to fight, or a `# dialogue` that owns
@@ -176,6 +192,18 @@ those belong to the region they happen in, which is why Miki's house, the beach
 and everything standing in them are `tulsa`'s. The one `# test` core owns is the
 only claim that can be made without walking anywhere.
 
+**A modal screen is a word the language closes, and no kind declares one.**
+`MODAL_SCREENS` lives in `src/grammar/actionResult.ts` beside the parser that reads
+`open modal:`; `# modal` is gone, because it restated the engine's own list and the
+engine opens `quest-journal` by name from `command.ts` while `core.dsl` never
+declared it. `sections/test.ts` refuses `open-modal:` through the same words,
+`modalStack.ts` keys its openers by `ModalScreen` so the compiler refuses both
+directions, and the oracle's forms map off the same list. **A kind that anything
+names may not declare `ids: 'global'`** — that flag silently opts a kind out of both
+reference visits, and `dsl.test.ts` derives its subjects twice over (every kind a
+schema field names, plus every kind the corpus's own references ask about) so the
+next one fails rather than ships.
+
 **A station is `# station <id>`, and a station's name is core's furniture.** The
 name is declared where the world's vocabulary is declared, the entity that opens
 one lists it in `stations:`, and the recipe that needs one names it in
@@ -216,6 +244,20 @@ forgeries, not asserted — a private constructor alone was not enough, since a
 matching object literal got through. **A grown item is never spent**, which the
 engine says in its own words in `content/engine-en.dsl`; a shop once had its own
 answer and was wrong.
+
+**An `always` node that writes its own `take:` is refused at load.** It is the
+fallback line, so a player who cannot afford it leaves the entity with nothing
+behind it and no Talk action at all — indistinguishable from a spent conversation.
+The refusal sits in `contradiction(node)` beside the `sticky`/`again:` one, so it
+covers a `# dialogue` node and a node under a `# quest` stage with nothing
+enumerated, and it reads its cost through the same `itemCost` the runtime's
+`affordable` reads. A cost on a `->` choice, a `when:` thread or an `ask:` thread is
+untouched: those hide only themselves.
+
+**`packedCount` counts off `packRows`, and no count is a door.** It was
+`carriedCount`, had no production caller, and is the plausible-sounding count that
+once let a shop sell grown copies for free. The name says a place rather than a
+holding, and `spendableCount` remains the only count a departure asks.
 
 **A dialogue node that takes more than the player holds is not offered.** Derived
 from the node's own `take:` in `openersNow`, so the author writes the cost once and
@@ -315,6 +357,11 @@ standing where the aggression is, **not** because `stop` changed — a world who
 *starting* location held an aggressive hostile would livelock again, and
 `fight.test.ts` proves the difference rather than asserting the good case.
 
+**`goto: starting-location` is answered live too**, through that same one
+spelling and that same one answer, at both the `cheat` command and the `# test`
+directive. `travel:`, `adjacent:` and `relative:` still refuse it, because a road to
+wherever the game starts is not a coherent map.
+
 **`relocate: starting-location` is answered live by the engine**, not resolved at
 parse time, so `core` may write it without naming a module it does not depend on
 and a world that moves its start moves this with it. The spelling exists once, in
@@ -412,6 +459,26 @@ preference, and a 932-token prefix cached nothing at all.
 **One harness, several prompts.** Below the point where a prompt is selected there
 is no branch on which prompt was chosen, and no branch on whether a save was
 loaded. `scripts/playbot.test.ts` asserts it.
+
+**An author's run in the app and the model's run are one shape, and it has one
+home.** `src/runtime/runLog.ts` declares what a turn records — the line, whether the
+engine took it, what it answered with, and the four things its player says about it
+(`note`, `expected`, `confusion`, `blocked`). That list is one declaration: the
+reply schema the model is held to, the parser that reads a reply, the described
+entry and the questions the app puts to an author all derive from it, so a fifth
+field is one entry there. The playbot's *prompt* deliberately does not derive — it
+is a page of prose tuned for a model, not a form label — and a claim in
+`scripts/playbot.test.ts` fails until the prose for a new field is written.
+
+**Recording a playtest in the app is holding a run, and nothing else.** There is no
+second flag saying the mode is on: the run lives in a slot, so a reload lands back
+in the sitting, and stopping drops it. A turn's answer is the transcript the driver
+already writes rather than a second rendering beside it, which is how a live
+action's ending lines reach the turn that began it. The run comes out through the
+clipboard and through the `playtest` test-harness surface, in the same words
+`describeEntry` gives a playbot run. The recorder is the app's counterpart of
+`runPlaybot` and lives at the same level — in `src/ui/playtest.ts`, not in
+`CommandContext`, because the playbot does not put its log there either.
 
 **A run that stops early with honest notes is a success.** The run's product is the
 player's own `expected` and `confusion`, not the moves — a run recording only moves
