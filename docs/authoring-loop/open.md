@@ -28,60 +28,79 @@ Shops only interact with items that define a value in coins. Otherwise, the item
 
 It goes without saying, but coins don't have a value and can't be bought or sold. This doesn't need a rule, just don't give coins a value and it won't create an infinite loop. 
 
-## Tulsa still contains non-tulsa related content
-- Tulsa has skills and stats and recipes that work everywhere, not just tulsa. 
-- It has flags that only matter for a specific quest. 
-- It has items that are independent of the location. (This is the most defensible one, but a cooked-herring is a fishing/cooking related item, not an item exclusive to Tulsa)
-- The sewer-key is an example that does belong. 
-- The bottle of vodka is not. It either should be sunny-s-bottle-of-vodka, or the examine text should be generic. (On second look, the item is referenced as tulsa.bottle-of-vodka which is a unique item in tulsa.)
-- Mostly, locations, entities, and dialogue are okay. Everything else technically needs a different home. 
-- Everything else can go into core. If core gets unreasonable, we can split it later. 
+## A station has no declaration of its own
+
+`stations: oven` on an entity is the only thing in the language that creates the
+name `oven`, and `validateRecipeReferences` (`src/content/references.ts:67`)
+refuses any recipe naming a station no *loaded* entity opens. So a recipe is
+pinned to the module holding the thing it is cooked on, not because a recipe is
+local knowledge but because the oven entity is the oven's only declaration. That
+is a name minted by a side effect, which is the failure mode CLAUDE.md's mission
+paragraph names.
+
+*Closes when:* `# station <id>` is a kind of its own — core names it, the entity
+that opens it lists it, the recipe that needs it resolves it through the
+namespace like every other id, and the refusal becomes *names an undeclared
+station*. `bread` and `cooked-herring` follow their recipes into core when it
+lands; they are the two sections the tulsa/core split could not move. Five sites
+load `core` alone and are the proof it worked: `src/runtime/localized.test.ts`
+(three), `scripts/probe.test.ts` (two).
+
+## A quest cannot hold all of its own state
+
+Ruled by the owner: **everything related to a quest belongs inside the quest
+file.** Nothing today lets it. `tulsa.mirror` sets `mirror-done` and
+`tulsa.giant-rat` sets `rats-killed`; both are read only by `tutorial-quests`,
+and neither can move there, because `tulsa` does not depend on `tutorial-quests`
+and the engine refuses the upward reference:
+
+    town [town] resolve: # entity town.mirror action "look in" set: names
+    errand.mirror-done, but errand is not this module or one of its dependencies
+
+A `# quest` hands **dialogue** to an upstream entity and cannot hand it an
+**action**, so moving the flag by moving what sets it does not work either. The
+corpus has zero `+` field edits and this is not an argument for inventing one.
+
+*Closes when:* a quest module can own a whole interaction on an entity declared
+upstream of it — at which point the mirror's `look in:` and the rat's `on death:`
+go to the quest that is the only reader of what they set. Until then the two
+flags stay where they are. Entity-private flags (`tulsa.mirror.done`, the way
+`tulsa.front-door` owns `unlocked`) would work today and were rejected: they
+re-home the flag without re-homing the quest, which is the requirement.
+
+**`sewer-toll-paid` is read and never set.** `castle-yard`'s road to
+`sewer-entrance` is gated on it (`content/tulsa.dsl`) and nothing in the corpus
+sets it, so that road is unreachable. It is Larry's toll and belongs to a quest
+that is not written; it closes the same way.
 
 ## For the human review pass
 
-Not bugs. Writing that promises a mechanic is a promise, and a playtester files it
-as a bug — three runs did, repeatedly and unprompted. This is the long pole and it
-is Yonatan's; `npm run review` is the sheet.
+The long pole, and it is Yonatan's. `npm run review` is the sheet and
+`content/reviewed.tsv` makes it resumable. Nothing is in front of it.
 
-However, prior to review, the text should be edited by agents freely to fix minor 
-problems as they arise. This includes most of the following. 
+The agent pre-pass that was queued here is done: every room that named a thing and
+offered no way to touch it now either does something or has stopped promising it
+would, and `npm run notes` reports **no rough lines** where it reported five. What
+is below is what a reading still has to settle.
 
-- The **sewer grate** is named in Market Square's own description and cannot be
-  touched. Two runs filed it four times; Mouse's dialogue hangs a plot hook on it.
-- *"a rack of axes nobody is watching closely enough"* offers no way to take one.
-- Oolga's *"something glints in her eye"* opens no counter.
-- The **anvil** is described as standing unused in the middle of the forge floor
-  and has no action.
-- **Painted Signs** point at MARKET, CASTLE and GATE and cannot be read.
-- **General Store, Fishing Supplies and Woodcutter's Stall** stand in Market Row as
-  named entities with nothing to do to them.
-- The **castle's upper windows** are named from Market Rooftops with no way to look.
-- The **hive mouth** says the comb was chewed through by *"something that was not a
-  bee"* and offers no way to look into it.
-- **Kelsa invites a reply that does not exist** — her line asks about the bees "as
-  if expecting a specific response", and no dialogue option answers it. Filed three
-  times in one run.
-- **Miki promises a mechanic the view does not offer.**
-  `content/tutorial-quests.dsl:70` says *"Here, gear changes your stats the moment
-  you equip it"*, and equipping is only reachable through `/inv <item>` or the
-  carried-items screen. **Ruled: the inventory screen owns equipping**, so the line
-  is what is wrong, not the mechanic. One run filed this about twenty times.
 - **The orbs read as healing items.** Two independent runs concluded Orb of Renewal
   and Orb of Vitality must restore health. They are item modifiers. Their `examine:`
-  lines were improved; whether that is enough is a reading question.
-- **The mirror reads as save corruption.** Two runs reported re-entering character
-  creation as a bug. It is permanent by design and renaming is allowed — so nothing
-  tells a player that, and something should.
-- *this island* is still said where Miki is not joking about it.
-- **Five lines are placeholders, and `npm run notes` names them**: `core.fish` and
-  `core.fishing-net` examine as *"A fish."* and *"A fishing net."*, and the window
-  in Miki's house examines as *"A window."* and says *"You climb out."* and *"You
-  catch a fish."* They are the whole of the thieving route's scenery.
+  lines were improved; whether that is enough is a reading question and was left
+  for this pass deliberately.
+- **The mirror cannot offer a rename, and the writing now says so.** Two runs read
+  re-entering character creation as save corruption; the glass now says it does not
+  ask a second time, which matches what the engine does. But *renaming is allowed*
+  turns out not to be true through any content path: `character-creation`
+  (`src/runtime/modals.ts`) asks name **and** race together and writes both, so
+  re-opening it would re-pick race too. Offering a rename needs a name-only modal
+  screen. Whether the game should have one is the owner's call.
 
-The other nine marks the corpus holds are `tulsa` entities waiting on quests that
-are not written — the anvil on A Grand Blade, Oolga's counter on Kill it with Fire,
-the hive mouth on Birds and the Bees. Those are notes, not rough writing, and they
-close when the quest modules arrive rather than in this pass.
+The eight marks the corpus holds are `tulsa` entities waiting on quests that are
+not written — the anvil on A Grand Blade, Oolga's counter on Kill it with Fire, the
+hive mouth on Birds and the Bees. Those are notes, not rough writing, and they
+close when the quest modules arrive rather than in this pass. Each of them now has
+a mechanic behind it that works today; the mark records only what the quest will
+add.
 
 ## The AFK model
 
@@ -131,29 +150,25 @@ hardening pass.
 
 ## Ours, and small
 
-**`remaining` does not reach the GUI.** `livePools()`
-(`src/runtime/command.ts:1129`) projects title, current and max, so the count that
-stops three rats reading as one that healed is shown in the terminal and the
-playbot and not in the game. Two files, and the second is `src/ui/LiveSheet.tsx`.
+**The oracle advertises a `choose:` form the engine refuses.** It prints
+`choose: <what the choice reads>`, but `answerModal` matches only
+`option.values[].value`, which for a dialogue modal is `String(index)`
+(`src/runtime/modals.ts`), so text never matches and only `choose: 0` works. This
+is the same fact as the line below, found from the other end: the oracle is
+already promising the fix. Whichever lands, both close together.
 
 **`choose: N` is an index into a list ordered by the words the player reads**, so a
 `# test` that picks one specific thread is pinned to one language. Found when Tulsa
 entered `translationSurvival` and `sunny-has-three-things-to-say` could not survive
 it; that test was rewritten to be order-free, and the `choose:` lines in
-`tutorial-quests` routes were not. *Closes when:* a test can name the thread it
-takes rather than its position.
+`tutorial-quests` routes were not. A `# test` written this week had to fall back to
+`choose: 0` for the same reason. *Closes when:* a test can name the thread it takes
+rather than its position.
 
-**`# test` cannot read a journal.** No directive exposes a hint, so a content claim
-about what the journal says can only pin the state the hint is gated on; the words
-are pinned in `journal.test.ts` on its own fixture. *Closes when:* a `journal:`
-directive exists — it belongs in `src/content/sections/test.ts`.
-
-**A stage's `log:` has the two-beat problem `hint:` just lost.** `hint when
-<condition>:` landed; `log:` has no conditional form, so a stage that spans two
-beats still reads as one constant. No evidence yet that an author has wanted it.
-
-**Two unconditional `hint:` lines in one stage are not refused**, and the second
-silently wins. It did before the conditional form too.
+**A stage's `log:` has no conditional form**, so a stage that spans two beats reads
+as one constant where `hint when <condition>:` would read as two. A second
+unconditional `log:` is now refused rather than silently winning, so the shape is
+at least honest. Still no evidence that an author has wanted the conditional form.
 
 **`rats-fall-to-repeated-use` discriminates on a 3.3× margin.** Its claim is now
 one rat down, which survives a rebalance of base attack or a better weapon — but a
