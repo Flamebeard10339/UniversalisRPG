@@ -249,6 +249,7 @@ cluster-jewel: creeping-rot
 title: Proving Blade
 examine: Unlovely, well balanced, and it has never been anywhere.
 slot: mainhand
+value: 20
 weapon, +2 attack
 max-level: 40
 

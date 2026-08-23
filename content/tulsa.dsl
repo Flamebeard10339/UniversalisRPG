@@ -1057,6 +1057,11 @@ node greeting:
 # save in-town
 {"version":12,"location":"tulsa.market-square"}
 
+// What the tutorial puts in a player's hands and nothing takes back off them,
+// standing in the row that would buy either.
+# save in-town-with-mikis-sword-and-shield
+{"version":12,"location":"tulsa.market-row","inventory":{"core.iron-sword":1,"core.wooden-shield":1}}
+
 // A pocket of curios out of the tutorial's rats, which is what a new arrival
 // has to trade with and the whole of the town's on-ramp to money. The drawer
 // and the rats between them hand out about this many.
@@ -1219,6 +1224,23 @@ travel: sha-dynastys
 craft: cooked-herring
 assert: has cooked-herring
 assert: xp.core.cooking = 3
+
+// A weapon base is a good like any other, which is a thing the counter can only
+// say by paying for one: a shop takes anything tradable it is offered, and what
+// makes these tradable is the `value:` each declares. Twenty-eight is what the
+// store's own rate leaves of a twenty-four and a twelve, rounded its way both
+// times.
+# test a-sword-and-a-shield-are-goods-at-a-counter
+load: in-town-with-mikis-sword-and-shield
+shop: general-store
+submit-modal: item=sell:core.iron-sword
+submit-modal: count=1
+submit-modal: item=sell:core.wooden-shield
+submit-modal: count=1
+submit-modal: item=close
+assert: inventory.coin = 28
+assert: not has core.iron-sword
+assert: not has core.wooden-shield
 
 // The two things in the market a light hand gets, and fifteen is the whole of
 // what they are worth: three at the grate and twelve off the rack. Each sets
