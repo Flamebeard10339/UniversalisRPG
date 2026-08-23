@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
+import { saidWords } from '../src/content/locale';
 import { newContext, runLine, type CommandContext } from '../src/runtime/command';
 import { sessionLocalizer, startSession, view } from '../src/runtime/session';
 import { pageStorage } from '../src/ui/agent/pageStorage';
@@ -12,7 +13,6 @@ import { LAYERS, OPENING, toLayer, toSubpage } from '../src/ui/nav';
 import { SHIPPED_SOURCES } from '../src/ui/shippedContent';
 import {
   driftingPaths,
-  everythingSaid,
   excusedCommandsAreReal,
   excusedPathsAreReal,
   unansweredCommands,
@@ -162,7 +162,7 @@ describe('no driver draws less of a live view than the others', () => {
   ];
 
   it('every leaf the same short run publishes reaches all three drivers, or none of them', () => {
-    const drifting = driftingPaths(runs(), everythingSaid(registry()), PARITY_EXCUSED);
+    const drifting = driftingPaths(runs(), saidWords(registry().locales), PARITY_EXCUSED);
     expect(drifting, `these paths reach some drivers and not others:\n  ${drifting.join('\n  ')}`).toEqual([]);
   });
 

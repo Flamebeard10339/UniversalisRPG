@@ -4,6 +4,7 @@ import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { localizerFor } from '../runtime/localized';
 import { asLocalized } from '../runtime/localizedFixture';
 import { loadUniverseWithDiagnostics } from '../content/load';
+import { leaves } from '../runtime/viewLeaves';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
 import { applyDirective, startSession, view, type PlayView } from '../runtime/session';
 import { App } from './App';
@@ -65,36 +66,15 @@ function accountedFor(run: string, permitted: readonly string[]): boolean {
 
 const onScreen = (runs: readonly string[], text: string): boolean => runs.some((run) => run.includes(text));
 
-function published(view: PlayView): string[] {
-  return [
-    view.location.title,
-    view.location.description ?? '',
-    ...view.entities.map((entity) => entity.title),
-    ...view.choices.flatMap((choice) => [choice.label, choice.detail ?? '']),
-    ...view.resources.map((resource) => resource.title),
-    ...view.modals.flatMap((modal) => modal.options.flatMap((option) => [option.label as string, ...(option.values ?? []).map((choice) => choice.shown as string)])),
-    ...view.discovered.map((place) => place.title),
-    ...view.carried.map((row) => row.name),
-    ...view.stats.map((row) => row.title),
-    ...view.xp.map((row) => row.title),
-    ...view.equipment.flatMap((row) => (row.name === null ? [row.title] : [row.title, row.name])),
-    ...view.journal.flatMap((entry) => [entry.title, ...entry.lines.map((line) => line.said)]),
-    ...view.said,
-  ];
-}
+// What a live view published as words a player may read: every string it holds anywhere, less the
+// addresses the world declares, since a title reaches the screen and the id beside it may not. Both
+// halves derive — the strings off the view's own leaves, the addresses off the sources — so a field
+// the view grows next month is covered with nothing here edited.
+const published = (view: PlayView, addresses: ReadonlySet<string>): string[] =>
+  leaves(view).flatMap((leaf) => leaf.signatures).filter((each) => !addresses.has(each));
 
 function pagesDrawn(view: PlayView): Record<string, number> {
   return { stats: view.stats.length, skills: view.xp.length, equipment: view.equipment.length, carried: view.carried.length, map: view.discovered.length };
-}
-
-function idsPublished(view: PlayView): string[] {
-  return [
-    ...view.stats.map((row) => row.id),
-    ...view.xp.map((row) => row.id),
-    ...view.equipment.flatMap((row) => (row.item === null ? [row.slot] : [row.slot, row.item])),
-    ...view.carried.map((row) => row.id),
-    ...view.discovered.map((place) => place.id),
-  ];
 }
 
 const shellWord = wordsOf(localizerFor(loadInEnglish(''), 'en'));
@@ -103,8 +83,11 @@ const NODE = { position: 1, direction: asLocalized('ne') };
 
 const SHELL_WORDS: readonly string[] = (Object.keys(LABELS) as LabelId[]).map((id) => shellWord(id, NODE));
 
-const authored = (driver: Driver): string[] =>
-  addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }]).map((section) => `# ${section.kind} ${section.address}`);
+const sourcesOf = (driver: Driver) => [...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }];
+
+const authored = (driver: Driver): string[] => addressable(sourcesOf(driver)).map((section) => `# ${section.kind} ${section.address}`);
+
+const addressesOf = (driver: Driver): ReadonlySet<string> => new Set(addressable(sourcesOf(driver)).map((section) => section.address));
 
 const engineRuns = (html: string): string[] => readable(html).filter((run) => !SHELL_WORDS.includes(run));
 
@@ -268,13 +251,13 @@ function everyPageFilled(): Driver {
 describe('what the shell puts on the screen', () => {
   it('renders nothing a player can read that the engine did not publish', () => {
     const driver = stocked();
+    const addresses = addressesOf(driver);
     const engine = new Set<string>(whatStoppingSays());
     let seen = 0;
 
     const step = (): void => {
       const at = driver.snapshot().view;
-      for (const line of published(at)) engine.add(line);
-      expect(idsPublished(at).filter((id) => engine.has(id))).toEqual([]);
+      for (const line of published(at, addresses)) engine.add(line);
       const html = renderToStaticMarkup(<App driver={driver} />);
 
       const runs = readable(html);
@@ -305,8 +288,7 @@ describe('what the shell puts on the screen', () => {
 
     expect(Object.entries(pagesDrawn(view)).filter(([, rows]) => rows === 0)).toEqual([]);
 
-    const engine = new Set<string>(published(view));
-    expect(idsPublished(view).filter((id) => engine.has(id))).toEqual([]);
+    const engine = new Set<string>(published(view, addressesOf(driver)));
     for (const run of readable(renderToStaticMarkup(<App driver={driver} />))) {
       expect(accountedFor(run, [...engine, ...SHELL_WORDS, ...authored(driver)]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
     }

@@ -353,6 +353,10 @@ export function everySaid(locales: Locales): Said[] {
   return said;
 }
 
+// The same sweep as the words alone. What tells a string a player reads from an id, an enum or a
+// figure, wherever a rendered surface is read back and asked what put a word on it.
+export const saidWords = (locales: Locales): ReadonlySet<string> => new Set(everySaid(locales).map((each) => each.text));
+
 export function moduleLocaleSections(locales: Locales, module: string | null): LocaleDeclaration[] {
   return locales.sections.filter((section) => section.module === module);
 }
