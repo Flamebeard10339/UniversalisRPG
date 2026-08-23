@@ -247,8 +247,8 @@ const everyTake = (registry: Registry): Array<{ obj: string; objId: string; acti
 describe('every door the corpus writes that takes something from the player', () => {
   const registry = loadUniverse(shippedSources());
 
-  it('is 4 of them, so the two claims below are about something', () => {
-    expect(everyTake(registry).length).toBe(4);
+  it('is 5 of them — three meals, the oven, and the second look in the mirror — so the two claims below are about something', () => {
+    expect(everyTake(registry).length).toBe(5);
   });
 
   it('moves not one thing when the player carries nothing, because each asks before it acts', () => {
