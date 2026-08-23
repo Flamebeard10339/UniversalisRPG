@@ -487,62 +487,41 @@ examine: A soldier of Yanodonin on the last piece of it, and not glad to be.
 
 // --- the stores ---
 //
-// Buying is a trade written out: what it costs, what it hands over. There is
-// no shop mechanism in the engine and this does not invent one.
+// A store is a # shop the entity behind the counter keeps. What it stocks is
+// what it has when nobody has been in; every one of them will take anything
+// tradable off you, because none of them says otherwise.
+
+# shop general-store
+coin: coin
+stocks:
+  6 core.pot-of-flour
+  10 core.jug-of-water
 
 # entity general-store
 title: General Store
 examine: Flour, water, rope, and a jar by the till for coins too bent to spend elsewhere.
-sell bent coins:
-  instant
-  requires: has core.bent-coin
-  take: 1 core.bent-coin
-  give: 1 coin
-  say: The grocer weighs it, shrugs, and gives you a good one.
-buy flour:
-  instant
-  requires: has 4 coin
-  take: 4 coin
-  give: 1 core.pot-of-flour
-  say: A pot of milled flour, four coins.
-buy water:
-  instant
-  requires: has 2 coin
-  take: 2 coin
-  give: 1 core.jug-of-water
-  say: A jug off the rack, two coins.
+keeps shop: general-store
+
+# shop fishing-supplies
+coin: coin
+stocks:
+  3 core.fishing-net
+  20 herring
 
 # entity fishing-supplies
 title: Fishing Supplies
 examine: Nets on hooks, line on spools, and a crate of herring on ice at the front.
-buy net:
-  instant
-  requires: has 25 coin
-  take: 25 coin
-  give: 1 core.fishing-net
-  say: A net, twenty-five coins, and she throws in the advice for free.
-buy herring:
-  instant
-  requires: has 6 coin
-  take: 6 coin
-  give: 1 herring
-  say: A herring off the ice, six coins.
+keeps shop: fishing-supplies
+
+# shop woodcutters-stall
+coin: coin
+stocks:
+  5 hand-axe
 
 # entity woodcutters-stall
 title: Woodcutter's Stall
 examine: A rack of hand axes and a standing offer chalked on the board behind it.
-buy axe:
-  instant
-  requires: has 15 coin
-  take: 15 coin
-  give: 1 hand-axe
-  say: A hand axe, fifteen coins, and no warranty.
-sell firewood:
-  instant
-  requires: has bundle-of-firewood
-  take: 1 bundle-of-firewood
-  give: 9 coin
-  say: He counts out nine coins without looking up.
+keeps shop: woodcutters-stall
 
 # entity oolgas-counter
 title: Oolga's Counter
@@ -1124,15 +1103,16 @@ assert: beach.discovered
 # test a-bent-coin-becomes-a-cooked-herring
 load: in-town-with-bent-coins
 travel: market-row
-use: entity.general-store.sell-bent-coins
-use: entity.general-store.sell-bent-coins
-use: entity.general-store.sell-bent-coins
-use: entity.general-store.sell-bent-coins
-use: entity.general-store.sell-bent-coins
-use: entity.general-store.sell-bent-coins
+shop: general-store
+submit-modal: item=sell:core.bent-coin
+submit-modal: count=6
+submit-modal: item=close
 assert: inventory.coin = 6
 assert: inventory.core.bent-coin = 2
-use: entity.fishing-supplies.buy-herring
+shop: fishing-supplies
+submit-modal: item=buy:core.herring
+submit-modal: count=1
+submit-modal: item=close
 assert: has herring
 assert: inventory.coin = 0
 travel: tavern-street
